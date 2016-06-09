@@ -1,0 +1,88 @@
+Talked about this with Harley Eades.  Apply for grant to develop this?
+
+* ISETL
+  See ISETL.  BUT: first order; looks like it just has one numeric
+  type (float).  Don't think it really even has much of a type
+  system.  Imperative.  Definitely doesn't have type declarations.
+
+* Syntax
+
+  Use math symbols? Unicode?  Allow both Unicode and ASCII
+  variants of syntax.
+
+  Will probably just end up collapsing types and terms into one
+  syntactic class, if we want to include things like identity
+  (equality) types.
+
+  T ::= ℕ
+      ; ℤ
+      ; ℚ
+      ; Bool
+      ; T → T
+      ; T × T
+      ; T + T         -- use U+ symbol
+      ; List T
+      ; Set T
+
+      ; Perm T        -- include these?  Maybe later...
+
+      ; e = e         -- identity type?
+
+  e ::= x             -- variable
+      ; n             -- natural number literal
+      ; -e            -- unary negation
+      ; O ; S e       -- Peano naturals
+      ; e : T         -- type ascription
+      ; e `binop` e
+      ; e !           -- factorial
+      ; true ; false ; if e then e else e
+      ; x ↦ e         -- can use  |->  notation?   (anonymous function)
+      ; e e           -- application
+      ; (e, e)        -- pairs (+ arbitrary n-tuples)
+      ; left e ; right e
+      ; case e of p1 -> e1; p2 -> e2; ...; pn -> en    -- what to do with case? patterns?
+      ; [e, ..., e]
+      ; {e, ..., e} ; list/set comprehensions
+
+
+      ; <e, ..., e> ; cycles (build permutations out of them)
+
+  z ::= integer
+
+  binop ::= + ; - ; * ; / ; ^ ; mod
+
+* Typing rules/built-in functions
+
+  Need some polymorphism for +, -, * ?  bounded polymorphism.
+
+  +, * : ∀ X ⊇ ℕ. X → X → X
+  - : ∀ X ⊇ ℤ. X → X → X
+  / : ℚ → ℚ → ℚ
+
+  This may need a pretty sophisticated dependent type system =)
+
+* Ideas
+
+  Include random generation/checking.
+  Curry-Howard?  Ability to write down theorems etc.?
+
+  Subtyping --- matches math practice.
+    - ℕ ⊆ ℤ ⊂ ℚ.
+    - A ⊆ A + B (and vice versa).
+
+  Function application is juxtaposition.  Works out nicely with
+  syntax for pairs, triples, etc.
+
+  Allow any number to be treated as a function of type ∀ X ⊇ ℕ. X
+  → X, which multiplies by that number.  This applies not just to
+  numeric literals but to *any* numeric expression.  So for
+  example one could write  (5x + 3y)(4z + 3)  instead of
+  (5*x + 3*y)*(4*z + 3).
+
+  Need to come up with a very stripped-down version of this to
+  implement first!  What are the MOST INTERESTING parts so far?
+  Then add features incrementally.
+
+  Most interesting part is numeric types, bounded quantification
+  for arithmetic operators, treating numbers as functions for
+  multiplication.

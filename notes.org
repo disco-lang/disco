@@ -59,16 +59,18 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   - : ∀ X ⊇ ℤ. X → X → X
   / : ℚ → ℚ → ℚ
 
-  This may need a pretty sophisticated dependent type system =)
-
 * Ideas
 
   Include random generation/checking.
   Curry-Howard?  Ability to write down theorems etc.?
 
+  No dependency other than equality type.  Ability to *state*
+  equalities and then e.g. have random tests run, or maybe even export
+  to Coq or Agda if you want to do mechanized proofs.
+
   Subtyping --- matches math practice.
     - ℕ ⊆ ℤ ⊂ ℚ.
-    - A ⊆ A + B (and vice versa).
+    - A ⊆ A + B (and vice versa)?  Maybe not.
 
   Function application is juxtaposition.  Works out nicely with
   syntax for pairs, triples, etc.
@@ -86,3 +88,15 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   Most interesting part is numeric types, bounded quantification
   for arithmetic operators, treating numbers as functions for
   multiplication.
+
+  Case analysis/pattern matching: maybe a construct something like
+  this?
+
+    { exp1  when  guard
+      exp2  when  exp = pattern
+    }
+
+  Bake in special syntax for lists, sets.  Have to bake in a bunch of
+  operations.
+
+  Mixfix operators?  User-defined infix operators?

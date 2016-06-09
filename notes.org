@@ -100,3 +100,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   operations.
 
   Mixfix operators?  User-defined infix operators?
+
+  Error messages are going to be really important and really hard!
+
+  Use trifecta for parsing?

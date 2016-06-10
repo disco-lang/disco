@@ -54,6 +54,8 @@ grammar
     | N                   ::   :: nat                     {{ com natural type }}
     | Z                   ::   :: int                     {{ com integer type }}
     | Q                   ::   :: rat                     {{ com rational type }}
+    | forall x : T1 . T2  ::   :: forall                  {{ com forall }}
+    | t1 = t2             ::   :: eq                      {{ com identity }}
     | ( T )               :: S :: paren
     | { T / X } T'        :: M :: tysub
 
@@ -107,6 +109,7 @@ grammar
     | Q                   ::   :: rat        {{ tex \mathbb{Q} }}
     | empty               ::   :: em         {{ tex \varnothing }}
     | top                 ::   :: top        {{ tex \top }}
+    | forall              ::   :: forall     {{ tex \forall }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement

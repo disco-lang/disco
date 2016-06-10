@@ -1,5 +1,8 @@
 Talked about this with Harley Eades.  Apply for grant to develop this?
 
+* Grant Opportunities
+  NSF HSF Solicitation: http://www.nsf.gov/pubs/2015/nsf15573/nsf15573.htm
+
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
   type (float).  Don't think it really even has much of a type

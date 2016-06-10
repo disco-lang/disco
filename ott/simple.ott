@@ -33,9 +33,11 @@ grammar
     | - t                 ::   :: neg                     {{ com negation }}
     | t * t'              ::   :: mul                     {{ com multiplication }}
     | t / t'              ::   :: div                     {{ com division }}
+    | let x = t1 in t2    ::   :: let                     {{ com let }}
     | case { t1 , g1 | .. | tk , gk }  ::  :: case        {{ com case analysis }}
     | ( t )               :: S :: paren
     | { t / x } t'        :: M :: tsub
+    | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
     | n                   ::   :: nat                     {{ com natural number literal }}
@@ -61,8 +63,9 @@ grammar
     | Q                   ::   :: rat                     {{ com rational type }}
 
   G {{ tex \Gamma }} :: G_ ::=                          {{ com type context }}
-    | empty               ::   :: em
-    | G , x : T           ::   :: vn
+    | empty               ::   :: em                      {{ com empty context }}
+    | G , x : T           ::   :: vn                      {{ com cons }}
+    | G , G'              :: M :: append                  {{ com append }}
 
   pattern, p :: 'pat_' ::=                              {{ com pattern }}
     | x                   ::   :: var                     {{ com variable }}
@@ -74,18 +77,26 @@ grammar
     | inl p               ::   :: inl                     {{ com left }}
     | inr p               ::   :: inr                     {{ com right }}
     | n                   ::   :: lit                     {{ com natural }}
+    | S p                 ::   :: succ                    {{ com successor }}
+
+  aguard, ag :: 'aguard_' ::=                           {{ com atomic guard }}
+    | if t                ::   :: bool                    {{ com boolean guard }}
+    | where t = p         ::   :: pat                     {{ com pattern guard }}
 
   guard, g :: 'guard_' ::=                              {{ com guard }}
-    | t                   ::   :: bool                    {{ com boolean guard }}
-    | x = p               ::   :: pat                     {{ com pattern guard }}
+    | top                 ::   :: top                     {{ com trivial guard }}
+    | aguard guard        ::   :: cons                    {{ com cons atomic }}
 
   terminals :: 'terminals_' ::=
     | |                   ::   :: pipe       {{ tex \mid }}
     | |->                 ::   :: mapsto     {{ tex \mapsto }}
     | -->                 ::   :: red        {{ tex \longrightarrow }}
+    | --->                ::   :: yields     {{ tex \rightsquigarrow }}
     |  ->                 ::   :: arrow      {{ tex \rightarrow }}
     | |-                  ::   :: turnstile  {{ tex \vdash }}
-    | in                  ::   :: in         {{ tex \in }}
+    | |-g                 ::   :: gturnstile {{ tex \vdash_g }}
+    | |-p                 ::   :: pturnstile {{ tex \vdash_p }}
+    | elem                ::   :: elem       {{ tex \in }}
     | Void                ::   :: void       {{ tex \mathbbold{0} }}
     | Unit                ::   :: unit       {{ tex \mathbbold{1} }}
     | Bool                ::   :: bool       {{ tex \mathbb{B} }}
@@ -95,11 +106,11 @@ grammar
     | Z                   ::   :: int        {{ tex \mathbb{Z} }}
     | Q                   ::   :: rat        {{ tex \mathbb{Q} }}
     | empty               ::   :: em         {{ tex \varnothing }}
-    | forall              ::   :: forall     {{ tex \forall }}
+    | top                 ::   :: top        {{ tex \top }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement
-    | x : T in G          ::   :: xTG
+    | x : T elem G        ::   :: xTelemG
     | formula1 .. formulak ::  :: dots
 
 parsing
@@ -144,8 +155,8 @@ defns
 defn
     G |- t : T :: :: type :: ty_    {{ com [[t]] has type [[T]] in context [[G]] }} by
 
-    x:T in G
-    ---------- :: var
+    x : T elem G
+    ------------ :: var
     G |- x : T
 
     -------------- :: unit
@@ -196,9 +207,67 @@ defn
     ----------------------------- :: mul_num
     G |- t t' : num
 
-    G |- t1 : T .. G |- tk : T
+    G |- t1 : T1     G , x : T1 |- t2 : T2
+    -------------------------------------- :: let
+    G |- let x = t1 in t2 : T2
+
+    G |-g t1 , g1 : T .. G |-g tk , gk : T
     ---------------------------------------- :: case
     G |- case { t1 , g1 | .. | tk , gk } : T
+
+defn
+    G |-g t , g : T :: :: guarded_type :: gty_    {{ com [[t]] guarded by [[g]] has type [[T]] in context [[G]] }} by
+
+    G |- t : T
+    ------------------ :: top
+    G |-g t , top : T
+
+    G |- t2 : Bool
+    G |-g t1 , g : T
+    -------------------- :: if
+    G |-g t1 , if t2 g : T
+
+    G |-p p : T2 ---> G2      G |- t1 : T2
+    G , G2 |-g t1 , g : T
+    ----------------------------- :: where
+    G |-g t1 , where t2 = p g : T
+
+defn
+    G |-p p : T ---> G' :: :: pattern :: 'p_'  {{ com [[p]] has type [[T]] in context [[G]], and produces bindings [[G']] }} by
+
+    ----------------------------- :: var
+    G |-p x : T ---> empty, x : T
+
+    -------------------------- :: wild
+    G |-p _ : T ---> empty
+
+    ------------------------------ :: unit
+    G |-p () : Unit ---> empty
+
+    -------------------------------- :: true
+    G |-p true : Bool ---> empty
+
+    --------------------------------- :: false
+    G |-p false : Bool ---> empty
+
+    G |-p p1 : T1 ---> G1    G |-p p2 : T2 ---> G2
+    ---------------------------------------------- :: pair
+    G |-p (p1,p2) : T1 ** T2 ---> G1,G2
+
+    G |-p p : T1 ---> G1
+    ------------------------------ :: inl
+    G |-p inl p : T1 ++ T2 ---> G1
+
+    G |-p p : T2 ---> G2
+    ------------------------------ :: inr
+    G |-p inr p : T1 ++ T2 ---> G2
+
+    ------------------------ :: nat
+    G |-p n : N ---> empty
+
+    G |-p p : N ---> G'
+    ----------------------- :: succ
+    G |-p S p : N ---> G'
 
 defns
   Jop :: '' ::=
@@ -217,3 +286,17 @@ defns
     t1 --> t1'
     -------------- :: ctx_app_arg
     v t1 --> v t1'
+
+    ------------------ :: case_empty
+    case { } --> wrong
+
+    ------------------------------------------------- :: case_top
+    case { t1 , top | t2 , g2 | .. | tk , gk } --> t1
+
+    ------------------------------------------------------------------------- :: case_true
+    case { t1 , if true g | t2 , g2 | .. | tk , gk } --> case { t1 , g | t2 , g2 | .. | tk , gk }
+
+    --------------------------------------------------------------------------- :: case_false
+    case { t1 , if false g | t2 , g2 | .. | tk , gk } --> case { t2 , g2 | .. | tk , gk }
+
+%    case { t1 , if t g | .. | tk , gk } --> case { t1' , g1 | .. | tk , gk }

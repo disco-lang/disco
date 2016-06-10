@@ -1,0 +1,219 @@
+% -*- compile-command: "ott -tex_show_meta false -i simple.ott -o simple.tex && pdflatex simple.tex" -*-
+
+embed
+  {{ tex-preamble
+\DeclareMathAlphabet{\mathbbold}{U}{bbold}{m}{n}
+  }}
+
+metavar termvar, x ::=
+  {{ tex \mathit{[[termvar]]} }} {{ com  term variable  }}
+
+% metavar typevar, X ::=
+%   {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
+
+metavar natural, n ::=
+  {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
+
+indexvar index, k ::=
+
+grammar
+  term, t :: 't_' ::=                                   {{ com term }}
+    | x                   ::   :: var                     {{ com variable }}
+    | ()                  ::   :: unit                    {{ com unit value }}
+    | true                ::   :: true                    {{ com true }}
+    | false               ::   :: false                   {{ com false }}
+    | x |-> t             ::   :: lam  (+ bind x in t +)  {{ com abstraction }}
+    | t t'                ::   :: app                     {{ com application }}
+    | ( t1 , t2 )         ::   :: pair                    {{ com pair }}
+    | inl t1              ::   :: inl                     {{ com left introduction }}
+    | inr t2              ::   :: inr                     {{ com right introduction }}
+    | n                   ::   :: nat                     {{ com natural literal }}
+    | t + t'              ::   :: add                     {{ com addition }}
+    | t - t'              ::   :: sub                     {{ com subtraction }}
+    | - t                 ::   :: neg                     {{ com negation }}
+    | t * t'              ::   :: mul                     {{ com multiplication }}
+    | t / t'              ::   :: div                     {{ com division }}
+    | case { t1 , g1 | .. | tk , gk }  ::  :: case        {{ com case analysis }}
+    | ( t )               :: S :: paren
+    | { t / x } t'        :: M :: tsub
+
+  value, v :: 'v_' ::=                                  {{ com value }}
+    | n                   ::   :: nat                     {{ com natural number literal }}
+    | x |-> t             ::   :: lam                     {{ com abstraction }}
+
+  type, T :: 'T_' ::=                                   {{ com type }}
+%    | X                   ::   :: var                     {{ com variable }}
+    | Void                ::   :: void                    {{ com void type }}
+    | Unit                ::   :: unit                    {{ com unit type }}
+    | Bool                ::   :: bool                    {{ com boolean type }}
+    | T1 -> T2            ::   :: arrow                   {{ com function type }}
+    | T1 ** T2            ::   :: product                 {{ com product type }}
+    | T1 ++ T2            ::   :: sum                     {{ com sum type }}
+    | N                   ::   :: nat                     {{ com natural type }}
+    | Z                   ::   :: int                     {{ com integer type }}
+    | Q                   ::   :: rat                     {{ com rational type }}
+    | ( T )               :: S :: paren
+    | { T / X } T'        :: M :: tysub
+
+  num {{ tex \nu }} :: 'num_' ::=                       {{ com numeric type }}
+    | N                   ::   :: nat                     {{ com natural type }}
+    | Z                   ::   :: int                     {{ com integer type }}
+    | Q                   ::   :: rat                     {{ com rational type }}
+
+  G {{ tex \Gamma }} :: G_ ::=                          {{ com type context }}
+    | empty               ::   :: em
+    | G , x : T           ::   :: vn
+
+  pattern, p :: 'pat_' ::=                              {{ com pattern }}
+    | x                   ::   :: var                     {{ com variable }}
+    | _                   ::   :: wild                    {{ com wildcard }}
+    | ()                  ::   :: unit                    {{ com unit }}
+    | true                ::   :: true                    {{ com true }}
+    | false               ::   :: false                   {{ com false }}
+    | ( p1 , p2 )         ::   :: pair                    {{ com pair }}
+    | inl p               ::   :: inl                     {{ com left }}
+    | inr p               ::   :: inr                     {{ com right }}
+    | n                   ::   :: lit                     {{ com natural }}
+
+  guard, g :: 'guard_' ::=                              {{ com guard }}
+    | t                   ::   :: bool                    {{ com boolean guard }}
+    | x = p               ::   :: pat                     {{ com pattern guard }}
+
+  terminals :: 'terminals_' ::=
+    | |                   ::   :: pipe       {{ tex \mid }}
+    | |->                 ::   :: mapsto     {{ tex \mapsto }}
+    | -->                 ::   :: red        {{ tex \longrightarrow }}
+    |  ->                 ::   :: arrow      {{ tex \rightarrow }}
+    | |-                  ::   :: turnstile  {{ tex \vdash }}
+    | in                  ::   :: in         {{ tex \in }}
+    | Void                ::   :: void       {{ tex \mathbbold{0} }}
+    | Unit                ::   :: unit       {{ tex \mathbbold{1} }}
+    | Bool                ::   :: bool       {{ tex \mathbb{B} }}
+    | **                  ::   :: prod       {{ tex \times }}
+    | ++                  ::   :: sum        {{ tex \uplus }}
+    | N                   ::   :: nat        {{ tex \mathbb{N} }}
+    | Z                   ::   :: int        {{ tex \mathbb{Z} }}
+    | Q                   ::   :: rat        {{ tex \mathbb{Q} }}
+    | empty               ::   :: em         {{ tex \varnothing }}
+    | forall              ::   :: forall     {{ tex \forall }}
+
+  formula :: 'formula_' ::=
+    | judgement           ::   :: judgement
+    | x : T in G          ::   :: xTG
+    | formula1 .. formulak ::  :: dots
+
+parsing
+  t_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
+
+subrules
+  v <:: t
+  num <:: T
+
+freevars
+  t x :: fv
+
+substitutions
+  single t x :: tsubst
+
+defns
+  Jsub :: '' ::=
+
+defn
+    T1 <: T2 :: :: sub :: sub_     {{ com [[T1]] is a subtype of [[T2]] }} by
+
+    ------ :: refl
+    T <: T
+
+    T1 <: T2   T2 <: T3
+    ------------------- :: trans
+    T1 <: T3
+
+    ------ :: n_z
+    N <: Z
+
+    ------ :: z_q
+    Z <: Q
+
+    T1' <: T1    T2 <: T2'
+    ---------------------- :: funty
+    T1 -> T2 <: T1' -> T2'
+
+defns
+  Jtype :: '' ::=
+
+defn
+    G |- t : T :: :: type :: ty_    {{ com [[t]] has type [[T]] in context [[G]] }} by
+
+    x:T in G
+    ---------- :: var
+    G |- x : T
+
+    -------------- :: unit
+    G |- () : Unit
+
+    ---------------- :: true
+    G |- true : Bool
+
+    ----------------- :: false
+    G |- false : Bool
+
+    G,x1: T1 |- t : T
+    ------------------ :: abs
+    G |- x1 |-> t : T1->T
+
+    G |- t : T1->T2    G |- t' : T1
+    ------------------------------- :: apply
+    G |- t t' : T2
+
+    G |- t1 : T1     G |- t2 : T2
+    ----------------------------- :: pair
+    G |- ( t1 , t2 ) : T1 ** T2
+
+    ---------- :: nat
+    G |- n : N
+
+    G |- t1 : num     G |- t2 : num
+    -------------------------------- :: add
+    G |- t1 + t2 : num
+
+    G |- t1 : num    G |- t2 : num
+    ------------------------------- :: mul
+    G |- t1 * t2 : num
+
+    G |- t1 : num     G |- t2 : num         Z <: num
+    ------------------------------------------------- :: sub
+    G |- t1 - t2 : num
+
+    G |- t : num       Z <: num
+    ---------------------------- :: neg
+    G |- - t : num
+
+    G |- t1 : num      G |- t2 : num       Q <: num
+    ----------------------------------------------- :: div
+    G |- t1 / t2 : num
+
+    G |- t : num    G |- t' : num
+    ----------------------------- :: mul_num
+    G |- t t' : num
+
+    G |- t1 : T .. G |- tk : T
+    ---------------------------------------- :: case
+    G |- case { t1 , g1 | .. | tk , gk } : T
+
+defns
+  Jop :: '' ::=
+
+    defn
+    t1 --> t2 ::  :: reduce :: ''       {{ com [[t1]] reduces to [[t2]] }} by
+
+
+    --------------------------  :: ax_app
+    (x |-> t12) v2 -->  {v2/x}t12
+
+    t1 --> t1'
+    -------------- :: ctx_app_fun
+    t1 t --> t1' t
+
+    t1 --> t1'
+    -------------- :: ctx_app_arg
+    v t1 --> v t1'

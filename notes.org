@@ -62,6 +62,13 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   - : ∀ X ⊇ ℤ. X → X → X
   / : ℚ → ℚ → ℚ
 
+* Reduction Strategy
+  
+  We settled on a mixture of CBV and CBN (call-by-need).  Numeric
+  types should reduce to values, but it would be interesting to allow
+  for infinite data types like streams, and hence, we will have a very
+  interesting mixture.  Are there example PLs with a similar mixture?
+
 * Ideas
 
   Include random generation/checking.

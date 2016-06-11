@@ -34,9 +34,9 @@ grammar
     | t * t'              ::   :: mul                     {{ com multiplication }}
     | t / t'              ::   :: div                     {{ com division }}
     | let x = t1 in t2    ::   :: let                     {{ com let }}
-    | case { t1 , g1 | .. | tk , gk }  ::  :: case        {{ com case analysis }}
+    | case branches       ::   :: case                    {{ com case analysis }}
     | ( t )               :: S :: paren
-    | { t / x } t'        :: M :: tsub
+    | theta t'            :: M :: tsub
     | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
@@ -81,6 +81,11 @@ grammar
     | n                   ::   :: lit                     {{ com natural }}
     | S p                 ::   :: succ                    {{ com successor }}
 
+  branches, b :: 'branches_' ::=
+    | empty                   ::   :: empty
+    | { branches              ::   :: skip
+    | { term guard branches   ::   :: cons
+
   aguard, ag :: 'aguard_' ::=                           {{ com atomic guard }}
     | if t                ::   :: bool                    {{ com boolean guard }}
     | where t = p         ::   :: pat                     {{ com pattern guard }}
@@ -89,6 +94,12 @@ grammar
     | top                 ::   :: top                     {{ com trivial guard }}
     | aguard guard        ::   :: cons                    {{ com cons atomic }}
 
+  subst, theta {{ tex \theta }} :: 'subst_' ::=
+    | empty               ::   :: empty
+    | { t / x } subst     ::   :: cons
+    | { t / x }           :: M :: singleton
+    | subst1 subst2       :: M :: compose
+
   terminals :: 'terminals_' ::=
     | |                   ::   :: pipe       {{ tex \mid }}
     | |->                 ::   :: mapsto     {{ tex \mapsto }}
@@ -96,8 +107,10 @@ grammar
     | --->                ::   :: yields     {{ tex \rightsquigarrow }}
     |  ->                 ::   :: arrow      {{ tex \rightarrow }}
     | |-                  ::   :: turnstile  {{ tex \vdash }}
+    | |-b                 ::   :: bturnstile {{ tex \vdash_b }}
     | |-g                 ::   :: gturnstile {{ tex \vdash_g }}
     | |-p                 ::   :: pturnstile {{ tex \vdash_p }}
+    | ~                   ::   :: sim        {{ tex \sim }}
     | elem                ::   :: elem       {{ tex \in }}
     | Void                ::   :: void       {{ tex \mathbbold{0} }}
     | Unit                ::   :: unit       {{ tex \mathbbold{1} }}
@@ -110,14 +123,20 @@ grammar
     | empty               ::   :: em         {{ tex \varnothing }}
     | top                 ::   :: top        {{ tex \top }}
     | forall              ::   :: forall     {{ tex \forall }}
+    | !                   ::   :: fail
+    | not                 ::   :: not        {{ tex \lnot }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement
     | x : T elem G        ::   :: xTelemG
     | formula1 .. formulak ::  :: dots
+    | not formula         ::   :: not
+    | ( formula )         :: S :: parens
+    | n >= 1              ::   :: geq
 
 parsing
   t_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
+  formula_dots left formula_not
 
 subrules
   v <:: t
@@ -214,9 +233,19 @@ defn
     -------------------------------------- :: let
     G |- let x = t1 in t2 : T2
 
-    G |-g t1 , g1 : T .. G |-g tk , gk : T
-    ---------------------------------------- :: case
-    G |- case { t1 , g1 | .. | tk , gk } : T
+    G |-b b : T
+    --------------- :: case
+    G |- case b : T
+
+defn
+    G |-b b : T :: :: branches_type :: bty_       {{ com branches [[b]] have type [[T]] in context [[G]] }} by
+
+    --------------- :: empty
+    G |-b empty : T
+
+    G |-b branches : T
+    -------------------- :: skip
+    G |-b { branches : T
 
 defn
     G |-g t , g : T :: :: guarded_type :: gty_    {{ com [[t]] guarded by [[g]] has type [[T]] in context [[G]] }} by
@@ -283,23 +312,104 @@ defns
     (x |-> t12) v2 -->  {v2/x}t12
 
     t1 --> t1'
-    -------------- :: ctx_app_fun
+    -------------- :: cong_app_fun
     t1 t --> t1' t
 
     t1 --> t1'
-    -------------- :: ctx_app_arg
+    -------------- :: cong_app_arg
     v t1 --> v t1'
 
-    ------------------ :: case_empty
-    case { } --> wrong
+    -------------------- :: case_empty
+    case empty --> wrong
 
-    ------------------------------------------------- :: case_top
-    case { t1 , top | t2 , g2 | .. | tk , gk } --> t1
+    --------------------------------- :: case_skip
+    case { branches --> case branches
 
-    ------------------------------------------------------------------------- :: case_true
-    case { t1 , if true g | t2 , g2 | .. | tk , gk } --> case { t1 , g | t2 , g2 | .. | tk , gk }
+    g --> g'
+    -------------------------------------------- :: cong_case
+    case { t g branches --> case { t g' branches
 
-    --------------------------------------------------------------------------- :: case_false
-    case { t1 , if false g | t2 , g2 | .. | tk , gk } --> case { t2 , g2 | .. | tk , gk }
+    g ---> theta
+    ------------------------------- :: case_success
+    case { t g branches --> theta t
 
-%    case { t1 , if t g | .. | tk , gk } --> case { t1' , g1 | .. | tk , gk }
+    g !
+    ------------------------------------- :: case_failure
+    case { t g branches --> case branches
+
+    defn
+    g --> g' ::  :: greduce :: 'gred_'  {{ com guard [[g]] reduces to [[g']] }} by
+
+    t --> t'
+    ------------------ :: if
+    if t g --> if t' g
+
+    t --> t'
+    -------------------------------- :: where
+    where t = p g --> where t' = p g
+
+    defn
+    guard ---> theta ::  :: success :: 'success_'   {{ com [[guard]] succeeds, producing substitution [[theta]] }} by
+
+    -------------- :: top
+    top ---> empty
+
+    g ---> theta
+    --------------------- :: true
+    if true g ---> theta
+
+    t ~ p ---> theta1
+    g ---> theta2
+    -------------------------------- :: match
+    where t = p g ---> theta2 theta1
+
+    defn
+    guard ! ::  :: failure :: 'fail_'   {{ com [[guard]] fails }} by
+
+    ------------ :: false
+    if false g !
+
+    not (t ~ p ---> theta)
+    ---------------------- :: match
+    where t = p g !
+
+    g !
+    ---------- :: rest
+    aguard g !
+
+    defn
+    t ~ p ---> theta ::  :: match :: 'match_'    {{ com term [[t]] matches pattern [[p]], producing substitution [[theta]] }} by
+
+    -------------------- :: var
+    t ~ x ---> { t / x }
+
+    -------------------- :: wild
+    t ~ _ ---> empty
+
+    ----------------- :: unit
+    t ~ () ---> empty
+
+    ---------------------- :: true
+    true ~ true ---> empty
+
+    ------------------------ :: false
+    false ~ false ---> empty
+
+    t1 ~ p1 ---> theta1     t2 ~ p2 ---> theta2
+    ------------------------------------------- :: pair
+    (t1, t2) ~ (p1, p2) ---> theta1 theta2
+
+    t ~ p ---> theta
+    ------------------------ :: inl
+    inl t ~ inl p ---> theta
+
+    t ~ p ---> theta
+    ------------------------ :: inr
+    inr t ~ inr p ---> theta
+
+    ---------------- :: nat
+    n ~ n ---> empty
+
+    n >= 1     (n - 1) ~ p ---> theta
+    --------------------------------- :: succ
+    n ~ S p ---> theta

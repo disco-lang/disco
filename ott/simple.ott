@@ -37,6 +37,7 @@ grammar
     | case branches       ::   :: case                    {{ com case analysis }}
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub
+    | 1                   :: M :: One
     | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
@@ -259,7 +260,7 @@ defn
     -------------------- :: if
     G |-g t1 , if t2 g : T
 
-    G |-p p : T2 ---> G2      G |- t1 : T2
+    G |-p p : T2 ---> G2      G |- t2 : T2
     G , G2 |-g t1 , g : T
     ----------------------------- :: where
     G |-g t1 , where t2 = p g : T

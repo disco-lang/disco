@@ -97,7 +97,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
   - Basic type inference 
 
-    See TAPL chapter 22.
+    See TAPL chapter 22.  Things seem to get more interesting in the
+    presence of subtying.  See page 338 of TAPL.
 
 * Reduction Strategy
   

@@ -18,7 +18,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     call-by-value/call-by-name strategy; note that this is not
     call-by-need.  Then we leave adding bounded quantification and
     adding call-by-need to the grant.  We should implement basic type
-    inference for the simple type sysytem.
+    inference for the simple type system.
 
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
@@ -94,6 +94,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
     Next step is reading this a bit and gauging how hard it would be
     to implement.
+
+  - Basic type inference 
+
+    See TAPL chapter 22.
 
 * Reduction Strategy
   

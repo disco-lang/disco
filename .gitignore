@@ -19,3 +19,9 @@ TAGS
 
 ott/*.pdf
 ott/*.tex
+
+*.bbl
+*.blg
+nsf/*.pdf
+nsf/main.tex
+nsf/description.tex

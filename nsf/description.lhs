@@ -17,6 +17,7 @@
 % section about evaluation is important.
 % }
 
+\newcommand{\thelang}{\textsc{NameOfLanguage}\xspace}
 
 \subsection{XXX}
 
@@ -29,15 +30,16 @@ introduction to writing formal proofs. (some citations?  does ACM
 curriculum guideline include discrete math?)
 
 \emph{Functional programming} is a style of programming, embodied in
-languages such as Haskell, OCaml, Scala, and F\# (citations), which
-emphasizes functions as first-class objects, compositionality, and
-XXX.  It lends itself particularly well to XXX.  XXX promotes
-high-level thinking, gives a concise and powerful vocabulary to talk
-about many other CS topics.  XXX e.g. parallelism.  XXX also
-increasingly used in industry.  For these reasons, it is becoming
-critical to expose undergraduate students to functional programming
-early, but many curricula struggle to make space for it.  XXX cite ACM
-guidelines; cite LACS exemplary curriculum (see Van Drunen).
+languages such as Haskell, OCaml, Scala, F\#, and Racket (citations;
+should we add more?), which emphasizes functions as first-class
+objects, compositionality, and XXX.  It lends itself particularly well
+to XXX.  XXX promotes high-level thinking, gives a concise and
+powerful vocabulary to talk about many other CS topics.  XXX
+e.g. parallelism.  XXX also increasingly used in industry.  For these
+reasons, it is becoming critical to expose undergraduate students to
+functional programming early, but many curricula struggle to make
+space for it.  XXX cite ACM guidelines; cite LACS exemplary curriculum
+(see Van Drunen).
 
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea XXX cite examples.
@@ -65,15 +67,58 @@ The benefits of such an approach are numerous:
   exploration of the mathematics XXX.
 \end{itemize}
 
-However, despite its benefits, this approach is not widespread in
-practice.  This may be due partly to 
+However, despite its benefits, this model is not widespread in
+practice.  This may be due partly to lack of awareness, but there are
+also some real roadblocks to adoption that make it impractical or
+impossible for many departments.
 
-%% Introduction/problem description
+\begin{itemize}
+\item Existing functional languages which are popular for
+  teaching---such as Haskell, Racket, OCaml, or SML---are
+  general-purpose languages which were not designed specifically with
+  teaching in mind.  The majority of their features are not needed in
+  the setting of discrete mathematics, and teachers must waste a lot
+  of time and energy explaining incidental detail or trying to hide it
+  from students.
+\item As with any subject, teaching a functional language requires
+  some expertise, or at least familiarity, on the part of the
+  instructor. XXX made worse by general-purpose languages which
+  require a high level of expertise to be able to usefully teach them
+  and help students navigate through the relevant features.  This is
+  especially a problem at schools where the discrete mathematics
+  course is taught by mathematics faculty rather than computer science
+  faculty.
+\item There is often an impedance mismatch between standard
+  mathematics notation and the notation used by existing functional
+  programming languages.
+\end{itemize}
 
 \subsection{Proposed work}
 \label{sec:proposed-work}
 
-Our primary goals in this project...
+To address these issues, we propose to develop a new functional
+programming language, \thelang, explicitly designed to be used in a
+discrete mathematics course, along with a suitable curriculum to go
+along with it.  Our primary goals in developing \thelang will be XXX.
+
+Features of \thelang will include:
+\begin{itemize}
+\item XXX bare-bones: not designed to be ``real-world'' or general
+  purpose.  No distracting details to hide.  OK since students will
+  not be expected to use it later.
+\item XXX syntax will be primarily inspired by common mathematical
+  notation, rather than typical functional programming syntax.
+\item XXX will have many features explicitly designed for discrete
+  mathematics: built-in lists, sets, multisets, ordered tuples, and
+  graphs; a standard library dealing with things like primality and
+  combinatorics; built-in visualization tools; and a focus on good
+  error messages.
+\end{itemize}
+
+\subsection{Examples}
+\label{sec:examples}
+
+XXX some examples of code we can/want to/will be able to write.
 
 \section{Related work}
 \label{sec:related-work}
@@ -85,3 +130,14 @@ Our primary goals in this project...
 
 \section{Broader impacts}
 \label{sec:impacts}
+
+XXX expand these
+
+\begin{itemize}
+\item undergraduate research---language development
+\item collaboration between our universities
+\item use as an example in PL classes
+\item curriculum will make it possible for others to adopt this model
+  as well
+\item encourage playing with math and engagement with CS.
+\end{itemize}

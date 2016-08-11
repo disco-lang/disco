@@ -1,7 +1,24 @@
 Talked about this with Harley Eades.  Apply for grant to develop this?
 
-* Grant Opportunities
-  NSF HSF Solicitation: http://www.nsf.gov/pubs/2015/nsf15573/nsf15573.htm
+* Grant 
+  - Opportunities
+    
+    NSF HSF Solicitation: http://www.nsf.gov/pubs/2015/nsf15573/nsf15573.htm
+
+  - What do we need to get done?
+
+    To apply for a grant it will be necessary to have a proof of
+    concept done that exhibts the usefulness of such a language.  I do
+    not think we will need a complete implementation, and we should
+    definately leave some of the more interesting parts to the
+    students who would be funded by the grant.  
+
+    The grant language can simply be the language that we have put
+    together in simple.ott.  As a reduction strategy we use the mixed
+    call-by-value/call-by-name strategy; note that this is not
+    call-by-need.  Then we leave adding bounded quantification and
+    adding call-by-need to the grant.  We should implement basic type
+    inference for the simple type system.
 
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
@@ -53,14 +70,35 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   z ::= integer
 
   binop ::= + ; - ; * ; / ; ^ ; mod
-
+  
 * Typing rules/built-in functions
 
-  Need some polymorphism for +, -, * ?  bounded polymorphism.
+  - Bounded Polymorphism
+    
+    To make applying numerical operations +, -, and *, easier bounded
+    polymorphism could be added.
 
-  +, * : ∀ X ⊇ ℕ. X → X → X
-  - : ∀ X ⊇ ℤ. X → X → X
-  / : ℚ → ℚ → ℚ
+    +, * : ∀ X ⊇ ℕ. X → X → X
+    - : ∀ X ⊇ ℤ. X → X → X
+    / : ℚ → ℚ → ℚ
+
+    Type system extension is straightforward.  I think it would be
+    possible to use the simplier system discussed in TAPL (see Figure
+    26-1 on page 392).  
+
+    The hard part of adding bounded quantification is type inference.
+    TAPL does not report on this, but I was able to find a
+    dissertation on the matter:
+
+    http://www.lfcs.inf.ed.ac.uk/reports/98/ECS-LFCS-98-403/ECS-LFCS-98-403.pdf
+
+    Next step is reading this a bit and gauging how hard it would be
+    to implement.
+
+  - Basic type inference 
+
+    See TAPL chapter 22.  Things seem to get more interesting in the
+    presence of subtying.  See page 338 of TAPL.
 
 * Reduction Strategy
   

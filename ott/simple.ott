@@ -248,6 +248,11 @@ defn
     -------------------- :: skip
     G |-b { branches : T
 
+
+    G |-g t , guard : T   G |-b branches : T
+    ---------------------------------------- :: cons
+    G |-b { term guard branches : T
+
 defn
     G |-g t , g : T :: :: guarded_type :: gty_    {{ com [[t]] guarded by [[g]] has type [[T]] in context [[G]] }} by
 

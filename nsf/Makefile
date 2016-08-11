@@ -14,7 +14,7 @@ main.tex : $(LATEXDEPS) main.lhs
 	rm -f main.tex
 	lhs2TeX --verb main.lhs > main.tex
 
-main.pdf : $(TOPFILE) $(MAKEDEPS) $(LATEXDEPS) 
+main.pdf : $(TOPFILE) $(MAKEDEPS) $(LATEXDEPS)
 	dos2unix main.tex
 	$(PDFLATEX) main.tex
 	$(BIBTEX) main
@@ -22,5 +22,5 @@ main.pdf : $(TOPFILE) $(MAKEDEPS) $(LATEXDEPS)
 	$(PDFLATEX) main.tex
 
 
-clean:	
+clean:
 	rm -f *~ *.aux *.bbl *.blg *.log main.tex *.ptb *.agdai *.agda.el *.hi $(GENERATED)

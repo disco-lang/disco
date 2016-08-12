@@ -39,3 +39,14 @@ data Pattern where
   PInj  :: Side -> Pattern -> Pattern
   PInt  :: Integer -> Pattern
   PSucc :: Pattern -> Pattern
+
+data Type where
+  TyVoid   :: Type
+  TyUnit   :: Type
+  TyBool   :: Type
+  TyArr    :: Type -> Type -> Type
+  TyPair   :: Type -> Type -> Type
+  TySum    :: Type -> Type -> Type
+  TyN      :: Type
+  TyZ      :: Type
+  TyQ      :: Type

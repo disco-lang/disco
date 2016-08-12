@@ -72,29 +72,33 @@ grammar
     | G , G'              :: M :: append                  {{ com append }}
 
   pattern, p :: 'pat_' ::=                              {{ com pattern }}
-    | x                   ::   :: var                     {{ com variable }}
-    | _                   ::   :: wild                    {{ com wildcard }}
-    | ()                  ::   :: unit                    {{ com unit }}
-    | true                ::   :: true                    {{ com true }}
-    | false               ::   :: false                   {{ com false }}
-    | ( p1 , p2 )         ::   :: pair                    {{ com pair }}
-    | inl p               ::   :: inl                     {{ com left }}
-    | inr p               ::   :: inr                     {{ com right }}
-    | n                   ::   :: lit                     {{ com natural }}
-    | S p                 ::   :: succ                    {{ com successor }}
+    | x                   ::   :: var   (+ binders = x +)     {{ com variable }}
+    | _                   ::   :: wild  (+ binders = {} +)    {{ com wildcard }}
+    | ()                  ::   :: unit  (+ binders = {} +)    {{ com unit }}
+    | true                ::   :: true  (+ binders = {} +)    {{ com true }}
+    | false               ::   :: false (+ binders = {} +)    {{ com false }}
+    | ( p1 , p2 )         ::   :: pair  (+ binders = binders(p1) union binders(p2) +)
+                                                              {{ com pair }}
+    | inl p               ::   :: inl   (+ binders = binders(p) +)
+                                                              {{ com left }}
+    | inr p               ::   :: inr   (+ binders = binders(p) +)
+                                                              {{ com right }}
+    | n                   ::   :: lit   (+ binders = {} +)    {{ com natural }}
+    | S p                 ::   :: succ  (+ binders = {} +)    {{ com successor }}
 
   branches, b :: 'branches_' ::=
     | empty                   ::   :: empty
     | { branches              ::   :: skip
-    | { term guard branches   ::   :: cons
+    | { term guard branches   ::   :: cons   (+ bind binders(guard) in term +)
 
   aguard, ag :: 'aguard_' ::=                           {{ com atomic guard }}
-    | if t                ::   :: bool                    {{ com boolean guard }}
-    | where t = p         ::   :: pat                     {{ com pattern guard }}
+    | if t                ::   :: bool  (+ binders = {} +)          {{ com boolean guard }}
+    | where t = p         ::   :: pat   (+ binders = binders(p) +)  {{ com pattern guard }}
 
   guard, g :: 'guard_' ::=                              {{ com guard }}
-    | top                 ::   :: top                     {{ com trivial guard }}
-    | aguard guard        ::   :: cons                    {{ com cons atomic }}
+    | top                 ::   :: top   (+ binders = {} +)    {{ com trivial guard }}
+    | ag g                ::   :: cons  (+ binders = binders(ag) union binders(g) +)
+                                                              {{ com cons atomic }}
 
   subst, theta {{ tex \theta }} :: 'subst_' ::=
     | empty               ::   :: empty

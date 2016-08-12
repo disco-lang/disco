@@ -8,8 +8,8 @@ embed
 metavar termvar, x ::=
   {{ tex \mathit{[[termvar]]} }} {{ com  term variable  }}
 
-% metavar typevar, X ::=
-%   {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
+metavar typevar, X ::=
+  {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
 
 metavar natural, n ::=
   {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
@@ -46,7 +46,7 @@ grammar
     | x |-> t             ::   :: lam                     {{ com abstraction }}
 
   type, T :: 'T_' ::=                                   {{ com type }}
-%    | X                   ::   :: var                     {{ com variable }}
+    | X                   ::   :: var                     {{ com variable }}
     | Void                ::   :: void                    {{ com void type }}
     | Unit                ::   :: unit                    {{ com unit type }}
     | Bool                ::   :: bool                    {{ com boolean type }}
@@ -56,7 +56,7 @@ grammar
     | N                   ::   :: nat                     {{ com natural type }}
     | Z                   ::   :: int                     {{ com integer type }}
     | Q                   ::   :: rat                     {{ com rational type }}
-    | forall x : T1 . T2  ::   :: forall                  {{ com forall }}
+    | forall X : T1 . T2  ::   :: forall                  {{ com forall }}
     | t1 = t2             ::   :: eq                      {{ com identity }}
     | ( T )               :: S :: paren
     | { T / X } T'        :: M :: tysub

@@ -1,13 +1,22 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE UndecidableInstances  #-}
+
 
 module Types where
 
 import           Unbound.LocallyNameless
 
 data Side = L | R
+  deriving Show
 
 data UOp = Neg
+  deriving Show
 data BOp = Add | Sub | Mul | Div
+  deriving Show
 
 data Term where
   TVar   :: Name Term -> Term
@@ -23,12 +32,14 @@ data Term where
   TLet   :: Bind (Rec (Name Term, Embed Term)) Term -> Term
   TCase  :: [Branch] -> Term
   TWrong :: Term
+  deriving Show
 
 type Branch = Bind [Guard] Term
 
 data Guard where
   GIf    :: Embed Term -> Guard
   GWhere :: Embed Term -> Pattern -> Guard
+  deriving Show
 
 data Pattern where
   PVar  :: Name Term -> Pattern
@@ -39,6 +50,7 @@ data Pattern where
   PInj  :: Side -> Pattern -> Pattern
   PInt  :: Integer -> Pattern
   PSucc :: Pattern -> Pattern
+  deriving Show
 
 data Type where
   TyVoid   :: Type
@@ -50,3 +62,14 @@ data Type where
   TyN      :: Type
   TyZ      :: Type
   TyQ      :: Type
+  deriving Show
+
+derive [''Side, ''UOp, ''BOp, ''Term, ''Guard, ''Pattern, ''Type]
+
+instance Alpha Side
+instance Alpha UOp
+instance Alpha BOp
+instance Alpha Term
+instance Alpha Guard
+instance Alpha Pattern
+instance Alpha Type

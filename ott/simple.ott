@@ -33,7 +33,8 @@ grammar
     | - t                 ::   :: neg                     {{ com negation }}
     | t * t'              ::   :: mul                     {{ com multiplication }}
     | t / t'              ::   :: div                     {{ com division }}
-    | let x = t1 in t2    ::   :: let                     {{ com let }}
+    | let x = t1 in t2    ::   :: let (+ bind x in t1 +)
+                                      (+ bind x in t2 +)  {{ com letrec }}
     | case branches       ::   :: case                    {{ com case analysis }}
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub

@@ -28,7 +28,9 @@ lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "where"
                         , "()"
-                        , "Void", "Unit", "Bool", "Nat", "Integer", "Rational", "N", "Z", "Q"]
+                        , "Void", "Unit", "Bool", "Nat", "Integer", "Rational"
+                        , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
+                        ]
   , P.reservedOpNames = [ "|->", "+", "-", "*", "/"
                         , "->" ]
   }
@@ -135,4 +137,27 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
             ]
 
     unary  name fun       = Prefix (reservedOp name >> return fun)
+    binary name fun assoc = Infix (reservedOp name >> return fun) assoc
+
+parseAtomicType :: Parser Type
+parseAtomicType =
+      TyVoid <$ reserved "Void"
+  <|> TyUnit <$ reserved "Unit"
+  <|> TyBool <$ reserved "Bool"
+  <|> TyN    <$ (reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
+  <|> TyZ    <$ (reserved "Integer" <|> reserved "Z" <|> reserved "ℤ")
+  <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
+  <|> parens parseType
+
+parseType :: Parser Type
+parseType = parseTypeExpr <|> parseAtomicType
+
+parseTypeExpr :: Parser Type
+parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression"
+  where
+    table = [ [ binary "*" TyPair AssocRight ]
+            , [ binary "+" TySum AssocRight ]
+            , [ binary "->" TyArr AssocRight ]
+            ]
+
     binary name fun assoc = Infix (reservedOp name >> return fun) assoc

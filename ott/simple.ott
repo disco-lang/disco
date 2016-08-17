@@ -33,6 +33,10 @@ grammar
     | - t                 ::   :: neg                     {{ com negation }}
     | t * t'              ::   :: mul                     {{ com multiplication }}
     | t / t'              ::   :: div                     {{ com division }}
+    | t == t'             ::   :: eq                      {{ com equality }}
+    | t <  t'             ::   :: lt                      {{ com less than }}
+    | t && t'             ::   :: and                     {{ com boolean and }}
+    | t || t'             ::   :: or                      {{ com boolean or }}
     | let x = t1 in t2    ::   :: let (+ bind x in t1 +)
                                       (+ bind x in t2 +)  {{ com letrec }}
     | case branches       ::   :: case                    {{ com case analysis }}
@@ -131,6 +135,9 @@ grammar
     | forall              ::   :: forall     {{ tex \forall }}
     | !                   ::   :: fail
     | not                 ::   :: not        {{ tex \lnot }}
+    | ==                  ::   :: eq         {{ tex \equiv }}
+    | &&                  ::   :: and        {{ tex \mathbin{\&\!\&} }}
+    | ||                  ::   :: or         {{ tex \mathbin{|\!|} }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement

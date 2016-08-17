@@ -15,7 +15,7 @@ data Side = L | R
 
 data UOp = Neg
   deriving Show
-data BOp = Add | Sub | Mul | Div
+data BOp = Add | Sub | Mul | Div | Equals | Less | And | Or
   deriving Show
 
 data Term where

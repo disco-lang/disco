@@ -8,7 +8,7 @@
 
 module Parser where
 
-import           Unbound.LocallyNameless
+import           Unbound.LocallyNameless (Name, bind, string2Name)
 
 import           Text.Parsec             hiding (Error, many, (<|>))
 import           Text.Parsec.Expr        hiding (Operator)
@@ -45,10 +45,11 @@ reservedOp = P.reservedOp lexer
 symbol :: String -> Parser String
 symbol = P.symbol lexer
 
-ident :: Parser String
-ident = P.identifier lexer
+ident :: Parser (Name Term)
+ident = string2Name <$> P.identifier lexer
 
-integer :: Parser Integer
+natural, integer :: Parser Integer
+natural = P.natural lexer
 integer = P.integer lexer
 
 whiteSpace :: Parser ()
@@ -56,14 +57,51 @@ whiteSpace = P.whiteSpace lexer
 
 parseAtom :: Parser Term
 parseAtom
-  =   (TVar . string2Name) <$> ident
-  <|> TUnit       <$ reserved "()"
+  =   TUnit       <$ reserved "()"
   <|> TBool True  <$ reserved "true"
   <|> TBool False <$ reserved "false"
-
+  <|> TVar <$> ident
+  <|> TInt <$> natural
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
 
   <|> parens parseTerm
 
+parseInj :: Parser Side
+parseInj =
+  L <$ reserved "inl" <|> R <$ reserved "inr"
+
 parseTerm :: Parser Term
-parseTerm = undefined
+parseTerm =
+      TAbs <$> try (bind <$> ident <*> (reservedOp "|->" *> parseTerm))
+  <|> TInj <$> parseInj <*> parseAtom
+  <|> parseLet
+  <|> parseCase
+  <|> parseExpr
+  <|> parseAtom
+
+parseLet :: Parser Term
+parseLet = fail ""
+
+parseCase :: Parser Term
+parseCase = fail ""
+
+parseExpr :: Parser Term
+parseExpr = buildExpressionParser table parseAtom <?> "expression"
+  where
+    table = [ [ binary ""  TApp AssocLeft ]
+            , [ unary  "-" (TUn Neg) ]
+            , [ binary "*" (TBin Mul) AssocLeft
+              , binary "/" (TBin Div) AssocLeft
+              ]
+            , [ binary "+" (TBin Add) AssocLeft
+              , binary "-" (TBin Sub) AssocLeft
+              ]
+            , [ binary "==" (TBin Equals) AssocNone
+              , binary "<" (TBin Less) AssocNone
+              ]
+            , [ binary "&&" (TBin And) AssocRight ]
+            , [ binary "||" (TBin Or)  AssocRight ]
+            ]
+
+    unary  name fun       = Prefix (reservedOp name >> return fun)
+    binary name fun assoc = Infix (reservedOp name >> return fun) assoc

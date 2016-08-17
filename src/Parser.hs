@@ -8,7 +8,7 @@
 
 module Parser where
 
-import           Unbound.LocallyNameless (Name, bind, string2Name)
+import           Unbound.LocallyNameless (Name, bind, embed, rec, string2Name)
 
 import           Text.Parsec             hiding (Error, many, (<|>))
 import           Text.Parsec.Expr        hiding (Operator)
@@ -16,7 +16,7 @@ import           Text.Parsec.Language    (haskellStyle)
 import           Text.Parsec.String      (Parser)
 import qualified Text.Parsec.Token       as P
 
-import           Control.Applicative     ((<|>))
+import           Control.Applicative     (many, (<|>))
 
 import           Types
 
@@ -80,10 +80,41 @@ parseTerm =
   <|> parseAtom
 
 parseLet :: Parser Term
-parseLet = fail ""
+parseLet =
+  TLet <$>
+    (reserved "let" *>
+      (bind
+        <$> (rec <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))))
+        <*> (reserved "in" *> parseTerm)))
 
 parseCase :: Parser Term
-parseCase = fail ""
+parseCase = TCase <$> (reserved "case" *> many parseBranch)
+
+parseBranch :: Parser Branch
+parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> many parseGuard)
+
+parseGuard :: Parser Guard
+parseGuard =
+      GIf    <$> (embed <$> (reserved "if" *> parseTerm))
+  <|> GWhere <$> (embed <$> (reserved "where" *> parseTerm)) <*> (symbol "=" *> parsePattern)
+
+parseAtomicPattern :: Parser Pattern
+parseAtomicPattern =
+      PVar <$> ident
+  <|> PWild <$ symbol "_"
+  <|> PUnit <$ reserved "()"
+  <|> PBool True  <$ reserved "true"
+  <|> PBool False <$ reserved "false"
+  <|> PInt <$> natural
+  <|> try (PPair <$> (symbol "(" *> parsePattern) <*> (symbol "," *> parsePattern <* symbol ")"))
+  <|> parens parsePattern
+
+parsePattern :: Parser Pattern
+parsePattern =
+      PInj <$> parseInj <*> parseAtomicPattern
+  <|> PInt <$> integer
+  <|> PSucc <$> (symbol "S" *> parseAtomicPattern)
+  <|> parseAtomicPattern
 
 parseExpr :: Parser Term
 parseExpr = buildExpressionParser table parseAtom <?> "expression"

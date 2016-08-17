@@ -89,6 +89,7 @@ grammar
                                                               {{ com right }}
     | n                   ::   :: lit   (+ binders = {} +)    {{ com natural }}
     | S p                 ::   :: succ  (+ binders = {} +)    {{ com successor }}
+    | ( p )               :: S :: paren
 
   branches, b :: 'branches_' ::=
     | empty                   ::   :: empty

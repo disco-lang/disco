@@ -1,5 +1,7 @@
 PDFLATEX = pdflatex
 BIBTEX = bibtex
+SKIM = skim_revert.sh
+SKIMRevinPath := $(shell command -v $(SKIM) 2> /dev/null)
 
 -include overrides.mk
 
@@ -9,6 +11,13 @@ LATEXDEPS = description.lhs data-management.tex summary.tex bay-bio.tex
 GENERATED = description.tex main.tex main.pdf
 
 all : main.pdf
+  # This is for my private machine.  It forces my PDF reader to reload.
+  # It should not run unless "skim_revert.sh" is in your PATH.
+  ifdef SKIMRevinPath	
+	@$(SKIM) main.pdf &>/dev/null
+	@$(SKIM) main.pdf &>/dev/null
+	@$(SKIM) main.pdf &>/dev/null
+  endif
 
 main.tex : $(LATEXDEPS) main.lhs
 	rm -f main.tex

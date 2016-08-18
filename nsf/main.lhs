@@ -96,7 +96,7 @@
 \clearpage\setcounter{page}{1}
 
 \bibliographystyle{alpha}  %% plenty of space
-\bibliography{XXX}
+\bibliography{references}
 
 \clearpage\setcounter{page}{1}
 

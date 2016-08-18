@@ -26,10 +26,9 @@ sort of \emph{discrete mathematics} course.  Such a course typically
 covers mathematical concepts that are often useful in a computer
 science context, such as induction and recursion, graphs, modular
 arithmetic, logic, and set theory.  In addition, it often serves as an
-introduction to writing formal proofs. (some citations?  does ACM
-curriculum guideline include discrete math?  Yes, its goes by the name
-of Discrete Structures, see
-https://www.acm.org/education/CS2013-final-report.pdf)
+introduction to writing formal proofs. See \cite{ACM:2013} for the
+Association for Computing Machinery's computer science curriculum
+guidelines.
 
 \emph{Functional programming} is a style of programming, embodied in
 languages such as Haskell, OCaml, Scala, F\#, and Racket (citations;

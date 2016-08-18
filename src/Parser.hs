@@ -161,3 +161,8 @@ parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression
             ]
 
     binary name fun assoc = Infix (reservedOp name >> return fun) assoc
+
+parseTermStr :: String -> Term
+parseTermStr s = case (parse parseTerm "" s) of
+                   Left e -> error.show $ e
+                   Right t -> t

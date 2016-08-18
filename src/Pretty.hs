@@ -4,10 +4,11 @@ import           Control.Applicative
 import           Data.Char               (toLower)
 
 import           Types
+import qualified Parser                  as PR
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, bind, embed, lunbind,
-                                          rec, string2Name)
+import           Unbound.LocallyNameless (LFreshM, Name, bind, embed, unembed, lunbind,
+                                          rec, unrec, string2Name, runLFreshM)
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -41,7 +42,11 @@ prettyTerm (TInj side t) = prettySide side <+> parens (prettyTerm t)  -- XXX
 prettyTerm (TInt n)      = integer n
 prettyTerm (TUn op t)    = prettyUOp op <> parens (prettyTerm t)   -- XXX
 prettyTerm (TBin op t1 t2) = hsep [parens $ prettyTerm t1, prettyBOp op, parens $ prettyTerm t2]  -- XXX
-prettyTerm TWrong = text "WRONG"
+prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->
+  let (x, em) = unrec def
+      t1 = unembed em
+   in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]
+prettyTerm TWrong = text "WRONG"                    
 -- To do:
 --   TLet
 --   TCase
@@ -64,3 +69,9 @@ prettyBOp Equals = text "=="
 prettyBOp Less   = text "<"
 prettyBOp And    = text "&&"
 prettyBOp Or     = text "||"
+
+prettyTermStr :: Term -> String
+prettyTermStr = PP.render.runLFreshM.prettyTerm
+
+echoTerm :: String -> String
+echoTerm = prettyTermStr.PR.parseTermStr

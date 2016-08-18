@@ -45,12 +45,10 @@ prettyTerm (TBin op t1 t2) = hsep [parens $ prettyTerm t1, prettyBOp op, parens 
 prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->
   let (x, em) = unrec def
       t1 = unembed em
-   in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]
+   in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]      
+prettyTerm (TCase b) = text "case" <+> prettyBranches b
 prettyTerm TWrong = text "WRONG"                    
 -- To do:
---   TLet
---   TCase
---
 --   add precedence & associativity handling to omit unnecessary parens
 
 prettySide :: Side -> Doc
@@ -70,6 +68,32 @@ prettyBOp Less   = text "<"
 prettyBOp And    = text "&&"
 prettyBOp Or     = text "||"
 
+prettyBranches :: [Branch] -> Doc                  
+prettyBranches [] = error "Empty branches are disallowed."
+prettyBranches [b] = prettyBranch b
+prettyBranches (b:bs) = prettyBranch b <+> prettyBranches bs
+                   
+prettyBranch :: Branch -> Doc
+prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
+
+prettyGuards :: [Guard] -> Doc
+-- HDE: What do we want our concrete syntax to be for the trivial guard?                
+prettyGuards = foldr (\g r -> prettyGuard g <+> r) (text "")
+                      
+prettyGuard :: Guard -> Doc
+prettyGuard (GIf et) = text "if" <+> (prettyTerm (unembed et))
+prettyGuard (GWhere et p) = text "where" <+> prettyTerm (unembed et) <+> text "=" <+> prettyPattern p
+
+prettyPattern :: Pattern -> Doc
+prettyPattern (PVar x) = prettyName x
+prettyPattern PWild = text "_"
+prettyPattern PUnit = text "()"                      
+prettyPattern (PBool b) = text $ map toLower $ show b
+prettyPattern (PPair p1 p2) = parens $ prettyPattern p1 <> text "," <+> prettyPattern p2
+prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
+prettyPattern (PInt n) = integer n
+prettyPattern (PSucc p) = text "S" <+> prettyPattern p
+       
 prettyTermStr :: Term -> String
 prettyTermStr = PP.render.runLFreshM.prettyTerm
 

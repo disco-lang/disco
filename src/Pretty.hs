@@ -1,6 +1,6 @@
 module Pretty where
 
-import           Control.Applicative
+import           Control.Applicative     hiding (empty)
 import           Data.Char               (toLower)
 
 import qualified Parser                  as PR
@@ -16,13 +16,16 @@ import           Unbound.LocallyNameless (LFreshM, Name, bind, embed, lunbind,
 
 type Doc = LFreshM PP.Doc
 
-hsep ds = PP.hsep <$> sequence ds
-parens = fmap PP.parens
-text = return . PP.text
-integer = return . PP.integer
+hsep ds  = PP.hsep <$> sequence ds
+parens   = fmap PP.parens
+text     = return . PP.text
+integer  = return . PP.integer
+nest n d = PP.nest n <$> d
+empty    = return PP.empty
 
 (<+>) = liftA2 (PP.<+>)
-(<>) = liftA2 (PP.<>)
+(<>)  = liftA2 (PP.<>)
+($+$) = liftA2 (PP.$+$)
 
 --------------------------------------------------
 
@@ -47,7 +50,7 @@ prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->
   let (x, em) = unrec def
       t1 = unembed em
    in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]
-prettyTerm (TCase b) = text "case" <+> prettyBranches b
+prettyTerm (TCase b) = text "case" $+$ nest 2 (prettyBranches b)
 prettyTerm TWrong = text "WRONG"
 -- To do:
 --   add precedence & associativity handling to omit unnecessary parens
@@ -71,8 +74,7 @@ prettyBOp Or     = text "||"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches [] = error "Empty branches are disallowed."
-prettyBranches [b] = prettyBranch b
-prettyBranches (b:bs) = prettyBranch b <+> prettyBranches bs
+prettyBranches bs = foldr ($+$) empty (map prettyBranch bs)
 
 prettyBranch :: Branch -> Doc
 prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
@@ -100,3 +102,6 @@ prettyTermStr = PP.render . runLFreshM . prettyTerm
 
 echoTerm :: String -> String
 echoTerm = prettyTermStr . PR.parseTermStr
+
+echoTermP :: String -> IO ()
+echoTermP = putStrLn . echoTerm

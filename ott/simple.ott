@@ -56,6 +56,9 @@ grammar
   value, v :: 'v_' ::=                                  {{ com value }}
     | n                   ::   :: nat                     {{ com natural number literal }}
     | x |-> t             ::   :: lam                     {{ com abstraction }}
+    | ( v1 , v2 )         ::   :: pair                    {{ com pair }}
+    | inl v               ::   :: inl                     {{ com left introduction }}
+    | inr v               ::   :: inr                     {{ com right introduction }}
 
   type, T :: 'T_' ::=                                   {{ com type }}
     | X                   ::   :: var                     {{ com variable }}

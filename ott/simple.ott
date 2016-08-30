@@ -25,6 +25,19 @@ grammar
     | x : T ;             ::   :: type                    {{ com type }}
     | x = t ;             ::   :: definition              {{ com definition }}
 
+  uop :: 'uop_' ::=                                     {{ com unary operator }}
+    | -                   ::   :: neg                     {{ com negation }}
+
+  bop :: 'bop_' ::=                                     {{ com binary operator }}
+    | +                   ::   :: add                     {{ com addition }}
+    | -                   ::   :: sub                     {{ com subtraction }}
+    | *                   ::   :: mul                     {{ com multiplication }}
+    | /                   ::   :: div                     {{ com division }}
+    | ==                  ::   :: eq                      {{ com equality }}
+    | <                   ::   :: lt                      {{ com less than }}
+    | &&                  ::   :: and                     {{ com boolean and }}
+    | ||                  ::   :: or                      {{ com boolean or }}
+
   term, t :: 't_' ::=                                   {{ com term }}
     | x                   ::   :: var                     {{ com variable }}
     | ()                  ::   :: unit                    {{ com unit value }}
@@ -36,15 +49,8 @@ grammar
     | inl t1              ::   :: inl                     {{ com left introduction }}
     | inr t2              ::   :: inr                     {{ com right introduction }}
     | n                   ::   :: nat                     {{ com natural literal }}
-    | t + t'              ::   :: add                     {{ com addition }}
-    | t - t'              ::   :: sub                     {{ com subtraction }}
-    | - t                 ::   :: neg                     {{ com negation }}
-    | t * t'              ::   :: mul                     {{ com multiplication }}
-    | t / t'              ::   :: div                     {{ com division }}
-    | t == t'             ::   :: eq                      {{ com equality }}
-    | t <  t'             ::   :: lt                      {{ com less than }}
-    | t && t'             ::   :: and                     {{ com boolean and }}
-    | t || t'             ::   :: or                      {{ com boolean or }}
+    | uop t               ::   :: uop                     {{ com unary operator }}
+    | t1 bop t2           ::   :: bop                     {{ com binary operator }}
     | let x = t1 in t2    ::   :: let (+ bind x in t1 +)
                                       (+ bind x in t2 +)  {{ com letrec }}
     | case branches       ::   :: case                    {{ com case analysis }}
@@ -160,7 +166,7 @@ grammar
     | n >= 1              ::   :: geq
 
 parsing
-  t_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
+  uop_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
   formula_dots left formula_not
 
 subrules

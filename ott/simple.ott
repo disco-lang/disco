@@ -333,16 +333,20 @@ defns
     defn
     t1 --> t2 ::  :: reduce :: ''       {{ com [[t1]] reduces to [[t2]] }} by
 
-
-    --------------------------  :: ax_app
+    empty |- v2 : num
+    --------------------------  :: beta_num
     (x |-> t12) v2 -->  {v2/x}t12
+
+    not (empty |- t2 : num)
+    ---------------------------- :: beta
+    (x |-> t12) t2 --> {t2/x}t12
 
     t1 --> t1'
     -------------- :: cong_app_fun
     t1 t --> t1' t
 
-    t1 --> t1'
-    -------------- :: cong_app_arg
+    empty |- t1 : num   t1 --> t1'
+    ------------------------------ :: cong_app_num
     v t1 --> v t1'
 
     -------------------- :: case_empty

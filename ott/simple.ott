@@ -3,6 +3,7 @@
 embed
   {{ tex-preamble
 \DeclareMathAlphabet{\mathbbold}{U}{bbold}{m}{n}
+\usepackage{stmaryrd}
   }}
 
 metavar termvar, x ::=
@@ -57,6 +58,7 @@ grammar
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub
     | 1                   :: M :: One
+    | [[ t ]]             :: M :: arith                   {{ com arithmetic }}
     | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
@@ -156,6 +158,8 @@ grammar
     | ==                  ::   :: eq         {{ tex \equiv }}
     | &&                  ::   :: and        {{ tex \mathbin{\&\!\&} }}
     | ||                  ::   :: or         {{ tex \mathbin{|\!|} }}
+    | [[                  ::   :: llb        {{ tex \llbracket }}
+    | ]]                  ::   :: rrb        {{ tex \rrbracket }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement
@@ -373,6 +377,24 @@ defns
     t --> t'
     ---------------- :: cong_inr
     inr t --> inr t'
+
+    t1 --> t1'
+    ------------------ :: cong_uop
+    uop t1 --> uop t1'
+
+    --------------------- :: uop
+    uop v --> [[ uop v ]]
+
+    t1 --> t1'
+    ------------------------ :: cong_bop_l
+    t1 bop t2 --> t1' bop t2
+
+    t2 --> t2'
+    ------------------------ :: cong_bop_r
+    t1 bop t2 --> t1 bop t2'
+
+    ----------------------------- :: bop
+    v1 bop v2 --> [[ v1 bop v2 ]]
 
     -------------------- :: case_empty
     case empty --> wrong

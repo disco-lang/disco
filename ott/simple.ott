@@ -412,6 +412,18 @@ defns
     ----------------------------- :: bop
     v1 bop v2 --> [[ v1 bop v2 ]]
 
+    empty |- t1 : num     t1 --> t1'
+    -------------------------------------- :: cong_let_num
+    let x = t1 in t2 --> let x = t1' in t2
+
+    empty |- v1 : num
+    ------------------------------ :: let_num
+    let x = v1 in t2 --> {v1/x} t2
+
+    not (empty |- t1 : num)
+    ------------------------------ :: let
+    let x = t1 in t2 --> {t1/x} t2
+
     -------------------- :: case_empty
     case empty --> wrong
 

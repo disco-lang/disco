@@ -14,9 +14,17 @@ metavar typevar, X ::=
 metavar natural, n ::=
   {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
 
-indexvar index, k ::=
+indexvar k ::=
+  {{ com  index }}
 
 grammar
+  prog, P :: 'P_' ::=                                   {{ com program }}
+    | decl1 .. declk      ::   :: decllist
+
+  decl, D :: 'D_' ::=                                   {{ com declaration }}
+    | x : T ;             ::   :: type                    {{ com type }}
+    | x = t ;             ::   :: definition              {{ com definition }}
+
   term, t :: 't_' ::=                                   {{ com term }}
     | x                   ::   :: var                     {{ com variable }}
     | ()                  ::   :: unit                    {{ com unit value }}

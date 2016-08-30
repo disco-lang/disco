@@ -21,7 +21,7 @@ import           Control.Applicative     (many, (<|>))
 import           Types
 
 ------------------------------------------------------------
--- Parser
+-- Lexer
 
 lexer :: P.TokenParser u
 lexer = P.makeTokenParser $
@@ -56,6 +56,17 @@ integer = P.integer lexer
 
 whiteSpace :: Parser ()
 whiteSpace = P.whiteSpace lexer
+
+------------------------------------------------------------
+-- Parser
+
+parseProg :: Parser Prog
+parseProg = parseDecl `sepEndBy` symbol ";"
+
+parseDecl :: Parser Decl
+parseDecl =
+      try (DType <$> ident <*> (symbol ":" *> parseType))
+  <|>      DDefn <$> ident <*> (symbol "=" *> parseTerm)
 
 parseAtom :: Parser Term
 parseAtom
@@ -166,3 +177,4 @@ parseTermStr :: String -> Term
 parseTermStr s = case (parse parseTerm "" s) of
                    Left e -> error.show $ e
                    Right t -> t
+

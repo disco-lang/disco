@@ -69,7 +69,7 @@ data Type where
   TyN      :: Type
   TyZ      :: Type
   TyQ      :: Type
-  deriving Show
+  deriving (Show, Eq)
 
 derive [''Side, ''UOp, ''BOp, ''Term, ''Guard, ''Pattern, ''Type]
 

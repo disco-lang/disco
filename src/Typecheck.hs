@@ -65,12 +65,17 @@ type Ctx = M.Map (Name Term) Type
 
 data TCError
   = Unbound (Name Term)
-  | NotArrow Term Type
+  | NotArrow Term Type     -- the type of a lambda should be an arrow type but isn't
+  | NotFun   ATerm         -- the term should be a function but has a non-arrow type
   | NotSum Term Type
-  | Mismatch Term Type Type    -- term, expected, actual
+  | Mismatch Type ATerm    -- expected, actual
   | CantInfer Term
+  deriving Show
 
 type TCM = ReaderT Ctx (ExceptT TCError LFreshM)
+
+runTCM :: TCM a -> Either TCError a
+runTCM = runLFreshM . runExceptT . flip runReaderT M.empty
 
 lookup :: Name Term -> TCM Type
 lookup x = do
@@ -107,9 +112,13 @@ check t ty = do
 checkSub :: ATerm -> Type -> TCM ATerm
 checkSub at ty = do
   let ty' = getType at
-  if (ty' == ty)
-     then return at
-     else return (ATSub ty at)
+  if (isSub ty' ty)
+   then
+     if (ty' == ty)
+       then return at
+       else return (ATSub ty at)
+   else
+     throwError (Mismatch ty at)
 
 isSub :: Type -> Type -> Bool
 isSub ty1 ty2 | ty1 == ty2 = True
@@ -118,6 +127,11 @@ isSub TyN TyQ = True
 isSub TyZ TyQ = True
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
+isSub _ _ = False
+
+getFunTy :: ATerm -> TCM (Type, Type)
+getFunTy (getType -> TyArr ty1 ty2) = return (ty1, ty2)
+getFunTy at = throwError (NotFun at)
 
 infer :: Term -> TCM ATerm
 infer (TVar x)      = do
@@ -125,7 +139,11 @@ infer (TVar x)      = do
   return $ ATVar ty x
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
-infer (TApp t t')   = undefined   -- XXX todo: app
+infer (TApp t t')   = do
+  at <- infer t
+  (ty1, ty2) <- getFunTy at
+  at' <- check t' ty1
+  return $ ATApp ty2 at at'
 infer (TPair t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

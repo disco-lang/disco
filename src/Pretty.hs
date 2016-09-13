@@ -69,7 +69,7 @@ prettyBOp And    = text "&&"
 prettyBOp Or     = text "||"
 
 prettyBranches :: [Branch] -> Doc                  
-prettyBranches [] = error "Empty branches are disallowed."
+prettyBranches [] = error "Empty branches are disallowed." -- Need a better error message.
 prettyBranches [b] = prettyBranch b
 prettyBranches (b:bs) = prettyBranch b <+> prettyBranches bs
                    

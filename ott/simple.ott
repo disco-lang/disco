@@ -3,6 +3,7 @@
 embed
   {{ tex-preamble
 \DeclareMathAlphabet{\mathbbold}{U}{bbold}{m}{n}
+\usepackage{stmaryrd}
   }}
 
 metavar termvar, x ::=
@@ -14,9 +15,30 @@ metavar typevar, X ::=
 metavar natural, n ::=
   {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
 
-indexvar index, k ::=
+indexvar k ::=
+  {{ com  index }}
 
 grammar
+  prog, P :: 'P_' ::=                                   {{ com program }}
+    | decl1 .. declk      ::   :: decllist
+
+  decl, D :: 'D_' ::=                                   {{ com declaration }}
+    | x : T ;             ::   :: type                    {{ com type }}
+    | x = t ;             ::   :: definition              {{ com definition }}
+
+  uop :: 'uop_' ::=                                     {{ com unary operator }}
+    | -                   ::   :: neg                     {{ com negation }}
+
+  bop :: 'bop_' ::=                                     {{ com binary operator }}
+    | +                   ::   :: add                     {{ com addition }}
+    | -                   ::   :: sub                     {{ com subtraction }}
+    | *                   ::   :: mul                     {{ com multiplication }}
+    | /                   ::   :: div                     {{ com division }}
+    | ==                  ::   :: eq                      {{ com equality }}
+    | <                   ::   :: lt                      {{ com less than }}
+    | &&                  ::   :: and                     {{ com boolean and }}
+    | ||                  ::   :: or                      {{ com boolean or }}
+
   term, t :: 't_' ::=                                   {{ com term }}
     | x                   ::   :: var                     {{ com variable }}
     | ()                  ::   :: unit                    {{ com unit value }}
@@ -28,26 +50,23 @@ grammar
     | inl t1              ::   :: inl                     {{ com left introduction }}
     | inr t2              ::   :: inr                     {{ com right introduction }}
     | n                   ::   :: nat                     {{ com natural literal }}
-    | t + t'              ::   :: add                     {{ com addition }}
-    | t - t'              ::   :: sub                     {{ com subtraction }}
-    | - t                 ::   :: neg                     {{ com negation }}
-    | t * t'              ::   :: mul                     {{ com multiplication }}
-    | t / t'              ::   :: div                     {{ com division }}
-    | t == t'             ::   :: eq                      {{ com equality }}
-    | t <  t'             ::   :: lt                      {{ com less than }}
-    | t && t'             ::   :: and                     {{ com boolean and }}
-    | t || t'             ::   :: or                      {{ com boolean or }}
+    | uop t               ::   :: uop                     {{ com unary operator }}
+    | t1 bop t2           ::   :: bop                     {{ com binary operator }}
     | let x = t1 in t2    ::   :: let (+ bind x in t1 +)
                                       (+ bind x in t2 +)  {{ com letrec }}
     | case branches       ::   :: case                    {{ com case analysis }}
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub
     | 1                   :: M :: One
+    | [[ t ]]             :: M :: arith                   {{ com arithmetic }}
     | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
     | n                   ::   :: nat                     {{ com natural number literal }}
     | x |-> t             ::   :: lam                     {{ com abstraction }}
+    | ( v1 , v2 )         ::   :: pair                    {{ com pair }}
+    | inl v               ::   :: inl                     {{ com left introduction }}
+    | inr v               ::   :: inr                     {{ com right introduction }}
 
   type, T :: 'T_' ::=                                   {{ com type }}
     | X                   ::   :: var                     {{ com variable }}
@@ -60,8 +79,8 @@ grammar
     | N                   ::   :: nat                     {{ com natural type }}
     | Z                   ::   :: int                     {{ com integer type }}
     | Q                   ::   :: rat                     {{ com rational type }}
-    | forall X : T1 . T2  ::   :: forall                  {{ com forall }}
-    | t1 = t2             ::   :: eq                      {{ com identity }}
+%    | forall X : T1 . T2  ::   :: forall                  {{ com forall }}
+%    | t1 = t2             ::   :: eq                      {{ com identity }}
     | ( T )               :: S :: paren
     | { T / X } T'        :: M :: tysub
 
@@ -139,6 +158,8 @@ grammar
     | ==                  ::   :: eq         {{ tex \equiv }}
     | &&                  ::   :: and        {{ tex \mathbin{\&\!\&} }}
     | ||                  ::   :: or         {{ tex \mathbin{|\!|} }}
+    | [[                  ::   :: llb        {{ tex \llbracket }}
+    | ]]                  ::   :: rrb        {{ tex \rrbracket }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement
@@ -149,7 +170,7 @@ grammar
     | n >= 1              ::   :: geq
 
 parsing
-  t_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
+  uop_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
   formula_dots left formula_not
 
 subrules
@@ -185,6 +206,14 @@ defn
     ---------------------- :: funty
     T1 -> T2 <: T1' -> T2'
 
+    T1 <: T1'    T2 <: T2'
+    ---------------------- :: prod
+    T1 ** T2 <: T1' ** T2'
+
+    T1 <: T1'    T2 <: T2'
+    ---------------------- :: sum
+    T1 ++ T2 <: T1' ++ T2'
+
 defns
   Jtype :: '' ::=
 
@@ -216,6 +245,14 @@ defn
     ----------------------------- :: pair
     G |- ( t1 , t2 ) : T1 ** T2
 
+    G |- t : T1
+    --------------------- :: inl
+    G |- inl t : T1 ++ T2
+
+    G |- t : T2
+    --------------------- :: inr
+    G |- inr t : T1 ++ T2
+
     ---------- :: nat
     G |- n : N
 
@@ -242,6 +279,22 @@ defn
     G |- t : num    G |- t' : num
     ----------------------------- :: mul_num
     G |- t t' : num
+
+    G |- t1 : T    G |- t2 : T
+    -------------------------- :: eq
+    G |- t1 == t2 : Bool
+
+    G |- t1 : num    G |- t2 : num
+    ------------------------------ :: lt
+    G |- t1 < t2 : Bool
+
+    G |- t1 : Bool    G |- t2 : Bool
+    -------------------------------- :: and
+    G |- t1 && t2 : Bool
+
+    G |- t1 : Bool    G |- t2 : Bool
+    -------------------------------- :: or
+    G |- t1 || t2 : Bool
 
     G |- t1 : T1     G , x : T1 |- t2 : T2
     -------------------------------------- :: let
@@ -325,17 +378,67 @@ defns
     defn
     t1 --> t2 ::  :: reduce :: ''       {{ com [[t1]] reduces to [[t2]] }} by
 
-
-    --------------------------  :: ax_app
+    empty |- v2 : num
+    --------------------------  :: beta_num
     (x |-> t12) v2 -->  {v2/x}t12
+
+    not (empty |- t2 : num)
+    ---------------------------- :: beta
+    (x |-> t12) t2 --> {t2/x}t12
 
     t1 --> t1'
     -------------- :: cong_app_fun
     t1 t --> t1' t
 
-    t1 --> t1'
-    -------------- :: cong_app_arg
+    empty |- t1 : num   t1 --> t1'
+    ------------------------------ :: cong_app_num
     v t1 --> v t1'
+
+    t1 --> t1'
+    -------------------- :: cong_fst
+    (t1,t2) --> (t1',t2)
+
+    t2 --> t2'
+    -------------------- :: cong_snd
+    (t1,t2) --> (t1,t2')
+
+    t --> t'
+    ---------------- :: cong_inl
+    inl t --> inl t'
+
+    t --> t'
+    ---------------- :: cong_inr
+    inr t --> inr t'
+
+    t1 --> t1'
+    ------------------ :: cong_uop
+    uop t1 --> uop t1'
+
+    --------------------- :: uop
+    uop v --> [[ uop v ]]
+
+    t1 --> t1'
+    ------------------------ :: cong_bop_l
+    t1 bop t2 --> t1' bop t2
+
+    t2 --> t2'
+    ------------------------ :: cong_bop_r
+    t1 bop t2 --> t1 bop t2'
+
+    ----------------------------- :: bop
+    v1 bop v2 --> [[ v1 bop v2 ]]
+
+    empty |- t1 : num     t1 --> t1'
+    -------------------------------------- :: cong_let_num
+    let x = t1 in t2 --> let x = t1' in t2
+
+    empty |- v1 : num
+    ------------------------------ :: let_num
+    let x = v1 in t2 --> {v1/x} t2
+
+    not (empty |- t1 : num)
+    ------------------------------ :: let
+    let x = t1 in t2 --> {t1/x} t2
 
     -------------------- :: case_empty
     case empty --> wrong

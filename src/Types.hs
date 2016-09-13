@@ -10,6 +10,13 @@ module Types where
 
 import           Unbound.LocallyNameless
 
+type Prog = [Decl]
+
+data Decl where
+  DType :: Name Term -> Type -> Decl
+  DDefn :: Name Term -> Term -> Decl
+  deriving Show
+
 data Side = L | R
   deriving Show
 
@@ -62,7 +69,7 @@ data Type where
   TyN      :: Type
   TyZ      :: Type
   TyQ      :: Type
-  deriving Show
+  deriving (Show, Eq)
 
 derive [''Side, ''UOp, ''BOp, ''Term, ''Guard, ''Pattern, ''Type]
 

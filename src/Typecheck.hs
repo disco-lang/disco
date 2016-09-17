@@ -355,6 +355,13 @@ infer (TBin Or t1 t2) = do
   at2 <- check t2 TyBool
   return $ ATBin TyBool Or at1 at2
 
+  -- TODO: this is actually wrong, it is not recursive at all.  I
+  -- don't think we can actually handle letrec in this simple
+  -- bidirectional system.  We need more high-powered type inference.
+
+  -- To infer the type of (let x = t1 in t2), assuming it is
+  -- NON-RECURSIVE, infer the type of t1, and then infer the type of
+  -- t2 in an extended context.
 infer (TLet l) = do
   lunbind l $ \(unrec -> (x, unembed -> t1), t2) -> do
   at1 <- infer t1
@@ -362,12 +369,16 @@ infer (TLet l) = do
   extend x ty1 $ do
   at2 <- infer t2
   return $ ATLet (getType at2) (bind (rec (translate x, embed at1)) at2)
+
+  -- Ascriptions are what let us flip from inference mode into
+  -- checking mode.
 infer (TAscr t ty) = do
   at <- check t ty
   return $ ATAscr at ty
 
 -- XXX todo: case
 
+  -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
 
 

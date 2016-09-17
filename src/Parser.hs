@@ -134,14 +134,18 @@ parseCase = TCase <$> (reserved "case" *> many parseBranch)
 parseBranch :: Parser Branch
 parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
 
+-- | Parse the list of guards in a branch.  @otherwise@ can be used
+--   interchangeably with an empty list of guards.
 parseGuards :: Parser [Guard]
 parseGuards = ([] <$ reserved "otherwise") <|> many parseGuard
 
+-- | Parse a single guard (either @if@ or @where@)
 parseGuard :: Parser Guard
 parseGuard =
       GIf    <$> (embed <$> (reserved "if" *> parseTerm))
   <|> GWhere <$> (embed <$> (reserved "where" *> parseTerm)) <*> (symbol "=" *> parsePattern)
 
+-- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern
 parseAtomicPattern =
       PVar <$> ident
@@ -153,12 +157,14 @@ parseAtomicPattern =
   <|> try (PPair <$> (symbol "(" *> parsePattern) <*> (symbol "," *> parsePattern <* symbol ")"))
   <|> parens parsePattern
 
+-- | Parse a complex pattern.
 parsePattern :: Parser Pattern
 parsePattern =
       PInj <$> parseInj <*> parseAtomicPattern
   <|> PSucc <$> (symbol "S" *> parseAtomicPattern)
   <|> parseAtomicPattern
 
+-- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
 parseExpr = buildExpressionParser table parseAtom <?> "expression"
   where
@@ -180,6 +186,7 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
     unary  name fun       = Prefix (reservedOp name >> return fun)
     binary name fun assoc = Infix (reservedOp name >> return fun) assoc
 
+-- | Parse an atomic type.
 parseAtomicType :: Parser Type
 parseAtomicType =
       TyVoid <$ reserved "Void"
@@ -190,9 +197,11 @@ parseAtomicType =
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
   <|> parens parseType
 
+-- | Parse a complex type.
 parseType :: Parser Type
 parseType = parseTypeExpr <|> parseAtomicType
 
+-- | Parse a type expression built out of binary operators.
 parseTypeExpr :: Parser Type
 parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression"
   where
@@ -203,6 +212,7 @@ parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression
 
     binary name fun assoc = Infix (reservedOp name >> return fun) assoc
 
+-- | For convenience/testing
 parseTermStr :: String -> Term
 parseTermStr s = case (parse parseTerm "" s) of
                    Left e -> error.show $ e

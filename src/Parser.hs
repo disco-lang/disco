@@ -28,7 +28,7 @@ lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "where"
                         , "()"
-                        , "Void", "Unit", "Bool", "Nat", "Integer", "Rational"
+                        , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
                         ]
   , P.reservedOpNames = [ "|->", "+", "-", "*", "/"
@@ -160,8 +160,8 @@ parseAtomicType =
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ reserved "Bool"
-  <|> TyN    <$ (reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
-  <|> TyZ    <$ (reserved "Integer" <|> reserved "Z" <|> reserved "ℤ")
+  <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
+  <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
   <|> parens parseType
 

@@ -34,7 +34,7 @@ data ATerm where
   ATApp   :: Type -> ATerm -> ATerm -> ATerm
   ATPair  :: Type -> ATerm -> ATerm -> ATerm
   ATInj   :: Type -> Side -> ATerm -> ATerm
-  ATInt   :: Integer -> ATerm
+  ATNat   :: Integer -> ATerm
   ATUn    :: Type -> UOp -> ATerm -> ATerm
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
   ATLet   :: Type -> Bind (Rec (Name ATerm, Embed ATerm)) ATerm -> ATerm
@@ -56,7 +56,7 @@ getType (ATAbs ty _)     = ty
 getType (ATApp ty _ _)   = ty
 getType (ATPair ty _ _)  = ty
 getType (ATInj ty _ _)   = ty
-getType (ATInt _)        = TyN      -- XXX something fishy here with numerics
+getType (ATNat _)        = TyN
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
 getType (ATLet ty _)     = ty
@@ -185,14 +185,14 @@ infer (TVar x)      = do
   return $ ATVar ty x
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
-infer (TApp t t')   = do
+infer (TJuxt t t')   = do
   at <- infer t
   inferFunApp at t' <|> inferMulApp at t' <|> throwError (Application at t')
 infer (TPair t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   return $ ATPair (TyPair (getType at1) (getType at2)) at1 at2
-infer (TInt n)      = return $ ATInt n
+infer (TNat n)      = return $ ATNat n
 infer (TBin Add t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

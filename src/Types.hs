@@ -5,71 +5,88 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-
 module Types where
 
 import           Unbound.LocallyNameless
 
+-- | A program is a list of declarations.
 type Prog = [Decl]
 
+-- | A declaration is either a type declaration or a definition.
 data Decl where
   DType :: Name Term -> Type -> Decl
   DDefn :: Name Term -> Term -> Decl
   deriving Show
 
+-- | Injections into a sum type (inl or inr) have a "side" (L or R).
 data Side = L | R
   deriving Show
 
+-- | Unary operators.
 data UOp = Neg
   deriving Show
+
+-- | Binary operators.
 data BOp = Add | Sub | Mul | Div | Equals | Less | And | Or
   deriving Show
 
+-- | Terms.
 data Term where
-  TVar   :: Name Term -> Term
-  TUnit  :: Term
-  TBool  :: Bool -> Term
-  TAbs   :: Bind (Name Term) Term -> Term
-  TApp   :: Term -> Term -> Term
-  TPair  :: Term -> Term -> Term
-  TInj   :: Side -> Term -> Term
-  TInt   :: Integer -> Term
-  TUn    :: UOp -> Term -> Term
-  TBin   :: BOp -> Term -> Term -> Term
+  TVar   :: Name Term -> Term                  -- ^ Variable
+  TUnit  :: Term                               -- ^ Unit ()
+  TBool  :: Bool -> Term                       -- ^ Boolean
+  TAbs   :: Bind (Name Term) Term -> Term      -- ^ Anonymous function abstraction
+  TJuxt  :: Term -> Term -> Term               -- ^ Juxtaposition (can be either
+                                               --   function application or multiplication)
+  TPair  :: Term -> Term -> Term               -- ^ Ordered pairs (x,y)
+  TInj   :: Side -> Term -> Term               -- ^ Injection into a sum type
+  TNat   :: Integer -> Term                    -- ^ A natural number
+  TUn    :: UOp -> Term -> Term                -- ^ Application of a unary operator
+  TBin   :: BOp -> Term -> Term -> Term        -- ^ Application of a binary operator
   TLet   :: Bind (Rec (Name Term, Embed Term)) Term -> Term
-  TCase  :: [Branch] -> Term
-  TAscr  :: Term -> Type -> Term
-  TWrong :: Term
+                                               -- ^ Recursive let expression
+                                               --   (let x = t1 in t2)
+  TCase  :: [Branch] -> Term                   -- ^ A case expression
+                                               --   consists of a list
+                                               --   of branches.
+  TAscr  :: Term -> Type -> Term               -- ^ Type ascription (expr : type)
+  TWrong :: Term                               -- ^ WRONG
   deriving Show
 
+-- | A branch of a case is a list of guards with an accompanying term.
+--   The guards scope over the term.
 type Branch = Bind [Guard] Term
 
+-- | A single guard in a branch.
 data Guard where
-  GIf    :: Embed Term -> Guard
-  GWhere :: Embed Term -> Pattern -> Guard
+  GIf    :: Embed Term -> Guard             -- ^ Boolean guard (if <test>)
+  GWhere :: Embed Term -> Pattern -> Guard  -- ^ Pattern guard (where term = pat)
   deriving Show
 
+-- | Patterns.
 data Pattern where
-  PVar  :: Name Term -> Pattern
-  PWild :: Pattern
-  PUnit :: Pattern
-  PBool :: Bool -> Pattern
-  PPair :: Pattern -> Pattern -> Pattern
-  PInj  :: Side -> Pattern -> Pattern
-  PInt  :: Integer -> Pattern
-  PSucc :: Pattern -> Pattern
+  PVar  :: Name Term -> Pattern             -- ^ Variable
+  PWild :: Pattern                          -- ^ Wildcard _
+  PUnit :: Pattern                          -- ^ Unit ()
+  PBool :: Bool -> Pattern                  -- ^ Literal boolean
+  PPair :: Pattern -> Pattern -> Pattern    -- ^ Pair pattern (pat1, pat2)
+  PInj  :: Side -> Pattern -> Pattern       -- ^ Injection pattern (inl pat or inr pat)
+  PNat  :: Integer -> Pattern               -- ^ Literal natural number pattern
+  PSucc :: Pattern -> Pattern               -- ^ Successor pattern, (succ n)
   deriving Show
+  -- TODO: figure out how to match on Z or Q!
 
+-- | Types.
 data Type where
-  TyVoid   :: Type
-  TyUnit   :: Type
-  TyBool   :: Type
-  TyArr    :: Type -> Type -> Type
-  TyPair   :: Type -> Type -> Type
-  TySum    :: Type -> Type -> Type
-  TyN      :: Type
-  TyZ      :: Type
-  TyQ      :: Type
+  TyVoid   :: Type                  -- ^ Void
+  TyUnit   :: Type                  -- ^ Unit
+  TyBool   :: Type                  -- ^ Bool
+  TyArr    :: Type -> Type -> Type  -- ^ Function type,  T1 -> T2
+  TyPair   :: Type -> Type -> Type  -- ^ Pair type, T1 * T2
+  TySum    :: Type -> Type -> Type  -- ^ Sum type, T1 + T2
+  TyN      :: Type                  -- ^ Natural numbers
+  TyZ      :: Type                  -- ^ Integers
+  TyQ      :: Type                  -- ^ Rationals
   deriving (Show, Eq)
 
 derive [''Side, ''UOp, ''BOp, ''Term, ''Guard, ''Pattern, ''Type]

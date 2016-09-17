@@ -74,7 +74,7 @@ parseAtom
   <|> TBool True  <$ reserved "true"
   <|> TBool False <$ reserved "false"
   <|> TVar <$> ident
-  <|> TInt <$> natural
+  <|> TNat <$> natural
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
 
   <|> parens parseTerm
@@ -124,21 +124,20 @@ parseAtomicPattern =
   <|> PUnit <$ reserved "()"
   <|> PBool True  <$ reserved "true"
   <|> PBool False <$ reserved "false"
-  <|> PInt <$> natural
+  <|> PNat <$> natural
   <|> try (PPair <$> (symbol "(" *> parsePattern) <*> (symbol "," *> parsePattern <* symbol ")"))
   <|> parens parsePattern
 
 parsePattern :: Parser Pattern
 parsePattern =
       PInj <$> parseInj <*> parseAtomicPattern
-  <|> PInt <$> integer
   <|> PSucc <$> (symbol "S" *> parseAtomicPattern)
   <|> parseAtomicPattern
 
 parseExpr :: Parser Term
 parseExpr = buildExpressionParser table parseAtom <?> "expression"
   where
-    table = [ [ binary ""  TApp AssocLeft ]
+    table = [ [ binary ""  TJuxt AssocLeft ]
             , [ unary  "-" (TUn Neg) ]
             , [ binary "*" (TBin Mul) AssocLeft
               , binary "/" (TBin Div) AssocLeft

@@ -51,11 +51,11 @@ prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    =
   lunbind bnd $ \(x,body) ->
   hsep [prettyName x, text "|->", prettyTerm body]
-prettyTerm (TApp t1 t2)  = parens (prettyTerm t1) <+> parens (prettyTerm t2) -- XXX
+prettyTerm (TJuxt t1 t2)  = parens (prettyTerm t1) <+> parens (prettyTerm t2) -- XXX
 prettyTerm (TPair t1 t2) =
   parens (prettyTerm t1 <> text "," <+> prettyTerm t2)
 prettyTerm (TInj side t) = prettySide side <+> parens (prettyTerm t)  -- XXX
-prettyTerm (TInt n)      = integer n
+prettyTerm (TNat n)      = integer n
 prettyTerm (TUn op t)    = prettyUOp op <> parens (prettyTerm t)   -- XXX
 prettyTerm (TBin op t1 t2) = hsep [parens $ prettyTerm t1, prettyBOp op, parens $ prettyTerm t2]  -- XXX
 prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->

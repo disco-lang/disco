@@ -30,8 +30,8 @@ interpTerm :: Term -> Either InterpError Value
 interpTerm = interpTerm' M.empty
 
 interpTerm' :: Env -> Term -> Either InterpError Value
-interpTerm' e (TVar x)   = maybe (Left $ UnboundError x) Right (M.lookup x e)
-interpTerm' _ TUnit      = Right VUnit
-interpTerm' _ (TBool b)  = Right (VBool b)
-interpTerm' e (TAbs abs) = undefined
-interpTerm' e (TApp f x) = undefined
+interpTerm' e (TVar x)    = maybe (Left $ UnboundError x) Right (M.lookup x e)
+interpTerm' _ TUnit       = Right VUnit
+interpTerm' _ (TBool b)   = Right (VBool b)
+interpTerm' e (TAbs abs)  = undefined
+interpTerm' e (TJuxt f x) = undefined

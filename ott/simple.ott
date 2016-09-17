@@ -136,6 +136,8 @@ grammar
     | -->                 ::   :: red        {{ tex \longrightarrow }}
     | --->                ::   :: yields     {{ tex \rightsquigarrow }}
     |  ->                 ::   :: arrow      {{ tex \rightarrow }}
+    | =>                  ::   :: infers     {{ tex \Rightarrow }}
+    | <=                  ::   :: checks     {{ tex \Leftarrow }}
     | |-                  ::   :: turnstile  {{ tex \vdash }}
     | |-b                 ::   :: bturnstile {{ tex \vdash_b }}
     | |-g                 ::   :: gturnstile {{ tex \vdash_g }}
@@ -160,6 +162,7 @@ grammar
     | ||                  ::   :: or         {{ tex \mathbin{|\!|} }}
     | [[                  ::   :: llb        {{ tex \llbracket }}
     | ]]                  ::   :: rrb        {{ tex \rrbracket }}
+    | \/                  ::   :: lub        {{ tex \sqcup }}
 
   formula :: 'formula_' ::=
     | judgement           ::   :: judgement
@@ -186,7 +189,7 @@ substitutions
 defns
   Jsub :: '' ::=
 
-defn
+  defn
     T1 <: T2 :: :: sub :: sub_     {{ com [[T1]] is a subtype of [[T2]] }} by
 
     ------ :: refl
@@ -213,6 +216,29 @@ defn
     T1 <: T1'    T2 <: T2'
     ---------------------- :: sum
     T1 ++ T2 <: T1' ++ T2'
+
+  defn
+    T1 = T2 \/ T3 :: :: lub :: lub_    {{ com [[T1]] is the lub of [[T2]] and [[T3]] }} by
+
+    T2 <: T1
+    ------------- :: subl
+    T1 = T1 \/ T2
+
+    T1 <: T2
+    ------------- :: subr
+    T2 = T1 \/ T2
+
+    T21 = T22 \/ T23
+    ---------------------------------- :: funty
+    T1 -> T21 = T1 -> T22 \/ T1 -> T23
+
+    T11 = T12 \/ T13     T21 = T22 \/ T23
+    ------------------------------------- :: prod
+    T11 ** T21 = T12 ** T22 \/ T13 ** T23
+
+    T11 = T12 \/ T13     T21 = T22 \/ T23
+    ------------------------------------- :: sum
+    T11 ++ T21 = T12 ++ T22 \/ T13 ++ T23
 
 defns
   Jtype :: '' ::=
@@ -534,3 +560,102 @@ defns
     n >= 1     (n - 1) ~ p ---> theta
     --------------------------------- :: succ
     n ~ S p ---> theta
+
+
+defns
+  Jalgtype :: '' ::=
+
+  defn
+    G |- t => T :: :: infer :: inf_    {{ com [[t]] synthesizes type [[T]] in context [[G]] }} by
+
+    x : T elem G
+    ------------ :: var
+    G |- x => T
+
+    --------------- :: unit
+    G |- () => Unit
+
+    ----------------- :: true
+    G |- true => Bool
+
+    ----------------- :: false
+    G |- false => Bool
+
+    G |- t => T1 -> T2    G |- t' <= T1
+    ----------------------------------- :: apply
+    G |- t t' => T2
+
+    G |- t => num1    G |- t' => num2
+    num3 = num1 \/ num2
+    ----------------------------------- :: mul_num
+    G |- t t' => num3
+
+    G |- t1 => T1    G |- t2 => T2
+    ------------------------------- :: pair
+    G |- (t1, t2) => T1 ** T2
+
+    ----------- :: nat
+    G |- n => N
+
+    G |- t1 => num1    G |- t2 => num2
+    num3 = num1 \/ num2
+    ---------------------------------- :: add
+    G |- t1 + t2 => num3
+
+    G |- t1 => num1    G |- t2 => num2
+    num3 = num1 \/ num2
+    ---------------------------------- :: mul
+    G |- t1 * t2 => num3
+
+    G |- t1 => num1    G |- t2 => num2
+    num3 = num1 \/ num2    num4 = num3 \/ Z
+    ---------------------------------- :: sub
+    G |- t1 - t2 => num3
+
+    G |- t => num      num2 = num \/ Z
+    ----------------------------------- :: neg
+    G |- - t => num2
+
+    G |- t1 <= Q   G |- t2 <= Q
+    --------------------------------- :: div
+    G |- t1 / t2 => Q
+
+    G |- t1 => T1     G |- t2 => T2
+    T3 = T1 \/ T2
+    ---------------------------------- :: eq
+    G |- t1 == t2 => Bool
+
+    G |- t1 <= Q   G |- t2 <= Q
+    --------------------------------- :: lt
+    G |- t1 < t2 => Bool
+
+    G |- t1 <= Bool    G |- t2 <= Bool
+    ---------------------------------- :: and
+    G |- t1 && t2 => Bool
+
+    G |- t1 <= Bool    G |- t2 <= Bool
+    ---------------------------------- :: or
+    G |- t1 || t2 => Bool
+
+    G |- t1 => T1   G, x : T1 |- t2 => T2
+    ----------------------------------------- :: let
+    G |- let x = t1 in t2 => T1
+
+  defn
+    G |- t <= T :: :: check :: chk_    {{ com [[t]] checks at type [[T]] in context [[G]] }} by
+
+    G, x1 : T1 |- t <= T
+    ------------------------- :: abs
+    G |- x1 |-> t <= T1 -> T
+
+    G |- t <= T1
+    ----------------------- :: inl
+    G |- inl t <= T1 ++ T2
+
+    G |- t <= T2
+    ----------------------- :: inr
+    G |- inr t <= T1 ++ T2
+
+    G |- t => T'    T' <: T
+    ----------------------- :: flip
+    G |- t <= T

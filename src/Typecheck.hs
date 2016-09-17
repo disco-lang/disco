@@ -180,6 +180,7 @@ checkSub at ty = do
 --   subtyping).
 isSub :: Type -> Type -> Bool
 isSub ty1 ty2 | ty1 == ty2 = True
+isSub TyVoid _ = True
 isSub TyN TyZ = True
 isSub TyN TyQ = True
 isSub TyZ TyQ = True

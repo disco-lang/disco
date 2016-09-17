@@ -84,8 +84,14 @@ parseInj =
   L <$ reserved "inl" <|> R <$ reserved "inr"
 
 parseTerm :: Parser Term
-parseTerm =
-      TAbs <$> try (bind <$> ident <*> (reservedOp "|->" *> parseTerm))
+parseTerm = ascribe <$> parseTerm' <*> optionMaybe (symbol ":" *> parseType)
+  where
+    ascribe t Nothing   = t
+    ascribe t (Just ty) = TAscr t ty
+
+parseTerm' :: Parser Term
+parseTerm' =
+      TAbs <$> try (bind <$> ident <*> (reservedOp "|->" *> parseTerm'))
   <|> TInj <$> parseInj <*> parseAtom
   <|> parseLet
   <|> parseCase

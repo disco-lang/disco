@@ -38,6 +38,7 @@ data Term where
   TBin   :: BOp -> Term -> Term -> Term
   TLet   :: Bind (Rec (Name Term, Embed Term)) Term -> Term
   TCase  :: [Branch] -> Term
+  TAscr  :: Term -> Type -> Term
   TWrong :: Term
   deriving Show
 

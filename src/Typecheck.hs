@@ -40,6 +40,7 @@ data ATerm where
   ATLet   :: Type -> Bind (Rec (Name ATerm, Embed ATerm)) ATerm -> ATerm
   ATCase  :: Type -> [Branch] -> ATerm
   ATWrong :: Type -> ATerm
+  ATAscr  :: ATerm -> Type -> ATerm
   ATSub   :: Type -> ATerm -> ATerm
   deriving Show
 
@@ -61,6 +62,8 @@ getType (ATBin ty _ _ _) = ty
 getType (ATLet ty _)     = ty
 getType (ATCase ty _)    = ty
 getType (ATWrong ty)     = ty
+getType (ATAscr _ ty)    = ty
+getType (ATSub ty _)     = ty
 
 type Ctx = M.Map (Name Term) Type
 
@@ -239,6 +242,9 @@ infer (TLet l) = do
   extend x ty1 $ do
   at2 <- infer t2
   return $ ATLet (getType at2) (bind (rec (translate x, embed at1)) at2)
+infer (TAscr t ty) = do
+  at <- check t ty
+  return $ ATAscr at ty
 
 -- XXX todo: case
 
@@ -254,4 +260,6 @@ inferMulApp at t' = do
   at' <- infer t'
   num3 <- numLub at at'
   return $ ATBin num3 Mul at at'
+
+------------------------------------------------------------
 

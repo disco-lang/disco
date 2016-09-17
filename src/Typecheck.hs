@@ -213,6 +213,28 @@ numLub at1 at2 = do
   checkNumTy at2
   lub (getType at1) (getType at2)
 
+-- | Decide whether a type is finite.
+isFinite :: Type -> Bool
+isFinite TyVoid = True
+isFinite TyUnit = True
+isFinite TyBool = True
+isFinite (TyPair ty1 ty2) = isFinite ty1 && isFinite ty2
+isFinite (TySum ty1 ty2)  = isFinite ty1 && isFinite ty2
+isFinite (TyArr ty1 ty2)  = isFinite ty1 && isFinite ty2
+isFinite _ = False
+
+-- | Decide whether a type has decidable equality.
+isDecidable :: Type -> Bool
+isDecidable TyVoid = True
+isDecidable TyUnit = True
+isDecidable TyBool = True
+isDecidable TyN    = True
+isDecidable TyZ    = True
+isDecidable TyQ    = True
+isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
+isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
+isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
+
 -- | Require two types to be equal.
 requireSameTy :: Type -> Type -> TCM ()
 requireSameTy ty1 ty2

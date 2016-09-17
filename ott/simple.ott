@@ -243,7 +243,64 @@ defns
 defns
   Jtype :: '' ::=
 
-defn
+  defn
+    Finite T :: :: fin :: fin_      {{ com [[T]] is finite }} by
+
+    ------------- :: Void
+    Finite Void
+
+    ------------- :: Unit
+    Finite Unit
+
+    ------------- :: Bool
+    Finite Bool
+
+    Finite T1   Finite T2
+    --------------------- :: prod
+    Finite T1 ** T2
+
+    Finite T1   Finite T2
+    --------------------- :: sum
+    Finite T1 ++ T2
+
+    Finite T1   Finite T2
+    --------------------- :: funty
+    Finite T1 -> T2
+
+  defn
+    Decidable T :: :: dec :: dec_   {{ com [[T]] has decidable equality }} by
+
+    -------------- :: Void
+    Decidable Void
+
+    -------------- :: Unit
+    Decidable Unit
+
+    -------------- :: Bool
+    Decidable Bool
+
+    -------------- :: N
+    Decidable N
+
+    -------------- :: Z
+    Decidable Z
+
+    -------------- :: Q
+    Decidable Q
+
+    Decidable T1   Decidable T2
+    --------------------------- :: prod
+    Decidable T1 ** T2
+
+    Decidable T1   Decidable T2
+    --------------------------- :: sum
+    Decidable T1 ++ T2
+
+    Finite T1    Decidable T2
+    ------------------------- :: funty
+    Decidable T1 -> T2
+
+  defn
     G |- t : T :: :: type :: ty_    {{ com [[t]] has type [[T]] in context [[G]] }} by
 
     x : T elem G
@@ -306,8 +363,8 @@ defn
     ----------------------------- :: mul_num
     G |- t t' : num
 
-    G |- t1 : T    G |- t2 : T
-    -------------------------- :: eq
+    G |- t1 : T    G |- t2 : T   Decidable T
+    ---------------------------------------- :: eq
     G |- t1 == t2 : Bool
 
     G |- t1 : num    G |- t2 : num

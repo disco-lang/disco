@@ -22,32 +22,43 @@ import           Unbound.LocallyNameless
 
 import           Types
 
--- Terms with type annotations.
--- Should probably really do this with a 2-level/open recursion
+-- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a free comonad or whatever
 
+-- | An @ATerm@ is a typechecked term where every node in the tree has
+--   been annotated with the type of the subterm rooted at that node.
 data ATerm where
-  ATVar   :: Type -> Name Term -> ATerm
-  ATUnit  :: ATerm
-  ATBool  :: Bool -> ATerm
-  ATAbs   :: Type -> Bind (Name ATerm) ATerm -> ATerm
-  ATApp   :: Type -> ATerm -> ATerm -> ATerm
-  ATPair  :: Type -> ATerm -> ATerm -> ATerm
-  ATInj   :: Type -> Side -> ATerm -> ATerm
-  ATNat   :: Integer -> ATerm
-  ATUn    :: Type -> UOp -> ATerm -> ATerm
-  ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
-  ATLet   :: Type -> Bind (Rec (Name ATerm, Embed ATerm)) ATerm -> ATerm
-  ATCase  :: Type -> [Branch] -> ATerm
-  ATWrong :: Type -> ATerm
-  ATAscr  :: ATerm -> Type -> ATerm
-  ATSub   :: Type -> ATerm -> ATerm
+  ATVar   :: Type -> Name Term -> ATerm                 -- ^ Variable with its type.
+  ATUnit  :: ATerm                                      -- ^ Unit.  We don't bother
+                                                        --   storing TyUnit here.
+  ATBool  :: Bool -> ATerm                              -- ^ Bool.  Don't bother storing
+                                                        --   the type.
+  ATAbs   :: Type -> Bind (Name ATerm) ATerm -> ATerm   -- ^ Abstraction.
+  ATApp   :: Type -> ATerm -> ATerm -> ATerm            -- ^ Application.
+  ATPair  :: Type -> ATerm -> ATerm -> ATerm            -- ^ Pair.
+  ATInj   :: Type -> Side -> ATerm -> ATerm             -- ^ Injection.
+  ATNat   :: Integer -> ATerm                           -- ^ Natural number.
+  ATUn    :: Type -> UOp -> ATerm -> ATerm              -- ^ Unary operator.
+  ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm     -- ^ Binary operator.
+  ATLet   :: Type -> Bind (Rec (Name ATerm, Embed ATerm)) ATerm -> ATerm  -- ^ Let.
+  ATCase  :: Type -> [Branch] -> ATerm                  -- ^ Case expression.
+  ATWrong :: Type -> ATerm                              -- ^ Wrong can have any type.
+  ATAscr  :: ATerm -> Type -> ATerm                     -- ^ Ascription.
+  ATSub   :: Type -> ATerm -> ATerm                     -- ^ @ATSub@ is used to record
+                                                        --   the fact that we made use of
+                                                        --   a subtyping judgment.
+                                                        --   The term has the given type T
+                                                        --   because its type is a subtype
+                                                        --   of T.
   deriving Show
+  -- TODO: I don't think we are currently very consistent about using ATSub everywhere
+  --   subtyping is invoked.  I am not sure how much it matters.
 
 derive [''ATerm]
 
 instance Alpha ATerm
 
+-- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
 getType (ATVar ty _)     = ty
 getType ATUnit           = TyUnit
@@ -67,28 +78,45 @@ getType (ATSub ty _)     = ty
 
 type Ctx = M.Map (Name Term) Type
 
+-- | Potential typechecking errors.
 data TCError
-  = Unbound (Name Term)
-  | NotArrow Term Type     -- the type of a lambda should be an arrow type but isn't
-  | NotFun   ATerm         -- the term should be a function but has a non-arrow type
-  | NotSum Term Type
-  | Mismatch Type ATerm    -- expected, actual
-  | CantInfer Term
-  | NotNum ATerm
-  | IncompatibleTypes Type Type
-  | Application ATerm Term  -- trying to apply fst to snd, not a function or not numeric etc.
-  | NoError
+  = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | NotArrow Term Type     -- ^ The type of a lambda should be an arrow type but isn't
+  | NotFun   ATerm         -- ^ The term should be a function but has a non-arrow type
+  | NotSum Term Type       -- ^ The term is an injection but is
+                           --   expected to have some type other than
+                           --   a sum type
+  | Mismatch Type ATerm    -- ^ Simple type mismatch: expected, actual
+  | CantInfer Term         -- ^ We were asked to infer the type of the
+                           --   term, but its type cannot be inferred
+  | NotNum ATerm           -- ^ The term is expected to have a numeric type but it doesn't
+  | IncompatibleTypes Type Type  -- ^ The types should have a lub
+                                 -- (i.e. common supertype) but they
+                                 -- don't.
+  | Juxtaposition ATerm Term
+                           -- ^ The first term is juxtaposed with the
+                           --   second, but typechecks as neither
+                           --   function application nor
+                           --   multiplication
+  | NoError                -- ^ Not an error.  The identity of the
+                           --   @Monoid TCError@ instance.
   deriving Show
 
+-- | 'TCError' is a monoid where we simply discard the first error.
 instance Monoid TCError where
   mempty = NoError
   mappend _ r = r
 
+-- | TypeCheckingMonad. Maintains a context of variable types, and can
+-- throw @TCError@s and generate fresh names.
 type TCM = ReaderT Ctx (ExceptT TCError LFreshM)
 
+-- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError a
 runTCM = runLFreshM . runExceptT . flip runReaderT M.empty
 
+-- | Look up a name in the context, either returning its type or
+--   throwing an unbound variable exception if it is not found.
 lookup :: Name Term -> TCM Type
 lookup x = do
   ctx <- ask
@@ -96,30 +124,45 @@ lookup x = do
     Nothing -> throwError (Unbound x)
     Just ty -> return ty
 
+-- | Run a @TCM@ computation in a context extended with a new binding.
 extend :: Name Term -> Type -> TCM a -> TCM a
 extend x ty = local (M.insert x ty)
 
+-- | Check that a term has the given type.  Either throws an error, or
+--   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
 
+  -- To check that an abstraction has an arrow type, check that the
+  -- body has the return type under an extended context.
 check (TAbs abs) ty@(TyArr ty1 ty2) = do
   lunbind abs $ \(x,t) -> do
   extend x ty1 $ do
   at <- check t ty2
   return $ ATAbs ty (bind (translate x) at)
+  -- We are trying to check an abstraction under a non-arrow type: error.
 check t@(TAbs _) ty = throwError (NotArrow t ty)
 
+  -- To check an injection has a sum type, recursively check the
+  -- relevant type.
 check (TInj L t) ty@(TySum ty1 ty2) = do
   at <- check t ty1
   return $ ATInj ty L at
 check (TInj R t) ty@(TySum ty1 ty2) = do
   at <- check t ty2
   return $ ATInj ty R at
+  -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
+  -- Finally, to check anything else, we can infer its type and then
+  -- check that the inferred type is a subtype of the given type.
 check t ty = do
   at <- infer t
   checkSub at ty
 
+-- | Check that the given annotated term has a type which is a subtype
+--   of the given type.  The returned annotated term may be the same
+--   as the input, or it may be wrapped in 'ATSub' if we made a
+--   nontrivial use of subtyping.
 checkSub :: ATerm -> Type -> TCM ATerm
 checkSub at ty = do
   let ty' = getType at
@@ -131,6 +174,8 @@ checkSub at ty = do
    else
      throwError (Mismatch ty at)
 
+-- | Check whether one type is a subtype of another (we have decidable
+--   subtyping).
 isSub :: Type -> Type -> Bool
 isSub ty1 ty2 | ty1 == ty2 = True
 isSub TyN TyZ = True
@@ -141,6 +186,7 @@ isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub _ _ = False
 
+-- | Compute the least upper bound
 lub :: Type -> Type -> TCM Type
 lub ty1 ty2
   | isSub ty1 ty2 = return ty2
@@ -187,7 +233,7 @@ infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
 infer (TJuxt t t')   = do
   at <- infer t
-  inferFunApp at t' <|> inferMulApp at t' <|> throwError (Application at t')
+  inferFunApp at t' <|> inferMulApp at t' <|> throwError (Juxtaposition at t')
 infer (TPair t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

@@ -13,6 +13,7 @@ module Typecheck where
 
 import Prelude hiding (lookup)
 
+import Control.Applicative ((<|>))
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import qualified Data.Map                as M
@@ -70,7 +71,15 @@ data TCError
   | NotSum Term Type
   | Mismatch Type ATerm    -- expected, actual
   | CantInfer Term
+  | NotNum ATerm
+  | IncompatibleTypes Type Type
+  | Application ATerm Term  -- trying to apply fst to snd, not a function or not numeric etc.
+  | NoError
   deriving Show
+
+instance Monoid TCError where
+  mempty = NoError
+  mappend _ r = r
 
 type TCM = ReaderT Ctx (ExceptT TCError LFreshM)
 
@@ -106,7 +115,6 @@ check t@(TInj _ _) ty = throwError (NotSum t ty)
 
 check t ty = do
   at <- infer t
-  let ty' = getType at
   checkSub at ty
 
 checkSub :: ATerm -> Type -> TCM ATerm
@@ -125,13 +133,48 @@ isSub ty1 ty2 | ty1 == ty2 = True
 isSub TyN TyZ = True
 isSub TyN TyQ = True
 isSub TyZ TyQ = True
+isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub _ _ = False
 
+lub :: Type -> Type -> TCM Type
+lub ty1 ty2
+  | isSub ty1 ty2 = return ty2
+  | isSub ty2 ty1 = return ty1
+lub (TyArr t1 t2) (TyArr t1' t2') = do
+  requireSameTy t1 t1'
+  t2'' <- lub t2 t2'
+  return $ TyArr t1 t2''
+lub (TyPair t1 t2) (TyPair t1' t2') = do
+  t1'' <- lub t1 t1'
+  t2'' <- lub t2 t2'
+  return $ TyPair t1'' t2''
+lub (TySum t1 t2) (TySum t1' t2') = do
+  t1'' <- lub t1 t1'
+  t2'' <- lub t2 t2'
+  return $ TySum t1'' t2''
+
+numLub :: ATerm -> ATerm -> TCM Type
+numLub at1 at2 = do
+  checkNumTy at1
+  checkNumTy at2
+  lub (getType at1) (getType at2)
+
+requireSameTy :: Type -> Type -> TCM ()
+requireSameTy ty1 ty2
+  | ty1 == ty2 = return ()
+  | otherwise  = throwError $ IncompatibleTypes ty1 ty2
+
 getFunTy :: ATerm -> TCM (Type, Type)
 getFunTy (getType -> TyArr ty1 ty2) = return (ty1, ty2)
 getFunTy at = throwError (NotFun at)
+
+checkNumTy :: ATerm -> TCM ()
+checkNumTy at =
+  if (getType at `elem` [TyN, TyZ, TyQ])
+     then return ()
+     else throwError (NotNum at)
 
 infer :: Term -> TCM ATerm
 infer (TVar x)      = do
@@ -141,17 +184,54 @@ infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
 infer (TApp t t')   = do
   at <- infer t
-  (ty1, ty2) <- getFunTy at
-  at' <- check t' ty1
-  return $ ATApp ty2 at at'
+  inferFunApp at t' <|> inferMulApp at t' <|> throwError (Application at t')
 infer (TPair t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   return $ ATPair (TyPair (getType at1) (getType at2)) at1 at2
 infer (TInt n)      = return $ ATInt n
-
--- XXX todo: arithmetic operators, with lub etc.
-
+infer (TBin Add t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  return $ ATBin num3 Add at1 at2
+infer (TBin Mul t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  return $ ATBin num3 Mul at1 at2
+infer (TBin Sub t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  num4 <- lub num3 TyZ
+  return $ ATBin num4 Sub at1 at2
+infer (TUn Neg t) = do
+  at <- infer t
+  checkNumTy at
+  num2 <- lub (getType at) TyZ
+  return $ ATUn num2 Neg at
+infer (TBin Div t1 t2) = do
+  at1 <- check t1 TyQ
+  at2 <- check t2 TyQ
+  return $ ATBin TyQ Div at1 at2
+infer (TBin Equals t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  _ <- lub (getType at1) (getType at2)
+  return $ ATBin TyBool Equals at1 at2
+infer (TBin Less t1 t2) = do
+  at1 <- check t1 TyQ
+  at2 <- check t2 TyQ
+  return $ ATBin TyBool Less at1 at2
+infer (TBin And t1 t2) = do
+  at1 <- check t1 TyBool
+  at2 <- check t2 TyBool
+  return $ ATBin TyBool And at1 at2
+infer (TBin Or t1 t2) = do
+  at1 <- check t1 TyBool
+  at2 <- check t2 TyBool
+  return $ ATBin TyBool Or at1 at2
 infer (TLet l) = do
   lunbind l $ \(unrec -> (x, unembed -> t1), t2) -> do
   at1 <- infer t1
@@ -163,3 +243,15 @@ infer (TLet l) = do
 -- XXX todo: case
 
 infer t = throwError (CantInfer t)
+
+
+inferFunApp at t' = do
+  (ty1, ty2) <- getFunTy at
+  at' <- check t' ty1
+  return $ ATApp ty2 at at'
+
+inferMulApp at t' = do
+  at' <- infer t'
+  num3 <- numLub at at'
+  return $ ATBin num3 Mul at at'
+

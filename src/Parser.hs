@@ -27,6 +27,7 @@ lexer :: P.TokenParser u
 lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "where"
+                        , "otherwise"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
@@ -60,14 +61,19 @@ whiteSpace = P.whiteSpace lexer
 ------------------------------------------------------------
 -- Parser
 
+-- | Parse an entire program (a list of declarations ended by
+--   semicolons).
 parseProg :: Parser Prog
 parseProg = parseDecl `sepEndBy` symbol ";"
 
+-- | Parse a single declaration (either a type declaration or
+--   definition).
 parseDecl :: Parser Decl
 parseDecl =
       try (DType <$> ident <*> (symbol ":" *> parseType))
   <|>      DDefn <$> ident <*> (symbol "=" *> parseTerm)
 
+-- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom
   =   TUnit       <$ reserved "()"
@@ -79,16 +85,20 @@ parseAtom
 
   <|> parens parseTerm
 
+-- | Parse an injection, i.e. either @inl@ or @inr@.
 parseInj :: Parser Side
 parseInj =
   L <$ reserved "inl" <|> R <$ reserved "inr"
 
+-- | Parse a term, consisting of a @parseTerm'@ optionally
+--   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = ascribe <$> parseTerm' <*> optionMaybe (symbol ":" *> parseType)
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
 
+-- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' =
       TAbs <$> try (bind <$> ident <*> (reservedOp "|->" *> parseTerm'))
@@ -98,6 +108,7 @@ parseTerm' =
   <|> parseExpr
   <|> parseAtom
 
+-- | Parse a let expression (@let x = t1 in t2@).
 parseLet :: Parser Term
 parseLet =
   TLet <$>
@@ -106,11 +117,25 @@ parseLet =
         <$> (rec <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))))
         <*> (reserved "in" *> parseTerm)))
 
+-- | Parse a case expression.
 parseCase :: Parser Term
 parseCase = TCase <$> (reserved "case" *> many parseBranch)
 
+-- | Parse one branch of a case expression.  Note a branch can start
+--   with many curly braces since we allow empty lines just for
+--   aesthetics, e.g.
+--
+--   @
+--     case {  3    where t = (false, _)
+--          {  5    where t = (true, 16)
+--          {
+--          {  7    otherwise
+--   @
 parseBranch :: Parser Branch
-parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> many parseGuard)
+parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
+
+parseGuards :: Parser [Guard]
+parseGuards = ([] <$ reserved "otherwise") <|> many parseGuard
 
 parseGuard :: Parser Guard
 parseGuard =

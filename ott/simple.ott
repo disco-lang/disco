@@ -55,6 +55,7 @@ grammar
     | let x = t1 in t2    ::   :: let (+ bind x in t1 +)
                                       (+ bind x in t2 +)  {{ com letrec }}
     | case branches       ::   :: case                    {{ com case analysis }}
+    | t : T               ::   :: ascribe                 {{ com type ascription }}
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub
     | 1                   :: M :: One
@@ -387,6 +388,10 @@ defns
     --------------- :: case
     G |- case b : T
 
+    G |- t : T
+    ---------------- :: ascribe
+    G |- (t : T) : T
+
 defn
     G |-b b : T :: :: branches_type :: bty_       {{ com branches [[b]] have type [[T]] in context [[G]] }} by
 
@@ -697,6 +702,10 @@ defns
     G |- t1 => T1   G, x : T1 |- t2 => T2
     ----------------------------------------- :: let
     G |- let x = t1 in t2 => T1
+
+    G |- t <= T
+    ----------------- :: ascribe
+    G |- (t : T) => T
 
   defn
     G |- t <= T :: :: check :: chk_    {{ com [[t]] checks at type [[T]] in context [[G]] }} by

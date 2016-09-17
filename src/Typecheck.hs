@@ -98,6 +98,8 @@ data TCError
                            --   second, but typechecks as neither
                            --   function application nor
                            --   multiplication
+  | Undecidable Type       -- ^ The type should be decidable so we can
+                           --   check equality, but it isn't.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -235,6 +237,13 @@ isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
 
+-- | Check whether the given type has decidable equality, and throw an
+--   error if not.
+checkDecidable :: Type -> TCM ()
+checkDecidable ty
+  | isDecidable ty = return ()
+  | otherwise      = throwError $ Undecidable ty
+
 -- | Require two types to be equal.
 requireSameTy :: Type -> Type -> TCM ()
 requireSameTy ty1 ty2
@@ -316,11 +325,11 @@ infer (TBin Div t1 t2) = do
   at2 <- check t2 TyQ
   return $ ATBin TyQ Div at1 at2
 
-  -- XXX fix me!
 infer (TBin Equals t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
-  _ <- lub (getType at1) (getType at2)
+  ty3 <- lub (getType at1) (getType at2)
+  checkDecidable ty3
   return $ ATBin TyBool Equals at1 at2
 infer (TBin Less t1 t2) = do
   at1 <- check t1 TyQ

@@ -325,16 +325,27 @@ infer (TBin Div t1 t2) = do
   at2 <- check t2 TyQ
   return $ ATBin TyQ Div at1 at2
 
+  -- An equality test always has type Bool, but we need to check a few
+  -- things first. We infer the types of both subterms and check that
+  -- (1) they have a common supertype which (2) has decidable
+  -- equality.
 infer (TBin Equals t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   ty3 <- lub (getType at1) (getType at2)
   checkDecidable ty3
   return $ ATBin TyBool Equals at1 at2
+
+  -- A less-than test always has type Bool, but we have to make sure
+  -- the subterms are OK.  We can simply check that both subterms can
+  -- be given type Q.
 infer (TBin Less t1 t2) = do
   at1 <- check t1 TyQ
   at2 <- check t2 TyQ
   return $ ATBin TyBool Less at1 at2
+
+  -- && and || always have type Bool, and the subterms must have type
+  -- Bool as well.
 infer (TBin And t1 t2) = do
   at1 <- check t1 TyBool
   at2 <- check t2 TyBool
@@ -343,6 +354,7 @@ infer (TBin Or t1 t2) = do
   at1 <- check t1 TyBool
   at2 <- check t2 TyBool
   return $ ATBin TyBool Or at1 at2
+
 infer (TLet l) = do
   lunbind l $ \(unrec -> (x, unembed -> t1), t2) -> do
   at1 <- infer t1

@@ -26,7 +26,7 @@ import           Types
 lexer :: P.TokenParser u
 lexer = P.makeTokenParser $
   haskellStyle
-  { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "where"
+  { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "when"
                         , "otherwise"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
@@ -126,8 +126,8 @@ parseCase = TCase <$> (reserved "case" *> many parseBranch)
 --   aesthetics, e.g.
 --
 --   @
---     case {  3    where t = (false, _)
---          {  5    where t = (true, 16)
+--     case {  3    when t = (false, _)
+--          {  5    when t = (true, 16)
 --          {
 --          {  7    otherwise
 --   @
@@ -139,11 +139,11 @@ parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
 parseGuards :: Parser [Guard]
 parseGuards = ([] <$ reserved "otherwise") <|> many parseGuard
 
--- | Parse a single guard (either @if@ or @where@)
+-- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
 parseGuard =
-      GIf    <$> (embed <$> (reserved "if" *> parseTerm))
-  <|> GWhere <$> (embed <$> (reserved "where" *> parseTerm)) <*> (symbol "=" *> parsePattern)
+      GIf   <$> (embed <$> (reserved "if" *> parseTerm))
+  <|> GWhen <$> (embed <$> (reserved "when" *> parseTerm)) <*> (symbol "=" *> parsePattern)
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern

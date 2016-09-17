@@ -118,7 +118,7 @@ grammar
 
   aguard, ag :: 'aguard_' ::=                           {{ com atomic guard }}
     | if t                ::   :: bool  (+ binders = {} +)          {{ com boolean guard }}
-    | where t = p         ::   :: pat   (+ binders = binders(p) +)  {{ com pattern guard }}
+    | when t = p          ::   :: pat   (+ binders = binders(p) +)  {{ com pattern guard }}
 
   guard, g :: 'guard_' ::=                              {{ com guard }}
     | top                 ::   :: top   (+ binders = {} +)    {{ com trivial guard }}
@@ -423,8 +423,8 @@ defn
 
     G |-p p : T2 ---> G2      G |- t2 : T2
     G , G2 |-g t1 , g : T
-    ----------------------------- :: where
-    G |-g t1 , where t2 = p g : T
+    ----------------------------- :: when
+    G |-g t1 , when t2 = p g : T
 
 defn
     G |-p p : T ---> G' :: :: pattern :: 'p_'  {{ com [[p]] has type [[T]] in context [[G]], and produces bindings [[G']] }} by
@@ -557,8 +557,8 @@ defns
     if t g --> if t' g
 
     t --> t'
-    -------------------------------- :: where
-    where t = p g --> where t' = p g
+    -------------------------------- :: when
+    when t = p g --> when t' = p g
 
     defn
     guard ---> theta ::  :: success :: 'success_'   {{ com [[guard]] succeeds, producing substitution [[theta]] }} by
@@ -573,7 +573,7 @@ defns
     t ~ p ---> theta1
     g ---> theta2
     -------------------------------- :: match
-    where t = p g ---> theta2 theta1
+    when t = p g ---> theta2 theta1
 
     defn
     guard ! ::  :: failure :: 'fail_'   {{ com [[guard]] fails }} by
@@ -583,7 +583,7 @@ defns
 
     not (t ~ p ---> theta)
     ---------------------- :: match
-    where t = p g !
+    when t = p g !
 
     g !
     ---------- :: rest

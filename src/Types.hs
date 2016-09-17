@@ -59,8 +59,8 @@ type Branch = Bind [Guard] Term
 
 -- | A single guard in a branch.
 data Guard where
-  GIf    :: Embed Term -> Guard             -- ^ Boolean guard (if <test>)
-  GWhere :: Embed Term -> Pattern -> Guard  -- ^ Pattern guard (where term = pat)
+  GIf   :: Embed Term -> Guard             -- ^ Boolean guard (if <test>)
+  GWhen :: Embed Term -> Pattern -> Guard  -- ^ Pattern guard (when term = pat)
   deriving Show
 
 -- | Patterns.

@@ -93,8 +93,8 @@ prettyBranch :: Branch -> Doc
 prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
 
 prettyGuards :: [Guard] -> Doc
--- HDE: What do we want our concrete syntax to be for the trivial guard?
-prettyGuards = foldr (\g r -> prettyGuard g <+> r) (text "")
+prettyGuards [] = text "otherwise"
+prettyGuards gs = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
 prettyGuard (GIf et) = text "if" <+> (prettyTerm (unembed et))

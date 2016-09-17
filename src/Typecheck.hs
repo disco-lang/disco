@@ -186,7 +186,8 @@ isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub _ _ = False
 
--- | Compute the least upper bound
+-- | Compute the least upper bound (least common supertype) of two
+--   types.  Return the LUB, or throw an error if there isn't one.
 lub :: Type -> Type -> TCM Type
 lub ty1 ty2
   | isSub ty1 ty2 = return ty2
@@ -204,41 +205,61 @@ lub (TySum t1 t2) (TySum t1' t2') = do
   t2'' <- lub t2 t2'
   return $ TySum t1'' t2''
 
+-- | Convenience function that ensures the given annotated terms have
+--   numeric types, AND computes their LUB.
 numLub :: ATerm -> ATerm -> TCM Type
 numLub at1 at2 = do
   checkNumTy at1
   checkNumTy at2
   lub (getType at1) (getType at2)
 
+-- | Require two types to be equal.
 requireSameTy :: Type -> Type -> TCM ()
 requireSameTy ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise  = throwError $ IncompatibleTypes ty1 ty2
 
+-- | Require a term to have a function type, returning the decomposed
+--   type if it does, throwing an error if not.
 getFunTy :: ATerm -> TCM (Type, Type)
 getFunTy (getType -> TyArr ty1 ty2) = return (ty1, ty2)
 getFunTy at = throwError (NotFun at)
 
+-- | Check that an annotated term has a numeric type.  Throw an error
+--   if not.
 checkNumTy :: ATerm -> TCM ()
 checkNumTy at =
   if (getType at `elem` [TyN, TyZ, TyQ])
      then return ()
      else throwError (NotNum at)
 
+-- | Infer the type of a term.  If it succeeds, it returns the term
+--   with all subterms annotated.
 infer :: Term -> TCM ATerm
+
+  -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
   ty <- lookup x
   return $ ATVar ty x
+
+  -- A few trivial cases.
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
+infer (TNat n)      = return $ ATNat n
+
 infer (TJuxt t t')   = do
   at <- infer t
   inferFunApp at t' <|> inferMulApp at t' <|> throwError (Juxtaposition at t')
+
+  -- To infer the type of a pair, just infer the types of both components.
 infer (TPair t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   return $ ATPair (TyPair (getType at1) (getType at2)) at1 at2
-infer (TNat n)      = return $ ATNat n
+
+  -- To infer the type of addition or multiplication, infer the types
+  -- of the subterms, check that they are numeric, and return their
+  -- lub.
 infer (TBin Add t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
@@ -249,21 +270,31 @@ infer (TBin Mul t1 t2) = do
   at2 <- infer t2
   num3 <- numLub at1 at2
   return $ ATBin num3 Mul at1 at2
+
+  -- Subtraction is similar, except that we must also lub with Z (a
+  -- Nat minus a Nat is not a Nat, it is an Int).
 infer (TBin Sub t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   num3 <- numLub at1 at2
   num4 <- lub num3 TyZ
   return $ ATBin num4 Sub at1 at2
+
+  -- Negation is similar to subtraction.
 infer (TUn Neg t) = do
   at <- infer t
   checkNumTy at
   num2 <- lub (getType at) TyZ
   return $ ATUn num2 Neg at
+
+  -- Division always has type Q.  We just have to check that
+  -- both subterms can be given type Q.
 infer (TBin Div t1 t2) = do
   at1 <- check t1 TyQ
   at2 <- check t2 TyQ
   return $ ATBin TyQ Div at1 at2
+
+  -- XXX fix me!
 infer (TBin Equals t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

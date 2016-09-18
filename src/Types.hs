@@ -50,7 +50,6 @@ data Term where
                                                --   consists of a list
                                                --   of branches.
   TAscr  :: Term -> Type -> Term               -- ^ Type ascription (expr : type)
-  TWrong :: Term                               -- ^ WRONG
   deriving Show
 
 -- | A branch of a case is a list of guards with an accompanying term.

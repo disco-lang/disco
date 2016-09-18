@@ -64,7 +64,6 @@ prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->
    in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]
 prettyTerm (TCase b) = text "case" $+$ nest 2 (prettyBranches b)
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
-prettyTerm TWrong = text "WRONG"
 -- To do:
 --   add precedence & associativity handling to omit unnecessary parens
 

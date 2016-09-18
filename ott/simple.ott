@@ -60,7 +60,6 @@ grammar
     | theta t'            :: M :: tsub
     | 1                   :: M :: One
     | [[ t ]]             :: M :: arith                   {{ com arithmetic }}
-    | wrong               ::   :: wrong                   {{ com runtime error }}
 
   value, v :: 'v_' ::=                                  {{ com value }}
     | n                   ::   :: nat                     {{ com natural number literal }}
@@ -531,9 +530,6 @@ defns
     not (empty |- t1 : num)
     ------------------------------ :: let
     let x = t1 in t2 --> {t1/x} t2
-
-    -------------------- :: case_empty
-    case empty --> wrong
 
     --------------------------------- :: case_skip
     case { branches --> case branches

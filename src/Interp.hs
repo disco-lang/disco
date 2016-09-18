@@ -5,7 +5,9 @@
 module Interp where
 
 import           Control.Monad           (join)
+import           Data.List               (find)
 import qualified Data.Map                as M
+import           Data.Maybe              (fromJust)
 import           Data.Ratio              ((%))
 
 import           Unbound.LocallyNameless (Name)
@@ -101,7 +103,11 @@ enumerate :: Type -> [Value]
 enumerate TyVoid           = []
 enumerate TyUnit           = [VUnit]
 enumerate TyBool           = [VBool False, VBool True]
-enumerate (TyArr ty1 ty2)  = undefined
+enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
+  where
+    vs1   = enumerate ty1
+    vs2   = enumerate ty2
+    mkFun vs1 vs2 = VFun $ \v -> snd . fromJust $ find (decideFor ty1 v . fst) (zip vs1 vs2)
 enumerate (TyPair ty1 ty2) = [ VPair x y | x <- enumerate ty1, y <- enumerate ty2 ]
 enumerate (TySum ty1 ty2)  = map (VInj L) (enumerate ty1) ++ map (VInj R) (enumerate ty2)
 enumerate _                = []  -- other cases shouldn't happen if the program type checks

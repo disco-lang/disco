@@ -108,7 +108,8 @@ grammar
     | inr p               ::   :: inr   (+ binders = binders(p) +)
                                                               {{ com right }}
     | n                   ::   :: lit   (+ binders = {} +)    {{ com natural }}
-    | S p                 ::   :: succ  (+ binders = {} +)    {{ com successor }}
+    | S p                 ::   :: succ  (+ binders = binders(p) +)
+                                                              {{ com successor }}
     | ( p )               :: S :: paren
 
   branches, b :: 'branches_' ::=

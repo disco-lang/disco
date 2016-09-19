@@ -28,7 +28,7 @@ import           Types
 -- | An @ATerm@ is a typechecked term where every node in the tree has
 --   been annotated with the type of the subterm rooted at that node.
 data ATerm where
-  ATVar   :: Type -> Name Term -> ATerm                 -- ^ Variable with its type.
+  ATVar   :: Type -> Name ATerm -> ATerm                -- ^ Variable with its type.
   ATUnit  :: ATerm                                      -- ^ Unit.  We don't bother
                                                         --   storing TyUnit here.
   ATBool  :: Bool -> ATerm                              -- ^ Bool.  Don't bother storing
@@ -272,7 +272,7 @@ infer :: Term -> TCM ATerm
   -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
   ty <- lookup x
-  return $ ATVar ty x
+  return $ ATVar ty (translate x)
 
   -- A few trivial cases.
 infer TUnit         = return ATUnit

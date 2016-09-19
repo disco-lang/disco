@@ -1,0 +1,29 @@
+-- Prime Number Test:
+--
+-- Citation: "The Haskell Road to Logic, Maths, and Programming, 2nd
+-- Edition, pages 4 - 11"
+
+-- We should add modulus or floor and ceiling to our numeric
+-- operators.
+-- 
+-- The following function returns True if d is a divisor of n.
+divides : Z -> Z -> B
+divides = d -> n -> n % d == 0
+
+-- ldf calculates the least common divisor of n that is at least k.
+--
+-- What will recursion elaborate to?
+ldf : Z -> Z -> Z
+ldf = k -> n -> {k           if divides k n
+                {n           if k^2 > n
+                {ldf (k+1) n otherwise  -- Maybe we should have
+                                        -- an otherwise?
+
+-- ld calculates the least divisor of n.
+ld : Z -> Z
+ld = n -> ldf 2 n
+
+-- Tests whether n is a prime or not.
+isPrime : Z -> Bool
+isPrime = n -> case {False     if n <= 1
+                    {ld n == n if n > 1

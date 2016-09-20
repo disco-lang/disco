@@ -5,19 +5,54 @@
 
 -- We should add modulus or floor and ceiling to our numeric
 -- operators.
--- 
+--
+-- BAY: agreed!  We will probably want to add a bunch of other operators as well.
+-- For example:
+--
+--   x | y   --> Bool, y is divisible by x
+--   x # y   --> Bool, x is relatively prime to y
+--
+-- We could even add more complex functions such as built-in primality
+-- testing, prime generation, etc.  (Of course, just because such things are built-in
+-- doesn't mean you can't also show how to code them by hand, or have students
+-- develop their own implementations.)
+--
 -- The following function returns True if d is a divisor of n.
 divides : Z -> Z -> B
 divides = d -> n -> n % d == 0
 
+-- BAY: Note the concrete syntax we currently have for lambdas is |->
+-- rather than -> (my idea was to mirror the usual math notation using
+-- \mapsto), but I am open to discussion on pretty much anything
+-- syntax-wise.
+
 -- ldf calculates the least common divisor of n that is at least k.
 --
 -- What will recursion elaborate to?
+--
+
+-- BAY: The original idea for 'let' was that it should be 'letrec',
+-- but the current system as described in ott is confused on this
+-- point.  I don't want to add a 'fix' operator because I wouldn't
+-- want to have to explain it to students.  One idea might be to just
+-- have plain non-recursive let, but allow top-level declared things
+-- to be recursive.  We could require type signatures on top-level
+-- things which would make typechecking easier.
+
 ldf : Z -> Z -> Z
 ldf = k -> n -> {k           if divides k n
                 {n           if k^2 > n
                 {ldf (k+1) n otherwise  -- Maybe we should have
                                         -- an otherwise?
+
+-- BAY: We already do have an 'otherwise'!  I introduced it as syntax
+-- sugar for an empty list of guards.
+
+-- BAY: Technically, with what we have now you need to write 'case'
+-- before the first curly brace, which you left out in the definition
+-- of 'ldf' above.  However, perhaps I like this better.  There
+-- doesn't seem to be any particular need for a 'case' keyword from a
+-- syntax/parsing point of view.
 
 -- ld calculates the least divisor of n.
 ld : Z -> Z

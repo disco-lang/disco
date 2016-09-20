@@ -100,6 +100,8 @@ data TCError
                            --   multiplication
   | Undecidable Type       -- ^ The type should be decidable so we can
                            --   check equality, but it isn't.
+  | Unordered Type         -- ^ The type should be totally ordered so
+                           --   we can check less than, but it isn't.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -245,6 +247,23 @@ checkDecidable ty
   | isDecidable ty = return ()
   | otherwise      = throwError $ Undecidable ty
 
+-- | XXX
+isOrdered :: Type -> Bool
+isOrdered TyVoid = True
+isOrdered TyUnit = True
+isOrdered TyBool = True
+isOrdered TyN    = True
+isOrdered TyZ    = True
+isOrdered TyQ    = True
+isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
+isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
+isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2
+
+checkOrdered :: Type -> TCM ()
+checkOrdered ty
+  | isOrdered ty = return ()
+  | otherwise    = throwError $ Unordered ty
+
 -- | Require two types to be equal.
 requireSameTy :: Type -> Type -> TCM ()
 requireSameTy ty1 ty2
@@ -341,8 +360,10 @@ infer (TBin Equals t1 t2) = do
   -- the subterms are OK.  We can simply check that both subterms can
   -- be given type Q.
 infer (TBin Less t1 t2) = do
-  at1 <- check t1 TyQ
-  at2 <- check t2 TyQ
+  at1 <- infer t1
+  at2 <- infer t2
+  ty3 <- lub (getType at1) (getType at2)
+  checkOrdered ty3
   return $ ATBin TyBool Less at1 at2
 
   -- && and || always have type Bool, and the subterms must have type

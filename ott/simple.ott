@@ -305,6 +305,39 @@ defns
     Decidable T1 -> T2
 
   defn
+    Ordered T :: :: ord :: ord_  {{ com [[T]] is totally ordered }} by
+
+    ------------ :: Void
+    Ordered Void
+
+    ------------ :: Unit
+    Ordered Unit
+
+    -------------- :: Bool
+    Ordered Bool
+
+    -------------- :: N
+    Ordered N
+
+    -------------- :: Z
+    Ordered Z
+
+    -------------- :: Q
+    Ordered Q
+
+    Ordered T1   Ordered T2
+    --------------------------- :: prod
+    Ordered T1 ** T2
+
+    Ordered T1   Ordered T2
+    --------------------------- :: sum
+    Ordered T1 ++ T2
+
+    Finite T1   Ordered T1   Ordered T2
+    ----------------------------------- :: funty
+    Ordered T1 -> T2
+
+  defn
     G |- t : T :: :: type :: ty_    {{ com [[t]] has type [[T]] in context [[G]] }} by
 
     x : T elem G
@@ -371,8 +404,8 @@ defns
     ---------------------------------------- :: eq
     G |- t1 == t2 : Bool
 
-    G |- t1 : num    G |- t2 : num
-    ------------------------------ :: lt
+    G |- t1 : T    G |- t2 : T   Ordered T
+    -------------------------------------- :: lt
     G |- t1 < t2 : Bool
 
     G |- t1 : Bool    G |- t2 : Bool
@@ -687,7 +720,8 @@ defns
     ---------------------------------- :: eq
     G |- t1 == t2 => Bool
 
-    G |- t1 <= Q   G |- t2 <= Q
+    G |- t1 => T1     G |- t2 => T2
+    T3 = T1 \/ T2     Ordered T2
     --------------------------------- :: lt
     G |- t1 < t2 => Bool
 

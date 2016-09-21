@@ -23,7 +23,7 @@ import           Unbound.LocallyNameless
 import           Types
 
 -- TODO: Should probably really do this with a 2-level/open recursion
--- approach, with a free comonad or whatever
+-- approach, with a cofree comonad or whatever
 
 -- | An @ATerm@ is a typechecked term where every node in the tree has
 --   been annotated with the type of the subterm rooted at that node.

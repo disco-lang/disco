@@ -247,7 +247,7 @@ checkDecidable ty
   | isDecidable ty = return ()
   | otherwise      = throwError $ Undecidable ty
 
--- | XXX
+-- | Check whether the given type has a total order.
 isOrdered :: Type -> Bool
 isOrdered TyVoid = True
 isOrdered TyUnit = True
@@ -259,6 +259,8 @@ isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2
 
+-- | Check whether the given type has a total order, and throw an
+--   error if not.
 checkOrdered :: Type -> TCM ()
 checkOrdered ty
   | isOrdered ty = return ()
@@ -357,8 +359,8 @@ infer (TBin Equals t1 t2) = do
   return $ ATBin TyBool Equals at1 at2
 
   -- A less-than test always has type Bool, but we have to make sure
-  -- the subterms are OK.  We can simply check that both subterms can
-  -- be given type Q.
+  -- the subterms are OK. We must check that their types are
+  -- compatible and have a total order.
 infer (TBin Less t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

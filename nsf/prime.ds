@@ -17,6 +17,8 @@
 -- doesn't mean you can't also show how to code them by hand, or have students
 -- develop their own implementations.)
 --
+-- HDE: agreed!
+--
 -- The following function returns True if d is a divisor of n.
 divides : Z -> Z -> B
 divides = d -> n -> n % d == 0
@@ -25,6 +27,10 @@ divides = d -> n -> n % d == 0
 -- rather than -> (my idea was to mirror the usual math notation using
 -- \mapsto), but I am open to discussion on pretty much anything
 -- syntax-wise.
+--
+-- HDE: Yeah, I was first using |->, but I am not sure if I like how
+-- it looks.  I was thinking that using the -> seems a little cleaner,
+-- so I was giving it a try to see which we like best.
 
 -- ldf calculates the least common divisor of n that is at least k.
 --
@@ -34,10 +40,16 @@ divides = d -> n -> n % d == 0
 -- BAY: The original idea for 'let' was that it should be 'letrec',
 -- but the current system as described in ott is confused on this
 -- point.  I don't want to add a 'fix' operator because I wouldn't
--- want to have to explain it to students.  One idea might be to just
--- have plain non-recursive let, but allow top-level declared things
--- to be recursive.  We could require type signatures on top-level
--- things which would make typechecking easier.
+-- want to have to explain it to students.
+--
+-- HDE: That's a good point; I agree.
+-- 
+-- One idea might be to just have plain non-recursive let, but allow
+-- top-level declared things to be recursive.  We could require type
+-- signatures on top-level things which would make typechecking
+-- easier.
+--
+-- HDE: I think this is the best idea.
 
 ldf : Z -> Z -> Z
 ldf = k -> n -> {k           if divides k n
@@ -47,12 +59,18 @@ ldf = k -> n -> {k           if divides k n
 
 -- BAY: We already do have an 'otherwise'!  I introduced it as syntax
 -- sugar for an empty list of guards.
-
+--
+-- HDE: great!  I missed that.
+-- 
 -- BAY: Technically, with what we have now you need to write 'case'
 -- before the first curly brace, which you left out in the definition
 -- of 'ldf' above.  However, perhaps I like this better.  There
 -- doesn't seem to be any particular need for a 'case' keyword from a
 -- syntax/parsing point of view.
+--
+-- HDE: Yup, I think it looks better, and looks more like a piecewise
+-- function.  I left "case" out to see what you thought.  I vote that
+-- we remove case. :-)
 
 -- ld calculates the least divisor of n.
 ld : Z -> Z

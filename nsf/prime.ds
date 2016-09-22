@@ -6,16 +6,16 @@
 -- We should add modulus or floor and ceiling to our numeric
 -- operators.
 --
--- BAY: agreed!  We will probably want to add a bunch of other operators as well.
--- For example:
+-- BAY: agreed!  We will probably want to add a bunch of other
+-- operators as well.  For example:
 --
 --   x | y   --> Bool, y is divisible by x
 --   x # y   --> Bool, x is relatively prime to y
 --
 -- We could even add more complex functions such as built-in primality
--- testing, prime generation, etc.  (Of course, just because such things are built-in
--- doesn't mean you can't also show how to code them by hand, or have students
--- develop their own implementations.)
+-- testing, prime generation, etc.  (Of course, just because such
+-- things are built-in doesn't mean you can't also show how to code
+-- them by hand, or have students develop their own implementations.)
 --
 -- HDE: agreed!
 --

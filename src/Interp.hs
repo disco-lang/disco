@@ -12,11 +12,11 @@ import qualified Data.Map                as M
 import           Data.Maybe              (fromJust)
 import           Data.Ratio              ((%))
 
-import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind,
+import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind, translate,
                                           runLFreshM, unembed)
 
 import           Parser
-import           Typecheck
+import           Typecheck hiding (ok)
 import           Types
 
 data Value where
@@ -168,7 +168,33 @@ checkGuard e (AGIf (unembed -> t)) = do
   case v of
     VBool True -> return (Just e)
     _          -> return Nothing
-checkGuard e (AGWhen (unembed -> t) p) = undefined
+checkGuard e (AGWhen (unembed -> t) p) = do
+  -- XXX FIX ME!  Should be lazy, i.e. t should be evaluated only as
+  -- much as demanded by the pattern.  Perhaps the easiest way is to
+  -- switch to a small-step interpreter.
+  v <- interpTerm e t
+  matchPattern p v
+
+matchPattern :: Pattern -> Value -> IM (Maybe Env)
+matchPattern (PVar x) v = return $ Just (M.singleton (translate x) v)
+matchPattern PWild     _ = ok
+matchPattern PUnit     _ = ok
+matchPattern (PBool b1) (VBool b2)
+  | b1 == b2  = ok
+matchPattern (PPair p1 p2) (VPair v1 v2) = do
+  e1 <- matchPattern p1 v1
+  e2 <- matchPattern p2 v2
+  return $ M.union <$> e1 <*> e2
+matchPattern (PInj s1 p) (VInj s2 v)
+  | s1 == s2 = matchPattern p v
+matchPattern (PNat n) (VNum r)
+  | r == (n % 1) = ok
+matchPattern (PSucc p) (VNum r) = matchPattern p (VNum (r-1))
+
+matchPattern _ _ = return Nothing
+
+ok :: IM (Maybe Env)
+ok   = return $ Just M.empty
 
 ------------------------------------------------------------
 

@@ -108,6 +108,9 @@ data TCError
                            --   check equality, but it isn't.
   | Unordered Type         -- ^ The type should be totally ordered so
                            --   we can check less than, but it isn't.
+  | EmptyCase              -- ^ Case analyses cannot be empty.
+  | NoLub Type Type        -- ^ The given types have no lub.
+  | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -123,7 +126,16 @@ type TCM = ReaderT Ctx (ExceptT TCError LFreshM)
 
 -- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError a
-runTCM = runLFreshM . runExceptT . flip runReaderT M.empty
+runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx
+
+emptyCtx :: Ctx
+emptyCtx = M.empty
+
+singleCtx :: Name Term -> Type -> Ctx
+singleCtx = M.singleton
+
+joinCtx :: Ctx -> Ctx -> Ctx
+joinCtx = M.union
 
 -- | Look up a name in the context, either returning its type or
 --   throwing an unbound variable exception if it is not found.
@@ -137,6 +149,11 @@ lookup x = do
 -- | Run a @TCM@ computation in a context extended with a new binding.
 extend :: Name Term -> Type -> TCM a -> TCM a
 extend x ty = local (M.insert x ty)
+
+-- | Run a @TCM@ computation in a context extended with an additional
+--   context.
+extends :: Ctx -> TCM a -> TCM a
+extends ctx = local (joinCtx ctx)
 
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
@@ -215,6 +232,7 @@ lub (TySum t1 t2) (TySum t1' t2') = do
   t1'' <- lub t1 t1'
   t2'' <- lub t2 t2'
   return $ TySum t1'' t2''
+lub ty1 ty2 = throwError $ NoLub ty1 ty2
 
 -- | Convenience function that ensures the given annotated terms have
 --   numeric types, AND computes their LUB.
@@ -404,7 +422,8 @@ infer (TAscr t ty) = do
 
 -- XXX todo: case
 
-infer (TCase bs) = error "IMPLEMENT TYPECHECKING FOR CASE"
+infer (TCase []) = throwError EmptyCase
+infer (TCase bs) = inferCase bs
 
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
@@ -419,6 +438,56 @@ inferMulApp at t' = do
   at' <- infer t'
   num3 <- numLub at at'
   return $ ATBin num3 Mul at at'
+
+inferCase :: [Branch] -> TCM ATerm
+inferCase bs = do
+  bs' <- mapM inferBranch bs
+  let (branchTys, abs') = unzip bs'
+  resTy <- foldM lub TyVoid branchTys
+  return $ ATCase resTy abs'
+
+inferBranch :: Branch -> TCM (Type, ABranch)
+inferBranch b =
+  lunbind b $ \(gs, t) -> do
+  (ags, ctx) <- inferGuards gs
+  extends ctx $ do
+  at <- infer t
+  return $ (getType at, bind ags at)
+
+inferGuards :: [Guard] -> TCM ([AGuard], Ctx)
+inferGuards []     = return ([], emptyCtx)
+inferGuards (g:gs) = do
+  (ag, ctx) <- inferGuard g
+  -- extends ctx $ do      -- XXX TODO: guards should scope over remaining guards
+                           -- need to fix definition of Branch to make it a telescope
+  (ags, ctx') <- inferGuards gs
+  return (ag:ags, ctx `joinCtx` ctx')
+
+inferGuard :: Guard -> TCM (AGuard, Ctx)
+inferGuard (GIf (unembed -> t)) = do
+  at <- check t TyBool
+  return (AGIf (embed at), emptyCtx)
+inferGuard (GWhen (unembed -> t) p) = do
+  at <- infer t
+  ctx <- checkPattern p (getType at)
+  return (AGWhen (embed at) p, ctx)
+
+checkPattern :: Pattern -> Type -> TCM Ctx
+checkPattern (PVar x) ty                    = return $ singleCtx x ty
+checkPattern PWild    _                     = ok
+checkPattern PUnit TyUnit                   = ok
+checkPattern (PBool _) TyBool               = ok
+checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
+  joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2
+checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
+checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
+checkPattern (PNat i)   TyN                 = ok
+checkPattern (PSucc p)  TyN                 = checkPattern p TyN
+
+checkPattern p ty = throwError (PatternType p ty)
+
+ok :: TCM Ctx
+ok = return emptyCtx
 
 ------------------------------------------------------------
 

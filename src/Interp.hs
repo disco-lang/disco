@@ -11,15 +11,17 @@ import qualified Data.Map                as M
 import           Data.Maybe              (fromJust)
 import           Data.Ratio              ((%))
 
-import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM)
+import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind,
+                                          runLFreshM, unembed)
 
+import           Parser
 import           Typecheck
 import           Types
 
 data Value where
   VUnit :: Value
   VBool :: Bool -> Value
-  VClos :: Name ATerm -> ATerm -> Env -> Value    -- closure
+  VClos :: Bind (Name ATerm) ATerm -> Env -> Value    -- closure
   VPair :: Value -> Value -> Value
   VInj  :: Side -> Value -> Value
   VNum  :: Rational -> Value
@@ -47,7 +49,7 @@ interpTerm' :: Env -> ATerm -> IM Value
 interpTerm' e (ATVar _ x)       = maybe (throwError $ UnboundError x) return (M.lookup x e)
 interpTerm' _ ATUnit            = return VUnit
 interpTerm' _ (ATBool b)        = return $ VBool b
-interpTerm' e (ATAbs _ abs)     = lunbind abs $ \(x,t) -> return $ VClos x t e
+interpTerm' e (ATAbs _ c)       = return $ VClos c e
 interpTerm' e (ATApp _ f x)     = join (interpApp <$> interpTerm' e f <*> interpTerm' e x)
 interpTerm' e (ATPair _ l r)    = VPair <$> interpTerm' e l <*> interpTerm' e r
 interpTerm' e (ATInj _ s t)     = VInj s <$> interpTerm' e t
@@ -59,8 +61,8 @@ interpTerm' e (ATCase _ bs)     = undefined
 interpTerm' e (ATAscr t _)      = interpTerm' e t
 
 interpApp :: Value -> Value -> IM Value
-interpApp (VClos x body e) v = interpTerm' (M.insert x v e) body
-interpApp f _                = throwError $ NotAFun f
+interpApp (VClos c e) v   = lunbind c $ \(x,t) -> interpTerm' (M.insert x v e) t
+interpApp f _             = throwError $ NotAFun f
 
 interpUOp :: UOp -> Value -> IM Value
 interpUOp Neg (VNum n) = return $ VNum (-n)

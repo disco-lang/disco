@@ -1,6 +1,7 @@
 {-# LANGUAGE GADTs        #-}
 {-# LANGUAGE RankNTypes   #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Interp where
 
@@ -25,6 +26,7 @@ data Value where
   VPair :: Value -> Value -> Value
   VInj  :: Side -> Value -> Value
   VNum  :: Rational -> Value
+  deriving Show
 
 data InterpError where
   UnboundError :: Name ATerm -> InterpError
@@ -32,6 +34,7 @@ data InterpError where
   DivByZero    ::               InterpError
   NotABool     :: Value      -> InterpError  -- ^ should be a boolean, but isn't
   NotAFun      :: Value      -> InterpError
+  deriving Show
 
 type Env = M.Map (Name ATerm) Value
 
@@ -50,15 +53,24 @@ interpTerm' e (ATVar _ x)       = maybe (throwError $ UnboundError x) return (M.
 interpTerm' _ ATUnit            = return VUnit
 interpTerm' _ (ATBool b)        = return $ VBool b
 interpTerm' e (ATAbs _ c)       = return $ VClos c e
+
+  -- XXX FIX ME: lazy evaluation
 interpTerm' e (ATApp _ f x)     = join (interpApp <$> interpTerm' e f <*> interpTerm' e x)
 interpTerm' e (ATPair _ l r)    = VPair <$> interpTerm' e l <*> interpTerm' e r
 interpTerm' e (ATInj _ s t)     = VInj s <$> interpTerm' e t
 interpTerm' _ (ATNat i)         = return $ VNum (i % 1)
 interpTerm' e (ATUn _ op t)     = interpTerm' e t >>= interpUOp op
 interpTerm' e (ATBin ty op l r) = join (interpBOp ty op <$> interpTerm' e l <*> interpTerm' e r)
-interpTerm' e (ATLet _ t)       = undefined
+
+  -- XXX FIX ME: lazy evaluation
+interpTerm' e (ATLet _ t)       =
+  lunbind t $ \((x, unembed -> t1), t2) -> do
+  v1 <- interpTerm' e t1
+  interpTerm' (M.insert x v1 e) t2
+
 interpTerm' e (ATCase _ bs)     = undefined
 interpTerm' e (ATAscr t _)      = interpTerm' e t
+interpTerm' e (ATSub _ t)       = interpTerm' e t
 
 interpApp :: Value -> Value -> IM Value
 interpApp (VClos c e) v   = lunbind c $ \(x,t) -> interpTerm' (M.insert x v e) t
@@ -131,3 +143,8 @@ enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
 enumerate (TyPair ty1 ty2) = [ VPair x y | x <- enumerate ty1, y <- enumerate ty2 ]
 enumerate (TySum ty1 ty2)  = map (VInj L) (enumerate ty1) ++ map (VInj R) (enumerate ty2)
 enumerate _                = []  -- other cases shouldn't happen if the program type checks
+
+------------------------------------------------------------
+
+eval :: String -> String
+eval = either show (either show show . runIM . interpTerm) . runTCM . infer . parseTermStr

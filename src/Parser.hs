@@ -27,12 +27,12 @@ lexer :: P.TokenParser u
 lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "when"
-                        , "otherwise"
+                        , "otherwise", "and", "or"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
                         ]
-  , P.reservedOpNames = [ "|->", "+", "-", "*", "/"
+  , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨"
                         , "->" ]
   }
 
@@ -179,8 +179,14 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
             , [ binary "==" (TBin Equals) AssocNone
               , binary "<" (TBin Less) AssocNone
               ]
-            , [ binary "&&" (TBin And) AssocRight ]
-            , [ binary "||" (TBin Or)  AssocRight ]
+            , [ binary "&&"  (TBin And) AssocRight
+              , binary "and" (TBin And) AssocRight
+              , binary "∧"   (TBin And) AssocRight
+              ]
+            , [ binary "||" (TBin Or)  AssocRight
+              , binary "or" (TBin Or) AssocRight
+              , binary "∨"  (TBin Or) AssocRight
+              ]
             ]
 
     unary  name fun       = Prefix (reservedOp name >> return fun)

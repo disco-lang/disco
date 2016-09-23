@@ -1,3 +1,11 @@
+-- BAY: This file now Actually Parses (tm).  I had to add semicolons
+-- to the end of every declaration since technically that's what we
+-- require at the moment.  It shouldn't be too much harder to get rid
+-- of the semicolons (basically we have to split the file into lines
+-- and then manually run parsers on each line, figuring out which
+-- lines need to be glued together and passed off to a parser all
+-- together).
+
 -- Prime Number Test:
 --
 -- Citation: "The Haskell Road to Logic, Maths, and Programming, 2nd
@@ -20,8 +28,8 @@
 -- HDE: agreed!
 --
 -- The following function returns True if d is a divisor of n.
-divides : Z -> Z -> B
-divides = d -> n -> n % d == 0
+divides : Z -> Z -> B;
+divides = d -> n -> n % d = 0;
 
 -- BAY: Note the concrete syntax we currently have for lambdas is |->
 -- rather than -> (my idea was to mirror the usual math notation using
@@ -31,6 +39,11 @@ divides = d -> n -> n % d == 0
 -- HDE: Yeah, I was first using |->, but I am not sure if I like how
 -- it looks.  I was thinking that using the -> seems a little cleaner,
 -- so I was giving it a try to see which we like best.
+--
+-- BAY: OK, -> now parses as an alternative to |-> .
+--
+-- BAY: Note I changed == to = , since this is standard mathematical
+-- notation.  I could be convinced to switch back.
 
 -- ldf calculates the least common divisor of n that is at least k.
 --
@@ -51,11 +64,10 @@ divides = d -> n -> n % d == 0
 --
 -- HDE: I think this is the best idea.
 
-ldf : Z -> Z -> Z
-ldf = k -> n -> {k           if divides k n
-                {n           if k^2 > n
-                {ldf (k+1) n otherwise  -- Maybe we should have
-                                        -- an otherwise?
+ldf : Z -> Z -> Z;
+ldf = k -> n -> { k           if divides k n
+                { n           if k^2 > n
+                { ldf (k+1) n otherwise;
 
 -- BAY: We already do have an 'otherwise'!  I introduced it as syntax
 -- sugar for an empty list of guards.
@@ -73,10 +85,10 @@ ldf = k -> n -> {k           if divides k n
 -- we remove case. :-)
 
 -- ld calculates the least divisor of n.
-ld : Z -> Z
-ld = n -> ldf 2 n
+ld : Z -> Z;
+ld = n -> ldf 2 n;
 
 -- Tests whether n is a prime or not.
-isPrime : Z -> Bool
-isPrime = n -> case {False     if n <= 1
-                    {ld n == n if n > 1
+isPrime : Z -> Bool;
+isPrime = n -> { False     if n <= 1
+               { ld n = n  if n > 1;

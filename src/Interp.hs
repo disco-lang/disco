@@ -8,9 +8,7 @@ module Interp where
 import           Control.Monad           (join)
 import           Control.Monad.Except    (ExceptT, runExceptT, throwError)
 import           Data.Char               (toLower)
-import           Data.List               (find)
 import qualified Data.Map                as M
-import           Data.Maybe              (fromJust)
 import           Data.Ratio              ((%), numerator, denominator)
 
 import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind, translate,
@@ -150,7 +148,7 @@ decideFor (TySum ty1 _) (VInj L v1) (VInj L v2)
   = decideFor ty1 v1 v2
 decideFor (TySum _ ty2) (VInj R v1) (VInj R v2)
   = decideFor ty2 v1 v2
-decideFor (TyArr ty1 ty2) c1@(VClos {}) c2@(VClos {})
+decideFor (TyArr _ty1 _ty2) _c1@(VClos {}) _c2@(VClos {})
   = undefined
   -- = and (zipWith (decideFor ty2) (map f1 ty1s) (map f2 ty1s))
   -- where
@@ -174,7 +172,7 @@ enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
   where
     vs1   = enumerate ty1
     vs2   = enumerate ty2
-    mkFun vs1 vs2 = undefined
+    mkFun _vs1 _vs2 = undefined
       -- VFun $ \v -> snd . fromJust $ find (decideFor ty1 v . fst) (zip vs1 vs2)
 enumerate (TyPair ty1 ty2) = [ VPair x y | x <- enumerate ty1, y <- enumerate ty2 ]
 enumerate (TySum ty1 ty2)  = map (VInj L) (enumerate ty1) ++ map (VInj R) (enumerate ty2)

@@ -19,7 +19,7 @@ import           Control.Monad.Reader
 import           Control.Monad.State
 import qualified Data.Map                as M
 
-import           Unbound.LocallyNameless
+import           Unbound.LocallyNameless hiding (comp)
 
 import           Types
 
@@ -175,8 +175,8 @@ check :: Term -> Type -> TCM ATerm
 
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.
-check (TAbs abs) ty@(TyArr ty1 ty2) = do
-  lunbind abs $ \(x,t) -> do
+check (TAbs lam) ty@(TyArr ty1 ty2) = do
+  lunbind lam $ \(x,t) -> do
   extend x ty1 $ do
   at <- check t ty2
   return $ ATAbs ty (bind (translate x) at)
@@ -185,10 +185,10 @@ check t@(TAbs _) ty = throwError (NotArrow t ty)
 
   -- To check an injection has a sum type, recursively check the
   -- relevant type.
-check (TInj L t) ty@(TySum ty1 ty2) = do
+check (TInj L t) ty@(TySum ty1 _) = do
   at <- check t ty1
   return $ ATInj ty L at
-check (TInj R t) ty@(TySum ty1 ty2) = do
+check (TInj R t) ty@(TySum _ ty2) = do
   at <- check t ty2
   return $ ATInj ty R at
   -- Trying to check an injection under a non-sum type: error.
@@ -394,6 +394,7 @@ infer (TBin Exp t1 t2) = do
     TyN -> return $ ATBin (getType at1) Exp at1 at2
     TyZ -> return $ ATBin TyQ Exp at1 at2
     TyQ -> throwError ExpQ
+    _   -> error "Impossible! getType at2 is not num type after checkNumTy"
 
   -- An equality test always has type Bool, but we need to check a few
   -- things first. We infer the types of both subterms and check that
@@ -466,11 +467,13 @@ infer (TCase bs) = inferCase bs
 infer t = throwError (CantInfer t)
 
 
+inferFunApp :: ATerm -> Term -> TCM ATerm
 inferFunApp at t' = do
   (ty1, ty2) <- getFunTy at
   at' <- check t' ty1
   return $ ATApp ty2 at at'
 
+inferMulApp :: ATerm -> Term -> TCM ATerm
 inferMulApp at t' = do
   at' <- infer t'
   num3 <- numLub at at'
@@ -529,7 +532,7 @@ checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
   joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2
 checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
 checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
-checkPattern (PNat i)   TyN                 = ok
+checkPattern (PNat _)   TyN                 = ok
 checkPattern (PSucc p)  TyN                 = checkPattern p TyN
 
 checkPattern p ty = throwError (PatternType p ty)

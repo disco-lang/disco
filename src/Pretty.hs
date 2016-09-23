@@ -13,22 +13,37 @@ import qualified Parser                  as PR
 import           Types
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, bind, embed, lunbind,
-                                          rec, runLFreshM, string2Name, unembed,
-                                          unrec)
+import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
+                                          unembed)
 
 --------------------------------------------------
 -- Monadic pretty-printing
 
+hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
+
+parens :: Functor f => f PP.Doc -> f PP.Doc
 parens   = fmap PP.parens
+
+text :: Monad m => String -> m PP.Doc
 text     = return . PP.text
+
+integer :: Monad m => Integer -> m PP.Doc
 integer  = return . PP.integer
+
+nest :: Functor f => Int -> f PP.Doc -> f PP.Doc
 nest n d = PP.nest n <$> d
+
+empty :: Monad m => m PP.Doc
 empty    = return PP.empty
 
+(<+>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
 (<+>) = liftA2 (PP.<+>)
+
+(<>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
 (<>)  = liftA2 (PP.<>)
+
+($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
 ($+$) = liftA2 (PP.$+$)
 
 --------------------------------------------------
@@ -57,8 +72,8 @@ assoc op
   | op `elem` [And, Or, Exp]            = AR
   | otherwise                           = AN
 
-pa :: BOp -> PA
-pa op = PA (prec op) (assoc op)
+getPA :: BOp -> PA
+getPA op = PA (prec op) (assoc op)
 
 data PA = PA Prec Assoc
   deriving (Show, Eq)
@@ -93,6 +108,7 @@ prettyTy TyN              = text "N"
 prettyTy TyZ              = text "Z"
 prettyTy TyQ              = text "Q"
 
+prettyTy' :: Prec -> Assoc -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
 --------------------------------------------------
@@ -120,7 +136,7 @@ prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' 10 AR t
 prettyTerm (TNat n)      = integer n
 prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AL t
-prettyTerm (TBin op t1 t2) = mparens (pa op) $
+prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   hsep
   [ prettyTerm' (prec op) AL t1
   , prettyBOp op
@@ -140,6 +156,7 @@ prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 
+prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 
 prettySide :: Side -> Doc

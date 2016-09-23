@@ -8,7 +8,7 @@
 
 module Parser where
 
-import           Unbound.LocallyNameless (Name, bind, embed, rec, string2Name)
+import           Unbound.LocallyNameless (Name, bind, embed, string2Name)
 
 import           Text.Parsec             hiding (Error, many, (<|>))
 import           Text.Parsec.Expr        hiding (Operator)
@@ -109,6 +109,7 @@ parseTerm' =
   <|> parseExpr
   <|> parseAtom
 
+parseMapsTo :: Parser ()
 parseMapsTo = (reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->")
 
 -- | Parse a let expression (@let x = t1 in t2@).

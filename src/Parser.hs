@@ -114,7 +114,7 @@ parseLet =
   TLet <$>
     (reserved "let" *>
       (bind
-        <$> (rec <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))))
+        <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm)))
         <*> (reserved "in" *> parseTerm)))
 
 -- | Parse a case expression.

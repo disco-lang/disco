@@ -40,7 +40,7 @@ data ATerm where
   ATNat   :: Integer -> ATerm                           -- ^ Natural number.
   ATUn    :: Type -> UOp -> ATerm -> ATerm              -- ^ Unary operator.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm     -- ^ Binary operator.
-  ATLet   :: Type -> Bind (Rec (Name ATerm, Embed ATerm)) ATerm -> ATerm  -- ^ Let.
+  ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm  -- ^ (Non-recursive) let.
   ATCase  :: Type -> [Branch] -> ATerm                  -- ^ Case expression.
   ATWrong :: Type -> ATerm                              -- ^ Wrong can have any type.
   ATAscr  :: ATerm -> Type -> ATerm                     -- ^ Ascription.
@@ -387,12 +387,12 @@ infer (TBin Or t1 t2) = do
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.
 infer (TLet l) = do
-  lunbind l $ \(unrec -> (x, unembed -> t1), t2) -> do
+  lunbind l $ \((x, unembed -> t1), t2) -> do
   at1 <- infer t1
   let ty1 = getType at1
   extend x ty1 $ do
   at2 <- infer t2
-  return $ ATLet (getType at2) (bind (rec (translate x, embed at1)) at2)
+  return $ ATLet (getType at2) (bind (translate x, embed at1) at2)
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.

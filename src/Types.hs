@@ -43,8 +43,8 @@ data Term where
   TNat   :: Integer -> Term                    -- ^ A natural number
   TUn    :: UOp -> Term -> Term                -- ^ Application of a unary operator
   TBin   :: BOp -> Term -> Term -> Term        -- ^ Application of a binary operator
-  TLet   :: Bind (Rec (Name Term, Embed Term)) Term -> Term
-                                               -- ^ Recursive let expression
+  TLet   :: Bind (Name Term, Embed Term) Term -> Term
+                                               -- ^ Non-recursive let expression
                                                --   (let x = t1 in t2)
   TCase  :: [Branch] -> Term                   -- ^ A case expression
                                                --   consists of a list

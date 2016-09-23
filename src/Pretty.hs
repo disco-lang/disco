@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ViewPatterns              #-}
 
 module Pretty where
 
@@ -125,9 +126,7 @@ prettyTerm (TBin op t1 t2) = mparens (pa op) $
   , prettyTerm' (prec op) AR t2
   ]
 prettyTerm (TLet bnd) = mparens initPA $
-  lunbind bnd $ \(def, t2) -> do
-  let (x, em) = unrec def
-      t1 = unembed em
+  lunbind bnd $ \((x, unembed -> t1), t2) ->
   hsep
     [ text "let"
     , prettyName x

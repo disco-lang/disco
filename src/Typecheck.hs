@@ -111,6 +111,8 @@ data TCError
   | EmptyCase              -- ^ Case analyses cannot be empty.
   | NoLub Type Type        -- ^ The given types have no lub.
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
+  | ModQ                   -- ^ Can't do mod on rationals.
+  | ExpQ                   -- ^ Can't exponentiate by a rational.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -371,26 +373,29 @@ infer (TBin Div t1 t2) = do
   at2 <- check t2 TyQ
   return $ ATBin TyQ Div at1 at2
 
+infer (TBin Exp t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  checkNumTy at1
+  checkNumTy at2
+  case getType at2 of
+    TyN -> return $ ATBin (getType at1) Exp at1 at2
+    TyZ -> return $ ATBin TyQ Exp at1 at2
+    TyQ -> throwError ExpQ
+
   -- An equality test always has type Bool, but we need to check a few
   -- things first. We infer the types of both subterms and check that
   -- (1) they have a common supertype which (2) has decidable
   -- equality.
-infer (TBin Equals t1 t2) = do
+infer (TBin Eq t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   ty3 <- lub (getType at1) (getType at2)
   checkDecidable ty3
-  return $ ATBin TyBool Equals at1 at2
+  return $ ATBin TyBool Eq at1 at2
 
-  -- A less-than test always has type Bool, but we have to make sure
-  -- the subterms are OK. We must check that their types are
-  -- compatible and have a total order.
-infer (TBin Less t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty3 <- lub (getType at1) (getType at2)
-  checkOrdered ty3
-  return $ ATBin TyBool Less at1 at2
+infer (TBin op t1 t2)
+  | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2
 
   -- && and || always have type Bool, and the subterms must have type
   -- Bool as well.
@@ -402,6 +407,14 @@ infer (TBin Or t1 t2) = do
   at1 <- check t1 TyBool
   at2 <- check t2 TyBool
   return $ ATBin TyBool Or at1 at2
+
+infer (TBin Mod t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  ty <- numLub at1 at2
+  if (isSub ty TyZ)
+    then return (ATBin ty Mod at1 at2)
+    else throwError ModQ
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
@@ -420,8 +433,6 @@ infer (TAscr t ty) = do
   at <- check t ty
   return $ ATAscr at ty
 
--- XXX todo: case
-
 infer (TCase []) = throwError EmptyCase
 infer (TCase bs) = inferCase bs
 
@@ -438,6 +449,17 @@ inferMulApp at t' = do
   at' <- infer t'
   num3 <- numLub at at'
   return $ ATBin num3 Mul at at'
+
+  -- A comparison always has type Bool, but we have to make sure
+  -- the subterms are OK. We must check that their types are
+  -- compatible and have a total order.
+inferComp :: BOp -> Term -> Term -> TCM ATerm
+inferComp comp t1 t2 = do
+  at1 <- infer t1
+  at2 <- infer t2
+  ty3 <- lub (getType at1) (getType at2)
+  checkOrdered ty3
+  return $ ATBin TyBool comp at1 at2
 
 inferCase :: [Branch] -> TCM ATerm
 inferCase bs = do

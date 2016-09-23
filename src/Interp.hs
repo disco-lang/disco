@@ -10,7 +10,7 @@ import           Control.Monad.Except    (ExceptT, runExceptT, throwError)
 import           Data.List               (find)
 import qualified Data.Map                as M
 import           Data.Maybe              (fromJust)
-import           Data.Ratio              ((%))
+import           Data.Ratio              ((%), numerator)
 
 import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind, translate,
                                           runLFreshM, unembed)
@@ -86,10 +86,15 @@ interpBOp _ Add     = numOp (+)
 interpBOp _ Sub     = numOp (-)
 interpBOp _ Mul     = numOp (*)
 interpBOp _ Div     = divOp
-interpBOp ty Equals = \v1 v2 -> return $ VBool (decideFor ty v1 v2)
-interpBOp _ Less    = undefined
+interpBOp _ Exp     = expOp
+interpBOp ty Eq     = \v1 v2 -> return $ VBool (decideFor ty v1 v2)
+interpBOp _ Lt      = undefined
+interpBOp _ Gt      = undefined
+interpBOp _ Leq     = undefined
+interpBOp _ Geq     = undefined
 interpBOp _ And     = boolOp (&&)
 interpBOp _ Or      = boolOp (||)
+interpBOp _ Mod     = modOp
 
 numOp :: (Rational -> Rational -> Rational) -> Value -> Value -> IM Value
 numOp (#) (VNum x) (VNum y) = return $ VNum (x # y)
@@ -102,6 +107,21 @@ divOp (VNum x) (VNum y)
   | otherwise = return $ VNum (x / y)
 divOp (VNum _) y = throwError $ NotANum y
 divOp x        _ = throwError $ NotANum x
+
+expOp :: Value -> Value -> IM Value
+expOp (VNum x) (VNum y) = return $ VNum (x ^^ (numerator y))
+  -- if the program typechecks, y will be an integer
+expOp (VNum _) y = throwError $ NotANum y
+expOp x        _ = throwError $ NotANum x
+
+modOp :: Value -> Value -> IM Value
+modOp (VNum x) (VNum y)
+  | y == 0    = throwError DivByZero
+  | otherwise = return $ VNum ((numerator x `mod` numerator y) % 1)
+                -- This is safe since if the program typechecks, mod will only ever be
+                -- called on integral things.
+modOp (VNum _) y = throwError $ NotANum y
+modOp x        _ = throwError $ NotANum x
 
 boolOp :: (Bool -> Bool -> Bool) -> Value -> Value -> IM Value
 boolOp (#) (VBool x) (VBool y) = return $ VBool (x # y)

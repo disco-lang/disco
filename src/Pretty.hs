@@ -44,17 +44,18 @@ prec op = fromJust . findIndex (op `elem`) $
   , []
   , [ Or ]
   , [ And ]
-  , [ Equals, Less ]
+  , [ Eq, Neq, Lt, Gt, Leq, Geq ]
   , []
   , [ Add, Sub ]
-  , [ Mul, Div ]
+  , [ Mul, Div, Mod ]
+  , [ Exp ]
   ]
 
 assoc :: BOp -> Assoc
 assoc op
-  | op `elem` [Add, Sub, Mul, Div] = AL
-  | op `elem` [And, Or]            = AR
-  | otherwise                      = AN
+  | op `elem` [Add, Sub, Mul, Div, Mod] = AL
+  | op `elem` [And, Or, Exp]            = AR
+  | otherwise                           = AN
 
 pa :: BOp -> PA
 pa op = PA (prec op) (assoc op)
@@ -135,7 +136,8 @@ prettyTerm (TLet bnd) = mparens initPA $
     , text "in"
     , prettyTerm' 0 AL t2
     ]
-prettyTerm (TCase b)    = text "case" $+$ nest 2 (prettyBranches b)
+prettyTerm (TCase b)    = nest 2 (prettyBranches b)
+  -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -152,10 +154,16 @@ prettyBOp Add    = text "+"
 prettyBOp Sub    = text "-"
 prettyBOp Mul    = text "*"
 prettyBOp Div    = text "/"
-prettyBOp Equals = text "=="
-prettyBOp Less   = text "<"
-prettyBOp And    = text "&&"
-prettyBOp Or     = text "||"
+prettyBOp Exp    = text "^"
+prettyBOp Eq     = text "="
+prettyBOp Neq    = text "/="
+prettyBOp Lt     = text "<"
+prettyBOp Gt     = text ">"
+prettyBOp Leq    = text "<="
+prettyBOp Geq    = text ">="
+prettyBOp And    = text "and"
+prettyBOp Or     = text "or"
+prettyBOp Mod    = text "mod"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches [] = error "Empty branches are disallowed."
@@ -181,6 +189,17 @@ prettyPattern (PPair p1 p2) = parens $ prettyPattern p1 <> text "," <+> prettyPa
 prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
 prettyPattern (PNat n) = integer n
 prettyPattern (PSucc p) = text "S" <+> prettyPattern p
+
+------------------------------------------------------------
+
+prettyProg :: Prog -> Doc
+prettyProg = foldr ($+$) empty . map prettyDecl
+
+prettyDecl :: Decl -> Doc
+prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
+prettyDecl (DDefn x t)  = (prettyName x <+> text "=" <+> prettyTerm t) $+$ text " "
+
+------------------------------------------------------------
 
 renderDoc :: Doc -> String
 renderDoc = PP.render . runLFreshM . flip runReaderT initPA

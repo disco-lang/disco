@@ -27,7 +27,7 @@ data UOp = Neg
   deriving (Show, Eq)
 
 -- | Binary operators.
-data BOp = Add | Sub | Mul | Div | Equals | Less | And | Or
+data BOp = Add | Sub | Mul | Div | Exp | Eq | Neq | Lt | Gt | Leq | Geq | And | Or | Mod
   deriving (Show, Eq)
 
 -- | Terms.

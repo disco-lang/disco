@@ -13,7 +13,7 @@ import           Unbound.LocallyNameless (Name, bind, embed, rec, string2Name)
 import           Text.Parsec             hiding (Error, many, (<|>))
 import           Text.Parsec.Expr        hiding (Operator)
 import           Text.Parsec.Language    (haskellStyle)
-import           Text.Parsec.String      (Parser)
+import           Text.Parsec.String      (Parser, parseFromFile)
 import qualified Text.Parsec.Token       as P
 
 import           Control.Applicative     (many, (<|>))
@@ -26,14 +26,15 @@ import           Types
 lexer :: P.TokenParser u
 lexer = P.makeTokenParser $
   haskellStyle
-  { P.reservedNames   = [ "true", "false", "inl", "inr", "let", "in", "case", "if", "when"
+  { P.reservedNames   = [ "true", "false", "True", "False", "inl", "inr", "let", "in"
+                        , "if", "when"
                         , "otherwise", "and", "or"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
                         ]
-  , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨"
-                        , "->" ]
+  , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨", "^"
+                        , "->", "<", ">", "<=", ">=", "/=" ]
   }
 
 parens :: Parser a -> Parser a
@@ -77,8 +78,8 @@ parseDecl =
 parseAtom :: Parser Term
 parseAtom
   =   TUnit       <$ reserved "()"
-  <|> TBool True  <$ reserved "true"
-  <|> TBool False <$ reserved "false"
+  <|> TBool True  <$ (reserved "true" <|> reserved "True")
+  <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
   <|> TNat <$> natural
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
@@ -101,12 +102,14 @@ parseTerm = ascribe <$> parseTerm' <*> optionMaybe (symbol ":" *> parseType)
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' =
-      TAbs <$> try (bind <$> ident <*> (reservedOp "|->" *> parseTerm'))
+      TAbs <$> try (bind <$> ident <*> (parseMapsTo *> parseTerm'))
   <|> TInj <$> parseInj <*> parseAtom
   <|> parseLet
   <|> parseCase
   <|> parseExpr
   <|> parseAtom
+
+parseMapsTo = (reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->")
 
 -- | Parse a let expression (@let x = t1 in t2@).
 parseLet :: Parser Term
@@ -119,17 +122,17 @@ parseLet =
 
 -- | Parse a case expression.
 parseCase :: Parser Term
-parseCase = TCase <$> (reserved "case" *> many parseBranch)
+parseCase = TCase <$> many1 parseBranch
 
 -- | Parse one branch of a case expression.  Note a branch can start
 --   with many curly braces since we allow empty lines just for
 --   aesthetics, e.g.
 --
 --   @
---     case {  3    when t = (false, _)
---          {  5    when t = (true, 16)
---          {
---          {  7    otherwise
+--     {  3    when t = (false, _)
+--     {  5    when t = (true, 16)
+--     {
+--     {  7    otherwise
 --   @
 parseBranch :: Parser Branch
 parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
@@ -151,8 +154,8 @@ parseAtomicPattern =
       PVar <$> ident
   <|> PWild <$ symbol "_"
   <|> PUnit <$ reserved "()"
-  <|> PBool True  <$ reserved "true"
-  <|> PBool False <$ reserved "false"
+  <|> PBool True  <$ (reserved "true" <|> reserved "True")
+  <|> PBool False <$ (reserved "false" <|> reserved "False")
   <|> PNat <$> natural
   <|> try (PPair <$> (symbol "(" *> parsePattern) <*> (symbol "," *> parsePattern <* symbol ")"))
   <|> parens parsePattern
@@ -170,14 +173,21 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
   where
     table = [ [ binary ""  TJuxt AssocLeft ]
             , [ unary  "-" (TUn Neg) ]
+            , [ binary "^" (TBin Exp) AssocRight ]
             , [ binary "*" (TBin Mul) AssocLeft
               , binary "/" (TBin Div) AssocLeft
+              , binary "%" (TBin Mod) AssocLeft
+              , binary "mod" (TBin Mod) AssocLeft
               ]
             , [ binary "+" (TBin Add) AssocLeft
               , binary "-" (TBin Sub) AssocLeft
               ]
-            , [ binary "==" (TBin Equals) AssocNone
-              , binary "<" (TBin Less) AssocNone
+            , [ binary "="  (TBin Eq)  AssocNone
+              , binary "/=" (TBin Neq) AssocNone
+              , binary "<"  (TBin Lt)  AssocNone
+              , binary ">"  (TBin Gt)  AssocNone
+              , binary "<=" (TBin Leq) AssocNone
+              , binary ">=" (TBin Geq) AssocNone
               ]
             , [ binary "&&"  (TBin And) AssocRight
               , binary "and" (TBin And) AssocRight
@@ -197,7 +207,7 @@ parseAtomicType :: Parser Type
 parseAtomicType =
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
-  <|> TyBool <$ reserved "Bool"
+  <|> TyBool <$ (reserved "Bool" <|> reserved "B")
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
@@ -229,3 +239,6 @@ parseTypeStr :: String -> Type
 parseTypeStr s = case (parse parseType "" s) of
                    Left e -> error.show $ e
                    Right t -> t
+
+parseFile :: FilePath -> IO (Either ParseError Prog)
+parseFile = parseFromFile (whiteSpace *> parseProg <* eof)

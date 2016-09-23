@@ -154,8 +154,6 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   Use trifecta for parsing?
 * Next steps
 
-  + Type inference/checking for entire programs (including recursive
-    top-level functions)
   + Interpreter for top-level recursive functions
   + Tiny REPL for loading programs and then evaluating expressions
   + LaTeX output mode for pretty-printer

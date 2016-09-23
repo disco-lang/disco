@@ -89,6 +89,7 @@ interpBOp _ Mul     = numOp' (*)
 interpBOp _ Div     = divOp
 interpBOp _ Exp     = expOp
 interpBOp ty Eq     = \v1 v2 -> return $ VBool (decideFor ty v1 v2)
+interpBOp ty Neq    = \v1 v2 -> return $ VBool (not (decideFor ty v1 v2))
 interpBOp _ Lt      = undefined
 interpBOp _ Gt      = undefined
 interpBOp _ Leq     = undefined

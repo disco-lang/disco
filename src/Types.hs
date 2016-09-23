@@ -28,6 +28,7 @@ data UOp = Neg
 
 -- | Binary operators.
 data BOp = Add | Sub | Mul | Div | Exp | Eq | Neq | Lt | Gt | Leq | Geq | And | Or | Mod
+         | Divides | RelPm
   deriving (Show, Eq)
 
 -- | Terms.

@@ -7,10 +7,11 @@ module Interp where
 
 import           Control.Monad           (join)
 import           Control.Monad.Except    (ExceptT, runExceptT, throwError)
+import           Data.Char               (toLower)
 import           Data.List               (find)
 import qualified Data.Map                as M
 import           Data.Maybe              (fromJust)
-import           Data.Ratio              ((%), numerator)
+import           Data.Ratio              ((%), numerator, denominator)
 
 import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind, translate,
                                           runLFreshM, unembed)
@@ -82,9 +83,9 @@ interpUOp Neg (VNum n) = return $ VNum (-n)
 interpUOp Neg v        = throwError $ NotANum v
 
 interpBOp :: Type -> BOp -> Value -> Value -> IM Value
-interpBOp _ Add     = numOp (+)
-interpBOp _ Sub     = numOp (-)
-interpBOp _ Mul     = numOp (*)
+interpBOp _ Add     = numOp' (+)
+interpBOp _ Sub     = numOp' (-)
+interpBOp _ Mul     = numOp' (*)
 interpBOp _ Div     = divOp
 interpBOp _ Exp     = expOp
 interpBOp ty Eq     = \v1 v2 -> return $ VBool (decideFor ty v1 v2)
@@ -95,11 +96,16 @@ interpBOp _ Geq     = undefined
 interpBOp _ And     = boolOp (&&)
 interpBOp _ Or      = boolOp (||)
 interpBOp _ Mod     = modOp
+interpBOp _ Divides = numOp divides
+interpBOp _ RelPm   = numOp relPm
 
-numOp :: (Rational -> Rational -> Rational) -> Value -> Value -> IM Value
-numOp (#) (VNum x) (VNum y) = return $ VNum (x # y)
+numOp :: (Rational -> Rational -> Value) -> Value -> Value -> IM Value
+numOp (#) (VNum x) (VNum y) = return $ x # y
 numOp _   (VNum _) y        = throwError $ NotANum y
 numOp _   x        _        = throwError $ NotANum x
+
+numOp' :: (Rational -> Rational -> Rational) -> Value -> Value -> IM Value
+numOp' f = numOp (\x y -> VNum (f x y))
 
 divOp :: Value -> Value -> IM Value
 divOp (VNum x) (VNum y)
@@ -122,6 +128,14 @@ modOp (VNum x) (VNum y)
                 -- called on integral things.
 modOp (VNum _) y = throwError $ NotANum y
 modOp x        _ = throwError $ NotANum x
+
+divides :: Rational -> Rational -> Value
+divides 0 0 = VBool True
+divides 0 _ = VBool False
+divides x y = VBool $ denominator (y / x) == 1
+
+relPm :: Rational -> Rational -> Value
+relPm (numerator -> x) (numerator -> y) = VBool $ gcd x y == 1
 
 boolOp :: (Bool -> Bool -> Bool) -> Value -> Value -> IM Value
 boolOp (#) (VBool x) (VBool y) = return $ VBool (x # y)
@@ -218,5 +232,15 @@ ok   = return $ Just M.empty
 
 ------------------------------------------------------------
 
-eval :: String -> String
-eval = either show (either show show . runIM . interpTermTop) . runTCM . infer . parseTermStr
+prettyValue :: Value -> String
+prettyValue VUnit     = "()"
+prettyValue (VBool f) = map toLower (show f)
+prettyValue (VClos _ _) = "<closure>"
+prettyValue (VPair v1 v2) = "(" ++ prettyValue v1 ++ ", " ++ prettyValue v2 ++ ")"
+prettyValue (VInj s v) = (case s of { L -> "inl "; R -> "inr " }) ++ prettyValue v
+prettyValue (VNum r)
+  | denominator r == 1 = show (numerator r)
+  | otherwise          = show (numerator r) ++ "/" ++ show (denominator r)
+
+eval :: String -> IO ()
+eval = putStrLn . either show (either show prettyValue . runIM . interpTermTop) . runTCM . infer . parseTermStr

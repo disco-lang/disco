@@ -28,13 +28,13 @@ lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "True", "False", "inl", "inr", "let", "in"
                         , "if", "when"
-                        , "otherwise", "and", "or"
+                        , "otherwise", "and", "or", "mod"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
                         ]
   , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨", "^"
-                        , "->", "<", ">", "<=", ">=", "/=" ]
+                        , "->", "<", ">", "<=", ">=", "/=", "%", "|", "#" ]
   }
 
 parens :: Parser a -> Parser a
@@ -188,6 +188,8 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
               , binary ">"  (TBin Gt)  AssocNone
               , binary "<=" (TBin Leq) AssocNone
               , binary ">=" (TBin Geq) AssocNone
+              , binary "|"  (TBin Divides) AssocNone
+              , binary "#"  (TBin RelPm) AssocNone
               ]
             , [ binary "&&"  (TBin And) AssocRight
               , binary "and" (TBin And) AssocRight

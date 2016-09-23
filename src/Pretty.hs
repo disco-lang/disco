@@ -44,7 +44,7 @@ prec op = fromJust . findIndex (op `elem`) $
   , []
   , [ Or ]
   , [ And ]
-  , [ Eq, Neq, Lt, Gt, Leq, Geq ]
+  , [ Eq, Neq, Lt, Gt, Leq, Geq, Divides, RelPm ]
   , []
   , [ Add, Sub ]
   , [ Mul, Div, Mod ]
@@ -150,20 +150,22 @@ prettyUOp :: UOp -> Doc
 prettyUOp Neg = text "-"
 
 prettyBOp :: BOp -> Doc
-prettyBOp Add    = text "+"
-prettyBOp Sub    = text "-"
-prettyBOp Mul    = text "*"
-prettyBOp Div    = text "/"
-prettyBOp Exp    = text "^"
-prettyBOp Eq     = text "="
-prettyBOp Neq    = text "/="
-prettyBOp Lt     = text "<"
-prettyBOp Gt     = text ">"
-prettyBOp Leq    = text "<="
-prettyBOp Geq    = text ">="
-prettyBOp And    = text "and"
-prettyBOp Or     = text "or"
-prettyBOp Mod    = text "mod"
+prettyBOp Add     = text "+"
+prettyBOp Sub     = text "-"
+prettyBOp Mul     = text "*"
+prettyBOp Div     = text "/"
+prettyBOp Exp     = text "^"
+prettyBOp Eq      = text "="
+prettyBOp Neq     = text "/="
+prettyBOp Lt      = text "<"
+prettyBOp Gt      = text ">"
+prettyBOp Leq     = text "<="
+prettyBOp Geq     = text ">="
+prettyBOp And     = text "and"
+prettyBOp Or      = text "or"
+prettyBOp Mod     = text "mod"
+prettyBOp Divides = text "|"
+prettyBOp RelPm   = text "#"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches [] = error "Empty branches are disallowed."

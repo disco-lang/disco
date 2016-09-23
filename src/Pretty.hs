@@ -1,7 +1,12 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
+
 module Pretty where
 
 import           Control.Applicative     hiding (empty)
+import           Control.Monad.Reader
 import           Data.Char               (toLower)
+import           Data.List               (findIndex)
+import           Data.Maybe              (fromJust)
 
 import qualified Parser                  as PR
 import           Types
@@ -13,8 +18,6 @@ import           Unbound.LocallyNameless (LFreshM, Name, bind, embed, lunbind,
 
 --------------------------------------------------
 -- Monadic pretty-printing
-
-type Doc = LFreshM PP.Doc
 
 hsep ds  = PP.hsep <$> sequence ds
 parens   = fmap PP.parens
@@ -28,6 +31,49 @@ empty    = return PP.empty
 ($+$) = liftA2 (PP.$+$)
 
 --------------------------------------------------
+-- Precedence and associativity
+
+type Prec = Int
+data Assoc = AL | AR | AN
+  deriving (Show, Eq)
+
+prec :: BOp -> Prec
+prec op = fromJust . findIndex (op `elem`) $
+  [ []
+  , []
+  , [ Or ]
+  , [ And ]
+  , [ Equals, Less ]
+  , []
+  , [ Add, Sub ]
+  , [ Mul, Div ]
+  ]
+
+assoc :: BOp -> Assoc
+assoc op
+  | op `elem` [Add, Sub, Mul, Div] = AL
+  | op `elem` [And, Or]            = AR
+  | otherwise                      = AN
+
+pa :: BOp -> PA
+pa op = PA (prec op) (assoc op)
+
+data PA = PA Prec Assoc
+  deriving (Show, Eq)
+
+instance Ord PA where
+  compare (PA p1 a1) (PA p2 a2) = compare p1 p2 `mappend` (if a1 == a2 then EQ else LT)
+
+initPA :: PA
+initPA = PA 0 AL
+
+funPA :: PA
+funPA = PA 10 AL
+
+type Doc = ReaderT PA LFreshM PP.Doc
+
+--------------------------------------------------
+
 prettyTy :: Type -> Doc
 prettyTy TyVoid = text "Void"
 prettyTy TyUnit = text "Unit"
@@ -41,6 +87,11 @@ prettyTy TyQ = text "Q"
 
 --------------------------------------------------
 
+mparens :: PA -> Doc -> Doc
+mparens pa doc = do
+  parentPA <- ask
+  (if (pa < parentPA) then parens else id) doc
+
 prettyName :: Name Term -> Doc
 prettyName = text . show
 
@@ -48,24 +99,39 @@ prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
-prettyTerm (TAbs bnd)    =
+prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(x,body) ->
-  hsep [prettyName x, text "|->", prettyTerm body]
-prettyTerm (TJuxt t1 t2)  = parens (prettyTerm t1) <+> parens (prettyTerm t2) -- XXX
+  hsep [prettyName x, text "↦", prettyTerm' 0 AL body]
+prettyTerm (TJuxt t1 t2) = mparens funPA $
+  prettyTerm' 10 AL t1 <+> prettyTerm' 10 AR t2
 prettyTerm (TPair t1 t2) =
-  parens (prettyTerm t1 <> text "," <+> prettyTerm t2)
-prettyTerm (TInj side t) = prettySide side <+> parens (prettyTerm t)  -- XXX
+  parens (prettyTerm' 0 AL t1 <> text "," <+> prettyTerm' 0 AL t2)
+prettyTerm (TInj side t) = mparens funPA $
+  prettySide side <+> prettyTerm' 10 AR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn op t)    = prettyUOp op <> parens (prettyTerm t)   -- XXX
-prettyTerm (TBin op t1 t2) = hsep [parens $ prettyTerm t1, prettyBOp op, parens $ prettyTerm t2]  -- XXX
-prettyTerm (TLet bnd) = lunbind bnd $ \(def, t2) ->
+prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AL t
+prettyTerm (TBin op t1 t2) = mparens (pa op) $
+  hsep
+  [ prettyTerm' (prec op) AL t1
+  , prettyBOp op
+  , prettyTerm' (prec op) AR t2
+  ]
+prettyTerm (TLet bnd) = mparens initPA $
+  lunbind bnd $ \(def, t2) -> do
   let (x, em) = unrec def
       t1 = unembed em
-   in hsep [text "let", prettyName x, text "=", prettyTerm t1, text "in", prettyTerm t2]
-prettyTerm (TCase b) = text "case" $+$ nest 2 (prettyBranches b)
+  hsep
+    [ text "let"
+    , prettyName x
+    , text "="
+    , prettyTerm' 0 AL t1
+    , text "in"
+    , prettyTerm' 0 AL t2
+    ]
+prettyTerm (TCase b)    = text "case" $+$ nest 2 (prettyBranches b)
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
--- To do:
---   add precedence & associativity handling to omit unnecessary parens
+
+prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 
 prettySide :: Side -> Doc
 prettySide L = text "inl"
@@ -115,7 +181,7 @@ prettyPattern (PNat n) = integer n
 prettyPattern (PSucc p) = text "S" <+> prettyPattern p
 
 prettyTermStr :: Term -> String
-prettyTermStr = PP.render . runLFreshM . prettyTerm
+prettyTermStr = PP.render . runLFreshM . flip runReaderT initPA . prettyTerm
 
 echoTerm :: String -> String
 echoTerm = prettyTermStr . PR.parseTermStr

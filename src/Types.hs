@@ -24,11 +24,11 @@ data Side = L | R
 
 -- | Unary operators.
 data UOp = Neg
-  deriving Show
+  deriving (Show, Eq)
 
 -- | Binary operators.
 data BOp = Add | Sub | Mul | Div | Equals | Less | And | Or
-  deriving Show
+  deriving (Show, Eq)
 
 -- | Terms.
 data Term where

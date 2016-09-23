@@ -1,0 +1,11 @@
+-- HDE: Should we be able to make type synonyms?
+type Matrix = List (List B)
+
+-- HDE: It is unclear how to do nested pattern matching.  Where does
+-- the outter 'when'-expression go?  Notice it's on the end.
+
+contains_empty_row ::  Matrix -> B
+contains_empty_row = l -> { False                         when l = []
+                             { { True                      when x = []
+                               { contains_empty_row xs     when x = y:ys
+                                                          when l = x:xs

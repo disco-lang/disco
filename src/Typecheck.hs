@@ -550,6 +550,7 @@ addType x ty = modify (M.insert (translate x) (Left ty))
 addDefn :: Name Term -> ATerm -> TCM ()
 addDefn x at = modify (M.alter (const (Just (Right at))) (translate x))
 
+-- XXX TODO: mutually recursive functions?
 inferProg :: Prog -> TCM ()
 inferProg [] = return ()
 inferProg (DType x ty : p) = do

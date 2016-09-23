@@ -224,3 +224,8 @@ parseTermStr s = case (parse parseTerm "" s) of
                    Left e -> error.show $ e
                    Right t -> t
 
+
+parseTypeStr :: String -> Type
+parseTypeStr s = case (parse parseType "" s) of
+                   Left e -> error.show $ e
+                   Right t -> t

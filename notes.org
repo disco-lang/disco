@@ -152,3 +152,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   Error messages are going to be really important and really hard!
 
   Use trifecta for parsing?
+* Next steps
+
+  + Add |, # operators
+  + Type inference/checking for entire programs (including recursive
+    top-level functions)
+  + Tiny REPL for loading programs and then evaluating expressions
+  + LaTeX output mode for pretty-printer

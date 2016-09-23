@@ -243,4 +243,4 @@ prettyValue (VNum r)
   | otherwise          = show (numerator r) ++ "/" ++ show (denominator r)
 
 eval :: String -> IO ()
-eval = putStrLn . either show (either show prettyValue . runIM . interpTermTop) . runTCM . infer . parseTermStr
+eval = putStrLn . either show (either show prettyValue . runIM . interpTermTop) . evalTCM . infer . parseTermStr

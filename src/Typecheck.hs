@@ -13,9 +13,10 @@ module Typecheck where
 
 import Prelude hiding (lookup)
 
-import Control.Applicative ((<|>))
+import           Control.Applicative ((<|>))
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Control.Monad.State
 import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless
@@ -64,6 +65,8 @@ derive [''ATerm, ''AGuard]
 
 instance Alpha ATerm
 instance Alpha AGuard
+
+type Defns = M.Map (Name ATerm) (Either Type ATerm)
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
@@ -114,6 +117,8 @@ data TCError
   | ModQ                   -- ^ Can't do mod on rationals.
   | ExpQ                   -- ^ Can't exponentiate by a rational.
   | RelPmQ                 -- ^ Can't ask about relative primality of rationals.
+  | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
+  | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -125,11 +130,17 @@ instance Monoid TCError where
 
 -- | TypeCheckingMonad. Maintains a context of variable types, and can
 -- throw @TCError@s and generate fresh names.
-type TCM = ReaderT Ctx (ExceptT TCError LFreshM)
+type TCM = StateT Defns (ReaderT Ctx (ExceptT TCError LFreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
-runTCM :: TCM a -> Either TCError a
-runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx
+runTCM :: TCM a -> Either TCError (a, Defns)
+runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
+
+evalTCM :: TCM a -> Either TCError a
+evalTCM = fmap fst . runTCM
+
+execTCM :: TCM a -> Either TCError Defns
+execTCM = fmap snd . runTCM
 
 emptyCtx :: Ctx
 emptyCtx = M.empty
@@ -528,3 +539,31 @@ ok = return emptyCtx
 
 ------------------------------------------------------------
 
+exists :: Name Term -> TCM (Maybe (Either Type ATerm))
+exists x = do
+  defns <- get
+  return $ M.lookup (translate x) defns
+
+addType :: Name Term -> Type -> TCM ()
+addType x ty = modify (M.insert (translate x) (Left ty))
+
+addDefn :: Name Term -> ATerm -> TCM ()
+addDefn x at = modify (M.alter (const (Just (Right at))) (translate x))
+
+inferProg :: Prog -> TCM ()
+inferProg [] = return ()
+inferProg (DType x ty : p) = do
+  mdef <- exists x
+  case mdef of
+    Nothing -> addType x ty
+    Just _  -> throwError $ DuplicateDecls x
+  extend x ty $ do
+  inferProg p
+inferProg (DDefn x t : p) = do
+  mdef <- exists x
+  at <- case mdef of
+    Nothing        -> infer t
+    Just (Left ty) -> check t ty
+    Just (Right _) -> throwError $ DuplicateDefns x
+  addDefn x at
+  inferProg p

@@ -41,7 +41,7 @@ data ATerm where
   ATUn    :: Type -> UOp -> ATerm -> ATerm              -- ^ Unary operator.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm     -- ^ Binary operator.
   ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm  -- ^ (Non-recursive) let.
-  ATCase  :: Type -> [Branch] -> ATerm                  -- ^ Case expression.
+  ATCase  :: Type -> [ABranch] -> ATerm                 -- ^ Case expression.
   ATAscr  :: ATerm -> Type -> ATerm                     -- ^ Ascription.
   ATSub   :: Type -> ATerm -> ATerm                     -- ^ @ATSub@ is used to record
                                                         --   the fact that we made use of
@@ -53,9 +53,17 @@ data ATerm where
   -- TODO: I don't think we are currently very consistent about using ATSub everywhere
   --   subtyping is invoked.  I am not sure how much it matters.
 
-derive [''ATerm]
+type ABranch = Bind [AGuard] ATerm
+
+data AGuard where
+  AGIf   :: Embed ATerm -> AGuard             -- ^ Boolean guard (if <test>)
+  AGWhen :: Embed ATerm -> Pattern -> AGuard  -- ^ Pattern guard (when term = pat)
+  deriving Show
+
+derive [''ATerm, ''AGuard]
 
 instance Alpha ATerm
+instance Alpha AGuard
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
@@ -399,6 +407,8 @@ infer (TAscr t ty) = do
   return $ ATAscr at ty
 
 -- XXX todo: case
+
+infer (TCase bs) = error "IMPLEMENT TYPECHECKING FOR CASE"
 
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)

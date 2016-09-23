@@ -29,11 +29,12 @@ data Value where
   deriving Show
 
 data InterpError where
-  UnboundError :: Name ATerm -> InterpError
-  NotANum      :: Value      -> InterpError  -- ^ v should be a number, but isn't
-  DivByZero    ::               InterpError
-  NotABool     :: Value      -> InterpError  -- ^ should be a boolean, but isn't
-  NotAFun      :: Value      -> InterpError
+  UnboundError  :: Name ATerm -> InterpError
+  NotANum       :: Value      -> InterpError  -- ^ v should be a number, but isn't
+  DivByZero     ::               InterpError
+  NotABool      :: Value      -> InterpError  -- ^ should be a boolean, but isn't
+  NotAFun       :: Value      -> InterpError
+  NonExhaustive ::               InterpError
   deriving Show
 
 type Env = M.Map (Name ATerm) Value
@@ -45,35 +46,35 @@ type IM = ExceptT InterpError LFreshM
 runIM :: IM a -> Either InterpError a
 runIM = runLFreshM . runExceptT
 
-interpTerm :: ATerm -> IM Value
-interpTerm = interpTerm' M.empty
+interpTermTop :: ATerm -> IM Value
+interpTermTop = interpTerm M.empty
 
-interpTerm' :: Env -> ATerm -> IM Value
-interpTerm' e (ATVar _ x)       = maybe (throwError $ UnboundError x) return (M.lookup x e)
-interpTerm' _ ATUnit            = return VUnit
-interpTerm' _ (ATBool b)        = return $ VBool b
-interpTerm' e (ATAbs _ c)       = return $ VClos c e
-
-  -- XXX FIX ME: lazy evaluation
-interpTerm' e (ATApp _ f x)     = join (interpApp <$> interpTerm' e f <*> interpTerm' e x)
-interpTerm' e (ATPair _ l r)    = VPair <$> interpTerm' e l <*> interpTerm' e r
-interpTerm' e (ATInj _ s t)     = VInj s <$> interpTerm' e t
-interpTerm' _ (ATNat i)         = return $ VNum (i % 1)
-interpTerm' e (ATUn _ op t)     = interpTerm' e t >>= interpUOp op
-interpTerm' e (ATBin ty op l r) = join (interpBOp ty op <$> interpTerm' e l <*> interpTerm' e r)
+interpTerm :: Env -> ATerm -> IM Value
+interpTerm e (ATVar _ x)       = maybe (throwError $ UnboundError x) return (M.lookup x e)
+interpTerm _ ATUnit            = return VUnit
+interpTerm _ (ATBool b)        = return $ VBool b
+interpTerm e (ATAbs _ c)       = return $ VClos c e
 
   -- XXX FIX ME: lazy evaluation
-interpTerm' e (ATLet _ t)       =
+interpTerm e (ATApp _ f x)     = join (interpApp <$> interpTerm e f <*> interpTerm e x)
+interpTerm e (ATPair _ l r)    = VPair <$> interpTerm e l <*> interpTerm e r
+interpTerm e (ATInj _ s t)     = VInj s <$> interpTerm e t
+interpTerm _ (ATNat i)         = return $ VNum (i % 1)
+interpTerm e (ATUn _ op t)     = interpTerm e t >>= interpUOp op
+interpTerm e (ATBin ty op l r) = join (interpBOp ty op <$> interpTerm e l <*> interpTerm e r)
+
+  -- XXX FIX ME: lazy evaluation
+interpTerm e (ATLet _ t)       =
   lunbind t $ \((x, unembed -> t1), t2) -> do
-  v1 <- interpTerm' e t1
-  interpTerm' (M.insert x v1 e) t2
+  v1 <- interpTerm e t1
+  interpTerm (M.insert x v1 e) t2
 
-interpTerm' e (ATCase _ bs)     = undefined
-interpTerm' e (ATAscr t _)      = interpTerm' e t
-interpTerm' e (ATSub _ t)       = interpTerm' e t
+interpTerm e (ATCase _ bs)     = interpCase e bs
+interpTerm e (ATAscr t _)      = interpTerm e t
+interpTerm e (ATSub _ t)       = interpTerm e t
 
 interpApp :: Value -> Value -> IM Value
-interpApp (VClos c e) v   = lunbind c $ \(x,t) -> interpTerm' (M.insert x v e) t
+interpApp (VClos c e) v   = lunbind c $ \(x,t) -> interpTerm (M.insert x v e) t
 interpApp f _             = throwError $ NotAFun f
 
 interpUOp :: UOp -> Value -> IM Value
@@ -118,7 +119,7 @@ decideFor (TyArr ty1 ty2) c1@(VClos {}) c2@(VClos {})
   = undefined
   -- = and (zipWith (decideFor ty2) (map f1 ty1s) (map f2 ty1s))
   -- where
-  --   mkFun (VClos x t e) v = interpTerm' (M.insert x v e) t
+  --   mkFun (VClos x t e) v = interpTerm (M.insert x v e) t
   --   f1 = mkFun c1
   --   f2 = mkFun c2
   --   ty1s = enumerate ty1
@@ -144,7 +145,32 @@ enumerate (TyPair ty1 ty2) = [ VPair x y | x <- enumerate ty1, y <- enumerate ty
 enumerate (TySum ty1 ty2)  = map (VInj L) (enumerate ty1) ++ map (VInj R) (enumerate ty2)
 enumerate _                = []  -- other cases shouldn't happen if the program type checks
 
+interpCase :: Env -> [ABranch] -> IM Value
+interpCase _ []     = throwError NonExhaustive
+interpCase e (b:bs) = do
+  lunbind b $ \(gs, t) -> do
+  res <- checkGuards e gs
+  case res of
+    Nothing -> interpCase e bs
+    Just e' -> interpTerm e' t
+
+checkGuards :: Env -> [AGuard] -> IM (Maybe Env)
+checkGuards e []     = return $ Just e
+checkGuards e (g:gs) = do
+  res <- checkGuard e g
+  case res of
+    Nothing -> return Nothing
+    Just e' -> checkGuards e' gs
+
+checkGuard :: Env -> AGuard -> IM (Maybe Env)
+checkGuard e (AGIf (unembed -> t)) = do
+  v <- interpTerm e t
+  case v of
+    VBool True -> return (Just e)
+    _          -> return Nothing
+checkGuard e (AGWhen (unembed -> t) p) = undefined
+
 ------------------------------------------------------------
 
 eval :: String -> String
-eval = either show (either show show . runIM . interpTerm) . runTCM . infer . parseTermStr
+eval = either show (either show show . runIM . interpTermTop) . runTCM . infer . parseTermStr

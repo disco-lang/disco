@@ -158,11 +158,6 @@ prettyBOp And    = text "&&"
 prettyBOp Or     = text "||"
 
 prettyBranches :: [Branch] -> Doc
-  -- TODO: Why should empty branches be disallowed?  A case with no
-  -- branches is exactly the right thing to eliminate a value of type
-  -- Void.  I think we ought to allow it, and perhaps also come up
-  -- with some nicer syntax sugar (e.g. maybe you can write 'absurd'
-  -- instead of writing a case with no branches).
 prettyBranches [] = error "Empty branches are disallowed."
 prettyBranches bs = foldr ($+$) empty (map prettyBranch bs)
 

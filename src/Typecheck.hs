@@ -42,7 +42,6 @@ data ATerm where
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm     -- ^ Binary operator.
   ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm  -- ^ (Non-recursive) let.
   ATCase  :: Type -> [Branch] -> ATerm                  -- ^ Case expression.
-  ATWrong :: Type -> ATerm                              -- ^ Wrong can have any type.
   ATAscr  :: ATerm -> Type -> ATerm                     -- ^ Ascription.
   ATSub   :: Type -> ATerm -> ATerm                     -- ^ @ATSub@ is used to record
                                                         --   the fact that we made use of
@@ -72,7 +71,6 @@ getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
 getType (ATLet ty _)     = ty
 getType (ATCase ty _)    = ty
-getType (ATWrong ty)     = ty
 getType (ATAscr _ ty)    = ty
 getType (ATSub ty _)     = ty
 

@@ -385,10 +385,6 @@ infer (TBin Or t1 t2) = do
   at2 <- check t2 TyBool
   return $ ATBin TyBool Or at1 at2
 
-  -- TODO: this is actually wrong, it is not recursive at all.  I
-  -- don't think we can actually handle letrec in this simple
-  -- bidirectional system.  We need more high-powered type inference.
-
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.

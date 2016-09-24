@@ -1,8 +1,8 @@
 Talked about this with Harley Eades.  Apply for grant to develop this?
 
-* Grant 
+* Grant
   - Opportunities
-    
+
     NSF HSF Solicitation: http://www.nsf.gov/pubs/2015/nsf15573/nsf15573.htm
 
   - What do we need to get done?
@@ -11,7 +11,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     concept done that exhibts the usefulness of such a language.  I do
     not think we will need a complete implementation, and we should
     definately leave some of the more interesting parts to the
-    students who would be funded by the grant.  
+    students who would be funded by the grant.
 
     The grant language can simply be the language that we have put
     together in simple.ott.  As a reduction strategy we use the mixed
@@ -70,11 +70,11 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   z ::= integer
 
   binop ::= + ; - ; * ; / ; ^ ; mod
-  
+
 * Typing rules/built-in functions
 
   - Bounded Polymorphism
-    
+
     To make applying numerical operations +, -, and *, easier bounded
     polymorphism could be added.
 
@@ -84,7 +84,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
     Type system extension is straightforward.  I think it would be
     possible to use the simplier system discussed in TAPL (see Figure
-    26-1 on page 392).  
+    26-1 on page 392).
 
     The hard part of adding bounded quantification is type inference.
     TAPL does not report on this, but I was able to find a
@@ -95,13 +95,13 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     Next step is reading this a bit and gauging how hard it would be
     to implement.
 
-  - Basic type inference 
+  - Basic type inference
 
     See TAPL chapter 22.  Things seem to get more interesting in the
     presence of subtying.  See page 338 of TAPL.
 
 * Reduction Strategy
-  
+
   We settled on a mixture of CBV and CBN (call-by-need).  Numeric
   types should reduce to values, but it would be interesting to allow
   for infinite data types like streams, and hence, we will have a very
@@ -154,6 +154,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   Use trifecta for parsing?
 * Next steps
 
+  + Desugaring
+    + comparison operators
+    + function pattern-matching
+  + Interpreter on desugared language
   + Interpreter for top-level recursive functions
   + Tiny REPL for loading programs and then evaluating expressions
   + LaTeX output mode for pretty-printer

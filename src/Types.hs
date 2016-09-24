@@ -98,3 +98,6 @@ instance Alpha Term
 instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Type
+
+isNumTy :: Type -> Bool
+isNumTy ty = ty `elem` [TyN, TyZ, TyQ]

@@ -20,7 +20,7 @@ data Decl where
 
 -- | Injections into a sum type (inl or inr) have a "side" (L or R).
 data Side = L | R
-  deriving (Show, Eq)
+  deriving (Show, Eq, Enum)
 
 -- | Unary operators.
 data UOp = Neg

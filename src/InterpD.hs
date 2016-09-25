@@ -27,7 +27,6 @@ data InterpError where
   NotANum       :: Value   -> InterpError  -- ^ v should be a number, but isn't
   DivByZero     ::            InterpError
   NotABool      :: Value   -> InterpError  -- ^ should be a boolean, but isn't
-  NotAFun       :: Value   -> InterpError
   NonExhaustive ::            InterpError
   deriving Show
 
@@ -41,106 +40,111 @@ runIM = runLFreshM . runExceptT . flip runReaderT M.empty
 extend :: AnyName -> Value -> IM a -> IM a
 extend x v = local (M.insert x v)
 
-interpTerm :: Core -> IM Value
-interpTerm (CVar x)     = do
+mkThunk :: Core -> IM Value
+mkThunk c = VThunk c <$> ask
+
+mkEnum :: Enum e => e -> Value
+mkEnum e = VCons (fromEnum e) []
+
+-- | Reduce a value to weak head normal form.
+whnf' :: Value -> IM Value
+whnf' (VThunk c e) = local (const e) $ whnf c
+whnf' v            = return v
+
+-- | Reduce a Core expression to weak head normal form.
+whnf :: Core -> IM Value
+whnf (CVar x) = do
   e <- ask
-  maybe (throwError $ UnboundError x) return (M.lookup x e)
-interpTerm (CCons i cs) = VCons i <$> mapM interpTerm cs
-interpTerm (CNat n)     = return $ VNum (n % 1)
-interpTerm (CAbs b)     = VClos b <$> ask
-interpTerm (CApp str c1 c2) = do
-  v1 <- interpTerm c1
+  v <- maybe (throwError $ UnboundError x) return (M.lookup x e)
+  whnf' v
+whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
+whnf (CNat n)       = return $ VNum (n % 1)
+whnf (CAbs b)       = VClos b <$> ask
+whnf (CApp str c1 c2) = do
+  v1 <- whnf c1
   v2 <- case str of
-    Strict -> interpTerm c2
-    Lazy   -> VThunk c2 <$> ask
-  interpApp v1 v2
-interpTerm (COp op cs) = do
-  vs <- mapM interpTerm cs
-  interpOp op vs
-interpTerm (CLet str b) =
+    Strict -> whnf c2       -- for types with strict evaluation, whnf = full reduction
+    Lazy   -> mkThunk c2
+  whnfApp v1 v2
+whnf (COp op cs)    = whnfOp op cs
+whnf (CLet str b)     =
   lunbind b $ \((x, unembed -> t1), t2) -> do
   v1 <- case str of
-    Strict -> interpTerm t1
-    Lazy   -> VThunk t1 <$> ask
+    Strict -> whnf t1
+    Lazy   -> mkThunk t1
   extend x v1 $ do
-  interpTerm t2
-interpTerm (CCase bs) = undefined
+  whnf t2
+whnf (CCase bs)     = undefined
 
-interpApp :: Value -> Value -> IM Value
-interpApp (VClos c e) v   =
+-- | Reduce an application to WHNF.  Precondition: the first argument
+--   has already been reduced to WHNF (which means it must be a
+--   closure).
+whnfApp :: Value -> Value -> IM Value
+whnfApp (VClos c e) v =
   lunbind c $ \(x,t) -> do
   local (const e)     $ do
   extend x v          $ do
-  interpTerm  t
-interpApp f _             = throwError $ NotAFun f
+  whnf t
+whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
 
-interpOp :: Op -> [Value] -> IM Value
-interpOp = undefined
+-- | Reduce an operator application to WHNF.
+whnfOp :: Op -> [Core] -> IM Value
+whnfOp OAdd     = numOp (+)
+whnfOp ONeg     = uNumOp negate
+whnfOp OMul     = numOp (*)
+whnfOp ODiv     = numOp' divOp
+whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
+  -- If the program typechecks, n will be an integer.
+whnfOp OAnd     = boolOp (&&)
+whnfOp OOr      = boolOp (||)
+whnfOp OMod     = numOp' modOp
+whnfOp ODivides = numOp' divides
+whnfOp ORelPm   = numOp' relPm
+whnfOp (OEq ty) = undefined
+whnfOp (OLt ty) = undefined
+whnfOp ONot     = notOp
 
--- interpUOp :: UOp -> Value -> IM Value
--- interpUOp Neg (VNum n) = return $ VNum (-n)
--- interpUOp Neg v        = throwError $ NotANum v
+numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
+numOp (#) = numOp' (\m n -> return (VNum (m # n)))
 
--- interpBOp :: Type -> BOp -> Value -> Value -> IM Value
--- interpBOp _ Add     = numOp' (+)
--- interpBOp _ Sub     = numOp' (-)
--- interpBOp _ Mul     = numOp' (*)
--- interpBOp _ Div     = divOp
--- interpBOp _ Exp     = expOp
--- interpBOp ty Eq     = \v1 v2 -> return $ VBool (decideFor ty v1 v2)
--- interpBOp ty Neq    = \v1 v2 -> return $ VBool (not (decideFor ty v1 v2))
--- interpBOp _ Lt      = undefined
--- interpBOp _ Gt      = undefined
--- interpBOp _ Leq     = undefined
--- interpBOp _ Geq     = undefined
--- interpBOp _ And     = boolOp (&&)
--- interpBOp _ Or      = boolOp (||)
--- interpBOp _ Mod     = modOp
--- interpBOp _ Divides = numOp divides
--- interpBOp _ RelPm   = numOp relPm
+numOp' :: (Rational -> Rational -> IM Value) -> [Core] -> IM Value
+numOp' (#) cs = do
+  [VNum m, VNum n] <- mapM whnf cs     -- If the program type checked this can
+  m # n                                -- never go wrong.
 
--- numOp :: (Rational -> Rational -> Value) -> Value -> Value -> IM Value
--- numOp (#) (VNum x) (VNum y) = return $ x # y
--- numOp _   (VNum _) y        = throwError $ NotANum y
--- numOp _   x        _        = throwError $ NotANum x
+uNumOp :: (Rational -> Rational) -> [Core] -> IM Value
+uNumOp f [c] = do
+  VNum m <- whnf c
+  return $ VNum (f m)
 
--- numOp' :: (Rational -> Rational -> Rational) -> Value -> Value -> IM Value
--- numOp' f = numOp (\x y -> VNum (f x y))
+divOp :: Rational -> Rational -> IM Value
+divOp _ 0 = throwError DivByZero
+divOp m n = return $ VNum (m / n)
 
--- divOp :: Value -> Value -> IM Value
--- divOp (VNum x) (VNum y)
---   | y == 0    = throwError DivByZero
---   | otherwise = return $ VNum (x / y)
--- divOp (VNum _) y = throwError $ NotANum y
--- divOp x        _ = throwError $ NotANum x
+modOp :: Rational -> Rational -> IM Value
+modOp m n
+  | n == 0    = throwError DivByZero
+  | otherwise = return $ VNum ((numerator m `mod` numerator n) % 1)
+                -- This is safe since if the program typechecks, mod will only ever be
+                -- called on integral things.
 
--- expOp :: Value -> Value -> IM Value
--- expOp (VNum x) (VNum y) = return $ VNum (x ^^ (numerator y))
---   -- if the program typechecks, y will be an integer
--- expOp (VNum _) y = throwError $ NotANum y
--- expOp x        _ = throwError $ NotANum x
+boolOp :: (Bool -> Bool -> Bool) -> [Core] -> IM Value
+boolOp (#) cs = do
+  [VCons i [], VCons j []] <- mapM whnf cs
+  return . mkEnum $ toEnum i # toEnum j
 
--- modOp :: Value -> Value -> IM Value
--- modOp (VNum x) (VNum y)
---   | y == 0    = throwError DivByZero
---   | otherwise = return $ VNum ((numerator x `mod` numerator y) % 1)
---                 -- This is safe since if the program typechecks, mod will only ever be
---                 -- called on integral things.
--- modOp (VNum _) y = throwError $ NotANum y
--- modOp x        _ = throwError $ NotANum x
+divides :: Rational -> Rational -> IM Value
+divides 0 0 = return $ mkEnum True
+divides 0 _ = return $ mkEnum False
+divides x y = return . mkEnum $ denominator (y / x) == 1
 
--- divides :: Rational -> Rational -> Value
--- divides 0 0 = VBool True
--- divides 0 _ = VBool False
--- divides x y = VBool $ denominator (y / x) == 1
+relPm :: Rational -> Rational -> IM Value
+relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 
--- relPm :: Rational -> Rational -> Value
--- relPm (numerator -> x) (numerator -> y) = VBool $ gcd x y == 1
-
--- boolOp :: (Bool -> Bool -> Bool) -> Value -> Value -> IM Value
--- boolOp (#) (VBool x) (VBool y) = return $ VBool (x # y)
--- boolOp _   (VBool _) y         = throwError $ NotABool y
--- boolOp _   x         _         = throwError $ NotABool x
+notOp :: [Core] -> IM Value
+notOp [c] = do
+  VCons i [] <- whnf c
+  return . mkEnum . not . toEnum $ i
 
 -- decideFor :: Type -> Value -> Value -> Bool
 -- decideFor (TyPair ty1 ty2) (VPair x1 y1) (VPair x2 y2)

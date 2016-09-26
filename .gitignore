@@ -2,6 +2,8 @@ dist
 cabal-dev
 *.o
 *.hi
+*.dyn_o
+*.dyn_hi
 *.chi
 *.chs.h
 .virthualenv
@@ -25,3 +27,5 @@ ott/*.tex
 nsf/*.pdf
 nsf/main.tex
 nsf/description.tex
+
+src/REPL

@@ -95,7 +95,7 @@ type Doc = ReaderT PA LFreshM PP.Doc
 --------------------------------------------------
 
 prettyTy :: Type -> Doc
-prettyTy TyVoid           = text "Void"
+prettyTy TyVoid           = name "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy (TyArr ty1 ty2)  = mparens arrPA $
@@ -165,6 +165,7 @@ prettySide R = text "inr"
 
 prettyUOp :: UOp -> Doc
 prettyUOp Neg = text "-"
+prettyUOp Not = text "not "
 
 prettyBOp :: BOp -> Doc
 prettyBOp Add     = text "+"
@@ -216,7 +217,9 @@ prettyProg = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
-prettyDecl (DDefn x t)  = (prettyName x <+> text "=" <+> prettyTerm t) $+$ text " "
+prettyDecl (DDefn x b)
+  = lunbind b $ \(ps, t) ->
+  (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 ------------------------------------------------------------
 

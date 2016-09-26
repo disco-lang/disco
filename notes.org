@@ -156,7 +156,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
   + Desugaring
     + function pattern-matching
-  + Interpreter on desugared language
   + Interpreter for top-level recursive functions
   + Tiny REPL for loading programs and then evaluating expressions
   + LaTeX output mode for pretty-printer
+  + Implement equality testing for functions
+  + Implement less-than testing

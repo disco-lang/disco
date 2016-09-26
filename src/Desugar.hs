@@ -19,7 +19,7 @@ data Strictness = Strict | Lazy
 -- | Core desugared language.  Mostly untyped (i.e. types have been
 --   erased).
 data Core where
-  CVar  :: AnyName -> Core                -- ^ A variable.
+  CVar  :: Name Core -> Core              -- ^ A variable.
   CCons :: Int -> [Core] -> Core          -- ^ A constructor, identified by number,
                                           --   plus arguments.  Note we do not need
                                           --   to remember which type the constructor
@@ -27,10 +27,10 @@ data Core where
                                           --   then we will never compare constructors
                                           --   from different types.
   CNat  :: Integer -> Core                -- ^ A natural number.
-  CAbs  :: Bind AnyName Core -> Core      -- ^ Lambda abstraction.
+  CAbs  :: Bind (Name Core) Core -> Core  -- ^ Lambda abstraction.
   CApp  :: Strictness -> Core -> Core -> Core   -- ^ Function application, with strictness.
   COp   :: Op -> [Core] -> Core                 -- ^ Operator application.
-  CLet  :: Strictness -> Bind (AnyName, Embed Core) Core -> Core
+  CLet  :: Strictness -> Bind (Name Core, Embed Core) Core -> Core
                                           -- ^ Non-recursive let, with strictness.
   CCase :: [CBranch] -> Core              -- ^ Case expression.
   deriving Show
@@ -47,10 +47,11 @@ type CBranch = Bind [(Embed Core, CPattern)] Core
 -- | Core (desugared) pattern.  We only need variables, wildcards,
 --   nats, and constructors.
 data CPattern where
-  CPVar  :: AnyName -> CPattern
+  CPVar  :: Name Core -> CPattern
   CPWild :: CPattern
   CPCons :: Int -> [CPattern] -> CPattern
   CPNat  :: Integer -> CPattern
+  CPSucc :: CPattern -> CPattern
   deriving Show
 
 derive [''Strictness, ''Core, ''Op, ''CPattern]
@@ -64,19 +65,22 @@ instance Alpha CPattern
 
 type DSM = LFreshM
 
+runDSM :: DSM a -> a
+runDSM = runLFreshM
+
 strictness :: Type -> Strictness
 strictness ty
   | isNumTy ty = Strict
   | otherwise  = Lazy
 
 desugar :: ATerm -> DSM Core
-desugar (ATVar _ x)   = return $ CVar (AnyName x)
+desugar (ATVar _ x)   = return $ CVar (translate x)
 desugar ATUnit        = return $ CCons 0 []
 desugar (ATBool b)    = return $ CCons (fromEnum b) []
 desugar (ATAbs _ lam) =
   lunbind lam $ \(x,t) -> do
   dt <- desugar t
-  return $ CAbs (bind (AnyName x) dt)
+  return $ CAbs (bind (translate x) dt)
 desugar (ATApp ty t1 t2) =
   CApp (strictness ty) <$> desugar t1 <*> desugar t2
 desugar (ATPair _ t1 t2) =
@@ -87,18 +91,19 @@ desugar (ATNat n) = return $ CNat n
 desugar (ATUn _ op t) =
   desugarUOp op <$> desugar t
 desugar (ATBin ty op t1 t2) =
-  desugarBOp ty op <$> desugar t1 <*> desugar t2
+  desugarBOp (getType t1) op <$> desugar t1 <*> desugar t2
 desugar (ATLet ty t) =
   lunbind t $ \((x, unembed -> t1), t2) -> do
   dt1 <- desugar t1
   dt2 <- desugar t2
-  return $ CLet (strictness (getType t1)) (bind (AnyName x, embed dt1) dt2)
+  return $ CLet (strictness (getType t1)) (bind (translate x, embed dt1) dt2)
 desugar (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugar (ATAscr t _) = desugar t
 desugar (ATSub _ t)  = desugar t
 
 desugarUOp :: UOp -> Core -> Core
 desugarUOp Neg c = COp ONeg [c]
+desugarUOp Not c = COp ONot [c]
 
 desugarBOp :: Type -> BOp -> Core -> Core -> Core
 desugarBOp _  Add     c1 c2 = COp OAdd [c1,c2]
@@ -134,11 +139,11 @@ desugarGuard (AGWhen (unembed -> at) p) = do
   return (embed c, desugarPattern p)
 
 desugarPattern :: Pattern -> CPattern
-desugarPattern (PVar x)      = CPVar (AnyName x)
+desugarPattern (PVar x)      = CPVar (translate x)
 desugarPattern PWild         = CPWild
 desugarPattern PUnit         = CPCons 0 []
 desugarPattern (PBool b)     = CPCons (fromEnum b) []
 desugarPattern (PPair p1 p2) = CPCons 0 [desugarPattern p1, desugarPattern p2]
 desugarPattern (PInj s p)    = CPCons (fromEnum s) [desugarPattern p]
 desugarPattern (PNat n)      = CPNat n
-desugarPattern (PSucc p)     = CPCons 0 [desugarPattern p]
+desugarPattern (PSucc p)     = CPSucc (desugarPattern p)

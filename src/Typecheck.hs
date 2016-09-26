@@ -410,7 +410,7 @@ infer (TBin Eq t1 t2) = do
 infer (TBin op t1 t2)
   | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2
 
-  -- && and || always have type Bool, and the subterms must have type
+  -- &&, ||, and not always have type Bool, and the subterms must have type
   -- Bool as well.
 infer (TBin And t1 t2) = do
   at1 <- check t1 TyBool
@@ -420,6 +420,9 @@ infer (TBin Or t1 t2) = do
   at1 <- check t1 TyBool
   at2 <- check t2 TyBool
   return $ ATBin TyBool Or at1 at2
+infer (TUn Not t) = do
+  at <- check t TyBool
+  return $ ATUn TyBool Not at
 
 infer (TBin Mod t1 t2) = do
   at1 <- infer t1
@@ -553,21 +556,35 @@ addType x ty = modify (M.insert (translate x) (Left ty))
 addDefn :: Name Term -> ATerm -> TCM ()
 addDefn x at = modify (M.alter (const (Just (Right at))) (translate x))
 
+declName :: Decl -> Name Term
+declName (DType x _)   = x
+declName (DDefn x _) = x
+
 -- XXX TODO: mutually recursive functions?
 inferProg :: Prog -> TCM ()
 inferProg [] = return ()
-inferProg (DType x ty : p) = do
+inferProg (DType x ty : prog) = do
   mdef <- exists x
   case mdef of
     Nothing -> addType x ty
     Just _  -> throwError $ DuplicateDecls x
   extend x ty $ do
-  inferProg p
-inferProg (DDefn x t : p) = do
+  inferProg prog
+inferProg decls@(DDefn x _ : _) = do
+  let (defnBlock, prog) = span ((==x) . declName) decls
   mdef <- exists x
   at <- case mdef of
-    Nothing        -> infer t
-    Just (Left ty) -> check t ty
+    Nothing        -> inferDefnBlock defnBlock
+    Just (Left ty) -> checkDefnBlock defnBlock ty
     Just (Right _) -> throwError $ DuplicateDefns x
   addDefn x at
-  inferProg p
+  inferProg prog
+
+-- Prerequisite: all Decls are DDefns with the same name.  XXX Need to
+-- make some sort of Term that this can turn into?  No, Defns needs to
+-- map names to typed definition blocks, not ATerms.
+inferDefnBlock :: [Decl] -> TCM ATerm
+inferDefnBlock = undefined
+
+checkDefnBlock :: [Decl] -> Type -> TCM ATerm
+checkDefnBlock = undefined

@@ -28,13 +28,13 @@ lexer = P.makeTokenParser $
   haskellStyle
   { P.reservedNames   = [ "true", "false", "True", "False", "inl", "inr", "let", "in"
                         , "if", "when"
-                        , "otherwise", "and", "or", "mod"
+                        , "otherwise", "and", "or", "not", "mod"
                         , "()"
                         , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
                         , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
                         ]
   , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨", "^"
-                        , "->", "<", ">", "<=", ">=", "/=", "%", "|", "#" ]
+                        , "->", "<", ">", "<=", ">=", "/=", "==", "%", "|", "#" ]
   }
 
 parens :: Parser a -> Parser a
@@ -72,7 +72,7 @@ parseProg = parseDecl `sepEndBy` symbol ";"
 parseDecl :: Parser Decl
 parseDecl =
       try (DType <$> ident <*> (symbol ":" *> parseType))
-  <|>      DDefn <$> ident <*> (symbol "=" *> parseTerm)
+  <|>      DDefn <$> ident <*> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm))
 
 -- | Parse an atomic term.
 parseAtom :: Parser Term
@@ -172,7 +172,9 @@ parsePattern =
 parseExpr :: Parser Term
 parseExpr = buildExpressionParser table parseAtom <?> "expression"
   where
-    table = [ [ binary ""  TJuxt AssocLeft ]
+    table = [ [ binary ""  TJuxt AssocLeft
+              , unary "not" (TUn Not)
+              ]
             , [ unary  "-" (TUn Neg) ]
             , [ binary "^" (TBin Exp) AssocRight ]
             , [ binary "*" (TBin Mul) AssocLeft
@@ -183,7 +185,7 @@ parseExpr = buildExpressionParser table parseAtom <?> "expression"
             , [ binary "+" (TBin Add) AssocLeft
               , binary "-" (TBin Sub) AssocLeft
               ]
-            , [ binary "="  (TBin Eq)  AssocNone
+            , [ binary "==" (TBin Eq)  AssocNone
               , binary "/=" (TBin Neq) AssocNone
               , binary "<"  (TBin Lt)  AssocNone
               , binary ">"  (TBin Gt)  AssocNone
@@ -233,7 +235,7 @@ parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression
 
 -- | For convenience/testing
 parseTermStr :: String -> Term
-parseTermStr s = case (parse parseTerm "" s) of
+parseTermStr s = case (parse (whiteSpace *> parseTerm <* eof) "" s) of
                    Left e -> error.show $ e
                    Right t -> t
 

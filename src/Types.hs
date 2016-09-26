@@ -12,10 +12,10 @@ import           Unbound.LocallyNameless
 -- | A program is a list of declarations.
 type Prog = [Decl]
 
--- | A declaration is either a type declaration or a definition.
+-- | A declaration is either a type declaration or (one clause of a) definition.
 data Decl where
   DType :: Name Term -> Type -> Decl
-  DDefn :: Name Term -> Term -> Decl
+  DDefn :: Name Term -> Bind [Pattern] Term -> Decl
   deriving Show
 
 -- | Injections into a sum type (inl or inr) have a "side" (L or R).
@@ -23,13 +23,15 @@ data Side = L | R
   deriving (Show, Eq, Enum)
 
 -- | Unary operators.
-data UOp = Neg
+data UOp = Neg | Not
   deriving (Show, Eq)
 
 -- | Binary operators.
 data BOp = Add | Sub | Mul | Div | Exp | Eq | Neq | Lt | Gt | Leq | Geq | And | Or | Mod
          | Divides | RelPm
   deriving (Show, Eq)
+
+-- XXX todo add TRat with ability to parse decimal notation
 
 -- | Terms.
 data Term where
@@ -54,8 +56,10 @@ data Term where
   deriving Show
 
 -- | A branch of a case is a list of guards with an accompanying term.
---   The guards scope over the term.
+--   The guards scope over the term.  Additionally, each guard scopes
+--   over subsequent guards.
 type Branch = Bind [Guard] Term
+  -- XXX TODO make guards telescoping!
 
 -- | A single guard in a branch.
 data Guard where

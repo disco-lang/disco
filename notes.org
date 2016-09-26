@@ -161,3 +161,15 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + LaTeX output mode for pretty-printer
   + Implement equality testing for functions
   + Implement less-than testing
+
+  Other things to do/consider:
+
+  + Finite types (like Fin n)
+  + Chained comparisons   (2 < x <= 5)
+  + Type qualifiers like "nonzero", "nonnegative", etc.
+  + Built-in counters, e.g. for collecting data re: big-O analysis
+  + Built-in visualizations, e.g.
+    - call graph
+    - discrete structures
+  + Stepwise execution
+  + Dynamic witnesses for type errors (see ICFP 2016 paper)

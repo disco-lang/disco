@@ -307,14 +307,3 @@ prettyValue _ (VNum r)
   | denominator r               == 1 = show (numerator r)
   | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
 
-eval :: String -> IO ()
-eval s = do
-  let res = evalTCM . infer . parseTermStr $ s
-  case res of
-    Left err -> print err
-    Right at -> do
-      let ty = getType at
-          c  = runDSM $ desugar at
-      case runIM (rnf c) of
-        Left err -> print err
-        Right v  -> putStrLn $ prettyValue ty v

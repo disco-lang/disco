@@ -173,3 +173,4 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - discrete structures
   + Stepwise execution
   + Dynamic witnesses for type errors (see ICFP 2016 paper)
+  + Machine-checkable examples

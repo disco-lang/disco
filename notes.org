@@ -161,6 +161,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + LaTeX output mode for pretty-printer
   + Implement equality testing for functions
   + Implement less-than testing
+  + Test suite
 
   Other things to do/consider:
 

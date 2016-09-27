@@ -103,5 +103,15 @@ instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Type
 
+instance Subst Term Type
+instance Subst Term Guard
+instance Subst Term Pattern
+instance Subst Term Side
+instance Subst Term BOp
+instance Subst Term UOp
+instance Subst Term Term where
+  isvar (TVar x) = Just (SubstName x)
+  isvar _ = Nothing
+
 isNumTy :: Type -> Bool
 isNumTy ty = ty `elem` [TyN, TyZ, TyQ]

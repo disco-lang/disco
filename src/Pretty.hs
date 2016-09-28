@@ -13,8 +13,7 @@ import qualified Parser                  as PR
 import           Types
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
-                                          unembed)
+import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM, unembed)
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -95,7 +94,7 @@ type Doc = ReaderT PA LFreshM PP.Doc
 --------------------------------------------------
 
 prettyTy :: Type -> Doc
-prettyTy TyVoid           = name "Void"
+prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy (TyArr ty1 ty2)  = mparens arrPA $

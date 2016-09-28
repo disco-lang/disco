@@ -5,6 +5,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
     NSF HSF Solicitation: http://www.nsf.gov/pubs/2015/nsf15573/nsf15573.htm
 
+    NSF IUSE: EHR  https://www.nsf.gov/pubs/2015/nsf15585/nsf15585.htm
+
   - What do we need to get done?
 
     To apply for a grant it will be necessary to have a proof of

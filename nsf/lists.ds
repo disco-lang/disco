@@ -5,7 +5,7 @@ type Matrix = List (List B)
 -- the outter 'when'-expression go?  Notice it's on the end.
 
 contains_empty_row ::  Matrix -> B
-contains_empty_row = l -> { False                         when l = []
-                             { { True                      when x = []
-                               { contains_empty_row xs     when x = y:ys
-                                                          when l = x:xs
+contains_empty_row = l -> { False                    when l = []
+                             { True                  when x = []
+                               contains_empty_row xs when x = y:ys
+                          when l = x:xs

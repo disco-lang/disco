@@ -161,7 +161,9 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + LaTeX output mode for pretty-printer
   + Implement equality testing for functions
   + Implement less-than testing
-  + Test suite
+  + Test suite:
+    - quick check properties
+    - regression test suite
 
   Other things to do/consider:
 
@@ -169,9 +171,16 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Chained comparisons   (2 < x <= 5)
   + Type qualifiers like "nonzero", "nonnegative", etc.
   + Built-in counters, e.g. for collecting data re: big-O analysis
-  + Built-in visualizations, e.g.
+  + Built-in visualizations (using Diagrams), e.g.
     - call graph
     - discrete structures
   + Stepwise execution
-  + Dynamic witnesses for type errors (see ICFP 2016 paper)
-  + Machine-checkable examples
+    - Small step evaluation
+      - Dynamic ability for detail
+  + Typing and parsing on the fly
+  + Dynamic explorable error messages:
+    - Dynamic witnesses for type errors (see ICFP 2016 paper, https://goo.gl/NCKXFi)        
+  + playgrounds:
+    - Can we do something like -fdefer-type-errors so that
+      students files load dispite of errors.
+  + Machine-checkable examples 

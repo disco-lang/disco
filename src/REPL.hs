@@ -120,7 +120,7 @@ handleCMD s =
   where
     handleLine :: REPLExpr -> REPLStateIO ()
     handleLine (Let x t) = push (x , t)
-    handleLine (TypeCheck t) = io.putStrLn $ "Type checking is not implemented yet"
+    handleLine (TypeCheck t) = (type_check t) >>= (io.putStrLn)
     handleLine (Eval t) = (eval t) >>= (io.putStrLn)
     handleLine (ShowAST t) = get >>= (\defs -> io.putStrLn.show $ unfoldDefsInTerm defs t)
     handleLine (Unfold t) = get >>= (\defs -> io.putStrLn.renderDoc.prettyTerm $ unfoldDefsInTerm defs t)
@@ -140,6 +140,14 @@ eval t = do
              in case runIM (rnf c) of
                   Left err -> return.show $ err
                   Right v  -> return $ prettyValue ty v        
+
+type_check :: Term -> REPLStateIO String
+type_check t = do
+  defs <- get
+  let tu = unfoldDefsInTerm defs t     
+   in case (evalTCM.infer $ tu) of
+        Left err -> return.show $ err
+        Right at -> return.renderDoc.prettyTy.getType $ at
 
 banner :: String
 banner = "Welcome to XXX!\n\nA language for programming discrete mathematics.\n\n"

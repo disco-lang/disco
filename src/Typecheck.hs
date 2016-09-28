@@ -8,7 +8,6 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
-
 module Typecheck where
 
 import Prelude hiding (lookup)

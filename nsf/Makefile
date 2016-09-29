@@ -19,7 +19,7 @@ all : main.pdf
 	@$(SKIM) main.pdf &>/dev/null
   endif
 
-main.tex : $(LATEXDEPS) main.lhs hde-bio.tex
+main.tex : $(LATEXDEPS) main.lhs hde-bio.tex broader-impacts.tex
 	rm -f main.tex
 	lhs2TeX --verb main.lhs > main.tex
 

@@ -1,3 +1,3 @@
 #!/bin/sh
 cabal sandbox init
-cabal install unbound parsec
+cabal install unbound parsec lens

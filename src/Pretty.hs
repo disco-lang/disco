@@ -1,5 +1,6 @@
 {-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell           #-}
 {-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE ViewPatterns              #-}
 
@@ -8,6 +9,7 @@ module Pretty where
 import           Prelude                 hiding (seq)
 
 import           Control.Applicative     hiding (empty)
+import           Control.Lens
 import           Control.Monad.Reader
 import           Data.Char               (toLower)
 import           Data.List               (findIndex, intersperse)
@@ -47,6 +49,7 @@ data Formatted where
   FAlignCtx :: Formatted -> Formatted    -- ^ Create a new local alignment context
   FAlign    :: Formatted                 -- ^ Alignment points get vertically aligned
                                          --   across lines
+  FIndent   :: Formatted -> Formatted    -- ^ An indented block
   FAlt      :: [(TextMode, Formatted)] -> Formatted
                                          -- ^ Alternatives, depending on output mode
   FParens   :: Formatted -> Formatted    -- ^ Parenthesized expression
@@ -313,31 +316,77 @@ formatPattern (PSucc p)     = seq' [keyword "S", formatPattern p]
   -- XXX todo need parens around succ if it's inside e.g. inl
 
 ------------------------------------------------------------
--- Format ->
+-- Rendering to String
 
--- XXX TODO: should probably go through PP.Doc
--- XXX TODO: Also need some kind of monadic context to keep track of mode & alignment
--- XXX TODO: Mode to choose Unicode vs ASCII symbols
-renderString :: Formatted -> String
-renderString FEmpty       = ""
-renderString (FAlt [])    = ""
-renderString (FAlt fs)    = renderString $ fromMaybe (snd . head $ fs) (lookup ASCII fs)
-renderString (FIdent s)   = s
-renderString (FKeyword s) = s
-renderString (FType s)    = s
-renderString (FSymbol s)  = s
-renderString (FInt i)     = show i
-renderString (FRat r)
-  | denominator r == 1    = show (numerator r)
-  | otherwise             = show (numerator r) ++ "/" ++ show (denominator r)
-renderString FUnit        = "()"
-renderString FComma       = ","
-renderString FSpace       = " "
-renderString (FAlignCtx f) = undefined
-renderString FAlign       = undefined
-renderString (FParens f)  = "(" ++ renderString f ++ ")"
-renderString (FSequence fs) = concatMap renderString fs
-renderString (FCase fs)   = undefined
+--------------------------------------------------
+-- Stringy type
+
+data Stringy where
+  Leaf      :: String -> Stringy
+  Concat    :: [Stringy] -> Stringy
+  SNewline  :: Stringy
+  SAlignCtx :: Stringy -> Stringy
+  SAlign    :: Stringy
+
+flattenStringy :: Stringy -> [Stringy]
+flattenStringy s = flattenStringy' s []
+  where
+    flattenStringy' :: Stringy -> ([Stringy] -> [Stringy])
+    flattenStringy' (Leaf s)      = singleton (Leaf s)
+    flattenStringy' (Concat ss)   = foldr (.) id (map flattenStringy' ss)
+    flattenStringy' SNewline      = singleton SNewline
+    flattenStringy' (SAlignCtx s) = singleton (SAlignCtx s)
+    flattenStringy' SAlign        = singleton SAlign
+
+    singleton x = ([x]++)
+
+--------------------------------------------------
+-- Rendering to Stringy
+
+data RenderCtx =
+  RenderCtx
+  { _textMode  :: TextMode
+  , _curIndent :: Int
+  }
+
+initRenderCtx :: RenderCtx
+initRenderCtx = RenderCtx { _textMode = ASCII, _curIndent = 0 }
+
+makeLenses ''RenderCtx
+
+type RenderM = Reader RenderCtx
+
+runRenderM :: RenderM a -> a
+runRenderM = flip runReader initRenderCtx
+
+leaf :: String -> RenderM Stringy
+leaf s = return $ Leaf s
+
+concatStringy :: [RenderM Stringy] -> RenderM Stringy
+concatStringy ss = Concat <$> sequence ss
+
+renderStringy :: Formatted -> RenderM Stringy
+renderStringy FEmpty           = leaf ""
+renderStringy (FAlt [])        = leaf ""
+renderStringy (FAlt fs)        = do
+  mode <- view textMode
+  renderStringy $ fromMaybe (snd . head $ fs) (lookup mode fs)
+renderStringy (FIdent s)       = leaf s
+renderStringy (FKeyword s)     = leaf s
+renderStringy (FType s)        = leaf s
+renderStringy (FSymbol s)      = leaf s
+renderStringy (FInt i)         = leaf $ show i
+renderStringy (FRat r)
+  | denominator r == 1         = leaf $ show (numerator r)
+  | otherwise                  = leaf $ show (numerator r) ++ "/" ++ show (denominator r)
+renderStringy FUnit            = leaf "()"
+renderStringy FComma           = leaf ","
+renderStringy FSpace           = leaf " "
+renderStringy (FAlignCtx f)    = SAlignCtx <$> renderStringy f
+renderStringy FAlign           = return SAlign
+renderStringy (FParens f)      = concatStringy [leaf "(", renderStringy f, leaf ")"]
+renderStringy (FSequence fs)   = concatStringy (map renderStringy fs)
+-- renderStringy (FCase fs)    = undefined
 
 --------------------------------------------------
 -- Monadic pretty-printing

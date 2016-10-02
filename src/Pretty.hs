@@ -1,49 +1,58 @@
+{-# LANGUAGE GADTs                     #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE ViewPatterns              #-}
 
 module Pretty where
 
+import           Prelude                 hiding (seq)
+
 import           Control.Applicative     hiding (empty)
 import           Control.Monad.Reader
 import           Data.Char               (toLower)
-import           Data.List               (findIndex)
+import           Data.List               (findIndex, intersperse)
 import           Data.Maybe              (fromJust)
+import           Data.Maybe              (fromMaybe)
+import           Data.Ratio
 
 import qualified Parser                  as PR
 import           Types
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM, unembed)
+import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
+                                          unembed)
 
 --------------------------------------------------
--- Monadic pretty-printing
+-- Internal document AST
 
-hsep :: Monad f => [f PP.Doc] -> f PP.Doc
-hsep ds  = PP.hsep <$> sequence ds
+data TextMode = ASCII | Unicode | LaTeX
+  deriving (Eq, Show)
 
-parens :: Functor f => f PP.Doc -> f PP.Doc
-parens   = fmap PP.parens
+data Formatted where
+  -- Terminals
+  FEmpty    :: Formatted
+  FAlt      :: [(TextMode, Formatted)] -> Formatted
+  FIdent    :: String    -> Formatted
+  FKeyword  :: String    -> Formatted
+  FType     :: String    -> Formatted
+  FSymbol   :: String    -> Formatted
+  FInt      :: Integer   -> Formatted
+  FRat      :: Rational  -> Formatted
+  FUnit     :: Formatted
 
-text :: Monad m => String -> m PP.Doc
-text     = return . PP.text
+  FComma    :: Formatted
+  FSpace    :: Formatted
 
-integer :: Monad m => Integer -> m PP.Doc
-integer  = return . PP.integer
-
-nest :: Functor f => Int -> f PP.Doc -> f PP.Doc
-nest n d = PP.nest n <$> d
-
-empty :: Monad m => m PP.Doc
-empty    = return PP.empty
-
-(<+>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
-(<+>) = liftA2 (PP.<+>)
-
-(<>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
-(<>)  = liftA2 (PP.<>)
-
-($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
-($+$) = liftA2 (PP.$+$)
+  -- Structure
+  FAlignCtx :: Formatted -> Formatted    -- create a new local alignment context
+  FAlign    :: Formatted                 -- Alignment points get vertically aligned
+  FParens   :: Formatted -> Formatted
+  FSequence :: [Formatted] -> Formatted
+  FNewline  :: Formatted
+  FCase     :: [Formatted] -> Formatted
+  FSuper    :: Formatted   -> Formatted
+  FSub      :: Formatted   -> Formatted
+  deriving Show
 
 --------------------------------------------------
 -- Precedence and associativity
@@ -89,147 +98,296 @@ funPA = PA 10 AL
 arrPA :: PA
 arrPA = PA 1 AR
 
-type Doc = ReaderT PA LFreshM PP.Doc
-
 --------------------------------------------------
+-- The formatting monad
 
-prettyTy :: Type -> Doc
-prettyTy TyVoid           = text "Void"
-prettyTy TyUnit           = text "Unit"
-prettyTy TyBool           = text "Bool"
-prettyTy (TyArr ty1 ty2)  = mparens arrPA $
-  prettyTy' 1 AL ty1 <+> text "->" <+> prettyTy' 1 AR ty2
-prettyTy (TyPair ty1 ty2) = mparens (PA 7 AR) $
-  prettyTy' 7 AL ty1 <+> text "*" <+> prettyTy' 7 AR ty2
-prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
-  prettyTy' 6 AL ty1 <+> text "+" <+> prettyTy' 6 AR ty2
-prettyTy TyN              = text "N"
-prettyTy TyZ              = text "Z"
-prettyTy TyQ              = text "Q"
+type MFormat = ReaderT PA LFreshM Formatted
 
-prettyTy' :: Prec -> Assoc -> Type -> Doc
-prettyTy' p a t = local (const (PA p a)) (prettyTy t)
+format :: MFormat -> Formatted
+format = runLFreshM . flip runReaderT initPA
 
---------------------------------------------------
+alt :: [(TextMode, MFormat)] -> MFormat
+alt fs = FAlt <$> sequence (map strength fs)
+  where
+    strength (a,b) = (a,) <$> b
 
-mparens :: PA -> Doc -> Doc
-mparens pa doc = do
+ident :: String -> MFormat
+ident = return . FIdent
+
+keyword :: String -> MFormat
+keyword = return . FKeyword
+
+seq :: [MFormat] -> MFormat
+seq fs = FSequence <$> sequence fs
+
+seq' :: [MFormat] -> MFormat
+seq' = seq . intersperse (return FSpace)
+
+symbol :: String -> MFormat
+symbol = return . FSymbol
+
+ascii :: String -> (TextMode, MFormat)
+ascii = (ASCII,) . symbol
+
+unicode :: String -> (TextMode, MFormat)
+unicode = (Unicode,) . symbol
+
+tex :: String -> (TextMode, MFormat)
+tex = (LaTeX,) . symbol
+
+typeName :: String -> (TextMode, MFormat)
+typeName = (ASCII,) . return . FType
+
+comma :: Monad m => m Formatted
+comma = return FComma
+
+space :: Monad m => m Formatted
+space = return FSpace
+
+align :: Monad m => m Formatted
+align = return FAlign
+
+newline :: Monad m => m Formatted
+newline = return FNewline
+
+parens :: Functor f => f Formatted -> f Formatted
+parens = fmap FParens
+
+mparens :: PA -> MFormat -> MFormat
+mparens pa fmt = do
   parentPA <- ask
-  (if (pa < parentPA) then parens else id) doc
+  (if (pa < parentPA) then parens else id) fmt
 
-prettyName :: Name Term -> Doc
-prettyName = text . show
+------------------------------------------------------------
+-- Formatting syntax
 
-prettyTerm :: Term -> Doc
-prettyTerm (TVar x)      = prettyName x
-prettyTerm TUnit         = text "()"
-prettyTerm (TBool b)     = text (map toLower $ show b)
-prettyTerm (TAbs bnd)    = mparens initPA $
-  lunbind bnd $ \(x,body) ->
-  hsep [prettyName x, text "↦", prettyTerm' 0 AL body]
-prettyTerm (TJuxt t1 t2) = mparens funPA $
-  prettyTerm' 10 AL t1 <+> prettyTerm' 10 AR t2
-prettyTerm (TPair t1 t2) =
-  parens (prettyTerm' 0 AL t1 <> text "," <+> prettyTerm' 0 AL t2)
-prettyTerm (TInj side t) = mparens funPA $
-  prettySide side <+> prettyTerm' 10 AR t
-prettyTerm (TNat n)      = integer n
-prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AL t
-prettyTerm (TBin op t1 t2) = mparens (getPA op) $
-  hsep
-  [ prettyTerm' (prec op) AL t1
-  , prettyBOp op
-  , prettyTerm' (prec op) AR t2
+formatTy :: Type -> MFormat
+formatTy TyVoid          = alt [typeName "Void", tex "\\mathbbold{0}"]
+formatTy TyUnit          = alt [typeName "Unit", tex "\\mathbbold{1}"]
+formatTy TyBool          = alt [typeName "Bool", tex "\\mathbb{B}" ]
+formatTy TyN             = alt [typeName "Nat",  tex "\\mathbb{N}" ]
+formatTy TyZ             = alt [typeName "Int",  tex "\\mathbb{Z}" ]
+formatTy TyQ             = alt [typeName "Rat",  tex "\\mathbb{Q}" ]
+formatTy (TyArr τ₁ τ₂)   = mparens arrPA $
+  seq'
+  [ formatTy' 1 AL τ₁
+  , alt [ascii "->", unicode "→", tex "\\to"]
+  , formatTy' 1 AR τ₂
   ]
-prettyTerm (TLet bnd) = mparens initPA $
-  lunbind bnd $ \((x, unembed -> t1), t2) ->
-  hsep
-    [ text "let"
-    , prettyName x
-    , text "="
-    , prettyTerm' 0 AL t1
-    , text "in"
-    , prettyTerm' 0 AL t2
+formatTy (TyPair τ₁ τ₂)  = mparens (PA 7 AR) $
+  seq'
+  [ formatTy' 7 AL τ₁
+  , alt [ascii "*", unicode "×", tex "\\times"]
+  , formatTy' 7 AR τ₂
+  ]
+formatTy (TySum τ₁ τ₂)   = mparens (PA 6 AR) $
+  seq'
+  [ formatTy' 6 AL τ₁
+  , alt [ascii "+"]
+  , formatTy' 6 AR τ₂
+  ]
+
+formatTy' :: Prec -> Assoc -> Type -> MFormat
+formatTy' p a τ = local (const (PA p a)) (formatTy τ)
+
+formatName :: Name Term -> MFormat
+formatName = ident . show
+
+formatTerm :: Term -> MFormat
+formatTerm (TVar x)      = formatName x
+formatTerm TUnit         = return FUnit
+formatTerm (TBool b)     = keyword (map toLower $ show b)
+formatTerm (TAbs bnd)    = mparens initPA $
+   lunbind bnd $ \(x,body) ->
+   seq'
+     [ formatName x
+     , alt
+       [ ascii "->"
+       , unicode "↦"
+       , tex "\\mapsto"
+       ]
+     , formatTerm' 0 AL body
+     ]
+formatTerm (TJuxt t1 t2) = mparens funPA $
+  seq' [formatTerm' 10 AL t1, formatTerm' 10 AR t2]
+formatTerm (TPair t1 t2) =
+  parens $ seq [ formatTerm' 0 AL t1, comma, space, formatTerm' 0 AL t2 ]
+formatTerm (TInj side t) = mparens funPA $
+  seq' [formatSide side, formatTerm' 10 AR t]
+formatTerm (TNat n)      = return $ FInt n
+formatTerm (TUn op t)    = seq [formatUOp op, formatTerm' 11 AL t]
+  -- Need a special case for exponentiation since it may be typeset as
+  -- a superscript
+formatTerm (TBin Exp t1 t2) = mparens (getPA Exp) $
+  seq
+  [ formatTerm' (prec Exp) AL t1
+  , alt
+    [ (ASCII, seq [space, formatBOp Exp, space, formatTerm' (prec Exp) AR t2])
+    , (LaTeX, FSuper <$> formatTerm' 0 AR t2)
     ]
-prettyTerm (TCase b)    = nest 2 (prettyBranches b)
+  ]
+formatTerm (TBin op t1 t2) = mparens (getPA op) $
+  seq'
+  [ formatTerm' (prec op) AL t1
+  , formatBOp op
+  , formatTerm' (prec op) AR t2
+  ]
+formatTerm (TLet bnd) = mparens initPA $
+  lunbind bnd $ \((x, unembed -> t1), t2) ->
+  seq'
+    [ keyword "let"
+    , formatName x
+    , symbol "="
+    , formatTerm' 0 AL t1
+    , keyword "in"
+    , formatTerm' 0 AL t2
+    ]
+formatTerm (TCase b)    = (FAlignCtx . FCase) <$> mapM formatBranch b
+
   -- XXX FIX ME: what is the precedence of ascription?
-prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
+formatTerm (TAscr t ty) =
+  parens $ seq' [formatTerm t, symbol ":", formatTy ty]
 
-prettyTerm' :: Prec -> Assoc -> Term -> Doc
-prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
+formatTerm' :: Prec -> Assoc -> Term -> MFormat
+formatTerm' p a t = local (const (PA p a)) (formatTerm t)
 
-prettySide :: Side -> Doc
-prettySide L = text "inl"
-prettySide R = text "inr"
+formatSide :: Side -> MFormat
+formatSide L = keyword "inl"
+formatSide R = keyword "inr"
 
-prettyUOp :: UOp -> Doc
-prettyUOp Neg = text "-"
-prettyUOp Not = text "not "
+formatUOp :: UOp -> MFormat
+formatUOp Neg = symbol "-"
+formatUOp Not =
+  alt
+  [ (ASCII, seq [keyword "not", space])
+  , unicode "¬"
+  , tex "\\neg"
+  ]
 
-prettyBOp :: BOp -> Doc
-prettyBOp Add     = text "+"
-prettyBOp Sub     = text "-"
-prettyBOp Mul     = text "*"
-prettyBOp Div     = text "/"
-prettyBOp Exp     = text "^"
-prettyBOp Eq      = text "="
-prettyBOp Neq     = text "/="
-prettyBOp Lt      = text "<"
-prettyBOp Gt      = text ">"
-prettyBOp Leq     = text "<="
-prettyBOp Geq     = text ">="
-prettyBOp And     = text "and"
-prettyBOp Or      = text "or"
-prettyBOp Mod     = text "mod"
-prettyBOp Divides = text "|"
-prettyBOp RelPm   = text "#"
+formatBOp :: BOp -> MFormat
+formatBOp Add     = symbol "+"
+formatBOp Sub     = alt [ascii "-", unicode "−"]
+formatBOp Mul     = alt [ascii "*", unicode "×", tex "\\times"]
+formatBOp Div     = alt [ascii "/", unicode "∕"]
+formatBOp Exp     = symbol "^"
+formatBOp Eq      = alt [ascii "==", unicode "≡", tex "\\equiv"]
+formatBOp Neq     = alt [ascii "/=", unicode "≠", tex "\\neq"]
+formatBOp Lt      = symbol "<"
+formatBOp Gt      = symbol ">"
+formatBOp Leq     = alt [ascii "<=", unicode "≤", tex "\\leq"]
+formatBOp Geq     = alt [ascii ">=", unicode "≥", tex "\\geq"]
+formatBOp And     = alt [(ASCII, keyword "and"), unicode "∧", tex "\\wedge"]
+formatBOp Or      = alt [(ASCII, keyword "or"), unicode "∨", tex "\\vee"]
+formatBOp Mod     = alt [(ASCII, keyword "mod")] -- XXX what to do for TeX?
+formatBOp Divides = alt [ascii "|", tex "\\mid"]
+formatBOp RelPm   = alt [ascii "#", tex "\\#"]
 
-prettyBranches :: [Branch] -> Doc
-prettyBranches [] = error "Empty branches are disallowed."
-prettyBranches bs = foldr ($+$) empty (map prettyBranch bs)
+formatBranch :: Branch -> MFormat
+formatBranch br =
+  lunbind br $ \(gs,t) ->
+  seq [formatTerm t, formatGuards gs]
 
-prettyBranch :: Branch -> Doc
-prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
+formatGuards :: [Guard] -> MFormat
+formatGuards [] = seq [align, keyword "otherwise"]
+formatGuards gs = seq $ intersperse newline (map formatGuard gs)
 
-prettyGuards :: [Guard] -> Doc
-prettyGuards [] = text "otherwise"
-prettyGuards gs = foldr (\g r -> prettyGuard g <+> r) (text "") gs
+formatGuard :: Guard -> MFormat
+formatGuard (GIf et) =
+  seq [align, keyword "if", align, formatTerm (unembed et)]
+formatGuard (GWhen et p) =
+  seq [ align, keyword "when", align
+      , seq' [formatTerm (unembed et), symbol "=", formatPattern p]
+      ]
 
-prettyGuard :: Guard -> Doc
-prettyGuard (GIf et) = text "if" <+> (prettyTerm (unembed et))
-prettyGuard (GWhen et p) = text "when" <+> prettyTerm (unembed et) <+> text "=" <+> prettyPattern p
-
-prettyPattern :: Pattern -> Doc
-prettyPattern (PVar x) = prettyName x
-prettyPattern PWild = text "_"
-prettyPattern PUnit = text "()"
-prettyPattern (PBool b) = text $ map toLower $ show b
-prettyPattern (PPair p1 p2) = parens $ prettyPattern p1 <> text "," <+> prettyPattern p2
-prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
-prettyPattern (PNat n) = integer n
-prettyPattern (PSucc p) = text "S" <+> prettyPattern p
-
-------------------------------------------------------------
-
-prettyProg :: Prog -> Doc
-prettyProg = foldr ($+$) empty . map prettyDecl
-
-prettyDecl :: Decl -> Doc
-prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
-prettyDecl (DDefn x b)
-  = lunbind b $ \(ps, t) ->
-  (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+formatPattern :: Pattern -> MFormat
+formatPattern (PVar x)      = formatName x
+formatPattern PWild         = alt [ascii "_", tex "\\_"]
+formatPattern PUnit         = return FUnit
+formatPattern (PBool b)     = keyword (map toLower $ show b)
+formatPattern (PPair p1 p2) = parens $ seq [formatPattern p1, comma, space, formatPattern p2]
+formatPattern (PInj s p)    = seq' [formatSide s, formatPattern p]
+formatPattern (PNat n)      = return $ FInt n
+formatPattern (PSucc p)     = seq' [keyword "S", formatPattern p]
+  -- XXX todo need parens around succ if it's inside e.g. inl
 
 ------------------------------------------------------------
+-- Format ->
 
-renderDoc :: Doc -> String
-renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+-- XXX TODO: should probably go through PP.Doc
+-- XXX TODO: Also need some kind of monadic context to keep track of mode & alignment
+-- XXX TODO: Mode to choose Unicode vs ASCII symbols
+renderString :: Formatted -> String
+renderString FEmpty       = ""
+renderString (FAlt [])    = ""
+renderString (FAlt fs)    = renderString $ fromMaybe (snd . head $ fs) (lookup ASCII fs)
+renderString (FIdent s)   = s
+renderString (FKeyword s) = s
+renderString (FType s)    = s
+renderString (FSymbol s)  = s
+renderString (FInt i)     = show i
+renderString (FRat r)
+  | denominator r == 1    = show (numerator r)
+  | otherwise             = show (numerator r) ++ "/" ++ show (denominator r)
+renderString FUnit        = "()"
+renderString FComma       = ","
+renderString FSpace       = " "
+renderString (FAlignCtx f) = undefined
+renderString FAlign       = undefined
+renderString (FParens f)  = "(" ++ renderString f ++ ")"
+renderString (FSequence fs) = concatMap renderString fs
+renderString (FCase fs)   = undefined
 
-echoTerm :: String -> String
-echoTerm = renderDoc . prettyTerm . PR.parseTermStr
+--------------------------------------------------
+-- Monadic pretty-printing
 
-echoTermP :: String -> IO ()
-echoTermP = putStrLn . echoTerm
+-- hsep :: Monad f => [f PP.Doc] -> f PP.Doc
+-- hsep ds  = PP.hsep <$> sequence ds
 
-echoType :: String -> String
-echoType = renderDoc . prettyTy . PR.parseTypeStr
+-- parens :: Functor f => f PP.Doc -> f PP.Doc
+-- parens   = fmap PP.parens
+
+-- text :: Monad m => String -> m PP.Doc
+-- text     = return . PP.text
+
+-- integer :: Monad m => Integer -> m PP.Doc
+-- integer  = return . PP.integer
+
+-- nest :: Functor f => Int -> f PP.Doc -> f PP.Doc
+-- nest n d = PP.nest n <$> d
+
+-- empty :: Monad m => m PP.Doc
+-- empty    = return PP.empty
+
+-- (<+>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+-- (<+>) = liftA2 (PP.<+>)
+
+-- (<>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+-- (<>)  = liftA2 (PP.<>)
+
+-- ($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+-- ($+$) = liftA2 (PP.$+$)
+
+-- ------------------------------------------------------------
+
+-- prettyProg :: Prog -> Doc
+-- prettyProg = foldr ($+$) empty . map prettyDecl
+
+-- prettyDecl :: Decl -> Doc
+-- prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
+-- prettyDecl (DDefn x b)
+--   = lunbind b $ \(ps, t) ->
+--   (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+
+-- ------------------------------------------------------------
+
+-- renderDoc :: Doc -> String
+-- renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+
+-- echoTerm :: String -> String
+-- echoTerm = renderDoc . prettyTerm . PR.parseTermStr
+
+-- echoTermP :: String -> IO ()
+-- echoTermP = putStrLn . echoTerm
+
+-- echoType :: String -> String
+-- echoType = renderDoc . prettyTy . PR.parseTypeStr

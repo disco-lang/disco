@@ -30,28 +30,30 @@ data TextMode = ASCII | Unicode | LaTeX
 
 data Formatted where
   -- Terminals
-  FEmpty    :: Formatted
-  FAlt      :: [(TextMode, Formatted)] -> Formatted
-  FIdent    :: String    -> Formatted
-  FKeyword  :: String    -> Formatted
-  FType     :: String    -> Formatted
-  FSymbol   :: String    -> Formatted
-  FInt      :: Integer   -> Formatted
-  FRat      :: Rational  -> Formatted
-  FUnit     :: Formatted
+  FEmpty    :: Formatted                 -- ^ The empty document
+  FIdent    :: String    -> Formatted    -- ^ An identifier
+  FKeyword  :: String    -> Formatted    -- ^ A keyword
+  FType     :: String    -> Formatted    -- ^ A type name
+  FSymbol   :: String    -> Formatted    -- ^ A symbol
+  FInt      :: Integer   -> Formatted    -- ^ An integer
+  FRat      :: Rational  -> Formatted    -- ^ A rational number
+  FUnit     :: Formatted                 -- ^ The unit value/pattern
 
-  FComma    :: Formatted
-  FSpace    :: Formatted
+  FComma    :: Formatted                 -- ^ A comma
+  FSpace    :: Formatted                 -- ^ Whitespace
+  FNewline  :: Formatted                 -- ^ Move to a new line
 
   -- Structure
-  FAlignCtx :: Formatted -> Formatted    -- create a new local alignment context
-  FAlign    :: Formatted                 -- Alignment points get vertically aligned
-  FParens   :: Formatted -> Formatted
-  FSequence :: [Formatted] -> Formatted
-  FNewline  :: Formatted
-  FCase     :: [Formatted] -> Formatted
-  FSuper    :: Formatted   -> Formatted
-  FSub      :: Formatted   -> Formatted
+  FAlignCtx :: Formatted -> Formatted    -- ^ Create a new local alignment context
+  FAlign    :: Formatted                 -- ^ Alignment points get vertically aligned
+                                         --   across lines
+  FAlt      :: [(TextMode, Formatted)] -> Formatted
+                                         -- ^ Alternatives, depending on output mode
+  FParens   :: Formatted -> Formatted    -- ^ Parenthesized expression
+  FSequence :: [Formatted] -> Formatted  -- ^ Sequence of formatted expressions
+  FCase     :: [Formatted] -> Formatted  -- ^ Case expression
+  FSuper    :: Formatted   -> Formatted  -- ^ Superscript
+  FSub      :: Formatted   -> Formatted  -- ^ Subscript
   deriving Show
 
 --------------------------------------------------

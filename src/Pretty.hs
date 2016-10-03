@@ -443,6 +443,10 @@ renderBox FNewline
   = error "renderBox FNewline: this should never happen!"
     -- case should never happen; should be handled in FSequence case
 
+renderBox (FSub f)         = renderBox f
+renderBox (FSuper f)       = renderBox f
+    -- ignore sub- and super-scripts in text generation mode
+
 renderBlock :: [Formatted] -> RenderM Box
 renderBlock
   = fmap (foldr hfuse (spacer 0) . intersperse (spacer 1)
@@ -455,10 +459,6 @@ renderBlock
 flatten :: Formatted -> [Formatted]
 flatten (FSequence fs) = concatMap flatten fs
 flatten f              = [f]
-
--- fmap (foldr hfuse (Box (repeat "")))
---   . fmap (map (pad . vcat))
---   . fmap transpose
 
 renderSequence :: [Formatted] -> RenderM Box
 renderSequence

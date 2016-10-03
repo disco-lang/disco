@@ -338,6 +338,31 @@ formatPattern (PNat n)      = return $ FInt n
 formatPattern (PSucc p)     = seq' [keyword "S", formatPattern p]
   -- XXX todo need parens around succ if it's inside e.g. inl
 
+-- ------------------------------------------------------------
+
+-- prettyProg :: Prog -> Doc
+-- prettyProg = foldr ($+$) empty . map prettyDecl
+
+-- prettyDecl :: Decl -> Doc
+-- prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
+-- prettyDecl (DDefn x b)
+--   = lunbind b $ \(ps, t) ->
+--   (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+
+-- ------------------------------------------------------------
+
+-- renderDoc :: Doc -> String
+-- renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+
+-- echoTerm :: String -> String
+-- echoTerm = renderDoc . prettyTerm . PR.parseTermStr
+
+-- echoTermP :: String -> IO ()
+-- echoTermP = putStrLn . echoTerm
+
+-- echoType :: String -> String
+-- echoType = renderDoc . prettyTy . PR.parseTypeStr
+
 ------------------------------------------------------------
 -- Rendering to String
 
@@ -466,57 +491,3 @@ renderSequence
   . mapM (concatBoxes . map renderBox)
   . splitOn [FNewline]
 
---------------------------------------------------
--- Monadic pretty-printing
-
--- hsep :: Monad f => [f PP.Doc] -> f PP.Doc
--- hsep ds  = PP.hsep <$> sequence ds
-
--- parens :: Functor f => f PP.Doc -> f PP.Doc
--- parens   = fmap PP.parens
-
--- text :: Monad m => String -> m PP.Doc
--- text     = return . PP.text
-
--- integer :: Monad m => Integer -> m PP.Doc
--- integer  = return . PP.integer
-
--- nest :: Functor f => Int -> f PP.Doc -> f PP.Doc
--- nest n d = PP.nest n <$> d
-
--- empty :: Monad m => m PP.Doc
--- empty    = return PP.empty
-
--- (<+>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
--- (<+>) = liftA2 (PP.<+>)
-
--- (<>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
--- (<>)  = liftA2 (PP.<>)
-
--- ($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
--- ($+$) = liftA2 (PP.$+$)
-
--- ------------------------------------------------------------
-
--- prettyProg :: Prog -> Doc
--- prettyProg = foldr ($+$) empty . map prettyDecl
-
--- prettyDecl :: Decl -> Doc
--- prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
--- prettyDecl (DDefn x b)
---   = lunbind b $ \(ps, t) ->
---   (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
-
--- ------------------------------------------------------------
-
--- renderDoc :: Doc -> String
--- renderDoc = PP.render . runLFreshM . flip runReaderT initPA
-
--- echoTerm :: String -> String
--- echoTerm = renderDoc . prettyTerm . PR.parseTermStr
-
--- echoTermP :: String -> IO ()
--- echoTermP = putStrLn . echoTerm
-
--- echoType :: String -> String
--- echoType = renderDoc . prettyTy . PR.parseTypeStr

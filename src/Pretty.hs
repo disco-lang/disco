@@ -1,8 +1,9 @@
-{-# LANGUAGE GADTs                     #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE TemplateHaskell           #-}
-{-# LANGUAGE TupleSections             #-}
-{-# LANGUAGE ViewPatterns              #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoMonomorphismRestriction  #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 module Pretty where
 
@@ -15,6 +16,7 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex, intersperse)
 import           Data.Maybe              (fromJust)
 import           Data.Maybe              (fromMaybe)
+import           Data.Monoid
 import           Data.Ratio
 
 import qualified Parser                  as PR
@@ -46,15 +48,17 @@ data Formatted where
   FNewline  :: Formatted                 -- ^ Move to a new line
 
   -- Structure
-  FAlignCtx :: Formatted -> Formatted    -- ^ Create a new local alignment context
+  FBlock    :: [Formatted] -> Formatted  -- ^ A vertically aligned
+                                         --   block
   FAlign    :: Formatted                 -- ^ Alignment points get vertically aligned
-                                         --   across lines
-  FIndent   :: Formatted -> Formatted    -- ^ An indented block
+                                         --   across lines, and scope within Blocks
+  FIndent   :: Formatted                 -- ^ Indent the following line or block
+
   FAlt      :: [(TextMode, Formatted)] -> Formatted
                                          -- ^ Alternatives, depending on output mode
   FParens   :: Formatted -> Formatted    -- ^ Parenthesized expression
   FSequence :: [Formatted] -> Formatted  -- ^ Sequence of formatted expressions
-  FCase     :: [Formatted] -> Formatted  -- ^ Case expression
+  FCase     :: [Formatted] -> Formatted  -- ^ Case expression (a special kind of Block)
   FSuper    :: Formatted   -> Formatted  -- ^ Superscript
   FSub      :: Formatted   -> Formatted  -- ^ Subscript
   deriving Show
@@ -247,7 +251,7 @@ formatTerm (TLet bnd) = mparens initPA $
     , keyword "in"
     , formatTerm' 0 AL t2
     ]
-formatTerm (TCase b)    = (FAlignCtx . FCase) <$> mapM formatBranch b
+formatTerm (TCase b)    = FCase <$> mapM formatBranch b
 
   -- XXX FIX ME: what is the precedence of ascription?
 formatTerm (TAscr t ty) =
@@ -319,29 +323,39 @@ formatPattern (PSucc p)     = seq' [keyword "S", formatPattern p]
 -- Rendering to String
 
 --------------------------------------------------
--- Stringy type
+-- String blocks
 
-data Stringy where
-  Leaf      :: String -> Stringy
-  Concat    :: [Stringy] -> Stringy
-  SNewline  :: Stringy
-  SAlignCtx :: Stringy -> Stringy
-  SAlign    :: Stringy
+newtype Block = Block [String]
 
-flattenStringy :: Stringy -> [Stringy]
-flattenStringy s = flattenStringy' s []
+str :: String -> Block
+str s = Block [s]
+
+hglue :: Block -> Block -> Block
+hglue (Block b1) (Block b2) = Block (zipWith (<>) b1 b2)
+
+-- | Horizontally concatenate a list of blocks.
+hcat :: [Block] -> Block
+hcat = foldr hglue (Block (repeat ""))
+
+vglue :: Block -> Block -> Block
+vglue (Block b1) (Block b2) = Block (b1 <> b2)
+
+vcat :: [Block] -> Block
+vcat = foldr vglue (Block [])
+
+pad :: Block -> Block
+pad (Block ls) = Block (map padStr ls)
   where
-    flattenStringy' :: Stringy -> ([Stringy] -> [Stringy])
-    flattenStringy' (Leaf s)      = singleton (Leaf s)
-    flattenStringy' (Concat ss)   = foldr (.) id (map flattenStringy' ss)
-    flattenStringy' SNewline      = singleton SNewline
-    flattenStringy' (SAlignCtx s) = singleton (SAlignCtx s)
-    flattenStringy' SAlign        = singleton SAlign
+    len      = maximum (0 : map length ls)
+    padStr s = s ++ replicate (len - length s) ' '
 
-    singleton x = ([x]++)
+-- | A block which is n spaces wide and infinitely tall.  Useful in
+--   the context of 'hcat'.
+spacer :: Int -> Block
+spacer n = Block (repeat (replicate n ' '))
 
 --------------------------------------------------
--- Rendering to Stringy
+-- Rendering to Blocks
 
 data RenderCtx =
   RenderCtx
@@ -359,34 +373,36 @@ type RenderM = Reader RenderCtx
 runRenderM :: RenderM a -> a
 runRenderM = flip runReader initRenderCtx
 
-leaf :: String -> RenderM Stringy
-leaf s = return $ Leaf s
+leaf :: String -> RenderM Block
+leaf s = return $ str s
 
-concatStringy :: [RenderM Stringy] -> RenderM Stringy
-concatStringy ss = Concat <$> sequence ss
+concatBlocks :: [RenderM Block] -> RenderM Block
+concatBlocks ss = hcat <$> sequence ss
 
-renderStringy :: Formatted -> RenderM Stringy
-renderStringy FEmpty           = leaf ""
-renderStringy (FAlt [])        = leaf ""
-renderStringy (FAlt fs)        = do
+renderBlock :: Formatted -> RenderM Block
+renderBlock FEmpty           = leaf ""
+renderBlock (FAlt [])        = leaf ""
+renderBlock (FAlt fs)        = do
   mode <- view textMode
-  renderStringy $ fromMaybe (snd . head $ fs) (lookup mode fs)
-renderStringy (FIdent s)       = leaf s
-renderStringy (FKeyword s)     = leaf s
-renderStringy (FType s)        = leaf s
-renderStringy (FSymbol s)      = leaf s
-renderStringy (FInt i)         = leaf $ show i
-renderStringy (FRat r)
+  renderBlock $ fromMaybe (snd . head $ fs) (lookup mode fs)
+renderBlock (FIdent s)       = leaf s
+renderBlock (FKeyword s)     = leaf s
+renderBlock (FType s)        = leaf s
+renderBlock (FSymbol s)      = leaf s
+renderBlock (FInt i)         = leaf $ show i
+renderBlock (FRat r)
   | denominator r == 1         = leaf $ show (numerator r)
   | otherwise                  = leaf $ show (numerator r) ++ "/" ++ show (denominator r)
-renderStringy FUnit            = leaf "()"
-renderStringy FComma           = leaf ","
-renderStringy FSpace           = leaf " "
-renderStringy (FAlignCtx f)    = SAlignCtx <$> renderStringy f
-renderStringy FAlign           = return SAlign
-renderStringy (FParens f)      = concatStringy [leaf "(", renderStringy f, leaf ")"]
-renderStringy (FSequence fs)   = concatStringy (map renderStringy fs)
--- renderStringy (FCase fs)    = undefined
+renderBlock FUnit            = leaf "()"
+renderBlock FComma           = leaf ","
+renderBlock FSpace           = leaf " "
+renderBlock FIndent          = return $ spacer 2
+renderBlock (FBlock f)       = undefined
+renderBlock (FParens f)      = concatBlocks [leaf "(", renderBlock f, leaf ")"]
+  -- XXX above doesn't work if f is actually a block.  Need to put
+  -- parens at beginning of first line and end of last line.
+renderBlock (FSequence fs)   = concatBlocks (map renderBlock fs)
+-- renderBlock (FCase fs)    = undefined
 
 --------------------------------------------------
 -- Monadic pretty-printing

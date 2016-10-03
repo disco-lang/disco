@@ -14,6 +14,7 @@ import           Control.Lens
 import           Control.Monad.Reader
 import           Data.Char               (toLower)
 import           Data.List               (findIndex, intersperse)
+import           Data.List.Split         (splitOn)
 import           Data.Maybe              (fromJust)
 import           Data.Maybe              (fromMaybe)
 import           Data.Monoid
@@ -52,7 +53,7 @@ data Formatted where
                                          --   block
   FAlign    :: Formatted                 -- ^ Alignment points get vertically aligned
                                          --   across lines, and scope within Blocks
-  FIndent   :: Formatted                 -- ^ Indent the following line or block
+  FIndent   :: Formatted   -> Formatted  -- ^ An indented section
 
   FAlt      :: [(TextMode, Formatted)] -> Formatted
                                          -- ^ Alternatives, depending on output mode
@@ -323,39 +324,56 @@ formatPattern (PSucc p)     = seq' [keyword "S", formatPattern p]
 -- Rendering to String
 
 --------------------------------------------------
--- String blocks
+-- String boxes
 
-newtype Block = Block [String]
+newtype Box = Box [String]
 
-str :: String -> Block
-str s = Block [s]
+instance Show Box where
+  show (Box ss) = unlines ss
 
-hglue :: Block -> Block -> Block
-hglue (Block b1) (Block b2) = Block (zipWith (<>) b1 b2)
+str :: String -> Box
+str s = Box [s]
 
--- | Horizontally concatenate a list of blocks.
-hcat :: [Block] -> Block
-hcat = foldr hglue (Block (repeat ""))
+-- | "Fuse" two boxes horizontally, by aligning their tops and
+--   zipping.  The result will be truncated to the height of the
+--   smaller box.
+hfuse :: Box -> Box -> Box
+hfuse (Box b1) (Box b2) = Box (zipWith (<>) b1 b2)
 
-vglue :: Block -> Block -> Block
-vglue (Block b1) (Block b2) = Block (b1 <> b2)
+-- | "Glue" two boxes together, placing the first line of the second
+--   box after the last line of the first.  The height of the result
+--   will be one less than the sum of the heights.
+hglue :: Box -> Box -> Box
+hglue (Box b1) (Box b2) =
+  (Box b1 `vglue` spacer len1)
+  `hfuse`
+  ((Box (replicate (length b1 - 1) [])) `vglue` (Box b2))
+  where
+    len1 = length (last b1)
 
-vcat :: [Block] -> Block
-vcat = foldr vglue (Block [])
+-- | Horizontally concatenate a list of boxes, via gluing.
+hcat :: [Box] -> Box
+hcat = foldr hglue (Box [""])
 
-pad :: Block -> Block
-pad (Block ls) = Block (map padStr ls)
+vglue :: Box -> Box -> Box
+vglue (Box b1) (Box b2) = Box (b1 <> b2)
+
+vcat :: [Box] -> Box
+vcat = foldr vglue (Box [])
+
+pad :: Box -> Box
+pad (Box ls) = Box (map padStr ls)
   where
     len      = maximum (0 : map length ls)
     padStr s = s ++ replicate (len - length s) ' '
 
--- | A block which is n spaces wide and infinitely tall.  Useful in
+-- | A box which is n spaces wide and infinitely tall.  Useful in
 --   the context of 'hcat'.
-spacer :: Int -> Block
-spacer n = Block (repeat (replicate n ' '))
+spacer :: Int -> Box
+spacer n = Box (repeat (replicate n ' '))
 
 --------------------------------------------------
--- Rendering to Blocks
+-- Rendering to Boxes
 
 data RenderCtx =
   RenderCtx
@@ -373,36 +391,40 @@ type RenderM = Reader RenderCtx
 runRenderM :: RenderM a -> a
 runRenderM = flip runReader initRenderCtx
 
-leaf :: String -> RenderM Block
+leaf :: String -> RenderM Box
 leaf s = return $ str s
 
-concatBlocks :: [RenderM Block] -> RenderM Block
-concatBlocks ss = hcat <$> sequence ss
+concatBoxes :: [RenderM Box] -> RenderM Box
+concatBoxes ss = hcat <$> sequence ss
 
-renderBlock :: Formatted -> RenderM Block
-renderBlock FEmpty           = leaf ""
-renderBlock (FAlt [])        = leaf ""
-renderBlock (FAlt fs)        = do
+renderBox :: Formatted -> RenderM Box
+renderBox FEmpty           = leaf ""
+renderBox (FAlt [])        = leaf ""
+renderBox (FAlt fs)        = do
   mode <- view textMode
-  renderBlock $ fromMaybe (snd . head $ fs) (lookup mode fs)
-renderBlock (FIdent s)       = leaf s
-renderBlock (FKeyword s)     = leaf s
-renderBlock (FType s)        = leaf s
-renderBlock (FSymbol s)      = leaf s
-renderBlock (FInt i)         = leaf $ show i
-renderBlock (FRat r)
-  | denominator r == 1         = leaf $ show (numerator r)
-  | otherwise                  = leaf $ show (numerator r) ++ "/" ++ show (denominator r)
-renderBlock FUnit            = leaf "()"
-renderBlock FComma           = leaf ","
-renderBlock FSpace           = leaf " "
-renderBlock FIndent          = return $ spacer 2
-renderBlock (FBlock f)       = undefined
-renderBlock (FParens f)      = concatBlocks [leaf "(", renderBlock f, leaf ")"]
-  -- XXX above doesn't work if f is actually a block.  Need to put
-  -- parens at beginning of first line and end of last line.
-renderBlock (FSequence fs)   = concatBlocks (map renderBlock fs)
--- renderBlock (FCase fs)    = undefined
+  renderBox $ fromMaybe (snd . head $ fs) (lookup mode fs)
+renderBox (FIdent s)       = leaf s
+renderBox (FKeyword s)     = leaf s
+renderBox (FType s)        = leaf s
+renderBox (FSymbol s)      = leaf s
+renderBox (FInt i)         = leaf $ show i
+renderBox (FRat r)
+  | denominator r == 1     = leaf $ show (numerator r)
+  | otherwise              = leaf $ show (numerator r) ++ "/" ++ show (denominator r)
+renderBox FUnit            = leaf "()"
+renderBox FComma           = leaf ","
+renderBox FSpace           = leaf " "
+renderBox (FIndent f)      = (spacer 2 `hfuse`) <$> renderBox f
+renderBox (FBlock f)       = renderBlock f
+renderBox (FParens f)      = concatBoxes [leaf "(", renderBox f, leaf ")"]
+renderBox (FSequence fs)   = concatBoxes (map renderBox fs)
+renderBox (FCase fs)       = ((Box (repeat "{ ")) `hfuse`) <$> renderBox (FBlock fs)
+
+renderBox FAlign           = leaf ""
+
+renderBlock :: [Formatted] -> RenderM Box
+renderBlock f = vcat <$> mapM renderBox f
+  -- XXX need to deal with alignment
 
 --------------------------------------------------
 -- Monadic pretty-printing

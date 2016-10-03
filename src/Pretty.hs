@@ -491,3 +491,27 @@ renderSequence
   . mapM (concatBoxes . map renderBox)
   . splitOn [FNewline]
 
+------------------------------------------------------------
+-- Rendering to LaTeX
+
+renderLaTeX :: Formatted -> String
+renderLaTeX FEmpty         = ""
+renderLaTeX (FIdent s)     = undefined
+renderLaTeX (FKeyword s)   = undefined
+renderLaTeX (FType s)      = undefined
+renderLaTeX (FSymbol s)    = undefined
+renderLaTeX (FInt n)       = undefined
+renderLaTeX (FRat r)       = undefined
+renderLaTeX FUnit          = undefined
+renderLaTeX FComma         = undefined
+renderLaTeX FSpace         = undefined
+renderLaTeX FNewline       = undefined
+renderLaTeX (FBlock fs)    = undefined
+renderLaTeX FAlign         = undefined
+renderLaTeX (FIndent f)    = undefined
+renderLaTeX (FAlt as)      = undefined
+renderLaTeX (FParens f)    = undefined
+renderLaTeX (FSequence fs) = undefined
+renderLaTeX (FCase fs)     = undefined
+renderLaTeX (FSuper f)     = undefined
+renderLaTeX (FSub f)       = undefined

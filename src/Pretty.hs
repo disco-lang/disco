@@ -12,8 +12,8 @@ import           Prelude                 hiding (seq)
 import           Control.Applicative     hiding (empty)
 import           Control.Lens
 import           Control.Monad.Reader
-import           Data.Char               (toLower)
-import           Data.List               (findIndex, intersperse)
+import           Data.Char               (toLower, isSpace)
+import           Data.List               (findIndex, intersperse, transpose)
 import           Data.List.Split         (splitOn)
 import           Data.Maybe              (fromJust)
 import           Data.Maybe              (fromMaybe)
@@ -62,7 +62,7 @@ data Formatted where
   FCase     :: [Formatted] -> Formatted  -- ^ Case expression (a special kind of Block)
   FSuper    :: Formatted   -> Formatted  -- ^ Superscript
   FSub      :: Formatted   -> Formatted  -- ^ Subscript
-  deriving Show
+  deriving (Eq, Show)
 
 --------------------------------------------------
 -- Precedence and associativity
@@ -111,10 +111,21 @@ arrPA = PA 1 AR
 --------------------------------------------------
 -- The formatting monad
 
-type MFormat = ReaderT PA LFreshM Formatted
+data FormatCtx
+  = FormatCtx
+    { _formatPA        :: PA
+    , _formatRightmost :: Bool
+    }
+
+makeLenses ''FormatCtx
+
+initFormatCtx :: FormatCtx
+initFormatCtx = FormatCtx initPA True
+
+type MFormat = ReaderT FormatCtx LFreshM Formatted
 
 format :: MFormat -> Formatted
-format = runLFreshM . flip runReaderT initPA
+format = runLFreshM . flip runReaderT initFormatCtx
 
 alt :: [(TextMode, MFormat)] -> MFormat
 alt fs = FAlt <$> sequence (map strength fs)
@@ -165,7 +176,7 @@ parens = fmap FParens
 
 mparens :: PA -> MFormat -> MFormat
 mparens pa fmt = do
-  parentPA <- ask
+  parentPA <- view formatPA
   (if (pa < parentPA) then parens else id) fmt
 
 ------------------------------------------------------------
@@ -198,7 +209,9 @@ formatTy (TySum τ₁ τ₂)   = mparens (PA 6 AR) $
   ]
 
 formatTy' :: Prec -> Assoc -> Type -> MFormat
-formatTy' p a τ = local (const (PA p a)) (formatTy τ)
+formatTy' p a τ
+  = local ((formatPA .~ PA p a) . (formatRightmost &&~ (a == AR)))
+  $ formatTy τ
 
 formatName :: Name Term -> MFormat
 formatName = ident . show
@@ -252,14 +265,19 @@ formatTerm (TLet bnd) = mparens initPA $
     , keyword "in"
     , formatTerm' 0 AL t2
     ]
-formatTerm (TCase b)    = FCase <$> mapM formatBranch b
+formatTerm (TCase b)    = do
+  rm <- view formatRightmost
+  (if rm then id else parens) $
+    FCase <$> mapM formatBranch b
 
   -- XXX FIX ME: what is the precedence of ascription?
 formatTerm (TAscr t ty) =
   parens $ seq' [formatTerm t, symbol ":", formatTy ty]
 
 formatTerm' :: Prec -> Assoc -> Term -> MFormat
-formatTerm' p a t = local (const (PA p a)) (formatTerm t)
+formatTerm' p a t
+  = local ((formatPA .~ PA p a) . (formatRightmost &&~ (a == AR)))
+  $ formatTerm t
 
 formatSide :: Side -> MFormat
 formatSide L = keyword "inl"
@@ -303,7 +321,7 @@ formatGuards gs = seq $ intersperse newline (map formatGuard gs)
 
 formatGuard :: Guard -> MFormat
 formatGuard (GIf et) =
-  seq [align, keyword "if", align, formatTerm (unembed et)]
+  seq [ align, keyword "if", align, formatTerm (unembed et)]
 formatGuard (GWhen et p) =
   seq [ align, keyword "when", align
       , seq' [formatTerm (unembed et), symbol "=", formatPattern p]
@@ -378,11 +396,10 @@ spacer n = Box (repeat (replicate n ' '))
 data RenderCtx =
   RenderCtx
   { _textMode  :: TextMode
-  , _curIndent :: Int
   }
 
 initRenderCtx :: RenderCtx
-initRenderCtx = RenderCtx { _textMode = ASCII, _curIndent = 0 }
+initRenderCtx = RenderCtx { _textMode = ASCII }
 
 makeLenses ''RenderCtx
 
@@ -417,14 +434,37 @@ renderBox FSpace           = leaf " "
 renderBox (FIndent f)      = (spacer 2 `hfuse`) <$> renderBox f
 renderBox (FBlock f)       = renderBlock f
 renderBox (FParens f)      = concatBoxes [leaf "(", renderBox f, leaf ")"]
-renderBox (FSequence fs)   = concatBoxes (map renderBox fs)
+renderBox (FSequence fs)   = renderSequence fs
 renderBox (FCase fs)       = ((Box (repeat "{ ")) `hfuse`) <$> renderBox (FBlock fs)
 
 renderBox FAlign           = leaf ""
+    -- ignore FAlign if it occurs outside an FBlock
+renderBox FNewline
+  = error "renderBox FNewline: this should never happen!"
+    -- case should never happen; should be handled in FSequence case
 
 renderBlock :: [Formatted] -> RenderM Box
-renderBlock f = vcat <$> mapM renderBox f
-  -- XXX need to deal with alignment
+renderBlock
+  = fmap (foldr hfuse (spacer 0) . intersperse (spacer 1)
+          . map (pad . vcat) . transpose)
+  . mapM (mapM renderSequence)
+  . map (splitOn [FAlign])
+  . concat . map (splitOn [FNewline])
+  . map flatten
+
+flatten :: Formatted -> [Formatted]
+flatten (FSequence fs) = concatMap flatten fs
+flatten f              = [f]
+
+-- fmap (foldr hfuse (Box (repeat "")))
+--   . fmap (map (pad . vcat))
+--   . fmap transpose
+
+renderSequence :: [Formatted] -> RenderM Box
+renderSequence
+  = (vcat <$>)
+  . mapM (concatBoxes . map renderBox)
+  . splitOn [FNewline]
 
 --------------------------------------------------
 -- Monadic pretty-printing

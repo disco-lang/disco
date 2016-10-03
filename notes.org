@@ -22,6 +22,55 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     adding call-by-need to the grant.  We should implement basic type
     inference for the simple type system.
 
+  - Notes from Meeting with Dr. August
+
+    - Overall she is excited about the project.
+      - Bridging the gap between math students and CS students is good.
+      - Visualizations as a default is very good! (her words)
+
+    - Need syntax examples that show off examples of programs that are easier
+      to understand/write in our PL as opposed to existing PLs
+
+    - Answer the question: what does our PL have that others do not?
+
+    - 1st paragraph should clearly state exactly what we are going to do,
+      that way the reviewer understands it up front.
+
+    - We must clearly state our education research question, and show that we
+      can answer it.
+
+    - Anwer the question: What will we learn?
+
+    - Examine recent awards to get an idea of what these proposals look like:
+       Go to nsf.gov -> awards -> advanced search
+      Then enter "Element code: 9178" and Keyword "math"
+
+    - Examples throughout the proposal should motivate why our *new*
+      PL is necessary over using or extending an existing PL.  But,
+      these examples should be understandable and impactful to a
+      *non-CS reviewer*.
+
+    - Reviewers may not be from CS, and may be chemist, biologist,
+      etc.
+
+    - Possible venues for publications:
+        - SIGCSE
+        - CCSE
+
+    - Make sure to study in detail the solication, and to make sure that
+      each point is answered.
+
+    - Built in ability to have visualizations is great.
+    
+    - Integrated IDE is great.
+
+    - Maybe machine learning examples might appeal to other STEM fields.
+
+    - One thing people do after building something in education is track 
+      how the students use it, for example, what functions do they use,
+      how long did they take to solve a problem, etc.  Can we track this
+      in our system?
+
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
   type (float).  Don't think it really even has much of a type

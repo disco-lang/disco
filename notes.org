@@ -71,6 +71,12 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
       how long did they take to solve a problem, etc.  Can we track this
       in our system?
 
+  - Example abstracts:
+        https://www.nsf.gov/awardsearch/showAward?AWD_ID=1525671&HistoricalAwards=false
+        https://www.nsf.gov/awardsearch/showAward?AWD_ID=1432257&HistoricalAwards=false
+        * https://www.nsf.gov/awardsearch/showAward?AWD_ID=1524739&HistoricalAwards=false
+        https://www.nsf.gov/awardsearch/showAward?AWD_ID=1651280&HistoricalAwards=false
+
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
   type (float).  Don't think it really even has much of a type

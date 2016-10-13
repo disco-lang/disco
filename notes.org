@@ -64,7 +64,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     
     - Integrated IDE is great.
 
-    - Maybe machine learning examples might appeal to other STEM fields.
+    - Maybe machine learning examples might appeal to other STEM
+      fields.
 
     - One thing people do after building something in education is track 
       how the students use it, for example, what functions do they use,
@@ -76,6 +77,19 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
         https://www.nsf.gov/awardsearch/showAward?AWD_ID=1432257&HistoricalAwards=false
         * https://www.nsf.gov/awardsearch/showAward?AWD_ID=1524739&HistoricalAwards=false
         https://www.nsf.gov/awardsearch/showAward?AWD_ID=1651280&HistoricalAwards=false
+  
+  - Some example research:
+     - On the Implementation of a Discrete Mathematics Course:
+       http://sigcse.org/sigcse/files/documents/pdfs/DiscreteMathReport.pdf
+     - Evaluating discrete mathematics exercises
+       http://dl.acm.org/citation.cfm?id=169352
+     - Report of the SIGCSE Committee on the Implementation of a One-Semester Discrete Mathematics Course
+       http://plone3test.acm.org/sigcse/resources/discrete-mathematics
+     - Discrete math with programming: better together
+       http://dl.acm.org/citation.cfm?id=1227310.1227348
+     - A statistical analysis of the effect of discrete mathematics on the performance of computer science 
+       majors in beginning computing classes
+       http://dl.acm.org/citation.cfm?id=5699     
 
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric

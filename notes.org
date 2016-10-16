@@ -42,7 +42,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - Anwer the question: What will we learn?
 
     - Examine recent awards to get an idea of what these proposals look like:
-       Go to nsf.gov -> awards -> advanced search
+      Go to nsf.gov -> awards -> advanced search
       Then enter "Element code: 9178" and Keyword "math"
 
     - Examples throughout the proposal should motivate why our *new*
@@ -61,7 +61,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
       each point is answered.
 
     - Built in ability to have visualizations is great.
-    
+
     - Integrated IDE is great.
 
     - Maybe machine learning examples might appeal to other STEM
@@ -223,6 +223,11 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   Error messages are going to be really important and really hard!
 
   Use trifecta for parsing?
+
+  + Features for developers/teachers?
+    + Include algebraic data types for use in developing libraries?
+    + Ability to extend the syntax in a library?
+
 * Next steps
 
   + Desugaring
@@ -255,3 +260,30 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - Can we do something like -fdefer-type-errors so that
       students files load dispite of errors.
   + Machine-checkable examples 
+* Related work
+
+  + VanDrunen, The Case for Teaching Functional Programming in
+    Discrete Math: http://cs.wheaton.edu/~tvandrun/dmfp/case4dmfp.pdf
+
+    (should follow up more references)
+
+  + LACS consortium, A 2007 model curriculum for a liberal arts degree
+    in computer science. Journal on Educational Resources in
+    Computing, 7(2):2, 2007. ISSN 1531-4278. doi:
+    http://doi.acm.org/10.1145/1240200.1240202.
+
+* Things to mention
+
+  + Talk about how it will help students to think about types.
+  + Design of web-based IDE makes it possible to collect data.
+  + It will help with proofs!  Curry-Howard, Agda, Coq, etc. but not
+    accessible.  We want to explore ways to incorporate it that make
+    it accessible.
+
+* How will it help students?
+
+  + Better at recursion/induction
+  + Proofs
+  + Not making type errors
+  + Be able to relate discrete mathematics to CS more directly
+  + Generate interest (fun, interactive)

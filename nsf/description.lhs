@@ -81,17 +81,23 @@ impossible for many departments.
   the setting of discrete mathematics, and teachers must waste a lot
   of time and energy explaining incidental detail or trying to hide it
   from students.
+\item With the notable exception of Racket, tooling for existing
+  functional languages is designed for professional programmers, not
+  for students.  The systems can be difficult to set up, generate
+  confusing error messages, and are generally designed to facilitate
+  production of code rather than interactive exploration and learning.
 \item As with any subject, teaching a functional language requires
   some expertise, or at least familiarity, on the part of the
-  instructor. XXX made worse by general-purpose languages which
-  require a high level of expertise to be able to usefully teach them
-  and help students navigate through the relevant features.  This is
-  especially a problem at schools where the discrete mathematics
-  course is taught by mathematics faculty rather than computer science
-  faculty.
+  instructor. XXX General-purpose functional languages exacerbate this
+  problem, since a high level of expertise is required to be able to
+  usefully teach them and help students navigate through the relevant
+  features.  This is especially a problem at schools where the
+  discrete mathematics course is taught by mathematics faculty rather
+  than computer science faculty.
 \item There is often an impedance mismatch between standard
   mathematics notation and the notation used by existing functional
-  programming languages.
+  programming languages.  For example, XXX.  XXX confusing for
+  students.
 \end{itemize}
 
 \section{Proposed work}
@@ -108,14 +114,18 @@ Features of \thelang will include:
 \begin{itemize}
 \item XXX bare-bones: not designed to be ``real-world'' or general
   purpose.  No distracting details to hide.  OK since students will
-  not be expected to use it later.
+  not be expected to use it later.  Easier for instructors to learn
+  and use.
+\item XXX web-based IDE designed specifically for students. Easy to
+  get started with (just visit a web page), interactively explorable
+  error messages, built-in visualization, integrated help.
 \item XXX syntax will be primarily inspired by common mathematical
   notation, rather than typical functional programming syntax.
 \item XXX will have many features explicitly designed for discrete
-  mathematics: built-in lists, sets, multisets, ordered tuples, and
-  graphs; a standard library dealing with things like primality and
-  combinatorics; built-in visualization tools; and a focus on good
-  error messages.
+  mathematics: built-in lists, sets, multisets, ordered tuples,
+  functions, relations, and graphs; a standard libraries dealing with
+  things like number theory and combinatorics; built-in visualization
+  tools.
 \end{itemize}
 
 \subsection{Examples}

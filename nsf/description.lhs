@@ -17,7 +17,7 @@
 % section about evaluation is important.
 % }
 
-\newcommand{\thelang}{\textsc{NameOfLanguage}\xspace}
+\newcommand{\thelang}{\textsc{Disco}\xspace}
 
 \subsection{XXX}
 

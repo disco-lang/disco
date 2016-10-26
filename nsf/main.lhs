@@ -78,10 +78,10 @@
  \setcounter{page}{1}
   \begin{center}
     \vspace*{2in}
-    {\LARGE TITLE GOES HERE}\\
+    {\LARGE Disco: A Programming Language for Discrete Mathematics Education}\\
     \vspace{0.5in} \LARGE \bf
-    XXX NAMES \\[1.8in]
-    XXX DATE
+    Harley Eades \\ Brent Yorgey \\[1.8in]
+    \today
   \end{center}
   \newpage
 %\fi

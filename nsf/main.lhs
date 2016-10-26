@@ -15,6 +15,8 @@
 \usepackage{supertabular}
 \usepackage{prettyref}
 
+\usepackage{amsmath}
+
 %% prettyref stuff -------------------------------------------
 
 \newrefformat{fig}{Figure~\ref{#1}}

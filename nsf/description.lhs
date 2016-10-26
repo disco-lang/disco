@@ -126,12 +126,122 @@ Features of \thelang will include:
   functions, relations, and graphs; a standard libraries dealing with
   things like number theory and combinatorics; built-in visualization
   tools.
+\item XXX ability to state and explore mathematical conjectures.
+\item XXX support for experimenting with computational complexity. XXX reword
 \end{itemize}
 
-\subsection{Examples}
+\subsection{An Extended Example: the Euclidean Algorithm}
 \label{sec:examples}
 
-XXX some examples of code we can/want to/will be able to write.
+As an extended example, we consider the Euclidean Algorithm, a
+standard topic in discrete mathematics.  One of the oldest known
+algorithms, the Euclidean Algorithm finds the \emph{greatest common
+  divisor}, or gcd, of two integers.
+
+The basic version of the algorithm works by repeatedly subtracting the
+smaller number from the larger, until one of them reaches zero.  It
+might be implemented in \thelang as follows:
+
+\begin{spec}
+gcd : Nat * Nat -> Nat
+gcd (a, b) =
+  { a             if b == 0
+  { gcd(b, a)     if a < b
+  { gcd(a-b, b)   otherwise.
+\end{spec}
+
+The first line, |gcd : Nat * Nat -> Nat|, declares that |gcd| is a
+function which takes a pair of natural numbers as input and returns
+another natural number as output.  The rest of the lines define the
+behavior of |gcd| on the pair of natural numbers |(a,b)| by cases: if
+|b| is zero, the output is |a|; if |a| is smaller than |b|, the output
+is the result of |gcd(b, a)|; in any other case, the output is the
+result of |gcd(a-b, b)|.
+
+The \thelang environment would assist a student in writing and
+understanding this |gcd| function in several ways:
+
+\begin{itemize}
+\item \textbf{Type checking}. XXX show potential type error.  Cite
+  examples for type error paper from ICFP.  XXX Helps develop
+  awareness of types, important in mathematics.
+\item \textbf{Step-by-step execution}. Of course a student would be
+  able to type in |gcd(15, 42)| and get |3| as the result.  But they
+  would also be able to interactively trace the step-by-step
+  evaluation, with the ability to dynamically expand the evaluation
+  trace to show more detail or collapse it to show less. XXX helps
+  develop computational thinking, mental model of computational processes
+
+  For example, beginning with |gcd(15, 42)|, the student might expand
+  it five steps, resulting in a trace that looks like \[ |gcd(15,42)|
+  \to |gcd(42,15)| \to |gcd(27,15)| \to |gcd(12,15)| \to |gcd(15,12)|
+  \to |gcd(3, 12)| \]  Perhaps the student does not understand the
+  first step: why does |gcd(42,15)| reduce to |gcd(15,42)|?  Clicking
+  on the first arrow might expand that step to show more detail:
+  \[ |gcd(42,15)| \to
+     \begin{array}{ll}
+       |{ 42              if 15 == 0| \\
+       |{ gcd(15,42)      if 15 < 42| \\
+       |{ gcd(15-42, 42)  otherwise|
+     \end{array}
+     \to |gcd(15,42)| \]
+  Clicking again might show even more detail, for example, that |15 ==
+  0| reduces to |false|, and so on.
+
+\item \textbf{Visualization}. XXX
+\end{itemize}
+
+It turns out that this first version of |gcd| is not very efficient.
+XXX exploring number of reduction steps, arithmetic operations, etc.
+
+A more efficient implementation works by directly finding the
+remainder of |a| when divided by |b| (using the |mod| operator)
+instead of repeatedly subtracting |b| from |a|.
+
+\begin{spec}
+gcd2 : Nat * Nat -> Nat
+gcd2 (a, b) =
+  { a                 if b == 0
+  { gcd2(b, a mod b)  otherwise.
+\end{spec}
+
+At this point the student thinks these two implementations of |gcd|
+have equivalent behavior, but is not entirely sure.  They can formally
+write down their conjecture as follows:
+\begin{spec}
+Conjecture gcd_same : for all a, b, gcd(a,b) == gcd2(a,b).
+\end{spec}
+\thelang cannot automatically prove this conjecture, but it can check
+that the conjecture is at least plausible: it will check that all the
+types match up, and automatically test the conjecture on many randomly
+generated example inputs XXX cite QuickCheck.  If all the tests
+succeed---while not a proof---it gives the student confidence that
+their implementation is correct.  On the other hand, if the system
+finds a counterexample, it can help the student more quickly hone in
+on the source of the error.  For example, suppose the student
+mistakenly wrote |gcd2(a, a mod b)| in the last line of the definition
+of |gcd2|.  After stating their conjecture, the system would quickly
+come back with an interactive error message, something like this:
+\begin{spec}
+Counterexample found for conjecture gcd_same:
+  a = 0
+  b = 1
+gcd(0,1) = 1 but gcd2(0,1) = 0.
+\end{spec}
+The student could once again click to expand parts of this message to
+show more detail, for example, to see detailed evaluation traces for
+the counterexamples.
+
+XXX finally, ... Bezout's identity.
+
+\begin{spec}
+extgcd : Nat * Nat -> Nat * Nat * Nat
+extgcd = ...
+
+Theorem bezouts_identity : for all a, b,
+  extgcd(a, b) = (g, x, y) =>
+  (x a + y b == g) and (gcd(a,b) == g).
+\end{spec}
 
 \subsection{Reshaping The Discrete Mathematics Curriculum}
 \label{subsec:reshaping_the_discrete_mathematics_curriculum}

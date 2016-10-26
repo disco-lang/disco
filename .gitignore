@@ -24,6 +24,7 @@ ott/*.tex
 
 *.bbl
 *.blg
+*.ptb
 nsf/*.pdf
 nsf/main.tex
 nsf/description.tex

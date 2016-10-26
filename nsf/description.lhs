@@ -19,7 +19,7 @@
 
 \newcommand{\thelang}{\textsc{Disco}\xspace}
 
-\subsection{XXX}
+\section{Introduction}
 
 Many computer science curricula at the university level require some
 sort of \emph{discrete mathematics} course.  Such a course typically
@@ -94,13 +94,15 @@ impossible for many departments.
   programming languages.
 \end{itemize}
 
-\subsection{Proposed work}
+\section{Proposed work}
 \label{sec:proposed-work}
 
 To address these issues, we propose to develop a new functional
 programming language, \thelang, explicitly designed to be used in a
 discrete mathematics course, along with a suitable curriculum to go
 along with it.  Our primary goals in developing \thelang will be XXX.
+
+\subsection{Language features}
 
 Features of \thelang will include:
 \begin{itemize}

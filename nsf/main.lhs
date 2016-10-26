@@ -78,7 +78,7 @@
  \setcounter{page}{1}
   \begin{center}
     \vspace*{2in}
-    {\LARGE Disco: A Programming Language for Discrete Mathematics Education}\\
+    {\LARGE Disco: A Programming Environment for Discrete Mathematics Education}\\
     \vspace{0.5in} \LARGE \bf
     Harley Eades \\ Brent Yorgey \\[1.8in]
     \today

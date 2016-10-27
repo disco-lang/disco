@@ -17,6 +17,10 @@
 % section about evaluation is important.
 % }
 
+\newenvironment{discomsg}{\begin{quote}\sffamily}{\end{quote}}
+\newcommand{\discoq}{\item[$\blacktriangleright$]}
+\newcommand{\discoqa}{\item[$\blacktriangledown$]}
+
 \newcommand{\thelang}{\textsc{Disco}\xspace}
 
 \section{Introduction}
@@ -134,9 +138,9 @@ Features of \thelang will include:
 \label{sec:examples}
 
 As an extended example, we consider the Euclidean Algorithm, a
-standard topic in discrete mathematics.  One of the oldest known
-algorithms, the Euclidean Algorithm finds the \emph{greatest common
-  divisor}, or gcd, of two integers.
+standard topic in a discrete mathematics course.  One of the oldest
+known algorithms, the Euclidean Algorithm finds the \emph{greatest
+  common divisor}, or gcd, of two integers.
 
 The basic version of the algorithm works by repeatedly subtracting the
 smaller number from the larger, until one of them reaches zero.  It
@@ -158,13 +162,76 @@ behavior of |gcd| on the pair of natural numbers |(a,b)| by cases: if
 is the result of |gcd(b, a)|; in any other case, the output is the
 result of |gcd(a-b, b)|.
 
-The \thelang environment would assist a student in writing and
+The \thelang environment could assist a student in writing and
 understanding this |gcd| function in several ways:
 
 \begin{itemize}
-\item \textbf{Type checking}. XXX show potential type error.  Cite
-  examples for type error paper from ICFP.  XXX Helps develop
-  awareness of types, important in mathematics.
+\item \textbf{Type checking}.
+  \thelang will support students in thinking about \emph{types}, which
+  are XXX fundamental in mathematics XXX explain why.
+
+  As an example, suppose that instead of |gcd(b,a)| on the
+  second-to-last line, the student writes |gcd(b)|.  This does not
+  make sense, and the environment must display some sort of error.
+  However, the great difficulty with errors is that although it is
+  impossible to know \emph{why} the user made a particular error, the
+  reason for the error has a profound impact on what information would
+  be helpful in correcting it.  For example, if the student just made
+  a silly typo, it should be enough to highlight the mistake.  On the
+  other hand, if the error is due to a more fundamental
+  misunderstanding, more information should be displayed to help the
+  student understand what they have done wrong.  Even in the case of a
+  fundamental misunderstanding, it would be overwhelming to display
+  \emph{all possible} information about the error, because the student
+  is likely to give up in frustration rather than patiently read
+  through and assimilate all the information.
+
+  \thelang will try to address these problems with \emph{interactive,
+    explorable} errors.  For example, in the case of a student typing
+  |gcd(b)| instead of |gcd(b,a)|, \thelang would begin by highlighting
+  the |b|.  Clicking or hovering on the |b| would bring up a simple
+  error message, along with \emph{questions the student can click to
+    explore more information}.  For example, it might display
+  something like:
+  \begin{discomsg}
+    Type error: `\verb|b|' is a natural number, but it is used in a place where there should
+    be a pair of natural numbers.
+    \begin{enumerate}
+    \discoq Why is `\verb|b|' a natural number?
+    \discoq Why should there be a pair of natural
+      numbers here instead?
+    \end{enumerate}
+  \end{discomsg}
+
+  Clicking to expand both questions might result in something like
+  \begin{discomsg}
+    Type error: `\verb|b|' is a natural number, but it is used in a place where there should
+    be a pair of natural numbers.
+    \begin{itemize}
+      \discoqa Why is `\verb|b|' a natural number?
+      \begin{discomsg}
+        `\verb|b|' is a natural number because it is the second
+        parameter of gcd.
+        \begin{itemize}
+        \discoq Why must the second parameter of gcd be a natural
+        number?
+        \end{itemize}
+      \end{discomsg}
+
+    \discoqa Why should there be a pair of natural numbers here instead?
+    \begin{discomsg}
+      Because this is an argument to gcd.
+      \begin{itemize}
+        \discoq Why must the argument to gcd be a pair of natural numbers?
+      \end{itemize}
+    \end{discomsg}
+    \end{itemize}
+  \end{discomsg}
+
+  Clicking or hovering on any of these would also highlight the
+  corresponding region of the program.
+
+  XXX Cite examples for type error paper from ICFP?
 \item \textbf{Step-by-step execution}. Of course a student would be
   able to type in |gcd(15, 42)| and get |3| as the result.  But they
   would also be able to interactively trace the step-by-step
@@ -221,27 +288,32 @@ finds a counterexample, it can help the student more quickly hone in
 on the source of the error.  For example, suppose the student
 mistakenly wrote |gcd2(a, a mod b)| in the last line of the definition
 of |gcd2|.  After stating their conjecture, the system would quickly
-come back with an interactive error message, something like this:
-\begin{spec}
-Counterexample found for conjecture gcd_same:
+come back with an interactive error:
+\begin{discomsg}
+Counterexample found for conjecture \verb|gcd_same|:
+\begin{verbatim}
   a = 0
   b = 1
-gcd(0,1) = 1 but gcd2(0,1) = 0.
-\end{spec}
-The student could once again click to expand parts of this message to
-show more detail, for example, to see detailed evaluation traces for
-the counterexamples.
+\end{verbatim}
+\verb|gcd(0,1) = 1|, but \verb|gcd2(0,1) = 0|.
+\begin{itemize}
+\discoq Why does \verb|gcd(0,1) = 1|?
+\discoq Why does \verb|gcd2(0,1) = 0|?
+\end{itemize}
+\end{discomsg}
+Expanding would once again allow the student to see detailed
+evaluation traces for the counterexamples.
 
-XXX finally, ... Bezout's identity.
+%% XXX finally, ... Bezout's identity.
 
-\begin{spec}
-extgcd : Nat * Nat -> Nat * Nat * Nat
-extgcd = ...
+%% \begin{spec}
+%% extgcd : Nat * Nat -> Nat * Nat * Nat
+%% extgcd = ...
 
-Theorem bezouts_identity : for all a, b,
-  extgcd(a, b) = (g, x, y) =>
-  (x a + y b == g) and (gcd(a,b) == g).
-\end{spec}
+%% Theorem bezouts_identity : for all a, b,
+%%   extgcd(a, b) = (g, x, y) =>
+%%   (x a + y b == g) and (gcd(a,b) == g).
+%% \end{spec}
 
 \subsection{Reshaping The Discrete Mathematics Curriculum}
 \label{subsec:reshaping_the_discrete_mathematics_curriculum}

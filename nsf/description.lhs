@@ -352,28 +352,12 @@ and/or papers at SIGCSE, ICFP, other relevant conferences.
 \section{Related work}
 \label{sec:related-work}
 
+\input{related-work}
 
 \section{Team qualifications}
 \label{sec:qualifications}
 
-The first co-PI, Harley Eades, \dots
-
-The second co-PI, Brent Yorgey, has experience in both functional
-programming and mathematics education.  He is well-known in the
-Haskell functional programming language community for his educational
-materials, such as the \emph{Typeclassopedia} \cite{Typeclassopedia},
-and his course materials for an undergraduate introductory Haskell
-course developed at the University of Pennsylvania, both of which are
-routinely recommended by the community as some of the best materials
-for learning functional programming in Haskell \cite{bitemyapp-learn}.
-Yorgey's blog, \emph{The Math Less Traveled} \cite{yorgey-tmlt}, explains
-discrete mathematics topics to a broad audience and attracts around
-10,000 unique visitors each month.
-
-Yorgey is also the lead developer of \emph{diagrams} \cite{diagrams}, a
-high-level framework for creating vector graphics, which will be used
-as the basis for visualizations in the \thelang environment.
-
+\input{team-qual}
 
 \section{Broader impacts}
 \label{sec:impacts}

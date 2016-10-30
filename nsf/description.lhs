@@ -356,6 +356,7 @@ and/or papers at SIGCSE, ICFP, other relevant conferences.
 \section{Team qualifications}
 \label{sec:qualifications}
 
+\input{team-qual}
 
 \section{Broader impacts}
 \label{sec:impacts}

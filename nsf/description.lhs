@@ -126,30 +126,37 @@ impossible for many departments.
 \label{sec:proposed-work}
 
 To address these issues, we propose to develop a new functional
-programming language, \thelang, explicitly designed to be used in a
-discrete mathematics course, along with a suitable curriculum to go
-along with it.  Our primary goals in developing \thelang will be XXX.
+programming language and web-based environment, \thelang, explicitly
+designed to be used in a discrete mathematics course, along with a
+suitable curriculum to accompany it.
 
-\subsection{Language features}
+\subsection{Design goals and features}
 
-Features of \thelang will include:
+Design goals and features of \thelang include:
 \begin{itemize}
-\item XXX bare-bones: not designed to be ``real-world'' or general
-  purpose.  No distracting details to hide.  OK since students will
-  not be expected to use it later.  Easier for instructors to learn
-  and use.
-\item XXX web-based IDE designed specifically for students. Easy to
-  get started with (just visit a web page), interactively explorable
-  error messages, built-in visualization, integrated help.
-\item XXX syntax will be primarily inspired by common mathematical
-  notation, rather than typical functional programming syntax.
-\item XXX will have many features explicitly designed for discrete
-  mathematics: built-in lists, sets, multisets, ordered tuples,
-  functions, relations, and graphs; a standard libraries dealing with
-  things like number theory and combinatorics; built-in visualization
+\item \textbf{Simplicity}: \thelang will not be intended or designed
+  to be ``real-world'' or general purpose.  Included features will be
+  carefully selected for their relevance, so there will be no
+  distracting details to hide from students, and the language will be
+  easy for instructors to learn and use.
+\item \textbf{Web-based}: \thelang will feature a web-based
+  development environment designed specifically for students. A
+  web-based environment makes it very easy to get started---one only
+  has to visit a web page rather than download and install software.
+  A web-based environment will also make it easy to support other
+  features such as interactively explorable error messages, built-in
+  visualizations, and integrated help.
+\item \textbf{Math-inspired}: The syntax of \thelang will be primarily
+  inspired by common mathematical notation, rather than typical
+  functional programming syntax.  For example, one will be able to
+  write \texttt{2x} instead of \texttt{2*x}.  See the next section for
+  more examples.
+\item \textbf{Discrete-specific}: \thelang will have many features
+  designed explicitly for discrete mathematics.  For example, it will
+  have built-in list, set, multiset, ordered tuple, function,
+  relation, and graph types; standard libraries dealing with things
+  like number theory and combinatorics; and built-in visualization
   tools.
-\item XXX ability to state and explore mathematical conjectures.
-\item XXX support for experimenting with computational complexity. XXX reword
 \end{itemize}
 
 \subsection{An Extended Example: the Euclidean Algorithm}

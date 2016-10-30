@@ -322,6 +322,15 @@ mathematics course.  Our example curriculum should go in here.  Then
 we will reference this section from the broader-impacts section.
 % subsection reshaping_the_discrete_mathematics_curriculum (end)
 
+\section{Assessment Plan}
+\label{sec:assessment}
+
+\section{Dissemination of Results}
+\label{sec:dissemination}
+
+Open-source code and freely available platform.  Blogs.  Workshops
+and/or papers at SIGCSE, ICFP, other relevant conferences.
+
 \section{Related work}
 \label{sec:related-work}
 

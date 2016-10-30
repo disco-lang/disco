@@ -340,13 +340,6 @@ evaluation traces for the counterexamples.
 %%   (x a + y b == g) and (gcd(a,b) == g).
 %% \end{spec}
 
-\subsection{Reshaping The Discrete Mathematics Curriculum}
-\label{subsec:reshaping_the_discrete_mathematics_curriculum}
-XXX Explain how this project will change the curriculum of a discrete
-mathematics course.  Our example curriculum should go in here.  Then
-we will reference this section from the broader-impacts section.
-% subsection reshaping_the_discrete_mathematics_curriculum (end)
-
 \section{Evaluation}
 \label{sec:assessment}
 

@@ -352,6 +352,7 @@ and/or papers at SIGCSE, ICFP, other relevant conferences.
 \section{Related work}
 \label{sec:related-work}
 
+\input{related-work}
 
 \section{Team qualifications}
 \label{sec:qualifications}

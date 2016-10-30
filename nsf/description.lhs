@@ -38,7 +38,7 @@ computer science.
 
 \emph{Functional programming} is a style of programming, embodied in
 languages such as Haskell, OCaml, Scala, F\#, and Racket, which
-emphasizes functions (\emph{i.e.} input-output processes) rather than
+emphasizes functions (\emph{i.e.}\ input-output processes) rather than
 sequences of instructions. It enables working at high levels of
 abstraction as well as rapid prototyping and refactoring, and provides
 a concise and powerful vocabulary to talk about many other topics in
@@ -53,30 +53,31 @@ functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea XXX cite
-examples.  Note LACS exemplary
-curriculum (see Van Drunen).
-The benefits of such an approach are numerous:
+examples.  XXX Note LACS exemplary curriculum (see Van Drunen).  The
+benefits of such an approach are numerous:
 \begin{itemize}
 \item It allows functional programming to be introduced at an early
   point in undergraduates' careers, since discrete mathematics is
   typically taken in the first or second year.  This allows ideas from
   functional programming to inform students' thinking about the rest
-  of the curriculum.  By contrast, when it is left until later in the
-  course of study, it is in danger of being seen as little more than a
-  curiosity.
-\item The two subjects are highly synergistic. XXX explain.  Cite Van
-  Drunen.  Don't go into too much detail since this is not our main
-  argument.
-\item In a traditional discrete mathematics course with both math and
+  of the curriculum.  By contrast, when functional programming is left
+  until later in the course of study, it is in danger of being seen as
+  esoteric or as a mere curiosity.
+\item The two subjects complement each other well. XXX explain.
+\item In a discrete mathematics course with both math and
   computer science majors, math majors can have a ``home turf
-  advantage'' since the course deals with topics that are already
+  advantage'' since the course deals with topics that may be already
   familiar to them (such as writing proofs), whereas computer science
   majors may struggle to connect the course content to computer
   science skills and concepts they already know.  Including functional
   programming levels the playing field, giving both groups of students
   a way to connect the course content to their previous experience.
+  Computer science majors will be more comfortable learning math
+  concepts that they can play with computationally; math majors can
+  leverage their math experience to learn a bit about programming.
 \item It is just plain fun: using programming enables interactive
-  exploration of the mathematics XXX.
+  exploration of mathematics concepts, which leads to higher
+  engagement and increased retention.
 \end{itemize}
 
 However, despite its benefits, this model is not widespread in
@@ -85,30 +86,40 @@ also some real roadblocks to adoption that make it impractical or
 impossible for many departments.
 
 \begin{itemize}
-\item Existing functional languages which are popular for
-  teaching---such as Haskell, Racket, OCaml, or SML---are
-  general-purpose languages which were not designed specifically with
-  teaching in mind.  The majority of their features are not needed in
-  the setting of discrete mathematics, and teachers must waste a lot
-  of time and energy explaining incidental detail or trying to hide it
-  from students.
+\item Existing functional languages---such as Haskell, Racket, OCaml,
+  or SML---are general-purpose languages which (with the notable
+  exception of Racket) were not designed specifically with teaching in
+  mind.  The majority of their features are not needed in the setting
+  of discrete mathematics, and teachers must waste a lot of time and
+  energy explaining incidental detail or trying to hide it from
+  students.
 \item With the notable exception of Racket, tooling for existing
   functional languages is designed for professional programmers, not
   for students.  The systems can be difficult to set up, generate
   confusing error messages, and are generally designed to facilitate
   production of code rather than interactive exploration and learning.
-\item As with any subject, teaching a functional language requires
-  some expertise, or at least familiarity, on the part of the
-  instructor. XXX General-purpose functional languages exacerbate this
-  problem, since a high level of expertise is required to be able to
-  usefully teach them and help students navigate through the relevant
-  features.  This is especially a problem at schools where the
-  discrete mathematics course is taught by mathematics faculty rather
-  than computer science faculty.
+\item As with any subject, effective teaching of a functional language
+  requires expertise in the language and its use, or at least thorough
+  familiarity, on the part of the instructor. General-purpose
+  functional languages are large, complex systems, requiring deep
+  study and years of experience to master.  Even if only a small part
+  of the language is presented to students, a high level of expertise
+  is still required to be able to select and present a relevant subset
+  of the language and to help students navigate around the features
+  they do not need.  For many instructors, spending years learning a
+  general-purpose functional language just to teach discrete
+  mathematics is a non-starter.  This is especially a problem at
+  schools where the discrete mathematics course is taught by
+  mathematics faculty rather than computer science faculty.
 \item There is often an impedance mismatch between standard
   mathematics notation and the notation used by existing functional
-  programming languages.  For example, XXX.  XXX confusing for
-  students.
+  programming languages.  As one simple example, in mathematics one
+  can write $2x$ to denote multiplication of $x$ by $2$; but many
+  programming languages require writing a multiplication operator, for
+  example, \texttt{2*x}.  Any one such impedance mismatch is small, but taken
+  as a whole they can be a real impediment to students as they move
+  back and forth between the worlds of abstract mathematics and
+  concrete computer programs.
 \end{itemize}
 
 \section{Proposed work}

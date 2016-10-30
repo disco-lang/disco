@@ -25,29 +25,36 @@
 
 \section{Introduction}
 
-Many computer science curricula at the university level require some
-sort of \emph{discrete mathematics} course.  Such a course typically
-covers mathematical concepts that are often useful in a computer
-science context, such as induction and recursion, graphs, modular
-arithmetic, logic, and set theory.  In addition, it often serves as an
-introduction to writing formal proofs. See \cite{ACM:2013} for the
-Association for Computing Machinery's computer science curriculum
-guidelines.
+Many computer science curricula at the university level include
+\emph{discrete mathematics} as a core requirement \cite{ACM:2013}.
+Often taken in the first or second year, a discrete mathematics course
+introduces mathematical structures and techniques of foundational
+importance in computer science, such as induction and recursion, set
+theory, logic, modular arithmetic, functions, relations, and graphs.
+In addition, it often serves as an introduction to writing formal
+proofs.  Although there is wide agreement that discrete mathematics is
+foundational, students sometimes struggle to see its relevance to
+computer science.
 
 \emph{Functional programming} is a style of programming, embodied in
-languages such as Haskell, OCaml, Scala, F\#, and Racket (citations;
-should we add more?), which emphasizes functions as first-class
-objects, compositionality, and XXX.  It lends itself particularly well
-to XXX.  XXX promotes high-level thinking, gives a concise and
-powerful vocabulary to talk about many other CS topics.  XXX
-e.g. parallelism.  XXX also increasingly used in industry.  For these
-reasons, it is becoming critical to expose undergraduate students to
-functional programming early, but many curricula struggle to make
-space for it.  XXX cite ACM guidelines; cite LACS exemplary curriculum
-(see Van Drunen).
+languages such as Haskell, OCaml, Scala, F\#, and Racket, which
+emphasizes functions (\emph{i.e.} input-output processes) rather than
+sequences of instructions. It enables working at high levels of
+abstraction as well as rapid prototyping and refactoring, and provides
+a concise and powerful vocabulary to talk about many other topics in
+computer science. It is seeing increasing adoption in industry, with
+applications as diverse as high-frequency trading algorithms,
+interactive web applications, and Facebook's anti-spam system.  For
+these reasons, it is becoming critical to expose undergraduate
+students to functional programming early, but many computer science
+programs struggle to make space for it.  The Association for Computing
+Machinery's 2013 curricular guidelines \cite{ACM:2013} do not include
+functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
-mathematics into a single course.  This is not a new idea XXX cite examples.
+mathematics into a single course.  This is not a new idea XXX cite
+examples.  Note LACS exemplary
+curriculum (see Van Drunen).
 The benefits of such an approach are numerous:
 \begin{itemize}
 \item It allows functional programming to be introduced at an early

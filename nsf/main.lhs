@@ -14,6 +14,7 @@
 \usepackage{xspace}
 \usepackage{supertabular}
 \usepackage{prettyref}
+\usepackage{hyperref}        
 
 \usepackage{amsmath}
 

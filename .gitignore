@@ -30,3 +30,4 @@ nsf/main.tex
 nsf/description.tex
 
 src/REPL
+*.out

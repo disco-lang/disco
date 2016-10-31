@@ -346,8 +346,7 @@ evaluation traces for the counterexamples.
 \section{Communication of Results}
 \label{sec:dissemination}
 
-Open-source code and freely available platform.  Blogs.  Workshops
-and/or papers at SIGCSE, ICFP, other relevant conferences.
+\input{comm-results}
 
 \section{Related work}
 \label{sec:related-work}

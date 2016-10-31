@@ -21,6 +21,8 @@
 \usepackage[style=authoryear, natbib]{biblatex}
 \bibliography{references}
 
+\usepackage{pgf}
+
 %% prettyref stuff -------------------------------------------
 
 \newrefformat{fig}{Figure~\ref{#1}}

@@ -306,6 +306,13 @@ leveraging the \emph{diagrams} vector graphics framework
 \citep{Yates:2015}, \thelang will have built-in support for
 visualizing many different types and operations.
 
+\begin{figure}
+  \centering
+  \input{diagrams/Examples.pgf}
+  \caption{A few example visualizations: set intersection, functions,
+    and graphs}
+\end{figure}
+
 In parallel with a \emph{textual} trace of the execution of
 |gcd(15,42)|, a student could also explore a \emph{visual} trace.
 

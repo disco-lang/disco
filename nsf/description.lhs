@@ -102,7 +102,8 @@ impossible for many departments.
   functional languages is designed for professional programmers, not
   for students.  The systems can be difficult to set up, generate
   confusing error messages, and are generally designed to facilitate
-  production of code rather than interactive exploration and learning.
+  efficient production of code rather than interactive exploration and
+  learning.
 \item As with any subject, effective teaching of a functional language
   requires expertise in the language and its use, or at least thorough
   familiarity, on the part of the instructor. General-purpose
@@ -321,7 +322,7 @@ Conjecture gcd_same : for all a, b, gcd(a,b) == gcd2(a,b).
 \thelang cannot automatically prove this conjecture, but it can check
 that the conjecture is at least plausible: it will check that all the
 types match up, and automatically test the conjecture on many randomly
-generated example inputs XXX cite QuickCheck.  If all the tests
+generated example inputs \cite{QuickCheck:2000}.  If all the tests
 succeed---while not a proof---it gives the student confidence that
 their implementation is correct.  On the other hand, if the system
 finds a counterexample, it can help the student more quickly hone in

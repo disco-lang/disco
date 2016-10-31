@@ -18,7 +18,7 @@
 
 \usepackage{amsmath}
 
-\usepackage[backend=bibtex, style=authoryear, natbib]{biblatex}
+\usepackage[style=authoryear, natbib]{biblatex}
 \bibliography{references}
 
 %% prettyref stuff -------------------------------------------

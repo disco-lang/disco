@@ -52,8 +52,10 @@ Machinery's 2013 curricular guidelines \cite{ACM:2013} do not include
 functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
-mathematics into a single course.  This is not a new idea XXX cite
-examples.  XXX Note LACS exemplary curriculum (see Van Drunen).  The
+mathematics into a single course.  This is not a new idea
+\cite{Wainwright:1992, VanDrunen:2011, Xing:2008}, and even shows up
+in the 2007 model curriculum of the Liberal Arts Computer Science
+Consortium \cite{LiberalArtsComputerScienceConsortium:2007}. The
 benefits of such an approach are numerous:
 \begin{itemize}
 \item It allows functional programming to be introduced at an early
@@ -63,7 +65,9 @@ benefits of such an approach are numerous:
   of the curriculum.  By contrast, when functional programming is left
   until later in the course of study, it is in danger of being seen as
   esoteric or as a mere curiosity.
-\item The two subjects complement each other well. XXX explain.
+\item The two subjects complement each other well: discrete math
+  topics make good functional programming exercises, and ideas from
+  functional programming help illuminate discrete math topics.
 \item In a discrete mathematics course with both math and
   computer science majors, math majors can have a ``home turf
   advantage'' since the course deals with topics that may be already
@@ -188,28 +192,34 @@ is the result of |gcd(b, a)|; in any other case, the output is the
 result of |gcd(a-b, b)|.
 
 The \thelang environment could assist a student in writing and
-understanding this |gcd| function in several ways:
+understanding this |gcd| function in several ways.
 
-\begin{itemize}
-\item \textbf{Type checking}.
-  \thelang will support students in thinking about \emph{types}, which
-  are XXX fundamental in mathematics XXX explain why.
+\paragraph{Type checking}  \thelang will support students in
+  thinking about \emph{types}, which are a way of determining which
+  sorts of values can be combined by which operations (for example,
+  one can perform addition on two numbers, but one cannot add a number
+  and a graph).  Types are fundamental in mathematics, but most
+  mathematicians think about them only in an implicit, intuitive way.
+  Fronting types as part of the \thelang language will give students
+  concrete encouragement and practice in thinking about types
+  explicitly.
 
   As an example, suppose that instead of |gcd(b,a)| on the
   second-to-last line, the student writes |gcd(b)|.  This does not
-  make sense, and the environment must display some sort of error.
-  However, the great difficulty with errors is that although it is
-  impossible to know \emph{why} the user made a particular error, the
-  reason for the error has a profound impact on what information would
-  be helpful in correcting it.  For example, if the student just made
-  a silly typo, it should be enough to highlight the mistake.  On the
-  other hand, if the error is due to a more fundamental
-  misunderstanding, more information should be displayed to help the
-  student understand what they have done wrong.  Even in the case of a
-  fundamental misunderstanding, it would be overwhelming to display
-  \emph{all possible} information about the error, because the student
-  is likely to give up in frustration rather than patiently read
-  through and assimilate all the information.
+  make sense, since |gcd| expects two arguments, and the environment
+  should display some sort of error.  However, the great difficulty
+  with errors is that although it is impossible to know \emph{why} the
+  user made a particular error, the reason for the error has a
+  profound impact on what information would be helpful in correcting
+  it.  For example, if the student just made a silly typo, it should
+  be enough to highlight the mistake.  On the other hand, if the error
+  is due to a more fundamental misunderstanding, more information
+  should be displayed to help the student understand what they have
+  done wrong.  Even in the case of a fundamental misunderstanding, it
+  would be overwhelming to display \emph{all possible} information
+  about the error, because the student is likely to give up in
+  frustration rather than patiently read through and assimilate all
+  the information.
 
   \thelang will try to address these problems with \emph{interactive,
     explorable} errors.  For example, in the case of a student typing
@@ -235,8 +245,8 @@ understanding this |gcd| function in several ways:
     \begin{itemize}
       \discoqa Why is `\verb|b|' a natural number?
       \begin{discomsg}
-        `\verb|b|' is a natural number because it is the second
-        parameter of gcd.
+        `\verb|b|' is a natural number because it is defined as the
+        second parameter of gcd.
         \begin{itemize}
         \discoq Why must the second parameter of gcd be a natural
         number?
@@ -256,13 +266,15 @@ understanding this |gcd| function in several ways:
   Clicking or hovering on any of these would also highlight the
   corresponding region of the program.
 
-  XXX Cite examples for type error paper from ICFP?
-\item \textbf{Step-by-step execution}. Of course a student would be
+  % XXX Cite examples for type error paper from ICFP?
+\paragraph{Step-by-step execution} Of course a student would be
   able to type in |gcd(15, 42)| and get |3| as the result.  But they
   would also be able to interactively trace the step-by-step
   evaluation, with the ability to dynamically expand the evaluation
-  trace to show more detail or collapse it to show less. XXX helps
-  develop computational thinking, mental model of computational processes
+  trace to show more detail or collapse it to show less. This will
+  help students develop computational thinking skills, allowing them
+  to develop, through examples, an accurate mental model of the
+  computation process.
 
   For example, beginning with |gcd(15, 42)|, the student might expand
   it five steps, resulting in a trace that looks like \[ |gcd(15,42)|
@@ -276,16 +288,18 @@ understanding this |gcd| function in several ways:
        |{ gcd(15,42)      if 15 < 42| \\
        |{ gcd(15-42, 42)  otherwise|
      \end{array}
-     \to |gcd(15,42)| \]
-  Clicking again might show even more detail, for example, that |15 ==
-  0| reduces to |false|, and so on.
+     \to |gcd(15,42)|
+   \]
+   Clicking again might show even more detail, for example, that
+   %
+   |15 == 0| reduces to |false|, and so on.
 
-\item \textbf{Visualization}. XXX
-\end{itemize}
+\paragraph{Visualization}
 
-It turns out that this first version of |gcd| is not very efficient.
-XXX exploring number of reduction steps, arithmetic operations, etc.
-
+\paragraph{Testing conjectures}  Now, it turns out that this first
+  version of |gcd| is not very efficient.
+% XXX exploring number of reduction steps, arithmetic
+% operations, etc.
 A more efficient implementation works by directly finding the
 remainder of |a| when divided by |b| (using the |mod| operator)
 instead of repeatedly subtracting |b| from |a|.

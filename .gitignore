@@ -31,3 +31,6 @@ nsf/description.tex
 
 src/REPL
 *.out
+
+*-blx.bib
+*.run.xml

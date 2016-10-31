@@ -53,7 +53,8 @@ functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea
-\cite{Wainwright:1992, VanDrunen:2011, Xing:2008}, and even shows up
+\cite{Wainwright:1992, Henderson:2002, Scharff:2002, Doets:2004,
+  ODonnell:2006, VanDrunen:2011, Xing:2008}, and even shows up
 in the 2007 model curriculum of the Liberal Arts Computer Science
 Consortium \cite{LiberalArtsComputerScienceConsortium:2007}. The
 benefits of such an approach are numerous:

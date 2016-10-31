@@ -1,39 +1,39 @@
 Using functional programming to teach discrete mathematics goes back
-to the 90's.  The discrete mathematics course taught by Wainwright at
-the University of Tulsa has always had a programming component
+at least to the 1990s.  The discrete mathematics course taught by
+Wainwright at the University of Tulsa has always had a programming
+component
 \cite{Wainwright:1992}, but it was not until non-computer science
 majors began taking the course that he was forced to decide whether to
 keep the programming part or to drop it.  He decided to keep it, but
 change the language to one that is easy to introduce and that
-compliments mathematics.  A natural solution was functional
-programming where he choose the functional programming language
-Miranda.  Wainwright reports that he is able to get his students fully
-up to speed on programming in Miranda in just one week.  
+complements mathematics.  A natural solution was functional
+programming, and he chose the functional programming language Miranda.
+Wainwright reported that he was able to get his students fully up to
+speed on programming in Miranda in just one week.
 
-Henderson has used the automated theorem prover ProLog and the
+Henderson has used the automated theorem prover Prolog and the
 functional programming language Standard ML in discrete mathematics
-for over fifteen years \cite{Henderson:2002}.  ProLog is used when the
+for over fifteen years \cite{Henderson:2002}.  Prolog is used when the
 students study logic, but Standard ML is used when they are learning
-functions, recursion, induction, sets, lists, etc.  He has found that
-students find more value in the concepts when they can apply them in a
-programming environment.  Henderson's work is similar to the work of
-Scharff and Wildenberg \cite{Scharff:2002} who also use Standard ML to
-teach discrete mathematics. The project being proposed here differs
-from their work in that \thelang{} will be designed with education in
-mind, and ProLog and Standard ML were not.
+functions, recursion, induction, sets, lists, and so on.  He has found
+that students find more value in the concepts when they can apply them
+in a programming environment.  Henderson's work is similar to the work
+of Scharff and Wildenberg \cite{Scharff:2002} who also use Standard ML
+to teach discrete mathematics. The project being proposed here differs
+from their work in that \thelang{} will be designed specifically with
+education in mind, and Prolog and Standard ML were not.
 
 Doets and Van Eijck published a book \cite{Doets:2004} on using the
 functional programming language Haskell to teach logic, mathematics,
-and programming.  Their book contains quick an extensive set of
-interesting exercises.  It has been used by many institutions.  A
-similar book by O'Donnell et al. propose to use Haskell in discrete
-mathematics as well \cite{ODonnell:2006}. The major difference between
+and programming, and has been used by many institutions.  A similar
+book by O'Donnell \emph{et al.} also proposes to use Haskell in discrete
+mathematics \cite{ODonnell:2006}. The major difference between
 their work and the project being proposed here is that Haskell is a
 general purpose programming language, and hence, has many features
 that are not required or conducive to education.
 
-Felleisen et al. propose a first year introductory sequence which is
-uses functional programming
+Felleisen \emph{et al.} propose a first year introductory sequence
+which is uses functional programming
 \cite{FELLEISEN_FINDLER_FLATT_KRISHNAMURTHI_2004}, but the authors
 warn that the curriculum should be based on a functional programming
 language that is designed for education, and one should not use
@@ -44,12 +44,12 @@ are the two most important parts of an introductory computer science
 sequence.
 
 In 2007 the Liberal Arts Computer Science Consortium released a new
-model of curriculum for computer science degrees at liberal arts
+model curriculum for computer science degrees at liberal arts
 institutions \cite{LiberalArtsComputerScienceConsortium:2007}.  They
 recommend that the best place to introduce functional programming is
 in a discrete mathematics course.  They emphasize that introducing
 students to multiple programming paradigms better prepares them for
-the real world. It forces them to get used to thinking differently
+the real world.  It forces them to get used to thinking differently
 which is a positive for all STEM students.
 
 The ACM Special Interest Group on Programming Languages hosted a
@@ -64,10 +64,10 @@ Cong-Cong Xing \cite{Xing:2008} realized his students were not
 understanding the difference between the name of a function, and the
 image of a function given some input.  The PI's of this project have
 also seen this type of confusion among their students.  Xing decided
-to use functional programming and the $\lambda$-calculus -- the formal
-theory at the heart of functional programming -- to aid his students
+to use functional programming and the $\lambda$-calculus---the formal
+theory at the heart of functional programming---to aid his students
 in understanding functions better. Unfortunately, similar to other
-approaches Xing used Standard ML.  We believe that students would have
+approaches, Xing used Standard ML.  We believe that students would have
 even better experiences with a programming environment that is
 designed for education.
 
@@ -84,12 +84,14 @@ here VanDrunen makes the following points:
   related.''  For example, recursion and induction are fundamental to
   both,
 \item ``Functional programming illuminates discrete mathematics.'' For
-  example, the definition of what a function is when students come
-  into discrete mathematics differs greatly from the definition they
-  learn.  Functions as mathematical objects themselves can be a hard
-  concept to grasp.  A functional programming languages gives an
-  opportunity to let them play with the notion of higher-order
-  functions to better their understanding.
+  example, a discrete mathematics course often introduces a precise
+  definition of the concept of a function, which allows functions to
+  be used as mathematical objects in and of themselves---and this can
+  be a hard concept for students to grasp.  A functional programming
+  language helps them solidify their understanding of functions by
+  providing opportunities to play with higher-order functions
+  (\emph{i.e.} functions which take other functions as inputs, or
+  return functions as outputs).
 \item ``Functional programming motivates discrete mathematics for
   computer science students.'' Many computer science students are not
   strong mathematics students despite the fact that computer science

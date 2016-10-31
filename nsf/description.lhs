@@ -296,7 +296,18 @@ understanding this |gcd| function in several ways.
    %
    |15 == 0| reduces to |false|, and so on.
 
-\paragraph{Visualization} XXX
+\paragraph{Visualization} Human brains are very good at processing
+complicated visual inputs and recognizing visual patterns, which is
+why \emph{data visualization} can be such a powerful tool to aid
+comprehension.  Many topics in discrete mathematics lend themselves
+well to visualization.  For example, set operations, lists, functions,
+relations, and graphs all have a strongly visual flavor.  By
+leveraging the \emph{diagrams} vector graphics framework
+\citep{Yates:2015}, \thelang will have built-in support for
+visualizing many different types and operations.
+
+In parallel with a \emph{textual} trace of the execution of
+|gcd(15,42)|, a student could also explore a \emph{visual} trace.
 
 \paragraph{Testing conjectures}  Now, it turns out that this first
   version of |gcd| is not very efficient.

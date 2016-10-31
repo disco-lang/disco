@@ -26,7 +26,7 @@
 \section{Introduction}
 
 Many computer science curricula at the university level include
-\emph{discrete mathematics} as a core requirement \cite{ACM:2013}.
+\emph{discrete mathematics} as a core requirement \citep{ACM:2013}.
 Often taken in the first or second year, a discrete mathematics course
 introduces mathematical structures and techniques of foundational
 importance in computer science, such as induction and recursion, set
@@ -48,15 +48,15 @@ interactive web applications, and Facebook's anti-spam system.  For
 these reasons, it is becoming critical to expose undergraduate
 students to functional programming early, but many computer science
 programs struggle to make space for it.  The Association for Computing
-Machinery's 2013 curricular guidelines \cite{ACM:2013} do not include
+Machinery's 2013 curricular guidelines \citep{ACM:2013} do not include
 functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea
-\cite{Wainwright:1992, Henderson:2002, Scharff:2002, Doets:2004,
+\citep{Wainwright:1992, Henderson:2002, Scharff:2002, Doets:2004,
   ODonnell:2006, VanDrunen:2011, Xing:2008}, and even shows up
 in the 2007 model curriculum of the Liberal Arts Computer Science
-Consortium \cite{LiberalArtsComputerScienceConsortium:2007}. The
+Consortium \citep{LiberalArtsComputerScienceConsortium:2007}. The
 benefits of such an approach are numerous:
 \begin{itemize}
 \item It allows functional programming to be introduced at an early
@@ -296,7 +296,7 @@ understanding this |gcd| function in several ways.
    %
    |15 == 0| reduces to |false|, and so on.
 
-\paragraph{Visualization}
+\paragraph{Visualization} XXX
 
 \paragraph{Testing conjectures}  Now, it turns out that this first
   version of |gcd| is not very efficient.
@@ -322,7 +322,7 @@ Conjecture gcd_same : for all a, b, gcd(a,b) == gcd2(a,b).
 \thelang cannot automatically prove this conjecture, but it can check
 that the conjecture is at least plausible: it will check that all the
 types match up, and automatically test the conjecture on many randomly
-generated example inputs \cite{QuickCheck:2000}.  If all the tests
+generated example inputs \citep{QuickCheck:2000}.  If all the tests
 succeed---while not a proof---it gives the student confidence that
 their implementation is correct.  On the other hand, if the system
 finds a counterexample, it can help the student more quickly hone in

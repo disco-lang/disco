@@ -14,9 +14,12 @@
 \usepackage{xspace}
 \usepackage{supertabular}
 \usepackage{prettyref}
-\usepackage{hyperref}        
+\usepackage{hyperref}
 
 \usepackage{amsmath}
+
+\usepackage[backend=bibtex, style=authoryear, natbib]{biblatex}
+\bibliography{references}
 
 %% prettyref stuff -------------------------------------------
 
@@ -75,6 +78,9 @@
 
 %include polycode.fmt
 
+% This works with biblatex >= 1.4.  Unnecessary with biblatex >= 1.5.
+% \DeclareDelimFormat[cbx@@textcite]{nameyeardelim}{\addspace}
+
 \begin{document}
 
 %\iftitle
@@ -98,8 +104,10 @@
 \clearpage\setcounter{page}{1}
 \clearpage\setcounter{page}{1}
 
-\bibliographystyle{alpha}  %% plenty of space
-\bibliography{references}
+% \bibliographystyle{alpha}  %% plenty of space
+% \bibliography{references}
+
+\printbibliography
 
 \clearpage\setcounter{page}{1}
 

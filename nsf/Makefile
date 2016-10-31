@@ -7,7 +7,7 @@ SKIMRevinPath := $(shell command -v $(SKIM) 2> /dev/null)
 
 TOPFILE = main.tex
 MAKEDEPS  = Makefile
-LATEXDEPS = description.lhs data-management.tex summary.tex bay-bio.tex hde-bio.tex broader-impacts.tex team-qual.tex comm-results.tex related-work.tex references.bib 
+LATEXDEPS = description.lhs data-management.tex summary.tex bay-bio.tex hde-bio.tex broader-impacts.tex team-qual.tex comm-results.tex related-work.tex references.bib evaluation.tex
 GENERATED = description.tex main.tex main.pdf
 
 all : main.pdf

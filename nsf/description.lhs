@@ -343,6 +343,8 @@ evaluation traces for the counterexamples.
 \section{Evaluation}
 \label{sec:assessment}
 
+\input{evaluation}
+
 \section{Communication of Results}
 \label{sec:dissemination}
 

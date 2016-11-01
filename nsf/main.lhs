@@ -18,7 +18,7 @@
 
 \usepackage{amsmath}
 
-\usepackage[style=authoryear, natbib]{biblatex}
+\usepackage[backend=bibtex, style=authoryear, natbib]{biblatex}
 \bibliography{references}
 
 \usepackage{pgf}

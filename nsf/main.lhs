@@ -85,6 +85,7 @@
 
 \begin{document}
 
+\thispagestyle{empty}
 %\iftitle
  \setcounter{page}{1}
   \begin{center}

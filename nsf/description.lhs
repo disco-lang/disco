@@ -304,9 +304,11 @@ well to visualization.  For example, set operations, lists, functions,
 relations, and graphs all have a strongly visual flavor.  By
 leveraging the \emph{diagrams} vector graphics framework
 \citep{Yates:2015}, \thelang will have built-in support for
-visualizing many different types and operations.
+visualizing many different types and operations.  For example,
+Figure~\ref{fig:example-viz} shows a small sampling of the sorts of
+visualizations that could be supported.
 
-\begin{figure}
+\begin{figure} \label{fig:example-viz}
   \centering
   \input{diagrams/Examples.pgf}
   \caption{A few example visualizations: set intersection, functions,
@@ -314,7 +316,16 @@ visualizing many different types and operations.
 \end{figure}
 
 In parallel with a \emph{textual} trace of the execution of
-|gcd(15,42)|, a student could also explore a \emph{visual} trace.
+|gcd(15,42)|, a student could also explore a \emph{visual} trace, as
+illustrated in Figure~\ref{fig:gcd-trace}.  This visual trace
+demonstrates in a tangible, visual way how |gcd| works by repeatedly
+subtracting the smaller number from the larger.
+
+\begin{figure} \label{fig:gcd-trace}
+  \centering
+  \input{diagrams/GCD.pgf}
+  \caption{Visualizing an execution trace of |gcd(15,42)|}
+\end{figure}
 
 \paragraph{Testing conjectures}  Now, it turns out that this first
   version of |gcd| is not very efficient.

@@ -150,7 +150,7 @@ type_check t = do
         Right at -> return.renderDoc.prettyTy.getType $ at
 
 banner :: String
-banner = "Welcome to XXX!\n\nA language for programming discrete mathematics.\n\n"
+banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
 
 main :: IO ()
 main = do
@@ -159,7 +159,7 @@ main = do
    where
        loop :: InputT REPLStateIO ()
        loop = do
-           minput <- getInputLine "XXX> "
+           minput <- getInputLine "Disco> "
            case minput of
                Nothing -> return ()
                Just input | input `isPrefixOf` ":quit" -> liftIO $ putStrLn "Goodbye!" >> return ()

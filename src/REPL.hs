@@ -1,4 +1,4 @@
-module Repl where
+module REPL where
 
 import           Control.Monad.State
 import           Data.List                               (isPrefixOf)

@@ -17,6 +17,8 @@ import           Control.Monad.Reader
 import           Data.Char               (toLower)
 import qualified Data.Map                as M
 import           Data.Ratio
+import Data.Maybe (fromJust)
+import Data.List (find)
 import           Unbound.LocallyNameless hiding (rnf, enumerate)
 
 import           Desugar
@@ -29,7 +31,10 @@ data Value where
   VCons  :: Int -> [Value] -> Value
   VClos  :: Bind (Name Value) Core -> Env -> Value
   VThunk :: Core -> Env -> Value
-  deriving Show
+  VFun   :: (Value -> Value) -> Value
+
+instance Show Value where
+  show _ = "<value>"
 
 type Env = M.Map (Name Value) Value
 
@@ -112,6 +117,7 @@ whnfApp (VClos c e) v =
   local (const e)     $ do
   extend x v          $ do
   whnf t
+whnfApp (VFun f) v = whnfV (f v)
 whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
 
 -- | Reduce an operator application to WHNF.
@@ -196,7 +202,7 @@ decideFor (TySum ty1 ty2) v1 v2 = do
 decideFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
-  ty1s <- enumerate ty1
+  let ty1s = enumerate ty1
   res1s <- mapM (whnfApp clos1) ty1s
   res2s <- mapM (whnfApp clos2) ty1s
   and <$> zipWithM (decideFor ty2) res1s res2s
@@ -207,43 +213,32 @@ primValEq (VCons i []) (VCons j []) = i == j
 primValEq (VNum n1)    (VNum n2)    = n1 == n2
 primValEq _ _                       = False
 
--- XXX This is not lazy enough!  Should dreate some kind of lazy
--- monadic generator.  Creating a list in the IM monad means the whole
--- list has to be generated before it can start being tested.
+decideForRnf :: Type -> Value -> Value -> Bool
+decideForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+  = decideForRnf ty1 v11 v21 && decideForRnf ty2 v12 v22
+decideForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
+  = i1 == i2 && decideForRnf ([ty1, ty2] !! i1) v1' v2'
+decideForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
+  = all (\v -> decideForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 
 -- XXX once we have lists/sets, create a way to get access to
 -- enumerations via surface syntax.
-enumerate :: Type -> IM [Value]
-enumerate TyVoid           = return $ []
-enumerate TyUnit           = return $ [VCons 0 []]
-enumerate TyBool           = return $ [VCons 0 [], VCons 1 []]
-enumerate (TyPair ty1 ty2) = do
-  xs <- enumerate ty1
-  ys <- enumerate ty2
-  return $ [VCons 0 [x, y] | x <- xs, y <- ys]
-enumerate (TySum ty1 ty2)  = do
-  xs <- enumerate ty1
-  ys <- enumerate ty2
-  return $ map (VCons 0 . (:[])) xs ++ map (VCons 1 . (:[])) ys
--- enumerate (TyArr ty1 ty2)  = do
---   vs1 <- enumerate ty1
---   vs2 <- enumerate ty2
---   mapM (mkFun vs1) (sequence (vs2 <$ vs1))
---   where
---     mkFun :: [Value] -> [Value] -> IM Value
---     mkFun vs1 vs2 = do
---       x <- fresh (string2Name "x")
---       return . flip VClos emptyEnv . bind x $
---         CCase (zipWith bind (map (\v -> [(embed _, _)]) vs1) vs2)
-
-      -- XXX The above seems ugly.  Make a way to embed functions directly
-      -- as values, to avoid having to go via the interpreter?
-
- -- map (mkFun vs1) (sequence (vs2 <$ vs1))
---   where
---     mkFun _vs1 _vs2 = undefined
---       -- VFun $ \v -> snd . fromJust $ find (decideFor ty1 v . fst) (zip vs1 vs2)
-enumerate _ = return []  -- other cases shouldn't happen if the program type checks
+enumerate :: Type -> [Value]
+enumerate TyVoid           = []
+enumerate TyUnit           = [VCons 0 []]
+enumerate TyBool           = [VCons 0 [], VCons 1 []]
+enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
+enumerate (TySum ty1 ty2)  =
+  map (VCons 0 . (:[])) (enumerate ty1) ++
+  map (VCons 1 . (:[])) (enumerate ty2)
+enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
+  where
+    vs1 = enumerate ty1
+    vs2 = enumerate ty2
+    mkFun :: [Value] -> [Value] -> Value
+    mkFun vs1 vs2
+      = VFun $ \v -> snd . fromJust . find (decideForRnf ty1 v . fst) $ zip vs1 vs2
+enumerate _ = []  -- other cases shouldn't happen if the program type checks
 
 whnfCase :: [CBranch] -> IM Value
 whnfCase []     = throwError NonExhaustive

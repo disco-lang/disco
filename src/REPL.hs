@@ -1,21 +1,19 @@
-module Repl where
+import           Control.Monad.State
+import           Data.List                               (isPrefixOf)
+import           System.Console.Haskeline
+import           System.Console.Haskeline.MonadException
+import           System.Exit
+import           Text.Parsec
+import           Unbound.LocallyNameless                 hiding (rnf)
+import           Unbound.LocallyNameless.Subst
 
-import Data.List (isPrefixOf)
-import Control.Monad.State
-import System.Console.Haskeline
-import System.Console.Haskeline.MonadException    
-import System.Exit    
-import Unbound.LocallyNameless hiding (rnf)
-import Unbound.LocallyNameless.Subst
-import Text.Parsec
-    
-import Queue
-import Desugar
-import InterpD
-import Parser
-import Typecheck
-import Types
-import Pretty
+import           Desugar
+import           InterpD
+import           Parser
+import           Pretty
+import           Queue
+import           Typecheck
+import           Types
 
 type Qelm = (Name Term, Term)
 type REPLStateIO = StateT (Queue Qelm) IO
@@ -25,16 +23,16 @@ instance MonadException m => MonadException (StateT s m) where
     controlIO f = StateT $ \s -> controlIO $ \(RunIO run) -> let
                     run' = RunIO (fmap (StateT . const) . run . flip runStateT s)
                     in fmap (flip runStateT s) $ f run'
-                
+
 io :: IO a -> REPLStateIO a
 io i = liftIO i
-    
+
 pop :: REPLStateIO (Name Term, Term)
 pop = get >>= return.headQ
 
 push :: Qelm -> REPLStateIO ()
-push t = get >>= put.(`snoc` t) 
-         
+push t = get >>= put.(`snoc` t)
+
 unfoldDefsInTerm :: (Queue Qelm) -> Term -> Term
 unfoldDefsInTerm q t =
     let uq = toListQ $ unfoldQueue q
@@ -48,26 +46,26 @@ unfoldQueue q = fixQ q emptyQ step
       substDef :: Name Term -> Term -> Qelm -> Qelm
       substDef x t (y, t') = (y, subst x t t')
 
-------------------------------------------------------------------------                 
+------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
-------------------------------------------------------------------------        
+------------------------------------------------------------------------
 
 data REPLExpr =
    Let (Name Term) Term         -- Toplevel let-expression: for the REPL
  | TypeCheck Term               -- Typecheck a term
- | Eval Term                    -- Evaluate a term   
+ | Eval Term                    -- Evaluate a term
  | ShowAST Term                 -- Show a terms AST
  | DumpState                    -- Trigger to dump the state for debugging.
  | Unfold Term                  -- Unfold the definitions in a term for debugging.
  deriving Show
-                    
+
 letParser = do
   reservedOp "let"
   n <- ident
   symbol "="
   t <- parseTerm
   eof
-  return $ Let n t         
+  return $ Let n t
 
 replTermCmdParser cmd c p = do
   symbol ":"
@@ -86,21 +84,21 @@ replIntCmdParser cmd c = do
   eof
   if (ucmd `isPrefixOf` cmd)
   then return c
-  else fail $ "Command \":"++cmd++"\" is unrecognized."       
+  else fail $ "Command \":"++cmd++"\" is unrecognized."
 
 evalParser = do
   t <- parseTerm
   eof
   return.Eval $ t
-                 
+
 typeCheckParser  = replTermCmdParser "type"   TypeCheck parseTerm
 showASTParser    = replTermCmdParser "show"   ShowAST   parseTerm
 unfoldTermParser = replTermCmdParser "unfold" Unfold    parseTerm
 dumpStateParser  = replIntCmdParser  "dump"   DumpState
-                 
+
 lineParser = letParser
           <|> try typeCheckParser
-          <|> try evalParser              
+          <|> try evalParser
           <|> try showASTParser
           <|> try unfoldTermParser
           <|> try dumpStateParser
@@ -109,11 +107,11 @@ lineParser = letParser
 parseLine :: String -> Either String REPLExpr
 parseLine s = case (parse lineParser "" s) of
                 Left msg -> Left $ show msg
-                Right l -> Right l                             
-                             
+                Right l -> Right l
+
 handleCMD :: String -> REPLStateIO ()
 handleCMD "" = return ()
-handleCMD s =    
+handleCMD s =
     case (parseLine s) of
       Left msg -> io $ putStrLn msg
       Right l -> handleLine l
@@ -131,7 +129,7 @@ handleCMD s =
 eval :: Term -> REPLStateIO String
 eval t = do
   defs <- get
-  let tu = unfoldDefsInTerm defs t         
+  let tu = unfoldDefsInTerm defs t
    in case evalTCM (infer tu) of
         Left err -> return.show $ err
         Right at ->
@@ -139,27 +137,27 @@ eval t = do
                 c  = runDSM $ desugar at
              in case runIM (rnf c) of
                   Left err -> return.show $ err
-                  Right v  -> return $ prettyValue ty v        
+                  Right v  -> return $ prettyValue ty v
 
 type_check :: Term -> REPLStateIO String
 type_check t = do
   defs <- get
-  let tu = unfoldDefsInTerm defs t     
+  let tu = unfoldDefsInTerm defs t
    in case (evalTCM.infer $ tu) of
         Left err -> return.show $ err
         Right at -> return.renderDoc.prettyTy.getType $ at
 
 banner :: String
-banner = "Welcome to XXX!\n\nA language for programming discrete mathematics.\n\n"
-                             
+banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
+
 main :: IO ()
 main = do
   putStr banner
   evalStateT (runInputT defaultSettings loop) emptyQ
-   where 
+   where
        loop :: InputT REPLStateIO ()
-       loop = do           
-           minput <- getInputLine "XXX> "
+       loop = do
+           minput <- getInputLine "Disco> "
            case minput of
                Nothing -> return ()
                Just input | input `isPrefixOf` ":quit" -> liftIO $ putStrLn "Goodbye!" >> return ()

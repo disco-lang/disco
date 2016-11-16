@@ -1,7 +1,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE ViewPatterns              #-}
 
-module Pretty where
+module Language.Disco.Pretty where
 
 import           Control.Applicative     hiding (empty)
 import           Control.Monad.Reader
@@ -9,11 +9,12 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 
-import qualified Parser                  as PR
-import           Types
+import qualified Language.Disco.Parser   as PR
+import           Language.Disco.Types
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM, unembed)
+import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
+                                          unembed)
 
 --------------------------------------------------
 -- Monadic pretty-printing

@@ -8,7 +8,7 @@
 -- combinator over queues to make complex function definitions easier.  --
 --------------------------------------------------------------------------
 
-module Queue where
+module Language.Disco.Util.Queue where
 
 data Queue a = Queue [a] [a]
 
@@ -21,10 +21,10 @@ instance Foldable Queue where
 
 instance Show a => Show (Queue a) where
     show = show.toListQ
-                
+
 emptyQ :: Queue a
 emptyQ = Queue [] []
-           
+
 headQ :: Queue a -> a
 headQ (Queue (x:xs) _) = x
 
@@ -37,7 +37,7 @@ snoc (Queue f r) x = queue f (x:r)
 
 tailQ :: Queue a -> Queue a
 tailQ (Queue (x:f) r) = queue f r
-                       
+
 mapQ :: (a -> b) -> Queue a -> Queue b
 mapQ m (Queue f r) = Queue (map m f) (map m r)
 

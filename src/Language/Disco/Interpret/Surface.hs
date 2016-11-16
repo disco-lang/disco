@@ -1,22 +1,23 @@
-{-# LANGUAGE GADTs        #-}
-{-# LANGUAGE RankNTypes   #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE ViewPatterns             #-}
 
-module Interp where
+module Language.Disco.Interpret.Surface where
 
-import           Control.Monad           (join)
-import           Control.Monad.Except    (ExceptT, runExceptT, throwError)
-import           Data.Char               (toLower)
-import qualified Data.Map                as M
-import           Data.Ratio              ((%), numerator, denominator)
+import           Control.Monad            (join)
+import           Control.Monad.Except     (ExceptT, runExceptT, throwError)
+import           Data.Char                (toLower)
+import qualified Data.Map                 as M
+import           Data.Ratio               (denominator, numerator, (%))
 
-import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind, translate,
-                                          runLFreshM, unembed)
+import           Unbound.LocallyNameless  (Bind, LFreshM, Name, lunbind,
+                                           runLFreshM, translate, unembed)
 
-import           Parser
-import           Typecheck hiding (ok)
-import           Types
+import           Language.Disco.Parser
+import           Language.Disco.Typecheck hiding (ok)
+import           Language.Disco.Types
 
 data Value where
   VUnit :: Value

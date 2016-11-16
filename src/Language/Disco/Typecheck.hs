@@ -1,18 +1,19 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
-module Typecheck where
+module Language.Disco.Typecheck where
 
-import Prelude hiding (lookup)
+import           Prelude                 hiding (lookup)
 
-import           Control.Applicative ((<|>))
+import           Control.Applicative     ((<|>))
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -20,7 +21,7 @@ import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
 
-import           Types
+import           Language.Disco.Types
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever

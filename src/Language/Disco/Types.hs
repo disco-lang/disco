@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module Types where
+module Language.Disco.Types where
 
 import           Unbound.LocallyNameless
 

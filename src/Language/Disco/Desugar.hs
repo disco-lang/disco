@@ -6,12 +6,12 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
-module Desugar where
+module Language.Disco.Desugar where
 
 import           Unbound.LocallyNameless
 
-import           Typecheck
-import           Types
+import           Language.Disco.Typecheck
+import           Language.Disco.Types
 
 data Strictness = Strict | Lazy
   deriving (Eq, Show)

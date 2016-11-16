@@ -1,3 +1,5 @@
+module Language.Disco.REPL where
+
 import           Control.Monad.State
 import           Data.List                               (isPrefixOf)
 import           System.Console.Haskeline
@@ -7,13 +9,14 @@ import           Text.Parsec
 import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
-import           Desugar
-import           InterpD
-import           Parser
-import           Pretty
-import           Queue
-import           Typecheck
-import           Types
+import           Language.Disco.Desugar
+import           Language.Disco.Interpret.Core
+import           Language.Disco.Parser
+import           Language.Disco.Pretty
+import           Language.Disco.Util.Queue
+
+import           Language.Disco.Typecheck
+import           Language.Disco.Types
 
 type Qelm = (Name Term, Term)
 type REPLStateIO = StateT (Queue Qelm) IO

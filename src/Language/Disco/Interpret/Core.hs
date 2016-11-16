@@ -1,30 +1,31 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RankNTypes            #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE RankNTypes               #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeFamilies             #-}
+{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
-module InterpD where
+module Language.Disco.Interpret.Core where
 
-import Debug.Trace
+import           Debug.Trace
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Data.Char               (toLower)
-import qualified Data.Map                as M
+import           Data.Char                (toLower)
+import           Data.List                (find)
+import qualified Data.Map                 as M
+import           Data.Maybe               (fromJust)
 import           Data.Ratio
-import Data.Maybe (fromJust)
-import Data.List (find)
-import           Unbound.LocallyNameless hiding (rnf, enumerate)
+import           Unbound.LocallyNameless  hiding (enumerate, rnf)
 
-import           Desugar
-import           Parser                  (parseTermStr)
-import           Typecheck               (evalTCM, getType, infer)
-import           Types
+import           Language.Disco.Desugar
+import           Language.Disco.Parser    (parseTermStr)
+import           Language.Disco.Typecheck (evalTCM, getType, infer)
+import           Language.Disco.Types
 
 data Value where
   VNum   :: Rational -> Value

@@ -4,7 +4,7 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE ViewPatterns             #-}
 
-module Language.Disco.Interpret.Surface where
+module Disco.Interpret.Surface where
 
 import           Control.Monad            (join)
 import           Control.Monad.Except     (ExceptT, runExceptT, throwError)
@@ -15,9 +15,9 @@ import           Data.Ratio               (denominator, numerator, (%))
 import           Unbound.LocallyNameless  (Bind, LFreshM, Name, lunbind,
                                            runLFreshM, translate, unembed)
 
-import           Language.Disco.Parser
-import           Language.Disco.Typecheck hiding (ok)
-import           Language.Disco.Types
+import           Disco.Parser
+import           Disco.Typecheck hiding (ok)
+import           Disco.Types
 
 data Value where
   VUnit :: Value

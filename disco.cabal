@@ -18,16 +18,16 @@ source-repository head
 
 library
   exposed-modules:
-                  Language.Disco.REPL
-                  Language.Disco.Parser
-                  Language.Disco.Pretty
-                  Language.Disco.Desugar
-                  Language.Disco.Interpret.Core
-                  Language.Disco.Interpret.Surface
-                  Language.Disco.Typecheck
-                  Language.Disco.Types
+                  Disco.REPL
+                  Disco.Parser
+                  Disco.Pretty
+                  Disco.Desugar
+                  Disco.Interpret.Core
+                  Disco.Interpret.Surface
+                  Disco.Typecheck
+                  Disco.Types
   other-modules:
-                  Language.Disco.Util.Queue
+                  Disco.Util.Queue
   other-extensions:
                    GADTs, RankNTypes, TypeFamilies, ViewPatterns,
                    FlexibleContexts, FlexibleInstances, MultiParamTypeClasses,

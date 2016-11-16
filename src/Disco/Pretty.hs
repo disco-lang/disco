@@ -1,7 +1,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE ViewPatterns              #-}
 
-module Language.Disco.Pretty where
+module Disco.Pretty where
 
 import           Control.Applicative     hiding (empty)
 import           Control.Monad.Reader
@@ -9,8 +9,8 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 
-import qualified Language.Disco.Parser   as PR
-import           Language.Disco.Types
+import qualified Disco.Parser   as PR
+import           Disco.Types
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,

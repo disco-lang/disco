@@ -9,7 +9,7 @@
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
-module Language.Disco.Typecheck where
+module Disco.Typecheck where
 
 import           Prelude                 hiding (lookup)
 
@@ -21,7 +21,7 @@ import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
 
-import           Language.Disco.Types
+import           Disco.Types
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever

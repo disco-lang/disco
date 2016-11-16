@@ -8,7 +8,7 @@
 -- combinator over queues to make complex function definitions easier.  --
 --------------------------------------------------------------------------
 
-module Language.Disco.Util.Queue where
+module Disco.Util.Queue where
 
 data Queue a = Queue [a] [a]
 

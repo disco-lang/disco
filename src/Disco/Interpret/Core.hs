@@ -9,7 +9,7 @@
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
-module Language.Disco.Interpret.Core where
+module Disco.Interpret.Core where
 
 import           Debug.Trace
 
@@ -22,10 +22,10 @@ import           Data.Maybe               (fromJust)
 import           Data.Ratio
 import           Unbound.LocallyNameless  hiding (enumerate, rnf)
 
-import           Language.Disco.Desugar
-import           Language.Disco.Parser    (parseTermStr)
-import           Language.Disco.Typecheck (evalTCM, getType, infer)
-import           Language.Disco.Types
+import           Disco.Desugar
+import           Disco.Parser    (parseTermStr)
+import           Disco.Typecheck (evalTCM, getType, infer)
+import           Disco.Types
 
 data Value where
   VNum   :: Rational -> Value

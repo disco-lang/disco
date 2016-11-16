@@ -6,7 +6,7 @@
 -- and can throw something together quickly.  Later we will probably
 -- want to redo this using e.g. trifecta.
 
-module Language.Disco.Parser where
+module Disco.Parser where
 
 import           Unbound.LocallyNameless (Name, bind, embed, string2Name)
 
@@ -18,7 +18,7 @@ import qualified Text.Parsec.Token       as P
 
 import           Control.Applicative     (many, (<|>))
 
-import           Language.Disco.Types
+import           Disco.Types
 
 ------------------------------------------------------------
 -- Lexer

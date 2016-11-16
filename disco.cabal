@@ -1,9 +1,7 @@
 name:                disco
 version:             0.1.0.0
 synopsis:            Functional programming language for teaching discrete math.
-description:         Disco is a simple functional programming language for use in
-                     teaching discrete math.  Its syntax is designed to be close
-                     to standard mathematical practice.
+description:         Functional programming language for teaching discrete math.
 license:             BSD3
 license-file:        LICENSE
 author:              Disco team
@@ -13,7 +11,7 @@ category:            Language
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
-tested-with:         GHC == 7.8.4, GHC == 7.10.2, GHC == 8.0.1
+tested-with:         GHC == 7.10.2, GHC == 8.0.1
 
 source-repository head
   type:     git
@@ -45,7 +43,7 @@ library
                        TemplateHaskell
                        UndecidableInstances
 
-  build-depends:       base >=4.7 && <4.10,
+  build-depends:       base >=4.8 && <4.10,
                        mtl >=2.2 && <2.3,
                        haskeline >=0.7 && <0.8,
                        parsec >=3.1 && <3.2,

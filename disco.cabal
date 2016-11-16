@@ -1,7 +1,9 @@
 name:                disco
 version:             0.1.0.0
 synopsis:            Functional programming language for teaching discrete math.
-description:         Functional programming language for teaching discrete math.
+description:         Disco is a simple functional programming language for use in
+                     teaching discrete math.  Its syntax is designed to be close
+                     to standard mathematical practice.
 license:             BSD3
 license-file:        LICENSE
 author:              Disco team

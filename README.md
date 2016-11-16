@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/disco-lang/disco.svg?branch=master)](https://travis-ci.org/disco-lang/disco)
+
 Prototype implementation of a small functional teaching language
 for use in a discrete mathematics course.
 

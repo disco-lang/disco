@@ -67,7 +67,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - Maybe machine learning examples might appeal to other STEM
       fields.
 
-    - One thing people do after building something in education is track 
+    - One thing people do after building something in education is track
       how the students use it, for example, what functions do they use,
       how long did they take to solve a problem, etc.  Can we track this
       in our system?
@@ -77,7 +77,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
         https://www.nsf.gov/awardsearch/showAward?AWD_ID=1432257&HistoricalAwards=false
         * https://www.nsf.gov/awardsearch/showAward?AWD_ID=1524739&HistoricalAwards=false
         https://www.nsf.gov/awardsearch/showAward?AWD_ID=1651280&HistoricalAwards=false
-  
+
   - Some example research:
      - On the Implementation of a Discrete Mathematics Course:
        http://sigcse.org/sigcse/files/documents/pdfs/DiscreteMathReport.pdf
@@ -87,9 +87,9 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
        http://plone3test.acm.org/sigcse/resources/discrete-mathematics
      - Discrete math with programming: better together
        http://dl.acm.org/citation.cfm?id=1227310.1227348
-     - A statistical analysis of the effect of discrete mathematics on the performance of computer science 
+     - A statistical analysis of the effect of discrete mathematics on the performance of computer science
        majors in beginning computing classes
-       http://dl.acm.org/citation.cfm?id=5699     
+       http://dl.acm.org/citation.cfm?id=5699
 
 * ISETL
   See ISETL.  BUT: first order; looks like it just has one numeric
@@ -255,11 +255,11 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
       - Dynamic ability for detail
   + Typing and parsing on the fly
   + Dynamic explorable error messages:
-    - Dynamic witnesses for type errors (see ICFP 2016 paper, https://goo.gl/NCKXFi)        
+    - Dynamic witnesses for type errors (see ICFP 2016 paper, https://goo.gl/NCKXFi)
   + playgrounds:
     - Can we do something like -fdefer-type-errors so that
       students files load dispite of errors.
-  + Machine-checkable examples 
+  + Machine-checkable examples
 * Related work
 
   + VanDrunen, The Case for Teaching Functional Programming in

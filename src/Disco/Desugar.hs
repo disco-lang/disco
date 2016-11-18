@@ -42,7 +42,12 @@ data Op = OAdd | ONeg | OMul | ODiv | OExp | OAnd | OOr | OMod | ODivides | ORel
         | OEq Type | OLt Type | ONot
   deriving Show
 
-type CBranch = Bind [(Embed Core, CPattern)] Core
+type CBranch = Bind CGuards Core
+
+data CGuards where
+  CGEmpty :: CGuards
+  CGCons  :: Rebind (Embed Core, CPattern) CGuards -> CGuards
+  deriving Show
 
 -- | Core (desugared) pattern.  We only need variables, wildcards,
 --   nats, and constructors.
@@ -54,12 +59,13 @@ data CPattern where
   CPSucc :: CPattern -> CPattern
   deriving Show
 
-derive [''Strictness, ''Core, ''Op, ''CPattern]
+derive [''Strictness, ''Core, ''Op, ''CPattern, ''CGuards]
 
 instance Alpha Strictness
 instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern
+instance Alpha CGuards
 
 ------------------------------------------------------------
 
@@ -126,17 +132,22 @@ desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBranch :: ABranch -> DSM CBranch
 desugarBranch b =
   lunbind b $ \(ags, at) -> do
-  cgs <- mapM desugarGuard ags
+  cgs <- desugarGuards ags
   c <- desugar at
   return $ bind cgs c
 
-desugarGuard :: AGuard -> DSM (Embed Core, CPattern)
-desugarGuard (AGIf (unembed -> at)) = do
-  c <- desugar at
-  return (embed c, CPCons (fromEnum True) [])
-desugarGuard (AGWhen (unembed -> at) p) = do
-  c <- desugar at
-  return (embed c, desugarPattern p)
+desugarGuards :: AGuards -> DSM CGuards
+desugarGuards AGEmpty = return CGEmpty
+desugarGuards (AGCons (unrebind -> (ag, ags))) =
+  case ag of
+    AGIf (unembed -> at) -> do
+      c <- desugar at
+      cgs <- desugarGuards ags
+      return $ CGCons (rebind (embed c, CPCons (fromEnum True) []) cgs)
+    AGWhen (unembed -> at) p -> do
+      c <- desugar at
+      cgs <- desugarGuards ags
+      return $ CGCons (rebind (embed c, desugarPattern p) cgs)
 
 desugarPattern :: Pattern -> CPattern
 desugarPattern (PVar x)      = CPVar (translate x)

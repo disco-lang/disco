@@ -54,16 +54,22 @@ data ATerm where
   -- TODO: I don't think we are currently very consistent about using ATSub everywhere
   --   subtyping is invoked.  I am not sure how much it matters.
 
-type ABranch = Bind [AGuard] ATerm
+type ABranch = Bind AGuards ATerm
+
+data AGuards where
+  AGEmpty :: AGuards
+  AGCons  :: Rebind AGuard AGuards -> AGuards
+  deriving Show
 
 data AGuard where
   AGIf   :: Embed ATerm -> AGuard             -- ^ Boolean guard (if <test>)
   AGWhen :: Embed ATerm -> Pattern -> AGuard  -- ^ Pattern guard (when term = pat)
   deriving Show
 
-derive [''ATerm, ''AGuard]
+derive [''ATerm, ''AGuards, ''AGuard]
 
 instance Alpha ATerm
+instance Alpha AGuards
 instance Alpha AGuard
 
 type Defns = M.Map (Name ATerm) (Either Type ATerm)
@@ -508,14 +514,13 @@ inferBranch b =
   at <- infer t
   return $ (getType at, bind ags at)
 
-inferGuards :: [Guard] -> TCM ([AGuard], Ctx)
-inferGuards []     = return ([], emptyCtx)
-inferGuards (g:gs) = do
+inferGuards :: Guards -> TCM (AGuards, Ctx)
+inferGuards GEmpty                       = return (AGEmpty, emptyCtx)
+inferGuards (GCons (unrebind -> (g,gs))) = do
   (ag, ctx) <- inferGuard g
-  -- extends ctx $ do      -- XXX TODO: guards should scope over remaining guards
-                           -- need to fix definition of Branch to make it a telescope
+  extends ctx $ do
   (ags, ctx') <- inferGuards gs
-  return (ag:ags, ctx `joinCtx` ctx')
+  return (AGCons (rebind ag ags), ctx `joinCtx` ctx')
 
 inferGuard :: Guard -> TCM (AGuard, Ctx)
 inferGuard (GIf (unembed -> t)) = do

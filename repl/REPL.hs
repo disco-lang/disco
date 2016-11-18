@@ -167,8 +167,10 @@ banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\
 
 main :: IO ()
 main = do
+  let settings = defaultSettings
+        { historyFile = Just ".disco_history" }
   putStr banner
-  evalStateT (runInputT defaultSettings loop) emptyQ
+  evalStateT (runInputT settings loop) emptyQ
    where
        loop :: InputT REPLStateIO ()
        loop = do

@@ -1,5 +1,3 @@
-module Disco.REPL where
-
 import           Control.Monad.State
 import           Data.List                               (isPrefixOf)
 import           System.Console.Haskeline
@@ -13,10 +11,10 @@ import           Disco.Desugar
 import           Disco.Interpret.Core
 import           Disco.Parser
 import           Disco.Pretty
-import           Disco.Util.Queue
-
 import           Disco.Typecheck
 import           Disco.Types
+
+import           Queue
 
 type Qelm = (Name Term, Term)
 type REPLStateIO = StateT (Queue Qelm) IO

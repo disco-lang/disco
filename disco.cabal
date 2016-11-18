@@ -21,7 +21,6 @@ source-repository head
 
 library
   exposed-modules:
-                       Disco.REPL
                        Disco.Parser
                        Disco.Pretty
                        Disco.Desugar
@@ -29,9 +28,6 @@ library
                        Disco.Interpret.Surface
                        Disco.Typecheck
                        Disco.Types
-
-  other-modules:
-                       Disco.Util.Queue
 
   other-extensions:
                        GADTs
@@ -47,7 +43,6 @@ library
 
   build-depends:       base >=4.8 && <4.10,
                        mtl >=2.2 && <2.3,
-                       haskeline >=0.7 && <0.8,
                        parsec >=3.1 && <3.2,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
@@ -56,4 +51,16 @@ library
                        unbound >= 0.4 && < 0.6
 
   hs-source-dirs:      src
+  default-language:    Haskell2010
+
+executable disco
+  hs-source-dirs:      repl
+  main-is:             REPL.hs
+  build-depends:       base,
+                       disco,
+                       haskeline >=0.7 && <0.8,
+                       mtl >=2.2 && <2.3,
+                       parsec >=3.1 && <3.2,
+                       unbound >= 0.4 && < 0.6
+
   default-language:    Haskell2010

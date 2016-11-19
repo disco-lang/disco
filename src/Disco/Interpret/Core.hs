@@ -311,7 +311,9 @@ match v (CPNat n)     = do
     True  -> ok
 match v (CPSucc p) = do
   VNum n <- whnfV v
-  match (VNum (n-1)) p
+  case n > 0 of
+    True  -> match (VNum (n-1)) p
+    False -> return Nothing
 
 ok :: IM (Maybe Env)
 ok = return $ Just M.empty

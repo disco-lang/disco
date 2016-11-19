@@ -9,6 +9,7 @@ cabal-dev
 .virthualenv
 *~
 dist_*
+dist-*
 .hsenv_*
 TAGS
 .diagrams-cache

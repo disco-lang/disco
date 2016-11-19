@@ -9,6 +9,7 @@
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
+-- | A big-step interpreter for the desugared Disco core language.
 module Disco.Interpret.Core where
 
 import           Debug.Trace
@@ -27,59 +28,98 @@ import           Disco.Parser            (parseTermStr)
 import           Disco.Typecheck         (evalTCM, getType, infer)
 import           Disco.Types
 
+-- | The type of values produced by the interpreter.
 data Value where
   VNum   :: Rational -> Value
-  VCons  :: Int -> [Value] -> Value
-  VClos  :: Bind (Name Value) Core -> Env -> Value
-  VThunk :: Core -> Env -> Value
-  VFun   :: (Value -> Value) -> Value
+    -- ^ A numeric value.
 
+  VCons  :: Int -> [Value] -> Value
+    -- ^ A constructor with arguments.  The Int indicates which
+    --   constructor it is.  For example, False is represented by
+    --   @VCons 0 []@, and True by @VCons 1 []@.  A pair is
+    --   represented by @VCons 0 [v1, v2]@, and @inr v@ by @VCons 1
+    --   [v]@.
+
+  VClos  :: Bind (Name Value) Core -> Env -> Value
+    -- ^ A closure, i.e. a function body together with its
+    --   environment.
+
+  VThunk :: Core -> Env -> Value
+    -- ^ A thunk, i.e. an unevaluated core expression together with
+    --   its environment.
+
+  VFun   :: (Value -> Value) -> Value
+    -- ^ A literal function value.  @VFun@ is only used when
+    --   enumerating function values in order to decide comparisons at
+    --   higher-order function types.  For example, in order to
+    --   compare two values of type @(Bool -> Bool) -> Bool@ for
+    --   equality, we have to enumerate all functions of type @Bool ->
+    --   Bool@ as @VFun@ values.
+
+-- XXX improve this.  Can't auto-derive Show instance but we can do a
+-- lot better than <value>.
 instance Show Value where
   show _ = "<value>"
 
+-- | An environment is a mapping from names to values.
 type Env = M.Map (Name Value) Value
 
 derive [''Value]
 
+-- | Errors that can be generated during interpreting.
 data InterpError where
-  UnboundError  :: Name Core -> InterpError
+  UnboundError  :: Name Core -> InterpError  -- ^ Unbound name.
   NotANum       :: Value     -> InterpError  -- ^ v should be a number, but isn't
-  DivByZero     ::              InterpError
-  NotABool      :: Value     -> InterpError  -- ^ should be a boolean, but isn't
-  NonExhaustive ::              InterpError
-  Unimplemented :: String    -> InterpError
+  DivByZero     ::              InterpError  -- ^ Division by zero.
+  NotABool      :: Value     -> InterpError  -- ^ v should be a boolean, but isn't
+  NonExhaustive ::              InterpError  -- ^ Non-exhaustive case analysis
+  Unimplemented :: String    -> InterpError  -- ^ Internal error for features not
+                                             --   yet implemented.
   deriving Show
 
--- | Interpreter monad.  Can throw InterpErrors, and generate fresh
---   names.
+-- | The interpreter monad.  Combines read-only access to an
+-- environment, and the ability to throw @InterpErrors@ and generate
+-- fresh names.
 type IM = ReaderT Env (ExceptT InterpError LFreshM)
 
+-- | Run a computation in the @IM@ monad, starting in the empty
+--   environment.
 runIM :: IM a -> Either InterpError a
 runIM = runLFreshM . runExceptT . flip runReaderT M.empty
 
+-- | The empty environment.
 emptyEnv :: Env
 emptyEnv = M.empty
 
+-- | Locally extend the environment with a new name -> value mapping,
+--   (shadowing any existing binding for the given name).
 extend :: Name Value -> Value -> IM a -> IM a
 extend x v = local (M.insert x v)
 
+-- | Locally extend the environment with another environment.
+--   Bindings in the new environment shadow bindings in the old.
 extends :: Env -> IM a -> IM a
 extends e' = local (M.union e')
 
+-- | Create a thunk by packaging up a @Core@ expression with the
+--   current environment.
 mkThunk :: Core -> IM Value
 mkThunk c = VThunk c <$> ask
 
+-- | Turn any instance of @Enum@ into a @Value@, by creating a
+--   constructor with an index corresponding to the enum value.
 mkEnum :: Enum e => e -> Value
 mkEnum e = VCons (fromEnum e) []
 
+-- | Evaluate a Core expression to reduced normal form.
 rnf :: Core -> IM Value
 rnf c = mkThunk c >>= rnfV
 
+-- | Reduce a value to reduced normal form.
 rnfV :: Value -> IM Value
-rnfV v = rnfV' v
-rnfV' (VCons i vs)   = VCons i <$> mapM rnfV vs
-rnfV' v@(VThunk _ _) = whnfV v >>= rnfV
-rnfV' v              = return v
+rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
+rnfV v@(VThunk _ _) = whnfV v >>= rnfV
+rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
 whnfV :: Value -> IM Value
@@ -110,9 +150,9 @@ whnf (CLet str b)     =
   extend (translate x) v1 $ whnf t2
 whnf (CCase bs)     = whnfCase bs
 
--- | Reduce an application to WHNF.  Precondition: the first argument
---   has already been reduced to WHNF (which means it must be a
---   closure).
+-- | Reduce an application to weak head normal form (WHNF).
+--   Precondition: the first argument has already been reduced to WHNF
+--   (which means it must be a closure, or a @VFun@).
 whnfApp :: Value -> Value -> IM Value
 whnfApp (VClos c e) v =
   lunbind c $ \(x,t) -> do
@@ -139,23 +179,34 @@ whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
 
+-- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
 numOp (#) = numOp' (\m n -> return (VNum (m # n)))
 
+-- | A more general version of 'numOp' where the binary operation has
+--   a result in the @IM@ monad (/e.g./ for operations which can throw
+--   a division by zero error).
 numOp' :: (Rational -> Rational -> IM Value) -> [Core] -> IM Value
 numOp' (#) cs = do
   [VNum m, VNum n] <- mapM whnf cs     -- If the program type checked this can
   m # n                                -- never go wrong.
 
+-- | Perform a numeric unary operation.
 uNumOp :: (Rational -> Rational) -> [Core] -> IM Value
 uNumOp f [c] = do
   VNum m <- whnf c
   return $ VNum (f m)
 
+-- | Perform a division. Throw a division by zero error if the second
+--   argument is 0.
 divOp :: Rational -> Rational -> IM Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ VNum (m / n)
 
+-- | Perform a mod operation; throw division by zero error if the
+--   second argument is zero.  Although this function takes two
+--   'Rational' arguments, note that if the disco program typechecks
+--   then the arguments must in fact be integers.
 modOp :: Rational -> Rational -> IM Value
 modOp m n
   | n == 0    = throwError DivByZero
@@ -163,16 +214,20 @@ modOp m n
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
 
+-- | Perform a boolean operation.
 boolOp :: (Bool -> Bool -> Bool) -> [Core] -> IM Value
 boolOp (#) cs = do
   [VCons i [], VCons j []] <- mapM whnf cs
   return . mkEnum $ toEnum i # toEnum j
 
+-- | Test whether one number divides another.
 divides :: Rational -> Rational -> IM Value
 divides 0 0 = return $ mkEnum True
 divides 0 _ = return $ mkEnum False
 divides x y = return . mkEnum $ denominator (y / x) == 1
 
+-- | Test relative primality.  Note that if the disco program
+--   typechecks, the arguments here will always be integers.
 relPm :: Rational -> Rational -> IM Value
 relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 

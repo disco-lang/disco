@@ -47,6 +47,7 @@ data InterpError where
   DivByZero     ::              InterpError
   NotABool      :: Value     -> InterpError  -- ^ should be a boolean, but isn't
   NonExhaustive ::              InterpError
+  Unimplemented :: String    -> InterpError
   deriving Show
 
 -- | Interpreter monad.  Can throw InterpErrors, and generate fresh
@@ -135,7 +136,7 @@ whnfOp OMod     = numOp' modOp
 whnfOp ODivides = numOp' divides
 whnfOp ORelPm   = numOp' relPm
 whnfOp (OEq ty) = eqOp ty
-whnfOp (OLt ty) = undefined
+whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
 
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -183,44 +184,43 @@ notOp [c] = do
 eqOp :: Type -> [Core] -> IM Value
 eqOp ty cs = do
   [v1, v2] <- mapM mkThunk cs
-  mkEnum <$> decideFor ty v1 v2
+  mkEnum <$> decideEqFor ty v1 v2
 
-decideFor :: Type -> Value -> Value -> IM Bool
-decideFor (TyPair ty1 ty2) v1 v2 = do
+decideEqFor :: Type -> Value -> Value -> IM Bool
+decideEqFor (TyPair ty1 ty2) v1 v2 = do
   VCons 0 [v11, v12] <- whnfV v1
   VCons 0 [v21, v22] <- whnfV v2
-  b1 <- decideFor ty1 v11 v21
+  b1 <- decideEqFor ty1 v11 v21
   case b1 of
     False -> return False
-    True  -> do
-      decideFor ty2 v12 v22
-decideFor (TySum ty1 ty2) v1 v2 = do
+    True  -> decideEqFor ty2 v12 v22
+decideEqFor (TySum ty1 ty2) v1 v2 = do
   VCons i1 [v1'] <- whnfV v1
   VCons i2 [v2'] <- whnfV v2
   case i1 == i2 of
     False -> return False
-    True  -> decideFor ([ty1, ty2] !! i1) v1' v2'
-decideFor (TyArr ty1 ty2) v1 v2 = do
+    True  -> decideEqFor ([ty1, ty2] !! i1) v1' v2'
+decideEqFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
   let ty1s = enumerate ty1
   res1s <- mapM (whnfApp clos1) ty1s
   res2s <- mapM (whnfApp clos2) ty1s
-  and <$> zipWithM (decideFor ty2) res1s res2s
-decideFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
+  and <$> zipWithM (decideEqFor ty2) res1s res2s
+decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
 
 primValEq :: Value -> Value -> Bool
 primValEq (VCons i []) (VCons j []) = i == j
 primValEq (VNum n1)    (VNum n2)    = n1 == n2
 primValEq _ _                       = False
 
-decideForRnf :: Type -> Value -> Value -> Bool
-decideForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
-  = decideForRnf ty1 v11 v21 && decideForRnf ty2 v12 v22
-decideForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
-  = i1 == i2 && decideForRnf ([ty1, ty2] !! i1) v1' v2'
-decideForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
+decideEqForRnf :: Type -> Value -> Value -> Bool
+decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+  = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
+decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
+  = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
+decideEqForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 
 -- XXX once we have lists/sets, create a way to get access to
 -- enumerations via surface syntax.
@@ -238,8 +238,42 @@ enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
     vs2 = enumerate ty2
     mkFun :: [Value] -> [Value] -> Value
     mkFun vs1 vs2
-      = VFun $ \v -> snd . fromJust . find (decideForRnf ty1 v . fst) $ zip vs1 vs2
+      = VFun $ \v -> snd . fromJust . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
+
+ltOp :: Type -> [Core] -> IM Value
+ltOp ty cs = do
+  [v1, v2] <- mapM mkThunk cs
+  (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
+
+decideOrdFor :: Type -> Value -> Value -> IM Ordering
+decideOrdFor (TyPair ty1 ty2) v1 v2 = do
+  VCons 0 [v11, v12] <- whnfV v1
+  VCons 0 [v21, v22] <- whnfV v2
+  o1 <- decideOrdFor ty1 v11 v21
+  case o1 of
+    EQ -> decideOrdFor ty2 v12 v22
+    _  -> return o1
+decideOrdFor (TySum ty1 ty2) v1 v2 = do
+  VCons i1 [v1'] <- whnfV v1
+  VCons i2 [v2'] <- whnfV v2
+  case compare i1 i2 of
+    EQ -> decideOrdFor ([ty1, ty2] !! i1) v1' v2'
+    o  -> return o
+decideOrdFor (TyArr ty1 ty2) v1 v2 = do
+  clos1 <- whnfV v1
+  clos2 <- whnfV v2
+  throwError $ Unimplemented "Comparison for function types is not yet implemented"
+  -- let ty1s = enumerate ty1
+  -- res1s <- mapM (whnfApp clos1) ty1s
+  -- res2s <- mapM (whnfApp clos2) ty1s
+  -- and <$> zipWithM (decideEqFor ty2) res1s res2s
+decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
+
+primValOrd :: Value -> Value -> Ordering
+primValOrd (VCons i []) (VCons j []) = compare i j
+primValOrd (VNum n1) (VNum n2)       = compare n1 n2
+primValOrd _ _                       = error "primValOrd: impossible!"
 
 whnfCase :: [CBranch] -> IM Value
 whnfCase []     = throwError NonExhaustive

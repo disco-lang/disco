@@ -449,7 +449,7 @@ infer (TBin RelPm t1 t2) = do
   at2 <- infer t2
   ty <- numLub at1 at2
   if (isSub ty TyZ)
-    then return (ATBin ty RelPm at1 at2)
+    then return (ATBin TyBool RelPm at1 at2)
     else throwError RelPmQ
 
   -- To infer the type of (let x = t1 in t2), assuming it is

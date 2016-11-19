@@ -58,6 +58,8 @@ data REPLExpr =
  | ShowAST Term                 -- Show a terms AST
  | DumpState                    -- Trigger to dump the state for debugging.
  | Unfold Term                  -- Unfold the definitions in a term for debugging.
+ | Parse Term                   -- Show the parsed AST
+ | Desugar Term                 -- Show a desugared term
  deriving Show
 
 letParser = do
@@ -96,6 +98,8 @@ typeCheckParser  = replTermCmdParser "type"   TypeCheck parseTerm
 showASTParser    = replTermCmdParser "show"   ShowAST   parseTerm
 unfoldTermParser = replTermCmdParser "unfold" Unfold    parseTerm
 dumpStateParser  = replIntCmdParser  "dump"   DumpState
+parseTermParser  = replTermCmdParser "parse"  Parse     parseTerm
+desugarTermParser = replTermCmdParser "desugar" Desugar parseTerm
 
 lineParser = letParser
           <|> try typeCheckParser
@@ -104,6 +108,8 @@ lineParser = letParser
           <|> try unfoldTermParser
           <|> try dumpStateParser
           <|> try evalParser
+          <|> try parseTermParser
+          <|> try desugarTermParser
 
 parseLine :: String -> Either String REPLExpr
 parseLine s = case (parse lineParser "" s) of
@@ -126,6 +132,14 @@ handleCMD s =
     handleLine DumpState = get >>= io.print.(mapQ prettyDef)
      where
        prettyDef (x, t) = "let "++(name2String x)++" = "++(renderDoc.prettyTerm $ t)
+    handleLine (Parse t) = io.print $ t
+    handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
+
+handleDesugar :: Term -> REPLStateIO String
+handleDesugar t = do
+  case evalTCM (infer t) of
+    Left err -> return.show $ err
+    Right at -> return.show.runDSM.desugar $ at
 
 eval :: Term -> REPLStateIO String
 eval t = do
@@ -153,8 +167,10 @@ banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\
 
 main :: IO ()
 main = do
+  let settings = defaultSettings
+        { historyFile = Just ".disco_history" }
   putStr banner
-  evalStateT (runInputT defaultSettings loop) emptyQ
+  evalStateT (runInputT settings loop) emptyQ
    where
        loop :: InputT REPLStateIO ()
        loop = do

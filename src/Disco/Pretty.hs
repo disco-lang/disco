@@ -9,12 +9,12 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 
-import qualified Disco.Parser   as PR
+import qualified Disco.Parser            as PR
 import           Disco.Types
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
-                                          unembed)
+                                          unembed, unrebind)
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -192,9 +192,14 @@ prettyBranches bs = foldr ($+$) empty (map prettyBranch bs)
 prettyBranch :: Branch -> Doc
 prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
 
-prettyGuards :: [Guard] -> Doc
-prettyGuards [] = text "otherwise"
-prettyGuards gs = foldr (\g r -> prettyGuard g <+> r) (text "") gs
+guardList :: Guards -> [Guard]
+guardList GEmpty = []
+guardList (GCons (unrebind -> (g,gs))) = g : guardList gs
+
+prettyGuards :: Guards -> Doc
+prettyGuards GEmpty                     = text "otherwise"
+prettyGuards (guardList -> gs)
+  = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
 prettyGuard (GIf et) = text "if" <+> (prettyTerm (unembed et))

@@ -6,17 +6,18 @@
 
 module Disco.Interpret.Surface where
 
-import           Control.Monad            (join)
-import           Control.Monad.Except     (ExceptT, runExceptT, throwError)
-import           Data.Char                (toLower)
-import qualified Data.Map                 as M
-import           Data.Ratio               (denominator, numerator, (%))
+import           Control.Monad           (join)
+import           Control.Monad.Except    (ExceptT, runExceptT, throwError)
+import           Data.Char               (toLower)
+import qualified Data.Map                as M
+import           Data.Ratio              (denominator, numerator, (%))
 
-import           Unbound.LocallyNameless  (Bind, LFreshM, Name, lunbind,
-                                           runLFreshM, translate, unembed)
+import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind,
+                                          runLFreshM, translate, unembed,
+                                          unrebind)
 
 import           Disco.Parser
-import           Disco.Typecheck hiding (ok)
+import           Disco.Typecheck         hiding (ok)
 import           Disco.Types
 
 data Value where
@@ -188,9 +189,9 @@ interpCase e (b:bs) = do
     Nothing -> interpCase e bs
     Just e' -> interpTerm e' t
 
-checkGuards :: Env -> [AGuard] -> IM (Maybe Env)
-checkGuards e []     = return $ Just e
-checkGuards e (g:gs) = do
+checkGuards :: Env -> AGuards -> IM (Maybe Env)
+checkGuards e AGEmpty                       = return $ Just e
+checkGuards e (AGCons (unrebind -> (g,gs))) = do
   res <- checkGuard e g
   case res of
     Nothing -> return Nothing

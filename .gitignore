@@ -38,3 +38,5 @@ src/REPL
 
 *-blx.bib
 *.run.xml
+
+.disco_history

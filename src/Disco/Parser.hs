@@ -8,7 +8,8 @@
 
 module Disco.Parser where
 
-import           Unbound.LocallyNameless (Name, bind, embed, string2Name)
+import           Unbound.LocallyNameless (Name, bind, embed, rebind,
+                                          string2Name)
 
 import           Text.Parsec             hiding (Error, many, (<|>))
 import           Text.Parsec.Expr        hiding (Operator)
@@ -140,8 +141,10 @@ parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
 
 -- | Parse the list of guards in a branch.  @otherwise@ can be used
 --   interchangeably with an empty list of guards.
-parseGuards :: Parser [Guard]
-parseGuards = ([] <$ reserved "otherwise") <|> many parseGuard
+parseGuards :: Parser Guards
+parseGuards = (GEmpty <$ reserved "otherwise") <|> (guards <$> many parseGuard)
+  where
+    guards = foldr (\g gs -> GCons $ rebind g gs) GEmpty
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard

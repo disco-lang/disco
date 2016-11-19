@@ -15,16 +15,16 @@ import           Debug.Trace
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Data.Char                (toLower)
-import           Data.List                (find)
-import qualified Data.Map                 as M
-import           Data.Maybe               (fromJust)
+import           Data.Char               (toLower)
+import           Data.List               (find)
+import qualified Data.Map                as M
+import           Data.Maybe              (fromJust)
 import           Data.Ratio
-import           Unbound.LocallyNameless  hiding (enumerate, rnf)
+import           Unbound.LocallyNameless hiding (enumerate, rnf)
 
 import           Disco.Desugar
-import           Disco.Parser    (parseTermStr)
-import           Disco.Typecheck (evalTCM, getType, infer)
+import           Disco.Parser            (parseTermStr)
+import           Disco.Typecheck         (evalTCM, getType, infer)
 import           Disco.Types
 
 data Value where
@@ -250,9 +250,9 @@ whnfCase (b:bs) = do
     Nothing -> whnfCase bs
     Just e' -> extends e' $ whnf t
 
-checkGuards :: [(Embed Core, CPattern)] -> IM (Maybe Env)
-checkGuards [] = ok
-checkGuards ((unembed -> c, p):gs) = do
+checkGuards :: CGuards -> IM (Maybe Env)
+checkGuards CGEmpty = ok
+checkGuards (CGCons (unrebind -> ((unembed -> c, p), gs))) = do
   v <- mkThunk c
   res <- match v p
   case res of

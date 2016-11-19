@@ -58,8 +58,12 @@ data Term where
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
 --   over subsequent guards.
-type Branch = Bind [Guard] Term
-  -- XXX TODO make guards telescoping!
+type Branch = Bind Guards Term
+
+data Guards where
+  GEmpty :: Guards
+  GCons  :: Rebind Guard Guards -> Guards
+  deriving Show
 
 -- | A single guard in a branch.
 data Guard where
@@ -93,17 +97,19 @@ data Type where
   TyQ      :: Type                  -- ^ Rationals
   deriving (Show, Eq)
 
-derive [''Side, ''UOp, ''BOp, ''Term, ''Guard, ''Pattern, ''Type]
+derive [''Side, ''UOp, ''BOp, ''Term, ''Guards, ''Guard, ''Pattern, ''Type]
 
 instance Alpha Side
 instance Alpha UOp
 instance Alpha BOp
 instance Alpha Term
+instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Type
 
 instance Subst Term Type
+instance Subst Term Guards
 instance Subst Term Guard
 instance Subst Term Pattern
 instance Subst Term Side

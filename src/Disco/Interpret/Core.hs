@@ -204,10 +204,20 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
   let ty1s = enumerate ty1
-  res1s <- mapM (whnfApp clos1) ty1s
-  res2s <- mapM (whnfApp clos2) ty1s
-  and <$> zipWithM (decideEqFor ty2) res1s res2s
+  decideEqForAll ty2 clos1 clos2 ty1s
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
+
+decideEqForAll :: Type -> Value -> Value -> [Value] -> IM Bool
+decideEqForAll ty2 clos1 clos2 vs = go vs
+  where
+    go []     = return True
+    go (v:vs) = do
+      r1 <- whnfApp clos1 v
+      r2 <- whnfApp clos2 v
+      b  <- decideEqFor ty2 r1 r2
+      case b of
+        False -> return False
+        True  -> go vs
 
 primValEq :: Value -> Value -> Bool
 primValEq (VCons i []) (VCons j []) = i == j
@@ -264,10 +274,20 @@ decideOrdFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
   let ty1s = enumerate ty1
-  res1s <- mapM (whnfApp clos1) ty1s
-  res2s <- mapM (whnfApp clos2) ty1s
-  mconcat <$> zipWithM (decideOrdFor ty2) res1s res2s
+  decideOrdForLex ty2 clos1 clos2 ty1s
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
+
+decideOrdForLex :: Type -> Value -> Value -> [Value] -> IM Ordering
+decideOrdForLex ty2 clos1 clos2 vs = go vs
+  where
+    go []     = return EQ
+    go (v:vs) = do
+      r1 <- whnfApp clos1 v
+      r2 <- whnfApp clos2 v
+      o  <- decideOrdFor ty2 r1 r2
+      case o of
+        EQ -> go vs
+        _  -> return o
 
 primValOrd :: Value -> Value -> Ordering
 primValOrd (VCons i []) (VCons j []) = compare i j

@@ -33,7 +33,6 @@ nsf/main.tex
 nsf/description.tex
 nsf/.diagrams_cache
 
-src/REPL
 *.out
 
 *-blx.bib

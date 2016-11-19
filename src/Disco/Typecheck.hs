@@ -442,7 +442,7 @@ infer (TBin Divides t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   ty <- numLub at1 at2
-  return (ATBin ty Divides at1 at2)
+  return (ATBin TyBool Divides at1 at2)
 
 infer (TBin RelPm t1 t2) = do
   at1 <- infer t1

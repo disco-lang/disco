@@ -531,6 +531,10 @@ inferGuard (GWhen (unembed -> t) p) = do
   ctx <- checkPattern p (getType at)
   return (AGWhen (embed at) p, ctx)
 
+-- XXX todo: check for nonlinear patterns.
+-- Nonlinear patterns can desugar to equality checks!
+-- Currently  { x when (3,4) = (x,x)   evaluates without error to 3.
+-- It should be accepted, but fail to match since 3 != 4.
 checkPattern :: Pattern -> Type -> TCM Ctx
 checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok

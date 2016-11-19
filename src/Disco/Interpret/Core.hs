@@ -28,6 +28,10 @@ import           Disco.Parser            (parseTermStr)
 import           Disco.Typecheck         (evalTCM, getType, infer)
 import           Disco.Types
 
+------------------------------------------------------------
+-- Types
+------------------------------------------------------------
+
 -- | The type of values produced by the interpreter.
 data Value where
   VNum   :: Rational -> Value
@@ -48,23 +52,24 @@ data Value where
     -- ^ A thunk, i.e. an unevaluated core expression together with
     --   its environment.
 
-  VFun   :: (Value -> Value) -> Value
+  VFun   :: ValFun -> Value
     -- ^ A literal function value.  @VFun@ is only used when
     --   enumerating function values in order to decide comparisons at
     --   higher-order function types.  For example, in order to
     --   compare two values of type @(Bool -> Bool) -> Bool@ for
     --   equality, we have to enumerate all functions of type @Bool ->
     --   Bool@ as @VFun@ values.
+  deriving Show
 
--- XXX improve this.  Can't auto-derive Show instance but we can do a
--- lot better than <value>.
-instance Show Value where
-  show _ = "<value>"
+newtype ValFun = ValFun (Value -> Value)
+
+instance Show ValFun where
+  show _ = "<fun>"
 
 -- | An environment is a mapping from names to values.
 type Env = M.Map (Name Value) Value
 
-derive [''Value]
+derive [''Value, ''ValFun]
 
 -- | Errors that can be generated during interpreting.
 data InterpError where
@@ -76,6 +81,10 @@ data InterpError where
   Unimplemented :: String    -> InterpError  -- ^ Internal error for features not
                                              --   yet implemented.
   deriving Show
+
+------------------------------------------------------------
+-- Interpreter monad
+------------------------------------------------------------
 
 -- | The interpreter monad.  Combines read-only access to an
 -- environment, and the ability to throw @InterpErrors@ and generate
@@ -100,6 +109,10 @@ extend x v = local (M.insert x v)
 --   Bindings in the new environment shadow bindings in the old.
 extends :: Env -> IM a -> IM a
 extends e' = local (M.union e')
+
+------------------------------------------------------------
+-- Evaluation
+------------------------------------------------------------
 
 -- | Create a thunk by packaging up a @Core@ expression with the
 --   current environment.
@@ -159,8 +172,12 @@ whnfApp (VClos c e) v =
   local (const e)     $ do
   extend x v          $ do
   whnf t
-whnfApp (VFun f) v = whnfV (f v)
+whnfApp (VFun (ValFun f)) v = whnfV (f v)
 whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
+
+------------------------------------------------------------
+-- Operator evaluation
+------------------------------------------------------------
 
 -- | Reduce an operator application to WHNF.
 whnfOp :: Op -> [Core] -> IM Value
@@ -231,64 +248,85 @@ divides x y = return . mkEnum $ denominator (y / x) == 1
 relPm :: Rational -> Rational -> IM Value
 relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 
+-- | Perform boolean negation.
 notOp :: [Core] -> IM Value
 notOp [c] = do
   VCons i [] <- whnf c
   return . mkEnum . not . toEnum $ i
 
+------------------------------------------------------------
+-- Equality testing
+------------------------------------------------------------
+
+-- | Test two expressions for equality at the given type.
 eqOp :: Type -> [Core] -> IM Value
 eqOp ty cs = do
   [v1, v2] <- mapM mkThunk cs
   mkEnum <$> decideEqFor ty v1 v2
 
+-- | Lazily decide equality of two values at the given type.
 decideEqFor :: Type -> Value -> Value -> IM Bool
+
+-- To decide equality at a pair type:
 decideEqFor (TyPair ty1 ty2) v1 v2 = do
+
+  -- First, reduce both values to WHNF, which will produce pairs.
   VCons 0 [v11, v12] <- whnfV v1
   VCons 0 [v21, v22] <- whnfV v2
+
+  -- Now decide equality of the first components.
   b1 <- decideEqFor ty1 v11 v21
   case b1 of
+    -- If they are not equal, we know the pairs are not equal, so
+    -- return False immediately without looking at the second
+    -- components.
     False -> return False
+
+    -- Otherwise, decide equality of the second components.
     True  -> decideEqFor ty2 v12 v22
+
+-- To decide equality at a sum type:
 decideEqFor (TySum ty1 ty2) v1 v2 = do
+
+  -- Reduce both values to WHNF, which will produce constructors
+  -- (either inl or inr) with one argument.
   VCons i1 [v1'] <- whnfV v1
   VCons i2 [v2'] <- whnfV v2
+
+  -- Check whether the constructors are the same.
   case i1 == i2 of
+    -- If not, the values are not equal.
     False -> return False
+    -- If so, decide equality for the contained values at whichever
+    -- type is appropriate.
     True  -> decideEqFor ([ty1, ty2] !! i1) v1' v2'
+
+-- To decide equality at an arrow type, (ty1 -> ty2):
 decideEqFor (TyArr ty1 ty2) v1 v2 = do
+
+  -- Reduce both values to WHNF, which should produce closures (or
+  -- @VFun@s).
   clos1 <- whnfV v1
   clos2 <- whnfV v2
+
+  -- Enumerate all the values of type ty1.
   let ty1s = enumerate ty1
+
+  -- Try evaluating the functions on each value and check whether they
+  -- agree.
   decideEqForAll ty2 clos1 clos2 ty1s
+
+-- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
+-- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
 
-decideEqForAll :: Type -> Value -> Value -> [Value] -> IM Bool
-decideEqForAll ty2 clos1 clos2 vs = go vs
-  where
-    go []     = return True
-    go (v:vs) = do
-      r1 <- whnfApp clos1 v
-      r2 <- whnfApp clos2 v
-      b  <- decideEqFor ty2 r1 r2
-      case b of
-        False -> return False
-        True  -> go vs
-
-primValEq :: Value -> Value -> Bool
-primValEq (VCons i []) (VCons j []) = i == j
-primValEq (VNum n1)    (VNum n2)    = n1 == n2
-primValEq _ _                       = False
-
-decideEqForRnf :: Type -> Value -> Value -> Bool
-decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
-  = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
-decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
-  = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
-decideEqForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
-
 -- XXX once we have lists/sets, create a way to get access to
--- enumerations via surface syntax.
+-- enumerations via surface syntax?
+
+-- | Enumerate all the values of a given (finite) type.  This function
+--   will never be called on an infinite type, since type checking
+--   ensures that equality or comparison testing will only be done in
+--   cases where a finite enumeration is required.
 enumerate :: Type -> [Value]
 enumerate TyVoid           = []
 enumerate TyUnit           = [VCons 0 []]
@@ -303,8 +341,72 @@ enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
     vs2 = enumerate ty2
     mkFun :: [Value] -> [Value] -> Value
     mkFun vs1 vs2
-      = VFun $ \v -> snd . fromJust . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
+      = VFun . ValFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
+    fromJust' _ (Just x) = x
+    fromJust' v Nothing  = error $ "fromJust in enumerate: " ++ show v
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
+
+-- XXX bug:
+-- Disco> (f -> f true : (B -> B) -> B) == (f -> f false : (B -> B) -> B)
+-- disco: fromJust in enumerate: VThunk (CCons 1 []) (fromList [(f,VFun <fun>)])
+-- CallStack (from HasCallStack):
+--   error, called at src/Disco/Interpret/Core.hs:346:28 in disco-0.1.0.0-6qpHSd8QnDv8iioXN9hgy:Disco.Interpret.Core
+--
+-- Problem is that a value not in RNF is being passed to a function
+-- created via 'enumerate', which currently assumes that arguments
+-- will already be in RNF (so they can be compared with
+-- decideEqForRnf).
+
+-- | Decide equality for two values at a given type, when we already
+--   know the values are in RNF.  This means the result doesn't need
+--   to be in the @IM@ monad, because no evaluation needs to happen.
+decideEqForRnf :: Type -> Value -> Value -> Bool
+decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+  = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
+decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
+  = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
+decideEqForRnf (TyArr ty1 ty2) (VFun (ValFun f1)) (VFun (ValFun f2))
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
+decideEqForRnf _ v1 v2 = primValEq v1 v2
+
+-- | @decideEqForAll ty f1 f2 vs@ lazily decides whether the given
+--   functions @f1@ and @f2@ produce the same output (of type @ty@) on
+--   all inputs in @vs@.
+decideEqForAll :: Type -> Value -> Value -> [Value] -> IM Bool
+decideEqForAll ty2 clos1 clos2 vs = go vs
+  where
+
+    -- If we made it through all the values without finding one on
+    -- which the functions disagree, then they are equal.
+    go []     = return True
+
+    go (v:vs) = do
+
+      -- Apply the closures to v
+      r1 <- whnfApp clos1 v
+      r2 <- whnfApp clos2 v
+
+      -- Decide whether the results are equal
+      b  <- decideEqFor ty2 r1 r2
+
+      case b of
+        -- If the results are not equal, immediately return False
+        -- without considering other inputs.
+        False -> return False
+
+        -- Otherwise, continue checking the rest of the inputs.
+        True  -> go vs
+
+-- | Decide whether two values of a primitive type (Void, Unit, Bool,
+--   N, Z, Q) are equal.
+primValEq :: Value -> Value -> Bool
+primValEq (VCons i []) (VCons j []) = i == j
+primValEq (VNum n1)    (VNum n2)    = n1 == n2
+primValEq _ _                       = False
+
+------------------------------------------------------------
+-- Comparison testing
+------------------------------------------------------------
 
 ltOp :: Type -> [Core] -> IM Value
 ltOp ty cs = do
@@ -348,6 +450,8 @@ primValOrd :: Value -> Value -> Ordering
 primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum n1) (VNum n2)       = compare n1 n2
 primValOrd _ _                       = error "primValOrd: impossible!"
+
+
 
 whnfCase :: [CBranch] -> IM Value
 whnfCase []     = throwError NonExhaustive
@@ -395,8 +499,6 @@ ok = return $ Just M.empty
 
 noMatch :: IM (Maybe Env)
 noMatch = return Nothing
-
--- ------------------------------------------------------------
 
 prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"

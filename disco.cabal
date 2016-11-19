@@ -11,7 +11,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:  README.md, repl/*.hs
 cabal-version:       >=1.10
 tested-with:         GHC == 7.10.2, GHC == 8.0.1
 

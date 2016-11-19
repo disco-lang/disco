@@ -263,11 +263,10 @@ decideOrdFor (TySum ty1 ty2) v1 v2 = do
 decideOrdFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
-  throwError $ Unimplemented "Comparison for function types is not yet implemented"
-  -- let ty1s = enumerate ty1
-  -- res1s <- mapM (whnfApp clos1) ty1s
-  -- res2s <- mapM (whnfApp clos2) ty1s
-  -- and <$> zipWithM (decideEqFor ty2) res1s res2s
+  let ty1s = enumerate ty1
+  res1s <- mapM (whnfApp clos1) ty1s
+  res2s <- mapM (whnfApp clos2) ty1s
+  mconcat <$> zipWithM (decideOrdFor ty2) res1s res2s
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 
 primValOrd :: Value -> Value -> Ordering

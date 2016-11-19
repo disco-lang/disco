@@ -176,6 +176,65 @@ whnfApp (VFun (ValFun f)) v = whnfV (f v)
 whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
 
 ------------------------------------------------------------
+-- Case analysis
+------------------------------------------------------------
+
+-- | Reduce a case expression to weak head normal form.
+whnfCase :: [CBranch] -> IM Value
+whnfCase []     = throwError NonExhaustive
+whnfCase (b:bs) = do
+  lunbind b $ \(gs, t) -> do
+  res <- checkGuards gs
+  case res of
+    Nothing -> whnfCase bs
+    Just e' -> extends e' $ whnf t
+
+-- | Check a chain of guards on one branch of a case.  Returns
+--   @Nothing@ if the guards fail to match, or a resulting environment
+--   of bindings if they do match.
+checkGuards :: CGuards -> IM (Maybe Env)
+checkGuards CGEmpty = ok
+checkGuards (CGCons (unrebind -> ((unembed -> c, p), gs))) = do
+  v <- mkThunk c
+  res <- match v p
+  case res of
+    Nothing -> return Nothing
+    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
+
+-- | Match a value against a pattern, returning an environment of
+--   bindings if the match succeeds.
+match :: Value -> CPattern -> IM (Maybe Env)
+match v (CPVar x)     = return $ Just (M.singleton (translate x) v)
+match _ CPWild        = ok
+match v (CPCons i ps) = do
+  VCons j vs <- whnfV v
+  case i == j of
+    False -> noMatch
+    True  -> do
+      res <- sequence <$> zipWithM match vs ps
+      case res of
+        Nothing -> noMatch
+        Just es -> return $ Just (M.unions es)
+match v (CPNat n)     = do
+  VNum m <- whnfV v
+  case m == n % 1 of
+    False -> noMatch
+    True  -> ok
+match v (CPSucc p) = do
+  VNum n <- whnfV v
+  case n > 0 of
+    True  -> match (VNum (n-1)) p
+    False -> noMatch
+
+-- | Convenience function: successfully match with no bindings.
+ok :: IM (Maybe Env)
+ok = return $ Just M.empty
+
+-- | Convenience function: fail to match.
+noMatch :: IM (Maybe Env)
+noMatch = return Nothing
+
+------------------------------------------------------------
 -- Operator evaluation
 ------------------------------------------------------------
 
@@ -451,54 +510,6 @@ primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum n1) (VNum n2)       = compare n1 n2
 primValOrd _ _                       = error "primValOrd: impossible!"
 
-
-
-whnfCase :: [CBranch] -> IM Value
-whnfCase []     = throwError NonExhaustive
-whnfCase (b:bs) = do
-  lunbind b $ \(gs, t) -> do
-  res <- checkGuards gs
-  case res of
-    Nothing -> whnfCase bs
-    Just e' -> extends e' $ whnf t
-
-checkGuards :: CGuards -> IM (Maybe Env)
-checkGuards CGEmpty = ok
-checkGuards (CGCons (unrebind -> ((unembed -> c, p), gs))) = do
-  v <- mkThunk c
-  res <- match v p
-  case res of
-    Nothing -> return Nothing
-    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
-
-match :: Value -> CPattern -> IM (Maybe Env)
-match v (CPVar x)     = return $ Just (M.singleton (translate x) v)
-match _ CPWild        = ok
-match v (CPCons i ps) = do
-  VCons j vs <- whnfV v
-  case i == j of
-    False -> noMatch
-    True  -> do
-      res <- sequence <$> zipWithM match vs ps
-      case res of
-        Nothing -> noMatch
-        Just es -> return $ Just (M.unions es)
-match v (CPNat n)     = do
-  VNum m <- whnfV v
-  case m == n % 1 of
-    False -> noMatch
-    True  -> ok
-match v (CPSucc p) = do
-  VNum n <- whnfV v
-  case n > 0 of
-    True  -> match (VNum (n-1)) p
-    False -> return Nothing
-
-ok :: IM (Maybe Env)
-ok = return $ Just M.empty
-
-noMatch :: IM (Maybe Env)
-noMatch = return Nothing
 
 prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"

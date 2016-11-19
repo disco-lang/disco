@@ -59,6 +59,10 @@ data Value where
     --   compare two values of type @(Bool -> Bool) -> Bool@ for
     --   equality, we have to enumerate all functions of type @Bool ->
     --   Bool@ as @VFun@ values.
+    --
+    --   We assume that all @VFun@ values are /strict/, that is, their
+    --   arguments should be fully evaluated to RNF before being
+    --   passed to the function.
   deriving Show
 
 newtype ValFun = ValFun (Value -> Value)
@@ -172,7 +176,7 @@ whnfApp (VClos c e) v =
   local (const e)     $ do
   extend x v          $ do
   whnf t
-whnfApp (VFun (ValFun f)) v = whnfV (f v)
+whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')
 whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
 
 ------------------------------------------------------------

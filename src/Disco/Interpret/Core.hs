@@ -383,9 +383,6 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
 
--- XXX once we have lists/sets, create a way to get access to
--- enumerations via surface syntax?
-
 -- | Enumerate all the values of a given (finite) type.  This function
 --   will never be called on an infinite type, since type checking
 --   ensures that equality or comparison testing will only be done in
@@ -408,17 +405,6 @@ enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
     fromJust' _ (Just x) = x
     fromJust' v Nothing  = error $ "fromJust in enumerate: " ++ show v
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
-
--- XXX bug:
--- Disco> (f -> f true : (B -> B) -> B) == (f -> f false : (B -> B) -> B)
--- disco: fromJust in enumerate: VThunk (CCons 1 []) (fromList [(f,VFun <fun>)])
--- CallStack (from HasCallStack):
---   error, called at src/Disco/Interpret/Core.hs:346:28 in disco-0.1.0.0-6qpHSd8QnDv8iioXN9hgy:Disco.Interpret.Core
---
--- Problem is that a value not in RNF is being passed to a function
--- created via 'enumerate', which currently assumes that arguments
--- will already be in RNF (so they can be compared with
--- decideEqForRnf).
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

@@ -544,7 +544,8 @@ checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
   joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2
 checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
 checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
-checkPattern (PNat _)   TyN                 = ok
+checkPattern (PNat _)   ty | isSub TyN ty   = ok
+  -- we can match any supertype of TyN against a Nat pattern
 checkPattern (PSucc p)  TyN                 = checkPattern p TyN
 
 checkPattern p ty = throwError (PatternType p ty)

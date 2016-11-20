@@ -258,8 +258,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + Fix parsing of 'let' in REPL (maybe just remove it, in conjunction
-    with next item)
+  + Redo parser to deal with indentation, adding implicit separators
+    etc. so
+    - we don't need semicolons at the ends of lines
+    - nested case works properly
   + Get REPL working with loading definitions from a file etc.
   + Test suite:
     - quick check properties

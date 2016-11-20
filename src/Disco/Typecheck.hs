@@ -134,8 +134,9 @@ instance Monoid TCError where
   mempty = NoError
   mappend _ r = r
 
--- | TypeCheckingMonad. Maintains a context of variable types, and can
--- throw @TCError@s and generate fresh names.
+-- | TypeCheckingMonad. Maintains a context of variable types and a
+--   set of definitions, and can throw @TCError@s and generate fresh
+--   names.
 type TCM = StateT Defns (ReaderT Ctx (ExceptT TCError LFreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.

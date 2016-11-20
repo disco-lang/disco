@@ -66,7 +66,7 @@ data REPLExpr =
 
 letParser :: Parser REPLExpr
 letParser = Let
-  <$> (reserved "let" *> ident)
+  <$> ident
   <*> (symbol "=" *> term)
 
 commandParser :: Parser REPLExpr
@@ -115,7 +115,7 @@ handleCMD s =
     handleLine (Unfold t) = get >>= (\defs -> io.putStrLn.renderDoc.prettyTerm $ unfoldDefsInTerm defs t)
     handleLine DumpState = get >>= io.print.(mapQ prettyDef)
      where
-       prettyDef (x, t) = "let "++(name2String x)++" = "++(renderDoc.prettyTerm $ t)
+       prettyDef (x, t) = (name2String x) ++ " = " ++ (renderDoc.prettyTerm $ t)
     handleLine (Parse t) = io.print $ t
     handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
     handleLine Help = io.putStrLn $ "Help!"

@@ -1,9 +1,10 @@
 import           Control.Monad.State
-import           Data.List                               (isPrefixOf)
+import           Data.List                               (find, isPrefixOf)
 import           System.Console.Haskeline
 import           System.Console.Haskeline.MonadException
 import           System.Exit
 import           Text.Parsec
+import           Text.Parsec.String
 import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
@@ -56,60 +57,43 @@ data REPLExpr =
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
  | ShowAST Term                 -- Show a terms AST
- | DumpState                    -- Trigger to dump the state for debugging.
  | Unfold Term                  -- Unfold the definitions in a term for debugging.
  | Parse Term                   -- Show the parsed AST
  | Desugar Term                 -- Show a desugared term
+ | DumpState                    -- Trigger to dump the state for debugging.
+ | Help
  deriving Show
 
-letParser = do
-  reservedOp "let"
-  n <- ident
-  symbol "="
-  t <- parseTerm
-  eof
-  return $ Let n t
+letParser :: Parser REPLExpr
+letParser = Let
+  <$> (reserved "let" *> ident)
+  <*> (symbol "=" *> term)
 
-replTermCmdParser cmd c p = do
+commandParser :: Parser REPLExpr
+commandParser = do
   symbol ":"
   ucmd <- many lower
-  whiteSpace
-  t <- p
-  eof
-  if (ucmd `isPrefixOf` cmd)
-  then return $ c t
-  else fail $ "Command \":"++cmd++"\" is unrecognized."
+  parseCommandArgs ucmd
 
-replIntCmdParser cmd c = do
-  symbol ":"
-  ucmd <- many lower
-  whiteSpace
-  eof
-  if (ucmd `isPrefixOf` cmd)
-  then return c
-  else fail $ "Command \":"++cmd++"\" is unrecognized."
+parseCommandArgs :: String -> Parser REPLExpr
+parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
+  where
+    badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
+    parsers =
+      [ ("type",    TypeCheck <$> term)
+      , ("show",    ShowAST   <$> term)
+      , ("unfold",  Unfold    <$> term)
+      , ("dump",    return DumpState)
+      , ("parse",   Parse     <$> term)
+      , ("desugar", Desugar   <$> term)
+      , ("help",    return Help)
+      ]
 
-evalParser = do
-  t <- parseTerm
-  eof
-  return.Eval $ t
-
-typeCheckParser  = replTermCmdParser "type"   TypeCheck parseTerm
-showASTParser    = replTermCmdParser "show"   ShowAST   parseTerm
-unfoldTermParser = replTermCmdParser "unfold" Unfold    parseTerm
-dumpStateParser  = replIntCmdParser  "dump"   DumpState
-parseTermParser  = replTermCmdParser "parse"  Parse     parseTerm
-desugarTermParser = replTermCmdParser "desugar" Desugar parseTerm
-
-lineParser = letParser
-          <|> try typeCheckParser
-          <|> try evalParser
-          <|> try showASTParser
-          <|> try unfoldTermParser
-          <|> try dumpStateParser
-          <|> try evalParser
-          <|> try parseTermParser
-          <|> try desugarTermParser
+lineParser :: Parser REPLExpr
+lineParser
+  =   commandParser
+  <|> try (Eval <$> (parseTerm <* eof))
+  <|> letParser
 
 parseLine :: String -> Either String REPLExpr
 parseLine s = case (parse lineParser "" s) of
@@ -134,6 +118,7 @@ handleCMD s =
        prettyDef (x, t) = "let "++(name2String x)++" = "++(renderDoc.prettyTerm $ t)
     handleLine (Parse t) = io.print $ t
     handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
+    handleLine Help = io.putStrLn $ "Help!"
 
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do

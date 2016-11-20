@@ -63,6 +63,9 @@ whiteSpace = P.whiteSpace lexer
 ------------------------------------------------------------
 -- Parser
 
+term :: Parser Term
+term = whiteSpace *> parseTerm <* eof
+
 -- | Parse an entire program (a list of declarations ended by
 --   semicolons).
 parseProg :: Parser Prog

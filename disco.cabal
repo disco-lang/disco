@@ -23,6 +23,7 @@ library
   exposed-modules:
                        Disco.AST.Core
                        Disco.AST.Surface
+                       Disco.AST.Typed
                        Disco.Parser
                        Disco.Pretty
                        Disco.Desugar

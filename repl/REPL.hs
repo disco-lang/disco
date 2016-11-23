@@ -9,6 +9,7 @@ import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
 import           Disco.AST.Surface
+import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Interpret.Core
 import           Disco.Parser

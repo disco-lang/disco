@@ -12,6 +12,7 @@ import           Unbound.LocallyNameless
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.AST.Typed
 import           Disco.Typecheck
 import           Disco.Types
 

@@ -21,7 +21,7 @@ import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
 
-import           Disco.Types
+import           Disco.AST.Surface
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever

@@ -16,9 +16,9 @@ import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind,
                                           runLFreshM, translate, unembed,
                                           unrebind)
 
+import           Disco.AST.Surface
 import           Disco.Parser
 import           Disco.Typecheck         hiding (ok)
-import           Disco.Types
 
 data Value where
   VUnit :: Value

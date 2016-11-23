@@ -8,12 +8,12 @@ import           Text.Parsec.String
 import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
+import           Disco.AST.Surface
 import           Disco.Desugar
 import           Disco.Interpret.Core
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck
-import           Disco.Types
 
 import           Queue
 

@@ -19,7 +19,7 @@ import qualified Text.Parsec.Token       as P
 
 import           Control.Applicative     (many, (<|>))
 
-import           Disco.Types
+import           Disco.AST.Surface
 
 ------------------------------------------------------------
 -- Lexer

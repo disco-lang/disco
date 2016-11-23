@@ -26,7 +26,8 @@ import           Unbound.LocallyNameless hiding (enumerate, rnf)
 import           Disco.Desugar
 import           Disco.Parser            (parseTermStr)
 import           Disco.Typecheck         (evalTCM, getType, infer)
-import           Disco.Types
+
+import           Disco.AST.Surface
 
 ------------------------------------------------------------
 -- Types

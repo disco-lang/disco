@@ -9,8 +9,8 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 
+import           Disco.AST.Surface
 import qualified Disco.Parser            as PR
-import           Disco.Types
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,

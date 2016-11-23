@@ -5,7 +5,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module Disco.Types where
+module Disco.AST.Surface where
 
 import           Unbound.LocallyNameless
 

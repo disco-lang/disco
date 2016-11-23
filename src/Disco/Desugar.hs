@@ -10,8 +10,8 @@ module Disco.Desugar where
 
 import           Unbound.LocallyNameless
 
+import           Disco.AST.Surface
 import           Disco.Typecheck
-import           Disco.Types
 
 data Strictness = Strict | Lazy
   deriving (Eq, Show)

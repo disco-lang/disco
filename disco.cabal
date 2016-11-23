@@ -21,13 +21,13 @@ source-repository head
 
 library
   exposed-modules:
+                       Disco.AST.Surface
                        Disco.Parser
                        Disco.Pretty
                        Disco.Desugar
                        Disco.Interpret.Core
                        Disco.Interpret.Surface
                        Disco.Typecheck
-                       Disco.Types
 
   other-extensions:
                        GADTs

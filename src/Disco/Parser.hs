@@ -20,6 +20,7 @@ import qualified Text.Parsec.Token       as P
 import           Control.Applicative     (many, (<|>))
 
 import           Disco.AST.Surface
+import           Disco.Types
 
 ------------------------------------------------------------
 -- Lexer

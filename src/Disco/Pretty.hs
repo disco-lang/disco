@@ -9,12 +9,14 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 
-import           Disco.AST.Surface
-import qualified Disco.Parser            as PR
-
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
                                           unembed, unrebind)
+
+import           Disco.AST.Surface
+import qualified Disco.Parser            as PR
+import           Disco.Types
+
 
 --------------------------------------------------
 -- Monadic pretty-printing

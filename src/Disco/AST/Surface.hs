@@ -9,6 +9,8 @@ module Disco.AST.Surface where
 
 import           Unbound.LocallyNameless
 
+import           Disco.Types
+
 -- | A program is a list of declarations.
 type Prog = [Decl]
 
@@ -90,26 +92,7 @@ data Pattern where
   deriving Show
   -- TODO: figure out how to match on Z or Q!
 
--- | Types.
-data Type where
-  TyVar    :: Name Type -> Type
-    -- Unification variables.  Ideally Type would be parameterized by
-    -- a variable type, then we could use Type' Void to represent
-    -- solved types, but I can't figure out how to make that work with
-    -- unbound.
-
-  TyVoid   :: Type                  -- ^ Void
-  TyUnit   :: Type                  -- ^ Unit
-  TyBool   :: Type                  -- ^ Bool
-  TyArr    :: Type -> Type -> Type  -- ^ Function type,  T1 -> T2
-  TyPair   :: Type -> Type -> Type  -- ^ Pair type, T1 * T2
-  TySum    :: Type -> Type -> Type  -- ^ Sum type, T1 + T2
-  TyN      :: Type                  -- ^ Natural numbers
-  TyZ      :: Type                  -- ^ Integers
-  TyQ      :: Type                  -- ^ Rationals
-  deriving (Show, Eq)
-
-derive [''Side, ''UOp, ''BOp, ''Term, ''Guards, ''Guard, ''Pattern, ''Type]
+derive [''Side, ''UOp, ''BOp, ''Term, ''Guards, ''Guard, ''Pattern]
 
 instance Alpha Side
 instance Alpha UOp
@@ -118,7 +101,6 @@ instance Alpha Term
 instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
-instance Alpha Type
 
 instance Subst Term Type
 instance Subst Term Guards
@@ -130,6 +112,3 @@ instance Subst Term UOp
 instance Subst Term Term where
   isvar (TVar x) = Just (SubstName x)
   isvar _ = Nothing
-
-isNumTy :: Type -> Bool
-isNumTy ty = ty `elem` [TyN, TyZ, TyQ]

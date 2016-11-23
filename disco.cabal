@@ -28,6 +28,7 @@ library
                        Disco.Interpret.Core
                        Disco.Interpret.Surface
                        Disco.Typecheck
+                       Disco.Types
 
   other-extensions:
                        GADTs

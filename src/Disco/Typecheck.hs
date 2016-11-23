@@ -14,9 +14,11 @@ module Disco.Typecheck where
 import           Prelude                 hiding (lookup)
 
 import           Control.Applicative     ((<|>))
+import           Control.Arrow           ((&&&))
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.List               (group, partition, sort)
 import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
@@ -25,7 +27,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
-type Defns = M.Map (Name ATerm) (Either Type ATerm)
+type Defns = M.Map (Name ATerm) (Bind [Pattern] ATerm)
 
 type Ctx = M.Map (Name Term) Type
 
@@ -61,6 +63,7 @@ data TCError
   | RelPmQ                 -- ^ Can't ask about relative primality of rationals.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
+  | NumPatterns            -- ^ # of patterns does not match type in definition
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -492,46 +495,44 @@ ok = return emptyCtx
 
 ------------------------------------------------------------
 
-exists :: Name Term -> TCM (Maybe (Either Type ATerm))
-exists x = do
-  defns <- get
-  return $ M.lookup (translate x) defns
-
-addType :: Name Term -> Type -> TCM ()
-addType x ty = modify (M.insert (translate x) (Left ty))
-
-addDefn :: Name Term -> ATerm -> TCM ()
-addDefn x at = modify (M.alter (const (Just (Right at))) (translate x))
+addDefn :: Name Term -> (Bind [Pattern] ATerm) -> TCM ()
+addDefn x b = modify (M.insert (translate x) b)
 
 declName :: Decl -> Name Term
-declName (DType x _)   = x
+declName (DType x _) = x
 declName (DDefn x _) = x
 
--- XXX TODO: mutually recursive functions?
-inferProg :: Prog -> TCM ()
-inferProg [] = return ()
-inferProg (DType x ty : prog) = do
-  mdef <- exists x
-  case mdef of
-    Nothing -> addType x ty
-    Just _  -> throwError $ DuplicateDecls x
-  extend x ty $ do
-  inferProg prog
-inferProg decls@(DDefn x _ : _) = do
-  let (defnBlock, prog) = span ((==x) . declName) decls
-  mdef <- exists x
-  at <- case mdef of
-    Nothing        -> inferDefnBlock defnBlock
-    Just (Left ty) -> checkDefnBlock defnBlock ty
-    Just (Right _) -> throwError $ DuplicateDefns x
-  addDefn x at
-  inferProg prog
+inferProg :: Prog -> TCM Ctx
+inferProg prog = do
+  let (defns, typeDecls) = partition isDefn prog
+  withTypeDecls typeDecls $ do
+    mapM_ checkDefn defns
+    ask
 
--- Prerequisite: all Decls are DDefns with the same name.  XXX Need to
--- make some sort of Term that this can turn into?  No, Defns needs to
--- map names to typed definition blocks, not ATerms.
-inferDefnBlock :: [Decl] -> TCM ATerm
-inferDefnBlock = undefined
+-- precondition: only called on DTypes
+withTypeDecls :: [Decl] -> TCM a -> TCM a
+withTypeDecls decls k = do
+  let dups :: [(Name Term, Int)]
+      dups = filter ((>1) . snd) . map (head &&& length) . group . sort . map declName $ decls
+  case dups of
+    ((x,_):_) -> throwError (DuplicateDecls x)
+    []        -> extends declCtx k
+  where
+    declCtx = M.fromList (map (\(DType x ty) -> (x,ty)) decls)
 
-checkDefnBlock :: [Decl] -> Type -> TCM ATerm
-checkDefnBlock = undefined
+-- precondition: only called on DDefns
+checkDefn :: Decl -> TCM ()
+checkDefn (DDefn x def) = do
+  ty <- lookup x
+  prevDefn <- gets (M.lookup (translate x))
+  case prevDefn of
+    Just _ -> throwError (DuplicateDefns x)
+    Nothing -> lunbind def $ \(pats, body) -> do
+      at <- go pats ty body
+      addDefn x (bind pats at)
+  where
+    go [] ty body = check body ty
+    go (p:ps) (TyArr ty1 ty2) body = do
+      ctx <- checkPattern p ty1
+      extends ctx $ go ps ty2 body
+    go _ _ _ = throwError NumPatterns   -- XXX include more info

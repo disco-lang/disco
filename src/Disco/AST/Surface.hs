@@ -20,6 +20,10 @@ data Decl where
   DDefn :: Name Term -> Bind [Pattern] Term -> Decl
   deriving Show
 
+isDefn :: Decl -> Bool
+isDefn DDefn{} = True
+isDefn _       = False
+
 -- | Injections into a sum type (inl or inr) have a "side" (L or R).
 data Side = L | R
   deriving (Show, Eq, Enum)

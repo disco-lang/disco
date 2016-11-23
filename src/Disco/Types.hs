@@ -39,6 +39,12 @@ data Term where
   TUnit  :: Term                               -- ^ Unit ()
   TBool  :: Bool -> Term                       -- ^ Boolean
   TAbs   :: Bind (Name Term) Term -> Term      -- ^ Anonymous function abstraction
+
+     -- Note, could add an optional type annotation to TAbs,
+     -- problem is I don't know what would be a good concrete syntax!
+     -- x : Int -> body  is tricky because when parsing the type,
+     -- the -> looks like a type arrow.  Could perhaps require
+     -- parens i.e.  (x : Int) -> body ?
   TJuxt  :: Term -> Term -> Term               -- ^ Juxtaposition (can be either
                                                --   function application or multiplication)
   TPair  :: Term -> Term -> Term               -- ^ Ordered pairs (x,y)

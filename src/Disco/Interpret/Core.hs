@@ -23,7 +23,7 @@ import           Data.Maybe              (fromJust)
 import           Data.Ratio
 import           Unbound.LocallyNameless hiding (enumerate, rnf)
 
-import           Disco.AST.Surface
+import           Disco.AST.Core
 import           Disco.Desugar
 import           Disco.Parser            (parseTermStr)
 import           Disco.Typecheck         (evalTCM, getType, infer)

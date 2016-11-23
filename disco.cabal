@@ -21,6 +21,7 @@ source-repository head
 
 library
   exposed-modules:
+                       Disco.AST.Core
                        Disco.AST.Surface
                        Disco.Parser
                        Disco.Pretty

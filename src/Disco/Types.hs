@@ -33,3 +33,12 @@ instance Alpha Type
 
 isNumTy :: Type -> Bool
 isNumTy ty = ty `elem` [TyN, TyZ, TyQ]
+
+data Strictness = Strict | Lazy
+  deriving (Eq, Show)
+
+strictness :: Type -> Strictness
+strictness ty
+  | isNumTy ty = Strict
+  | otherwise  = Lazy
+

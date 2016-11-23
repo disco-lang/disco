@@ -289,3 +289,16 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - Can we do something like -fdefer-type-errors so that
       students files load despite errors.
   + Machine-checkable examples
+* Links
+
+  Here's how Idris represents terms: https://github.com/idris-lang/Idris-dev/blob/8ea27ae997ea1e4214ce47ad228bd7c35a891459/src/Idris/Core/TT.hs
+  Idris parsing:
+    https://github.com/idris-lang/Idris-dev/blob/master/src/Idris/Parser/Helpers.hs
+    https://github.com/idris-lang/Idris-dev/blob/master/src/Idris/Parser/Expr.hs
+
+  Trifecta:
+    http://hackage.haskell.org/package/trifecta
+    Use in conjunction with http://hackage.haskell.org/package/parsers
+
+  Layout parsing:
+    http://hackage.haskell.org/package/located

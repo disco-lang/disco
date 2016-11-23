@@ -92,6 +92,12 @@ data Pattern where
 
 -- | Types.
 data Type where
+  TyVar    :: Name Type -> Type
+    -- Unification variables.  Ideally Type would be parameterized by
+    -- a variable type, then we could use Type' Void to represent
+    -- solved types, but I can't figure out how to make that work with
+    -- unbound.
+
   TyVoid   :: Type                  -- ^ Void
   TyUnit   :: Type                  -- ^ Unit
   TyBool   :: Type                  -- ^ Bool

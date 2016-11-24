@@ -24,7 +24,6 @@ import           Unbound.LocallyNameless hiding (enumerate, rnf)
 
 import           Disco.AST.Core
 import           Disco.Desugar
-import           Disco.Parser            (parseTermStr)
 import           Disco.Types
 
 ------------------------------------------------------------

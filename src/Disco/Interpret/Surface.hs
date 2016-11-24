@@ -244,6 +244,3 @@ prettyValue (VInj s v) = (case s of { L -> "inl "; R -> "inr " }) ++ prettyValue
 prettyValue (VNum r)
   | denominator r == 1 = show (numerator r)
   | otherwise          = show (numerator r) ++ "/" ++ show (denominator r)
-
-eval :: String -> IO ()
-eval = putStrLn . either show (either show prettyValue . runIM . interpTermTop) . evalTCM . infer . parseTermStr

@@ -2,20 +2,16 @@
 {-# LANGUAGE RankNTypes   #-}
 {-# LANGUAGE TypeFamilies #-}
 
--- Simple proof of concept parser using Parsec, since I know it well
--- and can throw something together quickly.  Later we will probably
--- want to redo this using e.g. trifecta.
-
 module Disco.Parser where
 
 import           Unbound.LocallyNameless (Name, bind, embed, rebind,
                                           string2Name)
 
-import           Text.Parsec             hiding (Error, many, (<|>))
-import           Text.Parsec.Expr        hiding (Operator)
-import           Text.Parsec.Language    (haskellStyle)
-import           Text.Parsec.String      (Parser, parseFromFile)
-import qualified Text.Parsec.Token       as P
+import           Text.Megaparsec
+import qualified Text.Megaparsec.Char    as C
+import           Text.Megaparsec.Expr    hiding (Operator)
+import qualified Text.Megaparsec.Lexer   as L
+import           Text.Megaparsec.String  (Parser)
 
 import           Control.Applicative     (many, (<|>))
 
@@ -25,41 +21,56 @@ import           Disco.Types
 ------------------------------------------------------------
 -- Lexer
 
-lexer :: P.TokenParser u
-lexer = P.makeTokenParser $
-  haskellStyle
-  { P.reservedNames   = [ "true", "false", "True", "False", "inl", "inr", "let", "in"
-                        , "if", "when"
-                        , "otherwise", "and", "or", "not", "mod"
-                        , "()"
-                        , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
-                        , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
-                        ]
-  , P.reservedOpNames = [ "|->", "+", "-", "*", "/", "&&", "||", "∧", "∨", "^"
-                        , "->", "<", ">", "<=", ">=", "/=", "==", "%", "|", "#" ]
-  }
+-- XXX should we use C.spaceChar here, or a variant that does not consume newlines?
+whiteSpace :: Parser ()
+whiteSpace = L.space (C.spaceChar *> pure ()) lineComment blockComment
+  where
+    lineComment  = L.skipLineComment "--"
+    blockComment = L.skipBlockComment "{-" "-}"
 
-parens :: Parser a -> Parser a
-parens     = P.parens lexer
-
-reserved :: String -> Parser ()
-reserved = P.reserved lexer
-
-reservedOp :: String -> Parser ()
-reservedOp = P.reservedOp lexer
+lexeme :: Parser a -> Parser a
+lexeme = L.lexeme whiteSpace
 
 symbol :: String -> Parser String
-symbol = P.symbol lexer
+symbol = L.symbol whiteSpace
+
+reservedOp :: String -> Parser ()
+reservedOp s = symbol s *> pure ()
+
+parens    = between (symbol "(") (symbol ")")
+braces    = between (symbol "{") (symbol "}")
+angles    = between (symbol "<") (symbol ">")
+brackets  = between (symbol "[") (symbol "]")
+semi      = symbol ";"
+comma     = symbol ","
+colon     = symbol ":"
+dot       = symbol "."
+
+natural = lexeme L.integer
+integer = L.signed whiteSpace natural
+
+reserved :: String -> Parser ()
+reserved w = lexeme $ C.string w *> notFollowedBy alphaNumChar
+
+reservedWords :: [String]
+reservedWords =
+  [ "true", "false", "True", "False", "inl", "inr", "let", "in"
+  , "if", "when"
+  , "otherwise", "and", "or", "not", "mod"
+  , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
+  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
+  ]
+
+identifier :: Parser String
+identifier = (lexeme . try) (p >>= check)
+  where
+    p       = (:) <$> letterChar <*> many alphaNumChar
+    check x = if x `elem` reservedWords
+                then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
+                else return x
 
 ident :: Parser (Name Term)
-ident = string2Name <$> P.identifier lexer
-
-natural, integer :: Parser Integer
-natural = P.natural lexer
-integer = P.integer lexer
-
-whiteSpace :: Parser ()
-whiteSpace = P.whiteSpace lexer
+ident = string2Name <$> identifier
 
 ------------------------------------------------------------
 -- Parser
@@ -70,7 +81,7 @@ term = whiteSpace *> parseTerm <* eof
 -- | Parse an entire program (a list of declarations ended by
 --   semicolons).
 parseProg :: Parser Prog
-parseProg = parseDecl `sepEndBy` symbol ";"
+parseProg = parseDecl `sepEndBy` semi
 
 -- | Parse a single declaration (either a type declaration or
 --   definition).
@@ -95,6 +106,8 @@ parseAtom
 parseInj :: Parser Side
 parseInj =
   L <$ reserved "inl" <|> R <$ reserved "inr"
+
+optionMaybe p = (Just <$> p) <|> pure Nothing
 
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
@@ -128,7 +141,7 @@ parseLet =
 
 -- | Parse a case expression.
 parseCase :: Parser Term
-parseCase = TCase <$> many1 parseBranch
+parseCase = TCase <$> some parseBranch
 
 -- | Parse one branch of a case expression.  Note a branch can start
 --   with many curly braces since we allow empty lines just for
@@ -141,7 +154,7 @@ parseCase = TCase <$> many1 parseBranch
 --     {  7    otherwise
 --   @
 parseBranch :: Parser Branch
-parseBranch = many1 (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
+parseBranch = some (symbol "{") *> (flip bind <$> parseTerm <*> parseGuards)
 
 -- | Parse the list of guards in a branch.  @otherwise@ can be used
 --   interchangeably with an empty list of guards.
@@ -161,58 +174,65 @@ parseAtomicPattern :: Parser Pattern
 parseAtomicPattern =
       PVar <$> ident
   <|> PWild <$ symbol "_"
-  <|> PUnit <$ reserved "()"
+  <|> PUnit <$ symbol "()"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
   <|> PNat <$> natural
-  <|> try (PPair <$> (symbol "(" *> parsePattern) <*> (symbol "," *> parsePattern <* symbol ")"))
+  <|> try (PPair <$ symbol "("
+                 <*> parsePattern
+                 <*  symbol ","
+                 <*> parsePattern
+                 <*  symbol ")"
+          )
   <|> parens parsePattern
 
 -- | Parse a complex pattern.
 parsePattern :: Parser Pattern
 parsePattern =
       PInj <$> parseInj <*> parseAtomicPattern
-  <|> PSucc <$> (symbol "S" *> parseAtomicPattern)
+  <|> PSucc <$ symbol "S" <*> parseAtomicPattern
   <|> parseAtomicPattern
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
-parseExpr = buildExpressionParser table parseAtom <?> "expression"
+parseExpr = makeExprParser parseAtom table <?> "expression"
   where
-    table = [ [ binary ""  TJuxt AssocLeft
+    table = [ [ infixL ""  TJuxt
               , unary "not" (TUn Not)
               ]
             , [ unary  "-" (TUn Neg) ]
-            , [ binary "^" (TBin Exp) AssocRight ]
-            , [ binary "*" (TBin Mul) AssocLeft
-              , binary "/" (TBin Div) AssocLeft
-              , binary "%" (TBin Mod) AssocLeft
-              , binary "mod" (TBin Mod) AssocLeft
+            , [ infixR "^" (TBin Exp) ]
+            , [ infixL "*" (TBin Mul)
+              , infixL "/" (TBin Div)
+              , infixL "%" (TBin Mod)
+              , infixL "mod" (TBin Mod)
               ]
-            , [ binary "+" (TBin Add) AssocLeft
-              , binary "-" (TBin Sub) AssocLeft
+            , [ infixL "+" (TBin Add)
+              , infixL "-" (TBin Sub)
               ]
-            , [ binary "==" (TBin Eq)  AssocNone
-              , binary "/=" (TBin Neq) AssocNone
-              , binary "<"  (TBin Lt)  AssocNone
-              , binary ">"  (TBin Gt)  AssocNone
-              , binary "<=" (TBin Leq) AssocNone
-              , binary ">=" (TBin Geq) AssocNone
-              , binary "|"  (TBin Divides) AssocNone
-              , binary "#"  (TBin RelPm) AssocNone
+            , [ infixN "==" (TBin Eq)
+              , infixN "/=" (TBin Neq)
+              , infixN "<"  (TBin Lt)
+              , infixN ">"  (TBin Gt)
+              , infixN "<=" (TBin Leq)
+              , infixN ">=" (TBin Geq)
+              , infixN "|"  (TBin Divides)
+              , infixN "#"  (TBin RelPm)
               ]
-            , [ binary "&&"  (TBin And) AssocRight
-              , binary "and" (TBin And) AssocRight
-              , binary "∧"   (TBin And) AssocRight
+            , [ infixR "&&"  (TBin And)
+              , infixR "and" (TBin And)
+              , infixR "∧"   (TBin And)
               ]
-            , [ binary "||" (TBin Or)  AssocRight
-              , binary "or" (TBin Or) AssocRight
-              , binary "∨"  (TBin Or) AssocRight
+            , [ infixR "||" (TBin Or)
+              , infixR "or" (TBin Or)
+              , infixR "∨"  (TBin Or)
               ]
             ]
 
-    unary  name fun       = Prefix (reservedOp name >> return fun)
-    binary name fun assoc = Infix (reservedOp name >> return fun) assoc
+    unary  name fun = Prefix (reservedOp name >> return fun)
+    infixL name fun = InfixL (reservedOp name >> return fun)
+    infixR name fun = InfixR (reservedOp name >> return fun)
+    infixN name fun = InfixN (reservedOp name >> return fun)
 
 -- | Parse an atomic type.
 parseAtomicType :: Parser Type
@@ -231,26 +251,11 @@ parseType = parseTypeExpr <|> parseAtomicType
 
 -- | Parse a type expression built out of binary operators.
 parseTypeExpr :: Parser Type
-parseTypeExpr = buildExpressionParser table parseAtomicType <?> "type expression"
+parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
   where
-    table = [ [ binary "*" TyPair AssocRight ]
-            , [ binary "+" TySum AssocRight ]
-            , [ binary "->" TyArr AssocRight ]
+    table = [ [ infixR "*" TyPair ]
+            , [ infixR "+" TySum  ]
+            , [ infixR "->" TyArr ]
             ]
 
-    binary name fun assoc = Infix (reservedOp name >> return fun) assoc
-
--- | For convenience/testing
-parseTermStr :: String -> Term
-parseTermStr s = case (parse (whiteSpace *> parseTerm <* eof) "" s) of
-                   Left e -> error.show $ e
-                   Right t -> t
-
-
-parseTypeStr :: String -> Type
-parseTypeStr s = case (parse parseType "" s) of
-                   Left e -> error.show $ e
-                   Right t -> t
-
-parseFile :: FilePath -> IO (Either ParseError Prog)
-parseFile = parseFromFile (whiteSpace *> parseProg <* eof)
+    infixR name fun = InfixR (reservedOp name >> return fun)

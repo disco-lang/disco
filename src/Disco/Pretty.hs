@@ -232,12 +232,3 @@ prettyDecl (DDefn x b)
 
 renderDoc :: Doc -> String
 renderDoc = PP.render . runLFreshM . flip runReaderT initPA
-
-echoTerm :: String -> String
-echoTerm = renderDoc . prettyTerm . PR.parseTermStr
-
-echoTermP :: String -> IO ()
-echoTermP = putStrLn . echoTerm
-
-echoType :: String -> String
-echoType = renderDoc . prettyTy . PR.parseTypeStr

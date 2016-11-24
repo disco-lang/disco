@@ -6,8 +6,8 @@ import qualified Data.Map                                as M
 import           System.Console.Haskeline
 import           System.Console.Haskeline.MonadException
 import           System.Exit
-import           Text.Parsec
-import           Text.Parsec.String
+import           Text.Megaparsec
+import           Text.Megaparsec.String                  (Parser)
 import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
@@ -58,7 +58,7 @@ letParser = Let
 commandParser :: Parser REPLExpr
 commandParser = do
   symbol ":"
-  ucmd <- many lower
+  ucmd <- many lowerChar
   parseCommandArgs ucmd
 
 parseCommandArgs :: String -> Parser REPLExpr
@@ -123,7 +123,8 @@ handleDesugar t = do
 
 handleLoad :: FilePath -> REPLStateIO ()
 handleLoad file = do
-  mp <- io (parseFile file)
+  str <- io $ readFile file
+  let mp = runParser parseProg file str
   case mp of
     Left err -> io $ print err
     Right p  ->

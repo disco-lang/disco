@@ -9,6 +9,10 @@ fib n =
   { n                  when n = 0
   { n                  when n = 1
   { fib m + fib (m+1)  when n = S (S m);
+    -- note we can't write
+    --   fib (n-1) + fib (n-2) otherwise
+    -- since that doesn't pass the type checker: it doesn't believe
+    -- that (n-1) and (n-2) are natural numbers.
 
 -- Mutually recursive functions.  The order of declarations and
 -- definitions does not matter.

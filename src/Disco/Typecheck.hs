@@ -27,7 +27,8 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
-type Defns = M.Map (Name ATerm) (Bind [Pattern] ATerm)
+type Defn  = Bind [Pattern] ATerm
+type Defns = M.Map (Name ATerm) Defn
 
 type Ctx = M.Map (Name Term) Type
 

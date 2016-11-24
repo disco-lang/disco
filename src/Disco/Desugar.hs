@@ -1,10 +1,11 @@
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleInstances        #-}
+{-# LANGUAGE GADTs                    #-}
+{-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE ViewPatterns             #-}
 
 module Disco.Desugar where
 
@@ -20,6 +21,19 @@ type DSM = LFreshM
 
 runDSM :: DSM a -> a
 runDSM = runLFreshM
+
+desugarDefn :: Defn -> DSM Core
+desugarDefn def =
+  lunbind def $ \(pats, body) -> go pats body
+  where
+    go []     body = desugar body
+    go (p:ps) body = do
+      arg  <- lfresh (string2Name "arg")
+      avoid [AnyName arg] $ do
+      let cp = desugarPattern p
+      rest <- go ps body
+      return $
+        CAbs (bind arg (CCase [bind (CGCons (rebind (embed $ CVar arg, cp) CGEmpty)) rest]))
 
 desugar :: ATerm -> DSM Core
 desugar (ATVar _ x)   = return $ CVar (translate x)

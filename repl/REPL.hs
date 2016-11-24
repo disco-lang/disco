@@ -1,5 +1,7 @@
+import           Control.Lens
 import           Control.Monad.State
 import           Data.List                               (find, isPrefixOf)
+import qualified Data.Map                                as M
 import           System.Console.Haskeline
 import           System.Console.Haskeline.MonadException
 import           System.Exit
@@ -8,18 +10,19 @@ import           Text.Parsec.String
 import           Unbound.LocallyNameless                 hiding (rnf)
 import           Unbound.LocallyNameless.Subst
 
+import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core
+import           Disco.Interpret.Core                    (prettyValue, rnf,
+                                                          runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck
 
-import           Queue
+type CDefns = M.Map (Name Core) Core
 
-type Qelm = (Name Term, Term)
-type REPLStateIO = StateT (Queue Qelm) IO
+type REPLStateIO = StateT (Ctx, CDefns) IO
 
 -- HDE: Is there a way around this?
 instance MonadException m => MonadException (StateT s m) where
@@ -30,25 +33,6 @@ instance MonadException m => MonadException (StateT s m) where
 io :: IO a -> REPLStateIO a
 io i = liftIO i
 
-pop :: REPLStateIO (Name Term, Term)
-pop = get >>= return.headQ
-
-push :: Qelm -> REPLStateIO ()
-push t = get >>= put.(`snoc` t)
-
-unfoldDefsInTerm :: (Queue Qelm) -> Term -> Term
-unfoldDefsInTerm q t =
-    let uq = toListQ $ unfoldQueue q
-     in substs uq t
-
-unfoldQueue :: (Queue Qelm) -> (Queue Qelm)
-unfoldQueue q = fixQ q emptyQ step
- where
-   step e@(x,t) _ r = (mapQ (substDef x t) r) `snoc` e
-    where
-      substDef :: Name Term -> Term -> Qelm -> Qelm
-      substDef x t (y, t') = (y, subst x t t')
-
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
 ------------------------------------------------------------------------
@@ -58,10 +42,10 @@ data REPLExpr =
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
  | ShowAST Term                 -- Show a terms AST
- | Unfold Term                  -- Unfold the definitions in a term for debugging.
  | Parse Term                   -- Show the parsed AST
  | Desugar Term                 -- Show a desugared term
  | DumpState                    -- Trigger to dump the state for debugging.
+ | Load FilePath                -- Load a file.
  | Help
  deriving Show
 
@@ -83,12 +67,14 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
     parsers =
       [ ("type",    TypeCheck <$> term)
       , ("show",    ShowAST   <$> term)
-      , ("unfold",  Unfold    <$> term)
-      , ("dump",    return DumpState)
       , ("parse",   Parse     <$> term)
       , ("desugar", Desugar   <$> term)
+      , ("load",    Load      <$> fileParser)
       , ("help",    return Help)
       ]
+
+fileParser :: Parser FilePath
+fileParser = whiteSpace *> many anyChar
 
 lineParser :: Parser REPLExpr
 lineParser
@@ -109,17 +95,24 @@ handleCMD s =
       Right l -> handleLine l
   where
     handleLine :: REPLExpr -> REPLStateIO ()
-    handleLine (Let x t) = push (x , t)
+    handleLine (Let x t) = handleLet x t
     handleLine (TypeCheck t) = (type_check t) >>= (io.putStrLn)
     handleLine (Eval t) = (eval t) >>= (io.putStrLn)
-    handleLine (ShowAST t) = get >>= (\defs -> io.putStrLn.show $ unfoldDefsInTerm defs t)
-    handleLine (Unfold t) = get >>= (\defs -> io.putStrLn.renderDoc.prettyTerm $ unfoldDefsInTerm defs t)
-    handleLine DumpState = get >>= io.print.(mapQ prettyDef)
-     where
-       prettyDef (x, t) = (name2String x) ++ " = " ++ (renderDoc.prettyTerm $ t)
+    handleLine (ShowAST t) = get >>= (\defs -> io.putStrLn.show $ t)
     handleLine (Parse t) = io.print $ t
     handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
+    handleLine (Load file) = handleLoad file
     handleLine Help = io.putStrLn $ "Help!"
+
+handleLet :: Name Term -> Term -> REPLStateIO ()
+handleLet x t = do
+  (ctx, defns) <- get
+  let mat = runTCM (extends ctx $ infer t)
+  case mat of
+    Left err -> io.print $ err   -- XXX pretty print
+    Right (at, _) -> do
+      _1 %= M.insert x (getType at)
+      _2 %= M.insert (translate x) (runDSM $ desugar at)
 
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do
@@ -127,26 +120,36 @@ handleDesugar t = do
     Left err -> return.show $ err
     Right at -> return.show.runDSM.desugar $ at
 
+handleLoad :: FilePath -> REPLStateIO ()
+handleLoad file = do
+  mp <- io (parseFile file)
+  case mp of
+    Left err -> io $ print err
+    Right p  ->
+      case runTCM (inferProg p) of
+        Left tcErr         -> io $ print tcErr   -- XXX pretty-print
+        Right (ctx, defns) -> do
+          let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)
+          put (ctx, cdefns)
+
 eval :: Term -> REPLStateIO String
 eval t = do
-  defs <- get
-  let tu = unfoldDefsInTerm defs t
-   in case evalTCM (infer tu) of
-        Left err -> return.show $ err
-        Right at ->
-            let ty = getType at
-                c  = runDSM $ desugar at
-             in case runIM (rnf c) of
-                  Left err -> return.show $ err
-                  Right v  -> return $ prettyValue ty v
+  (ctx, defns) <- get
+  case evalTCM (extends ctx $ infer t) of
+    Left err -> return.show $ err
+    Right at ->
+      let ty = getType at
+          c  = runDSM $ desugar at
+      in case runIM' defns (rnf c) of
+           Left err -> return.show $ err
+           Right v  -> return $ prettyValue ty v
 
 type_check :: Term -> REPLStateIO String
 type_check t = do
-  defs <- get
-  let tu = unfoldDefsInTerm defs t
-   in case (evalTCM.infer $ tu) of
-        Left err -> return.show $ err
-        Right at -> return.renderDoc.prettyTy.getType $ at
+  (ctx, _) <- get
+  case (evalTCM $ extends ctx (infer t)) of
+    Left err -> return.show $ err
+    Right at -> return.renderDoc.prettyTy.getType $ at
 
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
@@ -156,7 +159,7 @@ main = do
   let settings = defaultSettings
         { historyFile = Just ".disco_history" }
   putStr banner
-  evalStateT (runInputT settings loop) emptyQ
+  evalStateT (runInputT settings loop) (M.empty, M.empty)
    where
        loop :: InputT REPLStateIO ()
        loop = do

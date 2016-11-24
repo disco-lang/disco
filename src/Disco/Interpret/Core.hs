@@ -14,6 +14,7 @@ module Disco.Interpret.Core where
 
 import           Debug.Trace
 
+import           Control.Lens            ((%~), (.~), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Char               (toLower)
@@ -71,7 +72,9 @@ instance Show ValFun where
   show _ = "<fun>"
 
 -- | An environment is a mapping from names to values.
-type Env = M.Map (Name Value) Value
+type Env  = M.Map (Name Value) Value
+
+type CEnv = M.Map (Name Core) Core
 
 derive [''Value, ''ValFun]
 
@@ -93,26 +96,40 @@ data InterpError where
 -- | The interpreter monad.  Combines read-only access to an
 -- environment, and the ability to throw @InterpErrors@ and generate
 -- fresh names.
-type IM = ReaderT Env (ExceptT InterpError LFreshM)
+type IM = ReaderT (Env, CEnv) (ExceptT InterpError LFreshM)
 
 -- | Run a computation in the @IM@ monad, starting in the empty
 --   environment.
 runIM :: IM a -> Either InterpError a
-runIM = runLFreshM . runExceptT . flip runReaderT M.empty
+runIM = runIM' M.empty
+
+-- | Run a computation in the @IM@ monad, starting in a given
+--   environment of definitions.
+runIM' :: CEnv -> IM a -> Either InterpError a
+runIM' cenv = runLFreshM . runExceptT . flip runReaderT (M.empty, cenv)
 
 -- | The empty environment.
-emptyEnv :: Env
-emptyEnv = M.empty
+emptyEnv :: (Env, CEnv)
+emptyEnv = (M.empty, M.empty)
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
 extend :: Name Value -> Value -> IM a -> IM a
-extend x v = local (M.insert x v)
+extend x v = local (_1 %~ M.insert x v)
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
 extends :: Env -> IM a -> IM a
-extends e' = local (M.union e')
+extends e' = local (_1 %~ M.union e')
+
+getEnv :: IM Env
+getEnv = fst <$> ask
+
+withEnv :: Env -> IM a -> IM a
+withEnv e = local (_1 .~ e)
+
+getCEnv :: IM CEnv
+getCEnv = snd <$> ask
 
 ------------------------------------------------------------
 -- Evaluation
@@ -121,7 +138,7 @@ extends e' = local (M.union e')
 -- | Create a thunk by packaging up a @Core@ expression with the
 --   current environment.
 mkThunk :: Core -> IM Value
-mkThunk c = VThunk c <$> ask
+mkThunk c = VThunk c <$> getEnv
 
 -- | Turn any instance of @Enum@ into a @Value@, by creating a
 --   constructor with an index corresponding to the enum value.
@@ -140,18 +157,24 @@ rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
 whnfV :: Value -> IM Value
-whnfV v@(VThunk c e) = local (const e) $ whnf c
+whnfV v@(VThunk c e) = withEnv e $ whnf c
 whnfV v              = return v
 
 -- | Reduce a Core expression to weak head normal form.
 whnf :: Core -> IM Value
 whnf (CVar x) = do
-  e <- ask
-  v <- maybe (throwError $ UnboundError x) return (M.lookup (translate x) e)
-  whnfV v
+  e <- getEnv
+  case (M.lookup (translate x) e) of
+    Just v  -> whnfV v
+    Nothing -> do
+      c <- getCEnv
+      case (M.lookup x c) of
+        Just core -> whnf core
+        Nothing   -> throwError $ UnboundError x
+
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
 whnf (CNat n)       = return $ VNum (n % 1)
-whnf (CAbs b)       = lunbind b $ \(x,t) -> VClos (bind (translate x) t) <$> ask
+whnf (CAbs b)       = lunbind b $ \(x,t) -> VClos (bind (translate x) t) <$> getEnv
 whnf (CApp str c1 c2) = do
   v1 <- whnf c1
   v2 <- case str of
@@ -159,7 +182,7 @@ whnf (CApp str c1 c2) = do
     Lazy   -> mkThunk c2
   whnfApp v1 v2
 whnf (COp op cs)    = whnfOp op cs
-whnf (CLet str b)     =
+whnf (CLet str b)   =
   lunbind b $ \((x, unembed -> t1), t2) -> do
   v1 <- case str of
     Strict -> whnf t1
@@ -173,7 +196,7 @@ whnf (CCase bs)     = whnfCase bs
 whnfApp :: Value -> Value -> IM Value
 whnfApp (VClos c e) v =
   lunbind c $ \(x,t) -> do
-  local (const e)     $ do
+  withEnv e           $ do
   extend x v          $ do
   whnf t
 whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')

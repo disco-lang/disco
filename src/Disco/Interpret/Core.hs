@@ -12,8 +12,6 @@
 -- | A big-step interpreter for the desugared Disco core language.
 module Disco.Interpret.Core where
 
-import           Debug.Trace
-
 import           Control.Lens            ((%~), (.~), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
@@ -45,7 +43,7 @@ data Value where
     --   represented by @VCons 0 [v1, v2]@, and @inr v@ by @VCons 1
     --   [v]@.
 
-  VClos  :: Bind (Name Value) Core -> Env -> Value
+  VClos  :: Bind (Name Core) Core -> Env -> Value
     -- ^ A closure, i.e. a function body together with its
     --   environment.
 
@@ -72,7 +70,7 @@ instance Show ValFun where
   show _ = "<fun>"
 
 -- | An environment is a mapping from names to values.
-type Env  = M.Map (Name Value) Value
+type Env  = M.Map (Name Core) Value
 
 type CEnv = M.Map (Name Core) Core
 
@@ -114,13 +112,13 @@ emptyEnv = (M.empty, M.empty)
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extend :: Name Value -> Value -> IM a -> IM a
-extend x v = local (_1 %~ M.insert x v)
+extend :: Name Core -> Value -> IM a -> IM a
+extend x v = avoid [AnyName x] . local (_1 %~ M.insert x v)
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
 extends :: Env -> IM a -> IM a
-extends e' = local (_1 %~ M.union e')
+extends e' = avoid (map AnyName (M.keys e')) . local (_1 %~ M.union e')
 
 getEnv :: IM Env
 getEnv = fst <$> ask
@@ -174,7 +172,7 @@ whnf (CVar x) = do
 
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
 whnf (CNat n)       = return $ VNum (n % 1)
-whnf (CAbs b)       = lunbind b $ \(x,t) -> VClos (bind (translate x) t) <$> getEnv
+whnf (CAbs b)       = VClos b <$> getEnv
 whnf (CApp str c1 c2) = do
   v1 <- whnf c1
   v2 <- case str of

@@ -1,5 +1,6 @@
 import           Control.Lens
 import           Control.Monad.State
+import           Data.Char                               (isSpace)
 import           Data.List                               (find, isPrefixOf)
 import qualified Data.Map                                as M
 import           System.Console.Haskeline
@@ -74,7 +75,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       ]
 
 fileParser :: Parser FilePath
-fileParser = whiteSpace *> many anyChar
+fileParser = whiteSpace *> many (satisfy (not . isSpace))
 
 lineParser :: Parser REPLExpr
 lineParser

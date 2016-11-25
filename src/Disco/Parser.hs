@@ -56,7 +56,7 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod"
+  , "otherwise", "and", "or", "not", "mod", "choose"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -200,8 +200,14 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
     table = [ [ infixL ""  TJuxt
               , unary "not" (TUn Not)
               ]
-            , [ unary  "-" (TUn Neg) ]
-            , [ infixR "^" (TBin Exp) ]
+            , [ unary  "-" (TUn Neg)
+              ]
+            , [ post   "!" (TUn Fact)
+              ]
+            , [ infixR "^" (TBin Exp)
+              ]
+            , [ infixN "choose" (TBin Binom)
+              ]
             , [ infixL "*" (TBin Mul)
               , infixL "/" (TBin Div)
               , infixL "%" (TBin Mod)
@@ -230,6 +236,7 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
             ]
 
     unary  name fun = Prefix (reservedOp name >> return fun)
+    post   name fun = Postfix (reservedOp name >> return fun)
     infixL name fun = InfixL (reservedOp name >> return fun)
     infixR name fun = InfixR (reservedOp name >> return fun)
     infixN name fun = InfixN (reservedOp name >> return fun)

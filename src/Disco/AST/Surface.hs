@@ -29,12 +29,12 @@ data Side = L | R
   deriving (Show, Eq, Enum)
 
 -- | Unary operators.
-data UOp = Neg | Not
+data UOp = Neg | Not | Fact
   deriving (Show, Eq)
 
 -- | Binary operators.
 data BOp = Add | Sub | Mul | Div | Exp | Eq | Neq | Lt | Gt | Leq | Geq | And | Or | Mod
-         | Divides | RelPm
+         | Divides | RelPm | Binom
   deriving (Show, Eq)
 
 -- XXX todo add TRat with ability to parse decimal notation

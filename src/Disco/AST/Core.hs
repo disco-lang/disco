@@ -34,7 +34,7 @@ data Core where
 --   all surface language operators show up here, since some can be
 --   desugared into combinators of the operators here.
 data Op = OAdd | ONeg | OMul | ODiv | OExp | OAnd | OOr | OMod | ODivides | ORelPm
-        | OEq Type | OLt Type | ONot
+        | OEq Type | OLt Type | ONot | OBinom | OFact
   deriving Show
 
 type CBranch = Bind CGuards Core

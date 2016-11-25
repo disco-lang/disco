@@ -12,15 +12,19 @@
 -- | A big-step interpreter for the desugared Disco core language.
 module Disco.Interpret.Core where
 
-import           Control.Lens            ((%~), (.~), _1)
+import           Control.Lens                       ((%~), (.~), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Data.Char               (toLower)
-import           Data.List               (find)
-import qualified Data.Map                as M
-import           Data.Maybe              (fromJust)
+import           Data.Char                          (toLower)
+import           Data.List                          (find)
+import qualified Data.Map                           as M
+import           Data.Maybe                         (fromJust)
 import           Data.Ratio
-import           Unbound.LocallyNameless hiding (enumerate, rnf)
+
+import           Unbound.LocallyNameless            hiding (enumerate, rnf)
+
+import           Math.Combinatorics.Exact.Binomial  (choose)
+import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Disco.AST.Core
 import           Disco.Desugar
@@ -275,6 +279,8 @@ whnfOp OOr      = boolOp (||)
 whnfOp OMod     = numOp' modOp
 whnfOp ODivides = numOp' divides
 whnfOp ORelPm   = numOp' relPm
+whnfOp OBinom   = numOp binom
+whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
@@ -330,6 +336,12 @@ divides x y = return . mkEnum $ denominator (y / x) == 1
 --   typechecks, the arguments here will always be integers.
 relPm :: Rational -> Rational -> IM Value
 relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
+
+binom :: Rational -> Rational -> Rational
+binom (numerator -> n) (numerator -> k) = choose n k % 1
+
+fact :: Rational -> Rational
+fact (numerator -> n) = factorial (fromIntegral n) % 1
 
 -- | Perform boolean negation.
 notOp :: [Core] -> IM Value

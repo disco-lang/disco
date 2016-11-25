@@ -69,6 +69,7 @@ desugar (ATSub _ t)  = desugar t
 desugarUOp :: UOp -> Core -> Core
 desugarUOp Neg c = COp ONeg [c]
 desugarUOp Not c = COp ONot [c]
+desugarUOp Fact c = COp OFact [c]
 
 desugarBOp :: Type -> BOp -> Core -> Core -> Core
 desugarBOp _  Add     c1 c2 = COp OAdd [c1,c2]
@@ -87,6 +88,7 @@ desugarBOp _  Or      c1 c2 = COp OOr  [c1, c2]
 desugarBOp _  Mod     c1 c2 = COp OMod [c1, c2]
 desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
+desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
 
 desugarBranch :: ABranch -> DSM CBranch
 desugarBranch b =

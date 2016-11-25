@@ -393,6 +393,15 @@ infer (TBin RelPm t1 t2) = do
     then return (ATBin TyBool RelPm at1 at2)
     else throwError RelPmQ
 
+infer (TBin Binom t1 t2) = do
+  at1 <- check t1 TyN     -- XXX for now.  Can handle negative or even Q arguments,
+  at2 <- check t2 TyN     -- but should we?
+  return $ ATBin TyN Binom at1 at2
+
+infer (TUn Fact t) = do
+  at <- check t TyN
+  return $ ATUn TyN Fact at
+
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.

@@ -253,9 +253,14 @@ parseType = parseTypeExpr <|> parseAtomicType
 parseTypeExpr :: Parser Type
 parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
   where
-    table = [ [ infixR "*" TyPair ]
-            , [ infixR "+" TySum  ]
-            , [ infixR "->" TyArr ]
+    table = [ [ infixR "*" TyPair
+              , infixR "×" TyPair ]
+            , [ infixR "+" TySum
+              , infixR "⊎" TySum
+              ]
+            , [ infixR "->" TyArr
+              , infixR "→"  TyArr
+              ]
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)

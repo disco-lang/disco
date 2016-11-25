@@ -1,10 +1,10 @@
 f : (N -> N) -> N * N -> N -> Z;
 f g (x,y) z = x + g y - z;   -- here g y is function application
 
-q : N -> N * N -> N -> Z;
+q : ℕ → ℕ×ℕ → ℕ → ℤ;          -- unicode syntax is allowed
 q g (x,y) z = x + g y - z;    -- here g y is multiplication
 
-fib : N -> N;                 -- a top-level recursive function
+fib : Nat -> Nat;                 -- a top-level recursive function
 fib n =
   { n                  when n = 0
   { n                  when n = 1

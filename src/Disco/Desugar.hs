@@ -88,6 +88,7 @@ desugarDefn def =
 desugarTerm :: ATerm -> DSM Core
 desugarTerm (ATVar _ x)   = return $ CVar (translate x)
 desugarTerm ATUnit        = return $ CCons 0 []
+desugarTerm (ATEmpty _)   = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
   lunbind lam $ \(x,t) -> do
@@ -138,6 +139,7 @@ desugarBOp _  Mod     c1 c2 = COp OMod [c1, c2]
 desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
+desugarBOp _  Cons    c1 c2 = CCons 1 [c1, c2]
 
 -- | Desugar a branch.
 desugarBranch :: ABranch -> DSM CBranch

@@ -109,6 +109,7 @@ prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
 prettyTy TyN              = text "N"
 prettyTy TyZ              = text "Z"
 prettyTy TyQ              = text "Q"
+prettyTy (TyList ty)      = text "[" <> prettyTy ty <> text "]"
 
 prettyTy' :: Prec -> Assoc -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)

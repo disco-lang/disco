@@ -65,6 +65,7 @@ data TCError
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
+  | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -119,6 +120,10 @@ extends ctx = local (joinCtx ctx)
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
+
+  -- We can check that the empty list has any list type.
+check TEmpty ty@(TyList _) = return $ ATEmpty ty
+check TEmpty ty            = throwError (NotList TEmpty ty)
 
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.
@@ -397,6 +402,11 @@ infer (TBin Binom t1 t2) = do
   at1 <- check t1 TyN     -- XXX for now.  Can handle negative or even Q arguments,
   at2 <- check t2 TyN     -- but should we?
   return $ ATBin TyN Binom at1 at2
+
+infer (TBin Cons t1 t2) = do
+  at1 <- infer t1
+  at2 <- check t2 (TyList (getType at1))
+  return $ ATBin (TyList (getType at1)) Cons at1 at2
 
 infer (TUn Fact t) = do
   at <- check t TyN

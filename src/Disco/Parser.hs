@@ -159,6 +159,7 @@ term = whiteSpace *> parseTerm <* eof
 parseAtom :: Parser Term
 parseAtom
   =   TUnit       <$ reserved "()"
+  <|> TEmpty      <$ reserved "[]"
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
@@ -277,6 +278,8 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
             , [ infixL "+" (TBin Add)
               , infixL "-" (TBin Sub)
               ]
+            , [ infixR "::" (TBin Cons)
+              ]
             , [ infixN "==" (TBin Eq)
               , infixN "/=" (TBin Neq)
               , infixN "<"  (TBin Lt)
@@ -311,6 +314,7 @@ parseAtomicType =
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
+  <|> TyList <$> brackets parseType
   <|> parens parseType
 
 -- | Parse a type.

@@ -50,6 +50,10 @@ data ATerm where
   --   the type.
   ATBool  :: Bool -> ATerm
 
+  -- | The empty list.  The type is inherently ambiguous so we store
+  --   it here.
+  ATEmpty :: Type -> ATerm
+
   -- | A natural number.
   ATNat   :: Integer -> ATerm
 

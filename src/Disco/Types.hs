@@ -61,6 +61,9 @@ data Type where
   -- | Rationals
   TyQ      :: Type
 
+  -- | Lists
+  TyList   :: Type -> Type
+
   deriving (Show, Eq)
 
 -- | Check whether a type is a numeric type (N, Z, or Q).

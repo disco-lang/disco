@@ -81,6 +81,7 @@ data BOp = Add     -- ^ Addition (@+@)
          | Divides -- ^ Divisibility test (@|@)
          | RelPm   -- ^ Relative primality test (@#@)
          | Binom   -- ^ Binomial coefficient (@binom@)
+         | Cons    -- ^ List cons (@::@)
   deriving (Show, Eq)
 
 -- XXX todo add TRat with ability to parse decimal notation
@@ -90,6 +91,9 @@ data Term where
 
   -- | A variable.
   TVar   :: Name Term -> Term
+
+  -- | The empty list.
+  TEmpty :: Term
 
   -- | The unit value, (), of type Unit.
   TUnit  :: Term

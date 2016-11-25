@@ -19,11 +19,11 @@ fib n =
 isEven : N -> Bool;
 isOdd  : N -> Bool;
 
-isEven n = { true       when n = 0
-           { isOdd n'   when n = S n';
+isEven n = { true      when n = 0
+           { isOdd m   when n = S m;
 
-isOdd  n = { false      when n = 0
-           { isEven n'  when n = S n';
+isOdd  n = { false     when n = 0
+           { isEven m  when n = S m;
 
 fact : N -> N;
 fact n =

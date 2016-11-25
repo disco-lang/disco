@@ -84,8 +84,8 @@ lineParser
   <|> letParser
 
 parseLine :: String -> Either String REPLExpr
-parseLine s = case (parse lineParser "" s) of
-                Left msg -> Left $ show msg
+parseLine s = case (runParser lineParser "" s) of
+                Left err -> Left $ (parseErrorPretty err)
                 Right l -> Right l
 
 handleCMD :: String -> REPLStateIO ()
@@ -124,9 +124,9 @@ handleDesugar t = do
 handleLoad :: FilePath -> REPLStateIO ()
 handleLoad file = do
   str <- io $ readFile file
-  let mp = runParser parseProg file str
+  let mp = runParser (parseProg <* eof) file str
   case mp of
-    Left err -> io $ print err
+    Left err -> io $ putStrLn (parseErrorPretty err)
     Right p  ->
       case runTCM (inferProg p) of
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print

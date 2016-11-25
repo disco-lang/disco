@@ -258,6 +258,9 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
+  + Z/Q patterns
+  + chained comparisons
+  + Use a single Disco monad for everything?
   + Parser:
     - deal with indentation, adding implicit separators etc. so
       - we don't need semicolons at the ends of lines

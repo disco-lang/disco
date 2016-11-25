@@ -40,3 +40,5 @@ nsf/.diagrams_cache
 *.run.xml
 
 .disco_history
+/src/highlight.js
+/src/style.css

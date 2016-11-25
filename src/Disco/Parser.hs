@@ -2,7 +2,46 @@
 {-# LANGUAGE RankNTypes   #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Disco.Parser where
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Parser
+-- Copyright   :  (c) 2016 disco team (see LICENSE)
+-- License     :  BSD-style (see LICENSE)
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Parser to convert concrete Disco syntax into an (untyped, surface
+-- language) AST.
+--
+-----------------------------------------------------------------------------
+
+module Disco.Parser
+       ( -- * Lexer
+
+         -- ** Basic lexemes
+         whiteSpace, lexeme, symbol, reservedOp
+       , natural, integer, reserved, reservedWords, identifier, ident
+
+         -- ** Punctuation
+       , parens, braces, angles, brackets
+       , semi, comma, colon, dot
+       , mapsTo
+
+         -- * Parser
+         -- ** Programs
+       , prog, parseProg, parseDecl
+
+         -- ** Terms
+       , term, parseTerm, parseTerm', parseExpr, parseAtom
+       , parseInj, parseLet
+
+         -- ** Case and patterns
+       , parseCase, parseBranch, parseGuards, parseGuard
+       , parsePattern, parseAtomicPattern
+
+         -- ** Types
+       , parseType, parseTypeExpr, parseAtomicType
+       )
+       where
 
 import           Unbound.LocallyNameless (Name, bind, embed, rebind,
                                           string2Name)
@@ -21,19 +60,24 @@ import           Disco.Types
 ------------------------------------------------------------
 -- Lexer
 
--- XXX should we use C.spaceChar here, or a variant that does not consume newlines?
+
+-- | Consume whitespace, including line and block comments.
 whiteSpace :: Parser ()
 whiteSpace = L.space (C.spaceChar *> pure ()) lineComment blockComment
+  -- XXX should we use C.spaceChar here, or a variant that does not consume newlines?
   where
     lineComment  = L.skipLineComment "--"
     blockComment = L.skipBlockComment "{-" "-}"
 
+-- | Parse a lexeme, that is, a parser followed by consuming whitespace.
 lexeme :: Parser a -> Parser a
 lexeme = L.lexeme whiteSpace
 
+-- | Parse a given string as a lexeme.
 symbol :: String -> Parser String
 symbol = L.symbol whiteSpace
 
+-- | Like 'symbol', but discard the result.
 reservedOp :: String -> Parser ()
 reservedOp s = symbol s *> pure ()
 
@@ -46,12 +90,22 @@ comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
 
+-- | The symbol that separates the variable binder from the body of a
+--   lambda (either @↦@, @->@, or @|->@).
+mapsTo :: Parser ()
+mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
+
+-- | Parse a natural number.
 natural = lexeme L.integer
+
+-- | Parse a signed integer.
 integer = L.signed whiteSpace natural
 
+-- | Parse a reserved word.
 reserved :: String -> Parser ()
 reserved w = lexeme $ C.string w *> notFollowedBy alphaNumChar
 
+-- | The list of all reserved words.
 reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in"
@@ -61,22 +115,28 @@ reservedWords =
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
 
+-- | Parse an identifier, i.e. any non-reserved string beginning with
+--   a letter and continuing with alphanumerics, underscores, and
+--   apostrophes.
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
   where
-    p       = (:) <$> letterChar <*> many alphaNumChar
+    p       = (:) <$> letterChar <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
                 else return x
 
+-- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
 ident = string2Name <$> identifier
 
 ------------------------------------------------------------
 -- Parser
 
-term :: Parser Term
-term = whiteSpace *> parseTerm <* eof
+-- | Parse the entire input as a program (with leading whitespace and
+--   no leftovers).
+prog :: Parser Prog
+prog = whiteSpace *> parseProg <* eof
 
 -- | Parse an entire program (a list of declarations ended by
 --   semicolons).
@@ -87,8 +147,13 @@ parseProg = parseDecl `sepEndBy` semi
 --   definition).
 parseDecl :: Parser Decl
 parseDecl =
-      try (DType <$> ident <*> (symbol ":" *> parseType))
+      try (DType <$> ident <*> (colon *> parseType))
   <|>      DDefn <$> ident <*> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm))
+
+-- | Parse the entire input as a term (with leading whitespace and
+--   no leftovers).
+term :: Parser Term
+term = whiteSpace *> parseTerm <* eof
 
 -- | Parse an atomic term.
 parseAtom :: Parser Term
@@ -107,28 +172,24 @@ parseInj :: Parser Side
 parseInj =
   L <$ reserved "inl" <|> R <$ reserved "inr"
 
-optionMaybe p = (Just <$> p) <|> pure Nothing
-
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
 parseTerm :: Parser Term
-parseTerm = ascribe <$> parseTerm' <*> optionMaybe (symbol ":" *> parseType)
+parseTerm = ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType)
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
+    optionMaybe p = (Just <$> p) <|> pure Nothing
 
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' =
-      TAbs <$> try (bind <$> ident <*> (parseMapsTo *> parseTerm'))
+      TAbs <$> try (bind <$> ident <*> (mapsTo *> parseTerm'))
   <|> TInj <$> parseInj <*> parseAtom
   <|> parseLet
   <|> parseCase
   <|> parseExpr
   <|> parseAtom
-
-parseMapsTo :: Parser ()
-parseMapsTo = (reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->")
 
 -- | Parse a let expression (@let x = t1 in t2@).
 parseLet :: Parser Term
@@ -186,7 +247,7 @@ parseAtomicPattern =
           )
   <|> parens parsePattern
 
--- | Parse a complex pattern.
+-- | Parse a pattern.
 parsePattern :: Parser Pattern
 parsePattern =
       PInj <$> parseInj <*> parseAtomicPattern
@@ -252,7 +313,7 @@ parseAtomicType =
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
   <|> parens parseType
 
--- | Parse a complex type.
+-- | Parse a type.
 parseType :: Parser Type
 parseType = parseTypeExpr <|> parseAtomicType
 

@@ -4,6 +4,14 @@
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE ViewPatterns             #-}
 
+-- | A half-finished attempt at a big-step interpreter for Disco
+--   surface syntax, before it was abandoned in favor of desugaring to
+--   an untyped core language and then interpreting that.
+--
+--   At some point it will be worthwhile to write a /small/-step
+--   interpreter for the surface language, which can be used in the
+--   IDE to help explain/illustrate program evaluation.
+
 module Disco.Interpret.Surface where
 
 import           Control.Monad           (join)

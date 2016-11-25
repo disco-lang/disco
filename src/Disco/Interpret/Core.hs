@@ -51,10 +51,10 @@ module Disco.Interpret.Core
 
          -- * Equality testing
        , eqOp, primValEq, enumerate
-       , decideEqFor, decideEqForRnf, decideEqForAll
+       , decideEqFor, decideEqForRnf, decideEqForClosures
 
          -- * Comparison testing
-       , ltOp, primValOrd, decideOrdFor, decideOrdForLex
+       , ltOp, primValOrd, decideOrdFor, decideOrdForClosures
 
        )
        where
@@ -500,33 +500,61 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
 
   -- Try evaluating the functions on each value and check whether they
   -- agree.
-  decideEqForAll ty2 clos1 clos2 ty1s
+  decideEqForClosures ty2 clos1 clos2 ty1s
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
 
--- | Enumerate all the values of a given (finite) type.  This function
---   will never be called on an infinite type, since type checking
---   ensures that equality or comparison testing will only be done in
---   cases where a finite enumeration is required.
+-- TODO: can the functions built by 'enumerate' be more efficient if
+-- enumerate builds *both* a list and a bijection to a prefix of the
+-- naturals?  Currently, the functions output by (enumerate (TyArr _ _))
+-- take linear time in the size of the input to evaluate since they
+-- have to do a lookup in an association list.  Does this even matter?
+
+-- | Enumerate all the values of a given (finite) type.  If the type
+--   has a linear order then the values are output in sorted order,
+--   that is, @v@ comes before @w@ in the list output by @enumerate@
+--   if and only if @v < w@.  This function will never be called on an
+--   infinite type, since type checking ensures that equality or
+--   comparison testing will only be done in cases where a finite
+--   enumeration is required.
 enumerate :: Type -> [Value]
+
+-- There are zero, one, and two values of types Void, Unit, and Bool respectively.
 enumerate TyVoid           = []
 enumerate TyUnit           = [VCons 0 []]
 enumerate TyBool           = [VCons 0 [], VCons 1 []]
+
+-- To enumerate a pair type, take the Cartesian product of enumerations.
 enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
+
+-- To enumerate a sum type, enumerate all the lefts followed by all the rights.
 enumerate (TySum ty1 ty2)  =
   map (VCons 0 . (:[])) (enumerate ty1) ++
   map (VCons 1 . (:[])) (enumerate ty2)
+
+-- To enumerate an arrow type @ty1 -> ty2@, enumerate all values of
+-- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
+-- values from the enumeration of @ty2@, and make a function by
+-- zipping each one together with the values of @ty1@.
 enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
   where
     vs1 = enumerate ty1
     vs2 = enumerate ty2
+
+    -- The actual function works by looking up the input value in an
+    -- association list.
     mkFun :: [Value] -> [Value] -> Value
     mkFun vs1 vs2
-      = VFun . ValFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
+      = VFun . ValFun $ \v ->
+        snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
+
+    -- A custom version of fromJust' so we get a better error message
+    -- just in case it ever happens
     fromJust' _ (Just x) = x
-    fromJust' v Nothing  = error $ "fromJust in enumerate: " ++ show v
+    fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
+
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
 
 -- | Decide equality for two values at a given type, when we already
@@ -541,11 +569,11 @@ decideEqForRnf (TyArr ty1 ty2) (VFun (ValFun f1)) (VFun (ValFun f2))
   = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
--- | @decideEqForAll ty f1 f2 vs@ lazily decides whether the given
+-- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
 --   functions @f1@ and @f2@ produce the same output (of type @ty@) on
 --   all inputs in @vs@.
-decideEqForAll :: Type -> Value -> Value -> [Value] -> IM Bool
-decideEqForAll ty2 clos1 clos2 vs = go vs
+decideEqForClosures :: Type -> Value -> Value -> [Value] -> IM Bool
+decideEqForClosures ty2 clos1 clos2 vs = go vs
   where
 
     -- If we made it through all the values without finding one on
@@ -589,39 +617,93 @@ ltOp ty cs = do
 
 -- | Lazily decide the ordering of two values at the given type.
 decideOrdFor :: Type -> Value -> Value -> IM Ordering
+
+-- To decide the ordering of two pairs:
 decideOrdFor (TyPair ty1 ty2) v1 v2 = do
+
+  -- Reduce both pairs to WHNF
   VCons 0 [v11, v12] <- whnfV v1
   VCons 0 [v21, v22] <- whnfV v2
+
+  -- Decide the ordering of the first pair components.
   o1 <- decideOrdFor ty1 v11 v21
   case o1 of
+    -- Pairs are ordered lexicographically, so if the first components
+    -- are equal, then we decide the ordering for the second
+    -- components
     EQ -> decideOrdFor ty2 v12 v22
+
+    -- Otherwise we just return the ordering without looking at the
+    -- second components
     _  -> return o1
+
+-- To decide the ordering for two sum injections:
 decideOrdFor (TySum ty1 ty2) v1 v2 = do
+
+  -- Reduce to WHNF
   VCons i1 [v1'] <- whnfV v1
   VCons i2 [v2'] <- whnfV v2
+
+  -- Compare the constructors
   case compare i1 i2 of
+    -- Only compare the contents if the constructors are equal
     EQ -> decideOrdFor ([ty1, ty2] !! i1) v1' v2'
+
+    -- Otherwise return the ordering of the constructors
     o  -> return o
+
+-- To decide the ordering for two functions:
 decideOrdFor (TyArr ty1 ty2) v1 v2 = do
+
+  -- Reduce both to WHNF
   clos1 <- whnfV v1
   clos2 <- whnfV v2
+
+  -- Enumerate the values of the input type, and then order the
+  -- functions by applying them both to each value in the enumeration
+  -- in turn, returning the ordering on the first value where the
+  -- functions differ.
   let ty1s = enumerate ty1
-  decideOrdForLex ty2 clos1 clos2 ty1s
+  decideOrdForClosures ty2 clos1 clos2 ty1s
+
+-- Otherwise we can compare the values primitively, without looking at
+-- the type.
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 
--- XXX comment above implementation
-
--- XXX comment me
-decideOrdForLex :: Type -> Value -> Value -> [Value] -> IM Ordering
-decideOrdForLex ty2 clos1 clos2 vs = go vs
+-- | Compare two functions lazily.  Functions are ordered
+--   lexicographically, if we think of a function @f : ty1 -> ty2@ as
+--   a tuple of @ty2@ values indexed by the ordered list of all @ty1@
+--   values.
+--
+--   Specifically, @decideOrdForClosures ty2 c1 c2 vs@, given two
+--   closures @c1@ and @c2@ of type @ty1 -> ty2@, and an enumeration
+--   @vs@ of values of type @ty1@, applies the closures to each
+--   subsequent value in @vs@ until the first one where the outputs
+--   differ; the ordering of those outputs is immediately returned
+--   without evaluating the functions on any further values in @vs@.
+--   Returns @EQ@ if the functions are equal on all values in @vs@.
+decideOrdForClosures :: Type -> Value -> Value -> [Value] -> IM Ordering
+decideOrdForClosures ty2 clos1 clos2 vs = go vs
   where
+
+    -- If there are no more input values to compare on, the functions
+    -- are equal.
     go []     = return EQ
     go (v:vs) = do
+
+      -- Apply both functions to the value v.
       r1 <- whnfApp clos1 v
       r2 <- whnfApp clos2 v
+
+      -- Check the ordering of the results at the output type.
       o  <- decideOrdFor ty2 r1 r2
       case o of
+
+        -- If the functions agree on v, then keep comparing on the
+        -- rest of the values.
         EQ -> go vs
+
+        -- Otherwise return the ordering of their outputs.
         _  -> return o
 
 -- | Decide the ordering of two values of a primitive type (Void,

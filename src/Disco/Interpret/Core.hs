@@ -9,8 +9,55 @@
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
--- | A big-step interpreter for the desugared Disco core language.
-module Disco.Interpret.Core where
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Interpret.Core
+-- Copyright   :  (c) 2016 disco team (see LICENSE)
+-- License     :  BSD-style (see LICENSE)
+-- Maintainer  :  byorgey@gmail.com
+--
+-- A big-step interpreter for the desugared, untyped Disco core
+-- language.
+--
+-----------------------------------------------------------------------------
+
+module Disco.Interpret.Core
+       (
+         -- * Values
+         Value(..), ValFun(..), prettyValue
+
+         -- * Interpreter monad
+       , Env, DefEnv
+       , InterpError(..)
+       , IM, runIM, runIM'
+       , emptyEnv, extend, extends, getEnv, withEnv, getDefEnv
+
+         -- * Evaluation
+       , mkThunk
+       , mkEnum
+
+         -- ** Full reduction
+       , rnf, rnfV
+
+         -- ** Weak head reduction
+       , whnf, whnfV, whnfApp
+
+         -- ** Case analysis and pattern-matching
+       , whnfCase, checkGuards, match, ok, noMatch
+
+         -- ** Operations
+       , whnfOp, numOp, numOp', uNumOp, divOp, modOp, boolOp
+       , divides, relPm, binom, fact, notOp
+
+         -- * Equality testing
+       , eqOp, primValEq, enumerate
+       , decideEqFor, decideEqForRnf, decideEqForAll
+
+         -- * Comparison testing
+       , ltOp, primValOrd, decideOrdFor, decideOrdForLex
+
+       )
+       where
 
 import           Control.Lens                       ((%~), (.~), _1)
 import           Control.Monad.Except
@@ -36,58 +83,94 @@ import           Disco.Types
 
 -- | The type of values produced by the interpreter.
 data Value where
+  -- | A numeric value.
   VNum   :: Rational -> Value
-    -- ^ A numeric value.
 
+  -- | A constructor with arguments.  The Int indicates which
+  --   constructor it is.  For example, False is represented by
+  --   @VCons 0 []@, and True by @VCons 1 []@.  A pair is
+  --   represented by @VCons 0 [v1, v2]@, and @inr v@ by @VCons 1
+  --   [v]@.
   VCons  :: Int -> [Value] -> Value
-    -- ^ A constructor with arguments.  The Int indicates which
-    --   constructor it is.  For example, False is represented by
-    --   @VCons 0 []@, and True by @VCons 1 []@.  A pair is
-    --   represented by @VCons 0 [v1, v2]@, and @inr v@ by @VCons 1
-    --   [v]@.
 
+  -- | A closure, i.e. a function body together with its
+  --   environment.
   VClos  :: Bind (Name Core) Core -> Env -> Value
-    -- ^ A closure, i.e. a function body together with its
-    --   environment.
 
+  -- | A thunk, i.e. an unevaluated core expression together with
+  --   its environment.
   VThunk :: Core -> Env -> Value
-    -- ^ A thunk, i.e. an unevaluated core expression together with
-    --   its environment.
 
+  -- | A literal function value.  @VFun@ is only used when
+  --   enumerating function values in order to decide comparisons at
+  --   higher-order function types.  For example, in order to
+  --   compare two values of type @(Bool -> Bool) -> Bool@ for
+  --   equality, we have to enumerate all functions of type @Bool ->
+  --   Bool@ as @VFun@ values.
+  --
+  --   We assume that all @VFun@ values are /strict/, that is, their
+  --   arguments should be fully evaluated to RNF before being
+  --   passed to the function.
   VFun   :: ValFun -> Value
-    -- ^ A literal function value.  @VFun@ is only used when
-    --   enumerating function values in order to decide comparisons at
-    --   higher-order function types.  For example, in order to
-    --   compare two values of type @(Bool -> Bool) -> Bool@ for
-    --   equality, we have to enumerate all functions of type @Bool ->
-    --   Bool@ as @VFun@ values.
-    --
-    --   We assume that all @VFun@ values are /strict/, that is, their
-    --   arguments should be fully evaluated to RNF before being
-    --   passed to the function.
   deriving Show
 
+-- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
+--   @newtype@ just so we can have a custom @Show@ instance for it and
+--   then derive a @Show@ instance for the rest of the @Value@ type.
 newtype ValFun = ValFun (Value -> Value)
 
 instance Show ValFun where
   show _ = "<fun>"
 
+-- | Basic pretty-printing of values.
+prettyValue :: Type -> Value -> String
+prettyValue TyUnit (VCons 0 []) = "()"
+prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
+prettyValue _ (VClos _ _)       = "<closure>"
+prettyValue _ (VThunk _ _)      = "<thunk>"
+prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
+  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
+prettyValue (TySum ty1 ty2) (VCons i [v])
+  = case i of
+      0 -> "inl " ++ prettyValue ty1 v
+      1 -> "inr " ++ prettyValue ty2 v
+prettyValue _ (VNum r)
+  | denominator r               == 1 = show (numerator r)
+  | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
+
+------------------------------------------------------------
+-- Environments & errors
+------------------------------------------------------------
+
 -- | An environment is a mapping from names to values.
 type Env  = M.Map (Name Core) Value
 
-type CEnv = M.Map (Name Core) Core
+-- | A definition environment is a mapping fron names to core terms.
+type DefEnv = M.Map (Name Core) Core
 
 derive [''Value, ''ValFun]
 
 -- | Errors that can be generated during interpreting.
 data InterpError where
-  UnboundError  :: Name Core -> InterpError  -- ^ Unbound name.
-  NotANum       :: Value     -> InterpError  -- ^ v should be a number, but isn't
-  DivByZero     ::              InterpError  -- ^ Division by zero.
-  NotABool      :: Value     -> InterpError  -- ^ v should be a boolean, but isn't
-  NonExhaustive ::              InterpError  -- ^ Non-exhaustive case analysis
-  Unimplemented :: String    -> InterpError  -- ^ Internal error for features not
-                                             --   yet implemented.
+
+  -- | An unbound name.
+  UnboundError  :: Name Core -> InterpError
+
+  -- | v should be a number, but isn't.
+  NotANum       :: Value     -> InterpError
+
+  -- | Division by zero.
+  DivByZero     ::              InterpError
+
+  -- | v should be a boolean, but isn't.
+  NotABool      :: Value     -> InterpError
+
+  -- | Non-exhaustive case analysis.
+  NonExhaustive ::              InterpError
+
+  -- | Internal error for features not yet implemented.
+  Unimplemented :: String    -> InterpError
+
   deriving Show
 
 ------------------------------------------------------------
@@ -95,9 +178,9 @@ data InterpError where
 ------------------------------------------------------------
 
 -- | The interpreter monad.  Combines read-only access to an
--- environment, and the ability to throw @InterpErrors@ and generate
--- fresh names.
-type IM = ReaderT (Env, CEnv) (ExceptT InterpError LFreshM)
+--   environment, and the ability to throw @InterpErrors@ and generate
+--   fresh names.
+type IM = ReaderT (Env, DefEnv) (ExceptT InterpError LFreshM)
 
 -- | Run a computation in the @IM@ monad, starting in the empty
 --   environment.
@@ -106,11 +189,11 @@ runIM = runIM' M.empty
 
 -- | Run a computation in the @IM@ monad, starting in a given
 --   environment of definitions.
-runIM' :: CEnv -> IM a -> Either InterpError a
+runIM' :: DefEnv -> IM a -> Either InterpError a
 runIM' cenv = runLFreshM . runExceptT . flip runReaderT (M.empty, cenv)
 
 -- | The empty environment.
-emptyEnv :: (Env, CEnv)
+emptyEnv :: (Env, DefEnv)
 emptyEnv = (M.empty, M.empty)
 
 -- | Locally extend the environment with a new name -> value mapping,
@@ -123,14 +206,19 @@ extend x v = avoid [AnyName x] . local (_1 %~ M.insert x v)
 extends :: Env -> IM a -> IM a
 extends e' = avoid (map AnyName (M.keys e')) . local (_1 %~ M.union e')
 
+-- | Get the current environment.
 getEnv :: IM Env
 getEnv = fst <$> ask
 
+-- | Run an @IM@ computation with a /replaced/ (not extended)
+--   environment.  This is used for evaluating things such as closures
+--   and thunks that come with their own environment.
 withEnv :: Env -> IM a -> IM a
 withEnv e = local (_1 .~ e)
 
-getCEnv :: IM CEnv
-getCEnv = snd <$> ask
+-- | Get the current definition environment.
+getDefEnv :: IM DefEnv
+getDefEnv = snd <$> ask
 
 ------------------------------------------------------------
 -- Evaluation
@@ -168,7 +256,7 @@ whnf (CVar x) = do
   case (M.lookup (translate x) e) of
     Just v  -> whnfV v
     Nothing -> do
-      c <- getCEnv
+      c <- getDefEnv
       case (M.lookup x c) of
         Just core -> whnf core
         Nothing   -> throwError $ UnboundError x
@@ -337,9 +425,12 @@ divides x y = return . mkEnum $ denominator (y / x) == 1
 relPm :: Rational -> Rational -> IM Value
 relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 
+-- | Binomial coefficient.  The arguments will always be natural
+--   numbers.
 binom :: Rational -> Rational -> Rational
 binom (numerator -> n) (numerator -> k) = choose n k % 1
 
+-- | Factorial.  The argument will always be a natural number.
 fact :: Rational -> Rational
 fact (numerator -> n) = factorial (fromIntegral n) % 1
 
@@ -489,11 +580,14 @@ primValEq _ _                       = False
 -- Comparison testing
 ------------------------------------------------------------
 
+-- | Test two expressions to see whether the first is less than the
+--   second at the given type.
 ltOp :: Type -> [Core] -> IM Value
 ltOp ty cs = do
   [v1, v2] <- mapM mkThunk cs
   (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
 
+-- | Lazily decide the ordering of two values at the given type.
 decideOrdFor :: Type -> Value -> Value -> IM Ordering
 decideOrdFor (TyPair ty1 ty2) v1 v2 = do
   VCons 0 [v11, v12] <- whnfV v1
@@ -515,6 +609,9 @@ decideOrdFor (TyArr ty1 ty2) v1 v2 = do
   decideOrdForLex ty2 clos1 clos2 ty1s
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 
+-- XXX comment above implementation
+
+-- XXX comment me
 decideOrdForLex :: Type -> Value -> Value -> [Value] -> IM Ordering
 decideOrdForLex ty2 clos1 clos2 vs = go vs
   where
@@ -527,24 +624,9 @@ decideOrdForLex ty2 clos1 clos2 vs = go vs
         EQ -> go vs
         _  -> return o
 
+-- | Decide the ordering of two values of a primitive type (Void,
+--   Unit, Bool, N, Z, Q).
 primValOrd :: Value -> Value -> Ordering
 primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum n1) (VNum n2)       = compare n1 n2
 primValOrd _ _                       = error "primValOrd: impossible!"
-
-
-prettyValue :: Type -> Value -> String
-prettyValue TyUnit (VCons 0 []) = "()"
-prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
-prettyValue _ (VClos _ _)       = "<closure>"
-prettyValue _ (VThunk _ _)      = "<thunk>"
-prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
-  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
-prettyValue (TySum ty1 ty2) (VCons i [v])
-  = case i of
-      0 -> "inl " ++ prettyValue ty1 v
-      1 -> "inr " ++ prettyValue ty2 v
-prettyValue _ (VNum r)
-  | denominator r               == 1 = show (numerator r)
-  | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
-

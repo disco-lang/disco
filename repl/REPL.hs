@@ -113,13 +113,13 @@ handleLet x t = do
     Left err -> io.print $ err   -- XXX pretty print
     Right (at, _) -> do
       _1 %= M.insert x (getType at)
-      _2 %= M.insert (translate x) (runDSM $ desugar at)
+      _2 %= M.insert (translate x) (runDSM $ desugarTerm at)
 
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do
   case evalTCM (infer t) of
     Left err -> return.show $ err
-    Right at -> return.show.runDSM.desugar $ at
+    Right at -> return.show.runDSM.desugarTerm $ at
 
 handleLoad :: FilePath -> REPLStateIO ()
 handleLoad file = do
@@ -141,7 +141,7 @@ eval t = do
     Left err -> return.show $ err
     Right at ->
       let ty = getType at
-          c  = runDSM $ desugar at
+          c  = runDSM $ desugarTerm at
       in case runIM' defns (rnf c) of
            Left err -> return.show $ err
            Right v  -> return $ prettyValue ty v

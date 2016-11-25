@@ -33,9 +33,9 @@ data Value where
 
 data InterpError where
   UnboundError  :: Name ATerm -> InterpError
-  NotANum       :: Value      -> InterpError  -- ^ v should be a number, but isn't
+  NotANum       :: Value      -> InterpError  -- v should be a number, but isn't
   DivByZero     ::               InterpError
-  NotABool      :: Value      -> InterpError  -- ^ should be a boolean, but isn't
+  NotABool      :: Value      -> InterpError  -- should be a boolean, but isn't
   NotAFun       :: Value      -> InterpError
   NonExhaustive ::               InterpError
   deriving Show

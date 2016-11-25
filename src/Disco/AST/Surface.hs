@@ -5,7 +5,30 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
-module Disco.AST.Surface where
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.AST.Surface
+-- Copyright   :  (c) 2016 disco team (see LICENSE)
+-- License     :  BSD-style (see LICENSE)
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Abstract syntax trees representing the surface syntax of the Disco
+-- language.
+--
+-----------------------------------------------------------------------------
+
+module Disco.AST.Surface
+       ( -- * Programs
+         Prog, Decl(..), isDefn
+
+         -- * Terms
+       , Side(..), UOp(..), BOp(..)
+       , Term(..)
+
+         -- * Case expressions and patterns
+       , Branch, Guards(..), Guard(..), Pattern(..)
+       )
+       where
 
 import           Unbound.LocallyNameless
 
@@ -14,57 +37,102 @@ import           Disco.Types
 -- | A program is a list of declarations.
 type Prog = [Decl]
 
--- | A declaration is either a type declaration or (one clause of a) definition.
+-- | A declaration is either a type declaration or a definition.
 data Decl where
+
+  -- | A type declaration, @name : type@.
   DType :: Name Term -> Type -> Decl
+
+  -- | A definition, @name pat1 .. patn = term@. The patterns bind
+  --   variables in the term. For example,  @f n (x,y) = n*x + y@.
   DDefn :: Name Term -> Bind [Pattern] Term -> Decl
   deriving Show
 
+-- | Check whether a declaration is a definition.
 isDefn :: Decl -> Bool
 isDefn DDefn{} = True
 isDefn _       = False
 
--- | Injections into a sum type (inl or inr) have a "side" (L or R).
+-- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
   deriving (Show, Eq, Enum)
 
 -- | Unary operators.
-data UOp = Neg | Not | Fact
+data UOp = Neg   -- ^ Arithmetic negation (@-@)
+         | Not   -- ^ Logical negation (@not@)
+         | Fact  -- ^ Factorial (@!@)
   deriving (Show, Eq)
 
 -- | Binary operators.
-data BOp = Add | Sub | Mul | Div | Exp | Eq | Neq | Lt | Gt | Leq | Geq | And | Or | Mod
-         | Divides | RelPm | Binom
+data BOp = Add     -- ^ Addition (@+@)
+         | Sub     -- ^ Subtraction (@-@)
+         | Mul     -- ^ Multiplication (@*@)
+         | Div     -- ^ Division (@/@)
+         | Exp     -- ^ Exponentiation (@^@)
+         | Eq      -- ^ Equality test (@==@)
+         | Neq     -- ^ Not-equal (@/=@)
+         | Lt      -- ^ Less than (@<@)
+         | Gt      -- ^ Greater than (@>@)
+         | Leq     -- ^ Less than or equal (@<=@)
+         | Geq     -- ^ Greater than or equal (@>=@)
+         | And     -- ^ Logical and (@&&@ / @and@)
+         | Or      -- ^ Logical or (@||@ / @or@)
+         | Mod     -- ^ Modulo (@mod@)
+         | Divides -- ^ Divisibility test (@|@)
+         | RelPm   -- ^ Relative primality test (@#@)
+         | Binom   -- ^ Binomial coefficient (@binom@)
   deriving (Show, Eq)
 
 -- XXX todo add TRat with ability to parse decimal notation
 
 -- | Terms.
 data Term where
-  TVar   :: Name Term -> Term                  -- ^ Variable
-  TUnit  :: Term                               -- ^ Unit ()
-  TBool  :: Bool -> Term                       -- ^ Boolean
-  TAbs   :: Bind (Name Term) Term -> Term      -- ^ Anonymous function abstraction
+
+  -- | A variable.
+  TVar   :: Name Term -> Term
+
+  -- | The unit value, (), of type Unit.
+  TUnit  :: Term
+
+  -- | True or false.
+  TBool  :: Bool -> Term
+
+  -- | An anonymous function.
+  TAbs   :: Bind (Name Term) Term -> Term
 
      -- Note, could add an optional type annotation to TAbs,
      -- problem is I don't know what would be a good concrete syntax!
      -- x : Int -> body  is tricky because when parsing the type,
      -- the -> looks like a type arrow.  Could perhaps require
      -- parens i.e.  (x : Int) -> body ?
-  TJuxt  :: Term -> Term -> Term               -- ^ Juxtaposition (can be either
-                                               --   function application or multiplication)
-  TPair  :: Term -> Term -> Term               -- ^ Ordered pairs (x,y)
-  TInj   :: Side -> Term -> Term               -- ^ Injection into a sum type
-  TNat   :: Integer -> Term                    -- ^ A natural number
-  TUn    :: UOp -> Term -> Term                -- ^ Application of a unary operator
-  TBin   :: BOp -> Term -> Term -> Term        -- ^ Application of a binary operator
+
+  -- | Juxtaposition (can be either function application or
+  --   multiplication).
+  TJuxt  :: Term -> Term -> Term
+
+  -- | An ordered pair, @(x,y)@.
+  TPair  :: Term -> Term -> Term
+
+  -- | An injection into a sum type.
+  TInj   :: Side -> Term -> Term
+
+  -- | A natural number.
+  TNat   :: Integer -> Term
+
+  -- | An application of a unary operator.
+  TUn    :: UOp -> Term -> Term
+
+  -- | An application of a binary operator.
+  TBin   :: BOp -> Term -> Term -> Term
+
+  -- | A (non-recursive) let expression, @let x = t1 in t2@.
   TLet   :: Bind (Name Term, Embed Term) Term -> Term
-                                               -- ^ Non-recursive let expression
-                                               --   (let x = t1 in t2)
-  TCase  :: [Branch] -> Term                   -- ^ A case expression
-                                               --   consists of a list
-                                               --   of branches.
-  TAscr  :: Term -> Type -> Term               -- ^ Type ascription (expr : type)
+
+  -- | A case expression.
+  TCase  :: [Branch] -> Term
+
+  -- | Type ascription, @(term : type)@.
+  TAscr  :: Term -> Type -> Term
   deriving Show
 
 -- | A branch of a case is a list of guards with an accompanying term.
@@ -72,27 +140,56 @@ data Term where
 --   over subsequent guards.
 type Branch = Bind Guards Term
 
+-- | A list of guards.  Variables bound in each guard scope over
+--   subsequent ones.
 data Guards where
+
+  -- | The empty list of guards, /i.e./ @otherwise@.
   GEmpty :: Guards
+
+  -- | A single guard (@if@ or @when@) followed by more guards.
   GCons  :: Rebind Guard Guards -> Guards
+
   deriving Show
 
--- | A single guard in a branch.
+-- | A single guard in a branch: either an @if@ or a @when@.
 data Guard where
-  GIf   :: Embed Term -> Guard             -- ^ Boolean guard (if <test>)
-  GWhen :: Embed Term -> Pattern -> Guard  -- ^ Pattern guard (when term = pat)
+
+  -- | Boolean guard (@if <test>@)
+  GIf   :: Embed Term -> Guard
+
+  -- | Pattern guard (@when term = pat@)
+  GWhen :: Embed Term -> Pattern -> Guard
+
   deriving Show
 
 -- | Patterns.
 data Pattern where
-  PVar  :: Name Term -> Pattern             -- ^ Variable
-  PWild :: Pattern                          -- ^ Wildcard _
-  PUnit :: Pattern                          -- ^ Unit ()
-  PBool :: Bool -> Pattern                  -- ^ Literal boolean
-  PPair :: Pattern -> Pattern -> Pattern    -- ^ Pair pattern (pat1, pat2)
-  PInj  :: Side -> Pattern -> Pattern       -- ^ Injection pattern (inl pat or inr pat)
-  PNat  :: Integer -> Pattern               -- ^ Literal natural number pattern
-  PSucc :: Pattern -> Pattern               -- ^ Successor pattern, (succ n)
+
+  -- | Variable pattern: matches anything and binds the variable.
+  PVar  :: Name Term -> Pattern
+
+  -- | Wildcard pattern @_@: matches anything.
+  PWild :: Pattern
+
+  -- | Unit pattern @()@: matches @()@.
+  PUnit :: Pattern
+
+  -- | Literal boolean pattern.
+  PBool :: Bool -> Pattern
+
+  -- | Pair pattern @(pat1, pat2)@.
+  PPair :: Pattern -> Pattern -> Pattern
+
+  -- | Injection pattern (@inl pat@ or @inr pat@).
+  PInj  :: Side -> Pattern -> Pattern
+
+  -- | Literal natural number pattern.
+  PNat  :: Integer -> Pattern
+
+  -- | Successor pattern, @S p@.
+  PSucc :: Pattern -> Pattern
+
   deriving Show
   -- TODO: figure out how to match on Z or Q!
 

@@ -258,8 +258,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + More comments/cleanup
-  + Z/Q patterns
+  + Z/Q patterns (general arithmetic patterns?)
+  + Multi-clause definitions
   + chained comparisons
   + Use a single Disco monad for everything?
   + Parser:
@@ -270,12 +270,16 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - quick check properties
     - regression test suite
   + Type reconstruction
-  + Collect multiple errors (parsing, type checking)
+  + Collect multiple warnings & errors (parsing, type checking)
 
   + LaTeX output mode for pretty-printer
 
   Other things to do/consider:
 
+  + Guards
+    - Merge if/when into a single syntax?
+    - Use syntax "is" for pattern guards?  e.g.  when p is (x,y)
+    - Then switch back to single = for equality testing?
   + Finite types (like Fin n)
   + Chained comparisons   (2 < x <= 5)
   + Type qualifiers like "nonzero", "nonnegative", etc.

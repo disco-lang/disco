@@ -237,6 +237,7 @@ parseAtomicPattern =
       PVar <$> ident
   <|> PWild <$ symbol "_"
   <|> PUnit <$ symbol "()"
+  <|> PEmpty <$ symbol "[]"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
   <|> PNat <$> natural
@@ -250,10 +251,16 @@ parseAtomicPattern =
 
 -- | Parse a pattern.
 parsePattern :: Parser Pattern
-parsePattern =
-      PInj <$> parseInj <*> parseAtomicPattern
-  <|> PSucc <$ symbol "S" <*> parseAtomicPattern
-  <|> parseAtomicPattern
+parsePattern = makeExprParser parseAtomicPattern table <?> "pattern"
+  where
+    table = [ [ prefix "inl" (PInj L)
+              , prefix "inr" (PInj R)
+              , prefix "S"   PSucc
+              ]
+            , [ infixR "::" PCons ]
+            ]
+    prefix name fun = Prefix (reserved name >> return fun)
+    infixR name fun = InfixR (reservedOp name >> return fun)
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

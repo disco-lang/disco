@@ -179,6 +179,12 @@ data Pattern where
   -- | Unit pattern @()@: matches @()@.
   PUnit :: Pattern
 
+  -- | Empty list pattern @[]@.
+  PEmpty :: Pattern
+
+  -- | Cons pattern @p1 :: p2@.
+  PCons :: Pattern -> Pattern -> Pattern
+
   -- | Literal boolean pattern.
   PBool :: Bool -> Pattern
 

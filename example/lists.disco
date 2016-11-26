@@ -1,7 +1,10 @@
 foldr : (N -> Q -> Q) -> Q -> [N] -> Q;
-foldr f z []      = z;
-foldr f z (x::xs) = f x (foldr f z xs);
+foldr f z l =
+  { z                   when l = []
+  { f x (foldr f z xs)  when l = x::xs;
 
 append : [N] * [N] -> [N];
-append ([]   , ys) = ys;
-append (x::xs, ys) = x :: append(xs,ys)
+append (xs, ys) =
+  { ys                   when xs = []
+  { x :: append(xs',ys)  when xs = x :: xs'
+

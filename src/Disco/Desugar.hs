@@ -170,6 +170,8 @@ desugarPattern :: Pattern -> CPattern
 desugarPattern (PVar x)      = CPVar (translate x)
 desugarPattern PWild         = CPWild
 desugarPattern PUnit         = CPCons 0 []
+desugarPattern PEmpty        = CPCons 0 []
+desugarPattern (PCons p1 p2) = CPCons 1 [desugarPattern p1, desugarPattern p2]
 desugarPattern (PBool b)     = CPCons (fromEnum b) []
 desugarPattern (PPair p1 p2) = CPCons 0 [desugarPattern p1, desugarPattern p2]
 desugarPattern (PInj s p)    = CPCons (fromEnum s) [desugarPattern p]

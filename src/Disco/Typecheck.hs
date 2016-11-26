@@ -499,6 +499,9 @@ checkPattern :: Pattern -> Type -> TCM Ctx
 checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok
 checkPattern PUnit TyUnit                   = ok
+checkPattern PEmpty (TyList _)              = ok
+checkPattern (PCons p1 p2) (TyList ty)      =
+  joinCtx <$> checkPattern p1 ty <*> checkPattern p2 (TyList ty)
 checkPattern (PBool _) TyBool               = ok
 checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
   joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2

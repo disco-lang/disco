@@ -1,0 +1,7 @@
+foldr : (N -> Q -> Q) -> Q -> [N] -> Q;
+foldr f z []      = z;
+foldr f z (x::xs) = f x (foldr f z xs);
+
+append : [N] * [N] -> [N];
+append ([]   , ys) = ys;
+append (x::xs, ys) = x :: append(xs,ys)

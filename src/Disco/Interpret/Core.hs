@@ -124,9 +124,7 @@ instance Show ValFun where
 prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"
 prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
-prettyValue (TyList _ ) (VCons 0 []) = "[]"
-prettyValue (TyList ty) (VCons 1 [hd,tl])
-  = prettyValue ty hd ++ " :: " ++ prettyValue (TyList ty) tl
+prettyValue (TyList ty) v = prettyList ty v
 prettyValue _ (VClos _ _)       = "<closure>"
 prettyValue _ (VThunk _ _)      = "<thunk>"
 prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
@@ -141,6 +139,15 @@ prettyValue _ (VNum r)
   | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
 
 prettyValue _ _ = error "Impossible! No matching case in prettyValue"
+
+prettyList :: Type -> Value -> String
+prettyList ty v = "[" ++ go v
+  where
+    go (VCons 0 []) = "]"
+    go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
+    go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
+    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+
 
 ------------------------------------------------------------
 -- Environments & errors

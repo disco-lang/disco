@@ -88,7 +88,6 @@ desugarDefn def =
 desugarTerm :: ATerm -> DSM Core
 desugarTerm (ATVar _ x)   = return $ CVar (translate x)
 desugarTerm ATUnit        = return $ CCons 0 []
-desugarTerm (ATEmpty _)   = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
   lunbind lam $ \(x,t) -> do
@@ -103,9 +102,12 @@ desugarTerm (ATInj _ s t) =
 desugarTerm (ATNat n) = return $ CNat n
 desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
-desugarTerm (ATBin ty op t1 t2) =
+desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) op <$> desugarTerm t1 <*> desugarTerm t2
-desugarTerm (ATLet ty t) =
+desugarTerm (ATList _ es) = do
+  des <- mapM desugarTerm es
+  return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
+desugarTerm (ATLet _ t) =
   lunbind t $ \((x, unembed -> t1), t2) -> do
   dt1 <- desugarTerm t1
   dt2 <- desugarTerm t2

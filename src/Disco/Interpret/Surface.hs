@@ -26,8 +26,6 @@ import           Unbound.LocallyNameless (Bind, LFreshM, Name, lunbind,
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Parser
-import           Disco.Typecheck         hiding (ok)
 import           Disco.Types
 
 data Value where

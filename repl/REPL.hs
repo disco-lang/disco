@@ -1,22 +1,18 @@
-import           Control.Lens
+import           Control.Lens             ((%=), _1, _2)
 import           Control.Monad.State
-import           Data.Char                               (isSpace)
-import           Data.List                               (find, isPrefixOf)
-import qualified Data.Map                                as M
+import           Data.Char                (isSpace)
+import           Data.List                (find, isPrefixOf)
+import qualified Data.Map                 as M
 import           System.Console.Haskeline
-import           System.Console.Haskeline.MonadException
-import           System.Exit
 import           Text.Megaparsec
-import           Text.Megaparsec.String                  (Parser)
-import           Unbound.LocallyNameless                 hiding (rnf)
-import           Unbound.LocallyNameless.Subst
+import           Text.Megaparsec.String   (Parser)
+import           Unbound.LocallyNameless  hiding (rnf)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core                    (prettyValue, rnf,
-                                                          runIM')
+import           Disco.Interpret.Core     (prettyValue, rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck
@@ -45,7 +41,6 @@ data REPLExpr =
  | ShowAST Term                 -- Show a terms AST
  | Parse Term                   -- Show the parsed AST
  | Desugar Term                 -- Show a desugared term
- | DumpState                    -- Trigger to dump the state for debugging.
  | Load FilePath                -- Load a file.
  | Help
  deriving Show
@@ -56,10 +51,7 @@ letParser = Let
   <*> (symbol "=" *> term)
 
 commandParser :: Parser REPLExpr
-commandParser = do
-  symbol ":"
-  ucmd <- many lowerChar
-  parseCommandArgs ucmd
+commandParser = (symbol ":" *> many lowerChar) >>= parseCommandArgs
 
 parseCommandArgs :: String -> Parser REPLExpr
 parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
@@ -99,7 +91,7 @@ handleCMD s =
     handleLine (Let x t) = handleLet x t
     handleLine (TypeCheck t) = (type_check t) >>= (io.putStrLn)
     handleLine (Eval t) = (eval t) >>= (io.putStrLn)
-    handleLine (ShowAST t) = get >>= (\defs -> io.putStrLn.show $ t)
+    handleLine (ShowAST t) = io.putStrLn.show $ t
     handleLine (Parse t) = io.print $ t
     handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file) = handleLoad file
@@ -107,7 +99,7 @@ handleCMD s =
 
 handleLet :: Name Term -> Term -> REPLStateIO ()
 handleLet x t = do
-  (ctx, defns) <- get
+  (ctx, _) <- get
   let mat = runTCM (extends ctx $ infer t)
   case mat of
     Left err -> io.print $ err   -- XXX pretty print

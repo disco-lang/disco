@@ -52,7 +52,7 @@ data ATerm where
 
   -- | The empty list.  The type is inherently ambiguous so we store
   --   it here.
-  ATEmpty :: Type -> ATerm
+  ATList :: Type -> [ATerm] -> ATerm
 
   -- | A natural number.
   ATNat   :: Integer -> ATerm
@@ -107,6 +107,7 @@ getType (ATPair ty _ _)  = ty
 getType (ATInj ty _ _)   = ty
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
+getType (ATList ty _)    = ty
 getType (ATLet ty _)     = ty
 getType (ATCase ty _)    = ty
 getType (ATAscr _ ty)    = ty

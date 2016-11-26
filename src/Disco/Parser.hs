@@ -81,10 +81,13 @@ symbol = L.symbol whiteSpace
 reservedOp :: String -> Parser ()
 reservedOp s = symbol s *> pure ()
 
+parens, braces, angles, brackets :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
+
+semi, comma, colon, dot :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
@@ -96,9 +99,11 @@ mapsTo :: Parser ()
 mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 
 -- | Parse a natural number.
+natural :: Parser Integer
 natural = lexeme L.integer
 
 -- | Parse a signed integer.
+integer :: Parser Integer
 integer = L.signed whiteSpace natural
 
 -- | Parse a reserved word.
@@ -159,7 +164,7 @@ term = whiteSpace *> parseTerm <* eof
 parseAtom :: Parser Term
 parseAtom
   =   TUnit       <$ reserved "()"
-  <|> TEmpty      <$ reserved "[]"
+  <|> TList       <$> brackets (parseTerm `sepBy` comma)
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident

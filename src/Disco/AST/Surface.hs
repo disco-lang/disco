@@ -92,9 +92,6 @@ data Term where
   -- | A variable.
   TVar   :: Name Term -> Term
 
-  -- | The empty list.
-  TEmpty :: Term
-
   -- | The unit value, (), of type Unit.
   TUnit  :: Term
 
@@ -128,6 +125,9 @@ data Term where
 
   -- | An application of a binary operator.
   TBin   :: BOp -> Term -> Term -> Term
+
+  -- | A literal list.
+  TList :: [Term] -> Term
 
   -- | A (non-recursive) let expression, @let x = t1 in t2@.
   TLet   :: Bind (Name Term, Embed Term) Term -> Term

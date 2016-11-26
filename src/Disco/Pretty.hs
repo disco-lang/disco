@@ -14,7 +14,6 @@ import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
                                           unembed, unrebind)
 
 import           Disco.AST.Surface
-import qualified Disco.Parser            as PR
 import           Disco.Types
 
 
@@ -187,6 +186,8 @@ prettyBOp Or      = text "or"
 prettyBOp Mod     = text "mod"
 prettyBOp Divides = text "|"
 prettyBOp RelPm   = text "#"
+prettyBOp Binom   = text "choose"
+prettyBOp Cons    = text "::"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches [] = error "Empty branches are disallowed."

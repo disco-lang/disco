@@ -122,8 +122,8 @@ extends ctx = local (joinCtx ctx)
 check :: Term -> Type -> TCM ATerm
 
   -- We can check that the empty list has any list type.
-check TEmpty ty@(TyList _) = return $ ATEmpty ty
-check TEmpty ty            = throwError (NotList TEmpty ty)
+check (TList []) ty@(TyList _) = return $ ATList ty []
+check (TList []) ty            = throwError (NotList (TList []) ty)
 
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.
@@ -229,6 +229,7 @@ isDecidable TyQ    = True
 isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
+isDecidable (TyList ty) = isDecidable ty
 
 -- | Check whether the given type has decidable equality, and throw an
 --   error if not.
@@ -248,6 +249,7 @@ isOrdered TyQ    = True
 isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2
+isOrdered (TyList ty) = isOrdered ty
 
 -- | Check whether the given type has a total order, and throw an
 --   error if not.
@@ -387,7 +389,7 @@ infer (TBin Mod t1 t2) = do
 infer (TBin Divides t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
-  ty <- numLub at1 at2
+  _ <- numLub at1 at2
   return (ATBin TyBool Divides at1 at2)
 
 infer (TBin RelPm t1 t2) = do
@@ -411,6 +413,12 @@ infer (TBin Cons t1 t2) = do
 infer (TUn Fact t) = do
   at <- check t TyN
   return $ ATUn TyN Fact at
+
+infer (TList (e:es)) = do
+  ate  <- infer e
+  let ty = getType ate
+  ates <- mapM (flip check ty) es
+  return $ ATList (TyList ty) (ate : ates)
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
@@ -559,3 +567,4 @@ checkDefn (DDefn x def) = do
       ctx <- checkPattern p ty1
       extends ctx $ go ps ty2 body
     go _ _ _ = throwError NumPatterns   -- XXX include more info
+checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d

@@ -65,7 +65,6 @@ import           Control.Monad.Reader
 import           Data.Char                          (toLower)
 import           Data.List                          (find)
 import qualified Data.Map                           as M
-import           Data.Maybe                         (fromJust)
 import           Data.Ratio
 
 import           Unbound.LocallyNameless            hiding (enumerate, rnf)
@@ -74,7 +73,6 @@ import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Disco.AST.Core
-import           Disco.Desugar
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -137,9 +135,12 @@ prettyValue (TySum ty1 ty2) (VCons i [v])
   = case i of
       0 -> "inl " ++ prettyValue ty1 v
       1 -> "inr " ++ prettyValue ty2 v
+      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
 prettyValue _ (VNum r)
   | denominator r               == 1 = show (numerator r)
   | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
+
+prettyValue _ _ = error "Impossible! No matching case in prettyValue"
 
 ------------------------------------------------------------
 -- Environments & errors
@@ -249,8 +250,8 @@ rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
 whnfV :: Value -> IM Value
-whnfV v@(VThunk c e) = withEnv e $ whnf c
-whnfV v              = return v
+whnfV (VThunk c e) = withEnv e $ whnf c
+whnfV v            = return v
 
 -- | Reduce a Core expression to weak head normal form.
 whnf :: Core -> IM Value
@@ -292,7 +293,7 @@ whnfApp (VClos c e) v =
   extend x v          $ do
   whnf t
 whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')
-whnfApp f _ = error "Impossible! First argument to whnfApp is not a closure."
+whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 
 ------------------------------------------------------------
 -- Case analysis
@@ -393,6 +394,7 @@ uNumOp :: (Rational -> Rational) -> [Core] -> IM Value
 uNumOp f [c] = do
   VNum m <- whnf c
   return $ VNum (f m)
+uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
@@ -442,6 +444,7 @@ notOp :: [Core] -> IM Value
 notOp [c] = do
   VCons i [] <- whnf c
   return . mkEnum . not . toEnum $ i
+notOp _ = error "Impossible! notOp called on list of length /= 1"
 
 ------------------------------------------------------------
 -- Equality testing
@@ -541,17 +544,17 @@ enumerate (TySum ty1 ty2)  =
 -- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
 -- values from the enumeration of @ty2@, and make a function by
 -- zipping each one together with the values of @ty1@.
-enumerate (TyArr ty1 ty2)  = map (mkFun vs1) (sequence (vs2 <$ vs1))
+enumerate (TyArr ty1 ty2)  = map mkFun (sequence (vs2 <$ vs1))
   where
     vs1 = enumerate ty1
     vs2 = enumerate ty2
 
     -- The actual function works by looking up the input value in an
     -- association list.
-    mkFun :: [Value] -> [Value] -> Value
-    mkFun vs1 vs2
+    mkFun :: [Value] -> Value
+    mkFun outs
       = VFun . ValFun $ \v ->
-        snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 vs2
+        snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
 
     -- A custom version of fromJust' so we get a better error message
     -- just in case it ever happens
@@ -576,7 +579,7 @@ decideEqForRnf _ v1 v2 = primValEq v1 v2
 --   functions @f1@ and @f2@ produce the same output (of type @ty@) on
 --   all inputs in @vs@.
 decideEqForClosures :: Type -> Value -> Value -> [Value] -> IM Bool
-decideEqForClosures ty2 clos1 clos2 vs = go vs
+decideEqForClosures ty2 clos1 clos2 = go
   where
 
     -- If we made it through all the values without finding one on
@@ -686,7 +689,7 @@ decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 --   without evaluating the functions on any further values in @vs@.
 --   Returns @EQ@ if the functions are equal on all values in @vs@.
 decideOrdForClosures :: Type -> Value -> Value -> [Value] -> IM Ordering
-decideOrdForClosures ty2 clos1 clos2 vs = go vs
+decideOrdForClosures ty2 clos1 clos2 = go
   where
 
     -- If there are no more input values to compare on, the functions

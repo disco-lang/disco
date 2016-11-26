@@ -27,8 +27,8 @@ module Disco.Parser
        , mapsTo
 
          -- * Parser
-         -- ** Programs
-       , prog, parseProg, parseDecl
+         -- ** Modules
+       , wholeModule, parseModule, parseDecl
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
@@ -138,15 +138,15 @@ ident = string2Name <$> identifier
 ------------------------------------------------------------
 -- Parser
 
--- | Parse the entire input as a program (with leading whitespace and
+-- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
-prog :: Parser Prog
-prog = whiteSpace *> parseProg <* eof
+wholeModule :: Parser Module
+wholeModule = whiteSpace *> parseModule <* eof
 
--- | Parse an entire program (a list of declarations ended by
+-- | Parse an entire module (a list of declarations ended by
 --   semicolons).
-parseProg :: Parser Prog
-parseProg = parseDecl `sepEndBy` semi
+parseModule :: Parser Module
+parseModule = parseDecl `sepEndBy` semi
 
 -- | Parse a single declaration (either a type declaration or
 --   definition).

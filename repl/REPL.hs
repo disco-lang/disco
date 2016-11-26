@@ -116,11 +116,11 @@ handleDesugar t = do
 handleLoad :: FilePath -> REPLStateIO ()
 handleLoad file = do
   str <- io $ readFile file
-  let mp = runParser (parseProg <* eof) file str
+  let mp = runParser wholeModule file str
   case mp of
     Left err -> io $ putStrLn (parseErrorPretty err)
     Right p  ->
-      case runTCM (inferProg p) of
+      case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print
         Right (ctx, defns) -> do
           let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)

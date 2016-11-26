@@ -18,8 +18,8 @@
 -----------------------------------------------------------------------------
 
 module Disco.AST.Surface
-       ( -- * Programs
-         Prog, Decl(..), isDefn
+       ( -- * Modules
+         Module, Decl(..), declName, isDefn
 
          -- * Terms
        , Side(..), UOp(..), BOp(..)
@@ -34,8 +34,8 @@ import           Unbound.LocallyNameless
 
 import           Disco.Types
 
--- | A program is a list of declarations.
-type Prog = [Decl]
+-- | A module is a list of declarations.
+type Module = [Decl]
 
 -- | A declaration is either a type declaration or a definition.
 data Decl where
@@ -47,6 +47,11 @@ data Decl where
   --   variables in the term. For example,  @f n (x,y) = n*x + y@.
   DDefn :: Name Term -> Bind [Pattern] Term -> Decl
   deriving Show
+
+-- | Get the name that a declaration is about.
+declName :: Decl -> Name Term
+declName (DType x _) = x
+declName (DDefn x _) = x
 
 -- | Check whether a declaration is a definition.
 isDefn :: Decl -> Bool

@@ -9,7 +9,52 @@
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
-module Disco.Typecheck where
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Typecheck
+-- Copyright   :  (c) 2016 disco team (see LICENSE)
+-- License     :  BSD-style (see LICENSE)
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Typecheck the Disco surface language and transform it into a
+-- type-annotated AST.
+--
+-----------------------------------------------------------------------------
+
+module Disco.Typecheck
+       ( -- * Type checking monad
+         TCM, runTCM, evalTCM, execTCM
+         -- ** Definitions
+       , Defn, Defns
+         -- ** Contexts
+       , Ctx, emptyCtx, singleCtx, joinCtx, joinCtxs
+       , lookup, extend, extends, addDefn
+         -- ** Errors
+       , TCError(..)
+
+         -- * Type checking
+       , check, checkPattern, ok, checkDefn
+         -- ** Whole modules
+       , checkModule, withTypeDecls
+         -- ** Subtyping
+       , checkSub, isSub, lub, numLub
+         -- ** Decidability
+       , isFinite
+       , isDecidable, checkDecidable
+       , isOrdered, checkOrdered
+
+       , requireSameTy
+       , getFunTy
+       , checkNumTy
+
+         -- * Type inference
+       , infer
+       , inferFunApp, inferMulApp
+       , inferComp
+         -- ** Case analysis
+       , inferCase, inferBranch, inferGuards
+       )
+       where
 
 import           Prelude                 hiding (lookup)
 
@@ -27,9 +72,16 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
+-- | A definition is a list of patterns that bind names in a term,
+--   without the name of the function being defined.  For example,
+--   given the concrete syntax @f n (x,y) = n*x + y@, the
+--   corresponding 'Defn' would be something like @[n, (x,y)] (n*x + y)@.
 type Defn  = Bind [Pattern] ATerm
+
+-- | A map from names to definitions.
 type Defns = M.Map (Name ATerm) Defn
 
+-- | A typing context, /i.e./ a map from names to types.
 type Ctx = M.Map (Name Term) Type
 
 -- | Potential typechecking errors.
@@ -75,7 +127,7 @@ instance Monoid TCError where
   mempty = NoError
   mappend _ r = r
 
--- | TypeCheckingMonad. Maintains a context of variable types and a
+-- | Type checking monad. Maintains a context of variable types and a
 --   set of definitions, and can throw @TCError@s and generate fresh
 --   names.
 type TCM = StateT Defns (ReaderT Ctx (ExceptT TCError LFreshM))
@@ -84,21 +136,29 @@ type TCM = StateT Defns (ReaderT Ctx (ExceptT TCError LFreshM))
 runTCM :: TCM a -> Either TCError (a, Defns)
 runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
 
+-- | Run a 'TCM' computation starting in the empty context, returning
+--   only the result of the computation.
 evalTCM :: TCM a -> Either TCError a
 evalTCM = fmap fst . runTCM
 
+-- | Run a 'TCM' computation starting in the empty context, returning
+--   only the resulting definitions.
 execTCM :: TCM a -> Either TCError Defns
 execTCM = fmap snd . runTCM
 
+-- | The empty context.
 emptyCtx :: Ctx
 emptyCtx = M.empty
 
+-- | A singleton context, mapping a name to a type.
 singleCtx :: Name Term -> Type -> Ctx
 singleCtx = M.singleton
 
+-- | Join two contexts (left-biased).
 joinCtx :: Ctx -> Ctx -> Ctx
 joinCtx = M.union
 
+-- | Join a list of contexts (left-biased).
 joinCtxs :: [Ctx] -> Ctx
 joinCtxs = M.unions
 
@@ -112,13 +172,19 @@ lookup x = do
     Just ty -> return ty
 
 -- | Run a @TCM@ computation in a context extended with a new binding.
+--   The new binding shadows any old binding for the same name.
 extend :: Name Term -> Type -> TCM a -> TCM a
 extend x ty = local (M.insert x ty)
 
 -- | Run a @TCM@ computation in a context extended with an additional
---   context.
+--   context.  Bindings in the additional context shadow any bindings
+--   with the same names in the existing context.
 extends :: Ctx -> TCM a -> TCM a
 extends ctx = local (joinCtx ctx)
+
+-- | Add a definition to the set of current definitions.
+addDefn :: Name Term -> (Bind [Pattern] ATerm) -> TCM ()
+addDefn x b = modify (M.insert (translate x) b)
 
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
@@ -446,20 +512,22 @@ infer (TCase bs) = inferCase bs
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
 
-
+-- | Try to infer the type of a function application.
 inferFunApp :: ATerm -> Term -> TCM ATerm
 inferFunApp at t' = do
   (ty1, ty2) <- getFunTy at
   at' <- check t' ty1
   return $ ATApp ty2 at at'
 
+-- | Try to infer the type of a multiplication.
 inferMulApp :: ATerm -> Term -> TCM ATerm
 inferMulApp at t' = do
   at' <- infer t'
   num3 <- numLub at at'
   return $ ATBin num3 Mul at at'
 
-  -- A comparison always has type Bool, but we have to make sure
+-- | Infer the type
+-- A comparison always has type Bool, but we have to make sure
   -- the subterms are OK. We must check that their types are
   -- compatible and have a total order.
 inferComp :: BOp -> Term -> Term -> TCM ATerm
@@ -470,6 +538,8 @@ inferComp comp t1 t2 = do
   checkOrdered ty3
   return $ ATBin TyBool comp at1 at2
 
+-- | Infer the type of a case expression.  The result type is the
+--   least upper bound (if it exists) of all the branches.
 inferCase :: [Branch] -> TCM ATerm
 inferCase bs = do
   bs' <- mapM inferBranch bs
@@ -477,6 +547,8 @@ inferCase bs = do
   resTy <- foldM lub TyVoid branchTys
   return $ ATCase resTy abs'
 
+-- | Infer the type of a case branch, returning the type along with a
+--   type-annotated branch.
 inferBranch :: Branch -> TCM (Type, ABranch)
 inferBranch b =
   lunbind b $ \(gs, t) -> do
@@ -485,6 +557,9 @@ inferBranch b =
   at <- infer t
   return $ (getType at, bind ags at)
 
+-- | Infer the type of a list of guards, returning the type-annotated
+--   list of guards along with a context of types for variables bound
+--   by the guards.
 inferGuards :: Guards -> TCM (AGuards, Ctx)
 inferGuards GEmpty                       = return (AGEmpty, emptyCtx)
 inferGuards (GCons (unrebind -> (g,gs))) = do
@@ -493,6 +568,8 @@ inferGuards (GCons (unrebind -> (g,gs))) = do
   (ags, ctx') <- inferGuards gs
   return (AGCons (rebind ag ags), ctx `joinCtx` ctx')
 
+-- | Infer the type of a guard, returning the type-annotated guard
+--   along with a context of types for any variables bound by the guard.
 inferGuard :: Guard -> TCM (AGuard, Ctx)
 inferGuard (GIf (unembed -> t)) = do
   at <- check t TyBool
@@ -506,6 +583,9 @@ inferGuard (GWhen (unembed -> t) p) = do
 -- Nonlinear patterns can desugar to equality checks!
 -- Currently  { x when (3,4) = (x,x)   evaluates without error to 3.
 -- It should be accepted, but fail to match since 3 != 4.
+
+-- | Check that a pattern has the given type, and return a context of
+--   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM Ctx
 checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok
@@ -525,26 +605,26 @@ checkPattern (PList ps) (TyList ty) =
 
 checkPattern p ty = throwError (PatternType p ty)
 
+-- | Successfully return the empty context.  A convenience method for
+--   checking patterns that bind no variables.
 ok :: TCM Ctx
 ok = return emptyCtx
 
-------------------------------------------------------------
-
-addDefn :: Name Term -> (Bind [Pattern] ATerm) -> TCM ()
-addDefn x b = modify (M.insert (translate x) b)
-
-declName :: Decl -> Name Term
-declName (DType x _) = x
-declName (DDefn x _) = x
-
-inferProg :: Prog -> TCM Ctx
-inferProg prog = do
-  let (defns, typeDecls) = partition isDefn prog
+-- | Check all the types in a module, returning a context of types for
+--   top-level definitions.
+checkModule :: Module -> TCM Ctx
+checkModule m = do
+  let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
     ask
 
--- precondition: only called on DTypes
+-- | Run a type checking computation in the context of some type
+--   declarations. First check that there are no duplicate type
+--   declarations; then run the computation in a context extended with
+--   the declared types.
+--
+--   Precondition: only called on 'DType's.
 withTypeDecls :: [Decl] -> TCM a -> TCM a
 withTypeDecls decls k = do
   let dups :: [(Name Term, Int)]
@@ -555,7 +635,7 @@ withTypeDecls decls k = do
   where
     declCtx = M.fromList (map (\(DType x ty) -> (x,ty)) decls)
 
--- precondition: only called on DDefns
+-- | Type check a top-level definition. Precondition: only called on 'DDefn's.
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x def) = do
   ty <- lookup x

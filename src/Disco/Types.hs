@@ -9,7 +9,7 @@
 -- Module      :  Disco.Types
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
--- Foobar      :  Wizzle
+-- Maintainer  :  byorgey@gmail.com
 --
 -- Disco language types.
 --

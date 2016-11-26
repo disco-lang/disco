@@ -179,12 +179,6 @@ data Pattern where
   -- | Unit pattern @()@: matches @()@.
   PUnit :: Pattern
 
-  -- | Empty list pattern @[]@.
-  PEmpty :: Pattern
-
-  -- | Cons pattern @p1 :: p2@.
-  PCons :: Pattern -> Pattern -> Pattern
-
   -- | Literal boolean pattern.
   PBool :: Bool -> Pattern
 
@@ -199,6 +193,12 @@ data Pattern where
 
   -- | Successor pattern, @S p@.
   PSucc :: Pattern -> Pattern
+
+  -- | Cons pattern @p1 :: p2@.
+  PCons :: Pattern -> Pattern -> Pattern
+
+  -- | List pattern @[p1, .., pn]@.
+  PList :: [Pattern] -> Pattern
 
   deriving Show
   -- TODO: figure out how to match on Z or Q!

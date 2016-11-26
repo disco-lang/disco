@@ -242,7 +242,6 @@ parseAtomicPattern =
       PVar <$> ident
   <|> PWild <$ symbol "_"
   <|> PUnit <$ symbol "()"
-  <|> PEmpty <$ symbol "[]"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
   <|> PNat <$> natural
@@ -252,6 +251,7 @@ parseAtomicPattern =
                  <*> parsePattern
                  <*  symbol ")"
           )
+  <|> PList <$> brackets (parsePattern `sepBy` comma)
   <|> parens parsePattern
 
 -- | Parse a pattern.

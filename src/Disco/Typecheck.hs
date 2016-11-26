@@ -99,6 +99,9 @@ singleCtx = M.singleton
 joinCtx :: Ctx -> Ctx -> Ctx
 joinCtx = M.union
 
+joinCtxs :: [Ctx] -> Ctx
+joinCtxs = M.unions
+
 -- | Look up a name in the context, either returning its type or
 --   throwing an unbound variable exception if it is not found.
 lookup :: Name Term -> TCM Type
@@ -507,9 +510,6 @@ checkPattern :: Pattern -> Type -> TCM Ctx
 checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok
 checkPattern PUnit TyUnit                   = ok
-checkPattern PEmpty (TyList _)              = ok
-checkPattern (PCons p1 p2) (TyList ty)      =
-  joinCtx <$> checkPattern p1 ty <*> checkPattern p2 (TyList ty)
 checkPattern (PBool _) TyBool               = ok
 checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
   joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2
@@ -518,6 +518,10 @@ checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
 checkPattern (PNat _)   ty | isSub TyN ty   = ok
   -- we can match any supertype of TyN against a Nat pattern
 checkPattern (PSucc p)  TyN                 = checkPattern p TyN
+checkPattern (PCons p1 p2) (TyList ty)      =
+  joinCtx <$> checkPattern p1 ty <*> checkPattern p2 (TyList ty)
+checkPattern (PList ps) (TyList ty) =
+  joinCtxs <$> mapM (flip checkPattern ty) ps
 
 checkPattern p ty = throwError (PatternType p ty)
 

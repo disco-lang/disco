@@ -1,0 +1,66 @@
+Notes about parsing.
+
+Parser state:
+  - stack of (column : Int, block start : String)
+  - num active blocks
+  - sep flag
+
+Maybe we need a Sequence instead of a stack, we need to push/pop from
+the end but also process block delimiters in order from left-right...
+Or maybe let's just not worry about it.  Just reverse the stack or
+whatever.  The nesting depth is never going to be very much.
+
+open : takes block start, pushes onto stack + increments num active blocks
+
+open :: String -> Parser ()
+open delim = do
+  col <- getColumn
+  string delim
+  push (col, delim)
+  numActive += 1
+
+whiteSpace --- inter-expression space.
+  - try:
+    - consume all whitespace
+    - if non-whitespace thing matches indent level and block type on the
+      stack, consume it and continue.
+    - if we see a newline after matching all delimiters, consume it
+      and start over.
+    - when we see either a newline or a non-whitespace thing without
+      seeing all current block delimiters, pop from stack until it
+      matches what we saw.
+
+whiteSpace :: Parser ()
+whiteSpace = do
+  many spaceChar
+  col <- getColumn
+  when (col < top of stack column) $ do
+    tabs <- reverse stack
+    go tabs tabs
+  where
+    go orig [] = try (eol >> go orig orig) <|> set 'sep' flag true
+    go orig ts@((tabcol, delim) : tabs) = do
+      col <- getColumn
+      cond [ (col > tabcol && delim == "") -> go orig tabs
+           ,  col > tabcol                 -> fail (missing delim)
+           ,  col == tabcol                ->
+                (try (string delim) >> many nonNLSpaceChar >> go orig tabs)
+           ,  col < tabcol                 ->
+                drop (length ts) stack
+
+close --- if num active blocks > stack size, decrement it and succeed;
+  else fail.
+
+close :: Parser ()
+close = do
+  case (length (stack) < numActive) of
+    True -> numActive -= 1
+    False -> fail
+
+How to do separators??
+  - set sep flag to true
+  - 'sep' combinator clears it.
+
+- 'lexeme' combinator fails if either
+  - 'sep' is true  (need to see 'sep' first)
+  - numActive > length stack (need to see 'close' first)

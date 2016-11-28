@@ -4,8 +4,7 @@ import           Data.Char                (isSpace)
 import           Data.List                (find, isPrefixOf)
 import qualified Data.Map                 as M
 import           System.Console.Haskeline
-import           Text.Megaparsec
-import           Text.Megaparsec.String   (Parser)
+import           Text.Megaparsec          hiding (runParser)
 import           Unbound.LocallyNameless  hiding (rnf)
 
 import           Disco.AST.Core
@@ -67,7 +66,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       ]
 
 fileParser :: Parser FilePath
-fileParser = whiteSpace *> many (satisfy (not . isSpace))
+fileParser = many spaceChar *> many (satisfy (not . isSpace))
 
 lineParser :: Parser REPLExpr
 lineParser

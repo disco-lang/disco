@@ -1,10 +1,15 @@
-foldr : (N -> Q -> Q) -> Q -> [N] -> Q;
+foldr : (N -> Q -> Q) -> Q -> [N] -> Q
 foldr f z l =
   { z                   when l = []
-  { f x (foldr f z xs)  when l = x::xs;
+  { f x (foldr f z xs)  when l = x::xs
 
-append : [N] * [N] -> [N];
+append : [N] * [N] -> [N]
 append (xs, ys) =
   { ys                   when xs = []
   { x :: append(xs',ys)  when xs = x :: xs'
+
+map : (Z -> Bool) -> [Z] -> [Bool]
+map f l =
+  { []               when l = []
+  { f x :: map f xs  when l = x :: xs
 

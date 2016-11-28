@@ -1,4 +1,4 @@
-foo : [N]+B -> N;
+foo : [N]+B -> N
 foo x =
   { n     when x = inl (n :: _)
   { 0     when x = inl []

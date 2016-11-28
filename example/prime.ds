@@ -28,8 +28,8 @@
 -- HDE: agreed!
 --
 -- The following function returns True if d is a divisor of n.
-divides : Z -> Z -> B;
-divides = d -> n -> n % d == 0;
+divides : Z -> Z -> B
+divides = d -> n -> n % d == 0
 
 -- BAY: Note the concrete syntax we currently have for lambdas is |->
 -- rather than -> (my idea was to mirror the usual math notation using
@@ -64,10 +64,10 @@ divides = d -> n -> n % d == 0;
 --
 -- HDE: I think this is the best idea.
 
-ldf : Z -> Z -> Z;
+ldf : Z -> Z -> Z
 ldf = k -> n -> { k           if k | n   -- divides k n
                 { n           if k^2 > n
-                { ldf (k+1) n otherwise;
+                { ldf (k+1) n otherwise
 
 -- BAY: We already do have an 'otherwise'!  I introduced it as syntax
 -- sugar for an empty list of guards.
@@ -85,10 +85,10 @@ ldf = k -> n -> { k           if k | n   -- divides k n
 -- we remove case. :-)
 
 -- ld calculates the least divisor of n.
-ld : Z -> Z;
-ld = n -> ldf 2 n;
+ld : Z -> Z
+ld = n -> ldf 2 n
 
 -- Tests whether n is a prime or not.
-isPrime : Z -> Bool;
+isPrime : Z -> Bool
 isPrime = n -> { False      if n <= 1
-               { ld n == n  if n > 1;
+               { ld n == n  if n > 1

@@ -1,14 +1,18 @@
-f : (N -> N) -> N * N -> N -> Z;
-f g (x,y) z = x + g y - z;   -- here g y is function application
+f : (N -> N) -> N * N -> N -> Z
+f g (x,y) z = x + g y - z   -- here g y is function application
 
-q : ℕ → ℕ×ℕ → ℕ → ℤ;          -- unicode syntax is allowed
-q g (x,y) z = x + g y - z;    -- here g y is multiplication
+q : ℕ → ℕ×ℕ → ℕ → ℤ          -- unicode syntax is allowed
+q g (x,y) z = x + g y - z    -- here g y is multiplication
 
-fib : Nat -> Nat;                 -- a top-level recursive function
+fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
-  { n                  when n = 0
-  { n                  when n = 1
-  { fib m + fib (m+1)  when n = S (S m);
+  { n when
+  {     n
+  {       = 0 {- a comment -}   -- note how a single branch can be
+                                -- broken across multiple lines starting
+                                -- with {
+  { n                  when {- another comment -} n = 1  -- comment
+  { fib m + fib (m+1)  when n = S (S m)
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise
     -- since that doesn't pass the type checker: it doesn't believe
@@ -16,16 +20,16 @@ fib n =
 
 -- Mutually recursive functions.  The order of declarations and
 -- definitions does not matter.
-isEven : N -> Bool;
-isOdd  : N -> Bool;
+isEven : N -> Bool
+isOdd  : N -> Bool
 
 isEven n = { true      when n = 0
-           { isOdd m   when n = S m;
+           { isOdd m   when n = S m
 
 isOdd  n = { false     when n = 0
-           { isEven m  when n = S m;
+           { isEven m  when n = S m
 
-fact : N -> N;
+fact : N -> N
 fact n =
   { 1   when n = 0
   { n * fact m   when n = S m

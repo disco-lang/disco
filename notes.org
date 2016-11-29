@@ -297,6 +297,11 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
     - Can we do something like -fdefer-type-errors so that
       students files load despite errors.
   + Machine-checkable examples
+  + Graph reduction?  Don't re-evaluate...
+  + Memoization annotation for functions?
+  + Option for ignoring subtraction/Z check
+  + More sophisticated checking of subtraction for N in a case
+
 * Links
 
   Here's how Idris represents terms: https://github.com/idris-lang/Idris-dev/blob/8ea27ae997ea1e4214ce47ad228bd7c35a891459/src/Idris/Core/TT.hs

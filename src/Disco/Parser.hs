@@ -429,7 +429,54 @@ wholeModule = whitespace *> L.nonIndented consumeWhitespace parseModule <* eof
 -- | Parse an entire module (a list of declarations ended by
 --   semicolons).
 parseModule :: Parser Module
-parseModule = open "" *> sep *> parseDecl `sepBy` sep
+parseModule = do
+  sep
+  topLevel <- parseTopLevel `sepBy` sep
+  -- traceShow topLevel $ return ()
+  mkModule topLevel
+  where
+    mkModule tls = return $ Module [d | TLDecl d <- tls] M.empty
+    tlIsDecl (TLDecl {}) = True
+    tlIsDecl _           = False
+    -- mkModule tls = do
+    --   m' <-
+
+    --   where
+    --     (docs, rest) = break tlIsDecl tls
+
+-- | Parse a top level item (either documentation or a declaration).
+parseTopLevel :: Parser TopLevel
+parseTopLevel = TLDoc <$> parseDocThing <|> TLDecl <$> parseDecl
+
+-- | Parse a documentation item: either a group of lines beginning
+--   with @|||@ (text documentation), or a group beginning with @!!!@
+--   (checked examples/properties).
+parseDocThing :: Parser DocThing
+parseDocThing
+  =   DocString     <$> parseDocString
+  <|> DocProperties <$> parseProperties
+
+-- | Parse a documentation group beginning with @|||@.
+parseDocString :: Parser [String]
+parseDocString = do
+  -- trace ("start docString") $ return ()
+  open "|||"
+  whitespace
+  ss <- block (requireVirtual *> manyTill anyChar eol <* whitespace)
+  close
+  -- trace ("end docString") $ return ()
+  return ss
+
+-- | Parse a group of examples/properties beginning with @!!!@.
+parseProperties :: Parser [Property]
+parseProperties = do
+  -- trace ("start properties") $ return ()
+  open "!!!"
+  whitespace
+  ps <- block (bind [] <$> parseTerm)
+  close
+  -- trace ("end properties") $ return ()
+  return ps
 
 -- | Parse a single declaration (either a type declaration or
 --   definition).

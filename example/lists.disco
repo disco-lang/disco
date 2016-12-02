@@ -1,15 +1,28 @@
+||| The eliminator for lists of natural numbers with a rational result.
+
+!!!   foldr (x -> y -> x + y) 0 [1,2,3]
+!!!     == 6
+!!!
+!!!   foldr (x -> y -> x + y) 0 [] == 0
+
 foldr : (N -> Q -> Q) -> Q -> [N] -> Q
 foldr f z l =
   { z                   when l = []
   { f x (foldr f z xs)  when l = x::xs
+
+||| Append two lists into a single list.
+
+!!!   append ([],[]) == []
+!!!   append ([1,2,3],[]) == [1,2,3]
+!!!   append ([1,2,3],[4,5,6]) == [1,2,3,4,5,6]
 
 append : [N] * [N] -> [N]
 append (xs, ys) =
   { ys                   when xs = []
   { x :: append(xs',ys)  when xs = x :: xs'
 
-map : (Z -> Bool) -> [Z] -> [Bool]
-map f l =
-  { []               when l = []
-  { f x :: map f xs  when l = x :: xs
+-- map : (Z -> Bool) -> [Z] -> [Bool]
+-- map f l =
+--   { []               when l = []
+--   { f x :: map f xs  when l = x :: xs
 

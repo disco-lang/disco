@@ -19,7 +19,11 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module, Decl(..), declName, isDefn
+         Module(..), TopLevel(..)
+         -- ** Documentation
+       , Docs, DocThing(..), Property
+         -- ** Declarations
+       , Decl(..), declName, isDefn
 
          -- * Terms
        , Side(..), UOp(..), BOp(..)
@@ -30,12 +34,34 @@ module Disco.AST.Surface
        )
        where
 
+import qualified Data.Map                as M
+
 import           Unbound.LocallyNameless
 
 import           Disco.Types
 
--- | A module is a list of declarations.
-type Module = [Decl]
+-- | A module is a list of declarations together with a collection of
+--   documentation for top-level names.
+data Module = Module [Decl] (M.Map (Name Term) Docs)
+  deriving Show
+
+-- | A TopLevel is either documentation (a 'DocThing') or a
+--   declaration ('Decl').
+data TopLevel = TLDoc DocThing | TLDecl Decl
+  deriving Show
+
+-- | Convenient synonym for a list of 'DocThing's.
+type Docs = [DocThing]
+
+-- | An item of documentation.
+data DocThing
+  = DocString     [String]      -- | A documentation string, i.e. a block of @||| text@ items
+  | DocProperties [Property]    -- | A group of examples/properties of the form @!!! property@
+  deriving Show
+
+-- | A property is a universally quantified term of the form
+--   @forall (v1 : T1) (v2 : T2). term@.
+type Property = Bind [(Name Term, Type)] Term
 
 -- | A declaration is either a type declaration or a definition.
 data Decl where

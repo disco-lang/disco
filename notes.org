@@ -258,6 +258,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
+  + Documentation:
+    - Freeform text (markdown?? See cheapskate library --- what Idris uses)
+    - Machine-checkable examples
+    - Quickcheck properties
   + Z/Q patterns (general arithmetic patterns?)
   + Multi-clause definitions
   + chained comparisons

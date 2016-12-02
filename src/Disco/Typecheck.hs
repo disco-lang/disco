@@ -613,7 +613,7 @@ ok = return emptyCtx
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
 checkModule :: Module -> TCM Ctx
-checkModule m = do
+checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns

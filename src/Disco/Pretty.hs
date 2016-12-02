@@ -221,8 +221,8 @@ prettyPattern (PSucc p) = text "S" <+> prettyPattern p
 
 ------------------------------------------------------------
 
-prettyModule :: Module -> Doc
-prettyModule = foldr ($+$) empty . map prettyDecl
+-- prettyModule :: Module -> Doc
+-- prettyModule = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty

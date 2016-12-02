@@ -617,6 +617,7 @@ checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
+    checkPropertyTypes docs
     ask
 
 -- | Run a type checking computation in the context of some type
@@ -652,3 +653,13 @@ checkDefn (DDefn x def) = do
       extends ctx $ go ps ty2 body
     go _ _ _ = throwError NumPatterns   -- XXX include more info
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
+
+-- | XXX
+checkPropertyTypes :: M.Map (Name Term) Docs -> TCM ()
+checkPropertyTypes docs = mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
+  where
+    properties = [ (n, ps) | (n, DocProperties ps) <- concatMap sequence . M.assocs $ docs ]
+    checkPropertyType prop = do
+      lunbind prop $ \(binds, t) -> do
+      extends (M.fromList binds) $ do
+      check t TyBool

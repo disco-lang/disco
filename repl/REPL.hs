@@ -121,9 +121,10 @@ handleLoad file = do
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print
-        Right (ctx, defns) -> do
+        Right ((docMap, ctx), defns) -> do
           let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)
           put (ctx, cdefns)
+          -- check the tests embedded in the documentation
 
 eval :: Term -> REPLStateIO String
 eval t = do

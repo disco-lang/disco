@@ -5,6 +5,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE RankNTypes               #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE TypeFamilies             #-}
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
@@ -612,13 +613,13 @@ ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM Ctx
+checkModule :: Module -> TCM (DocMap, Ctx)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
     checkPropertyTypes docs
-    ask
+    (docs,) <$> ask
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type
@@ -655,7 +656,7 @@ checkDefn (DDefn x def) = do
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | XXX
-checkPropertyTypes :: M.Map (Name Term) Docs -> TCM ()
+checkPropertyTypes :: DocMap -> TCM ()
 checkPropertyTypes docs = mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
   where
     properties = [ (n, ps) | (n, DocProperties ps) <- concatMap sequence . M.assocs $ docs ]

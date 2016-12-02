@@ -18,7 +18,7 @@
 
 module Disco.Parser
        ( -- * Parser type
-         ParserState(..), Parser, runParser
+         ParserState(..), initParserState, Parser, runParser
 
          -- ** Parser utilities
 
@@ -28,7 +28,7 @@ module Disco.Parser
          -- * Lexer
 
          -- ** Layout
-       , open, sep, close
+       , open, sep, close, block
        , requireSep, requireClose, requireVirtual
 
          -- ** Basic lexemes
@@ -58,6 +58,8 @@ module Disco.Parser
        )
        where
 
+-- import           Debug.Trace
+
 import           Unbound.LocallyNameless (Name, bind, embed, rebind,
                                           string2Name)
 
@@ -72,6 +74,9 @@ import           Control.Applicative     (many, (<|>))
 import           Control.Lens
 import           Control.Monad.State
 import           Data.Char               (isSpace)
+import           Data.Either             (isRight)
+import qualified Data.Map                as M
+import           Text.Printf
 
 import           Disco.AST.Surface
 import           Disco.Types
@@ -130,6 +135,7 @@ open delim = do
   _ <- string delim     -- parse the delimiter
   pushTab (col, delim)  -- push the new column on the stack
   numActive += 1        -- increment the number of active blocks
+  -- trace ("open " ++ delim) $ return ()
 
 -- | A virtual separator token.  Occurs between subsequent things
 --   which both start in the same alignment column.
@@ -139,19 +145,47 @@ sep = do
   -- The implementation is actually simple: make sure we are expecting
   -- a separator here.  If so, reset the separator flag; if not, fail.
   s <- use isSep
-  when (not s) $ fail "Unexpected separator"   -- XXX
+  when (not s) $
+    fail
+      (concat
+      [ "The parser required a separator but none was found.\n"
+      , "Please report this as a bug: https://github.com/disco-lang/disco/issues"
+      ])
+
   isSep .= False
+  -- pos <- getPosition
+  -- trace ("sep " ++ show pos) $ return ()
 
 -- | A virutal close token, used at the end of a block.
 close :: Parser ()
 close = eof <|> do
+  -- pos <- getPosition
   n   <- use numActive
   stk <- use tabStack
   case (length stk < n) of
-    True  -> numActive -= 1
-    False -> fail "Nothing to close here"  -- XXX?
+    True  -> do numActive -= 1
+                -- trace ("close " ++ show pos) (return ())
+    False -> fail $ concat
+               [ "The parser required a close but the stack is empty.\n"
+               , "Please report this as a bug: https://github.com/disco-lang/disco/issues"
+               ]
       -- I hope this failure mode will only occur if there is a bug in
       -- the parser, not with incorrect user syntax.
+
+-- | Parse an indented block, with individual items parsed by the
+--   given parser.  For example, something like
+--
+--   @
+--      item1
+--      item2 item2
+--        item2 item2 item2
+--      item3
+--   @
+--
+--   The current column when 'block' is first invoked is taken as the
+--   alignment column for the block.
+block :: Parser a -> Parser [a]
+block item = open "" *> (item `sepBy` sep) <* close
 
 -- | See if a virtual separator token is required, and fail if so.
 --   This is called right before parsing any other (non-virtual)
@@ -160,7 +194,7 @@ close = eof <|> do
 requireSep :: Parser ()
 requireSep = do
   s <- use isSep
-  when s $ fail "Missing separator"  -- XXX
+  when s $ fail "Missing separator"  -- XXX better error message.  Can this happen?
 
 -- | See if a virtual close token is required, and fail if so.  This
 --   is called right before parsing any other (non-virtual) token,
@@ -171,22 +205,30 @@ requireClose :: Parser ()
 requireClose = do
   n   <- use numActive
   stk <- use tabStack
-  when (n > length stk) $ fail "Missing close"   -- XXX
+  -- trace ("requireClose: " ++ show n ++ " " ++ show stk) $ return ()
+  when (n > length stk) $
+    fail "Encountered a dedented token, but the block is not ready to close."
+      -- XXX better error message
 
 -- | Possibly require virtual separator and close tokens.
 requireVirtual :: Parser ()
 requireVirtual = requireSep >> requireClose
 
--- | Consume whitespace and deal with indentation and layout.
+-- | Consume whitespace and deal with indentation and layout.  This is
+--   where the magic happens, and needs to be invoked after every
+--   token.
 whitespace :: Parser ()
 whitespace = do
 
   -- Eat up actual whitespace (including newlines) and comments
   consumeWhitespace
 
-  -- Find out what column we ended up in.
+  -- Find out what column we ended up in, and the current stack.
   col <- getColumn
   stk <- use tabStack
+
+  -- pos <- getPosition
+  -- trace ("whitespace: " ++ show pos ++ " " ++ show stk) $ return ()
 
   -- Get the rightmost alignment column.
   let rightmost = case stk of { ((p,_):_) -> p; _ -> unsafePos 1 }
@@ -196,7 +238,7 @@ whitespace = do
   -- stack of alignments appropriately, require separators and/or
   -- block closes, etc.
   when (col <= rightmost) $ do
-    tabs <- uses tabStack reverse  -- Get the alignment stack in
+    let tabs = reverse stk         -- Get the alignment stack in
                                    -- reverse so we can process it
                                    -- L->R
     go tabs tabs rightmost
@@ -224,38 +266,64 @@ whitespace = do
     go orig ts@((tabcol, delim) : moreTabs) rm = do
       col <- getColumn
 
+      -- Check if we are at the end of the line, without consuming anything.
+      atEOL <- isRight <$> observing (lookAhead eol)
+
       -- Check our relationship to the next alignment column.
       if
+         -- If all remaining delimiters are empty, it's OK to be at
+         -- EOL, even if it comes in a column before the next
+         -- alignment. Just consume it and start again on the next
+         -- line.
+         | all (\(_,d) -> null d) ts && atEOL -> eol >> consumeWhitespace >> go orig orig rm
+
          -- If we're past it but the delimiter for that column was empty,
          -- no problem: just keep processing the next alignment column
          | (col > tabcol && null delim) -> go orig moreTabs rm
 
          -- Otherwise, there should have been a delimiter in that column
          -- but there wasn't, so fail.
-         | col > tabcol                 -> fail "Missing delimiter"  -- XXX better error
+         | col > tabcol                 ->
+             fail $
+             printf
+               (concat
+                  [ "There should be a '%s' in column %d to match the previous line, "
+                  , "but I didn't find one.\nPlease check your indentation."
+                  ]
+               )
+               delim
+               (unPos tabcol)
 
          -- If we're at the next alignment column, try to consume the delimiter
-         -- followed by whitespace on the same line, then continue processing columns
-         | col == tabcol                -> do _ <- string delim
-                                              consumeLineWhitespace
-                                              go orig moreTabs rm
+         -- followed by whitespace on the same line, then continue processing columns.
+         -- If we don't find the delimiter, consider that block closed.
+         | col == tabcol                ->
+             (do _ <- try (string delim)
+                 consumeLineWhitespace
+                 go orig moreTabs rm
+             )
+             <|>
+             closeBlocks col
 
          -- If we're before the next alignment column, then we need to
          -- close some blocks, and possibly require a separator.
-         | col < tabcol                 -> do
+         | col < tabcol                 -> closeBlocks col
 
-             -- Drop any remaining alignment columns.  Some 'close'
-             -- operations will be required to get the number of
-             -- active blocks equal to the size of the stack again.
-             tabStack %= drop (length ts)
+      where
+        closeBlocks col = do
 
-             -- We should require a separator if the current column is
-             -- equal to the column now on top of the stack.
-             stk <- use tabStack
-             let acol = case stk of
-                          []        -> unsafePos 1
-                          ((p,_):_) -> p
-             isSep .= (col == acol)
+          -- Drop any remaining alignment columns.  Some 'close'
+          -- operations will be required to get the number of
+          -- active blocks equal to the size of the stack again.
+          tabStack %= drop (length ts)
+
+          -- We should require a separator if the current column is
+          -- equal to the column now on top of the stack.
+          stk <- use tabStack
+          let acol = case stk of
+                       []        -> unsafePos 1
+                       ((p,_):_) -> p
+          isSep .= (col == acol)
 
 -- | Generically consume whitespace, including comments.  The first
 --   argument specifies which actual whitespace characters to consume.
@@ -269,9 +337,6 @@ consumeWhitespace' sc = L.space (sc *> pure ()) lineComment blockComment
 --   newline characters.
 consumeLineWhitespace :: Parser ()
 consumeLineWhitespace = consumeWhitespace' (satisfy (\c -> isSpace c && c `notElem` "\r\n"))
-
-  -- XXX block comments could consume newline characters!  Do we need a version of
-  -- the block comment parser that does not consume newlines?
 
 -- | Consume whitespace, including comments and newlines.
 consumeWhitespace :: Parser ()
@@ -348,6 +413,11 @@ identifier = (lexeme . try) (p >>= check)
 ident :: Parser (Name Term)
 ident = string2Name <$> identifier
 
+-- | Optionally parse, succesfully returning 'Nothing' if the parse
+--   fails.
+optionMaybe :: Parser a -> Parser (Maybe a)
+optionMaybe p = (Just <$> p) <|> pure Nothing
+
 ------------------------------------------------------------
 -- Parser
 
@@ -375,8 +445,8 @@ term = whitespace *> parseTerm <* eof
 
 -- | Parse an atomic term.
 parseAtom :: Parser Term
-parseAtom
-  =   TUnit       <$ reserved "()"
+parseAtom = -- trace "parseAtom" $
+      TUnit       <$ reserved "()"
   <|> TList       <$> brackets (parseTerm `sepBy` comma)
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
@@ -394,11 +464,11 @@ parseInj =
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
 parseTerm :: Parser Term
-parseTerm = ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType)
+parseTerm = -- trace "parseTerm" $
+  (ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
-    optionMaybe p = (Just <$> p) <|> pure Nothing
 
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term

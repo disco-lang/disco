@@ -76,6 +76,7 @@ import           Control.Monad.State
 import           Data.Char               (isSpace)
 import           Data.Either             (isRight)
 import qualified Data.Map                as M
+import           Data.Maybe              (catMaybes)
 import           Text.Printf
 
 import           Disco.AST.Surface
@@ -433,16 +434,21 @@ parseModule = do
   sep
   topLevel <- parseTopLevel `sepBy` sep
   -- traceShow topLevel $ return ()
-  mkModule topLevel
+  let theMod = mkModule topLevel
+  --traceShow theMod $
+  return theMod
   where
-    mkModule tls = return $ Module [d | TLDecl d <- tls] M.empty
-    tlIsDecl (TLDecl {}) = True
-    tlIsDecl _           = False
-    -- mkModule tls = do
-    --   m' <-
+    groupTLs _ [] = []
+    groupTLs revDocs (TLDoc doc : rest)
+      = groupTLs (doc : revDocs) rest
+    groupTLs revDocs (TLDecl decl@(DType{}) : rest)
+      = (decl, Just (declName decl, reverse revDocs)) : groupTLs [] rest
+    groupTLs _ (TLDecl defn : rest)
+      = (defn, Nothing) : groupTLs [] rest
 
-    --   where
-    --     (docs, rest) = break tlIsDecl tls
+    mkModule tls = Module decls (M.fromList (catMaybes docs))
+      where
+        (decls, docs) = unzip $ groupTLs [] tls
 
 -- | Parse a top level item (either documentation or a declaration).
 parseTopLevel :: Parser TopLevel

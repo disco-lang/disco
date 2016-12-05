@@ -515,6 +515,30 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
   -- agree.
   decideEqForClosures ty2 clos1 clos2 ty1s
 
+-- To decide equality at a list type, [elTy]:
+decideEqFor (TyList elTy) v1 v2 = do
+
+  -- Reduce both values to WHNF; will be either nil with no arguments
+  -- or cons with two.
+  VCons c1 l1 <- whnfV v1
+  VCons c2 l2 <- whnfV v2
+
+  case (c1,c2) of
+    (0,0) -> return True      -- Both are nil.
+    (1,1) -> do               -- Both are cons.
+
+      -- Check head equality.
+      heq <- decideEqFor elTy (l1 !! 0) (l2 !! 0)
+      case heq of
+
+        -- If heads are unequal, so are lists.
+        False -> return False
+        -- Otherwise, check tails for equality.
+        True  -> decideEqFor (TyList elTy) (l1 !! 1) (l2 !! 1)
+
+    -- Different constructors => unequal.
+    _     -> return False
+
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2

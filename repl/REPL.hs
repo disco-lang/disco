@@ -154,9 +154,7 @@ runTest ap = do
     Left err -> (io . print $ err) >> return False
     Right v  -> case v of
       VCons 1 [] -> return True
-      _          -> do
-        io . print $ v
-        return False
+      _          -> return False
 
 eval :: Term -> REPLStateIO String
 eval t = do

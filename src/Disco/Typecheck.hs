@@ -35,6 +35,8 @@ module Disco.Typecheck
 
          -- * Type checking
        , check, checkPattern, ok, checkDefn
+       , checkPropertyTypes
+
          -- ** Whole modules
        , checkModule, withTypeDecls
          -- ** Subtyping
@@ -61,6 +63,7 @@ import           Prelude                 hiding (lookup)
 
 import           Control.Applicative     ((<|>))
 import           Control.Arrow           ((&&&))
+import           Control.Lens            ((%~), (&), _1, _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -613,13 +616,13 @@ ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (DocMap, Ctx)
+checkModule :: Module -> TCM (DocMap, M.Map (Name ATerm) [AProperty], Ctx)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
-    checkPropertyTypes docs
-    (docs,) <$> ask
+    aprops <- checkPropertyTypes docs
+    (docs,aprops,) <$> ask
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type
@@ -656,11 +659,16 @@ checkDefn (DDefn x def) = do
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | XXX
-checkPropertyTypes :: DocMap -> TCM ()
-checkPropertyTypes docs = mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
+checkPropertyTypes :: DocMap -> TCM (M.Map (Name ATerm) [AProperty])
+checkPropertyTypes docs
+  = (M.fromList . (traverse . _1 %~ translate))
+    <$> ((traverse . _2 . traverse) checkPropertyType) properties
+  -- mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
   where
     properties = [ (n, ps) | (n, DocProperties ps) <- concatMap sequence . M.assocs $ docs ]
+    checkPropertyType :: Property -> TCM AProperty
     checkPropertyType prop = do
       lunbind prop $ \(binds, t) -> do
       extends (M.fromList binds) $ do
-      check t TyBool
+      at <- check t TyBool
+      return $ bind (binds & traverse . _1 %~ translate) at

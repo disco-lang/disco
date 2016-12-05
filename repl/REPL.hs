@@ -11,7 +11,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core     (prettyValue, rnf, runIM')
+import           Disco.Interpret.Core     (Value (..), prettyValue, rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck
@@ -114,17 +114,49 @@ handleDesugar t = do
 
 handleLoad :: FilePath -> REPLStateIO ()
 handleLoad file = do
-  str <- io $ readFile file
+  io . putStrLn $ "Loading " ++ file ++ "..."
+  str <- io $ readFile file   -- XXX catch errors
   let mp = runParser wholeModule file str
   case mp of
     Left err -> io $ putStrLn (parseErrorPretty err)
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print
-        Right ((docMap, ctx), defns) -> do
+        Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)
           put (ctx, cdefns)
-          -- check the tests embedded in the documentation
+          runAllTests aprops
+          io . putStrLn $ "Loaded."
+
+runAllTests :: M.Map (Name ATerm) [AProperty] -> REPLStateIO ()
+runAllTests aprops = do
+  io $ putStrLn "Running tests..."
+  mapM_ runTests (M.assocs aprops)
+
+runTests :: (Name ATerm, [AProperty]) -> REPLStateIO ()
+runTests (n, props) =
+  case props of
+    [] -> return ()
+    _  -> do
+      io $ putStr ("  " ++ name2String n ++ ": ")
+      bs <- mapM runTest props
+      case and bs of
+        True  -> io $ putStrLn "OK"
+        False -> io $ putStrLn "One or more tests failed." -- XXX
+
+runTest :: AProperty -> REPLStateIO Bool
+runTest ap = do
+  (_, defns) <- get
+  let res = runIM' defns $ do
+        lunbind ap $ \(binds, at) -> do
+          rnf . runDSM $ desugarTerm at
+  case res of
+    Left err -> (io . print $ err) >> return False
+    Right v  -> case v of
+      VCons 1 [] -> return True
+      _          -> do
+        io . print $ v
+        return False
 
 eval :: Term -> REPLStateIO String
 eval t = do

@@ -4,6 +4,12 @@ f g (x,y) z = x + g y - z   -- here g y is function application
 q : ℕ → ℕ×ℕ → ℕ → ℤ          -- unicode syntax is allowed
 q g (x,y) z = x + g y - z    -- here g y is multiplication
 
+||| A naive implementation of the fibonacci function.
+!!!   fib 0 == 0
+!!!   fib 1 == 1
+!!!   fib 2 == 1
+!!!   fib 5 == 5
+!!!   fib 12 == 144
 fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
   { n when

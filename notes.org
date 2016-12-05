@@ -258,19 +258,11 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + Documentation:
-    - Freeform text (markdown?? See cheapskate library --- what Idris uses)
-    - Machine-checkable examples
-    - Quickcheck properties
   + Z/Q patterns (general arithmetic patterns?)
   + polymorphism
   + Multi-clause definitions
   + chained comparisons
   + Use a single Disco monad for everything?
-  + Parser:
-    - deal with indentation, adding implicit separators etc. so
-      - we don't need semicolons at the ends of lines
-      - nested case works properly
   + Test suite:
     - quick check properties
     - regression test suite
@@ -281,6 +273,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
   Other things to do/consider:
 
+  - Markdown for documentation? See cheapskate library --- what Idris uses.
   + Guards
     - Merge if/when into a single syntax?
     - Use syntax "is" for pattern guards?  e.g.  when p is (x,y)

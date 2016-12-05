@@ -142,7 +142,11 @@ runTests (n, props) =
       bs <- mapM runTest props
       case and bs of
         True  -> io $ putStrLn "OK"
-        False -> io $ putStrLn "One or more tests failed." -- XXX
+        False -> io $ putStrLn "One or more tests failed."
+          -- XXX Get more informative test results.  If test fails
+          -- pretty-print the expression that failed.  In addition, if
+          -- test term looks like an equality test, report expected
+          -- and actual values.
 
 runTest :: AProperty -> REPLStateIO Bool
 runTest ap = do

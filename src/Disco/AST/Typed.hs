@@ -126,11 +126,11 @@ data AGuards where
 -- | A single guard (@if@ or @when@) containing a type-annotated term.
 data AGuard where
 
-  -- | Boolean guard (@if <test>@)
-  AGIf   :: Embed ATerm -> AGuard
+  -- | Boolean guard (@when <test>@)
+  AGBool :: Embed ATerm -> AGuard
 
   -- | Pattern guard (@when term = pat@)
-  AGWhen :: Embed ATerm -> Pattern -> AGuard
+  AGPat  :: Embed ATerm -> Pattern -> AGuard
 
   deriving Show
 

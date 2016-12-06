@@ -206,12 +206,12 @@ checkGuards e (AGCons (unrebind -> (g,gs))) = do
     Just e' -> checkGuards e' gs
 
 checkGuard :: Env -> AGuard -> IM (Maybe Env)
-checkGuard e (AGIf (unembed -> t)) = do
+checkGuard e (AGBool (unembed -> t)) = do
   v <- interpTerm e t
   case v of
     VBool True -> return (Just e)
     _          -> return Nothing
-checkGuard e (AGWhen (unembed -> t) p) = do
+checkGuard e (AGPat (unembed -> t) p) = do
   -- XXX FIX ME!  Should be lazy, i.e. t should be evaluated only as
   -- much as demanded by the pattern.  Perhaps the easiest way is to
   -- switch to a small-step interpreter.

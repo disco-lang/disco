@@ -194,10 +194,10 @@ data Guards where
 data Guard where
 
   -- | Boolean guard (@if <test>@)
-  GIf   :: Embed Term -> Guard
+  GBool :: Embed Term -> Guard
 
   -- | Pattern guard (@when term = pat@)
-  GWhen :: Embed Term -> Pattern -> Guard
+  GPat  :: Embed Term -> Pattern -> Guard
 
   deriving Show
 

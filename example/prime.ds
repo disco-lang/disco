@@ -29,7 +29,7 @@
 --
 -- The following function returns True if d is a divisor of n.
 divides : Z -> Z -> B
-divides = d -> n -> n % d == 0
+divides = d -> n -> n % d = 0
 
 -- BAY: Note the concrete syntax we currently have for lambdas is |->
 -- rather than -> (my idea was to mirror the usual math notation using
@@ -91,4 +91,4 @@ ld = n -> ldf 2 n
 -- Tests whether n is a prime or not.
 isPrime : Z -> Bool
 isPrime = n -> { False      if n <= 1
-               { ld n == n  if n > 1
+               { ld n = n   if n > 1

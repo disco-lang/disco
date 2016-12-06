@@ -158,11 +158,11 @@ desugarGuards (AGCons (unrebind -> (ag, ags))) =
   case ag of
 
     -- Boolean guards are desugared to a pattern-match on @true@.
-    AGIf (unembed -> at) -> do
+    AGBool (unembed -> at) -> do
       c <- desugarTerm at
       cgs <- desugarGuards ags
       return $ CGCons (rebind (embed c, CPCons (fromEnum True) []) cgs)
-    AGWhen (unembed -> at) p -> do
+    AGPat (unembed -> at) p -> do
       c <- desugarTerm at
       cgs <- desugarGuards ags
       return $ CGCons (rebind (embed c, desugarPattern p) cgs)

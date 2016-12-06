@@ -575,13 +575,13 @@ inferGuards (GCons (unrebind -> (g,gs))) = do
 -- | Infer the type of a guard, returning the type-annotated guard
 --   along with a context of types for any variables bound by the guard.
 inferGuard :: Guard -> TCM (AGuard, Ctx)
-inferGuard (GIf (unembed -> t)) = do
+inferGuard (GBool (unembed -> t)) = do
   at <- check t TyBool
-  return (AGIf (embed at), emptyCtx)
-inferGuard (GWhen (unembed -> t) p) = do
+  return (AGBool (embed at), emptyCtx)
+inferGuard (GPat (unembed -> t) p) = do
   at <- infer t
   ctx <- checkPattern p (getType at)
-  return (AGWhen (embed at) p, ctx)
+  return (AGPat (embed at) p, ctx)
 
 -- XXX todo: check for nonlinear patterns.
 -- Nonlinear patterns can desugar to equality checks!

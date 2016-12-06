@@ -392,7 +392,7 @@ reserved w = lexeme $ C.string w *> notFollowedBy alphaNumChar
 -- | The list of all reserved words.
 reservedWords :: [String]
 reservedWords =
-  [ "true", "false", "True", "False", "inl", "inr", "let", "in"
+  [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
@@ -567,8 +567,12 @@ parseGuards = (GEmpty <$ reserved "otherwise") <|> (guards <$> many parseGuard)
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
 parseGuard =
-      GIf   <$> (embed <$> (reserved "if" *> parseTerm))
-  <|> GWhen <$> (embed <$> (reserved "when" *> parseTerm)) <*> (symbol "=" *> parsePattern)
+  mkGuard <$> (embed <$> (guardWord *> parseTerm))
+          <*> optionMaybe (reserved "is" *> parsePattern)
+  where
+    guardWord = reserved "when" <|> reserved "if"
+    mkGuard t Nothing  = GBool t
+    mkGuard t (Just p) = GPat  t p
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern
@@ -626,7 +630,7 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
               ]
             , [ infixR "::" (TBin Cons)
               ]
-            , [ infixN "==" (TBin Eq)
+            , [ infixN "=" (TBin Eq)
               , infixN "/=" (TBin Neq)
               , infixN "<"  (TBin Lt)
               , infixN ">"  (TBin Gt)

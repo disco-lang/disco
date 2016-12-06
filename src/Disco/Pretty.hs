@@ -206,8 +206,8 @@ prettyGuards (guardList -> gs)
   = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
-prettyGuard (GIf et) = text "if" <+> (prettyTerm (unembed et))
-prettyGuard (GWhen et p) = text "when" <+> prettyTerm (unembed et) <+> text "=" <+> prettyPattern p
+prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
+prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
 
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x) = prettyName x

@@ -72,3 +72,15 @@ executable disco
                        optparse-applicative >= 0.12 && < 0.14
 
   default-language:    Haskell2010
+
+test-suite disco-tests
+  type: exitcode-stdio-1.0
+  main-is: Tests.hs
+  hs-source-dirs: test
+  build-depends:    base >= 4.7 && < 4.10,
+                    tasty >= 0.10 && < 0.12,
+                    tasty-golden >= 2.3 && < 2.4,
+                    directory >= 1.2 && < 1.3,
+                    filepath >= 1.4 && < 1.5,
+                    process >= 1.4 && < 1.5
+  default-language: Haskell2010

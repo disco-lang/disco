@@ -199,9 +199,12 @@ check p@(TPair t1 t2) ty@(TyPair ty1 ty2) = do
   at2 <- check t2 ty2
   return $ ATPair ty at1 at2
 
-  -- We can check that the empty list has any list type.
-check (TList []) ty@(TyList _) = return $ ATList ty []
-check (TList []) ty            = throwError (NotList (TList []) ty)
+check (TList xs) ty@(TyList eltTy) = do
+  axs <- mapM (flip check eltTy) xs
+  return $ ATList ty axs
+
+check (TList xs) ty            = throwError (NotList (TList xs) ty)
+
 
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.

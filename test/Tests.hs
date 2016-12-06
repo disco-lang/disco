@@ -1,7 +1,7 @@
 module Main where
 
 import           Control.Monad     (filterM)
-import           System.Directory  (doesDirectoryExist, listDirectory)
+import           System.Directory  (doesDirectoryExist, getDirectoryContents)
 import           System.FilePath   ((</>))
 import           System.Process    (system)
 
@@ -10,8 +10,9 @@ import           Test.Tasty.Golden
 
 main :: IO ()
 main = do
-  testDirs <- listDirectory "test" >>= filterM (doesDirectoryExist . ("test"</>))
-  let testTree = testGroup "disco" $ map mkGolden testDirs
+  testDirs <- getDirectoryContents "test" >>= filterM (doesDirectoryExist . ("test"</>))
+  let testDirs' = filter (\f -> f /= "." && f /= "..") testDirs
+  let testTree = testGroup "disco" $ map mkGolden testDirs'
   defaultMain testTree
 
 mkGolden :: FilePath -> TestTree

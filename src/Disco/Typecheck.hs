@@ -227,11 +227,26 @@ check (TInj R t) ty@(TySum _ ty2) = do
   -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
+-- XXX check TLet
+
+check (TCase bs) ty = do
+  abs <- mapM (checkBranch ty) bs
+  return (ATCase ty abs)
+
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.
 check t ty = do
   at <- infer t
   checkSub at ty
+
+-- | XXX
+checkBranch :: Type -> Branch -> TCM ABranch
+checkBranch ty b =
+  lunbind b $ \(gs, t) -> do
+  (ags, ctx) <- inferGuards gs
+  extends ctx $ do
+  at <- check t ty
+  return $ bind ags at
 
 -- | Check that the given annotated term has a type which is a subtype
 --   of the given type.  The returned annotated term may be the same

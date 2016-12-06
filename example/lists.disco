@@ -23,6 +23,6 @@ append (xs, ys) =
 
 map : (Z -> Bool) -> [Z] -> [Bool]
 map f l =
---  { []               when l is []
+  { []               when l is []
   { f x :: map f xs  when l is x :: xs
 

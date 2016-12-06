@@ -80,7 +80,8 @@ script:
  # Manually add disco executable to the path, needed by the test suite
  # BAY  6 Dec 2016, added after discussion with hvr.
  # Eventually once cabal new-test is finished this will be unnecessary.
- - PATH=dist-newstyle/build/**/$SRC_BASENAME/**/$PKGNAME:$PATH
+ - EXELOC=`ls -d dist-newstyle/*/*/*/$SRC_BASENAME/build/$PKGNAME`
+ - PATH=$EXELOC:$PATH
 
  - shopt -s globstar;
    RC=true; for T in ${TESTS[@]}; do echo "== $T ==";

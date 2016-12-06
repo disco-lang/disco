@@ -242,7 +242,8 @@ main = do
       minput <- getInputLine "Disco> "
       case minput of
         Nothing -> return ()
-        Just input | input `isPrefixOf` ":quit" -> do
-                       liftIO $ putStrLn "Goodbye!"
-                       return ()
-                   | otherwise -> (lift.handleCMD $ input) >> loop
+        Just input
+          | input `isPrefixOf` ":quit" -> do
+              liftIO $ putStrLn "Goodbye!"
+              return ()
+          | otherwise -> (lift.handleCMD $ input) >> loop

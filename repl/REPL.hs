@@ -3,6 +3,8 @@ import           Control.Monad.State
 import           Data.Char                (isSpace)
 import           Data.List                (find, isPrefixOf)
 import qualified Data.Map                 as M
+
+import qualified Options.Applicative      as O
 import           System.Console.Haskeline
 import           Text.Megaparsec          hiding (runParser)
 import           Unbound.LocallyNameless  hiding (rnf)
@@ -89,7 +91,7 @@ handleCMD s =
     handleLine :: REPLExpr -> REPLStateIO ()
     handleLine (Let x t) = handleLet x t
     handleLine (TypeCheck t) = (type_check t) >>= (io.putStrLn)
-    handleLine (Eval t) = (eval t) >>= (io.putStrLn)
+    handleLine (Eval t) = (evalTerm t) >>= (io.putStrLn)
     handleLine (ShowAST t) = io.putStrLn.show $ t
     handleLine (Parse t) = io.print $ t
     handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
@@ -160,8 +162,8 @@ runTest ap = do
       VCons 1 [] -> return True
       _          -> return False
 
-eval :: Term -> REPLStateIO String
-eval t = do
+evalTerm :: Term -> REPLStateIO String
+evalTerm t = do
   (ctx, defns) <- get
   case evalTCM (extends ctx $ infer t) of
     Left err -> return.show $ err
@@ -182,17 +184,45 @@ type_check t = do
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
 
+data DiscoOpts = DiscoOpts
+  { evaluate :: Maybe String }
+
+discoOpts :: O.Parser DiscoOpts
+discoOpts = DiscoOpts
+  <$> optional (
+        O.strOption (mconcat
+          [ O.long "evaluate"
+          , O.short 'e'
+          , O.help "evaluate an expression"
+          , O.metavar "TERM"
+          ])
+      )
+
+discoInfo :: O.ParserInfo DiscoOpts
+discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
+  [ O.fullDesc
+  , O.progDesc "progDesc"
+  , O.header "header"
+  ]
+
 main :: IO ()
 main = do
-  let settings = defaultSettings
-        { historyFile = Just ".disco_history" }
-  putStr banner
-  evalStateT (runInputT settings loop) (M.empty, M.empty)
-   where
-       loop :: InputT REPLStateIO ()
-       loop = do
-           minput <- getInputLine "Disco> "
-           case minput of
-               Nothing -> return ()
-               Just input | input `isPrefixOf` ":quit" -> liftIO $ putStrLn "Goodbye!" >> return ()
-                          | otherwise -> (lift.handleCMD $ input) >> loop
+  opts <- O.execParser discoInfo
+
+  let batch = maybe False (const True) (evaluate opts)
+      settings = defaultSettings
+            { historyFile = Just ".disco_history" }
+  when (not batch) $ putStr banner
+  case (evaluate opts) of
+    Just str -> evalStateT (handleCMD str) (M.empty, M.empty)
+    Nothing  -> evalStateT (runInputT settings loop) (M.empty, M.empty)
+  where
+    loop :: InputT REPLStateIO ()
+    loop = do
+      minput <- getInputLine "Disco> "
+      case minput of
+        Nothing -> return ()
+        Just input | input `isPrefixOf` ":quit" -> do
+                       liftIO $ putStrLn "Goodbye!"
+                       return ()
+                   | otherwise -> (lift.handleCMD $ input) >> loop

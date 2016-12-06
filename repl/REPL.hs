@@ -3,6 +3,7 @@ import           Control.Monad.State
 import           Data.Char                (isSpace)
 import           Data.List                (find, isPrefixOf)
 import qualified Data.Map                 as M
+import           Data.Maybe               (isJust)
 
 import qualified Options.Applicative      as O
 import           System.Console.Haskeline
@@ -185,7 +186,9 @@ banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
 
 data DiscoOpts = DiscoOpts
-  { evaluate :: Maybe String }
+  { evaluate :: Maybe String
+  , cmdFile  :: Maybe String
+  }
 
 discoOpts :: O.Parser DiscoOpts
 discoOpts = DiscoOpts
@@ -197,25 +200,42 @@ discoOpts = DiscoOpts
           , O.metavar "TERM"
           ])
       )
+  <*> optional (
+        O.strOption (mconcat
+          [ O.long "file"
+          , O.short 'f'
+          , O.help "execute the commands in a file"
+          , O.metavar "FILE"
+          ])
+      )
 
 discoInfo :: O.ParserInfo DiscoOpts
 discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   [ O.fullDesc
-  , O.progDesc "progDesc"
-  , O.header "header"
+  , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
+  , O.header "disco v0.1"
   ]
 
 main :: IO ()
 main = do
   opts <- O.execParser discoInfo
 
-  let batch = maybe False (const True) (evaluate opts)
+  let batch = any isJust [evaluate opts, cmdFile opts]
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  case (evaluate opts) of
-    Just str -> evalStateT (handleCMD str) (M.empty, M.empty)
-    Nothing  -> evalStateT (runInputT settings loop) (M.empty, M.empty)
+  flip evalStateT (M.empty, M.empty) $ do
+    case cmdFile opts of
+      Just file -> do
+        cmds <- io $ readFile file    -- XXX handle failure
+        mapM_ handleCMD (lines cmds)
+      Nothing   -> return ()
+    case evaluate opts of
+      Just str -> handleCMD str
+      Nothing  -> return ()
+
+    when (not batch) $ runInputT settings loop
+
   where
     loop :: InputT REPLStateIO ()
     loop = do

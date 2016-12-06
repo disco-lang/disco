@@ -194,6 +194,11 @@ addDefn x b = modify (M.insert (translate x) b)
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
 
+check p@(TPair t1 t2) ty@(TyPair ty1 ty2) = do
+  at1 <- check t1 ty1
+  at2 <- check t2 ty2
+  return $ ATPair ty at1 at2
+
   -- We can check that the empty list has any list type.
 check (TList []) ty@(TyList _) = return $ ATList ty []
 check (TList []) ty            = throwError (NotList (TList []) ty)

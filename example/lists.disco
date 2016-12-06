@@ -12,9 +12,8 @@ foldr f z l =
 
 ||| Append two lists into a single list.
 
---   append ([],[]) == []
---   append ([1,2,3],[]) == [1,2,3]
-
+!!!   append ([], [])          = ([] : [N])
+!!!   append ([1,2,3],[])      = [1,2,3]
 !!!   append ([1,2,3],[4,5,6]) = [1,2,3,4,5,6]
 
 append : [N] * [N] -> [N]

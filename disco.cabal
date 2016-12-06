@@ -89,5 +89,6 @@ test-suite disco-tests
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.3,
                     filepath >= 1.4 && < 1.5,
-                    process >= 1.4 && < 1.5
+                    process >= 1.4 && < 1.5,
+                    disco
   default-language: Haskell2010

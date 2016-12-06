@@ -76,6 +76,12 @@ script:
  # there's no 'cabal new-test' yet, so let's emulate for now
  - TESTS=( $(awk 'tolower($0) ~ /^test-suite / { print $2 }' *.cabal) )
  - if [ "$TEST" != "--enable-tests" ]; then TESTS=(); fi
+
+ # Manually add disco executable to the path, needed by the test suite
+ # BAY  6 Dec 2016, added after discussion with hvr.
+ # Eventually once cabal new-test is finished this will be unnecessary.
+ - PATH=dist-newstyle/build/**/$SRC_BASENAME/**/$PKGNAME:$PATH
+
  - shopt -s globstar;
    RC=true; for T in ${TESTS[@]}; do echo "== $T ==";
    if dist-newstyle/build/**/$SRC_BASENAME/**/build/$T/$T; then echo "= $T OK =";

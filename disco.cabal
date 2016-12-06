@@ -20,7 +20,7 @@ cabal-version:       >= 1.23
 build-type:          Custom
 
 custom-setup
-  setup-depends: base, Cabal
+  setup-depends: base, Cabal, process
 
 source-repository head
   type:     git

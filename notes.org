@@ -269,10 +269,6 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Collect multiple warnings & errors (parsing, type checking)
   + LaTeX output mode for pretty-printer
   + Markdown for documentation? See cheapskate library --- what Idris uses.
-  + Guards
-    - Merge if/when into a single syntax?
-    - Use syntax "is" for pattern guards?  e.g.  when p is (x,y)
-    - Then switch back to single = for equality testing?
   + Finite types (like Fin n)
   + Chained comparisons   (2 < x <= 5)
   + Type qualifiers like "nonzero", "nonnegative", etc.

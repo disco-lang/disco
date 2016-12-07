@@ -132,9 +132,11 @@ handleLoad file = do
           io . putStrLn $ "Loaded."
 
 runAllTests :: M.Map (Name ATerm) [AProperty] -> REPLStateIO ()
-runAllTests aprops = do
-  io $ putStrLn "Running tests..."
-  mapM_ runTests (M.assocs aprops)
+runAllTests aprops
+  | M.null aprops = return ()
+  | otherwise     = do
+      io $ putStrLn "Running tests..."
+      mapM_ runTests (M.assocs aprops)
 
 runTests :: (Name ATerm, [AProperty]) -> REPLStateIO ()
 runTests (n, props) =

@@ -264,7 +264,6 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Use a single Disco monad for everything?
   + Test suite:
     - quick check properties
-    - regression test suite
   + Type reconstruction
   + Collect multiple warnings & errors (parsing, type checking)
   + LaTeX output mode for pretty-printer

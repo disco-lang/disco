@@ -35,3 +35,20 @@ map f l =
   { []               when l is []
   { f x :: map f xs  when l is x :: xs
 
+||| Take the first n elements of a list.
+!!!   take 1 [true, false, true] = [true]
+!!!   take 3 [true, false] = [true, false]
+!!!   take 0 [true, false] = ([] : List Bool)
+
+take : ℕ → List Bool → List Bool
+take n l =
+  { []               when n is 0
+  { []               when l is []
+
+  { x :: take n' xs  when l is x::xs
+                     when n is S n'
+
+||| Repeat the given element infinitely.
+!!!   take 3 (repeat true) = [true, true, true]
+repeat : Bool → List Bool
+repeat x = x :: repeat x

@@ -100,15 +100,16 @@ prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy (TyArr ty1 ty2)  = mparens arrPA $
-  prettyTy' 1 AL ty1 <+> text "->" <+> prettyTy' 1 AR ty2
+  prettyTy' 1 AL ty1 <+> text "→" <+> prettyTy' 1 AR ty2
 prettyTy (TyPair ty1 ty2) = mparens (PA 7 AR) $
-  prettyTy' 7 AL ty1 <+> text "*" <+> prettyTy' 7 AR ty2
+  prettyTy' 7 AL ty1 <+> text "×" <+> prettyTy' 7 AR ty2
 prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
   prettyTy' 6 AL ty1 <+> text "+" <+> prettyTy' 6 AR ty2
-prettyTy TyN              = text "N"
-prettyTy TyZ              = text "Z"
-prettyTy TyQ              = text "Q"
-prettyTy (TyList ty)      = text "[" <> prettyTy ty <> text "]"
+prettyTy TyN              = text "ℕ"
+prettyTy TyZ              = text "ℤ"
+prettyTy TyQ              = text "ℚ"
+prettyTy (TyList ty)      = mparens (PA 9 AR) $
+  text "List" <+> prettyTy' 9 AR ty
 
 prettyTy' :: Prec -> Assoc -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)

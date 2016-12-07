@@ -664,7 +664,12 @@ parseAtomicType =
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
-  <|> TyList <$> brackets parseType
+    -- This explicitly allows "List List N" to parse as List (List N).
+    -- Since we don't have arbitrary application of higher-kinded type
+    -- expressions, only application of an explicit set of
+    -- right-associative single-argument type formers (e.g. List, and
+    -- eventually things like Set), this can't cause any ambiguity.
+  <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> parens parseType
 
 -- | Parse a type.
@@ -685,4 +690,5 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
               ]
             ]
 
+    prefix name fun = Prefix (reservedOp name >> return fun)
     infixR name fun = InfixR (reservedOp name >> return fun)

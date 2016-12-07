@@ -1,0 +1,6 @@
+foo : [N]+B -> N
+foo x =
+  { n     when x is inl (n :: _)
+  { 0     when x is inl []
+  { 1     when x is inr True
+  { 2     when x is inr False

@@ -58,8 +58,8 @@ type DocMap = M.Map (Name Term) Docs
 
 -- | An item of documentation.
 data DocThing
-  = DocString     [String]      -- | A documentation string, i.e. a block of @||| text@ items
-  | DocProperties [Property]    -- | A group of examples/properties of the form @!!! property@
+  = DocString     [String]      -- ^ A documentation string, i.e. a block of @||| text@ items
+  | DocProperties [Property]    -- ^ A group of examples/properties of the form @!!! property@
   deriving Show
 
 -- | A property is a universally quantified term of the form

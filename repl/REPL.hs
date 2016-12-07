@@ -1,4 +1,6 @@
-import           Control.Lens             ((%=), _1, _2)
+{-# LANGUAGE TemplateHaskell #-}
+
+import           Control.Lens             (makeLenses, use, (%=), (.=), _1, _2)
 import           Control.Monad.State
 import           Data.Char                (isSpace)
 import           Data.List                (find, isPrefixOf)
@@ -21,7 +23,18 @@ import           Disco.Typecheck
 
 type CDefns = M.Map (Name Core) Core
 
-type REPLStateIO = StateT (Ctx, CDefns) IO
+data REPLState = REPLState
+  { _replCtx   :: Ctx
+  , _replDefns :: CDefns
+  , _replDocs  :: DocMap
+  }
+
+makeLenses ''REPLState
+
+initREPLState :: REPLState
+initREPLState = REPLState M.empty M.empty M.empty
+
+type REPLStateIO = StateT REPLState IO
 
 -- HDE: Is there a way around this?
 instance MonadException m => MonadException (StateT s m) where
@@ -44,6 +57,7 @@ data REPLExpr =
  | Parse Term                   -- Show the parsed AST
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
+ | Doc (Name Term)              -- Show documentation.
  | Help
  deriving Show
 
@@ -65,6 +79,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       , ("parse",   Parse     <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
+      , ("doc",     Doc       <$> (whitespace *> ident))
       , ("help",    return Help)
       ]
 
@@ -90,24 +105,26 @@ handleCMD s =
       Right l -> handleLine l
   where
     handleLine :: REPLExpr -> REPLStateIO ()
-    handleLine (Let x t) = handleLet x t
-    handleLine (TypeCheck t) = (type_check t) >>= (io.putStrLn)
-    handleLine (Eval t) = (evalTerm t) >>= (io.putStrLn)
-    handleLine (ShowAST t) = io.putStrLn.show $ t
-    handleLine (Parse t) = io.print $ t
-    handleLine (Desugar t) = handleDesugar t >>= (io.putStrLn)
-    handleLine (Load file) = handleLoad file
-    handleLine Help = io.putStrLn $ "Help!"
+
+    handleLine (Let x t)     = handleLet x t
+    handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
+    handleLine (Eval t)      = (evalTerm t) >>= (io.putStrLn)
+    handleLine (ShowAST t)   = io.putStrLn.show $ t
+    handleLine (Parse t)     = io.print $ t
+    handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
+    handleLine (Load file)   = handleLoad file
+    handleLine (Doc name)    = handleDocs name
+    handleLine Help          = io.putStrLn $ "Help!"
 
 handleLet :: Name Term -> Term -> REPLStateIO ()
 handleLet x t = do
-  (ctx, _) <- get
+  ctx <- use replCtx
   let mat = runTCM (extends ctx $ infer t)
   case mat of
     Left err -> io.print $ err   -- XXX pretty print
     Right (at, _) -> do
-      _1 %= M.insert x (getType at)
-      _2 %= M.insert (translate x) (runDSM $ desugarTerm at)
+      replCtx   %= M.insert x (getType at)
+      replDefns %= M.insert (translate x) (runDSM $ desugarTerm at)
 
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do
@@ -127,7 +144,9 @@ handleLoad file = do
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)
-          put (ctx, cdefns)
+          replDefns .= cdefns
+          replDocs  .= docMap
+          replCtx   .= ctx
           runAllTests aprops
           io . putStrLn $ "Loaded."
 
@@ -155,7 +174,7 @@ runTests (n, props) =
 
 runTest :: AProperty -> REPLStateIO Bool
 runTest ap = do
-  (_, defns) <- get
+  defns <- use replDefns
   let res = runIM' defns $ do
         lunbind ap $ \(binds, at) -> do
           rnf . runDSM $ desugarTerm at
@@ -165,9 +184,22 @@ runTest ap = do
       VCons 1 [] -> return True
       _          -> return False
 
+handleDocs :: Name Term -> REPLStateIO ()
+handleDocs name = do
+  ctx  <- use replCtx
+  docs <- use replDocs
+  case M.lookup name ctx of
+    Nothing -> io . putStrLn $ "No documentation found for " ++ show name ++ "."
+    Just ty -> do
+      io . putStrLn $ show name ++ " : " ++ renderDoc (prettyTy ty)
+      case M.lookup name docs of
+        Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
+        _ -> return ()
+
 evalTerm :: Term -> REPLStateIO String
 evalTerm t = do
-  (ctx, defns) <- get
+  ctx   <- use replCtx
+  defns <- use replDefns
   case evalTCM (extends ctx $ infer t) of
     Left err -> return.show $ err
     Right at ->
@@ -177,12 +209,12 @@ evalTerm t = do
            Left err -> return.show $ err
            Right v  -> return $ prettyValue ty v
 
-type_check :: Term -> REPLStateIO String
-type_check t = do
-  (ctx, _) <- get
+handleTypeCheck :: Term -> REPLStateIO String
+handleTypeCheck t = do
+  ctx <- use replCtx
   case (evalTCM $ extends ctx (infer t)) of
     Left err -> return.show $ err
-    Right at -> return.renderDoc.prettyTy.getType $ at
+    Right at -> return . renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
 
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
@@ -226,7 +258,7 @@ main = do
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  flip evalStateT (M.empty, M.empty) $ do
+  flip evalStateT initREPLState $ do
     case cmdFile opts of
       Just file -> do
         cmds <- io $ readFile file    -- XXX handle failure

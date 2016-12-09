@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import           Control.Lens             (makeLenses, use, (%=), (.=))
 import           Control.Monad.State

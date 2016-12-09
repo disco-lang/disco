@@ -17,3 +17,32 @@ Feel free to look around, ask questions, etc.  You can even contribute
 some code if you like---collaborators are most welcome.  However, note
 that no guarantees are made about anything in particular at the
 moment.
+
+Building
+--------
+
+First, make sure you have
+[the `stack` tool](https://docs.haskellstack.org/en/stable/README/).
+Then at a command prompt, execute
+
+```
+stack build
+```
+
+After this completes, you should be able to
+
+```
+stack exec disco
+```
+
+to run the Disco command-line REPL.
+
+While developing, you may want to use a command like
+
+```
+stack build --fast --file-watch --ghc-options='-Wall'
+```
+
+which will turn on warnings, turn off optimizations for a faster
+edit-compile-test cycle, and automatically recompile every time a
+source file changes.

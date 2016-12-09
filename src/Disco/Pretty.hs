@@ -96,6 +96,7 @@ type Doc = ReaderT PA LFreshM PP.Doc
 --------------------------------------------------
 
 prettyTy :: Type -> Doc
+prettyTy (TyVar v)        = text (show v)
 prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
@@ -138,7 +139,8 @@ prettyTerm (TPair t1 t2) =
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' 10 AR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AL t
+prettyTerm (TUn Fact t)  = prettyTerm' 11 AL t <> text "!"
+prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AR t
 prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   hsep
   [ prettyTerm' (prec op) AL t1
@@ -158,6 +160,7 @@ prettyTerm (TLet bnd) = mparens initPA $
 prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
+prettyTerm (TList {})   = error "prettyTerm TList unimplemented"
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -167,8 +170,9 @@ prettySide L = text "inl"
 prettySide R = text "inr"
 
 prettyUOp :: UOp -> Doc
-prettyUOp Neg = text "-"
-prettyUOp Not = text "not "
+prettyUOp Neg  = text "-"
+prettyUOp Not  = text "not "
+prettyUOp Fact = error "Impossible! prettyUOp Fact"
 
 prettyBOp :: BOp -> Doc
 prettyBOp Add     = text "+"
@@ -219,6 +223,8 @@ prettyPattern (PPair p1 p2) = parens $ prettyPattern p1 <> text "," <+> prettyPa
 prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
 prettyPattern (PNat n) = integer n
 prettyPattern (PSucc p) = text "S" <+> prettyPattern p
+prettyPattern (PCons {}) = error "prettyPattern PCons unimplemented"
+prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 
 ------------------------------------------------------------
 

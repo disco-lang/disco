@@ -81,6 +81,7 @@ interpTerm e (ATLet _ t)       =
 interpTerm e (ATCase _ bs)     = interpCase e bs
 interpTerm e (ATAscr t _)      = interpTerm e t
 interpTerm e (ATSub _ t)       = interpTerm e t
+interpTerm _ _ = error "interpTerm unimplemented"
 
 interpApp :: Value -> Value -> IM Value
 interpApp (VClos c e) v   = lunbind c $ \(x,t) -> interpTerm (M.insert x v e) t
@@ -89,6 +90,7 @@ interpApp f _             = throwError $ NotAFun f
 interpUOp :: UOp -> Value -> IM Value
 interpUOp Neg (VNum n) = return $ VNum (-n)
 interpUOp Neg v        = throwError $ NotANum v
+interpUOp _ _ = error "interpUOp unimplemented"
 
 interpBOp :: Type -> BOp -> Value -> Value -> IM Value
 interpBOp _ Add     = numOp' (+)
@@ -107,6 +109,7 @@ interpBOp _ Or      = boolOp (||)
 interpBOp _ Mod     = modOp
 interpBOp _ Divides = numOp divides
 interpBOp _ RelPm   = numOp relPm
+interpBOp _ _ = error "interpBOp unimplemented"
 
 numOp :: (Rational -> Rational -> Value) -> Value -> Value -> IM Value
 numOp (#) (VNum x) (VNum y) = return $ x # y

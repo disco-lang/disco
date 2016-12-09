@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-import           Control.Lens             (makeLenses, use, (%=), (.=), _1, _2)
+import           Control.Lens             (makeLenses, use, (%=), (.=))
 import           Control.Monad.State
 import           Data.Char                (isSpace)
 import           Data.List                (find, isPrefixOf)
@@ -113,7 +113,7 @@ handleCMD s =
     handleLine (Parse t)     = io.print $ t
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file)   = handleLoad file
-    handleLine (Doc name)    = handleDocs name
+    handleLine (Doc x)       = handleDocs x
     handleLine Help          = io.putStrLn $ "Help!"
 
 handleLet :: Name Term -> Term -> REPLStateIO ()
@@ -173,10 +173,10 @@ runTests (n, props) =
           -- and actual values.
 
 runTest :: AProperty -> REPLStateIO Bool
-runTest ap = do
+runTest aprop = do
   defns <- use replDefns
   let res = runIM' defns $ do
-        lunbind ap $ \(binds, at) -> do
+        lunbind aprop $ \(_binds, at) -> do
           rnf . runDSM $ desugarTerm at
   case res of
     Left err -> (io . print $ err) >> return False
@@ -185,14 +185,14 @@ runTest ap = do
       _          -> return False
 
 handleDocs :: Name Term -> REPLStateIO ()
-handleDocs name = do
+handleDocs x = do
   ctx  <- use replCtx
   docs <- use replDocs
-  case M.lookup name ctx of
-    Nothing -> io . putStrLn $ "No documentation found for " ++ show name ++ "."
+  case M.lookup x ctx of
+    Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
-      io . putStrLn $ show name ++ " : " ++ renderDoc (prettyTy ty)
-      case M.lookup name docs of
+      io . putStrLn $ show x ++ " : " ++ renderDoc (prettyTy ty)
+      case M.lookup x docs of
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
 

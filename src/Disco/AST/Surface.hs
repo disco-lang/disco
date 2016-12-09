@@ -45,7 +45,7 @@ import           Disco.Types
 data Module = Module [Decl] DocMap
   deriving Show
 
--- | A TopLevel is either documentation (a 'DocThing') or a
+-- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl
   deriving Show

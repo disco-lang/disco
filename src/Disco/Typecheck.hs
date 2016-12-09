@@ -194,7 +194,7 @@ addDefn x b = modify (M.insert (translate x) b)
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
 
-check p@(TPair t1 t2) ty@(TyPair ty1 ty2) = do
+check (TPair t1 t2) ty@(TyPair ty1 ty2) = do
   at1 <- check t1 ty1
   at2 <- check t2 ty2
   return $ ATPair ty at1 at2
@@ -230,8 +230,8 @@ check t@(TInj _ _) ty = throwError (NotSum t ty)
 -- XXX check TLet
 
 check (TCase bs) ty = do
-  abs <- mapM (checkBranch ty) bs
-  return (ATCase ty abs)
+  bs' <- mapM (checkBranch ty) bs
+  return (ATCase ty bs')
 
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.
@@ -316,6 +316,7 @@ isFinite _ = False
 
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
+isDecidable (TyVar _) = error "isDecidable TyVar"
 isDecidable TyVoid = True
 isDecidable TyUnit = True
 isDecidable TyBool = True
@@ -336,6 +337,7 @@ checkDecidable ty
 
 -- | Check whether the given type has a total order.
 isOrdered :: Type -> Bool
+isOrdered (TyVar _) = error "isOrdered TyVar"
 isOrdered TyVoid = True
 isOrdered TyUnit = True
 isOrdered TyBool = True

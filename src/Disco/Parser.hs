@@ -690,5 +690,4 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
               ]
             ]
 
-    prefix name fun = Prefix (reservedOp name >> return fun)
     infixR name fun = InfixR (reservedOp name >> return fun)

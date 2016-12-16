@@ -162,9 +162,12 @@ prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TList {})   = error "prettyTerm TList unimplemented"
-prettyTerm (TRat  r)
-  | denominator r == 1  = text (show (numerator r))
-  | otherwise           = text (show (numerator r)) <> text "/" <> text (show (denominator r))
+prettyTerm (TRat  r)    =
+     text (show (numerator r `div` denominator r)) <> text "."
+  <> text (decimalize (10 * (numerator r `mod` denominator r)) (denominator r))
+  where
+    decimalize 0 _ = ""
+    decimalize r d = show (r `div` d) ++ decimalize (10 * (r `mod` d)) d
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)

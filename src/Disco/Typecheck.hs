@@ -239,7 +239,7 @@ check t ty = do
   at <- infer t
   checkSub at ty
 
--- | XXX
+-- | Check the type of a branch, returning a type-annotated branch.
 checkBranch :: Type -> Branch -> TCM ABranch
 checkBranch ty b =
   lunbind b $ \(gs, t) -> do

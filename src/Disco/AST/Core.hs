@@ -45,8 +45,8 @@ data Core where
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
-  -- | A natural number.
-  CNat  :: Integer -> Core
+  -- | A rational number.
+  CNum  :: Rational -> Core
 
   -- | An anonymous function.
   CAbs  :: Bind (Name Core) Core -> Core
@@ -140,6 +140,7 @@ data CPattern where
 
 derive [''Core, ''Op, ''CPattern, ''CGuards]
 
+instance Alpha Rational   -- XXX duplicate orphan!
 instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern

@@ -273,7 +273,7 @@ whnf (CVar x) = do
         Nothing   -> throwError $ UnboundError x
 
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
-whnf (CNat n)       = return $ VNum (n % 1)
+whnf (CNum n)       = return $ VNum n
 whnf (CAbs b)       = VClos b <$> getEnv
 whnf (CApp str c1 c2) = do
   v1 <- whnf c1

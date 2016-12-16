@@ -118,8 +118,6 @@ data BOp = Add     -- ^ Addition (@+@)
          | Cons    -- ^ List cons (@::@)
   deriving (Show, Eq)
 
--- XXX todo add TRat with ability to parse decimal notation
-
 -- | Terms.
 data Term where
 
@@ -153,6 +151,9 @@ data Term where
 
   -- | A natural number.
   TNat   :: Integer -> Term
+
+  -- | A rational number, parsed as a decimal.
+  TRat   :: Rational -> Term
 
   -- | An application of a unary operator.
   TUn    :: UOp -> Term -> Term
@@ -239,6 +240,7 @@ data Pattern where
 
 derive [''Side, ''UOp, ''BOp, ''Term, ''Guards, ''Guard, ''Pattern]
 
+instance Alpha Rational   -- XXX orphan!
 instance Alpha Side
 instance Alpha UOp
 instance Alpha BOp
@@ -247,6 +249,7 @@ instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
 
+instance Subst Term Rational
 instance Subst Term Type
 instance Subst Term Guards
 instance Subst Term Guard

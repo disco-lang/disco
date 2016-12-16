@@ -31,6 +31,7 @@ module Disco.Desugar
        )
        where
 
+import           Data.Ratio
 import           Unbound.LocallyNameless
 
 import           Disco.AST.Core
@@ -99,7 +100,8 @@ desugarTerm (ATPair _ t1 t2) =
   CCons 0 <$> mapM desugarTerm [t1,t2]
 desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
-desugarTerm (ATNat n) = return $ CNat n
+desugarTerm (ATNat n) = return $ CNum (n%1)
+desugarTerm (ATRat r) = return $ CNum r
 desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =

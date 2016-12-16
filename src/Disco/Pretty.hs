@@ -8,6 +8,7 @@ import           Control.Monad.Reader
 import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
+import           Data.Ratio
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
@@ -161,6 +162,9 @@ prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TList {})   = error "prettyTerm TList unimplemented"
+prettyTerm (TRat  r)
+  | denominator r == 1  = text (show (numerator r))
+  | otherwise           = text (show (numerator r)) <> text "/" <> text (show (denominator r))
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)

@@ -33,7 +33,7 @@ module Disco.Parser
 
          -- ** Basic lexemes
        , whitespace, lexeme, symbol, reservedOp
-       , natural, integer, reserved, reservedWords, identifier, ident
+       , natural, reserved, reservedWords, identifier, ident
 
          -- ** Punctuation
        , parens, braces, angles, brackets
@@ -73,10 +73,11 @@ import qualified Text.Megaparsec.String  as MP
 import           Control.Applicative     (many, (<|>))
 import           Control.Lens
 import           Control.Monad.State
-import           Data.Char               (isSpace)
+import           Data.Char               (isDigit, isSpace)
 import           Data.Either             (isRight)
 import qualified Data.Map                as M
 import           Data.Maybe              (catMaybes)
+import           Data.Ratio
 import           Text.Printf
 
 import           Disco.AST.Surface
@@ -381,9 +382,12 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 natural :: Parser Integer
 natural = lexeme L.integer
 
--- | Parse a signed integer.
-integer :: Parser Integer
-integer = L.signed whitespace natural
+-- | Parse a decimal of the form @xxx.yyyy@.
+decimal :: Parser Rational
+decimal = lexeme (readDecimal <$> some digit <* char '.' <*> some digit)
+  where
+    digit = satisfy isDigit
+    readDecimal a b = (read a % 1) + (read b % (10^(length b)))
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
@@ -504,6 +508,7 @@ parseAtom = -- trace "parseAtom" $
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
+  <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
 

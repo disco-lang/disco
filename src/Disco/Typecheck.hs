@@ -389,6 +389,7 @@ infer (TVar x)      = do
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
 infer (TNat n)      = return $ ATNat n
+infer (TRat r)      = return $ ATRat r
 
 infer (TJuxt t t')   = do
   at <- infer t

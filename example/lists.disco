@@ -60,3 +60,21 @@ length : List Bool → ℕ
 length l =
   { 0              when l is []
   { 1 + length l'  when l is _ :: l'
+
+iterateP : (ℕ×ℕ → ℕ×ℕ) → ℕ×ℕ → List (ℕ×ℕ)
+iterateP f p = p :: iterateP f (f p)
+
+fib2_helper : ℕ×ℕ → ℕ×ℕ
+fib2_helper (a,b) = (b,a+b)
+
+indexP : ℕ -> List (ℕ×ℕ) -> ℕ×ℕ
+indexP n l =
+  { p             when n is 0
+  {               when l is (p :: _)
+  { indexP n' l'  when n is S n'
+  {               when l is (_ :: l')
+
+-- Why is this so slow?
+fib2 : ℕ → ℕ
+fib2 n = { x when (indexP n (iterateP fib2_helper (0,1))) is (x,_)
+

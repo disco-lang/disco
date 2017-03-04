@@ -261,6 +261,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Z/Q patterns (general arithmetic patterns?)
   + polymorphism
   + Multi-clause definitions
+  + Use extensible tree type ("Trees that Grow")?
   + Use a single Disco monad for everything?
   + Test suite:
     - quick check properties

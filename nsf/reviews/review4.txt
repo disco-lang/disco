@@ -1,0 +1,81 @@
+Review #4
+
+Proposal Number:
+	
+
+ 
+	
+
+1712399
+
+NSF Program:
+	
+
+ 
+	
+
+IUSE
+
+Principal Investigator:
+	
+
+ 
+	
+
+Eades III, Harley D
+
+Proposal Title:
+	
+
+ 
+	
+
+Disco: A Programming Environment for Discrete Mathematics Education
+
+Rating:
+	
+
+ 
+	
+
+Fair
+
+
+REVIEW:
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to intellectual merit.
+
+Project would develop DISCO, a functional programming language specifically for use in teaching discrete mathematics. The idea is to provide fewer features than a professional language to make it easier to learn and to provide some additional features.
+
+A potentially important piece of related work is Dr. Scheme, which provides "language levels" to hide complexity until the learner has mastered earlier concepts. How is DISCO better?
+
+In general, the idea that having all features distracts novice learners is plausible, but your case would be strengthened with specific examples. (I have taught languages in which I am not an expert and many features don't appear unless you try to use them.) Also, given that various professional functional languages are in use for courses such as yours, be more specific about the inadequacies of that approach.
+
+The two proposed features of DISCO that seem new to me are
+1) The ability to expand an execution trace. In some sense, students should be able to step through the code, but providing a shortcut is likely to be helpful. How does this appear when a function makes more than one recursive call?
+2) The tie to visualizations. There is a lot of work on algorithm visualization but I'm not aware of work incorporating it into the language itself. One possible issue is that visualizations may be problem-specific (search trees, graph algorithms, sorting, etc) so it might be hard to give useful visualizations in general. I see a potentially large payoff, but more details are needed.
+
+The PIs have a very suitable background in language design and implementation.
+
+
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to broader impacts.
+
+Discrete mathematics is a core CS course so improving student learning in this course has potentially large impact.
+
+The use of undergrad researchers is excellent, but more details should be provided. How will you organize them? (Individuals with their own projects or pairs? How often will you meet?) Also, what are anticipated tasks for them?
+
+In order to have large impact, the goal should be for your language to be adopted at other institutions. This is discussed only briefly in the proposal. The PIs should develop more detailed plans for dissemination. What will drive people to your tutorials and webpage?
+
+Please evaluate the strengths and
+weaknesses of the proposal with respect to any additional solicitation-specific review criteria, if
+applicable
+
+
+
+Summary Statement
+
+Improving discrete math education is a good goal and the PIs have a strong background in language design. They just need to further justify the need for a new language (concrete examples and use cases). The plan for the language and its implementation should also be more detailed. The proposal was short so there is plenty of room to say more.
+

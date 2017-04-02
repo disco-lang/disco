@@ -1,0 +1,65 @@
+Review #3
+
+Proposal Number:
+	
+
+ 
+	
+
+1712399
+
+NSF Program:
+	
+
+ 
+	
+
+IUSE
+
+Principal Investigator:
+	
+
+ 
+	
+
+Eades III, Harley D
+
+Proposal Title:
+	
+
+ 
+	
+
+Disco: A Programming Environment for Discrete Mathematics Education
+
+Rating:
+	
+
+ 
+	
+
+Poor
+
+
+REVIEW:
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to intellectual merit.
+
+The proposal suggests that the development of a new programming language to use in a discrete mathematics course can combine functional programming and discrete mathematics in order to include a functional language in student preparation. The development of a new language has merit, however it does not address a significant challenge in a way that addresses the educational merit of the activity. There are significant challenges for students to learn functional programming as well as discrete mathematics, and this proposal does not address either of those concerns. It also does not cite any of the relevant literature on functional programming in education (Bootstrap, Scheme).
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to broader impacts.
+
+There does not seem to be a concern in the discrete mathematics community that is addressed by this proposal. This leads me to believe the larger mathematics community will not adopt the intervention and therefore this project will not have broader impacts beyond the PIs. The plan does not have a strong evaluation plan and the team does not appear qualified to conduct the educational research necessary to generate a outcome that can be generalized.
+
+Please evaluate the strengths and
+weaknesses of the proposal with respect to any additional solicitation-specific review criteria, if
+applicable
+
+The evaluation plan for this proposal is very weak and there are no listed partners on the project that have explicit education research or evaluation experience.
+
+Summary Statement
+
+This proposal does not speak explicitly to any well cited problem in undergraduate education (other than the lack of inclusion of a particular programming language paradigm in undergraduate education). The proposal does not cite appropriate relevant literature, and the team seems underprepared to do the education research required.
+

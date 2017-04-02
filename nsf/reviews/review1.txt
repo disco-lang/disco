@@ -1,0 +1,112 @@
+Review #1
+
+Proposal Number:
+	
+
+ 
+	
+
+1712399
+
+NSF Program:
+	
+
+ 
+	
+
+IUSE
+
+Principal Investigator:
+	
+
+ 
+	
+
+Eades III, Harley D
+
+Proposal Title:
+	
+
+ 
+	
+
+Disco: A Programming Environment for Discrete Mathematics Education
+
+Rating:
+	
+
+ 
+	
+
+Fair
+
+
+REVIEW:
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to intellectual merit.
+
+Strengths
+
+The connection between functional programming and discrete mathematics is strong and genuine. My institution has had a course that followed exactly the plan proposed using Haskell for many years (although we recently vote to remove it from the curriculum due to staffing issues). The academically strong students loved it and the evidence collected proved that it helped these students become even better computer scientists, while not hurting the learning of average students. This approach can work.
+
+Concerns
+
+The proposers state that this is not a new idea, and I could not agree more. This clearly takes it out of the realm of transformative and original work.
+
+The proposers make many claims without sufficient supporting evidence. For example, that functional programming is widely used in industry (supported by only three examples with no supporting citations). On page 3 when the proposers claim that mathematicians think about types only in an implicit and intuitive way. A third example is on page 8 when the proposers say "We believe that students would have even better experiences with a programming environment that is designed for education."
+
+I find the authors justification for creating a new language to be insufficient. They only provided one concrete example, that 2x is better than 2*x. However 2*x makes the operator visible instead of implicit, which seems like a good thing. The proposers needed to do a much more complete and systematic comparison between existing functional languages and environments and the needs of this project to justify the work of creating a new language and system. For example, many languages have facilities for tracing the execution of a method (even a print statement at the beginning of the GCD function could produce the output on page 4). The visualization package that the authors would adapt could be written in an existing language, if it isn't already available. And Wainwright's evidence that students can learn Miranda in a single week is ignored when arguing for a new language.
+
+Structurally, putting the literature review at the end of the proposal was a poor choice. It prevented the knowledge of the literature from informing the work of the proposal. Also, writing a literature review as one paragraph to a work is usually a bad idea. The literature needs to be integrated into a cohesive whole and explained.
+
+The idea that it takes years to become an expert in a new language is ridiculous since most computer scientists are extremely adept at learning new languages. I taught a workshop using Python after two days of using it a couple of years ago. It is true that learning new programming paradigms is a difficult multi-year process, however most CS faculty would be familiar with functional languages such as Lisp that have been used in artificial intelligence classes for decades. This may have some validity for mathematicians, but there is no evidence that mathematics faculty will be willing to adopt this system.
+
+The language to be used in this class will end up being a toy language. Many CS students do not wish to use toy languages since these languages are never used in industry. If the language were just a subset of Haskell, for example, a tremendous amount of effort would have been saved and students couldn't argue that it wasn't a real language.
+
+The idea that including programming in discrete mathematics levels the playing field between CS and math majors is incorrect (page 1). It gives CS students an advantage, since they have programmed before. This may make the system even less appealing to mathematics faculty.
+
+I found the idea of using random testing as a proof technique to be especially troubling. The reason that we need formal methods in CS is to get away from simple testing as a method of determining correctness. There are environments available that allow formal proofs of conjectures already.
+
+The evaluation section of the proposal is weak (pages 6-7). All of the evidence that the would support the success of the system is indirect (i.e. student and faculty perceptions of what students can do) instead of direct (measured results of what students can actually do). The research questions are not well formed, which creates insurmountable problems when it comes to finding a solid assessment strategy.
+
+There is no timeline for the work given in the proposal. Critical details like which software development methodology would be used are missing. Having a distributed team meet only yearly seems like a recipe for failure (page 10).
+
+There is no evidence, such as a letter of commitment, that any faculty at other institutions are willing to adopt this system.
+
+The proposers need to remember that CS is very different from one institution to another. Claims that CS students taking discrete mathematics have only a basic understanding of mathematics are not true in my context (we're in an engineering college). Our students typically take the second semester of calculus concurrently with discrete mathematics.
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to broader impacts.
+
+Strengths
+
+It is possible that integrating functional programming into discrete mathematics would result in having some mathematics majors move to computer science. This might be especially true for those that primarily enjoy symbolic manipulation of mathematics who are at risk of dropping mathematics when they find out that mathematics involves proofs. This argument was not made by the proposers.
+
+Concerns
+
+Including members of underrepresented groups in the research process is not sufficient. There is no effort made to consider how the needs to specific underrepresented groups could be met through this work. 61% women is not an especially high number today (national average is 56% in higher education these days). The idea that integrating education with computer science will attract female students to the research team was not supported with evidence.
+
+There is no evidence presented that mathematics and computer science faculty will be any more willing to use this system than they have been to use existing work in this area.
+
+Much of the dissemination plan focuses on functional programming conferences and journals. If this work is to have truly broad impact, the focus should be in computer science education (SIGCSE, FIE) and mathematics education conferences.
+
+Please evaluate the strengths and
+weaknesses of the proposal with respect to any additional solicitation-specific review criteria, if
+applicable
+
+N/A
+
+Summary Statement
+
+The proposers plan to design a functional language for discrete mathematics classes and create an integrated development environment for beginning programmers. The idea is not original or transformative, as commercial textbooks (cited in the proposal) exist that use this concept. The evaluation plan was inadequate.
+
+Additional Considerations
+
+Data Management Plan: The data management plan did not discuss the storage and sharing of assessment data for the project.
+
+
+Postdoctoral Mentoring Plan: N/A
+
+
+Results from Prior NSF Funding: N/A

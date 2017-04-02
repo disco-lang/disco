@@ -1,0 +1,97 @@
+Review #2
+
+Proposal Number:
+	
+
+ 
+	
+
+1712399
+
+NSF Program:
+	
+
+ 
+	
+
+IUSE
+
+Principal Investigator:
+	
+
+ 
+	
+
+Eades III, Harley D
+
+Proposal Title:
+	
+
+ 
+	
+
+Disco: A Programming Environment for Discrete Mathematics Education
+
+Rating:
+	
+
+ 
+	
+
+Fair
+
+
+REVIEW:
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to intellectual merit.
+
+Intellectual Merit:
+
+Strengths:
+
+The PIs propose to develop a functional programming language to be used to teach Discrete Mathematics at the same time that students learn functional programming, which is a novel idea.
+
+The project would also produce curricular modules to cover the discrete mathematics standard topics and the functional programming topics.
+
+Weaknesses:
+
+The proposal mostly describes the features of the programming environment but there is no discussion on the contributions to the Discrete Mathematics course.
+
+Usually, the time to cover the topics in a Discrete Mathematics course is very tight. Adding topics on functional programming will require reducing time in the teaching of the discrete mathematics.
+
+The proposal needs to explain the structure of the new course and more details on how the teaching of functional programming will be combined with the teaching of the discrete math topics.
+
+There is no concrete evaluation plan.
+
+
+In the context of the five review elements, please
+evaluate the strengths and weaknesses of the proposal with respect to broader impacts.
+
+Broader Impact:
+
+Strengths:
+
+The programming language would have a web-based interactive environment that will be available together with supplementary materials.
+
+The products could be of benefit to students taking discrete mathematics courses.
+
+Weaknesses:
+
+It is mentioned that particular effort will be made to incorporate students from underrepresented groups but there are no specific plans on how this will be done.
+
+The dissemination plan is week.
+
+
+Please evaluate the strengths and
+weaknesses of the proposal with respect to any additional solicitation-specific review criteria, if
+applicable
+
+
+
+Summary Statement
+
+Summary:
+
+The PIs propose to develop a functional programming language to be used to teach Discrete Mathematics at the same time that students learn functional programming. The project would also produce curricular modules to cover the discrete mathematics standard topics and the functional programming topics.
+

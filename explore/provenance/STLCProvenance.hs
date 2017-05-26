@@ -312,6 +312,14 @@ substConstraints = map . substConstraint
     structurally, just do so.  If a constraint involves a variable on
     either side of the :=:, first check whether that variable is in
     the domain of the substitution, and expand it if so.
+
+  - We now have a way to explain the constraint solving process.  But
+    we also need another data type of reasons that explains steps
+    taken in the type inference process, that is, steps taken by the
+    'infer' and 'check' functions. Then extend 'infer' and 'check' to
+    return reasons as well as a result.  Actually, all this really
+    boils down to is that infer and check should return not just types
+    but actual *typing derivations*.
 -}
 
 {-

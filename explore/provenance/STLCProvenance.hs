@@ -262,7 +262,7 @@ instance Pretty Subst where
     where
       prettyMapping (x, (ty, _)) = printf "%s |-> %s" (pretty x) (pretty ty)
 
--- XXX fix this undefined
+-- XXX FIXME.  What is the reason that should be associated with the result of composition?
 (.@) :: Subst -> Subst -> Subst
 s2@(Subst m2) .@ Subst m1 = Subst $ M.union (M.map (applySubst s2 *** RSubst undefined s2) m1) m2
 
@@ -583,53 +583,53 @@ ty1 =?= ty2 = constraints %= (((ty1 :=: ty2) :? RUnknown) :)
 (===) :: UType -> UType -> Reason -> InferM ()
 (ty1 === ty2) reason = constraints %= (((ty1 :=: ty2) :? reason) :)
 
-infer :: Expr -> InferM UType
+infer :: Expr -> InferM Typing
 infer (EVar x) = do
   ctx <- ask
   case M.lookup x ctx of
-    Just ty -> return ty
+    Just ty -> return (TDVar ctx x ty)
     Nothing -> throwError $ UnboundVar x
-infer (EInt _)       = return TyInt
-infer (EBin _ e1 e2) = do
+infer (EInt n)       = return (TDInt n)
+infer (EBin op e1 e2) = do
   check e1 TyInt
-  check e2 TyInt
-  return TyInt
+  check e2 TyInt  -- XXX need check to return derivation too?
+  return (TDBin op e1 undefined e2 undefined)
 infer (EApp e1 e2) = do
   ty1 <- infer e1
   ty2 <- infer e2
 
   argTy <- fresh
   resTy <- fresh
-  (ty1 === TyFun argTy resTy) (RFun e1 e2)
-  (ty2 === argTy)             (RApp e1 e2)
-  return resTy
+  (getType ty1 === TyFun argTy resTy) (RFun e1 e2)
+  (getType ty2 === argTy)             (RApp e1 e2)
+  return (TDFiat resTy)
 infer (ELam x margTy body) = do
   argTy <- case margTy of
     Nothing -> fresh
     Just ty -> return (embed ty)
   withBinding x argTy $ do
     resTy <- infer body
-    return $ TyFun argTy resTy
+    return $ TDFiat $ TyFun argTy (getType resTy)
 
 infer (EPair e1 e2) = do
   ty1 <- infer e1
   ty2 <- infer e2
-  return (TyPair ty1 ty2)
+  return $ TDFiat $ TyPair (getType ty1) (getType ty2)
 
 infer EFst = do
   ty1 <- fresh
   ty2 <- fresh
-  return (TyFun (TyPair ty1 ty2) ty1)
+  return $ TDFiat $ TyFun (TyPair ty1 ty2) ty1
 infer ESnd = do
   ty1 <- fresh
   ty2 <- fresh
-  return (TyFun (TyPair ty1 ty2) ty2)
+  return $ TDFiat $ TyFun (TyPair ty1 ty2) ty2
 
 -- XXX Need to somehow pass along why we are checking this type
 check :: Expr -> UType -> InferM ()
 check e ty = do
   ty' <- infer e
-  (ty' === ty) (RCheck e)
+  (getType ty' === ty) (RCheck e)
 
 --------------------------------------------------
 -- Unification/constraint solving
@@ -682,7 +682,7 @@ recon :: Expr -> Except TypeError Type
 recon e = do
   (uty, cs) <- runInferM (infer e)
   sub <- solve cs
-  return $ resolveUTy (applySubst sub uty)
+  return $ resolveUTy (applySubst sub (getType uty))
 
 ------------------------------------------------------------
 -- Interpreter

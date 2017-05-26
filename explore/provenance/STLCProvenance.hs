@@ -235,6 +235,10 @@ instance Pretty Env where
 --------------------------------------------------
 -- Types with unification variables
 
+-- XXX TODO: each unification variable should say where it came from!
+-- e.g. "The type of expression e" or "the input type of function
+-- expression e" and so on.
+
 data UVar = UVar String
   deriving (Show, Eq, Ord)
 

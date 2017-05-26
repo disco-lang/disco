@@ -14,10 +14,11 @@ module STLCProvenance where
 
 import           Parsing2
 
+import qualified Data.Set as S
 import           Data.Tree
 import           Data.Monoid ((<>))
 import           Control.Arrow ((***))
-import           Control.Lens (makeLenses, _2, (%~), view, (<%=), (%=))
+import           Control.Lens (makeLenses, _2, (%~), view, (<%=), (%=), (??))
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -72,11 +73,11 @@ data Type' v where
 translate :: (u -> v) -> Type' u -> Type' v
 translate = fmap
 
-fvs :: Type' v -> [v]
-fvs (TyVar v) = [v]
-fvs TyInt = []
-fvs (TyFun ty1 ty2)  = fvs ty1 ++ fvs ty2
-fvs (TyPair ty1 ty2) = fvs ty1 ++ fvs ty2
+fvs :: Ord v => Type' v -> S.Set v
+fvs (TyVar v) = S.singleton v
+fvs TyInt     = S.empty
+fvs (TyFun ty1 ty2)  = fvs ty1 `S.union` fvs ty2
+fvs (TyPair ty1 ty2) = fvs ty1 `S.union` fvs ty2
 
 -- Normal STLC types have no type variables.
 type Type = Type' Void
@@ -235,15 +236,39 @@ instance Pretty Env where
 --------------------------------------------------
 -- Types with unification variables
 
--- XXX TODO: each unification variable should say where it came from!
--- e.g. "The type of expression e" or "the input type of function
--- expression e" and so on.
+data UVarReason where
+  InputTypeOf   :: Expr -> UVarReason
+  OutputTypeOf  :: Expr -> UVarReason
+  LambdaArgType :: String -> Expr -> UVarReason
+  TyFst         :: Expr -> UVarReason
+  TySnd         :: Expr -> UVarReason
+  deriving (Show)
 
-data UVar = UVar String
-  deriving (Show, Eq, Ord)
+instance Pretty UVarReason where
+  pretty (InputTypeOf e)     = printf "input type of the function expression %s" (pretty e)
+  pretty (OutputTypeOf e)    = printf "output type of the function expression %s" (pretty e)
+  pretty (LambdaArgType x e) = printf "type of the argument %s to lambda expression %s"
+                                 x (pretty e)
+  pretty (TyFst e)           = printf "first type component of the argument to %s" (pretty e)
+  pretty (TySnd e)           = printf "second type component of the argument to %s" (pretty e)
+
+type RawUVar = String
+
+data UVar = UVar RawUVar UVarReason
+  deriving Show
+
+-- Ignore provenance when comparing uvars
+instance Eq UVar where
+  (UVar u1 _) == (UVar u2 _) = u1 == u2
+
+instance Ord UVar where
+  compare (UVar u1 _) (UVar u2 _) = compare u1 u2
 
 instance Pretty UVar where
-  pretty (UVar v) = v
+  pretty (UVar v _) = v
+
+explainUVar :: UVar -> String
+explainUVar (UVar v r) = printf "- %s is the %s" v (pretty r)
 
 type UType = Type' UVar
 type UCtx  = Ctx' UVar
@@ -275,8 +300,8 @@ isEmptySubst (Subst s) = M.null s
 (|->) :: UVar -> (UType, Reason) -> Subst
 x |-> ty = Subst $ M.singleton x ty
 
-restrictSubst :: [UVar] -> Subst -> Subst
-restrictSubst vars (Subst m) = Subst $ M.filterWithKey (\k _ -> k `elem` vars) m
+restrictSubst :: S.Set UVar -> Subst -> Subst
+restrictSubst vars (Subst m) = Subst $ M.filterWithKey (\k _ -> k `S.member` vars) m
 
 applySubst :: Subst -> UType -> UType
 applySubst (Subst s) ty@(TyVar x)
@@ -315,6 +340,10 @@ applySubst s (TyPair ty1 ty2) = TyPair (applySubst s ty1) (applySubst s ty2)
     return reasons as well as a result.  Actually, all this really
     boils down to is that infer and check should return not just types
     but actual *typing derivations*.
+
+  - This also goes hand-in-hand with preserving the provenance of
+    parsed syntax, so each Expr is associated with a particular
+    location in the input syntax.
 -}
 
 {-
@@ -428,7 +457,7 @@ substConstraints = map . substConstraint
   where
     substConstraint sub (c@(ty1 :=: ty2) :? p)
       = (applySubst sub ty1 :=: applySubst sub ty2)
-          :? rSubst c (restrictSubst (fvs ty1 ++ fvs ty2) sub) p
+          :? rSubst c (restrictSubst (fvs ty1 `S.union` fvs ty2) sub) p
     rSubst c s p
       | isEmptySubst s = p
       | otherwise      = RSubst c s p
@@ -457,11 +486,15 @@ explainConstraint mode c@(ty1 :=: ty2) reason
       [ printf "- %s that %s = %s" (showMode mode) (pretty ty1) (pretty ty2)
       , "  because " <> explanation
       ]
-      subreasons
+      (uvarExplanations ++ subreasons)
   where
+    uvarExplanations :: [Tree [String]]
+    uvarExplanations = map (leaf . (:[]) . explainUVar) . S.toList $ fvs ty1 `S.union` fvs ty2
     (explanation, subreasons) = prettyReason mode c reason
     showMode Check = "Checking"
     showMode Infer = "Inferred"
+
+    leaf x = Node x []
 
 prettyReason :: InferMode -> RawConstraint -> Reason -> (String, [Tree [String]])
 prettyReason _ _ RUnknown = ("of unknown reason.", [])
@@ -506,7 +539,7 @@ prettyReason mode c (RSubst c2@(ty1 :=: ty2) s@(Subst m) r)
   | otherwise      =
     ( printf "it resulted from applying %s to the constraint %s = %s."
         (pretty s) (pretty ty1) (pretty ty2)
-    , map (\(x,(ty,r)) -> explainConstraint Infer (TyVar x :=: ty) r) (M.assocs m)
+    , map (\(x,(ty,r2)) -> explainConstraint Infer (TyVar x :=: ty) r2) (M.assocs m)
       ++ [explainConstraint mode c2 r]
     )
 
@@ -568,8 +601,11 @@ runInferM
   . flip runStateT initInferState
   . flip runReaderT M.empty
 
-fresh :: InferM UType
-fresh = (TyVar . UVar . head) <$> (nameSupply <%= tail)
+rawFresh :: InferM RawUVar
+rawFresh = head <$> (nameSupply <%= tail)
+
+fresh :: UVarReason -> InferM UType
+fresh r = TyVar . (UVar ?? r) <$> rawFresh
 
 withBinding :: String -> UType -> InferM a -> InferM a
 withBinding x ty = local (M.insert x ty)
@@ -598,14 +634,14 @@ infer (EApp e1 e2) = do
   ty1 <- infer e1
   ty2 <- infer e2
 
-  argTy <- fresh
-  resTy <- fresh
+  argTy <- fresh (InputTypeOf  e1)
+  resTy <- fresh (OutputTypeOf e1)
   (getType ty1 === TyFun argTy resTy) (RFun e1 e2)
   (getType ty2 === argTy)             (RApp e1 e2)
   return (TDFiat resTy)
-infer (ELam x margTy body) = do
+infer l@(ELam x margTy body) = do
   argTy <- case margTy of
-    Nothing -> fresh
+    Nothing -> fresh (LambdaArgType x l)
     Just ty -> return (embed ty)
   withBinding x argTy $ do
     resTy <- infer body
@@ -617,12 +653,12 @@ infer (EPair e1 e2) = do
   return $ TDFiat $ TyPair (getType ty1) (getType ty2)
 
 infer EFst = do
-  ty1 <- fresh
-  ty2 <- fresh
+  ty1 <- fresh (TyFst EFst)
+  ty2 <- fresh (TySnd EFst)
   return $ TDFiat $ TyFun (TyPair ty1 ty2) ty1
 infer ESnd = do
-  ty1 <- fresh
-  ty2 <- fresh
+  ty1 <- fresh (TyFst EFst)
+  ty2 <- fresh (TySnd ESnd)
   return $ TDFiat $ TyFun (TyPair ty1 ty2) ty2
 
 -- XXX Need to somehow pass along why we are checking this type

@@ -12,11 +12,6 @@
 
 module STLCProvenance where
 
--- TODO:
---
--- Provenance for constraints and errors
--- Replace Parsing2 with something more modern? megaparsec?
-
 import           Parsing2
 
 import           Data.Tree
@@ -76,6 +71,12 @@ data Type' v where
 
 translate :: (u -> v) -> Type' u -> Type' v
 translate = fmap
+
+fvs :: Type' v -> [v]
+fvs (TyVar v) = [v]
+fvs TyInt = []
+fvs (TyFun ty1 ty2)  = fvs ty1 ++ fvs ty2
+fvs (TyPair ty1 ty2) = fvs ty1 ++ fvs ty2
 
 -- Normal STLC types have no type variables.
 type Type = Type' Void
@@ -251,8 +252,14 @@ embed = translate absurd
 newtype Subst = Subst (M.Map UVar (UType, Reason))
   deriving Show
 
+instance Pretty Subst where
+  pretty (Subst m) = printf "[%s]" . intercalate ", " . map prettyMapping . M.assocs $ m
+    where
+      prettyMapping (x, (ty, _)) = printf "%s |-> %s" (pretty x) (pretty ty)
+
+-- XXX fix this undefined
 (.@) :: Subst -> Subst -> Subst
-s2@(Subst m2) .@ Subst m1 = Subst $ M.union (M.map (applySubst s2 *** RSubst s2) m1) m2
+s2@(Subst m2) .@ Subst m1 = Subst $ M.union (M.map (applySubst s2 *** RSubst undefined s2) m1) m2
 
 idSubst :: Subst
 idSubst = Subst M.empty
@@ -262,6 +269,9 @@ isEmptySubst (Subst s) = M.null s
 
 (|->) :: UVar -> (UType, Reason) -> Subst
 x |-> ty = Subst $ M.singleton x ty
+
+restrictSubst :: [UVar] -> Subst -> Subst
+restrictSubst vars (Subst m) = Subst $ M.filterWithKey (\k _ -> k `elem` vars) m
 
 applySubst :: Subst -> UType -> UType
 applySubst (Subst s) ty@(TyVar x)
@@ -275,11 +285,103 @@ applySubst s (TyPair ty1 ty2) = TyPair (applySubst s ty1) (applySubst s ty2)
 substConstraints :: Subst -> [Constraint] -> [Constraint]
 substConstraints = map . substConstraint
   where
-    substConstraint sub ((ty1 :=: ty2) :? p)
-      = (applySubst sub ty1 :=: applySubst sub ty2) :? RSubst sub p
+    substConstraint sub (c@(ty1 :=: ty2) :? p)
+      = (applySubst sub ty1 :=: applySubst sub ty2)
+          :? rSubst c (restrictSubst (fvs ty1 ++ fvs ty2) sub) p
+    rSubst c s p
+      | isEmptySubst s = p
+      | otherwise      = RSubst c s p
 
 --------------------------------------------------
 -- Constraints
+
+{- TODOS/thoughts:
+
+  - Too much reliance on unification variables... reading explanations
+    full of unification variables makes it very hard to follow.  Not
+    sure how to get around that.  Also ought to somehow suppress some
+    "administrative" sorts of substitutions.
+-}
+
+{-
+
+Some examples:
+
+>>> eval "(^f : Int -> Int. f <3, 4>) (^x.x+1)"
+Can't unify Int and <Int, Int>
+- Checking that Int = <Int, Int>
+  because the input types of Int -> Int and <Int, Int> -> u5 must match.
+    - Checking that Int -> Int = <Int, Int> -> u5
+      because it resulted from applying [u1 |-> <Int, Int>] to the constraint Int -> Int = u1 -> u5.
+        - Inferred that u1 = <Int, Int>
+          because <3, 4> is an argument to a function (namely, f), so its type <Int, Int> must be the same as the function's input type u1.
+        - Checking that Int -> Int = u1 -> u5
+          because it resulted from applying [u2 |-> u5] to the constraint Int -> Int = u1 -> u2.
+            - Inferred that u2 = u5
+              because the output types of (Int -> Int) -> u2 and (u3 -> Int) -> u5 must match.
+                - Inferred that (Int -> Int) -> u2 = (u3 -> Int) -> u5
+                  because it resulted from applying [u4 |-> u3 -> Int] to the constraint (Int -> Int) -> u2 = u4 -> u5.
+                    - Inferred that u4 = u3 -> Int
+                      because ^x. x + 1 is an argument to a function (namely, ^f : Int -> Int. f <3, 4>), so its type u3 -> Int must be the same as the function's input type u4.
+                    - Inferred that (Int -> Int) -> u2 = u4 -> u5
+                      because ^f : Int -> Int. f <3, 4> is applied to an argument (namely, ^x. x + 1), so its type ((Int -> Int) -> u2) must be a function type.
+            - Checking that Int -> Int = u1 -> u2
+              because f is applied to an argument (namely, <3, 4>), so its type (Int -> Int) must be a function type.
+
+
+>>> eval "(^p. fst p + 3) <<2,5>, 6>"
+Can't unify <Int, Int> and Int
+- Checking that <Int, Int> = Int
+  because it resulted from applying [u2 |-> <Int, Int>] to the constraint u2 = Int.
+    - Inferred that u2 = <Int, Int>
+      because the first components of <u2, u3> and <<Int, Int>, Int> must match.
+        - Inferred that <u2, u3> = <<Int, Int>, Int>
+          because the input types of <u2, u3> -> u2 and <<Int, Int>, Int> -> Int must match.
+            - Inferred that <u2, u3> -> u2 = <<Int, Int>, Int> -> Int
+              because it resulted from applying [u4 |-> <<Int, Int>, Int>] to the constraint <u2, u3> -> u2 = u4 -> Int.
+                - Inferred that u4 = <<Int, Int>, Int>
+                  because it resulted from applying [u1 |-> <<Int, Int>, Int>] to the constraint u1 = u4.
+                    - Inferred that u1 = <<Int, Int>, Int>
+                      because the input types of u1 -> Int and <<Int, Int>, Int> -> u7 must match.
+                        - Inferred that u1 -> Int = <<Int, Int>, Int> -> u7
+                          because it resulted from applying [u6 |-> <<Int, Int>, Int>] to the constraint u1 -> Int = u6 -> u7.
+                            - Inferred that u6 = <<Int, Int>, Int>
+                              because <<2, 5>, 6> is an argument to a function (namely, ^p. fst p + 3), so its type <<Int, Int>, Int> must be the same as the function's input type u6.
+                            - Inferred that u1 -> Int = u6 -> u7
+                              because ^p. fst p + 3 is applied to an argument (namely, <<2, 5>, 6>), so its type (u1 -> Int) must be a function type.
+                    - Inferred that u1 = u4
+                      because p is an argument to a function (namely, fst), so its type u1 must be the same as the function's input type u4.
+                - Inferred that <u2, u3> -> u2 = u4 -> Int
+                  because it resulted from applying [u5 |-> Int] to the constraint <u2, u3> -> u2 = u4 -> u5.
+                    - Inferred that u5 = Int
+                      because fst p, which was inferred to have type u5, must also have type Int.
+                    - Inferred that <u2, u3> -> u2 = u4 -> u5
+                      because fst is applied to an argument (namely, p), so its type (<u2, u3> -> u2) must be a function type.
+    - Checking that u2 = Int
+      because the output types of <u2, u3> -> u2 and <<Int, Int>, Int> -> Int must match.
+        - Checking that <u2, u3> -> u2 = <<Int, Int>, Int> -> Int
+          because it resulted from applying [u4 |-> <<Int, Int>, Int>] to the constraint <u2, u3> -> u2 = u4 -> Int.
+            - Inferred that u4 = <<Int, Int>, Int>
+              because it resulted from applying [u1 |-> <<Int, Int>, Int>] to the constraint u1 = u4.
+                - Inferred that u1 = <<Int, Int>, Int>
+                  because the input types of u1 -> Int and <<Int, Int>, Int> -> u7 must match.
+                    - Inferred that u1 -> Int = <<Int, Int>, Int> -> u7
+                      because it resulted from applying [u6 |-> <<Int, Int>, Int>] to the constraint u1 -> Int = u6 -> u7.
+                        - Inferred that u6 = <<Int, Int>, Int>
+                          because <<2, 5>, 6> is an argument to a function (namely, ^p. fst p + 3), so its type <<Int, Int>, Int> must be the same as the function's input type u6.
+                        - Inferred that u1 -> Int = u6 -> u7
+                          because ^p. fst p + 3 is applied to an argument (namely, <<2, 5>, 6>), so its type (u1 -> Int) must be a function type.
+                - Inferred that u1 = u4
+                  because p is an argument to a function (namely, fst), so its type u1 must be the same as the function's input type u4.
+            - Checking that <u2, u3> -> u2 = u4 -> Int
+              because it resulted from applying [u5 |-> Int] to the constraint <u2, u3> -> u2 = u4 -> u5.
+                - Inferred that u5 = Int
+                  because fst p, which was inferred to have type u5, must also have type Int.
+                - Checking that <u2, u3> -> u2 = u4 -> u5
+                  because fst is applied to an argument (namely, p), so its type (<u2, u3> -> u2) must be a function type.
+
+
+-}
 
 data Reason where
   RUnknown :: Reason
@@ -289,12 +391,12 @@ data Reason where
 
   RSym    :: Reason -> Reason
 
-  RFunArg :: RawConstraint -> Reason -> Reason
-  RFunRes :: RawConstraint -> Reason -> Reason
-  RPairFst :: Reason -> Reason
-  RPairSnd :: Reason -> Reason
+  RFunArg  :: RawConstraint -> Reason -> Reason
+  RFunRes  :: RawConstraint -> Reason -> Reason
+  RPairFst :: RawConstraint -> Reason -> Reason
+  RPairSnd :: RawConstraint -> Reason -> Reason
 
-  RSubst  :: Subst -> Reason -> Reason
+  RSubst  :: RawConstraint -> Subst -> Reason -> Reason
   -- application of substitution
 
   deriving Show
@@ -302,33 +404,73 @@ data Reason where
 withIndent indent s = replicate indent ' ' <> s
 
 prettyConstraint :: RawConstraint -> Reason -> String
-prettyConstraint c r = layoutTree 0 (explainConstraint c r)
+prettyConstraint c r = intercalate "\n" $ layoutTree (explainConstraint Check c r)
   where
-    layoutTree indent (Node s ts) = intercalate "\n" (s ++ map (layoutTree (indent+2) ts))
+    layoutTree :: Tree [String] -> [String]
+    layoutTree (Node s ts)
+      = s ++ concatMap (map (withIndent 4) . layoutTree) ts
 
-explainConstraint :: RawConstraint -> Reason -> Tree [String]
-explainConstraint indent c@(ty1 :=: ty2) reason
-  = Node (printf "Trying to equate %s and %s" (pretty ty1) (pretty ty2))
-    <> (withIndent indent "because ")
-    <> prettyReason c reason
+explainConstraint :: InferMode -> RawConstraint -> Reason -> Tree [String]
+explainConstraint mode c@(ty1 :=: ty2) reason
+  = Node
+      [ printf "- %s that %s = %s" (showMode mode) (pretty ty1) (pretty ty2)
+      , "  because " <> explanation
+      ]
+      subreasons
+  where
+    (explanation, subreasons) = prettyReason mode c reason
+    showMode Check = "Checking"
+    showMode Infer = "Inferred"
 
-prettyReason :: RawConstraint -> Reason -> String
-prettyReason _ RUnknown
-  = "Unknown reason."
-prettyReason (ty1 :=: ty2) (RApp e1 e2) = error "RApp"
-  -- = printf "Checking the application of %s (of type %s) to %s (of type %s)."
-  --     (pretty e1) (pretty ty1) (pretty e2) (pretty ty2)
-prettyReason _ (RCheck e)  = error "RCheck"
-prettyReason _ (RSym r)    = error "RSym"
-prettyReason (ty1 :=: ty2) (RFunArg c@(fun1 :=: fun2) r) =
-  printf "the argument types of %s and %s should match.\n" (pretty fun1) (pretty fun2)
-  <> explainConstraint c r
-prettyReason _ (RFunRes c r) = error "RFunRes"
-prettyReason _ (RPairFst r) = error "RPairFst"
-prettyReason _ (RPairSnd r) = error "RPairSnd"
-prettyReason c (RSubst s r)
-  | isEmptySubst s = prettyReason c r
-  | otherwise      = error "RSubst"
+prettyReason :: InferMode -> RawConstraint -> Reason -> (String, [Tree [String]])
+prettyReason _ _ RUnknown = ("of unknown reason.", [])
+prettyReason _ (ty1 :=: _) (RFun e1 e2) =
+  ( printf "%s is applied to an argument (namely, %s), so its type (%s) must be a function type."
+      (pretty e1) (pretty e2) (pretty ty1)
+  , []
+  )
+prettyReason _ (ty1 :=: ty2) (RApp e1 e2) =
+  ( printf "%s is an argument to a function (namely, %s), so its type %s must be the same as the function's input type %s."
+      (pretty e2) (pretty e1) (pretty ty1) (pretty ty2)
+  , []
+  )
+prettyReason mode (ty1 :=: ty2) (RCheck e) =
+  ( printf "%s, which was inferred to have type %s, must also have type %s."
+      (pretty e) (pretty ty1) (pretty ty2)
+  , []
+  )
+  -- XXX explain how we inferred the type of e and why we are checking
+  -- the type we are checking
+
+prettyReason mode (ty1 :=: ty2) (RSym r)
+  = prettyReason mode (ty2 :=: ty1) r
+prettyReason mode _ (RFunArg c@(fun1 :=: fun2) r) =
+  ( printf "the input types of %s and %s must match." (pretty fun1) (pretty fun2)
+  , [explainConstraint mode c r]
+  )
+prettyReason mode _ (RFunRes c@(fun1 :=: fun2) r) =
+  ( printf "the output types of %s and %s must match." (pretty fun1) (pretty fun2)
+  , [explainConstraint mode c r]
+  )
+prettyReason mode _ (RPairFst c@(p1 :=: p2) r) =
+  ( printf "the first components of %s and %s must match." (pretty p1) (pretty p2)
+  , [explainConstraint mode c r]
+  )
+prettyReason mode _ (RPairSnd c@(p1 :=: p2) r) =
+  ( printf "the second components of %s and %s must match." (pretty p1) (pretty p2)
+  , [explainConstraint mode c r]
+  )
+prettyReason mode c (RSubst c2@(ty1 :=: ty2) s@(Subst m) r)
+  | isEmptySubst s = prettyReason mode c r
+  | otherwise      =
+    ( printf "it resulted from applying %s to the constraint %s = %s."
+        (pretty s) (pretty ty1) (pretty ty2)
+    , map (\(x,(ty,r)) -> explainConstraint Infer (TyVar x :=: ty) r) (M.assocs m)
+      ++ [explainConstraint mode c2 r]
+    )
+
+data InferMode = Check | Infer
+  deriving (Eq, Ord, Show)
 
 data RawConstraint = UType :=: UType
   deriving Show
@@ -387,8 +529,9 @@ fresh = (TyVar . UVar . head) <$> (nameSupply <%= tail)
 withBinding :: String -> UType -> InferM a -> InferM a
 withBinding x ty = local (M.insert x ty)
 
--- For convenience when converting the system without provenance.  We
--- should never have any of these in the finished version.
+-- For convenience when converting the system without provenance or
+-- adding new features, before explaining them.  Eventually there
+-- should not be any uses of this operator.
 (=?=) :: UType -> UType -> InferM ()
 ty1 =?= ty2 = constraints %= (((ty1 :=: ty2) :? RUnknown) :)
 
@@ -437,6 +580,7 @@ infer ESnd = do
   ty2 <- fresh
   return (TyFun (TyPair ty1 ty2) ty2)
 
+-- XXX Need to somehow pass along why we are checking this type
 check :: Expr -> UType -> InferM ()
 check e ty = do
   ty' <- infer e
@@ -472,10 +616,10 @@ solveOne (c@(TyFun ty11 ty12 :=: TyFun ty21 ty22) :? p)
       [ (ty11 :=: ty21) :? RFunArg c p
       , (ty12 :=: ty22) :? RFunRes c p
       ]
-solveOne ((TyPair ty11 ty12 :=: TyPair ty21 ty22) :? p)
+solveOne (c@(TyPair ty11 ty12 :=: TyPair ty21 ty22) :? p)
   = return $ Right
-      [ (ty11 :=: ty21) :? RPairFst p
-      , (ty12 :=: ty22) :? RPairSnd p
+      [ (ty11 :=: ty21) :? RPairFst c p
+      , (ty12 :=: ty22) :? RPairSnd c p
       ]
 solveOne c =
   throwError $ CantUnify c

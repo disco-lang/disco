@@ -282,16 +282,6 @@ applySubst _ TyInt            = TyInt
 applySubst s (TyFun ty1 ty2)  = TyFun (applySubst s ty1) (applySubst s ty2)
 applySubst s (TyPair ty1 ty2) = TyPair (applySubst s ty1) (applySubst s ty2)
 
-substConstraints :: Subst -> [Constraint] -> [Constraint]
-substConstraints = map . substConstraint
-  where
-    substConstraint sub (c@(ty1 :=: ty2) :? p)
-      = (applySubst sub ty1 :=: applySubst sub ty2)
-          :? rSubst c (restrictSubst (fvs ty1 ++ fvs ty2) sub) p
-    rSubst c s p
-      | isEmptySubst s = p
-      | otherwise      = RSubst c s p
-
 --------------------------------------------------
 -- Constraints
 
@@ -402,6 +392,12 @@ Can't unify <Int, Int> and Int
 
 -}
 
+data RawConstraint = UType :=: UType
+  deriving Show
+
+instance Pretty RawConstraint where
+  pretty (ty1 :=: ty2) = printf "%s = %s" (pretty ty1) (pretty ty2)
+
 data Reason where
   RUnknown :: Reason
   RFun    :: Expr -> Expr -> Reason
@@ -420,6 +416,23 @@ data Reason where
 
   deriving Show
 
+data Constraint = RawConstraint :? Reason
+
+substConstraints :: Subst -> [Constraint] -> [Constraint]
+substConstraints = map . substConstraint
+  where
+    substConstraint sub (c@(ty1 :=: ty2) :? p)
+      = (applySubst sub ty1 :=: applySubst sub ty2)
+          :? rSubst c (restrictSubst (fvs ty1 ++ fvs ty2) sub) p
+    rSubst c s p
+      | isEmptySubst s = p
+      | otherwise      = RSubst c s p
+
+
+instance Pretty Constraint where
+  pretty (c :? p) = prettyConstraint c p
+
+withIndent :: Int -> String -> String
 withIndent indent s = replicate indent ' ' <> s
 
 prettyConstraint :: RawConstraint -> Reason -> String
@@ -428,6 +441,10 @@ prettyConstraint c r = intercalate "\n" $ layoutTree (explainConstraint Check c 
     layoutTree :: Tree [String] -> [String]
     layoutTree (Node s ts)
       = s ++ concatMap (map (withIndent 4) . layoutTree) ts
+
+
+data InferMode = Check | Infer
+  deriving (Eq, Ord, Show)
 
 explainConstraint :: InferMode -> RawConstraint -> Reason -> Tree [String]
 explainConstraint mode c@(ty1 :=: ty2) reason
@@ -487,20 +504,6 @@ prettyReason mode c (RSubst c2@(ty1 :=: ty2) s@(Subst m) r)
     , map (\(x,(ty,r)) -> explainConstraint Infer (TyVar x :=: ty) r) (M.assocs m)
       ++ [explainConstraint mode c2 r]
     )
-
-data InferMode = Check | Infer
-  deriving (Eq, Ord, Show)
-
-data RawConstraint = UType :=: UType
-  deriving Show
-
-instance Pretty RawConstraint where
-  pretty (ty1 :=: ty2) = printf "%s = %s" (pretty ty1) (pretty ty2)
-
-data Constraint = RawConstraint :? Reason
-
-instance Pretty Constraint where
-  pretty (c :? p) = prettyConstraint c p
 
 --------------------------------------------------
 -- Type errors

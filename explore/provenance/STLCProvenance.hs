@@ -242,6 +242,7 @@ instance Pretty UVar where
   pretty (UVar v) = v
 
 type UType = Type' UVar
+type UCtx  = Ctx' UVar
 
 embed :: Type -> UType
 embed = translate absurd
@@ -555,7 +556,7 @@ initInferState = InferState names []
 
 makeLenses ''InferState
 
-type InferM = ReaderT (Ctx' UVar) (StateT InferState (Except TypeError))
+type InferM = ReaderT UCtx (StateT InferState (Except TypeError))
 
 runInferM :: InferM a -> Except TypeError (a, [Constraint])
 runInferM

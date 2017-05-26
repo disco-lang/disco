@@ -287,6 +287,9 @@ instance Pretty Subst where
     where
       prettyMapping (x, (ty, _)) = printf "%s |-> %s" (pretty x) (pretty ty)
 
+inDomain :: UVar -> Subst -> Bool
+inDomain x (Subst m) = x `M.member` m
+
 -- XXX FIXME.  What is the reason that should be associated with the result of composition?
 (.@) :: Subst -> Subst -> Subst
 s2@(Subst m2) .@ Subst m1 = Subst $ M.union (M.map (applySubst s2 *** RSubst undefined s2) m1) m2

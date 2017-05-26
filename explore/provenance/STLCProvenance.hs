@@ -514,10 +514,28 @@ instance Pretty TypeError where
   pretty (UnboundVar x)
     = printf "Unbound variable %s" x
   pretty (Infinite (c@(x :=: ty) :? r))
-    = printf "Infinite type %s = %s (%s)" (pretty x) (pretty ty) (prettyConstraint c r)
+    = printf "%s = %s would result in an infinite type\n" (pretty x) (pretty ty)
+   <> prettyConstraint c r
   pretty (CantUnify (c@(ty1 :=: ty2) :? r))
     = printf "Can't unify %s and %s\n" (pretty ty1) (pretty ty2)
    <> prettyConstraint c r
+
+--------------------------------------------------
+-- Typing derivations
+
+data Typing' v where
+  TDVar  :: Ctx' v -> String -> Type' v -> Typing' v
+  TDInt  :: Integer -> Typing' v
+  TDBin  :: Op -> Expr -> Typing' v -> Expr -> Typing' v -> Typing' v
+  TDFiat :: Type' v -> Typing' v
+
+type Typing = Typing' UVar
+
+getType :: Typing' v -> Type' v
+getType (TDVar _ _ ty) = ty
+getType (TDInt _)      = TyInt
+getType (TDBin _ _ _ _ _) = TyInt
+getType (TDFiat ty)    = ty
 
 --------------------------------------------------
 -- Inference algorithm

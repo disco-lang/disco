@@ -679,10 +679,7 @@ solve (c:cs) = do
     Right newCs -> solve (newCs ++ cs)
 
 occurs :: UVar -> UType -> Bool
-occurs x (TyVar t)      = x == t
-occurs _ TyInt          = False
-occurs x (TyFun t1 t2)  = occurs x t1 || occurs x t2
-occurs x (TyPair t1 t2) = occurs x t1 || occurs x t2
+occurs x = (x `S.member`) . fvs
 
 solveOne :: Constraint -> Except TypeError (Either Subst [Constraint])
 solveOne ((ty1 :=: ty2) :? _)

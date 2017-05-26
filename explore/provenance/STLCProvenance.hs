@@ -301,6 +301,17 @@ substConstraints = map . substConstraint
     full of unification variables makes it very hard to follow.  Not
     sure how to get around that.  Also ought to somehow suppress some
     "administrative" sorts of substitutions.
+
+  - I think we can probably simplify things, explanation-wise, by
+    applying substitutions as *late* as possible.  That is, we should
+    accumulate substitutions lazily, and only apply some substitution
+    when it is actually necessary to make progress.
+
+    More concretely, keep an accumulated substitution as an extra
+    parameter to 'solve'; if a constraint can be decomposed
+    structurally, just do so.  If a constraint involves a variable on
+    either side of the :=:, first check whether that variable is in
+    the domain of the substitution, and expand it if so.
 -}
 
 {-
@@ -544,7 +555,7 @@ infer (EVar x) = do
   case M.lookup x ctx of
     Just ty -> return ty
     Nothing -> throwError $ UnboundVar x
-infer (EInt _)      = return TyInt
+infer (EInt _)       = return TyInt
 infer (EBin _ e1 e2) = do
   check e1 TyInt
   check e2 TyInt

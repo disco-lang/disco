@@ -347,6 +347,35 @@ applySubst s (TyPair ty1 ty2) = TyPair (applySubst s ty1) (applySubst s ty2)
   - This also goes hand-in-hand with preserving the provenance of
     parsed syntax, so each Expr is associated with a particular
     location in the input syntax.
+
+  - Note in email to Harley: One thing I am struggling with now is
+    that there are lots and lots of unification variables everywhere
+    which makes things rather hard to follow (even if it were
+    presented interactively).  Typically it wouldn't matter too much
+    in what "style" you implement type inference---it's just an
+    "implementation detail"--- but if the user actually gets to
+    explore typing derivations then I'm realizing that it's really
+    important for them to be in a "natural deduction" sort of style.
+    Right now I'm wondering whether it is possible to use a natural
+    deduction/bidirectional sort of system with just enough constraint
+    solving to have full type reconstruction.  On the other
+    hand... maybe it's worth e.g. syntactically requiring type
+    annotations on lambda arguments, which would allow much more
+    natural/easier to understand derivations, without needing to
+    resort to constraint solving.  The usual argument for omitting
+    such annotations is that it is tedious for the programmer and it's
+    possible for the computer to reconstruct everything anyway.  But
+    in a pedagogical setting I'm not sure those arguments hold water.
+
+  - I also wonder about a compromise where it is willing to infer the
+    type of a lambda argument from the way it is used in the body of
+    the lambda --- so, for example, you could write (x -> x + 1) and
+    it would be OK with inferring that x has type Nat --- but it is
+    not willing to infer anything from the way the lambda is used in
+    its context.  I am not sure whether this would work.  The idea
+    would be to get some of the benefits of being able to write quick
+    anonymous functions without type annotations, WITHOUT having to do
+    constriaint solving.
 -}
 
 {-
@@ -674,35 +703,41 @@ check e ty = do
 -- Unification/constraint solving
 
 solve :: [Constraint] -> Except TypeError Subst
-solve []     = return idSubst
-solve (c:cs) = do
-  u <- solveOne c
+solve = solve' idSubst
+
+solve' :: Subst -> [Constraint] -> Except TypeError Subst
+solve' s []     = return s
+solve' s (c:cs) = do
+  u <- solveOne s c
   case u of
-    Left sub    -> (.@ sub) <$> solve (substConstraints sub cs)
-    Right newCs -> solve (newCs ++ cs)
+    Left sub    -> solve' (sub .@ s) cs
+    Right newCs -> solve' s (newCs ++ cs)
 
 occurs :: UVar -> UType -> Bool
 occurs x = (x `S.member`) . fvs
 
-solveOne :: Constraint -> Except TypeError (Either Subst [Constraint])
-solveOne ((ty1 :=: ty2) :? _)
+solveOne :: Subst -> Constraint -> Except TypeError (Either Subst [Constraint])
+solveOne s ((ty1 :=: ty2) :? _)
   | ty1 == ty2 = return $ Left idSubst
-solveOne c@((TyVar x :=: ty2) :? p)
+solveOne s c@(rc@(TyVar x :=: ty2) :? p)
+  | x `inDomain` s
+    = solveOne s ((applySubst s (TyVar x) :=: ty2)
+                    :? RSubst rc (restrictSubst (S.singleton x) s) p)
   | occurs x ty2 = throwError $ Infinite c
   | otherwise    = return $ Left (x |-> (ty2, p))
-solveOne ((ty1 :=: x@(TyVar _)) :? p)
-  = solveOne ((x :=: ty1) :? RSym p)
-solveOne (c@(TyFun ty11 ty12 :=: TyFun ty21 ty22) :? p)
+solveOne s ((ty1 :=: x@(TyVar _)) :? p)
+  = solveOne s ((x :=: ty1) :? RSym p)
+solveOne s (c@(TyFun ty11 ty12 :=: TyFun ty21 ty22) :? p)
   = return $ Right
       [ (ty11 :=: ty21) :? RFunArg c p
       , (ty12 :=: ty22) :? RFunRes c p
       ]
-solveOne (c@(TyPair ty11 ty12 :=: TyPair ty21 ty22) :? p)
+solveOne s (c@(TyPair ty11 ty12 :=: TyPair ty21 ty22) :? p)
   = return $ Right
       [ (ty11 :=: ty21) :? RPairFst c p
       , (ty12 :=: ty22) :? RPairSnd c p
       ]
-solveOne c =
+solveOne s c =
   throwError $ CantUnify c
 
 resolveUTy :: UType -> Type

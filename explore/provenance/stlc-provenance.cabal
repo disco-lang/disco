@@ -10,7 +10,7 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     STLCProvenance
+  exposed-modules:     STLCBidirProvenance
   other-modules:       Parsing2
   other-extensions:    DeriveFunctor, FlexibleInstances, GADTs, TemplateHaskell, TypeSynonymInstances
   build-depends:       base >=4.9 && <4.10,

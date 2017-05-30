@@ -289,6 +289,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Memoization annotation for functions?
   + Option for ignoring subtraction/Z check
   + More sophisticated checking of subtraction for N in a case
+  + isqrt function
 
 * Links
 

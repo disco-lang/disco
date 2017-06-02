@@ -6,6 +6,7 @@ cabal-dev
 *.dyn_hi
 *.chi
 *.chs.h
+*.agdai
 .virthualenv
 *~
 dist_*

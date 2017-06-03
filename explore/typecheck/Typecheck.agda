@@ -12,6 +12,8 @@ data Type : Set where
   Nat : Type
   _⇒_ : Type → Type → Type
 
+infixr 80 _⇒_
+
 ⟦_⟧ : Type → Set
 ⟦ Nat ⟧ = ℕ
 ⟦ τ₁ ⇒ τ₂ ⟧ = ⟦ τ₁ ⟧ → ⟦ τ₂ ⟧
@@ -50,7 +52,7 @@ data Expr (n : ℕ) : Set where
 
   var : Fin n → Expr n
   ƛ   : Type → Expr (suc n) → Expr n
-  _∙_ : Expr n → Expr n → Expr n
+  _·_ : Expr n → Expr n → Expr n
 
 Ctx : ℕ → Set
 Ctx n = Vec Type n
@@ -71,31 +73,44 @@ data _⊢_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
   ƛ    : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
        → (τ₁ ∷ Γ) ⊢ t ∶ τ₂
        → Γ ⊢ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+  _·_  : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₁ τ₂}
+       → Γ ⊢ t₁ ∶ τ₁ ⇒ τ₂
+       → Γ ⊢ t₂ ∶ τ₁
+       → Γ ⊢ t₁ · t₂ ∶ τ₂
 
 -- Explicit evidence for the *untypability* of a term.
 data _⊬_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
-  lit : ∀ {n} {Γ : Ctx n} {m} {τ}
-      → Nat ≁ τ
-      → Γ ⊬ lit m ∶ τ
-  addˡ : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
-      → Γ ⊬ t₁ ∶ Nat
-      → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
-  addʳ : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
-      → Γ ⊬ t₂ ∶ Nat
-      → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
+  mismatch : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
+           → Γ ⊢ t ∶ τ₁
+           → τ₁ ≁ τ₂
+           → Γ ⊬ t ∶ τ₂
+  ⊕ˡ     : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
+           → Γ ⊬ t₁ ∶ Nat
+           → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
+  ⊕ʳ     : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
+           → Γ ⊬ t₂ ∶ Nat
+           → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
 
-  var : ∀ {n} {Γ : Ctx n} {i} {τ}
-       → lookup i Γ ≁ τ
-       → Γ ⊬ var i ∶ τ
   ƛ-fun  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
-         → (∀ {τ₂ τ₃} → τ ≁ (τ₂ ⇒ τ₃))
-         → Γ ⊬ ƛ τ₁ t ∶ τ
+           → (∀ {τ₂ τ₃} → τ ≁ τ₂ ⇒ τ₃)
+           → Γ ⊬ ƛ τ₁ t ∶ τ
   ƛ-cong : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
-       → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
-       → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+         → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
+         → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+  -- ·-fun  : ∀ {n} {Γ : Ctx n}
+  --       →
 
 -- Type inference for a term in a given context returns either a type
 -- and a valid typing derivation, or a constructive proof that the
 -- term has no type.
 infer : ∀ {n} → (Γ : Ctx n) → (t : Expr n) → (∃ λ τ → Γ ⊢ t ∶ τ) ⊎ (∀ τ → Γ ⊬ t ∶ τ)
-infer Γ t = {!!}
+infer Γ (lit n)   = inj₁ (Nat , lit)
+infer Γ (t₁ ⊕ t₂) with infer Γ t₁ | infer Γ t₂
+infer Γ (t₁ ⊕ t₂) | inj₁ (Nat , Γ⊢t₁∶Nat) | inj₁ (Nat , Γ⊢t₂∶Nat) = inj₁ (Nat , (Γ⊢t₁∶Nat ⊕ Γ⊢t₂∶Nat))
+infer Γ (t₁ ⊕ t₂) | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁⇒τ₂) | inj₁ _ = inj₂ (λ _ → ⊕ˡ (mismatch Γ⊢t₁∶τ₁⇒τ₂ (≁-sym Nat≁⇒)))
+infer Γ (t₁ ⊕ t₂) | inj₁ _ | inj₁ (τ₃ ⇒ τ₄ , Γ⊢t₂∶τ₃⇒τ₄) = inj₂ (λ _ → ⊕ʳ (mismatch Γ⊢t₂∶τ₃⇒τ₄ (≁-sym Nat≁⇒)))
+infer Γ (t₁ ⊕ t₂) | inj₂ Γ⊬t₁∶ | _ = inj₂ (λ _ → ⊕ˡ (Γ⊬t₁∶ Nat))
+infer Γ (t₁ ⊕ t₂) | _ | inj₂ Γ⊬t₂∶ = inj₂ (λ _ → ⊕ʳ (Γ⊬t₂∶ Nat))
+infer Γ (var i)   = inj₁ (lookup i Γ , var)
+infer Γ (ƛ x t)   = {!!}
+infer Γ (t₁ · t₂) = {!!}

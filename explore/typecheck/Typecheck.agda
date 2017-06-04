@@ -2,6 +2,7 @@ module Typecheck where
 
 open import Relation.Binary.PropositionalEquality
 
+open import Relation.Nullary
 open import Data.Nat
 open import Data.Fin
 open import Data.Vec
@@ -18,6 +19,25 @@ infixr 80 _⇒_
 ⟦ Nat ⟧ = ℕ
 ⟦ τ₁ ⇒ τ₂ ⟧ = ⟦ τ₁ ⟧ → ⟦ τ₂ ⟧
 
+⇒-inj : ∀ {τ₁ τ₂ τ₃ τ₄} → (τ₁ ⇒ τ₂ ≡ τ₃ ⇒ τ₄) → (τ₁ ≡ τ₃) × (τ₂ ≡ τ₄)
+⇒-inj refl = refl , refl
+
+≢-cong-⇒ : ∀ {τ₁ τ₂ τ₃ τ₄} → (τ₁ ⇒ τ₂ ≢ τ₃ ⇒ τ₄) → (τ₁ ≢ τ₃) ⊎ (τ₂ ≢ τ₄)
+≢-cong-⇒ {Nat} {τ₃ = Nat} pf = {!!}
+≢-cong-⇒ {Nat} {τ₃ = τ₆ ⇒ τ₇} pf = inj₁ (λ ())
+≢-cong-⇒ {τ₅ ⇒ τ₆} {τ₃ = Nat} pf = inj₁ (λ ())
+≢-cong-⇒ {τ₅ ⇒ τ₆} {τ₃ = τ₈ ⇒ τ₉} pf = {!!}
+
+-- Equality of types is decidable.
+_≡?_ : (τ₁ τ₂ : Type) → (τ₁ ≡ τ₂) ⊎ (τ₁ ≢ τ₂)
+Nat ≡? Nat = inj₁ refl
+Nat ≡? (τ₂ ⇒ τ₃) = inj₂ (λ ())
+(τ₁ ⇒ τ₂) ≡? Nat = inj₂ (λ ())
+(τ₁ ⇒ τ₂) ≡? (τ₃ ⇒ τ₄) with τ₁ ≡? τ₃ | τ₂ ≡? τ₄
+(τ₁ ⇒ τ₂) ≡? (.τ₁ ⇒ .τ₂) | inj₁ refl | inj₁ refl = inj₁ refl
+(τ₁ ⇒ τ₂) ≡? (τ₃ ⇒ τ₄) | inj₂ τ₁≢τ₃ | _ = inj₂ (λ eq → τ₁≢τ₃ (proj₁ (⇒-inj eq)))
+(τ₁ ⇒ τ₂) ≡? (τ₃ ⇒ τ₄) | _ | inj₂ τ₂≢τ₄ = inj₂ (λ eq → τ₂≢τ₄ (proj₂ (⇒-inj eq)))
+
 -- A type of explicit evidence explaining *why* two types are unequal.
 data _≁_ : Type → Type → Set where
   Nat≁⇒ : ∀ {τ₁ τ₂} → Nat ≁ (τ₁ ⇒ τ₂)
@@ -26,17 +46,30 @@ data _≁_ : Type → Type → Set where
 
   ≁-sym   : ∀ {τ₁ τ₂} → τ₁ ≁ τ₂ → τ₂ ≁ τ₁
 
--- Given such a proof we can show the types are unequal.  But we can't
--- go the other direction.  The whole point is that τ₁ ≢ τ₂ is
--- nonconstructive, but τ₁ ≁ τ₂ gives us something we can introspect
--- on in order to produce better explanations / error messages.
+-- Given such a proof we can show the types are unequal.
 ≁-≢ : ∀ {τ₁ τ₂} → (τ₁ ≁ τ₂) → (τ₁ ≢ τ₂)
 ≁-≢ Nat≁⇒ = λ ()
 ≁-≢ (⇒ˡ-≁ τ₁≁τ₂)  refl = ≁-≢ τ₁≁τ₂ refl
 ≁-≢ (⇒ʳ-≁ τ₃≁τ₄)  refl = ≁-≢ τ₃≁τ₄ refl
 ≁-≢ (≁-sym τ₂≁τ₁) refl = ≁-≢ τ₂≁τ₁ refl
 
--- Equality of types is decidable.
+-- Since our universe of types is closed, we can actually go the other
+-- way too.
+≢-≁ : ∀ {τ₁ τ₂} → (τ₁ ≢ τ₂) → (τ₁ ≁ τ₂)
+≢-≁ {Nat} {Nat} τ₁≢τ₂ with τ₁≢τ₂ refl
+... | ()
+≢-≁ {Nat} {τ₂ ⇒ τ₃} _ = Nat≁⇒
+≢-≁ {τ₁ ⇒ τ₂} {Nat} _ = ≁-sym Nat≁⇒
+≢-≁ {τ₁ ⇒ τ₂} {τ₃ ⇒ τ₄} τ₁⇒τ₂≢τ₃⇒τ₄ with ≢-cong-⇒ τ₁⇒τ₂≢τ₃⇒τ₄
+≢-≁ {τ₁ ⇒ τ₂} {τ₃ ⇒ τ₄} τ₁⇒τ₂≢τ₃⇒τ₄ | inj₁ τ₁≢τ₃ = ⇒ˡ-≁ (≢-≁ τ₁≢τ₃)
+≢-≁ {τ₁ ⇒ τ₂} {τ₃ ⇒ τ₄} τ₁⇒τ₂≢τ₃⇒τ₄ | inj₂ τ₂≢τ₄ = ⇒ʳ-≁ (≢-≁ τ₂≢τ₄)
+
+-- Note, however, that there might be *multiple* terms of type τ₁ ≁
+-- τ₂: each corresponds to a different explanation of why the types
+-- are not equal.  We might actually care which one we have.
+-- Round-tripping through (τ₁ ≢ τ₂) is not the identity.
+
+-- Equality of types is also decidable using ≁ instead of ≢.
 _∼?_ : (τ₁ τ₂ : Type) → (τ₁ ≡ τ₂) ⊎ (τ₁ ≁ τ₂)
 Nat ∼? Nat = inj₁ refl
 Nat ∼? (τ₂ ⇒ τ₃) = inj₂ Nat≁⇒
@@ -45,6 +78,8 @@ Nat ∼? (τ₂ ⇒ τ₃) = inj₂ Nat≁⇒
 (τ₁ ⇒ τ₃) ∼? (.τ₁ ⇒ .τ₃) | inj₁ refl | inj₁ refl  = inj₁ refl
 (τ₁ ⇒ τ₃) ∼? (τ₂ ⇒ τ₄) | inj₁ _ | inj₂ τ₃≁τ₄ = inj₂ (⇒ʳ-≁ τ₃≁τ₄)
 (τ₁ ⇒ τ₃) ∼? (τ₂ ⇒ τ₄) | inj₂ τ₁≁τ₂ | q = inj₂ (⇒ˡ-≁ τ₁≁τ₂)
+
+-- (Untyped) expressions of STLC + arithmetic.
 
 data Expr (n : ℕ) : Set where
   lit : ℕ → Expr n
@@ -80,29 +115,46 @@ data _⊢_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
 
 -- Explicit evidence for the *untypability* of a term.
 data _⊬_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
-  mismatch : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
-           → Γ ⊢ t ∶ τ₁
-           → τ₁ ≁ τ₂
-           → Γ ⊬ t ∶ τ₂
-  ⊕ˡ     : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
-           → Γ ⊬ t₁ ∶ Nat
-           → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
-  ⊕ʳ     : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
-           → Γ ⊬ t₂ ∶ Nat
-           → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
 
-  ƛ-fun  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
-           → (∀ {τ₂ τ₃} → τ ≁ τ₂ ⇒ τ₃)
-           → Γ ⊬ ƛ τ₁ t ∶ τ
-  ƛ-cong : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
-         → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
-         → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
-  -- ·-fun  : ∀ {n} {Γ : Ctx n}
-  --       →
+  -- explicitly build in uniqueness of typing as an axiom
+  mismatch : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
+             → Γ ⊢ t ∶ τ₁
+             → τ₁ ≁ τ₂
+             → Γ ⊬ t ∶ τ₂
+
+  ⊕ˡ       : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
+             → Γ ⊬ t₁ ∶ Nat
+             → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
+  ⊕ʳ       : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
+             → Γ ⊬ t₂ ∶ Nat
+             → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
+  ⊕≁Nat    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
+             → τ ≁ Nat → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
+
+  ƛ-funty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
+             → (∀ {τ₂} → τ ≁ τ₁ ⇒ τ₂)
+             → Γ ⊬ ƛ τ₁ t ∶ τ
+  ƛ-resty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂ τ₃}
+             → (τ₁ ∷ Γ) ⊢ t ∶ τ₂
+             → τ₂ ≁ τ₃
+             → Γ ⊬ ƛ τ₁ t ∶ τ₁ ⇒ τ₃
+  ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
+             → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
+             → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+
+  ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
+             → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
+             → Γ ⊬ t₁ · t₂ ∶ τ₂
+  ·-arg    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₁ τ₂}
+             → Γ ⊢ t₁ ∶ τ₁ ⇒ τ₂
+             → Γ ⊬ t₂ ∶ τ₁
+             → Γ ⊬ t₁ · t₂ ∶ τ₂
 
 -- Type inference for a term in a given context returns either a type
 -- and a valid typing derivation, or a constructive proof that the
--- term has no type.
+-- term has no type.  Note that in this system, ALL terms can be
+-- inferred.  In a bidirectional system we would have to restrict this
+-- to only take inferrable terms as inputs.
 infer : ∀ {n} → (Γ : Ctx n) → (t : Expr n) → (∃ λ τ → Γ ⊢ t ∶ τ) ⊎ (∀ τ → Γ ⊬ t ∶ τ)
 infer Γ (lit n)   = inj₁ (Nat , lit)
 infer Γ (t₁ ⊕ t₂) with infer Γ t₁ | infer Γ t₂
@@ -112,5 +164,79 @@ infer Γ (t₁ ⊕ t₂) | inj₁ _ | inj₁ (τ₃ ⇒ τ₄ , Γ⊢t₂∶τ�
 infer Γ (t₁ ⊕ t₂) | inj₂ Γ⊬t₁∶ | _ = inj₂ (λ _ → ⊕ˡ (Γ⊬t₁∶ Nat))
 infer Γ (t₁ ⊕ t₂) | _ | inj₂ Γ⊬t₂∶ = inj₂ (λ _ → ⊕ʳ (Γ⊬t₂∶ Nat))
 infer Γ (var i)   = inj₁ (lookup i Γ , var)
-infer Γ (ƛ x t)   = {!!}
-infer Γ (t₁ · t₂) = {!!}
+infer Γ (ƛ τ₁ t) with infer (τ₁ ∷ Γ) t
+infer Γ (ƛ τ₁ t) | inj₁ (τ₂ , τ₁∷Γ⊢t∶τ₂) = inj₁ (τ₁ ⇒ τ₂ , ƛ τ₁∷Γ⊢t∶τ₂)
+infer Γ (ƛ τ₁ t) | inj₂ τ₁∷Γ⊬t∶ = inj₂ lemma
+  where
+    lemma : (τ : Type) → Γ ⊬ ƛ τ₁ t ∶ τ
+    lemma Nat        = ƛ-funty Nat≁⇒
+    lemma (τ₁′ ⇒ τ₂) with τ₁′ ∼? τ₁
+    lemma (.τ₁ ⇒ τ₂) | inj₁ refl = ƛ (τ₁∷Γ⊬t∶ τ₂)
+    lemma (τ₁′ ⇒ τ₂) | inj₂ τ₁′≁τ₁ = ƛ-funty (λ {τ₃} → ⇒ˡ-≁ τ₁′≁τ₁)
+infer Γ (t₁ · t₂) with infer Γ t₁ | infer Γ t₂
+infer Γ (t₁ · t₂) | inj₁ (Nat , Γ⊢t₁∶Nat) | _ = inj₂ (λ _ → ·-fun (mismatch Γ⊢t₁∶Nat Nat≁⇒))
+infer Γ (t₁ · t₂) | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁⇒τ₂) | inj₁ (τ₁′ , Γ⊢t₂∶τ₁′) with τ₁ ∼? τ₁′
+infer Γ (t₁ · t₂) | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁⇒τ₂) | inj₁ (.τ₁ , Γ⊢t₂∶τ₁ ) | inj₁ refl = inj₁ (τ₂ , (Γ⊢t₁∶τ₁⇒τ₂ · Γ⊢t₂∶τ₁))
+infer Γ (t₁ · t₂) | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁⇒τ₂) | inj₁ (τ₁′ , Γ⊢t₂∶τ₁′) | inj₂ τ₁≁τ₁′ = inj₂ lemma2
+  where
+    lemma2 : ∀ τ → Γ ⊬ t₁ · t₂ ∶ τ
+    lemma2 τ with τ ∼? τ₂
+    lemma2 τ | inj₁ τ≡τ₂ rewrite τ≡τ₂ = ·-arg Γ⊢t₁∶τ₁⇒τ₂ (mismatch Γ⊢t₂∶τ₁′ (≁-sym τ₁≁τ₁′))
+    lemma2 τ | inj₂ τ≁τ₂ = ·-fun (mismatch Γ⊢t₁∶τ₁⇒τ₂ (⇒ʳ-≁ (≁-sym τ≁τ₂)))
+infer Γ (t₁ · t₂) | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁⇒τ₂) | inj₂ Γ⊬t₂ = inj₂ lemma3
+  where
+    lemma3 : ∀ τ → Γ ⊬ t₁ · t₂ ∶ τ
+    lemma3 τ with τ ∼? τ₂
+    lemma3 τ | inj₁ τ≡τ₂ rewrite τ≡τ₂ = ·-arg Γ⊢t₁∶τ₁⇒τ₂ (Γ⊬t₂ τ₁)
+    lemma3 τ | inj₂ τ≁τ₂ = ·-fun (mismatch Γ⊢t₁∶τ₁⇒τ₂ (⇒ʳ-≁ (≁-sym τ≁τ₂)))
+infer Γ (t₁ · t₂) | inj₂ Γ⊬t₁∶ | _ = inj₂ (λ τ₂ → ·-fun (λ {τ₁} → Γ⊬t₁∶ (τ₁ ⇒ τ₂)))
+
+-- Check whether a given term has a *given* type.
+check : ∀ {n} → (Γ : Ctx n) → (t : Expr n) → (τ : Type) → (Γ ⊢ t ∶ τ) ⊎ (Γ ⊬ t ∶ τ)
+check Γ (lit _)   (τ ⇒ τ₁) = inj₂ (mismatch lit Nat≁⇒)
+check Γ (lit _)   Nat      = inj₁ lit
+check Γ (_  ⊕ _ ) (τ ⇒ τ₁) = inj₂ (⊕≁Nat (≁-sym Nat≁⇒))
+check Γ (t₁ ⊕ t₂) Nat with check Γ t₁ Nat | check Γ t₂ Nat
+check Γ (t₁ ⊕ t₂) Nat | inj₁ Γ⊢t₁∶Nat | inj₁ Γ⊢t₂∶Nat = inj₁ (Γ⊢t₁∶Nat ⊕ Γ⊢t₂∶Nat)
+check Γ (t₁ ⊕ t₂) Nat | inj₂ Γ⊬t₁∶Nat | _             = inj₂ (⊕ˡ Γ⊬t₁∶Nat)
+check Γ (t₁ ⊕ t₂) Nat | _             | inj₂ Γ⊬t₂∶Nat = inj₂ (⊕ʳ Γ⊬t₂∶Nat)
+check Γ (var i)   τ with τ ∼? lookup i Γ
+check Γ (var i) τ | inj₁ τ≡iΓ rewrite τ≡iΓ = inj₁ var
+check Γ (var i) τ | inj₂ τ≁iΓ = inj₂ (mismatch var (≁-sym τ≁iΓ))
+check Γ (ƛ τ₁ t) Nat = inj₂ (ƛ-funty Nat≁⇒)
+check Γ (ƛ τ₁ t) (τ ⇒ τ₂) with τ ∼? τ₁ | check (τ₁ ∷ Γ) t τ₂
+check Γ (ƛ τ₁ t) (τ ⇒ τ₂) | inj₂ τ≁τ₁ | _ = inj₂ (ƛ-funty (⇒ˡ-≁ τ≁τ₁))
+check Γ (ƛ τ₁ t) (.τ₁ ⇒ τ₂) | inj₁ refl | inj₂ τ₁∷Γ⊬t∶τ₂ = inj₂ (ƛ τ₁∷Γ⊬t∶τ₂)
+check Γ (ƛ τ₁ t) (.τ₁ ⇒ τ₂) | inj₁ refl | inj₁ τ₁∷Γ⊢t∶τ₂ = inj₁ (ƛ τ₁∷Γ⊢t∶τ₂)
+  --- In order to check an application we have to resort to inference on t₁.
+check Γ (t₁ · t₂) τ with infer Γ t₁
+check Γ (t₁ · t₂) τ | inj₂ Γ⊬t₁∶ = inj₂ (·-fun (λ {τ₁} → Γ⊬t₁∶ (τ₁ ⇒ τ)))
+check Γ (t₁ · t₂) τ | inj₁ (Nat , Γ⊢t₁∶τ₁) = inj₂ (·-fun (mismatch Γ⊢t₁∶τ₁ Nat≁⇒))
+check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) with τ ∼? τ₂
+check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₂ τ≁τ₂ = inj₂ (·-fun (mismatch Γ⊢t₁∶τ₁ (⇒ʳ-≁ (≁-sym τ≁τ₂))))
+check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₁ τ≡τ₂ rewrite τ≡τ₂ with check Γ t₂ τ₁
+check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₁ τ≡τ₂ | inj₂ Γ⊬t₂∶τ₁ = inj₂ (·-arg Γ⊢t₁∶τ₁ Γ⊬t₂∶τ₁)
+check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₁ τ≡τ₂ | inj₁ Γ⊢t₂∶τ₁ = inj₁ (Γ⊢t₁∶τ₁ · Γ⊢t₂∶τ₁)
+
+-- The above are comforting, but how do we know that ⊬ is really
+-- correct?  To be correct it has to be equivalent to the negation of ⊢.
+
+-- First, we show that we really do have unique types:
+
+⊢-unique : ∀ {n} (Γ : Ctx n) (t : Expr n) (τ₁ τ₂ : Type) → (Γ ⊢ t ∶ τ₁) → (Γ ⊢ t ∶ τ₂) → (τ₁ ≡ τ₂)
+⊢-unique Γ (lit _)   .Nat .Nat lit lit = refl
+⊢-unique Γ (t₁ ⊕ t₂) .Nat .Nat (_ ⊕ _) (_ ⊕ _) = refl
+⊢-unique Γ (var i) .(lookup i Γ) .(lookup i Γ) var var = refl
+⊢-unique Γ (ƛ τ₃ t) τ₁ τ₂ Γ⊢t∶τ₁ Γ⊢t∶τ₂ = {!!}
+⊢-unique Γ (t₁ · t₂) τ₁ τ₂ (Γ⊢t∶τ₁ · Γ⊢t∶τ₂) (Γ⊢t∶τ₃ · Γ⊢t∶τ₄) = {!!}
+
+⊬-¬⊢ : ∀ {n} → (Γ : Ctx n) → (t : Expr n) → (τ : Type) → (Γ ⊬ t ∶ τ) → (¬ (Γ ⊢ t ∶ τ))
+⊬-¬⊢ Γ t τ (mismatch Γ⊢t∶τ₁ τ₁≁τ) Γ⊢t∶τ = {!!}
+⊬-¬⊢ Γ _ τ (⊕ˡ Γ⊬t∶τ) = {!!}
+⊬-¬⊢ Γ _ τ (⊕ʳ Γ⊬t∶τ) = {!!}
+⊬-¬⊢ Γ _ τ (⊕≁Nat x) = {!!}
+⊬-¬⊢ Γ _ τ (ƛ-funty x) = {!!}
+⊬-¬⊢ Γ _ _ (ƛ-resty x x₁) = {!!}
+⊬-¬⊢ Γ _ _ (ƛ Γ⊬t∶τ) = {!!}
+⊬-¬⊢ Γ _ τ (·-fun x) = {!!}
+⊬-¬⊢ Γ _ τ (·-arg x Γ⊬t∶τ) = {!!}

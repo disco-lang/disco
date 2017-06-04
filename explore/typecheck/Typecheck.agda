@@ -2,6 +2,7 @@ module Typecheck where
 
 open import Relation.Binary.PropositionalEquality
 
+open import Function using (id)
 open import Data.Empty
 open import Relation.Nullary
 open import Data.Nat
@@ -10,23 +11,20 @@ open import Data.Vec
 open import Data.Sum
 open import Data.Product
 
+------------------------------------------------------------
+-- Types
+------------------------------------------------------------
+
+-- A universe of types for STLC + natural numbers.
 data Type : Set where
   Nat : Type
   _⇒_ : Type → Type → Type
 
 infixr 80 _⇒_
 
-⟦_⟧ : Type → Set
-⟦ Nat ⟧ = ℕ
-⟦ τ₁ ⇒ τ₂ ⟧ = ⟦ τ₁ ⟧ → ⟦ τ₂ ⟧
-
+-- The function type constructor is injective.
 ⇒-inj : ∀ {τ₁ τ₂ τ₃ τ₄} → (τ₁ ⇒ τ₂ ≡ τ₃ ⇒ τ₄) → (τ₁ ≡ τ₃) × (τ₂ ≡ τ₄)
 ⇒-inj refl = refl , refl
-
--- ≢-cong-⇒ {Nat} {τ₃ = Nat} pf = inj₂ (λ τ₂≡τ₄ → pf (cong _ τ₂≡τ₄))
--- ≢-cong-⇒ {Nat} {τ₃ = τ₆ ⇒ τ₇} pf = inj₁ (λ ())
--- ≢-cong-⇒ {τ₅ ⇒ τ₆} {τ₃ = Nat} pf = inj₁ (λ ())
--- ≢-cong-⇒ {τ₅ ⇒ τ₆} {τ₃ = τ₈ ⇒ τ₉} pf = {!!}
 
 -- Equality of types is decidable.
 _≡?_ : (τ₁ τ₂ : Type) → (τ₁ ≡ τ₂) ⊎ (τ₁ ≢ τ₂)
@@ -60,7 +58,15 @@ data _≁_ : Type → Type → Set where
 ≁-≢ (≁-sym τ₂≁τ₁) refl = ≁-≢ τ₂≁τ₁ refl
 
 -- Since our universe of types is closed, we can actually go the other
--- way too.
+-- way too. That is, ≢ is equivalent to ≁ ; the point is that the
+-- latter is more immediately informative (by pattern-matching etc.)
+-- which can be used to produce error messages and so on.
+--
+-- Note, however, that there might be *multiple* terms of type τ₁ ≁
+-- τ₂: each corresponds to a different explanation of why the types
+-- are not equal.  We might actually care which one we have.
+-- Round-tripping through (τ₁ ≢ τ₂) is not the identity.
+
 ≢-≁ : ∀ {τ₁ τ₂} → (τ₁ ≢ τ₂) → (τ₁ ≁ τ₂)
 ≢-≁ {Nat} {Nat} τ₁≢τ₂ with τ₁≢τ₂ refl
 ... | ()
@@ -70,23 +76,15 @@ data _≁_ : Type → Type → Set where
 ≢-≁ {τ₁ ⇒ τ₂} {τ₃ ⇒ τ₄} τ₁⇒τ₂≢τ₃⇒τ₄ | inj₁ τ₁≢τ₃ = ⇒ˡ-≁ (≢-≁ τ₁≢τ₃)
 ≢-≁ {τ₁ ⇒ τ₂} {τ₃ ⇒ τ₄} τ₁⇒τ₂≢τ₃⇒τ₄ | inj₂ τ₂≢τ₄ = ⇒ʳ-≁ (≢-≁ τ₂≢τ₄)
 
--- Note, however, that there might be *multiple* terms of type τ₁ ≁
--- τ₂: each corresponds to a different explanation of why the types
--- are not equal.  We might actually care which one we have.
--- Round-tripping through (τ₁ ≢ τ₂) is not the identity.
-
--- Equality of types is also decidable using ≁ instead of ≢.
+-- Sometimes it's convenient to decide equality of types using ≁ in place of ≢.
 _∼?_ : (τ₁ τ₂ : Type) → (τ₁ ≡ τ₂) ⊎ (τ₁ ≁ τ₂)
-Nat ∼? Nat = inj₁ refl
-Nat ∼? (τ₂ ⇒ τ₃) = inj₂ Nat≁⇒
-(τ₁ ⇒ τ₂) ∼? Nat = inj₂ (≁-sym Nat≁⇒)
-(τ₁ ⇒ τ₃) ∼? (τ₂ ⇒ τ₄) with τ₁ ∼? τ₂ | τ₃ ∼? τ₄
-(τ₁ ⇒ τ₃) ∼? (.τ₁ ⇒ .τ₃) | inj₁ refl | inj₁ refl  = inj₁ refl
-(τ₁ ⇒ τ₃) ∼? (τ₂ ⇒ τ₄) | inj₁ _ | inj₂ τ₃≁τ₄ = inj₂ (⇒ʳ-≁ τ₃≁τ₄)
-(τ₁ ⇒ τ₃) ∼? (τ₂ ⇒ τ₄) | inj₂ τ₁≁τ₂ | q = inj₂ (⇒ˡ-≁ τ₁≁τ₂)
+τ₁ ∼? τ₂ = Data.Sum.map id ≢-≁ (τ₁ ≡? τ₂)
+
+------------------------------------------------------------
+-- Expressions
+------------------------------------------------------------
 
 -- (Untyped) expressions of STLC + arithmetic.
-
 data Expr (n : ℕ) : Set where
   lit : ℕ → Expr n
   _⊕_ : Expr n → Expr n → Expr n
@@ -97,6 +95,10 @@ data Expr (n : ℕ) : Set where
 
 Ctx : ℕ → Set
 Ctx n = Vec Type n
+
+------------------------------------------------------------
+-- Typing
+------------------------------------------------------------
 
 -- Typing derivations.
 data _⊢_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
@@ -175,6 +177,10 @@ data _⊬_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
              → Γ ⊬ t₂ ∶ τ₁
              → Γ ⊬ t₁ · t₂ ∶ τ₂
 
+------------------------------------------------------------
+-- Type inference and checking
+------------------------------------------------------------
+
 -- Type inference for a term in a given context returns either a type
 -- and a valid typing derivation, or a constructive proof that the
 -- term has no type.  Note that in this system, ALL terms can be
@@ -233,7 +239,7 @@ check Γ (ƛ τ₁ t) (τ ⇒ τ₂) with τ ∼? τ₁ | check (τ₁ ∷ Γ) t
 check Γ (ƛ τ₁ t) (τ ⇒ τ₂) | inj₂ τ≁τ₁ | _ = inj₂ (ƛ-funty (⇒ˡ-≁ τ≁τ₁))
 check Γ (ƛ τ₁ t) (.τ₁ ⇒ τ₂) | inj₁ refl | inj₂ τ₁∷Γ⊬t∶τ₂ = inj₂ (ƛ τ₁∷Γ⊬t∶τ₂)
 check Γ (ƛ τ₁ t) (.τ₁ ⇒ τ₂) | inj₁ refl | inj₁ τ₁∷Γ⊢t∶τ₂ = inj₁ (ƛ τ₁∷Γ⊢t∶τ₂)
-  --- In order to check an application we have to resort to inference on t₁.
+  --- Note that in order to check an application we have to use type inference on t₁.
 check Γ (t₁ · t₂) τ with infer Γ t₁
 check Γ (t₁ · t₂) τ | inj₂ Γ⊬t₁∶ = inj₂ (·-fun (λ {τ₁} → Γ⊬t₁∶ (τ₁ ⇒ τ)))
 check Γ (t₁ · t₂) τ | inj₁ (Nat , Γ⊢t₁∶τ₁) = inj₂ (·-fun (mismatch Γ⊢t₁∶τ₁ Nat≁⇒))
@@ -243,11 +249,17 @@ check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj�
 check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₁ τ≡τ₂ | inj₂ Γ⊬t₂∶τ₁ = inj₂ (·-arg Γ⊢t₁∶τ₁ Γ⊬t₂∶τ₁)
 check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj₁ τ≡τ₂ | inj₁ Γ⊢t₂∶τ₁ = inj₁ (Γ⊢t₁∶τ₁ · Γ⊢t₂∶τ₁)
 
--- The above are comforting, but how do we know that ⊬ is really
--- correct?  To be correct it has to be equivalent to the negation of ⊢.
+------------------------------------------------------------
+-- Correctness
+------------------------------------------------------------
+
+-- The whole idea is that ⊬ is a more explicit/constructive, yet
+-- equivalent, way to represent the negation of ⊢ .  We can actually
+-- prove the equivalence.
 
 -- First, straightforward induction on typing derivations shows that
--- we really do have unique types:
+-- we really do have unique types, as assumed by the 'mismatch'
+-- constructor.
 
 ⊢-unique : ∀ {n} {Γ : Ctx n} {t : Expr n} {τ₁ τ₂ : Type} → (Γ ⊢ t ∶ τ₁) → (Γ ⊢ t ∶ τ₂) → (τ₁ ≡ τ₂)
 ⊢-unique lit lit = refl
@@ -260,12 +272,16 @@ check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj�
 -- just induction over derivations, making use of uniqueness of
 -- typing.
 ⊬-¬⊢ : ∀ {n} {Γ : Ctx n} {t : Expr n} {τ : Type} → (Γ ⊬ t ∶ τ) → (¬ (Γ ⊢ t ∶ τ))
+
 ⊬-¬⊢ (mismatch Γ⊢t∶τ₁ τ₁≁τ) Γ⊢t∶τ = ≁-≢ τ₁≁τ (⊢-unique Γ⊢t∶τ₁ Γ⊢t∶τ)
-⊬-¬⊢ (⊕ˡ Γ⊬t₁∶N) (Γ⊢t₁∶N ⊕ _     ) = ⊬-¬⊢ Γ⊬t₁∶N Γ⊢t₁∶N
-⊬-¬⊢ (⊕ʳ Γ⊬t₂∶N) (_      ⊕ Γ⊢t₂∶N) = ⊬-¬⊢ Γ⊬t₂∶N Γ⊢t₂∶N
-⊬-¬⊢ (⊕≁Nat τ≁N) (_      ⊕ _     ) = ≁-≢ τ≁N refl
-⊬-¬⊢ (ƛ-funty τ≁τ₁⇒) (ƛ _) = ≁-≢ τ≁τ₁⇒ refl
-⊬-¬⊢ (ƛ Γ⊬t∶τ₂) (ƛ Γ⊢t∶τ₂) = ⊬-¬⊢ Γ⊬t∶τ₂ Γ⊢t∶τ₂
+
+⊬-¬⊢ (⊕ˡ Γ⊬t₁∶N)     (Γ⊢t₁∶N ⊕ _     ) = ⊬-¬⊢ Γ⊬t₁∶N Γ⊢t₁∶N
+⊬-¬⊢ (⊕ʳ Γ⊬t₂∶N)     (_      ⊕ Γ⊢t₂∶N) = ⊬-¬⊢ Γ⊬t₂∶N Γ⊢t₂∶N
+⊬-¬⊢ (⊕≁Nat τ≁N)     (_      ⊕ _     ) = ≁-≢ τ≁N refl
+
+⊬-¬⊢ (ƛ-funty τ≁τ₁⇒) (ƛ _)      = ≁-≢ τ≁τ₁⇒ refl
+⊬-¬⊢ (ƛ Γ⊬t∶τ₂)      (ƛ Γ⊢t∶τ₂) = ⊬-¬⊢ Γ⊬t∶τ₂ Γ⊢t∶τ₂
+
 ⊬-¬⊢ (·-fun Γ⊬t₁) (Γ⊢t₁ · _) = ⊬-¬⊢ Γ⊬t₁ Γ⊢t₁
 ⊬-¬⊢ (·-arg Γ⊢t₁∶τ₁⇒τ Γ⊬t₂∶τ) (Γ⊢t₁∶τ₂⇒τ · Γ⊢t₂)
   rewrite proj₁ (⇒-inj (⊢-unique Γ⊢t₁∶τ₁⇒τ Γ⊢t₁∶τ₂⇒τ)) = ⊬-¬⊢ Γ⊬t₂∶τ Γ⊢t₂

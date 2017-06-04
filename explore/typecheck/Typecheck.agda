@@ -98,10 +98,7 @@ data Expr (n : ℕ) : Set where
 Ctx : ℕ → Set
 Ctx n = Vec Type n
 
--- Should we have two types, one for typability and one for
--- untypability, or should we combine them into a single type indexed
--- by Bool?  Let's try separate types first.
-
+-- Typing derivations.
 data _⊢_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
   lit  : ∀ {n} {Γ : Ctx n} {m}
        → Γ ⊢ lit m ∶ Nat
@@ -119,15 +116,19 @@ data _⊢_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
        → Γ ⊢ t₂ ∶ τ₁
        → Γ ⊢ t₁ · t₂ ∶ τ₂
 
--- Explicit evidence for the *untypability* of a term.
+-- Explicit, constructive evidence for the *untypability* of a term.
 data _⊬_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
 
-  -- explicitly build in uniqueness of typing as an axiom
+  -- Explicitly build in uniqueness of typing as an axiom.  t is not
+  -- typeable at type τ₂ if t is typeable at some different type.
   mismatch : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
              → Γ ⊢ t ∶ τ₁
              → τ₁ ≁ τ₂
              → Γ ⊬ t ∶ τ₂
 
+  -- There are three ways for a + term to fail to have a given type τ:
+  -- either the left or right sides do not have type Nat, or the type
+  -- τ itself is not Nat.
   ⊕ˡ       : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
              → Γ ⊬ t₁ ∶ Nat
              → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
@@ -137,17 +138,35 @@ data _⊬_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
   ⊕≁Nat    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ}
              → τ ≁ Nat → Γ ⊬ (t₁ ⊕ t₂) ∶ τ
 
+  -- ƛ-funty holds if τ is not a function type at all, or if it is a
+  -- function type whose input type is not τ₁.
   ƛ-funty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
              → (∀ {τ₂} → τ ≁ τ₁ ⇒ τ₂)
              → Γ ⊬ ƛ τ₁ t ∶ τ
-  ƛ-resty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂ τ₃}
-             → (τ₁ ∷ Γ) ⊢ t ∶ τ₂
-             → τ₂ ≁ τ₃
-             → Γ ⊬ ƛ τ₁ t ∶ τ₁ ⇒ τ₃
+
+  -- Otherwise, τ is of the form (τ₁ ⇒ τ₂) but the body t does not
+  -- have type τ₂.  Note this could be either because t is not typable
+  -- at all, or because it has some type other than τ₂.
   ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
              → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
              → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
 
+  -- Had this ƛ-resty constructor, but it turns out we don't need it:
+  -- it is not used in inference or checking, and isn't needed to
+  -- prove equivalence of ⊬ and ¬ ⊢ .  It handles *only* the case
+  -- where t is typable but has a type different than the output type
+  -- of the whole expression; but the ƛ constructor handles this case
+  -- as well as the case where t is not typeable at all.
+
+  -- ƛ-resty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂ τ₃}
+  --            → (τ₁ ∷ Γ) ⊢ t ∶ τ₂
+  --            → τ₂ ≁ τ₃
+  --            → Γ ⊬ ƛ τ₁ t ∶ τ₁ ⇒ τ₃
+
+  -- Finally, there are two cases when an application is not typeable.
+  -- Either the function does not have an appropriate function type,
+  -- or the argument does not have a type that matches the function's
+  -- input type.
   ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
              → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
              → Γ ⊬ t₁ · t₂ ∶ τ₂
@@ -246,7 +265,6 @@ check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj�
 ⊬-¬⊢ (⊕ʳ Γ⊬t₂∶N) (_      ⊕ Γ⊢t₂∶N) = ⊬-¬⊢ Γ⊬t₂∶N Γ⊢t₂∶N
 ⊬-¬⊢ (⊕≁Nat τ≁N) (_      ⊕ _     ) = ≁-≢ τ≁N refl
 ⊬-¬⊢ (ƛ-funty τ≁τ₁⇒) (ƛ _) = ≁-≢ τ≁τ₁⇒ refl
-⊬-¬⊢ (ƛ-resty Γ⊢t∶τ₂ τ₂≁τ₃) (ƛ Γ⊢t∶τ₃) = ≁-≢ τ₂≁τ₃ (⊢-unique Γ⊢t∶τ₂ Γ⊢t∶τ₃)
 ⊬-¬⊢ (ƛ Γ⊬t∶τ₂) (ƛ Γ⊢t∶τ₂) = ⊬-¬⊢ Γ⊬t∶τ₂ Γ⊢t∶τ₂
 ⊬-¬⊢ (·-fun Γ⊬t₁) (Γ⊢t₁ · _) = ⊬-¬⊢ Γ⊬t₁ Γ⊢t₁
 ⊬-¬⊢ (·-arg Γ⊢t₁∶τ₁⇒τ Γ⊬t₂∶τ) (Γ⊢t₁∶τ₂⇒τ · Γ⊢t₂)

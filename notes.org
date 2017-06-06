@@ -271,7 +271,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Markdown for documentation? See cheapskate library --- what Idris uses.
   + Finite types (like Fin n)
   + Chained comparisons   (2 < x <= 5)
-  + Type qualifiers like "nonzero", "nonnegative", etc.
+  + Type qualifiers like "nonzero", "nonnegative", "non-empty", etc.
   + Built-in counters, e.g. for collecting data re: big-O analysis
   + Built-in visualizations (using Diagrams), e.g.
     - call graph
@@ -287,6 +287,7 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
       students files load despite errors.
   + Graph reduction?  Don't re-evaluate...
   + Memoization annotation for functions?
+  + Saturating subtraction ∸ for naturals?
   + Option for ignoring subtraction/Z check
   + More sophisticated checking of subtraction for N in a case
   + isqrt function

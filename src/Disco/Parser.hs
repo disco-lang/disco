@@ -32,6 +32,7 @@ module Disco.Parser
        , requireSep, requireClose, requireVirtual
 
          -- ** Basic lexemes
+       , consumeWhitespace
        , whitespace, lexeme, symbol, reservedOp
        , natural, reserved, reservedWords, identifier, ident
 

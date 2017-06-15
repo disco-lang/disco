@@ -59,6 +59,7 @@ data REPLExpr =
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
  | Doc (Name Term)              -- Show documentation.
+ | Nop                          -- No-op, e.g. if the user just enters a comment
  | Help
  deriving Show
 
@@ -90,7 +91,8 @@ fileParser = many spaceChar *> many (satisfy (not . isSpace))
 lineParser :: Parser REPLExpr
 lineParser
   =   commandParser
-  <|> try (Eval <$> (parseTerm <* eof))
+  <|> try (Nop <$ (consumeWhitespace <* eof))
+  <|> try (Eval <$> (consumeWhitespace *> parseTerm <* eof))
   <|> letParser
 
 parseLine :: String -> Either String REPLExpr
@@ -115,6 +117,7 @@ handleCMD s =
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file)   = handleLoad file
     handleLine (Doc x)       = handleDocs x
+    handleLine Nop           = return ()
     handleLine Help          = io.putStrLn $ "Help!"
 
 handleLet :: Name Term -> Term -> REPLStateIO ()
@@ -278,7 +281,7 @@ main = do
       case minput of
         Nothing -> return ()
         Just input
-          | input `isPrefixOf` ":quit" -> do
+          | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
               liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> (lift.handleCMD $ input) >> loop

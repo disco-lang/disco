@@ -268,9 +268,11 @@ checkSub at ty = do
 isSub :: Type -> Type -> Bool
 isSub ty1 ty2 | ty1 == ty2 = True
 isSub TyVoid _ = True
-isSub TyN TyZ = True
-isSub TyN TyQ = True
-isSub TyZ TyQ = True
+isSub TyN TyZ  = True
+isSub TyN TyQP = True
+isSub TyN TyQ  = True
+isSub TyZ TyQ  = True
+isSub TyQP TyQ = True
 isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
@@ -282,6 +284,8 @@ lub :: Type -> Type -> TCM Type
 lub ty1 ty2
   | isSub ty1 ty2 = return ty2
   | isSub ty2 ty1 = return ty1
+lub TyQP TyZ = return TyQ
+lub TyZ TyQP = return TyQ
 lub (TyArr t1 t2) (TyArr t1' t2') = do
   requireSameTy t1 t1'
   t2'' <- lub t2 t2'
@@ -322,6 +326,7 @@ isDecidable TyUnit = True
 isDecidable TyBool = True
 isDecidable TyN    = True
 isDecidable TyZ    = True
+isDecidable TyQP   = True
 isDecidable TyQ    = True
 isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
@@ -343,6 +348,7 @@ isOrdered TyUnit = True
 isOrdered TyBool = True
 isOrdered TyN    = True
 isOrdered TyZ    = True
+isOrdered TyQP   = True
 isOrdered TyQ    = True
 isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
@@ -372,7 +378,7 @@ getFunTy at = throwError (NotFun at)
 --   if not.
 checkNumTy :: ATerm -> TCM ()
 checkNumTy at =
-  if (getType at `elem` [TyN, TyZ, TyQ])
+  if (isNumTy $ getType at)
      then return ()
      else throwError (NotNum at)
 
@@ -435,12 +441,13 @@ infer (TUn Sqrt t) = do
   at <- check t TyN
   return $ ATUn TyN Sqrt at
 
-  -- Division always has type Q.  We just have to check that
-  -- both subterms can be given type Q.
+  -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do
-  at1 <- check t1 TyQ
-  at2 <- check t2 TyQ
-  return $ ATBin TyQ Div at1 at2
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  num4 <- lub num3 TyQP
+  return $ ATBin num4 Div at1 at2
 
 infer (TBin Exp t1 t2) = do
   at1 <- infer t1
@@ -448,8 +455,16 @@ infer (TBin Exp t1 t2) = do
   checkNumTy at1
   checkNumTy at2
   case getType at2 of
+
+    -- t1^n has the same type as t1 when n : Nat.
     TyN -> return $ ATBin (getType at1) Exp at1 at2
-    TyZ -> return $ ATBin TyQ Exp at1 at2
+
+    -- t1^z has type (lub ty1 Q+) when t1 : ty1 and z : Z.
+    -- For example, (-3)^(-5) has type Q (= lub Z Q+)
+    -- but 3^(-5) has type Q+.
+    TyZ -> do
+      res <- lub (getType at1) TyQP
+      return $ ATBin res Exp at1 at2
     TyQ -> throwError ExpQ
     _   -> error "Impossible! getType at2 is not num type after checkNumTy"
 

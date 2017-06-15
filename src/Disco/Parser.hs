@@ -383,7 +383,7 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 natural :: Parser Integer
 natural = lexeme L.integer
 
--- | Parse a decimal of the form @xxx.yyyy@.
+-- | Parse a nonnegative decimal of the form @xxx.yyyy@.
 decimal :: Parser Rational
 decimal = lexeme (readDecimal <$> some digit <* char '.' <*> some digit)
   where

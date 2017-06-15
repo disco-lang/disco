@@ -153,7 +153,7 @@ data Term where
   -- | A natural number.
   TNat   :: Integer -> Term
 
-  -- | A rational number, parsed as a decimal.
+  -- | A nonnegative rational number, parsed as a decimal.
   TRat   :: Rational -> Term
 
   -- | An application of a unary operator.

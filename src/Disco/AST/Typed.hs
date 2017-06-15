@@ -58,7 +58,7 @@ data ATerm where
   -- | A natural number.
   ATNat   :: Integer -> ATerm
 
-  -- | A rational number.
+  -- | A nonnegative rational number.
   ATRat   :: Rational -> ATerm
 
   -- | Anonymous function, with its type.
@@ -105,7 +105,7 @@ getType (ATVar ty _)     = ty
 getType ATUnit           = TyUnit
 getType (ATBool _)       = TyBool
 getType (ATNat _)        = TyN
-getType (ATRat _)        = TyQ
+getType (ATRat _)        = TyQP
 getType (ATAbs ty _)     = ty
 getType (ATApp ty _ _)   = ty
 getType (ATPair ty _ _)  = ty

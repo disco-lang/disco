@@ -110,6 +110,7 @@ prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
 prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
+prettyTy TyQP             = text "ℚ⁺"
 prettyTy (TyList ty)      = mparens (PA 9 AR) $
   text "List" <+> prettyTy' 9 AR ty
 

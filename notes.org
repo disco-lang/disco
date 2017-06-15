@@ -263,6 +263,17 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Multi-clause definitions
   + Use extensible tree type ("Trees that Grow")?
   + Use a single Disco monad for everything?
+    - see blog post on "ReaderT pattern"?  Env data type and IORefs
+      for state or something like that?
+
+    Disco monad itself could have state for current definitions in
+    scope; read-only env has things like language extensions enabled,
+    various other options, etc.  Also want errors using Validation or
+    something.  ... but that can't be a monad?  Not sure how that is
+    supposed to work.
+
+    Locally e.g. typechecking could use another ReaderT layer for the context?
+
   + Test suite:
     - quick check properties
   + Type reconstruction
@@ -287,10 +298,12 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
       students files load despite errors.
   + Graph reduction?  Don't re-evaluate...
   + Memoization annotation for functions?
-  + Saturating subtraction ∸ for naturals?
+  + Saturating subtraction ∸ for naturals and Q+
   + Option for ignoring subtraction/Z check
   + More sophisticated checking of subtraction for N in a case
   + isqrt function
+
+  + mechanism for language extensions (like GHC has)
 
 * Links
 

@@ -1,0 +1,10 @@
+sqIso : Nat * Nat -> Nat
+sqIso (x,y) =
+  { y^2 + x           x <= y
+  { (x+1)^2 - 1 - y   otherwise
+
+sqIso' : Nat -> Nat * Nat
+sqIso' n =
+  let r = sqrt n
+  in  { (n - r^2, r)            if  n <= r^2 + r
+      { (r, (r+1)^2 - 1 - n)    otherwise

@@ -79,6 +79,7 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
+        | OSqrt    -- ^ Integer square root (@sqrt@)
         | OMul     -- ^ Multiplication (@*@)
         | ODiv     -- ^ Division (@/@)
         | OExp     -- ^ Exponentiation (@^@)
@@ -145,4 +146,3 @@ instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern
 instance Alpha CGuards
-

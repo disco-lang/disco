@@ -431,6 +431,10 @@ infer (TUn Neg t) = do
   num2 <- lub (getType at) TyZ
   return $ ATUn num2 Neg at
 
+infer (TUn Sqrt t) = do
+  at <- check t TyN
+  return $ ATUn TyN Sqrt at
+
   -- Division always has type Q.  We just have to check that
   -- both subterms can be given type Q.
 infer (TBin Div t1 t2) = do

@@ -95,6 +95,7 @@ data Side = L | R
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
+         | Sqrt  -- ^ Integer square root (@sqrt@)
   deriving (Show, Eq)
 
 -- | Binary operators.

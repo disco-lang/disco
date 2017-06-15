@@ -123,6 +123,7 @@ desugarUOp :: UOp -> Core -> Core
 desugarUOp Neg  c = COp ONeg  [c]
 desugarUOp Not  c = COp ONot  [c]
 desugarUOp Fact c = COp OFact [c]
+desugarUOp Sqrt c = COp OSqrt [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> BOp -> Core -> Core -> Core

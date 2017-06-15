@@ -179,6 +179,7 @@ prettySide R = text "inr"
 prettyUOp :: UOp -> Doc
 prettyUOp Neg  = text "-"
 prettyUOp Not  = text "not "
+prettyUOp Sqrt = text "sqrt "
 prettyUOp Fact = error "Impossible! prettyUOp Fact"
 
 prettyBOp :: BOp -> Doc

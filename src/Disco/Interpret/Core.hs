@@ -369,6 +369,7 @@ noMatch = return Nothing
 whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
+whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -402,6 +403,29 @@ uNumOp f [c] = do
   VNum m <- whnf c
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
+
+-- | Perform a square root on an operation. If the program typechecks,
+--   then the argument and output will really be Naturals
+integerSqrt :: Rational -> Rational
+integerSqrt n = integerSqrt' (fromIntegral (numerator n)) % 1
+
+-- | implementation of `integerSqrt'` taken from the Haskell wiki:
+--   https://wiki.haskell.org/Generic_number_type#squareRoot
+integerSqrt' :: Integer -> Integer
+integerSqrt' 0 = 0
+integerSqrt' 1 = 1
+integerSqrt' n =
+  let twopows = iterate (^!2) 2
+      (lowerRoot, lowerN) =
+        last $ takeWhile ((n>=) . snd) $ zip (1:twopows) twopows
+      newtonStep x = div (x + div n x) 2
+      iters = iterate newtonStep (integerSqrt' (div n lowerN ) * lowerRoot)
+      isRoot r = r^!2 <= n && n < (r+1)^!2
+  in  head $ dropWhile (not . isRoot) iters
+
+-- this operator is used for `integerSqrt'`
+(^!) :: Num a => a -> Int -> a
+(^!) x n = x^n
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.

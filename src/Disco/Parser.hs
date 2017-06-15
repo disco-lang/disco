@@ -398,7 +398,7 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod", "choose"
+  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -622,6 +622,8 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
             , [ post   "!" (TUn Fact)
               ]
             , [ infixR "^" (TBin Exp)
+              ]
+            , [ unary "sqrt" (TUn Sqrt)
               ]
             , [ infixN "choose" (TBin Binom)
               ]

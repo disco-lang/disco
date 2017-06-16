@@ -47,7 +47,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseInj, parseLet
+       , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
        , parseCase, parseBranch, parseGuards, parseGuard
@@ -399,6 +399,7 @@ reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt"
+  , "enumerate", "count"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -511,6 +512,7 @@ parseAtom = -- trace "parseAtom" $
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
+  <|> parseTypeOp
 
   <|> parens parseTerm
 
@@ -698,3 +700,11 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
+
+parseTyOp :: Parser TyOp
+parseTyOp =
+        Enumerate <$ reserved "enumerate"
+    <|> Count     <$ reserved "count"
+
+parseTypeOp :: Parser Term
+parseTypeOp = TTyOp <$> parseTyOp <*> parseAtomicType

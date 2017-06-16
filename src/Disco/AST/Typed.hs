@@ -81,6 +81,9 @@ data ATerm where
   -- | A binary operator application.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
 
+  -- | A type operator application.
+  ATTyOp  :: Type -> TyOp -> Type -> ATerm
+
   -- | A (non-recursive) let expression.
   ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm
 

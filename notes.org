@@ -258,9 +258,6 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + Z/Q patterns (general arithmetic patterns?)
-  + polymorphism
-  + Multi-clause definitions
   + Use extensible tree type ("Trees that Grow")?
   + Use a single Disco monad for everything?
     - see blog post on "ReaderT pattern"?  Env data type and IORefs
@@ -274,14 +271,10 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
     Locally e.g. typechecking could use another ReaderT layer for the context?
 
-  + Test suite:
-    - quick check properties
-  + Type reconstruction
   + Collect multiple warnings & errors (parsing, type checking)
   + LaTeX output mode for pretty-printer
   + Markdown for documentation? See cheapskate library --- what Idris uses.
   + Finite types (like Fin n)
-  + Chained comparisons   (2 < x <= 5)
   + Type qualifiers like "nonzero", "nonnegative", "non-empty", etc.
   + Built-in counters, e.g. for collecting data re: big-O analysis
   + Built-in visualizations (using Diagrams), e.g.
@@ -301,9 +294,17 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + Saturating subtraction ∸ for naturals and Q+
   + Option for ignoring subtraction/Z check
   + More sophisticated checking of subtraction for N in a case
-  + isqrt function
-
   + mechanism for language extensions (like GHC has)
+
+** Github issues
+
+  Next steps that have been turned into Github issues:
+
+  + (#8)  Chained comparisons   (2 < x <= 5)
+  + (#11) Z/Q patterns (general arithmetic patterns?)
+  + (#6)  polymorphism
+  + (#12) Multi-clause definitions
+  + (#13) QuickCheck properties in test suite
 
 * Links
 

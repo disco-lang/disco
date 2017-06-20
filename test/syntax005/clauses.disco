@@ -1,0 +1,7 @@
+-- An example of a function defined by pattern-matching clauses, with
+-- multiple clauses and multiple arguments.
+
+zipWithN : (N -> N -> N) -> List N -> List N -> List N
+zipWithN _ []        _         = []
+zipWithN _ _         []        = []
+zipWithN f (m :: ms) (n :: ns) = f m n :: zipWithN f ms ns

@@ -1,0 +1,2 @@
+q : ℕ → ℕ×ℕ → ℕ → ℤ          -- unicode syntax is allowed
+q g (x,y) z = x + g y - z    -- here g y is multiplication

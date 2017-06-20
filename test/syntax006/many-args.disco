@@ -1,0 +1,4 @@
+-- A stress test: a function with a lot of pattern arguments
+f : N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> N * N -> List N -> List N -> List N -> N
+f (a0,b1) (a2,b3) (a4,b5) (a6,b7) (a8,b9) (a10,b11) (a12,b13) (a14,b15) (a16,b17) (a18,b19) (a20,b21) (a22,b23) (a24,b25) (a26,b27) (a28,b29) (a30,b31) (a32,b33) (a34,b35) (a36,b37) (a38,b39) [1,2,3,4,5] [6,7,8] [9,10] = a0 * b1 + a2 * b3 + a4 * b5 + a6 * b7 + a8 * b9 + a10 * b11 + a12 * b13 + a14 * b15 + a16 * b17 + a18 * b19 + a20 * b21 + a22 * b23 + a24 * b25 + a26 * b27 + a28 * b29 + a30 * b31 + a32 * b33 + a34 * b35 + a36 * b37 + a38 * b39
+f _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ = 0

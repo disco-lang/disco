@@ -168,7 +168,7 @@ prettyTerm (TRat  r)    =
   <> text (decimalize (10 * (numerator r `mod` denominator r)) (denominator r))
   where
     decimalize 0 _ = ""
-    decimalize r d = show (r `div` d) ++ decimalize (10 * (r `mod` d)) d
+    decimalize n d = show (n `div` d) ++ decimalize (10 * (n `mod` d)) d
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)

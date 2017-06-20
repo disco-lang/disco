@@ -55,7 +55,7 @@ library
                        TemplateHaskell
                        UndecidableInstances
 
-  build-depends:       base >=4.8 && <4.10,
+  build-depends:       base >=4.8 && <4.11,
                        mtl >=2.2 && <2.3,
                        megaparsec >= 5.1 && < 5.2,
                        pretty >=1.1 && <1.2,

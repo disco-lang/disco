@@ -75,6 +75,12 @@ script:
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
 
+ # Manually add disco executable to the path, needed by the test suite
+ # BAY  6 Dec 2016, added after discussion with hvr.
+ # Eventually once cabal new-test is finished this will be unnecessary.
+ - EXELOC=`ls -d dist-newstyle/*/*/*/$SRC_BASENAME/build/$PKGNAME`
+ - PATH=$EXELOC:$PATH
+
  # build & run tests
  - cabal new-build -w ${HC} ${TEST} ${BENCH} all
  - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} all; fi

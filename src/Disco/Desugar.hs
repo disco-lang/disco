@@ -65,10 +65,9 @@ desugarDefn :: Defn -> DSM Core
 desugarDefn def = do
   lunbinds def $ \clausePairs -> do
     let (pats, bodies) = unzip clausePairs
-        nVars = length (head pats)    -- invariant: these all have the same length
 
     -- generate dummy variables for lambdas
-    args <- replicateM nVars (lfresh (string2Name "arg"))
+    args <- zipWithM (\_ i -> lfresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
     avoid (map AnyName args) $ do
       branches <- zipWithM (mkBranch args) bodies pats
 

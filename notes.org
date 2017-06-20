@@ -300,6 +300,9 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
   + (#6)  polymorphism
   + (#12) Multi-clause definitions
   + (#13) QuickCheck properties in test suite
+  + (#14) Finite types (like Fin n)
+  + (#15) Stepwise execution (small step evaluation)
+  + (#16) Graph reduction?  Don't re-evaluate...
 
 * Links
 

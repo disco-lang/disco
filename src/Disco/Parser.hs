@@ -451,7 +451,19 @@ parseModule = do
     groupTLs _ (TLDecl defn : rest)
       = (defn, Nothing) : groupTLs [] rest
 
-    mkModule tls = Module decls (M.fromList (catMaybes docs))
+    defnGroups []                = []
+    defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+    defnGroups (DDefn x bs : ds)  = DDefn x (bs ++ concatMap getClauses grp) : defnGroups rest
+      where
+        (grp, rest) = span matchDefn $ ds
+        matchDefn (DDefn x' _) = x == x'
+        matchDefn _ = False
+        getClauses (DDefn _ cs) = cs
+        getClauses _ = error "Impossible!"
+          -- Impossible since we only call getClauses on things that
+          -- passed matchDefn
+
+    mkModule tls = Module (defnGroups decls) (M.fromList (catMaybes docs))
       where
         (decls, docs) = unzip $ groupTLs [] tls
 
@@ -490,11 +502,13 @@ parseProperties = do
   return ps
 
 -- | Parse a single declaration (either a type declaration or
---   definition).
+--   single definition clause).
 parseDecl :: Parser Decl
 parseDecl =
       try (DType <$> ident <*> (colon *> parseType))
-  <|>      DDefn <$> ident <*> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm))
+  <|>      DDefn
+           <$> ident
+           <*> ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).

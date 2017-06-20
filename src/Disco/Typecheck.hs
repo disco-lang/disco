@@ -71,16 +71,18 @@ import           Data.List               (group, partition, sort)
 import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
+import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
--- | A definition is a list of patterns that bind names in a term,
---   without the name of the function being defined.  For example,
---   given the concrete syntax @f n (x,y) = n*x + y@, the
---   corresponding 'Defn' would be something like @[n, (x,y)] (n*x + y)@.
-type Defn  = Bind [Pattern] ATerm
+-- | A definition is a group of clauses, each having a list of
+--   patterns that bind names in a term, without the name of the
+--   function being defined.  For example, given the concrete syntax
+--   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
+--   something like @[n, (x,y)] (n*x + y)@.
+type Defn  = [Bind [Pattern] ATerm]
 
 -- | A map from names to definitions.
 type Defns = M.Map (Name ATerm) Defn
@@ -187,7 +189,7 @@ extends :: Ctx -> TCM a -> TCM a
 extends ctx = local (joinCtx ctx)
 
 -- | Add a definition to the set of current definitions.
-addDefn :: Name Term -> (Bind [Pattern] ATerm) -> TCM ()
+addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
 addDefn x b = modify (M.insert (translate x) b)
 
 -- | Check that a term has the given type.  Either throws an error, or
@@ -685,22 +687,41 @@ withTypeDecls decls k = do
   where
     declCtx = M.fromList (map (\(DType x ty) -> (x,ty)) decls)
 
--- | Type check a top-level definition. Precondition: only called on 'DDefn's.
+-- | Type check a top-level definition. Precondition: only called on
+--   'DDefn's.
 checkDefn :: Decl -> TCM ()
-checkDefn (DDefn x def) = do
+checkDefn (DDefn x clauses) = do
   ty <- lookup x
   prevDefn <- gets (M.lookup (translate x))
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
-    Nothing -> lunbind def $ \(pats, body) -> do
-      at <- go pats ty body
-      addDefn x (bind pats at)
+    Nothing -> do
+      checkNumPats clauses
+      aclauses <- mapM (checkClause ty) clauses
+      addDefn x aclauses
   where
+    numPats = length . fst . unsafeUnbind
+
+    checkNumPats []     = return ()   -- This can't happen, but meh
+    checkNumPats [_]    = return ()
+    checkNumPats (c:cs)
+      | all ((==0) . numPats) (c:cs) = throwError (DuplicateDefns x)
+      | not (all (== numPats c) (map numPats cs)) = throwError NumPatterns
+               -- XXX more info, this error actually means # of
+               -- patterns don't match across different clauses
+      | otherwise = return ()
+
+    checkClause ty clause =
+      lunbind clause $ \(pats, body) -> do
+      at <- go pats ty body
+      return $ bind pats at
+
     go [] ty body = check body ty
     go (p:ps) (TyArr ty1 ty2) body = do
       ctx <- checkPattern p ty1
       extends ctx $ go ps ty2 body
     go _ _ _ = throwError NumPatterns   -- XXX include more info
+
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | XXX

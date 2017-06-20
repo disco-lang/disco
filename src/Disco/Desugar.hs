@@ -31,6 +31,8 @@ module Disco.Desugar
        )
        where
 
+import           Control.Monad.Cont
+
 import           Data.Ratio
 import           Unbound.LocallyNameless
 
@@ -60,30 +62,58 @@ runDSM = runLFreshM
 --     n -> p -> { n*x + y  when p = (x,y)
 --   @
 desugarDefn :: Defn -> DSM Core
-desugarDefn def =
-  lunbind def $ \(pats, body) -> go pats body
+desugarDefn def = do
+  lunbinds def $ \clausePairs -> do
+    let (pats, bodies) = unzip clausePairs
+        nVars = length (head pats)    -- invariant: these all have the same length
+
+    -- generate dummy variables for lambdas
+    args <- replicateM nVars (lfresh (string2Name "arg"))
+    avoid (map AnyName args) $ do
+      branches <- zipWithM (mkBranch args) bodies pats
+
+      -- Create lambdas and one big case
+      return $ mkFunction args (CCase branches)
+
   where
+    lunbinds :: (Alpha a, Alpha b) => [Bind a b] -> ([(a,b)] -> DSM r) -> DSM r
+    lunbinds = runContT . mapM (ContT . lunbind)
 
-    -- No patterns left, just desugar the body.
-    go []     body = desugarTerm body
+    mkBranch :: [Name Core] -> ATerm -> [Pattern] -> DSM CBranch
+    mkBranch xs b ps = do
+      b'  <- desugarTerm b
+      let ps' = map desugarPattern ps
+      return $ bind (mkGuards xs ps') b'
 
-    -- Desugar the first pattern into a lambda.
-    go (p:ps) body = do
+    mkGuards :: [Name Core] -> [CPattern] -> CGuards
+    mkGuards [] _ = CGEmpty
+    mkGuards (x:xs) (p:ps) = CGCons (rebind (embed (CVar x), p) (mkGuards xs ps))
+    mkGuards _ _ = error "Impossible! mkGuards given lists of different lengths"
 
-      -- Desugar the pattern itself, and the rest of the definition.
-      let cp = desugarPattern p
-      rest <- go ps body
+    mkFunction :: [Name Core] -> Core -> Core
+    mkFunction [] c     = c
+    mkFunction (x:xs) c = CAbs (bind x (mkFunction xs c))
 
-      case cp of
-        -- If the pattern is a variable, desugar to a simple lambda, @x -> rest@.
-        CPVar x -> return $ CAbs (bind x rest)
+    -- -- No patterns left, just desugar the body.
+    -- go []     body = desugarTerm body
 
-        -- Otherwise, desugar to a lambda containing a case, @arg -> { rest when arg = p@.
-        _       -> do
-          arg  <- lfresh (string2Name "arg")
-          avoid [AnyName arg] $ do
-          return $
-            CAbs (bind arg (CCase [bind (CGCons (rebind (embed $ CVar arg, cp) CGEmpty)) rest]))
+    -- -- Desugar the first pattern into a lambda.
+    -- go (p:ps) body = do
+
+    --   -- Desugar the pattern itself, and the rest of the definition.
+    --   let cp = desugarPattern p
+    --   rest <- go ps body
+
+    --   case cp of
+    --     -- If the pattern is a variable, desugar to a simple lambda, @x -> rest@.
+    --     CPVar x -> return $ CAbs (bind x rest)
+
+    --     -- Otherwise, desugar to a lambda containing a case, @arg -> { rest when arg = p@.
+    --     _       -> do
+    --       arg  <- lfresh (string2Name "arg")
+    --       avoid [AnyName arg] $ do
+    --       return $
+    --         CAbs (bind arg (CCase [bind (CGCons (rebind (embed $ CVar arg, cp) CGEmpty)) rest]))
 
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM Core

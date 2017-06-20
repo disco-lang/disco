@@ -21,6 +21,9 @@ import           Disco.Types
 --------------------------------------------------
 -- Monadic pretty-printing
 
+vcat :: Monad f => [f PP.Doc] -> f PP.Doc
+vcat ds  = PP.vcat <$> sequence ds
+
 hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
 
@@ -242,9 +245,11 @@ prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
-prettyDecl (DDefn x b)
-  = lunbind b $ \(ps, t) ->
-  (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
+  where
+    prettyClause b
+      = lunbind b $ \(ps, t) ->
+        (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 ------------------------------------------------------------
 

@@ -29,13 +29,23 @@ fib n =
 isEven : N -> Bool
 isOdd  : N -> Bool
 
+-- We can either write a definition explicitly using a case...
 isEven n = { true      when n is 0
            { isOdd m   when n is S m
 
-isOdd  n = { false     when n is 0
-           { isEven m  when n is S m
+-- Or we can directly define by cases like this (which is just syntax
+-- sugar for something like the former).
+isOdd 0     = false
+isOdd (S m) = isEven m
+
+-- Again, here are two equivalent definitions of fact using the two
+-- different styles.
 
 fact : N -> N
 fact n =
   { 1            when n is 0
   { n * fact m   when n is S m
+
+fact2 : N -> N
+fact2 0 = 1
+fact2 (S m) = (m + 1) * fact2 m

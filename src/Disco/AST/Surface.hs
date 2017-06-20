@@ -72,9 +72,10 @@ data Decl where
   -- | A type declaration, @name : type@.
   DType :: Name Term -> Type -> Decl
 
-  -- | A definition, @name pat1 .. patn = term@. The patterns bind
-  --   variables in the term. For example,  @f n (x,y) = n*x + y@.
-  DDefn :: Name Term -> Bind [Pattern] Term -> Decl
+  -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
+  --   patterns bind variables in the term. For example, @f n (x,y) =
+  --   n*x + y@.
+  DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
   deriving Show
 
 -- | Get the name that a declaration is about.

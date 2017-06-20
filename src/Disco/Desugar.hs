@@ -94,27 +94,6 @@ desugarDefn def = do
     mkFunction [] c     = c
     mkFunction (x:xs) c = CAbs (bind x (mkFunction xs c))
 
-    -- -- No patterns left, just desugar the body.
-    -- go []     body = desugarTerm body
-
-    -- -- Desugar the first pattern into a lambda.
-    -- go (p:ps) body = do
-
-    --   -- Desugar the pattern itself, and the rest of the definition.
-    --   let cp = desugarPattern p
-    --   rest <- go ps body
-
-    --   case cp of
-    --     -- If the pattern is a variable, desugar to a simple lambda, @x -> rest@.
-    --     CPVar x -> return $ CAbs (bind x rest)
-
-    --     -- Otherwise, desugar to a lambda containing a case, @arg -> { rest when arg = p@.
-    --     _       -> do
-    --       arg  <- lfresh (string2Name "arg")
-    --       avoid [AnyName arg] $ do
-    --       return $
-    --         CAbs (bind arg (CCase [bind (CGCons (rebind (embed $ CVar arg, cp) CGEmpty)) rest]))
-
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM Core
 desugarTerm (ATVar _ x)   = return $ CVar (translate x)

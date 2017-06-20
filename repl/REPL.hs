@@ -55,6 +55,7 @@ data REPLExpr =
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
  | ShowAST Term                 -- Show a terms AST
+ | ShowDefn (Name Term)         -- Show a variable's definition
  | Parse Term                   -- Show the parsed AST
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
@@ -78,6 +79,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
     parsers =
       [ ("type",    TypeCheck <$> term)
       , ("show",    ShowAST   <$> term)
+      , ("defn",    ShowDefn  <$> (whitespace *> ident))
       , ("parse",   Parse     <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
@@ -113,6 +115,7 @@ handleCMD s =
     handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
     handleLine (Eval t)      = (evalTerm t) >>= (io.putStrLn)
     handleLine (ShowAST t)   = io.putStrLn.show $ t
+    handleLine (ShowDefn x)  = handleShowDefn x >>= (io.putStrLn)
     handleLine (Parse t)     = io.print $ t
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file)   = handleLoad file
@@ -129,6 +132,13 @@ handleLet x t = do
     Right (at, _) -> do
       replCtx   %= M.insert x (getType at)
       replDefns %= M.insert (translate x) (runDSM $ desugarTerm at)
+
+handleShowDefn :: Name Term -> REPLStateIO String
+handleShowDefn x = do
+  defns <- use replDefns
+  case M.lookup (translate x) defns of
+    Nothing -> return $ "No definition for " ++ show x
+    Just d  -> return $ show d
 
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do

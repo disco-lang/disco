@@ -137,9 +137,9 @@ handleDesugar t = do
     Right at -> return.show.runDSM.desugarTerm $ at
 
 handleLoad :: FilePath -> REPLStateIO ()
-handleLoad file = do
+handleLoad file = handle (fileNotFound file) $ do
   io . putStrLn $ "Loading " ++ file ++ "..."
-  str <- io $ readFile file   -- XXX catch errors
+  str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
     Left err -> io $ putStrLn (parseErrorPretty err)
@@ -254,6 +254,9 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   , O.header "disco v0.1"
   ]
 
+fileNotFound :: FilePath -> IOException -> REPLStateIO ()
+fileNotFound file _ = liftIO . putStrLn $ "File not found: " ++ file
+
 main :: IO ()
 main = do
   opts <- O.execParser discoInfo
@@ -264,8 +267,8 @@ main = do
   when (not batch) $ putStr banner
   flip evalStateT initREPLState $ do
     case cmdFile opts of
-      Just file -> do
-        cmds <- io $ readFile file    -- XXX handle failure
+      Just file -> handle (fileNotFound file) $ do
+        cmds <- io $ readFile file
         mapM_ handleCMD (lines cmds)
       Nothing   -> return ()
     case evaluate opts of

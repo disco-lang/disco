@@ -21,11 +21,13 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
 
 cabal-version:       >= 1.10
 
-cabal-version:       >= 1.23
+-- eventually we want this to be able to specify custom-setup section below
+-- cabal-version:    >= 1.23
 build-type:          Custom
 
-custom-setup
-  setup-depends: base, Cabal, process
+-- eventually we'll want to specify this
+-- custom-setup
+--   setup-depends: base, Cabal, process
 
 source-repository head
   type:     git

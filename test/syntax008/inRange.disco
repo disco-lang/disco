@@ -1,0 +1,2 @@
+inRange : N -> N -> (N -> Bool)
+inRange a b = n -> a <= n <= b

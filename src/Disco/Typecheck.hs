@@ -479,16 +479,16 @@ infer (TBin Exp t1 t2) = do
     TyQ -> throwError ExpQ
     _   -> error "Impossible! getType at2 is not num type after checkNumTy"
 
-  -- An equality test always has type Bool, but we need to check a few
-  -- things first. We infer the types of both subterms and check that
-  -- (1) they have a common supertype which (2) has decidable
-  -- equality.
-infer (TBin Eq t1 t2) = do
+  -- An equality or inequality test always has type Bool, but we need
+  -- to check a few things first. We infer the types of both subterms
+  -- and check that (1) they have a common supertype which (2) has
+  -- decidable equality.
+infer (TBin eqOp t1 t2) | eqOp `elem` [Eq, Neq] = do
   at1 <- infer t1
   at2 <- infer t2
   ty3 <- lub (getType at1) (getType at2)
   checkDecidable ty3
-  return $ ATBin TyBool Eq at1 at2
+  return $ ATBin TyBool eqOp at1 at2
 
 infer (TBin op t1 t2)
   | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2

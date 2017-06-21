@@ -114,6 +114,7 @@ desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) op <$> desugarTerm t1 <*> desugarTerm t2
+desugarTerm (ATChain _ t1 links) = desugarChain t1 links
 desugarTerm (ATList _ es) = do
   des <- mapM desugarTerm es
   return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
@@ -153,6 +154,14 @@ desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
 desugarBOp _  Cons    c1 c2 = CCons 1 [c1, c2]
+
+desugarChain :: ATerm -> [ALink] -> DSM Core
+desugarChain _ [] = error "Can't happen! desugarChain _ []"
+desugarChain t1 [ATLink op t2] = desugarTerm (ATBin TyBool op t1 t2)
+desugarChain t1 (ATLink op t2 : links) = do
+  c1 <- desugarTerm  (ATBin TyBool op t1 t2)
+  c2 <- desugarChain t2 links
+  return $ desugarBOp TyBool And c1 c2
 
 -- | Desugar a branch.
 desugarBranch :: ABranch -> DSM CBranch

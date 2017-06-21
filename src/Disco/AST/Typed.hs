@@ -20,7 +20,7 @@
 
 module Disco.AST.Typed
        ( -- * Type-annotated terms
-         ATerm(..), getType
+         ATerm(..), ALink(..), getType
 
        , AProperty
          -- * Branches and guards
@@ -81,6 +81,8 @@ data ATerm where
   -- | A binary operator application.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
 
+  ATChain :: Type -> ATerm -> [ALink] -> ATerm
+
   -- | A (non-recursive) let expression.
   ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm
 
@@ -99,6 +101,10 @@ data ATerm where
   -- TODO: I don't think we are currently very consistent about using ATSub everywhere
   --   subtyping is invoked.  I am not sure how much it matters.
 
+data ALink where
+  ATLink :: BOp -> ATerm -> ALink
+  deriving Show
+
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
 getType (ATVar ty _)     = ty
@@ -112,6 +118,7 @@ getType (ATPair ty _ _)  = ty
 getType (ATInj ty _ _)   = ty
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
+getType (ATChain ty _ _) = ty
 getType (ATList ty _)    = ty
 getType (ATLet ty _)     = ty
 getType (ATCase ty _)    = ty
@@ -140,8 +147,9 @@ data AGuard where
 
 type AProperty = Bind [(Name ATerm, Type)] ATerm
 
-derive [''ATerm, ''AGuards, ''AGuard]
+derive [''ATerm, ''ALink, ''AGuards, ''AGuard]
 
 instance Alpha ATerm
+instance Alpha ALink
 instance Alpha AGuards
 instance Alpha AGuard

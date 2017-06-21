@@ -543,6 +543,11 @@ infer (TUn Fact t) = do
   at <- check t TyN
   return $ ATUn TyN Fact at
 
+infer (TChain t1 links) = do
+  at1 <- infer t1
+  alinks <- inferChain t1 links
+  return $ ATChain TyBool at1 alinks
+
 infer (TList (e:es)) = do
   ate  <- infer e
   let ty = getType ate
@@ -597,6 +602,13 @@ inferComp comp t1 t2 = do
   ty3 <- lub (getType at1) (getType at2)
   checkOrdered ty3
   return $ ATBin TyBool comp at1 at2
+
+inferChain :: Term -> [Link] -> TCM [ALink]
+inferChain _  [] = return []
+inferChain t1 (TLink op t2 : links) = do
+  at2 <- infer t1
+  _   <- check (TBin op t1 t2) TyBool
+  (ATLink op at2 :) <$> inferChain t2 links
 
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.

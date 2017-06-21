@@ -67,7 +67,7 @@ import           Data.List                          (find)
 import qualified Data.Map                           as M
 import           Data.Ratio
 
-import           Unbound.LocallyNameless            hiding (enumerate, rnf)
+import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
 
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
@@ -726,6 +726,24 @@ decideOrdFor (TyArr ty1 ty2) v1 v2 = do
   -- functions differ.
   let ty1s = enumerate ty1
   decideOrdForClosures ty2 clos1 clos2 ty1s
+
+-- To decide the ordering for two lists:
+decideOrdFor (TyList ty) v1 v2 = do
+
+  -- Reduce both to WHNF
+  l1 <- whnfV v1
+  l2 <- whnfV v2
+
+  -- Lexicographic ordering
+  case (l1, l2) of
+    (VCons 0 _, VCons 0 _) -> return EQ   -- Both empty list
+    (VCons 0 _, VCons 1 _) -> return LT   -- Empty < cons
+    (VCons 1 _, VCons 0 _) -> return GT   -- Cons > empty
+    (VCons 1 [x1, l1'], VCons 1 [x2, l2']) -> do
+      o <- decideOrdFor ty x1 x2
+      case o of
+        EQ -> decideOrdFor (TyList ty) l1' l2'
+        _  -> return o
 
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.

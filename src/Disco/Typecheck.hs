@@ -300,6 +300,9 @@ lub (TySum t1 t2) (TySum t1' t2') = do
   t1'' <- lub t1 t1'
   t2'' <- lub t2 t2'
   return $ TySum t1'' t2''
+lub (TyList t1) (TyList t2) = do
+  t' <- lub t1 t2
+  return $ TyList t'
 lub ty1 ty2 = throwError $ NoLub ty1 ty2
 
 -- | Convenience function that ensures the given annotated terms have

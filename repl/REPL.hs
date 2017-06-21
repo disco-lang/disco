@@ -54,9 +54,9 @@ data REPLExpr =
    Let (Name Term) Term         -- Toplevel let-expression: for the REPL
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
- | ShowAST Term                 -- Show a terms AST
  | ShowDefn (Name Term)         -- Show a variable's definition
  | Parse Term                   -- Show the parsed AST
+ | Pretty Term                  -- Pretty-print a term
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
  | Doc (Name Term)              -- Show documentation.
@@ -78,9 +78,9 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     parsers =
       [ ("type",    TypeCheck <$> term)
-      , ("show",    ShowAST   <$> term)
       , ("defn",    ShowDefn  <$> (whitespace *> ident))
       , ("parse",   Parse     <$> term)
+      , ("pretty",  Pretty    <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
       , ("doc",     Doc       <$> (whitespace *> ident))
@@ -114,9 +114,9 @@ handleCMD s =
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
     handleLine (Eval t)      = (evalTerm t) >>= (io.putStrLn)
-    handleLine (ShowAST t)   = io.putStrLn.show $ t
     handleLine (ShowDefn x)  = handleShowDefn x >>= (io.putStrLn)
     handleLine (Parse t)     = io.print $ t
+    handleLine (Pretty t)    = io.putStrLn $ renderDoc (prettyTerm t)
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file)   = handleLoad file
     handleLine (Doc x)       = handleDocs x

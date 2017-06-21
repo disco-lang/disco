@@ -13,33 +13,14 @@ true
 false
 false
 true
-false
-true
-true
 true
 false
+true
 true
 false
 true
 false
+true
 false
-1:7:
-unexpected '<'
-expecting ':' or end of input
-
-1:7:
-unexpected '<'
-expecting ':' or end of input
-
-1:7:
-unexpected '<'
-expecting ':' or end of input
-
-1:7:
-unexpected '<'
-expecting ':' or end of input
-
-1:7:
-unexpected '<'
-expecting ':' or end of input
-
+false
+CantInfer (TList [])

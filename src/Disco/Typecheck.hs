@@ -229,7 +229,13 @@ check (TInj R t) ty@(TySum _ ty2) = do
   -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
--- XXX check TLet
+check (TLet l) ty =
+  lunbind l $ \((x, unembed -> t1), t2) -> do
+    at1 <- infer t1
+    let ty1 = getType at1
+    extend x ty1 $ do
+      at2 <- check t2 ty
+      return $ ATLet ty (bind (translate x, embed at1) at2)
 
 check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs

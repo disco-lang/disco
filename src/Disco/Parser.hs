@@ -525,6 +525,7 @@ parseAtom = -- trace "parseAtom" $
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
+  <|> TInj <$> parseInj <*> parseAtom
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
 
   <|> parens parseTerm
@@ -547,7 +548,6 @@ parseTerm = -- trace "parseTerm" $
 parseTerm' :: Parser Term
 parseTerm' =
       TAbs <$> try (bind <$> ident <*> (mapsTo *> parseTerm'))
-  <|> TInj <$> parseInj <*> parseAtom
   <|> parseLet
   <|> parseCase
   <|> parseExpr

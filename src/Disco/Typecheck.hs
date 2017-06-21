@@ -606,7 +606,7 @@ inferComp comp t1 t2 = do
 inferChain :: Term -> [Link] -> TCM [ALink]
 inferChain _  [] = return []
 inferChain t1 (TLink op t2 : links) = do
-  at2 <- infer t1
+  at2 <- infer t2
   _   <- check (TBin op t1 t2) TyBool
   (ATLink op at2 :) <$> inferChain t2 links
 

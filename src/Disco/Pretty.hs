@@ -152,6 +152,14 @@ prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   , prettyBOp op
   , prettyTerm' (prec op) AR t2
   ]
+prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
+    prettyTerm' (prec Eq) AL t
+    : concatMap prettyLink lks
+  where
+    prettyLink (TLink op t2) =
+      [ prettyBOp op
+      , prettyTerm' (prec op) AR t2
+      ]
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \((x, unembed -> t1), t2) ->
   hsep

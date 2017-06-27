@@ -106,6 +106,7 @@ desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) op <$> desugarTerm t1 <*> desugarTerm t2
+desugarTerm (ATTyOp _ op t) = desugarTyOp op t
 desugarTerm (ATList _ es) = do
   des <- mapM desugarTerm es
   return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
@@ -145,6 +146,11 @@ desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
 desugarBOp _  Cons    c1 c2 = CCons 1 [c1, c2]
+
+-- | Desugar a type operator application.
+desugarTyOp :: TyOp -> Type -> Core
+desugarTyOp Enumerate ty = COp (OEnum  ty) []
+desugarTyOp Count     ty = COp (OCount ty) []
 
 -- | Desugar a branch.
 desugarBranch :: ABranch -> DSM CBranch

@@ -99,6 +99,8 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OLt Type -- ^ Less than (@<@).  Similarly, typechecking has
                    --   determined that the given type has a decidable
                    --   ordering relation.
+        | OEnum Type
+        | OCount Type
   deriving Show
 
 -- | A branch, consisting of a list of guards and a term.

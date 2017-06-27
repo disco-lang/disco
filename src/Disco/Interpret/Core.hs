@@ -384,6 +384,8 @@ whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
+-- whnfOp OEnum    = come back to these
+-- whnfOp OCount   =
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -403,6 +405,18 @@ uNumOp f [c] = do
   VNum m <- whnf c
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
+
+countOp :: [Core] -> IM Value
+countOp [CType TyVoid]            = 0
+countOp [CType TyUnit]            = 1
+countOp [CType TyBool]            = 2
+-- countOp [CType (TyArr ty1 ty2)]   = not sure how to handle this one
+countOp [CType (TyPair ty1 ty2)]  = (countOp ty1) * (countOp ty2)
+countOp [CType (TySum ty1 ty2)]   = (countOp ty1) + (countOp ty2)
+-- I'm pretty sure all other types are infinite
+countOp _                         = error "Impossible! The type is infinite."
+
+
 
 -- | Perform a square root on an operation. If the program typechecks,
 --   then the argument and output will really be Naturals

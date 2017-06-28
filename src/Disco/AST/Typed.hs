@@ -115,6 +115,7 @@ getType (ATPair ty _ _)  = ty
 getType (ATInj ty _ _)   = ty
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
+getType (ATTyOp ty _ _)  = ty
 getType (ATList ty _)    = ty
 getType (ATLet ty _)     = ty
 getType (ATCase ty _)    = ty

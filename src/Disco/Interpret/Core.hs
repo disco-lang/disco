@@ -384,8 +384,8 @@ whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
--- whnfOp OEnum    = come back to these
--- whnfOp OCount   =
+-- whnfOp OEnum    = not quite sure how to implement this
+whnfOp OCount   = countOp
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -406,15 +406,20 @@ uNumOp f [c] = do
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
+-- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value
-countOp [CType TyVoid]            = 0
-countOp [CType TyUnit]            = 1
-countOp [CType TyBool]            = 2
--- countOp [CType (TyArr ty1 ty2)]   = not sure how to handle this one
-countOp [CType (TyPair ty1 ty2)]  = (countOp ty1) * (countOp ty2)
-countOp [CType (TySum ty1 ty2)]   = (countOp ty1) + (countOp ty2)
+countOp [CType ty]  = return $ VNum ((countOp' ty) % 1)
+
+countOp' :: Type -> Integer
+countOp' TyVoid            = 0
+countOp' TyUnit            = 1
+countOp' TyBool            = 2
+-- countOp' (TyArr ty1 ty2)   = not sure how to handle this one
+countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
+countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
+-- countOp' (TyList ty)       = not sure how to handle this one either
 -- I'm pretty sure all other types are infinite
-countOp _                         = error "Impossible! The type is infinite."
+countOp' _                 = error "Impossible! The type is infinite."
 
 
 

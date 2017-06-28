@@ -97,6 +97,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
          | Sqrt  -- ^ Integer square root (@sqrt@)
+         | Lg    -- ^ Floor of base-2 logarithm (@lg@)
   deriving (Show, Eq)
 
 -- | Binary operators.

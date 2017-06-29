@@ -452,6 +452,10 @@ infer (TUn Sqrt t) = do
   at <- check t TyN
   return $ ATUn TyN Sqrt at
 
+infer (TUn Lg t)  = do
+  at <- check t TyN
+  return $ ATUn TyN Lg at
+
   -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do
   at1 <- infer t1

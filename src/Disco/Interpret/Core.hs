@@ -175,6 +175,9 @@ data InterpError where
   -- | Division by zero.
   DivByZero     ::              InterpError
 
+  -- | Taking the base-2 logarithm of zero.
+  LgOfZero      ::              InterpError
+
   -- | v should be a boolean, but isn't.
   NotABool      :: Value     -> InterpError
 
@@ -372,7 +375,7 @@ whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OSqrt    = uNumOp integerSqrt
-whnfOp OLg      = uNumOp integerLg
+whnfOp OLg      = lgOp
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -407,7 +410,7 @@ uNumOp f [c] = do
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
--- | Perform a square root on an operation. If the program typechecks,
+-- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
 integerSqrt :: Rational -> Rational
 integerSqrt n = integerSqrt' (fromIntegral (numerator n)) % 1
@@ -430,8 +433,16 @@ integerSqrt' n =
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
 
-integerLg :: Rational -> Rational
-integerLg n = toInteger (integerLog2 (fromIntegral (numerator n))) % 1
+-- | Perform a base-2 logarithmic operation
+lgOp :: [Core] -> IM Value
+lgOp [c] = do
+  VNum m <- whnf c
+  lgOp' m
+
+lgOp' :: Rational -> IM Value
+lgOp' 0 = throwError LgOfZero
+lgOp' n = return $ VNum
+            (toInteger (integerLog2 (fromIntegral (numerator n))) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.

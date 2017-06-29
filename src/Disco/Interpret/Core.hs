@@ -72,6 +72,8 @@ import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
+import           Math.NumberTheory.Logarithms       (integerLog2)
+
 import           Disco.AST.Core
 import           Disco.Types
 
@@ -370,6 +372,7 @@ whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OSqrt    = uNumOp integerSqrt
+whnfOp OLg      = uNumOp integerLg
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -426,6 +429,9 @@ integerSqrt' n =
 -- this operator is used for `integerSqrt'`
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
+
+integerLg :: Rational -> Rational
+integerLg n = toInteger (integerLog2 (fromIntegral (numerator n))) % 1
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.

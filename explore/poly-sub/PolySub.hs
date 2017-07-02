@@ -1,9 +1,11 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 
 -- System F extended with a bit of arithmetic, some simple subtyping,
 -- and let expressions.
@@ -12,6 +14,9 @@ module PolySub where
 
 import           Parsing2
 
+import Control.Monad.State
+import Control.Monad.Reader
+import Control.Monad.Except
 import Data.List (intercalate)
 import qualified Data.Map    as M
 import           Data.Maybe
@@ -35,14 +40,9 @@ data Expr where
 
   ELet  :: String -> Expr -> Expr -> Expr
 
-  deriving Show
+  EAnn  :: Expr -> Sigma -> Expr
 
-data Value where
-  VInt     :: Integer -> Value
-  VClosure :: Env -> String -> Expr -> Value
   deriving Show
-
-type Env = M.Map String Value
 
 -- Non-polymorphic types.
 data Type where
@@ -53,9 +53,11 @@ data Type where
   deriving (Show, Eq)
 
 -- Sigma types: top-level polymorphism.
-data Sigma where
-  Forall :: String -> Sigma
-  Tau    :: Type   -> Sigma
+data Sigma = Forall [String] Type
+  deriving Show
+
+mono :: Type -> Sigma
+mono = Forall []
 
 type Ctx = M.Map String Sigma
 
@@ -197,42 +199,90 @@ instance Pretty Value where
 -- Type checker
 ------------------------------------------------------------
 
-data TypeError where
-  Unbound :: String -> TypeError
-  NonNum  :: Type   -> TypeError
-  NoLub   :: Type -> Type -> TypeError
+--------------------------------------------------
+-- Type checking monad
 
-infer :: Ctx -> Expr -> Either TypeError Sigma
-infer ctx (EVar x) =
+newtype TC a = TC { unTC :: StateT Int (ReaderT Ctx (Except TypeError)) a }
+  deriving (Functor, Applicative, Monad, MonadReader Ctx, MonadState Int, MonadError TypeError)
+
+runTC :: TC a -> Either TypeError a
+runTC (TC t) = runExcept . flip runReaderT M.empty . flip evalStateT 0 $ t
+
+extend :: String -> Sigma -> TC a -> TC a
+extend x s = local (M.insert x s)
+
+--------------------------------------------------
+-- Inference mode
+
+data SubC = Type :<: Type
+
+data TypeError where
+  Unbound  :: String -> TypeError
+  NonNum   :: Type   -> TypeError
+  NoLub    :: Type -> Type -> TypeError
+  NotFunTy :: Type -> TypeError
+
+-- Infer returns a *monotype* (which can contain type variables).
+-- There is a separate function for inferring a polytype, which first
+-- runs 'infer' and then generalizes over free type variables.
+
+infer :: Expr -> TC (Type, [SubC])
+infer (EVar x) = do
+  ctx <- ask
   case M.lookup x ctx of
-    Nothing -> Left (Unbound x)
-    Just ty -> Right ty
-infer ctx (ENat _) = Right (Tau TyNat)
-infer ctx (EBin Plus e1 e2 ) = do
-  Tau v1 <- infer ctx e1
-  Tau v2 <- infer ctx e2
+    Nothing  -> throwError $ Unbound x
+    Just sig -> undefined   -- generate fresh ty vars
+infer (ENat _) = return (TyNat, [])
+infer (EBin Plus e1 e2 ) = do
+  (v1, d1) <- infer e1
+  (v2, d2) <- infer e2
   checkNumTy v1
   checkNumTy v2
-  Tau <$> lub v1 v2
-infer ctx (EBin Minus e1 e2) = undefined
+  (, d1 ++ d2) <$> lub v1 v2
+infer (EBin Minus e1 e2) = do
+  d1 <- check e1 TyInt
+  d2 <- check e2 TyInt
+  return (TyInt, d1 ++ d2)
+infer (ELam x (Just ty1) e) = extend x (mono ty1) $ do
+  (ty2, d) <- infer e
+  return (TyFun ty1 ty2, d)
+infer (EApp e1 e2) = do
+  (funty, d1) <- infer e1
+  case funty of
+    TyFun ty1 ty2 -> do
+      d2 <- check e2 ty1
+      return (ty2, d1 ++ d2)
+    _             -> throwError $ NotFunTy funty
+infer (EAnn t sig) = undefined
+  -- instantiate sig with fresh ty vars
+  -- check t with the resulting type
+  -- ensure that there are no nontrivial constraints containing the fresh ty vars
+  -- return sig along with only those constraints not mentioning the fresh ty vars
 
-checkNumTy :: Type -> Either TypeError ()
+  -- Should write something to simplify subtyping constraints as we go
+  -- along.  At this point I don't think it's realistic to only
+  -- collect them and solve at the very end.
+
+checkNumTy :: Type -> TC ()
 checkNumTy TyNat = return ()
 checkNumTy TyInt = return ()
-checkNumTy ty    = Left (NonNum ty)
+checkNumTy ty    = throwError $ NonNum ty
 
-lub :: Type -> Type -> Either TypeError Type
+lub :: Type -> Type -> TC Type
 lub t1 t2 | t1 == t2 = return t1
 lub TyNat TyInt = return TyInt
 lub TyInt TyNat = return TyInt
 lub t1@(TyFun t11 t12) t2@(TyFun t21 t22)
-  | t11 /= t21 = Left (NoLub t1 t2)
+  | t11 /= t21 = throwError $ NoLub t1 t2
   | otherwise  = do
       t2 <- lub t12 t22
       return $ TyFun t11 t2
 
-check :: Ctx -> Expr -> Type -> Either TypeError ()
-check ctx e ty = undefined
+--------------------------------------------------
+-- Checking mode
+
+check :: Expr -> Type -> TC [SubC]
+check e ty = undefined
 
 -- check ctx e@(ELam x Nothing body) ty =
 --   case ty of
@@ -254,6 +304,13 @@ check ctx e ty = undefined
 ------------------------------------------------------------
 -- Interpreter
 ------------------------------------------------------------
+
+data Value where
+  VInt     :: Integer -> Value
+  VClosure :: Env -> String -> Expr -> Value
+  deriving Show
+
+type Env = M.Map String Value
 
 interp :: Expr -> Value
 interp = interp' M.empty

@@ -420,6 +420,7 @@ countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
 -- All other types are infinite
 countOp' _                 = error "Impossible! The type is infinite."
 
+-- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> IM Value
 enumOp [CType ty] = return $ (convert (enumerate ty))
 

@@ -400,6 +400,12 @@ checkNumTy at =
      then return ()
      else throwError (NotNum at)
 
+convNumTy :: Type -> Type
+convNumTy TyN   = TyN
+convNumTy TyZ   = TyZ
+convNumTy TyQ   = TyZ
+convNumTy TyQP  = TyN
+
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
 infer :: Term -> TCM ATerm
@@ -462,6 +468,18 @@ infer (TUn Sqrt t) = do
 infer (TUn Lg t)  = do
   at <- check t TyN
   return $ ATUn TyN Lg at
+
+infer (TUn Floor t) = do
+  at <- infer t
+  checkNumTy at
+  -- ty <- convNumTy (getType at) why does this cause an error?
+  return $ ATUn (convNumTy (getType at)) Floor at
+
+infer (TUn Ceil t) = do
+  at <- infer t
+  checkNumTy at
+  -- ty <- convNumTy (getType at)
+  return $ ATUn (convNumTy (getType at)) Ceil at
 
   -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do

@@ -376,6 +376,8 @@ whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OLg      = lgOp
+whnfOp OFloor   = uNumOp floorOp
+whnfOp OCeil    = uNumOp ceilOp
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -456,6 +458,12 @@ integerSqrt' n =
 -- this operator is used for `integerSqrt'`
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
+
+floorOp :: Rational -> Rational
+floorOp n = (floor n) % 1
+
+ceilOp :: Rational -> Rational
+ceilOp n  = (ceiling n) % 1
 
 -- | Perform a base-2 logarithmic operation
 lgOp :: [Core] -> IM Value

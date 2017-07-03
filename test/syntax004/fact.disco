@@ -1,0 +1,12 @@
+-- Here are two equivalent definitions of factorial using the two
+-- different styles: one with a case expression, and one with two
+-- pattern-matching clauses.
+
+fact : N -> N
+fact n =
+  { 1            when n is 0
+  { n * fact m   when n is S m
+
+fact2 : N -> N
+fact2 0 = 1
+fact2 (S m) = (m + 1) * fact2 m

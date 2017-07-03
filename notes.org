@@ -258,39 +258,51 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + Z/Q patterns (general arithmetic patterns?)
-  + polymorphism
-  + Multi-clause definitions
   + Use extensible tree type ("Trees that Grow")?
   + Use a single Disco monad for everything?
-  + Test suite:
-    - quick check properties
-  + Type reconstruction
+    - see blog post on "ReaderT pattern"?  Env data type and IORefs
+      for state or something like that?
+
+    Disco monad itself could have state for current definitions in
+    scope; read-only env has things like language extensions enabled,
+    various other options, etc.  Also want errors using Validation or
+    something.  ... but that can't be a monad?  Not sure how that is
+    supposed to work.
+
+    Locally e.g. typechecking could use another ReaderT layer for the context?
+
   + Collect multiple warnings & errors (parsing, type checking)
   + LaTeX output mode for pretty-printer
   + Markdown for documentation? See cheapskate library --- what Idris uses.
-  + Finite types (like Fin n)
-  + Chained comparisons   (2 < x <= 5)
   + Type qualifiers like "nonzero", "nonnegative", "non-empty", etc.
   + Built-in counters, e.g. for collecting data re: big-O analysis
   + Built-in visualizations (using Diagrams), e.g.
     - call graph
     - discrete structures
-  + Stepwise execution
-    - Small step evaluation
-      - Dynamic ability for detail
   + Typing and parsing on the fly
   + Dynamic explorable error messages:
     - Dynamic witnesses for type errors (see ICFP 2016 paper, https://goo.gl/NCKXFi)
   + playgrounds:
     - Can we do something like -fdefer-type-errors so that
       students files load despite errors.
-  + Graph reduction?  Don't re-evaluate...
   + Memoization annotation for functions?
-  + Saturating subtraction ∸ for naturals?
+  + Saturating subtraction ∸ for naturals and Q+
   + Option for ignoring subtraction/Z check
   + More sophisticated checking of subtraction for N in a case
-  + isqrt function
+  + mechanism for language extensions (like GHC has)
+
+** Github issues
+
+  Next steps that have been turned into Github issues:
+
+  + (#8)  Chained comparisons   (2 < x <= 5)
+  + (#11) Z/Q patterns (general arithmetic patterns?)
+  + (#6)  polymorphism
+  + (#12) Multi-clause definitions
+  + (#13) QuickCheck properties in test suite
+  + (#14) Finite types (like Fin n)
+  + (#15) Stepwise execution (small step evaluation)
+  + (#16) Graph reduction?  Don't re-evaluate...
 
 * Links
 

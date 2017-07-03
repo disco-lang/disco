@@ -67,10 +67,12 @@ import           Data.List                          (find)
 import qualified Data.Map                           as M
 import           Data.Ratio
 
-import           Unbound.LocallyNameless            hiding (enumerate, rnf)
+import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
 
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
+
+import           Math.NumberTheory.Logarithms       (integerLog2)
 
 import           Disco.AST.Core
 import           Disco.Types
@@ -172,6 +174,9 @@ data InterpError where
 
   -- | Division by zero.
   DivByZero     ::              InterpError
+
+  -- | Taking the base-2 logarithm of zero.
+  LgOfZero      ::              InterpError
 
   -- | v should be a boolean, but isn't.
   NotABool      :: Value     -> InterpError
@@ -370,6 +375,7 @@ whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OSqrt    = uNumOp integerSqrt
+whnfOp OLg      = lgOp
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -428,7 +434,7 @@ convert :: [Value] -> Value
 convert []       = VCons 0 []
 convert (x : xs) = VCons 1 [x, convert xs]
 
--- | Perform a square root on an operation. If the program typechecks,
+-- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
 integerSqrt :: Rational -> Rational
 integerSqrt n = integerSqrt' (fromIntegral (numerator n)) % 1
@@ -450,6 +456,16 @@ integerSqrt' n =
 -- this operator is used for `integerSqrt'`
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
+
+-- | Perform a base-2 logarithmic operation
+lgOp :: [Core] -> IM Value
+lgOp [c] = do
+  VNum m <- whnf c
+  lgOp' m
+
+lgOp' :: Rational -> IM Value
+lgOp' 0 = throwError LgOfZero
+lgOp' n = return $ VNum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
@@ -750,6 +766,24 @@ decideOrdFor (TyArr ty1 ty2) v1 v2 = do
   -- functions differ.
   let ty1s = enumerate ty1
   decideOrdForClosures ty2 clos1 clos2 ty1s
+
+-- To decide the ordering for two lists:
+decideOrdFor (TyList ty) v1 v2 = do
+
+  -- Reduce both to WHNF
+  l1 <- whnfV v1
+  l2 <- whnfV v2
+
+  -- Lexicographic ordering
+  case (l1, l2) of
+    (VCons 0 _, VCons 0 _) -> return EQ   -- Both empty list
+    (VCons 0 _, VCons 1 _) -> return LT   -- Empty < cons
+    (VCons 1 _, VCons 0 _) -> return GT   -- Cons > empty
+    (VCons 1 [x1, l1'], VCons 1 [x2, l2']) -> do
+      o <- decideOrdFor ty x1 x2
+      case o of
+        EQ -> decideOrdFor (TyList ty) l1' l2'
+        _  -> return o
 
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.

@@ -71,16 +71,18 @@ import           Data.List               (group, partition, sort)
 import qualified Data.Map                as M
 
 import           Unbound.LocallyNameless hiding (comp)
+import           Unbound.LocallyNameless.Ops (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
--- | A definition is a list of patterns that bind names in a term,
---   without the name of the function being defined.  For example,
---   given the concrete syntax @f n (x,y) = n*x + y@, the
---   corresponding 'Defn' would be something like @[n, (x,y)] (n*x + y)@.
-type Defn  = Bind [Pattern] ATerm
+-- | A definition is a group of clauses, each having a list of
+--   patterns that bind names in a term, without the name of the
+--   function being defined.  For example, given the concrete syntax
+--   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
+--   something like @[n, (x,y)] (n*x + y)@.
+type Defn  = [Bind [Pattern] ATerm]
 
 -- | A map from names to definitions.
 type Defns = M.Map (Name ATerm) Defn
@@ -188,7 +190,7 @@ extends :: Ctx -> TCM a -> TCM a
 extends ctx = local (joinCtx ctx)
 
 -- | Add a definition to the set of current definitions.
-addDefn :: Name Term -> (Bind [Pattern] ATerm) -> TCM ()
+addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
 addDefn x b = modify (M.insert (translate x) b)
 
 -- | Check that a term has the given type.  Either throws an error, or
@@ -228,7 +230,13 @@ check (TInj R t) ty@(TySum _ ty2) = do
   -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
--- XXX check TLet
+check (TLet l) ty =
+  lunbind l $ \((x, unembed -> t1), t2) -> do
+    at1 <- infer t1
+    let ty1 = getType at1
+    extend x ty1 $ do
+      at2 <- check t2 ty
+      return $ ATLet ty (bind (translate x, embed at1) at2)
 
 check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
@@ -269,9 +277,11 @@ checkSub at ty = do
 isSub :: Type -> Type -> Bool
 isSub ty1 ty2 | ty1 == ty2 = True
 isSub TyVoid _ = True
-isSub TyN TyZ = True
-isSub TyN TyQ = True
-isSub TyZ TyQ = True
+isSub TyN TyZ  = True
+isSub TyN TyQP = True
+isSub TyN TyQ  = True
+isSub TyZ TyQ  = True
+isSub TyQP TyQ = True
 isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
@@ -283,6 +293,8 @@ lub :: Type -> Type -> TCM Type
 lub ty1 ty2
   | isSub ty1 ty2 = return ty2
   | isSub ty2 ty1 = return ty1
+lub TyQP TyZ = return TyQ
+lub TyZ TyQP = return TyQ
 lub (TyArr t1 t2) (TyArr t1' t2') = do
   requireSameTy t1 t1'
   t2'' <- lub t2 t2'
@@ -295,6 +307,9 @@ lub (TySum t1 t2) (TySum t1' t2') = do
   t1'' <- lub t1 t1'
   t2'' <- lub t2 t2'
   return $ TySum t1'' t2''
+lub (TyList t1) (TyList t2) = do
+  t' <- lub t1 t2
+  return $ TyList t'
 lub ty1 ty2 = throwError $ NoLub ty1 ty2
 
 -- | Convenience function that ensures the given annotated terms have
@@ -329,6 +344,7 @@ isDecidable TyUnit = True
 isDecidable TyBool = True
 isDecidable TyN    = True
 isDecidable TyZ    = True
+isDecidable TyQP   = True
 isDecidable TyQ    = True
 isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
@@ -350,6 +366,7 @@ isOrdered TyUnit = True
 isOrdered TyBool = True
 isOrdered TyN    = True
 isOrdered TyZ    = True
+isOrdered TyQP   = True
 isOrdered TyQ    = True
 isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
@@ -379,7 +396,7 @@ getFunTy at = throwError (NotFun at)
 --   if not.
 checkNumTy :: ATerm -> TCM ()
 checkNumTy at =
-  if (getType at `elem` [TyN, TyZ, TyQ])
+  if (isNumTy $ getType at)
      then return ()
      else throwError (NotNum at)
 
@@ -442,12 +459,17 @@ infer (TUn Sqrt t) = do
   at <- check t TyN
   return $ ATUn TyN Sqrt at
 
-  -- Division always has type Q.  We just have to check that
-  -- both subterms can be given type Q.
+infer (TUn Lg t)  = do
+  at <- check t TyN
+  return $ ATUn TyN Lg at
+
+  -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do
-  at1 <- check t1 TyQ
-  at2 <- check t2 TyQ
-  return $ ATBin TyQ Div at1 at2
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  num4 <- lub num3 TyQP
+  return $ ATBin num4 Div at1 at2
 
 infer (TBin Exp t1 t2) = do
   at1 <- infer t1
@@ -455,21 +477,29 @@ infer (TBin Exp t1 t2) = do
   checkNumTy at1
   checkNumTy at2
   case getType at2 of
+
+    -- t1^n has the same type as t1 when n : Nat.
     TyN -> return $ ATBin (getType at1) Exp at1 at2
-    TyZ -> return $ ATBin TyQ Exp at1 at2
+
+    -- t1^z has type (lub ty1 Q+) when t1 : ty1 and z : Z.
+    -- For example, (-3)^(-5) has type Q (= lub Z Q+)
+    -- but 3^(-5) has type Q+.
+    TyZ -> do
+      res <- lub (getType at1) TyQP
+      return $ ATBin res Exp at1 at2
     TyQ -> throwError ExpQ
     _   -> error "Impossible! getType at2 is not num type after checkNumTy"
 
-  -- An equality test always has type Bool, but we need to check a few
-  -- things first. We infer the types of both subterms and check that
-  -- (1) they have a common supertype which (2) has decidable
-  -- equality.
-infer (TBin Eq t1 t2) = do
+  -- An equality or inequality test always has type Bool, but we need
+  -- to check a few things first. We infer the types of both subterms
+  -- and check that (1) they have a common supertype which (2) has
+  -- decidable equality.
+infer (TBin eqOp t1 t2) | eqOp `elem` [Eq, Neq] = do
   at1 <- infer t1
   at2 <- infer t2
   ty3 <- lub (getType at1) (getType at2)
   checkDecidable ty3
-  return $ ATBin TyBool Eq at1 at2
+  return $ ATBin TyBool eqOp at1 at2
 
 infer (TBin op t1 t2)
   | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2
@@ -523,6 +553,11 @@ infer (TBin Cons t1 t2) = do
 infer (TUn Fact t) = do
   at <- check t TyN
   return $ ATUn TyN Fact at
+
+infer (TChain t1 links) = do
+  at1 <- infer t1
+  alinks <- inferChain t1 links
+  return $ ATChain TyBool at1 alinks
 
 infer (TList (e:es)) = do
   ate  <- infer e
@@ -587,6 +622,13 @@ inferComp comp t1 t2 = do
   checkOrdered ty3
   return $ ATBin TyBool comp at1 at2
 
+inferChain :: Term -> [Link] -> TCM [ALink]
+inferChain _  [] = return []
+inferChain t1 (TLink op t2 : links) = do
+  at2 <- infer t2
+  _   <- check (TBin op t1 t2) TyBool
+  (ATLink op at2 :) <$> inferChain t2 links
+
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.
 inferCase :: [Branch] -> TCM ATerm
@@ -627,11 +669,6 @@ inferGuard (GPat (unembed -> t) p) = do
   at <- infer t
   ctx <- checkPattern p (getType at)
   return (AGPat (embed at) p, ctx)
-
--- XXX todo: check for nonlinear patterns.
--- Nonlinear patterns can desugar to equality checks!
--- Currently  { x when (3,4) = (x,x)   evaluates without error to 3.
--- It should be accepted, but fail to match since 3 != 4.
 
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
@@ -685,22 +722,41 @@ withTypeDecls decls k = do
   where
     declCtx = M.fromList (map (\(DType x ty) -> (x,ty)) decls)
 
--- | Type check a top-level definition. Precondition: only called on 'DDefn's.
+-- | Type check a top-level definition. Precondition: only called on
+--   'DDefn's.
 checkDefn :: Decl -> TCM ()
-checkDefn (DDefn x def) = do
+checkDefn (DDefn x clauses) = do
   ty <- lookup x
   prevDefn <- gets (M.lookup (translate x))
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
-    Nothing -> lunbind def $ \(pats, body) -> do
-      at <- go pats ty body
-      addDefn x (bind pats at)
+    Nothing -> do
+      checkNumPats clauses
+      aclauses <- mapM (checkClause ty) clauses
+      addDefn x aclauses
   where
+    numPats = length . fst . unsafeUnbind
+
+    checkNumPats []     = return ()   -- This can't happen, but meh
+    checkNumPats [_]    = return ()
+    checkNumPats (c:cs)
+      | all ((==0) . numPats) (c:cs) = throwError (DuplicateDefns x)
+      | not (all (== numPats c) (map numPats cs)) = throwError NumPatterns
+               -- XXX more info, this error actually means # of
+               -- patterns don't match across different clauses
+      | otherwise = return ()
+
+    checkClause ty clause =
+      lunbind clause $ \(pats, body) -> do
+      at <- go pats ty body
+      return $ bind pats at
+
     go [] ty body = check body ty
     go (p:ps) (TyArr ty1 ty2) body = do
       ctx <- checkPattern p ty1
       extends ctx $ go ps ty2 body
     go _ _ _ = throwError NumPatterns   -- XXX include more info
+
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | XXX

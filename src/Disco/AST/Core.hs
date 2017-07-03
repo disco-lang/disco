@@ -83,6 +83,7 @@ data Core where
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
         | OSqrt    -- ^ Integer square root (@sqrt@)
+        | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OMul     -- ^ Multiplication (@*@)
         | ODiv     -- ^ Division (@/@)
         | OExp     -- ^ Exponentiation (@^@)

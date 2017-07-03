@@ -21,6 +21,9 @@ import           Disco.Types
 --------------------------------------------------
 -- Monadic pretty-printing
 
+vcat :: Monad f => [f PP.Doc] -> f PP.Doc
+vcat ds  = PP.vcat <$> sequence ds
+
 hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
 
@@ -110,6 +113,7 @@ prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
 prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
+prettyTy TyQP             = text "ℚ⁺"
 prettyTy (TyList ty)      = mparens (PA 9 AR) $
   text "List" <+> prettyTy' 9 AR ty
 
@@ -148,6 +152,14 @@ prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   , prettyBOp op
   , prettyTerm' (prec op) AR t2
   ]
+prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
+    prettyTerm' (prec Eq) AL t
+    : concatMap prettyLink lks
+  where
+    prettyLink (TLink op t2) =
+      [ prettyBOp op
+      , prettyTerm' (prec op) AR t2
+      ]
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \((x, unembed -> t1), t2) ->
   hsep
@@ -167,7 +179,7 @@ prettyTerm (TRat  r)    =
   <> text (decimalize (10 * (numerator r `mod` denominator r)) (denominator r))
   where
     decimalize 0 _ = ""
-    decimalize r d = show (r `div` d) ++ decimalize (10 * (r `mod` d)) d
+    decimalize n d = show (n `div` d) ++ decimalize (10 * (n `mod` d)) d
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -180,6 +192,7 @@ prettyUOp :: UOp -> Doc
 prettyUOp Neg  = text "-"
 prettyUOp Not  = text "not "
 prettyUOp Sqrt = text "sqrt "
+prettyUOp Lg   = text "lg "
 prettyUOp Fact = error "Impossible! prettyUOp Fact"
 
 prettyBOp :: BOp -> Doc
@@ -241,9 +254,11 @@ prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
-prettyDecl (DDefn x b)
-  = lunbind b $ \(ps, t) ->
-  (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
+  where
+    prettyClause b
+      = lunbind b $ \(ps, t) ->
+        (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 ------------------------------------------------------------
 

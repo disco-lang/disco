@@ -54,11 +54,13 @@ data REPLExpr =
    Let (Name Term) Term         -- Toplevel let-expression: for the REPL
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
- | ShowAST Term                 -- Show a terms AST
+ | ShowDefn (Name Term)         -- Show a variable's definition
  | Parse Term                   -- Show the parsed AST
+ | Pretty Term                  -- Pretty-print a term
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
  | Doc (Name Term)              -- Show documentation.
+ | Nop                          -- No-op, e.g. if the user just enters a comment
  | Help
  deriving Show
 
@@ -76,8 +78,9 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     parsers =
       [ ("type",    TypeCheck <$> term)
-      , ("show",    ShowAST   <$> term)
+      , ("defn",    ShowDefn  <$> (whitespace *> ident))
       , ("parse",   Parse     <$> term)
+      , ("pretty",  Pretty    <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
       , ("doc",     Doc       <$> (whitespace *> ident))
@@ -90,7 +93,8 @@ fileParser = many spaceChar *> many (satisfy (not . isSpace))
 lineParser :: Parser REPLExpr
 lineParser
   =   commandParser
-  <|> try (Eval <$> (parseTerm <* eof))
+  <|> try (Nop <$ (consumeWhitespace <* eof))
+  <|> try (Eval <$> (consumeWhitespace *> parseTerm <* eof))
   <|> letParser
 
 parseLine :: String -> Either String REPLExpr
@@ -110,11 +114,13 @@ handleCMD s =
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
     handleLine (Eval t)      = (evalTerm t) >>= (io.putStrLn)
-    handleLine (ShowAST t)   = io.putStrLn.show $ t
+    handleLine (ShowDefn x)  = handleShowDefn x >>= (io.putStrLn)
     handleLine (Parse t)     = io.print $ t
+    handleLine (Pretty t)    = io.putStrLn $ renderDoc (prettyTerm t)
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
     handleLine (Load file)   = handleLoad file
     handleLine (Doc x)       = handleDocs x
+    handleLine Nop           = return ()
     handleLine Help          = io.putStrLn $ "Help!"
 
 handleLet :: Name Term -> Term -> REPLStateIO ()
@@ -127,6 +133,13 @@ handleLet x t = do
       replCtx   %= M.insert x (getType at)
       replDefns %= M.insert (translate x) (runDSM $ desugarTerm at)
 
+handleShowDefn :: Name Term -> REPLStateIO String
+handleShowDefn x = do
+  defns <- use replDefns
+  case M.lookup (translate x) defns of
+    Nothing -> return $ "No definition for " ++ show x
+    Just d  -> return $ show d
+
 handleDesugar :: Term -> REPLStateIO String
 handleDesugar t = do
   case evalTCM (infer t) of
@@ -134,9 +147,9 @@ handleDesugar t = do
     Right at -> return.show.runDSM.desugarTerm $ at
 
 handleLoad :: FilePath -> REPLStateIO ()
-handleLoad file = do
+handleLoad file = handle (fileNotFound file) $ do
   io . putStrLn $ "Loading " ++ file ++ "..."
-  str <- io $ readFile file   -- XXX catch errors
+  str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
     Left err -> io $ putStrLn (parseErrorPretty err)
@@ -251,6 +264,9 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   , O.header "disco v0.1"
   ]
 
+fileNotFound :: FilePath -> IOException -> REPLStateIO ()
+fileNotFound file _ = liftIO . putStrLn $ "File not found: " ++ file
+
 main :: IO ()
 main = do
   opts <- O.execParser discoInfo
@@ -261,8 +277,8 @@ main = do
   when (not batch) $ putStr banner
   flip evalStateT initREPLState $ do
     case cmdFile opts of
-      Just file -> do
-        cmds <- io $ readFile file    -- XXX handle failure
+      Just file -> handle (fileNotFound file) $ do
+        cmds <- io $ readFile file
         mapM_ handleCMD (lines cmds)
       Nothing   -> return ()
     case evaluate opts of
@@ -278,7 +294,7 @@ main = do
       case minput of
         Nothing -> return ()
         Just input
-          | input `isPrefixOf` ":quit" -> do
+          | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
               liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> (lift.handleCMD $ input) >> loop

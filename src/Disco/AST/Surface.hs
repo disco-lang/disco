@@ -26,7 +26,7 @@ module Disco.AST.Surface
        , Decl(..), declName, isDefn
 
          -- * Terms
-       , Side(..), UOp(..), BOp(..)
+       , Side(..), UOp(..), BOp(..), Link(..)
        , TyOp(..), Term(..)
 
          -- * Case expressions and patterns
@@ -72,9 +72,10 @@ data Decl where
   -- | A type declaration, @name : type@.
   DType :: Name Term -> Type -> Decl
 
-  -- | A definition, @name pat1 .. patn = term@. The patterns bind
-  --   variables in the term. For example,  @f n (x,y) = n*x + y@.
-  DDefn :: Name Term -> Bind [Pattern] Term -> Decl
+  -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
+  --   patterns bind variables in the term. For example, @f n (x,y) =
+  --   n*x + y@.
+  DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
   deriving Show
 
 -- | Get the name that a declaration is about.
@@ -96,6 +97,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
          | Sqrt  -- ^ Integer square root (@sqrt@)
+         | Lg    -- ^ Floor of base-2 logarithm (@lg@)
   deriving (Show, Eq)
 
 -- | Binary operators.
@@ -158,7 +160,7 @@ data Term where
   -- | A natural number.
   TNat   :: Integer -> Term
 
-  -- | A rational number, parsed as a decimal.
+  -- | A nonnegative rational number, parsed as a decimal.
   TRat   :: Rational -> Term
 
   -- | An application of a unary operator.
@@ -169,6 +171,11 @@ data Term where
 
   -- | An application of a type operator.
   TTyOp  :: TyOp -> Type -> Term
+
+  -- | A chained comparison.  Should contain only comparison
+  --   operators.
+  TChain :: Term -> [Link] -> Term
+
 
   -- | A literal list.
   TList :: [Term] -> Term
@@ -181,6 +188,10 @@ data Term where
 
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term
+  deriving Show
+
+data Link where
+  TLink :: BOp -> Term -> Link
   deriving Show
 
 -- | A branch of a case is a list of guards with an accompanying term.
@@ -247,13 +258,14 @@ data Pattern where
   deriving Show
   -- TODO: figure out how to match on Z or Q!
 
-derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Guards, ''Guard, ''Pattern]
+derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Link, ''Guards, ''Guard, ''Pattern]
 
 instance Alpha Rational   -- XXX orphan!
 instance Alpha Side
 instance Alpha UOp
 instance Alpha BOp
 instance Alpha TyOp
+instance Alpha Link
 instance Alpha Term
 instance Alpha Guards
 instance Alpha Guard
@@ -268,6 +280,7 @@ instance Subst Term Side
 instance Subst Term BOp
 instance Subst Term UOp
 instance Subst Term TyOp
+instance Subst Term Link
 instance Subst Term Term where
   isvar (TVar x) = Just (SubstName x)
   isvar _ = Nothing

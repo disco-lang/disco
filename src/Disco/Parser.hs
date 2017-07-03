@@ -32,6 +32,7 @@ module Disco.Parser
        , requireSep, requireClose, requireVirtual
 
          -- ** Basic lexemes
+       , consumeWhitespace
        , whitespace, lexeme, symbol, reservedOp
        , natural, reserved, reservedWords, identifier, ident
 
@@ -71,7 +72,7 @@ import qualified Text.Megaparsec.Lexer   as L
 import qualified Text.Megaparsec.String  as MP
 
 import           Control.Applicative     (many, (<|>))
-import           Control.Lens
+import           Control.Lens            hiding (op)
 import           Control.Monad.State
 import           Data.Char               (isDigit, isSpace)
 import           Data.Either             (isRight)
@@ -382,7 +383,7 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 natural :: Parser Integer
 natural = lexeme L.integer
 
--- | Parse a decimal of the form @xxx.yyyy@.
+-- | Parse a nonnegative decimal of the form @xxx.yyyy@.
 decimal :: Parser Rational
 decimal = lexeme (readDecimal <$> some digit <* char '.' <*> some digit)
   where
@@ -398,7 +399,7 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt"
+  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
@@ -451,7 +452,19 @@ parseModule = do
     groupTLs _ (TLDecl defn : rest)
       = (defn, Nothing) : groupTLs [] rest
 
-    mkModule tls = Module decls (M.fromList (catMaybes docs))
+    defnGroups []                = []
+    defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+    defnGroups (DDefn x bs : ds)  = DDefn x (bs ++ concatMap getClauses grp) : defnGroups rest
+      where
+        (grp, rest) = span matchDefn $ ds
+        matchDefn (DDefn x' _) = x == x'
+        matchDefn _ = False
+        getClauses (DDefn _ cs) = cs
+        getClauses _ = error "Impossible!"
+          -- Impossible since we only call getClauses on things that
+          -- passed matchDefn
+
+    mkModule tls = Module (defnGroups decls) (M.fromList (catMaybes docs))
       where
         (decls, docs) = unzip $ groupTLs [] tls
 
@@ -490,11 +503,13 @@ parseProperties = do
   return ps
 
 -- | Parse a single declaration (either a type declaration or
---   definition).
+--   single definition clause).
 parseDecl :: Parser Decl
 parseDecl =
       try (DType <$> ident <*> (colon *> parseType))
-  <|>      DDefn <$> ident <*> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm))
+  <|>      DDefn
+           <$> ident
+           <*> ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -511,6 +526,7 @@ parseAtom = -- trace "parseAtom" $
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
+  <|> TInj <$> parseInj <*> parseAtom
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
   <|> parseTypeOp
 
@@ -534,7 +550,6 @@ parseTerm = -- trace "parseTerm" $
 parseTerm' :: Parser Term
 parseTerm' =
       TAbs <$> try (bind <$> ident <*> (mapsTo *> parseTerm'))
-  <|> TInj <$> parseInj <*> parseAtom
   <|> parseLet
   <|> parseCase
   <|> parseExpr
@@ -614,7 +629,7 @@ parsePattern = makeExprParser parseAtomicPattern table <?> "pattern"
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
-parseExpr = makeExprParser parseAtom table <?> "expression"
+parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
   where
     table = [ [ infixL ""  TJuxt
               , unary "not" (TUn Not)
@@ -626,6 +641,8 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
             , [ infixR "^" (TBin Exp)
               ]
             , [ unary "sqrt" (TUn Sqrt)
+              ]
+            , [ unary "lg" (TUn Lg)
               ]
             , [ infixN "choose" (TBin Binom)
               ]
@@ -639,14 +656,14 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
               ]
             , [ infixR "::" (TBin Cons)
               ]
-            , [ infixN "=" (TBin Eq)
-              , infixN "/=" (TBin Neq)
-              , infixN "<"  (TBin Lt)
-              , infixN ">"  (TBin Gt)
-              , infixN "<=" (TBin Leq)
-              , infixN ">=" (TBin Geq)
-              , infixN "|"  (TBin Divides)
-              , infixN "#"  (TBin RelPm)
+            , [ infixR "="  (TBin Eq)
+              , infixR "/=" (TBin Neq)
+              , infixR "<"  (TBin Lt)
+              , infixR ">"  (TBin Gt)
+              , infixR "<=" (TBin Leq)
+              , infixR ">=" (TBin Geq)
+              , infixR "|"  (TBin Divides)
+              , infixR "#"  (TBin RelPm)
               ]
             , [ infixR "&&"  (TBin And)
               , infixR "and" (TBin And)
@@ -663,6 +680,23 @@ parseExpr = makeExprParser parseAtom table <?> "expression"
     infixL name fun = InfixL (reservedOp name >> return fun)
     infixR name fun = InfixR (reservedOp name >> return fun)
     infixN name fun = InfixN (reservedOp name >> return fun)
+
+    isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides, RelPm]
+
+    fixChains (TUn op t) = TUn op (fixChains t)
+    fixChains (TBin op t1 (TBin op' t21 t22))
+      | isChainable op && isChainable op' = TChain t1 (TLink op t21 : getLinks op' t22)
+    fixChains (TBin op t1 t2) = TBin op (fixChains t1) (fixChains t2)
+    fixChains (TJuxt t1 t2) = TJuxt (fixChains t1) (fixChains t2)
+
+    -- Only recurse as long as we see TUn, TBin, or TJuxt which could
+    -- have been generated by the expression parser.  If we see
+    -- anything else we can stop.
+    fixChains e = e
+
+    getLinks op (TBin op' t1 t2)
+      | isChainable op' = TLink op t1 : getLinks op' t2
+    getLinks op e = [TLink op (fixChains e)]
 
 -- | Parse an atomic type.
 parseAtomicType :: Parser Type

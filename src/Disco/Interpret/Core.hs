@@ -414,11 +414,10 @@ countOp' :: Type -> Integer
 countOp' TyVoid            = 0
 countOp' TyUnit            = 1
 countOp' TyBool            = 2
--- countOp' (TyArr ty1 ty2)   = not sure how to handle this one
+countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
 countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
 countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
--- countOp' (TyList ty)       = not sure how to handle this one either
--- I'm pretty sure all other types are infinite
+-- All other types are infinite
 countOp' _                 = error "Impossible! The type is infinite."
 
 

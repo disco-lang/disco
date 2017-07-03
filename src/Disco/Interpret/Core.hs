@@ -390,6 +390,8 @@ whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
+whnfOp OEnum    = enumOp
+whnfOp OCount   = countOp
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -409,6 +411,28 @@ uNumOp f [c] = do
   VNum m <- whnf c
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
+
+-- | Perform a count on the number of values for the given type.
+countOp :: [Core] -> IM Value
+countOp [CType ty]  = return $ VNum ((countOp' ty) % 1)
+
+countOp' :: Type -> Integer
+countOp' TyVoid            = 0
+countOp' TyUnit            = 1
+countOp' TyBool            = 2
+countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
+countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
+countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
+-- All other types are infinite
+countOp' _                 = error "Impossible! The type is infinite."
+
+-- | Perform an enumeration of the values of a given type.
+enumOp :: [Core] -> IM Value
+enumOp [CType ty] = return $ (convert (enumerate ty))
+
+convert :: [Value] -> Value
+convert []       = VCons 0 []
+convert (x : xs) = VCons 1 [x, convert xs]
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
@@ -548,7 +572,7 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
 
-  -- Enumerate all the values of type ty1.
+  --  all the values of type ty1.
   let ty1s = enumerate ty1
 
   -- Try evaluating the functions on each value and check whether they

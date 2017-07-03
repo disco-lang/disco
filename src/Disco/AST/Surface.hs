@@ -27,7 +27,7 @@ module Disco.AST.Surface
 
          -- * Terms
        , Side(..), UOp(..), BOp(..), Link(..)
-       , Term(..)
+       , TyOp(..), Term(..)
 
          -- * Case expressions and patterns
        , Branch, Guards(..), Guard(..), Pattern(..)
@@ -121,6 +121,11 @@ data BOp = Add     -- ^ Addition (@+@)
          | Cons    -- ^ List cons (@::@)
   deriving (Show, Eq)
 
+-- | Type Operators
+data TyOp = Enumerate -- List all values of a type
+          | Count     -- Count how many values there are of a type
+  deriving (Show, Eq)
+
 -- | Terms.
 data Term where
 
@@ -164,9 +169,13 @@ data Term where
   -- | An application of a binary operator.
   TBin   :: BOp -> Term -> Term -> Term
 
+  -- | An application of a type operator.
+  TTyOp  :: TyOp -> Type -> Term
+
   -- | A chained comparison.  Should contain only comparison
   --   operators.
   TChain :: Term -> [Link] -> Term
+
 
   -- | A literal list.
   TList :: [Term] -> Term
@@ -249,12 +258,13 @@ data Pattern where
   deriving Show
   -- TODO: figure out how to match on Z or Q!
 
-derive [''Side, ''UOp, ''BOp, ''Term, ''Link, ''Guards, ''Guard, ''Pattern]
+derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Link, ''Guards, ''Guard, ''Pattern]
 
 instance Alpha Rational   -- XXX orphan!
 instance Alpha Side
 instance Alpha UOp
 instance Alpha BOp
+instance Alpha TyOp
 instance Alpha Link
 instance Alpha Term
 instance Alpha Guards
@@ -269,6 +279,7 @@ instance Subst Term Pattern
 instance Subst Term Side
 instance Subst Term BOp
 instance Subst Term UOp
+instance Subst Term TyOp
 instance Subst Term Link
 instance Subst Term Term where
   isvar (TVar x) = Just (SubstName x)

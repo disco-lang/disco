@@ -81,6 +81,9 @@ data ATerm where
   -- | A binary operator application.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
 
+  -- | A type operator application.
+  ATTyOp  :: Type -> TyOp -> Type -> ATerm
+
   ATChain :: Type -> ATerm -> [ALink] -> ATerm
 
   -- | A (non-recursive) let expression.
@@ -118,6 +121,7 @@ getType (ATPair ty _ _)  = ty
 getType (ATInj ty _ _)   = ty
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty
+getType (ATTyOp ty _ _)  = ty
 getType (ATChain ty _ _) = ty
 getType (ATList ty _)    = ty
 getType (ATLet ty _)     = ty

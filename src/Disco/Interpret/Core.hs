@@ -384,7 +384,7 @@ whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
--- whnfOp OEnum    = not quite sure how to implement this
+whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
 
 -- | Perform a numeric binary operation.
@@ -420,7 +420,12 @@ countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
 -- All other types are infinite
 countOp' _                 = error "Impossible! The type is infinite."
 
+enumOp :: [Core] -> IM Value
+enumOp [CType ty] = return $ (convert (enumerate ty))
 
+convert :: [Value] -> Value
+convert []       = VCons 0 []
+convert (x : xs) = VCons 1 [x, convert xs]
 
 -- | Perform a square root on an operation. If the program typechecks,
 --   then the argument and output will really be Naturals
@@ -550,7 +555,7 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
 
-  -- Enumerate all the values of type ty1.
+  --  all the values of type ty1.
   let ty1s = enumerate ty1
 
   -- Try evaluating the functions on each value and check whether they

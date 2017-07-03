@@ -400,7 +400,7 @@ reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
-  , "enumerate", "count"
+  , "enumerate", "count", "floor", "ceiling"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -643,6 +643,9 @@ parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
             , [ unary "sqrt" (TUn Sqrt)
               ]
             , [ unary "lg" (TUn Lg)
+              ]
+            , [ unary "floor" (TUn Floor)
+              , unary "ceiling" (TUn Ceil)
               ]
             , [ infixN "choose" (TBin Binom)
               ]

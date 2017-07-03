@@ -441,8 +441,7 @@ lgOp [c] = do
 
 lgOp' :: Rational -> IM Value
 lgOp' 0 = throwError LgOfZero
-lgOp' n = return $ VNum
-            (toInteger (integerLog2 (fromIntegral (numerator n))) % 1)
+lgOp' n = return $ VNum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.

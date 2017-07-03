@@ -189,11 +189,13 @@ prettySide L = text "inl"
 prettySide R = text "inr"
 
 prettyUOp :: UOp -> Doc
-prettyUOp Neg  = text "-"
-prettyUOp Not  = text "not "
-prettyUOp Sqrt = text "sqrt "
-prettyUOp Lg   = text "lg "
-prettyUOp Fact = error "Impossible! prettyUOp Fact"
+prettyUOp Neg   = text "-"
+prettyUOp Not   = text "not "
+prettyUOp Sqrt  = text "sqrt "
+prettyUOp Lg    = text "lg "
+prettyUOp Floor = text "floor "
+prettyUOp Ceil  = text "ceiling "
+prettyUOp Fact  = error "Impossible! prettyUOp Fact"
 
 prettyBOp :: BOp -> Doc
 prettyBOp Add     = text "+"

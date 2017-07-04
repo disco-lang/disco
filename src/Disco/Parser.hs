@@ -362,11 +362,13 @@ reservedOp s = try (symbol s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets :: Parser a -> Parser a
+parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
+fbrack    = between (symbol "⌊") (symbol "⌋")
+cbrack    = between (symbol "⌈") (symbol "⌉")
 
 semi, comma, colon, dot :: Parser String
 semi      = symbol ";"

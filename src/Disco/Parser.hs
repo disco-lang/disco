@@ -650,6 +650,7 @@ parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
               , infixL "/" (TBin Div)
               , infixL "%" (TBin Mod)
               , infixL "mod" (TBin Mod)
+              , infixL "//" (TBin IDiv)
               ]
             , [ infixL "+" (TBin Add)
               , infixL "-" (TBin Sub)

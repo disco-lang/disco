@@ -312,7 +312,7 @@ prettyDecimal :: Rational -> String
 prettyDecimal r = show n ++ "." ++ fractionalDigits
   where
     (n,d) = properFraction r
-    (prefix,rep) = toDecimalDigits (numerator d) (denominator d)
+    (prefix,rep) = digitalExpansion 10 (numerator d) (denominator d)
     fractionalDigits = concatMap show prefix ++ repetend
     repetend = case rep of
       []  -> ""
@@ -334,23 +334,25 @@ findRep' prevs ix (x:xs)
 slice :: (Int,Int) -> [a] -> [a]
 slice (s,f) = drop s . take f
 
--- | @toDecimalDigits n d@ takes the numerator and denominator of a
---   fraction between 0 and 1, and returns two lists of digits
---   @(prefix, rep)@, such that the infinite decimal expansion of n/d is
---   @prefix ++ cycle rep@.  For example,
+-- | @digitalExpansion b n d@ takes the numerator and denominator of a
+--   fraction n/d between 0 and 1, and returns two lists of digits
+--   @(prefix, rep)@, such that the infinite base-b expansion of n/d is
+--   0.@(prefix ++ cycle rep)@.  For example,
 --
---   > toDecimalDigits 1 4  = ([2,5],[0])
---   > toDecimalDigits 1 7  = ([], [1,4,2,8,5,7])
---   > toDecimalDigits 3 28 = ([1,0], [7,1,4,2,8,5])
+--   > digitalExpansion 10 1 4  = ([2,5],[0])
+--   > digitalExpansion 10 1 7  = ([], [1,4,2,8,5,7])
+--   > digitalExpansion 10 3 28 = ([1,0], [7,1,4,2,8,5])
+--   > digitalExpansion 2  1 5  = ([], [0,0,1,1])
 --
-toDecimalDigits :: Integer -> Integer -> ([Integer],[Integer])
-toDecimalDigits n d = (prefix,rep)
+--   It works by performing the standard long division algorithm, and
+--   looking for the first time that the remainder repeats.
+digitalExpansion :: Integer -> Integer -> Integer -> ([Integer],[Integer])
+digitalExpansion b n d = (prefix,rep)
   where
-    decimalStep n (d,r) = ((10*r) `divMod` n)
-    res       = tail $ iterate (decimalStep d) (0,n)
+    longDivStep n (d,r) = ((b*r) `divMod` n)
+    res       = tail $ iterate (longDivStep d) (0,n)
     digits    = map fst res
     Just lims = findRep res
     rep       = slice lims digits
     prefix    = take (fst lims) digits
 
--- TODO: generalize the above to work in any base

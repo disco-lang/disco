@@ -17,7 +17,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core     (Value (..), prettyValue, rnf, runIM')
+import           Disco.Interpret.Core     (Value (..), rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck

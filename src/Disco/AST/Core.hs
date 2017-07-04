@@ -19,7 +19,8 @@
 
 module Disco.AST.Core
        ( -- * Core AST
-         Core(..)
+         RationalDisplay(..)
+       , Core(..)
        , Op(..)
 
          -- * Case expressions and patterns
@@ -30,6 +31,22 @@ module Disco.AST.Core
 import           Unbound.LocallyNameless
 
 import           Disco.Types
+
+-- | A type of flags specifying whether to display a rational number
+--   as a fraction or a decimal.
+data RationalDisplay = Fraction | Decimal
+  deriving (Eq, Show)
+
+-- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
+--   idea that the result should be displayed as a decimal if any
+--   decimal literals are used in the input; otherwise, the default is
+--   to display as a fraction.  So the identity element is 'Fraction',
+--   and 'Decimal' always wins when combining.
+instance Monoid RationalDisplay where
+  mempty = Fraction
+  Decimal `mappend` _ = Decimal
+  _ `mappend` Decimal = Decimal
+  _ `mappend` _       = Fraction
 
 -- | AST for the desugared, untyped core language.
 data Core where
@@ -46,7 +63,7 @@ data Core where
   CCons :: Int -> [Core] -> Core
 
   -- | A rational number.
-  CNum  :: Rational -> Core
+  CNum  :: RationalDisplay -> Rational -> Core
 
   -- | An anonymous function.
   CAbs  :: Bind (Name Core) Core -> Core
@@ -145,9 +162,10 @@ data CPattern where
 
   deriving Show
 
-derive [''Core, ''Op, ''CPattern, ''CGuards]
+derive [''RationalDisplay, ''Core, ''Op, ''CPattern, ''CGuards]
 
 instance Alpha Rational   -- XXX duplicate orphan!
+instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern

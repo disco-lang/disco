@@ -9,12 +9,15 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 import           Data.Ratio
+import qualified Data.Map                as M
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
                                           unembed, unrebind)
 
+import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.Interpret.Core    (Value(..))
 import           Disco.Types
 
 
@@ -264,3 +267,90 @@ prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
 
 renderDoc :: Doc -> String
 renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+
+------------------------------------------------------------
+-- Pretty-printing values
+------------------------------------------------------------
+
+-- | Basic pretty-printing of values.
+prettyValue :: Type -> Value -> String
+prettyValue TyUnit (VCons 0 []) = "()"
+prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
+prettyValue (TyList ty) v = prettyList ty v
+prettyValue _ (VClos _ _)       = "<closure>"
+prettyValue _ (VThunk _ _)      = "<thunk>"
+prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
+  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
+prettyValue (TySum ty1 ty2) (VCons i [v])
+  = case i of
+      0 -> "inl " ++ prettyValue ty1 v
+      1 -> "inr " ++ prettyValue ty2 v
+      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
+prettyValue _ (VNum d r)
+  | denominator r == 1 = show (numerator r)
+  | otherwise          = case d of
+      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> prettyDecimal r
+
+prettyValue _ _ = error "Impossible! No matching case in prettyValue"
+
+prettyList :: Type -> Value -> String
+prettyList ty v = "[" ++ go v
+  where
+    go (VCons 0 []) = "]"
+    go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
+    go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
+    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+
+--------------------------------------------------
+-- Pretty-printing decimals
+
+-- | Pretty-print a rational number using its decimal expansion, in
+--   the format @nnn.prefix[rep]...@, with any repeating digits enclosed
+--   in square brackets.
+prettyDecimal :: Rational -> String
+prettyDecimal r = show n ++ "." ++ fractionalDigits
+  where
+    (n,d) = properFraction r
+    (prefix,rep) = toDecimalDigits (numerator d) (denominator d)
+    fractionalDigits = concatMap show prefix ++ repetend
+    repetend = case rep of
+      []  -> ""
+      [0] -> ""
+      _   -> "[" ++ concatMap show rep ++ "]"
+
+-- Given a list, find the indices of the list giving the first and
+-- second occurrence of the first element to repeat, or Nothing if
+-- there are no repeats.
+findRep :: Ord a => [a] -> Maybe (Int,Int)
+findRep = findRep' M.empty 0
+
+findRep' :: Ord a => M.Map a Int -> Int -> [a] -> Maybe (Int,Int)
+findRep' _ _ [] = Nothing
+findRep' prevs ix (x:xs)
+  | x `M.member` prevs = Just (prevs M.! x, ix)
+  | otherwise          = findRep' (M.insert x ix prevs) (ix+1) xs
+
+slice :: (Int,Int) -> [a] -> [a]
+slice (s,f) = drop s . take f
+
+-- | @toDecimalDigits n d@ takes the numerator and denominator of a
+--   fraction between 0 and 1, and returns two lists of digits
+--   @(prefix, rep)@, such that the infinite decimal expansion of n/d is
+--   @prefix ++ cycle rep@.  For example,
+--
+--   > toDecimalDigits 1 4  = ([2,5],[0])
+--   > toDecimalDigits 1 7  = ([], [1,4,2,8,5,7])
+--   > toDecimalDigits 3 28 = ([1,0], [7,1,4,2,8,5])
+--
+toDecimalDigits :: Integer -> Integer -> ([Integer],[Integer])
+toDecimalDigits n d = (prefix,rep)
+  where
+    decimalStep n (d,r) = ((10*r) `divMod` n)
+    res       = tail $ iterate (decimalStep d) (0,n)
+    digits    = map fst res
+    Just lims = findRep res
+    rep       = slice lims digits
+    prefix    = take (fst lims) digits
+
+-- TODO: generalize the above to work in any base

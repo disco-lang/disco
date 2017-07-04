@@ -1,0 +1,8 @@
+* Why does mathematical convention deal so ineptly with multisets?
+
+  Math stackexchange question with some good insights and interesting responses:
+  https://math.stackexchange.com/questions/152223/why-does-mathematical-convention-deal-so-ineptly-with-multisets
+* Coercion and type inference
+
+  John C. Mitchell
+  http://dl.acm.org/citation.cfm?id=800529&dl=ACM&coll=DL&CFID=781024363&CFTOKEN=74865356

@@ -59,6 +59,18 @@ data Sigma = Forall [String] Type
 mono :: Type -> Sigma
 mono = Forall []
 
+-- Substitution from type variables to types
+type TySubst = M.Map String Type
+
+tySubst :: TySubst -> Type -> Type
+tySubst θ (TyVar v) =
+  case M.lookup v θ of
+    Just ty -> ty
+    Nothing -> TyVar v
+tySubst _ TyNat = TyNat
+tySubst _ TyInt = TyInt
+tySubst θ (TyFun ty1 ty2) = TyFun (tySubst θ ty1) (tySubst θ ty2)
+
 type Ctx = M.Map String Sigma
 
 ------------------------------------------------------------
@@ -211,6 +223,23 @@ runTC (TC t) = runExcept . flip runReaderT M.empty . flip evalStateT 0 $ t
 extend :: String -> Sigma -> TC a -> TC a
 extend x s = local (M.insert x s)
 
+fresh :: TC String
+fresh = do
+  i <- get
+  put (i+1)
+  return ("a" ++ show i)
+
+freshening :: [String] -> TC TySubst
+freshening as = do
+  as' <- mapM (const fresh) as
+  return $ M.fromList (zip as (map TyVar as'))
+
+-- Instantiate a forall with fresh type variables.
+inst :: Sigma -> TC Type
+inst (Forall vs ty) = do
+  θ <- freshening vs
+  return (tySubst θ ty)
+
 --------------------------------------------------
 -- Inference mode
 
@@ -221,9 +250,10 @@ data TypeError where
   NonNum   :: Type   -> TypeError
   NoLub    :: Type -> Type -> TypeError
   NotFunTy :: Type -> TypeError
+  deriving Show
 
 -- Infer returns a *monotype* (which can contain type variables).
--- There is a separate function for inferring a polytype, which first
+-- There will be a separate function for inferring a polytype, which first
 -- runs 'infer' and then generalizes over free type variables.
 
 infer :: Expr -> TC (Type, [SubC])
@@ -231,7 +261,7 @@ infer (EVar x) = do
   ctx <- ask
   case M.lookup x ctx of
     Nothing  -> throwError $ Unbound x
-    Just sig -> undefined   -- generate fresh ty vars
+    Just sig -> (,[]) <$> inst sig
 infer (ENat _) = return (TyNat, [])
 infer (EBin Plus e1 e2 ) = do
   (v1, d1) <- infer e1
@@ -253,15 +283,26 @@ infer (EApp e1 e2) = do
       d2 <- check e2 ty1
       return (ty2, d1 ++ d2)
     _             -> throwError $ NotFunTy funty
-infer (EAnn t sig) = undefined
-  -- instantiate sig with fresh ty vars
-  -- check t with the resulting type
+infer (EAnn t sig) = do
+  ty <- inst sig
+  d <- check t ty
+
   -- ensure that there are no nontrivial constraints containing the fresh ty vars
   -- return sig along with only those constraints not mentioning the fresh ty vars
-
+  --
   -- Should write something to simplify subtyping constraints as we go
   -- along.  At this point I don't think it's realistic to only
   -- collect them and solve at the very end.
+  --
+  -- Somehow we need to take advantage of the fact that we only
+  -- ultimately care about subtyping between numeric types?
+  --
+  -- Yes! See sections 5 & 6 of Fuh and Mishra, Type Inference with
+  -- Subtypes (TCS 73 (1990) pp.155-175).
+  --
+  -- Need to figure out how this relates to bidirectionality.
+  --
+  -- Want to get a copy of http://dl.acm.org/citation.cfm?id=800529&dl=ACM&coll=DL&CFID=781024363&CFTOKEN=74865356
 
 checkNumTy :: Type -> TC ()
 checkNumTy TyNat = return ()

@@ -72,6 +72,8 @@ import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
+import           Math.NumberTheory.Logarithms       (integerLog2)
+
 import           Disco.AST.Core
 import           Disco.Types
 
@@ -172,6 +174,9 @@ data InterpError where
 
   -- | Division by zero.
   DivByZero     ::              InterpError
+
+  -- | Taking the base-2 logarithm of zero.
+  LgOfZero      ::              InterpError
 
   -- | v should be a boolean, but isn't.
   NotABool      :: Value     -> InterpError
@@ -370,6 +375,7 @@ whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OSqrt    = uNumOp integerSqrt
+whnfOp OLg      = lgOp
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
@@ -384,6 +390,8 @@ whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
+whnfOp OEnum    = enumOp
+whnfOp OCount   = countOp
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -404,7 +412,29 @@ uNumOp f [c] = do
   return $ VNum (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
--- | Perform a square root on an operation. If the program typechecks,
+-- | Perform a count on the number of values for the given type.
+countOp :: [Core] -> IM Value
+countOp [CType ty]  = return $ VNum ((countOp' ty) % 1)
+
+countOp' :: Type -> Integer
+countOp' TyVoid            = 0
+countOp' TyUnit            = 1
+countOp' TyBool            = 2
+countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
+countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
+countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
+-- All other types are infinite
+countOp' _                 = error "Impossible! The type is infinite."
+
+-- | Perform an enumeration of the values of a given type.
+enumOp :: [Core] -> IM Value
+enumOp [CType ty] = return $ (convert (enumerate ty))
+
+convert :: [Value] -> Value
+convert []       = VCons 0 []
+convert (x : xs) = VCons 1 [x, convert xs]
+
+-- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
 integerSqrt :: Rational -> Rational
 integerSqrt n = integerSqrt' (fromIntegral (numerator n)) % 1
@@ -426,6 +456,16 @@ integerSqrt' n =
 -- this operator is used for `integerSqrt'`
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
+
+-- | Perform a base-2 logarithmic operation
+lgOp :: [Core] -> IM Value
+lgOp [c] = do
+  VNum m <- whnf c
+  lgOp' m
+
+lgOp' :: Rational -> IM Value
+lgOp' 0 = throwError LgOfZero
+lgOp' n = return $ VNum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
@@ -532,7 +572,7 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
   clos1 <- whnfV v1
   clos2 <- whnfV v2
 
-  -- Enumerate all the values of type ty1.
+  --  all the values of type ty1.
   let ty1s = enumerate ty1
 
   -- Try evaluating the functions on each value and check whether they

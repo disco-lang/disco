@@ -114,6 +114,7 @@ desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) op <$> desugarTerm t1 <*> desugarTerm t2
+desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
 desugarTerm (ATList _ es) = do
   des <- mapM desugarTerm es
@@ -133,6 +134,7 @@ desugarUOp Neg  c = COp ONeg  [c]
 desugarUOp Not  c = COp ONot  [c]
 desugarUOp Fact c = COp OFact [c]
 desugarUOp Sqrt c = COp OSqrt [c]
+desugarUOp Lg   c = COp OLg   [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> BOp -> Core -> Core -> Core
@@ -154,6 +156,11 @@ desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
 desugarBOp _  Cons    c1 c2 = CCons 1 [c1, c2]
+
+-- | Desugar a type operator application.
+desugarTyOp :: TyOp -> Type -> Core
+desugarTyOp Enumerate ty = COp OEnum  [CType ty]
+desugarTyOp Count     ty = COp OCount [CType ty]
 
 desugarChain :: ATerm -> [ALink] -> DSM Core
 desugarChain _ [] = error "Can't happen! desugarChain _ []"

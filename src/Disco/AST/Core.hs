@@ -72,6 +72,9 @@ data Core where
   -- | A case expression.
   CCase :: [CBranch] -> Core
 
+  -- | A type.
+  CType :: Type -> Core
+
   deriving Show
 
 -- | Operators that can show up in the core language.  Note that not
@@ -80,6 +83,7 @@ data Core where
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
         | OSqrt    -- ^ Integer square root (@sqrt@)
+        | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OMul     -- ^ Multiplication (@*@)
         | ODiv     -- ^ Division (@/@)
         | OExp     -- ^ Exponentiation (@^@)
@@ -99,6 +103,8 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OLt Type -- ^ Less than (@<@).  Similarly, typechecking has
                    --   determined that the given type has a decidable
                    --   ordering relation.
+        | OEnum
+        | OCount
   deriving Show
 
 -- | A branch, consisting of a list of guards and a term.

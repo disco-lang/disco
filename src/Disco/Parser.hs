@@ -48,7 +48,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseInj, parseLet
+       , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
        , parseCase, parseBranch, parseGuards, parseGuard
@@ -399,7 +399,8 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt"
+  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
+  , "enumerate", "count"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -527,6 +528,7 @@ parseAtom = -- trace "parseAtom" $
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
+  <|> parseTypeOp
 
   <|> parens parseTerm
 
@@ -640,6 +642,8 @@ parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
               ]
             , [ unary "sqrt" (TUn Sqrt)
               ]
+            , [ unary "lg" (TUn Lg)
+              ]
             , [ infixN "choose" (TBin Binom)
               ]
             , [ infixL "*" (TBin Mul)
@@ -730,3 +734,11 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
+
+parseTyOp :: Parser TyOp
+parseTyOp =
+        Enumerate <$ reserved "enumerate"
+    <|> Count     <$ reserved "count"
+
+parseTypeOp :: Parser Term
+parseTypeOp = TTyOp <$> parseTyOp <*> parseAtomicType

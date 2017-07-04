@@ -114,6 +114,7 @@ data TCError
                            --   check equality, but it isn't.
   | Unordered Type         -- ^ The type should be totally ordered so
                            --   we can check less than, but it isn't.
+  | Infinite Type
   | EmptyCase              -- ^ Case analyses cannot be empty.
   | NoLub Type Type        -- ^ The given types have no lub.
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
@@ -329,6 +330,12 @@ isFinite (TySum ty1 ty2)  = isFinite ty1 && isFinite ty2
 isFinite (TyArr ty1 ty2)  = isFinite ty1 && isFinite ty2
 isFinite _ = False
 
+-- | Check whether the given type is finite, and throw an error if not.
+checkFinite :: Type -> TCM ()
+checkFinite ty
+  | isFinite ty = return ()
+  | otherwise   = throwError $ Infinite ty
+
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
 isDecidable (TyVar _) = error "isDecidable TyVar"
@@ -452,6 +459,10 @@ infer (TUn Sqrt t) = do
   at <- check t TyN
   return $ ATUn TyN Sqrt at
 
+infer (TUn Lg t)  = do
+  at <- check t TyN
+  return $ ATUn TyN Lg at
+
   -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do
   at1 <- infer t1
@@ -553,6 +564,14 @@ infer (TList (e:es)) = do
   let ty = getType ate
   ates <- mapM (flip check ty) es
   return $ ATList (TyList ty) (ate : ates)
+
+infer (TTyOp Enumerate t) = do
+  at <- checkFinite t
+  return $ ATTyOp (TyList t) Enumerate t
+
+infer (TTyOp Count t) = do
+  at <- checkFinite t
+  return $ ATTyOp TyN Count t
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of

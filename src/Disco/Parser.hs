@@ -550,20 +550,23 @@ term = whitespace *> parseTerm <* eof
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = -- trace "parseAtom" $
-      TUnit       <$ reserved "()"
-  <|> TList       <$> brackets (parseTerm `sepBy` comma)
+      TList       <$> brackets (parseTerm `sepBy` comma)
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
-  <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
   <|> parseTypeOp
   <|> TUn Floor <$> fbrack parseTerm
   <|> TUn Ceil <$> cbrack parseTerm
 
-  <|> parens parseTerm
+  <|> tuple <$> (parens (parseTerm `sepBy` comma))
+
+tuple :: [Term] -> Term
+tuple []  = TUnit
+tuple [x] = x
+tuple t   = TTup t
 
 -- | Parse an injection, i.e. either @inl@ or @inr@.
 parseInj :: Parser Side

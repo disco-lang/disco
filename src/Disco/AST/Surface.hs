@@ -154,6 +154,8 @@ data Term where
   TJuxt  :: Term -> Term -> Term
 
   -- | An ordered pair, @(x,y)@.
+  TTup   :: [Term] -> Term
+
   TPair  :: Term -> Term -> Term
 
   -- | An injection into a sum type.

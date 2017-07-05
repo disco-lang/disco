@@ -42,7 +42,6 @@ library
                        Disco.Pretty
                        Disco.Desugar
                        Disco.Interpret.Core
-                       Disco.Interpret.Surface
                        Disco.Typecheck
                        Disco.Types
 

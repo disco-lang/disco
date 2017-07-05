@@ -156,8 +156,6 @@ data Term where
   -- | An ordered pair, @(x,y)@.
   TTup   :: [Term] -> Term
 
-  TPair  :: Term -> Term -> Term
-
   -- | An injection into a sum type.
   TInj   :: Side -> Term -> Term
 

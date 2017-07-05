@@ -98,6 +98,8 @@ data TCError
   | NotSum Term Type       -- ^ The term is an injection but is
                            --   expected to have some type other than
                            --   a sum type
+  | NotTuple Term Type     -- ^ The term is a tuple but has a type
+                           --   which is not an appropriate product type
   | Mismatch Type ATerm    -- ^ Simple type mismatch: expected, actual
   | CantInfer Term         -- ^ We were asked to infer the type of the
                            --   term, but its type cannot be inferred
@@ -197,10 +199,9 @@ addDefn x b = modify (M.insert (translate x) b)
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
 
-check (TPair t1 t2) ty@(TyPair ty1 ty2) = do
-  at1 <- check t1 ty1
-  at2 <- check t2 ty2
-  return $ ATPair ty at1 at2
+check (TTup ts) ty = do
+  ats <- checkTuple ts ty
+  return $ ATTup ty ats
 
 check (TList xs) ty@(TyList eltTy) = do
   axs <- mapM (flip check eltTy) xs
@@ -247,6 +248,19 @@ check (TCase bs) ty = do
 check t ty = do
   at <- infer t
   checkSub at ty
+
+-- | Check the types of terms in a tuple against a nested
+--   pair type.
+checkTuple :: [Term] -> Type -> TCM [ATerm]
+checkTuple [] _   = error "Impossible! checkTuple []"
+checkTuple [t] ty = do     -- (:[]) <$> check t ty
+  at <- check t ty
+  return [at]
+checkTuple (t:ts) (TyPair ty1 ty2) = do
+  at  <- check t ty1
+  ats <- checkTuple ts ty2
+  return (at:ats)
+checkTuple ts ty = throwError $ NotTuple (TTup ts) ty
 
 -- | Check the type of a branch, returning a type-annotated branch.
 checkBranch :: Type -> Branch -> TCM ABranch
@@ -426,10 +440,9 @@ infer (TJuxt t t')   = do
   inferFunApp at t' <|> inferMulApp at t' <|> throwError (Juxtaposition at t')
 
   -- To infer the type of a pair, just infer the types of both components.
-infer (TPair t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  return $ ATPair (TyPair (getType at1) (getType at2)) at1 at2
+infer (TTup ts) = do
+  (ty, ats) <- inferTuple ts
+  return $ ATTup ty ats
 
   -- To infer the type of addition or multiplication, infer the types
   -- of the subterms, check that they are numeric, and return their
@@ -646,6 +659,10 @@ inferChain t1 (TLink op t2 : links) = do
   at2 <- infer t2
   _   <- check (TBin op t1 t2) TyBool
   (ATLink op at2 :) <$> inferChain t2 links
+
+inferTuple :: [Term] -> TCM (Type, [ATerm])
+inferTuple [] = error "Impossible! inferTuple []"
+inferTuple _  = undefined
 
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.

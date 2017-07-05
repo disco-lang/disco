@@ -19,6 +19,8 @@ module Disco.Types
        ( Type(..)
 
        , isNumTy, Strictness(..), strictness
+
+       , unpair
        )
        where
 
@@ -82,6 +84,11 @@ strictness :: Type -> Strictness
 strictness ty
   | isNumTy ty = Strict
   | otherwise  = Lazy
+
+-- | Decompose T1 * (T2 * ( ... )) into a list of types.
+unpair :: Type -> [Type]
+unpair (TyPair ty1 ty2) = ty1 : unpair ty2
+unpair ty               = [ty]
 
 derive [''Type, ''Strictness]
 

@@ -70,8 +70,8 @@ data ATerm where
   --   whether we have a function application or a multiplication.
   ATApp   :: Type -> ATerm -> ATerm -> ATerm
 
-  -- | A pair.
-  ATPair  :: Type -> ATerm -> ATerm -> ATerm
+  -- | An n-tuple.
+  ATTup   :: Type -> [ATerm] -> ATerm
 
   -- | A sum type injection.
   ATInj   :: Type -> Side -> ATerm -> ATerm
@@ -118,7 +118,7 @@ getType (ATNat _)        = TyN
 getType (ATRat _)        = TyQP
 getType (ATAbs ty _)     = ty
 getType (ATApp ty _ _)   = ty
-getType (ATPair ty _ _)  = ty
+getType (ATTup ty _)     = ty
 getType (ATInj ty _ _)   = ty
 getType (ATUn ty _ _)    = ty
 getType (ATBin ty _ _ _) = ty

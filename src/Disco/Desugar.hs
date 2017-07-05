@@ -130,11 +130,13 @@ desugarTerm (ATSub _ t)  = desugarTerm t
 
 -- | Desugar a unary operator application.
 desugarUOp :: UOp -> Core -> Core
-desugarUOp Neg  c = COp ONeg  [c]
-desugarUOp Not  c = COp ONot  [c]
-desugarUOp Fact c = COp OFact [c]
-desugarUOp Sqrt c = COp OSqrt [c]
-desugarUOp Lg   c = COp OLg   [c]
+desugarUOp Neg    c = COp ONeg    [c]
+desugarUOp Not    c = COp ONot    [c]
+desugarUOp Fact   c = COp OFact   [c]
+desugarUOp Sqrt   c = COp OSqrt   [c]
+desugarUOp Lg     c = COp OLg     [c]
+desugarUOp Floor  c = COp OFloor  [c]
+desugarUOp Ceil   c = COp OCeil   [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> BOp -> Core -> Core -> Core

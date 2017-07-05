@@ -362,11 +362,13 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets :: Parser a -> Parser a
+parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
+fbrack    = between (symbol "⌊") (symbol "⌋")
+cbrack    = between (symbol "⌈") (symbol "⌉")
 
 semi, comma, colon, dot :: Parser String
 semi      = symbol ";"
@@ -400,7 +402,7 @@ reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
-  , "enumerate", "count"
+  , "enumerate", "count", "floor", "ceiling"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -529,6 +531,8 @@ parseAtom = -- trace "parseAtom" $
   <|> TInj <$> parseInj <*> parseAtom
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
   <|> parseTypeOp
+  <|> TUn Floor <$> fbrack parseTerm
+  <|> TUn Ceil <$> cbrack parseTerm
 
   <|> parens parseTerm
 
@@ -643,6 +647,9 @@ parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
             , [ unary "sqrt" (TUn Sqrt)
               ]
             , [ unary "lg" (TUn Lg)
+              ]
+            , [ unary "floor" (TUn Floor)
+              , unary "ceiling" (TUn Ceil)
               ]
             , [ infixN "choose" (TBin Binom)
               ]

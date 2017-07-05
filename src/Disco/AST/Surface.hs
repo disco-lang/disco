@@ -98,6 +98,8 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Fact  -- ^ Factorial (@!@)
          | Sqrt  -- ^ Integer square root (@sqrt@)
          | Lg    -- ^ Floor of base-2 logarithm (@lg@)
+         | Floor -- ^ Floor of fractional type (@floor@)
+         | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
   deriving (Show, Eq)
 
 -- | Binary operators.

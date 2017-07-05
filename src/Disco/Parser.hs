@@ -356,7 +356,7 @@ symbol s = requireVirtual >> L.symbol whitespace s
 
 -- | Like 'symbol', but discard the result.
 reservedOp :: String -> Parser ()
-reservedOp s = try (symbol s *> notFollowedBy (oneOf opChar))
+reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]

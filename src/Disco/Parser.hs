@@ -531,6 +531,8 @@ parseAtom = -- trace "parseAtom" $
   <|> TInj <$> parseInj <*> parseAtom
   <|> try (TPair <$> (symbol "(" *> parseTerm) <*> (symbol "," *> parseTerm <* symbol ")"))
   <|> parseTypeOp
+  <|> TUn Floor <$> fbrack parseTerm
+  <|> TUn Ceil <$> cbrack parseTerm
 
   <|> parens parseTerm
 

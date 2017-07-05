@@ -661,8 +661,15 @@ inferChain t1 (TLink op t2 : links) = do
   (ATLink op at2 :) <$> inferChain t2 links
 
 inferTuple :: [Term] -> TCM (Type, [ATerm])
-inferTuple [] = error "Impossible! inferTuple []"
-inferTuple _  = undefined
+inferTuple []     = error "Impossible! inferTuple []"
+inferTuple [t]    = do
+  at <- infer t
+  return (getType at, [at])
+inferTuple (t:ts) = do
+  at <- infer t
+  (ty, ats) <- inferTuple ts
+  return (TyPair (getType at) ty, at:ats)
+
 
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.

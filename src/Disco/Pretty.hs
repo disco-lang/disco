@@ -9,12 +9,15 @@ import           Data.Char               (toLower)
 import           Data.List               (findIndex)
 import           Data.Maybe              (fromJust)
 import           Data.Ratio
+import qualified Data.Map                as M
 
 import qualified Text.PrettyPrint        as PP
 import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
                                           unembed, unrebind)
 
+import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.Interpret.Core    (Value(..))
 import           Disco.Types
 
 
@@ -174,12 +177,7 @@ prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TList {})   = error "prettyTerm TList unimplemented"
-prettyTerm (TRat  r)    =
-     text (show (numerator r `div` denominator r)) <> text "."
-  <> text (decimalize (10 * (numerator r `mod` denominator r)) (denominator r))
-  where
-    decimalize 0 _ = ""
-    decimalize n d = show (n `div` d) ++ decimalize (10 * (n `mod` d)) d
+prettyTerm (TRat  r)    = text (prettyDecimal r)
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -266,3 +264,92 @@ prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
 
 renderDoc :: Doc -> String
 renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+
+------------------------------------------------------------
+-- Pretty-printing values
+------------------------------------------------------------
+
+-- | Basic pretty-printing of values.
+prettyValue :: Type -> Value -> String
+prettyValue TyUnit (VCons 0 []) = "()"
+prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
+prettyValue (TyList ty) v = prettyList ty v
+prettyValue _ (VClos _ _)       = "<closure>"
+prettyValue _ (VThunk _ _)      = "<thunk>"
+prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
+  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
+prettyValue (TySum ty1 ty2) (VCons i [v])
+  = case i of
+      0 -> "inl " ++ prettyValue ty1 v
+      1 -> "inr " ++ prettyValue ty2 v
+      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
+prettyValue _ (VNum d r)
+  | denominator r == 1 = show (numerator r)
+  | otherwise          = case d of
+      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> prettyDecimal r
+
+prettyValue _ _ = error "Impossible! No matching case in prettyValue"
+
+prettyList :: Type -> Value -> String
+prettyList ty v = "[" ++ go v
+  where
+    go (VCons 0 []) = "]"
+    go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
+    go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
+    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+
+--------------------------------------------------
+-- Pretty-printing decimals
+
+-- | Pretty-print a rational number using its decimal expansion, in
+--   the format @nnn.prefix[rep]...@, with any repeating digits enclosed
+--   in square brackets.
+prettyDecimal :: Rational -> String
+prettyDecimal r = show n ++ "." ++ fractionalDigits
+  where
+    (n,d) = properFraction r
+    (prefix,rep) = digitalExpansion 10 (numerator d) (denominator d)
+    fractionalDigits = concatMap show prefix ++ repetend
+    repetend = case rep of
+      []  -> ""
+      [0] -> ""
+      _   -> "[" ++ concatMap show rep ++ "]"
+
+-- Given a list, find the indices of the list giving the first and
+-- second occurrence of the first element to repeat, or Nothing if
+-- there are no repeats.
+findRep :: Ord a => [a] -> Maybe (Int,Int)
+findRep = findRep' M.empty 0
+
+findRep' :: Ord a => M.Map a Int -> Int -> [a] -> Maybe (Int,Int)
+findRep' _ _ [] = Nothing
+findRep' prevs ix (x:xs)
+  | x `M.member` prevs = Just (prevs M.! x, ix)
+  | otherwise          = findRep' (M.insert x ix prevs) (ix+1) xs
+
+slice :: (Int,Int) -> [a] -> [a]
+slice (s,f) = drop s . take f
+
+-- | @digitalExpansion b n d@ takes the numerator and denominator of a
+--   fraction n/d between 0 and 1, and returns two lists of digits
+--   @(prefix, rep)@, such that the infinite base-b expansion of n/d is
+--   0.@(prefix ++ cycle rep)@.  For example,
+--
+--   > digitalExpansion 10 1 4  = ([2,5],[0])
+--   > digitalExpansion 10 1 7  = ([], [1,4,2,8,5,7])
+--   > digitalExpansion 10 3 28 = ([1,0], [7,1,4,2,8,5])
+--   > digitalExpansion 2  1 5  = ([], [0,0,1,1])
+--
+--   It works by performing the standard long division algorithm, and
+--   looking for the first time that the remainder repeats.
+digitalExpansion :: Integer -> Integer -> Integer -> ([Integer],[Integer])
+digitalExpansion b n d = (prefix,rep)
+  where
+    longDivStep n (d,r) = ((b*r) `divMod` n)
+    res       = tail $ iterate (longDivStep d) (0,n)
+    digits    = map fst res
+    Just lims = findRep res
+    rep       = slice lims digits
+    prefix    = take (fst lims) digits
+

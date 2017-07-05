@@ -24,7 +24,7 @@
 module Disco.Interpret.Core
        (
          -- * Values
-         Value(..), ValFun(..), prettyValue
+         Value(..), ValFun(..)
 
          -- * Interpreter monad
        , Env, DefEnv
@@ -65,6 +65,7 @@ import           Control.Monad.Reader
 import           Data.Char                          (toLower)
 import           Data.List                          (find)
 import qualified Data.Map                           as M
+import           Data.Monoid
 import           Data.Ratio
 
 import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
@@ -83,8 +84,9 @@ import           Disco.Types
 
 -- | The type of values produced by the interpreter.
 data Value where
-  -- | A numeric value.
-  VNum   :: Rational -> Value
+  -- | A numeric value, which also carries a flag saying how
+  --   fractional values should be diplayed.
+  VNum   :: RationalDisplay -> Rational -> Value
 
   -- | A constructor with arguments.  The Int indicates which
   --   constructor it is.  For example, False is represented by
@@ -122,34 +124,10 @@ newtype ValFun = ValFun (Value -> Value)
 instance Show ValFun where
   show _ = "<fun>"
 
--- | Basic pretty-printing of values.
-prettyValue :: Type -> Value -> String
-prettyValue TyUnit (VCons 0 []) = "()"
-prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
-prettyValue (TyList ty) v = prettyList ty v
-prettyValue _ (VClos _ _)       = "<closure>"
-prettyValue _ (VThunk _ _)      = "<thunk>"
-prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
-  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
-prettyValue (TySum ty1 ty2) (VCons i [v])
-  = case i of
-      0 -> "inl " ++ prettyValue ty1 v
-      1 -> "inr " ++ prettyValue ty2 v
-      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
-prettyValue _ (VNum r)
-  | denominator r               == 1 = show (numerator r)
-  | otherwise                   = show (numerator r) ++ "/" ++ show (denominator r)
-
-prettyValue _ _ = error "Impossible! No matching case in prettyValue"
-
-prettyList :: Type -> Value -> String
-prettyList ty v = "[" ++ go v
-  where
-    go (VCons 0 []) = "]"
-    go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
-    go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
-    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
-
+-- | A convenience function for creating a default @VNum@ value with a
+--   default (@Fractional@) flag.
+vnum :: Rational -> Value
+vnum = VNum mempty
 
 ------------------------------------------------------------
 -- Environments & errors
@@ -278,7 +256,7 @@ whnf (CVar x) = do
         Nothing   -> throwError $ UnboundError x
 
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
-whnf (CNum n)       = return $ VNum n
+whnf (CNum d n)     = return $ VNum d n
 whnf (CAbs b)       = VClos b <$> getEnv
 whnf (CApp str c1 c2) = do
   v1 <- whnf c1
@@ -348,14 +326,14 @@ match v (CPCons i ps) = do
         Nothing -> noMatch
         Just es -> return $ Just (M.unions es)
 match v (CPNat n)     = do
-  VNum m <- whnfV v
+  VNum _ m <- whnfV v
   case m == n % 1 of
     False -> noMatch
     True  -> ok
 match v (CPSucc p) = do
-  VNum n <- whnfV v
+  VNum _ n <- whnfV v
   case n > 0 of
-    True  -> match (VNum (n-1)) p
+    True  -> match (vnum (n-1)) p
     False -> noMatch
 
 -- | Convenience function: successfully match with no bindings.
@@ -397,26 +375,29 @@ whnfOp OCount   = countOp
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
-numOp (#) = numOp' (\m n -> return (VNum (m # n)))
+numOp (#) = numOp' (\m n -> return (vnum (m # n)))
 
 -- | A more general version of 'numOp' where the binary operation has
 --   a result in the @IM@ monad (/e.g./ for operations which can throw
 --   a division by zero error).
 numOp' :: (Rational -> Rational -> IM Value) -> [Core] -> IM Value
 numOp' (#) cs = do
-  [VNum m, VNum n] <- mapM whnf cs     -- If the program type checked this can
-  m # n                                -- never go wrong.
+  [VNum d1 m, VNum d2 n] <- mapM whnf cs     -- If the program type checked this can
+  res <- m # n                               -- never go wrong.
+  case res of
+    VNum _ r -> return $ VNum (d1 <> d2) r   -- Re-flag any resulting numeric value with
+    _        -> return res                   --   the combination of the input flags.
 
 -- | Perform a numeric unary operation.
 uNumOp :: (Rational -> Rational) -> [Core] -> IM Value
 uNumOp f [c] = do
-  VNum m <- whnf c
-  return $ VNum (f m)
+  VNum d m <- whnf c
+  return $ VNum d (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value
-countOp [CType ty]  = return $ VNum ((countOp' ty) % 1)
+countOp [CType ty]  = return $ vnum ((countOp' ty) % 1)
 
 countOp' :: Type -> Integer
 countOp' TyVoid            = 0
@@ -468,18 +449,18 @@ ceilOp n  = (ceiling n) % 1
 -- | Perform a base-2 logarithmic operation
 lgOp :: [Core] -> IM Value
 lgOp [c] = do
-  VNum m <- whnf c
+  VNum _ m <- whnf c
   lgOp' m
 
 lgOp' :: Rational -> IM Value
 lgOp' 0 = throwError LgOfZero
-lgOp' n = return $ VNum (toInteger (integerLog2 (numerator n)) % 1)
+lgOp' n = return $ vnum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
 divOp :: Rational -> Rational -> IM Value
 divOp _ 0 = throwError DivByZero
-divOp m n = return $ VNum (m / n)
+divOp m n = return $ vnum (m / n)
 
 -- | Perform a mod operation; throw division by zero error if the
 --   second argument is zero.  Although this function takes two
@@ -488,7 +469,7 @@ divOp m n = return $ VNum (m / n)
 modOp :: Rational -> Rational -> IM Value
 modOp m n
   | n == 0    = throwError DivByZero
-  | otherwise = return $ VNum ((numerator m `mod` numerator n) % 1)
+  | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
 
@@ -710,7 +691,7 @@ decideEqForClosures ty2 clos1 clos2 = go
 --   N, Z, Q) are equal.
 primValEq :: Value -> Value -> Bool
 primValEq (VCons i []) (VCons j []) = i == j
-primValEq (VNum n1)    (VNum n2)    = n1 == n2
+primValEq (VNum _ n1)  (VNum _ n2)  = n1 == n2
 primValEq _ _                       = False
 
 ------------------------------------------------------------
@@ -837,5 +818,5 @@ decideOrdForClosures ty2 clos1 clos2 = go
 --   Unit, Bool, N, Z, Q).
 primValOrd :: Value -> Value -> Ordering
 primValOrd (VCons i []) (VCons j []) = compare i j
-primValOrd (VNum n1) (VNum n2)       = compare n1 n2
+primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
 primValOrd _ _                       = error "primValOrd: impossible!"

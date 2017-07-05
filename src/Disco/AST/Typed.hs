@@ -58,7 +58,8 @@ data ATerm where
   -- | A natural number.
   ATNat   :: Integer -> ATerm
 
-  -- | A nonnegative rational number.
+  -- | A nonnegative rational number (parsed and displayed as a
+  --   decimal).
   ATRat   :: Rational -> ATerm
 
   -- | Anonymous function, with its type.

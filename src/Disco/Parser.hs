@@ -385,12 +385,41 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 natural :: Parser Integer
 natural = lexeme L.integer
 
--- | Parse a nonnegative decimal of the form @xxx.yyyy@.
+-- | Parse a nonnegative decimal of the form @xxx.yyyy[zzz]@, where
+--   the @y@s and bracketed @z@s are optional.  For example, this
+--   parser accepts all of the following:
+--
+--   > 2.
+--   > 2.0
+--   > 2.333
+--   > 2.33[45]
+--   > 2.[45]
+--
+--   The idea is that brackets surround an infinitely repeating
+--   sequence of digits.
 decimal :: Parser Rational
-decimal = lexeme (readDecimal <$> some digit <* char '.' <*> some digit)
+decimal = lexeme (readDecimal <$> some digit <* char '.'
+                              <*> many digit
+                              <*> optionMaybe (brackets (some digit))
+                 )
   where
     digit = satisfy isDigit
-    readDecimal a b = (read a % 1) + (read b % (10^(length b)))
+    readDecimal a b mrep = read a % 1   -- integer part
+
+                           -- next part is just b/10^n
+                         + (if null b then 0 else read b) % (10^(length b))
+
+                           -- repeating part
+                         + readRep (length b) mrep
+    readRep _      Nothing    = 0
+    readRep offset (Just rep) = read rep % (10^offset * (10^(length rep) - 1))
+      -- If s = 0.[rep] then 10^(length rep) * s = rep.[rep], so
+      -- 10^(length rep) * s - s = rep, so
+      --
+      --   s = rep/(10^(length rep) - 1).
+      --
+      -- We also have to divide by 10^(length b) to shift it over
+      -- past any non-repeating prefix.
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()

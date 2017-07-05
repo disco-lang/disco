@@ -33,6 +33,9 @@ hsep ds  = PP.hsep <$> sequence ds
 parens :: Functor f => f PP.Doc -> f PP.Doc
 parens   = fmap PP.parens
 
+brackets :: Functor f => f PP.Doc -> f PP.Doc
+brackets = fmap PP.brackets
+
 text :: Monad m => String -> m PP.Doc
 text     = return . PP.text
 
@@ -151,7 +154,9 @@ prettyTerm (TJuxt t1 t2) = mparens funPA $
 prettyTerm (TTup ts)     = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 AL) ts)
   parens (hsep ds)
--- parens (prettyTerm' 0 AL t1 <> text "," <+> prettyTerm' 0 AL t2)
+prettyTerm (TList ts)    = do
+  ds <- punctuate (text ",") (map (prettyTerm' 0 AL) ts)
+  brackets (hsep ds)
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' 10 AR t
 prettyTerm (TNat n)      = integer n
@@ -184,7 +189,6 @@ prettyTerm (TLet bnd) = mparens initPA $
 prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
-prettyTerm (TList {})   = error "prettyTerm TList unimplemented"
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc

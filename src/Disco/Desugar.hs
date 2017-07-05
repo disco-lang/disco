@@ -104,8 +104,7 @@ desugarTerm (ATAbs _ lam) =
   return $ CAbs (bind (translate x) dt)
 desugarTerm (ATApp ty t1 t2) =
   CApp (strictness ty) <$> desugarTerm t1 <*> desugarTerm t2
-desugarTerm (ATPair _ t1 t2) =
-  CCons 0 <$> mapM desugarTerm [t1,t2]
+desugarTerm (ATTup _ ts) = desugarTuples ts
 desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
 desugarTerm (ATNat n) = return $ CNum Fraction (n%1)
@@ -127,6 +126,12 @@ desugarTerm (ATLet _ t) =
 desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugarTerm (ATAscr t _) = desugarTerm t
 desugarTerm (ATSub _ t)  = desugarTerm t
+
+-- | Desugar a tuple to nested pairs.
+desugarTuples :: [ATerm] -> DSM Core
+desugarTuples []      = error "Impossible! desugarTuples []"
+desugarTuples [t]     = desugarTerm t
+desugarTuples (t:ts)  = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
 
 -- | Desugar a unary operator application.
 desugarUOp :: UOp -> Core -> Core

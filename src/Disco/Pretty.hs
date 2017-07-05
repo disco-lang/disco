@@ -54,6 +54,12 @@ empty    = return PP.empty
 ($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
 ($+$) = liftA2 (PP.$+$)
 
+punctuate :: Monad f => f PP.Doc -> [f PP.Doc] -> f [f PP.Doc]
+punctuate p ds = do
+  p' <- p
+  ds' <- sequence ds
+  return . map return $ PP.punctuate p' ds'
+
 --------------------------------------------------
 -- Precedence and associativity
 
@@ -142,8 +148,10 @@ prettyTerm (TAbs bnd)    = mparens initPA $
   hsep [prettyName x, text "↦", prettyTerm' 0 AL body]
 prettyTerm (TJuxt t1 t2) = mparens funPA $
   prettyTerm' 10 AL t1 <+> prettyTerm' 10 AR t2
-prettyTerm (TPair t1 t2) =
-  parens (prettyTerm' 0 AL t1 <> text "," <+> prettyTerm' 0 AL t2)
+prettyTerm (TTup ts)     = do
+  ds <- punctuate (text ",") (map (prettyTerm' 0 AL) ts)
+  parens (hsep ds)
+-- parens (prettyTerm' 0 AL t1 <> text "," <+> prettyTerm' 0 AL t2)
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' 10 AR t
 prettyTerm (TNat n)      = integer n
@@ -276,8 +284,7 @@ prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
 prettyValue (TyList ty) v = prettyList ty v
 prettyValue _ (VClos _ _)       = "<closure>"
 prettyValue _ (VThunk _ _)      = "<thunk>"
-prettyValue (TyPair ty1 ty2) (VCons 0 [v1, v2])
-  = "(" ++ prettyValue ty1 v1 ++ ", " ++ prettyValue ty2 v2 ++ ")"
+prettyValue ty@(TyPair _ _) v   = "(" ++ prettyTuple ty v ++ ")"
 prettyValue (TySum ty1 ty2) (VCons i [v])
   = case i of
       0 -> "inl " ++ prettyValue ty1 v
@@ -298,6 +305,10 @@ prettyList ty v = "[" ++ go v
     go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
     go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
     go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+
+prettyTuple :: Type -> Value -> String
+prettyTuple (TyPair ty1 ty2) (VCons 0 [v1, v2]) = prettyValue ty1 v1 ++ ", " ++ prettyTuple ty2 v2
+prettyTuple ty v = prettyValue ty v
 
 --------------------------------------------------
 -- Pretty-printing decimals

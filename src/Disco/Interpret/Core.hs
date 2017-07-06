@@ -450,6 +450,7 @@ lgOp :: [Core] -> IM Value
 lgOp [c] = do
   VNum _ m <- whnf c
   lgOp' m
+lgOp cs = error $ "Impossible! lgOp on " ++ show cs
 
 lgOp' :: Rational -> IM Value
 lgOp' 0 = throwError LgOfZero

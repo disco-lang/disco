@@ -1,6 +1,6 @@
 :load test/case001/case001.disco
-foo (inl [])
-foo (inr true)
-foo (inr false)
-foo (inl [3])
-foo (inl [4,2])
+foo (left [])
+foo (right true)
+foo (right false)
+foo (left [3])
+foo (left [4,2])

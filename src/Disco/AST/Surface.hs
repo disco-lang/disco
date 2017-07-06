@@ -110,7 +110,7 @@ data BOp = Add     -- ^ Addition (@+@)
          | Mul     -- ^ Multiplication (@*@)
          | Div     -- ^ Division (@/@)
          | Exp     -- ^ Exponentiation (@^@)
-         | IDiv    -- ^ Integer division (@//@)  
+         | IDiv    -- ^ Integer division (@//@)
          | Eq      -- ^ Equality test (@==@)
          | Neq     -- ^ Not-equal (@/=@)
          | Lt      -- ^ Less than (@<@)
@@ -242,8 +242,8 @@ data Pattern where
   -- | Literal boolean pattern.
   PBool :: Bool -> Pattern
 
-  -- | Pair pattern @(pat1, pat2)@.
-  PPair :: Pattern -> Pattern -> Pattern
+  -- | Tuple pattern @(pat1, .. , patn)@.
+  PTup  :: [Pattern] -> Pattern
 
   -- | Injection pattern (@inl pat@ or @inr pat@).
   PInj  :: Side -> Pattern -> Pattern

@@ -637,18 +637,16 @@ parseAtomicPattern :: Parser Pattern
 parseAtomicPattern =
       PVar <$> ident
   <|> PWild <$ symbol "_"
-  <|> PUnit <$ symbol "()"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
   <|> PNat <$> natural
-  <|> try (PPair <$ symbol "("
-                 <*> parsePattern
-                 <*  symbol ","
-                 <*> parsePattern
-                 <*  symbol ")"
-          )
   <|> PList <$> brackets (parsePattern `sepBy` comma)
-  <|> parens parsePattern
+  <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
+
+tuplePat :: [Pattern] -> Pattern
+tuplePat []  = PUnit
+tuplePat [x] = x
+tuplePat t   = PTup t
 
 -- | Parse a pattern.
 parsePattern :: Parser Pattern

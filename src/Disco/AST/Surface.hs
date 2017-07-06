@@ -5,6 +5,8 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans  #-}  -- for Alpha Rational
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface

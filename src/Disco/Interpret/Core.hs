@@ -397,6 +397,7 @@ uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value
 countOp [CType ty]  = return $ vnum ((countOp' ty) % 1)
+countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 
 countOp' :: Type -> Integer
 countOp' TyVoid            = 0
@@ -406,11 +407,12 @@ countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
 countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
 countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
 -- All other types are infinite
-countOp' _                 = error "Impossible! The type is infinite."
+countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is infinite."
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> IM Value
 enumOp [CType ty] = return $ (convert (enumerate ty))
+enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
 convert :: [Value] -> Value
 convert []       = VCons 0 []

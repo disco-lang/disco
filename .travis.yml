@@ -68,7 +68,7 @@ script:
  - "echo 'packages: .' > cabal.project"
  # this builds all libraries and executables (without tests/benchmarks)
  - rm -f cabal.project.freeze
- - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
+ - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all --ghc-options='-Wall -Werror'
  # this builds all libraries and executables (including tests/benchmarks)
  # - rm -rf ./dist-newstyle
 
@@ -79,7 +79,7 @@ script:
  - PATH=$EXELOC:$PATH
 
  # build & run tests
- - cabal new-build -w ${HC} ${TEST} ${BENCH} all
+ - cabal new-build -w ${HC} ${TEST} ${BENCH} all --ghc-options='-Wall -Werror'
  - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} all; fi
 
 # EOF

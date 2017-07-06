@@ -198,8 +198,8 @@ prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 
 prettySide :: Side -> Doc
-prettySide L = text "inl"
-prettySide R = text "inr"
+prettySide L = text "left"
+prettySide R = text "right"
 
 prettyUOp :: UOp -> Doc
 prettyUOp Neg   = text "-"
@@ -294,8 +294,8 @@ prettyValue _ (VThunk _ _)      = "<thunk>"
 prettyValue ty@(TyPair _ _) v   = "(" ++ prettyTuple ty v ++ ")"
 prettyValue (TySum ty1 ty2) (VCons i [v])
   = case i of
-      0 -> "inl " ++ prettyValue ty1 v
-      1 -> "inr " ++ prettyValue ty2 v
+      0 -> "left " ++ prettyValue ty1 v
+      1 -> "right " ++ prettyValue ty2 v
       _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
 prettyValue _ (VNum d r)
   | denominator r == 1 = show (numerator r)
@@ -370,4 +370,3 @@ digitalExpansion b n d = (prefix,rep)
     Just lims = findRep res
     rep       = slice lims digits
     prefix    = take (fst lims) digits
-

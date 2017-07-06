@@ -100,6 +100,7 @@ data TCError
                            --   a sum type
   | NotTuple Term Type     -- ^ The term is a tuple but has a type
                            --   which is not an appropriate product type
+  | NotTuplePattern Pattern Type
   | Mismatch Type ATerm    -- ^ Simple type mismatch: expected, actual
   | CantInfer Term         -- ^ We were asked to infer the type of the
                            --   term, but its type cannot be inferred
@@ -728,8 +729,8 @@ checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok
 checkPattern PUnit TyUnit                   = ok
 checkPattern (PBool _) TyBool               = ok
-checkPattern (PPair p1 p2) (TyPair ty1 ty2) =
-  joinCtx <$> checkPattern p1 ty1 <*> checkPattern p2 ty2
+checkPattern (PTup ps) ty                   =
+  joinCtxs <$> checkTuplePat ps ty
 checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
 checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
 checkPattern (PNat _)   ty | isSub TyN ty   = ok
@@ -741,6 +742,17 @@ checkPattern (PList ps) (TyList ty) =
   joinCtxs <$> mapM (flip checkPattern ty) ps
 
 checkPattern p ty = throwError (PatternType p ty)
+
+checkTuplePat :: [Pattern] -> Type -> TCM [Ctx]
+checkTuplePat [] _   = error "Impossible! checkTuplePat []"
+checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
+  ctx <- checkPattern p ty
+  return [ctx]
+checkTuplePat (p:ps) (TyPair ty1 ty2) = do
+  ctx  <- checkPattern p ty1
+  ctxs <- checkTuplePat ps ty2
+  return (ctx:ctxs)
+checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
 
 -- | Successfully return the empty context.  A convenience method for
 --   checking patterns that bind no variables.

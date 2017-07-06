@@ -208,7 +208,7 @@ desugarPattern (PVar x)      = CPVar (translate x)
 desugarPattern PWild         = CPWild
 desugarPattern PUnit         = CPCons 0 []
 desugarPattern (PBool b)     = CPCons (fromEnum b) []
-desugarPattern (PPair p1 p2) = CPCons 0 [desugarPattern p1, desugarPattern p2]
+desugarPattern (PTup p)      = desugarTuplePats p
 desugarPattern (PInj s p)    = CPCons (fromEnum s) [desugarPattern p]
 desugarPattern (PNat n)      = CPNat n
 desugarPattern (PSucc p)     = CPSucc (desugarPattern p)
@@ -216,3 +216,8 @@ desugarPattern (PCons p1 p2) = CPCons 1 [desugarPattern p1, desugarPattern p2]
 desugarPattern (PList ps)    = foldr (\p cp -> CPCons 1 [desugarPattern p, cp])
                                      (CPCons 0 [])
                                      ps
+
+desugarTuplePats :: [Pattern] -> CPattern
+desugarTuplePats []      = error "Impossible! desugarTuplePats []"
+desugarTuplePats [p]     = desugarPattern p
+desugarTuplePats (p:ps)  = CPCons 0 [desugarPattern p, desugarTuplePats ps]

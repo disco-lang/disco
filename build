@@ -1,0 +1,2 @@
+#!/bin/sh
+stack build --fast --file-watch --ghc-options='-Wall'

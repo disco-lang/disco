@@ -289,8 +289,9 @@ prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"
 prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
 prettyValue (TyList ty) v = prettyList ty v
-prettyValue _ (VClos _ _)       = "<closure>"
+prettyValue _ (VClos _ _)       = "<function>"
 prettyValue _ (VThunk _ _)      = "<thunk>"
+prettyValue _ (VFun _)          = "<function>"
 prettyValue ty@(TyPair _ _) v   = "(" ++ prettyTuple ty v ++ ")"
 prettyValue (TySum ty1 ty2) (VCons i [v])
   = case i of

@@ -7,7 +7,6 @@ import           Control.Applicative     hiding (empty)
 import           Control.Monad.Reader
 import           Data.Char               (toLower)
 import           Data.List               (findIndex)
-import           Data.Maybe              (fromJust)
 import           Data.Ratio
 import qualified Data.Map                as M
 
@@ -71,7 +70,7 @@ data Assoc = AL | AR | AN
   deriving (Show, Eq)
 
 prec :: BOp -> Prec
-prec op = fromJust . findIndex (op `elem`) $
+prec op = fromJust' . findIndex (op `elem`) $
   [ []
   , []
   , [ Or ]
@@ -82,6 +81,10 @@ prec op = fromJust . findIndex (op `elem`) $
   , [ Mul, Div, Mod ]
   , [ Exp ]
   ]
+  where
+    fromJust' (Just x) = x
+    fromJust' Nothing  = error $
+      "Error! Unknown operator " ++ show op ++ " in Disco.Pretty.prec"
 
 assoc :: BOp -> Assoc
 assoc op

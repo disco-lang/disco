@@ -29,6 +29,7 @@ module Disco.AST.Surface
 
          -- * Terms
        , Side(..), UOp(..), BOp(..), Link(..)
+       , Qual(..), Quals(..)
        , TyOp(..), Term(..)
 
          -- * Case expressions and patterns

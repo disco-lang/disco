@@ -181,9 +181,11 @@ data Term where
   --   operators.
   TChain :: Term -> [Link] -> Term
 
-
   -- | A literal list.
   TList :: [Term] -> Term
+
+  -- | List comprehension.
+  TListComp :: Bind Quals Term -> Term
 
   -- | A (non-recursive) let expression, @let x = t1 in t2@.
   TLet   :: Bind (Name Term, Embed Term) Term -> Term
@@ -193,6 +195,32 @@ data Term where
 
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term
+  deriving Show
+
+-- Note: very similar to guards
+--  maybe some generalization in the future?
+-- | A list of qualifiers in list comprehension.
+--   Special type needed to record the binding structure.
+data Quals where
+
+  -- | The empty list of qualifiers
+  QEmpty :: Quals
+
+  -- | A qualifier followed by zero or more other qualifiers
+  --   this qualifier can bind variables in the subsequent qualifiers.
+  QCons  :: Rebind Qual Quals -> Quals
+
+  deriving Show
+
+-- | A single qualifier in a list comprehension.
+data Qual where
+
+  -- | A binding qualifier (i.e. @x <- t@)
+  QBind   :: Name Term -> Term -> Qual
+
+  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  QGuard  :: Term -> Qual
+
   deriving Show
 
 data Link where
@@ -263,7 +291,8 @@ data Pattern where
   deriving Show
   -- TODO: figure out how to match on Z or Q!
 
-derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Link, ''Guards, ''Guard, ''Pattern]
+derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Link,
+        ''Guards, ''Guard, ''Pattern, ''Qual, ''Quals]
 
 instance Alpha Rational   -- XXX orphan!
 instance Alpha Side
@@ -275,12 +304,16 @@ instance Alpha Term
 instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
+instance Alpha Quals
+instance Alpha Qual
 
 instance Subst Term Rational
 instance Subst Term Type
 instance Subst Term Guards
 instance Subst Term Guard
 instance Subst Term Pattern
+instance Subst Term Quals
+instance Subst Term Qual
 instance Subst Term Side
 instance Subst Term BOp
 instance Subst Term UOp

@@ -1,0 +1,9 @@
+count Void
+count Unit
+count Bool
+count (Bool + Bool -> Bool)
+count (Bool * Bool)
+enumerate (Bool -> Bool)
+enumerate (Bool * Bool + Bool)
+enumerate (Unit + Bool)
+enumerate (Void * Unit)

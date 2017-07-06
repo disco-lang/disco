@@ -326,7 +326,7 @@ prettyTuple ty v = prettyValue ty v
 prettyDecimal :: Rational -> String
 prettyDecimal r = show n ++ "." ++ fractionalDigits
   where
-    (n,d) = properFraction r
+    (n,d) = properFraction r :: (Integer, Rational)
     (prefix,rep) = digitalExpansion 10 (numerator d) (denominator d)
     fractionalDigits = concatMap show prefix ++ repetend
     repetend = case rep of
@@ -364,8 +364,8 @@ slice (s,f) = drop s . take f
 digitalExpansion :: Integer -> Integer -> Integer -> ([Integer],[Integer])
 digitalExpansion b n d = (prefix,rep)
   where
-    longDivStep n (d,r) = ((b*r) `divMod` n)
-    res       = tail $ iterate (longDivStep d) (0,n)
+    longDivStep (_, r) = ((b*r) `divMod` d)
+    res       = tail $ iterate longDivStep (0,n)
     digits    = map fst res
     Just lims = findRep res
     rep       = slice lims digits

@@ -62,7 +62,6 @@ module Disco.Interpret.Core
 import           Control.Lens                       ((%~), (.~), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
-import           Data.Char                          (toLower)
 import           Data.List                          (find)
 import qualified Data.Map                           as M
 import           Data.Monoid
@@ -773,6 +772,7 @@ decideOrdFor (TyList ty) v1 v2 = do
       case o of
         EQ -> decideOrdFor (TyList ty) l1' l2'
         _  -> return o
+    _ -> error $ "Impossible! decideOrdFor " ++ show (TyList ty, v1, v2)
 
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.

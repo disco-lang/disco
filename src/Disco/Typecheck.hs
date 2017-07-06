@@ -502,6 +502,14 @@ infer (TBin Div t1 t2) = do
   num4 <- lub num3 TyQP
   return $ ATBin num4 Div at1 at2
 
+ -- Very similar to division
+infer (TBin IDiv t1 t2) = do
+  at1 <- infer t1
+  at2 <- infer t2
+  num3 <- numLub at1 at2
+  let num4 = integralizeTy num3
+  return $ ATBin num4 IDiv at1 at2
+
 infer (TBin Exp t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2

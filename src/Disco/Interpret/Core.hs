@@ -271,6 +271,7 @@ whnf (CLet str b)   =
     Lazy   -> mkThunk t1
   extend (translate x) v1 $ whnf t2
 whnf (CCase bs)     = whnfCase bs
+whnf (CType _)      = error "Called whnf on CType"
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF

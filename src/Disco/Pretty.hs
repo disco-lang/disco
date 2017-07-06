@@ -193,6 +193,8 @@ prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
+prettyTerm (TTyOp op ty)  = mparens funPA $
+    prettyTyOp op <+> prettyTy' 10 AR ty
 
 prettyTerm' :: Prec -> Assoc -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -200,6 +202,10 @@ prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 prettySide :: Side -> Doc
 prettySide L = text "inl"
 prettySide R = text "inr"
+
+prettyTyOp :: TyOp -> Doc
+prettyTyOp Enumerate  = text "enumerate"
+prettyTyOp Count      = text "count"
 
 prettyUOp :: UOp -> Doc
 prettyUOp Neg   = text "-"
@@ -215,6 +221,7 @@ prettyBOp Add     = text "+"
 prettyBOp Sub     = text "-"
 prettyBOp Mul     = text "*"
 prettyBOp Div     = text "/"
+prettyBOp IDiv    = text "//"
 prettyBOp Exp     = text "^"
 prettyBOp Eq      = text "="
 prettyBOp Neq     = text "/="
@@ -370,4 +377,3 @@ digitalExpansion b n d = (prefix,rep)
     Just lims = findRep res
     rep       = slice lims digits
     prefix    = take (fst lims) digits
-

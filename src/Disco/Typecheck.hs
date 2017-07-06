@@ -419,6 +419,7 @@ integralizeTy TyN   = TyN
 integralizeTy TyZ   = TyZ
 integralizeTy TyQ   = TyZ
 integralizeTy TyQP  = TyN
+integralizeTy t     = error $ "Called integralizeTy on " ++ show t
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
@@ -605,11 +606,11 @@ infer (TList (e:es)) = do
   return $ ATList (TyList ty) (ate : ates)
 
 infer (TTyOp Enumerate t) = do
-  at <- checkFinite t
+  checkFinite t
   return $ ATTyOp (TyList t) Enumerate t
 
 infer (TTyOp Count t) = do
-  at <- checkFinite t
+  checkFinite t
   return $ ATTyOp TyN Count t
 
   -- To infer the type of (let x = t1 in t2), assuming it is

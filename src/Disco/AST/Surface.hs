@@ -181,7 +181,7 @@ opTable =
   , [ uopInfo Pre  Floor   ["floor"]
     , uopInfo Pre  Ceil    ["ceiling"]
     ]
-  , [ bopInfo In   Binom   ["choose"]
+  , [ bopInfo In   Choose   ["choose"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]

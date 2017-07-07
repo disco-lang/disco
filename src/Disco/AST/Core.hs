@@ -115,6 +115,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | ODivides -- ^ Divisibility test (@|@)
         | ORelPm   -- ^ Relative primality test (@#@)
         | OBinom   -- ^ Binomial coefficient (@choose@)
+        | OMultinom -- ^ Multinomial coefficient (@choose@)
         | OFact    -- ^ Factorial (@!@)
         | OEq Type -- ^ Equality test (@==@) at the given type.  At
                    --   this point, typechecking has determined that

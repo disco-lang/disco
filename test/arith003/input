@@ -14,3 +14,13 @@
 4 choose 4
 4 choose 5
 1000 choose 256
+10 choose []
+10 choose [1]
+10 choose [2]
+10 choose [2] = 10 choose 2
+10 choose [2,8] = 10 choose 2
+10 choose [2,3,4]
+10 choose [2,3,2] = 10! / (2! * 3! * 2! * 3!)
+10 choose [2,3,5]
+10 choose [2,3,6]
+10 choose [1,1,1,1,1,1,1,1,1,1]

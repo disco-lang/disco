@@ -112,7 +112,7 @@ desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
-  desugarBOp (getType t1) op <$> desugarTerm t1 <*> desugarTerm t2
+  desugarBOp (getType t1) (getType t2) op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
 desugarTerm (ATList _ es) = do
@@ -144,26 +144,28 @@ desugarUOp Floor  c = COp OFloor  [c]
 desugarUOp Ceil   c = COp OCeil   [c]
 
 -- | Desugar a binary operator application.
-desugarBOp :: Type -> BOp -> Core -> Core -> Core
-desugarBOp _  Add     c1 c2 = COp OAdd [c1,c2]
-desugarBOp _  Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
-desugarBOp _  Mul     c1 c2 = COp OMul [c1, c2]
-desugarBOp _  Div     c1 c2 = COp ODiv [c1, c2]
-desugarBOp _  IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]
-desugarBOp _  Exp     c1 c2 = COp OExp [c1, c2]
-desugarBOp ty Eq      c1 c2 = COp (OEq ty) [c1, c2]
-desugarBOp ty Neq     c1 c2 = COp ONot [COp (OEq ty) [c1, c2]]
-desugarBOp ty Lt      c1 c2 = COp (OLt ty) [c1, c2]
-desugarBOp ty Gt      c1 c2 = COp (OLt ty) [c2, c1]
-desugarBOp ty Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
-desugarBOp ty Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
-desugarBOp _  And     c1 c2 = COp OAnd [c1, c2]
-desugarBOp _  Or      c1 c2 = COp OOr  [c1, c2]
-desugarBOp _  Mod     c1 c2 = COp OMod [c1, c2]
-desugarBOp _  Divides c1 c2 = COp ODivides [c1, c2]
-desugarBOp _  RelPm   c1 c2 = COp ORelPm [c1, c2]
-desugarBOp _  Binom   c1 c2 = COp OBinom [c1, c2]
-desugarBOp _  Cons    c1 c2 = CCons 1 [c1, c2]
+desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core
+desugarBOp _  _ Add     c1 c2 = COp OAdd [c1,c2]
+desugarBOp _  _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
+desugarBOp _  _ Mul     c1 c2 = COp OMul [c1, c2]
+desugarBOp _  _ Div     c1 c2 = COp ODiv [c1, c2]
+desugarBOp _  _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]
+desugarBOp _  _ Exp     c1 c2 = COp OExp [c1, c2]
+desugarBOp ty _ Eq      c1 c2 = COp (OEq ty) [c1, c2]
+desugarBOp ty _ Neq     c1 c2 = COp ONot [COp (OEq ty) [c1, c2]]
+desugarBOp ty _ Lt      c1 c2 = COp (OLt ty) [c1, c2]
+desugarBOp ty _ Gt      c1 c2 = COp (OLt ty) [c2, c1]
+desugarBOp ty _ Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
+desugarBOp ty _ Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
+desugarBOp _  _ And     c1 c2 = COp OAnd [c1, c2]
+desugarBOp _  _ Or      c1 c2 = COp OOr  [c1, c2]
+desugarBOp _  _ Mod     c1 c2 = COp OMod [c1, c2]
+desugarBOp _  _ Divides c1 c2 = COp ODivides [c1, c2]
+desugarBOp _  _ RelPm   c1 c2 = COp ORelPm [c1, c2]
+desugarBOp _  _ Cons    c1 c2 = CCons 1 [c1, c2]
+
+desugarBOp _  TyN Choose c1 c2 = COp OBinom [c1, c2]
+desugarBOp _ _    Choose c1 c2 = COp OMultinom [c1, c2]
 
 -- | Desugar a type operator application.
 desugarTyOp :: TyOp -> Type -> Core
@@ -176,7 +178,7 @@ desugarChain t1 [ATLink op t2] = desugarTerm (ATBin TyBool op t1 t2)
 desugarChain t1 (ATLink op t2 : links) = do
   c1 <- desugarTerm  (ATBin TyBool op t1 t2)
   c2 <- desugarChain t2 links
-  return $ desugarBOp TyBool And c1 c2
+  return $ desugarBOp TyBool TyBool And c1 c2
 
 -- | Desugar a branch.
 desugarBranch :: ABranch -> DSM CBranch

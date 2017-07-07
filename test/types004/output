@@ -1,0 +1,9 @@
+0
+1
+2
+16
+4
+[<function>, <function>, <function>, <function>]
+[left (false, false), left (false, true), left (true, false), left (true, true), right false, right true]
+[left (), right false, right true]
+[]

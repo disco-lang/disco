@@ -366,6 +366,7 @@ whnfOp OMod     = numOp' modOp
 whnfOp ODivides = numOp' divides
 whnfOp ORelPm   = numOp' relPm
 whnfOp OBinom   = numOp binom
+whnfOp OMultinom = multinomOp
 whnfOp OFact    = uNumOp fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
@@ -497,6 +498,25 @@ relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 --   numbers.
 binom :: Rational -> Rational -> Rational
 binom (numerator -> n) (numerator -> k) = choose n k % 1
+
+multinomOp :: [Core] -> IM Value
+multinomOp [c1, c2] = do
+  VNum _ n <- whnf c1
+  ks       <- rnf  c2
+  return . vnum $ multinomial (numerator n) (asList ks) % 1
+  where
+    asList :: Value -> [Integer]
+    asList (VCons 0 _) = []
+    asList (VCons 1 [VNum _ k, ks]) = numerator k : asList ks
+    asList v = error $ "multinomOp.asList " ++ show v
+
+    multinomial :: Integer -> [Integer] -> Integer
+    multinomial _ []     = 1
+    multinomial n (k:ks)
+      | k > n     = 0
+      | otherwise = choose n k * multinomial (n-k) ks
+
+multinomOp cs = error $ "Impossible! multinomOp " ++ show cs
 
 -- | Factorial.  The argument will always be a natural number.
 fact :: Rational -> Rational

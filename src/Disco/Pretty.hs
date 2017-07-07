@@ -5,8 +5,7 @@ module Disco.Pretty where
 
 import           Control.Applicative     hiding (empty)
 import           Control.Monad.Reader
-import           Data.Char               (toLower)
-import           Data.List               (findIndex)
+import           Data.Char               (toLower, isAlpha)
 import           Data.Ratio
 import qualified Data.Map                as M
 
@@ -66,49 +65,39 @@ punctuate p ds = do
 -- Precedence and associativity
 
 type Prec = Int
-data Assoc = AL | AR | AN
-  deriving (Show, Eq)
 
 prec :: BOp -> Prec
-prec op = fromJust' . findIndex (op `elem`) $
-  [ []
-  , []
-  , [ Or ]
-  , [ And ]
-  , [ Eq, Neq, Lt, Gt, Leq, Geq, Divides, RelPm ]
-  , []
-  , [ Add, Sub ]
-  , [ Mul, Div, Mod ]
-  , [ Exp ]
-  ]
-  where
-    fromJust' (Just x) = x
-    fromJust' Nothing  = error $
-      "Error! Unknown operator " ++ show op ++ " in Disco.Pretty.prec"
+prec op =
+  case M.lookup op bopMap of
+    Just (OpInfo _ _ p) -> p
+    _                   -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
-assoc :: BOp -> Assoc
-assoc op
-  | op `elem` [Add, Sub, Mul, Div, Mod] = AL
-  | op `elem` [And, Or, Exp]            = AR
-  | otherwise                           = AN
+assoc :: BOp -> BFixity
+assoc op =
+  case M.lookup op bopMap of
+    Just (OpInfo (BOpF fx _) _ _) -> fx
+    _                             -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 getPA :: BOp -> PA
 getPA op = PA (prec op) (assoc op)
 
-data PA = PA Prec Assoc
+data PA = PA Prec BFixity
   deriving (Show, Eq)
 
 instance Ord PA where
   compare (PA p1 a1) (PA p2 a2) = compare p1 p2 `mappend` (if a1 == a2 then EQ else LT)
 
 initPA :: PA
-initPA = PA 0 AL
+initPA = PA 0 InL
+
+funPrec :: Prec
+funPrec = length opTable
 
 funPA :: PA
-funPA = PA 10 AL
+funPA = PA funPrec InL
 
 arrPA :: PA
-arrPA = PA 1 AR
+arrPA = PA 1 InR
 
 type Doc = ReaderT PA LFreshM PP.Doc
 
@@ -120,19 +109,19 @@ prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy (TyArr ty1 ty2)  = mparens arrPA $
-  prettyTy' 1 AL ty1 <+> text "→" <+> prettyTy' 1 AR ty2
-prettyTy (TyPair ty1 ty2) = mparens (PA 7 AR) $
-  prettyTy' 7 AL ty1 <+> text "×" <+> prettyTy' 7 AR ty2
-prettyTy (TySum  ty1 ty2) = mparens (PA 6 AR) $
-  prettyTy' 6 AL ty1 <+> text "+" <+> prettyTy' 6 AR ty2
+  prettyTy' 1 InL ty1 <+> text "→" <+> prettyTy' 1 InR ty2
+prettyTy (TyPair ty1 ty2) = mparens (PA 7 InR) $
+  prettyTy' 7 InL ty1 <+> text "×" <+> prettyTy' 7 InR ty2
+prettyTy (TySum  ty1 ty2) = mparens (PA 6 InR) $
+  prettyTy' 6 InL ty1 <+> text "+" <+> prettyTy' 6 InR ty2
 prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
 prettyTy TyQP             = text "ℚ⁺"
-prettyTy (TyList ty)      = mparens (PA 9 AR) $
-  text "List" <+> prettyTy' 9 AR ty
+prettyTy (TyList ty)      = mparens (PA 9 InR) $
+  text "List" <+> prettyTy' 9 InR ty
 
-prettyTy' :: Prec -> Assoc -> Type -> Doc
+prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
 --------------------------------------------------
@@ -151,33 +140,33 @@ prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(x,body) ->
-  hsep [prettyName x, text "↦", prettyTerm' 0 AL body]
+  hsep [prettyName x, text "↦", prettyTerm' 0 InL body]
 prettyTerm (TJuxt t1 t2) = mparens funPA $
-  prettyTerm' 10 AL t1 <+> prettyTerm' 10 AR t2
+  prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
 prettyTerm (TTup ts)     = do
-  ds <- punctuate (text ",") (map (prettyTerm' 0 AL) ts)
+  ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   parens (hsep ds)
 prettyTerm (TList ts)    = do
-  ds <- punctuate (text ",") (map (prettyTerm' 0 AL) ts)
+  ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   brackets (hsep ds)
 prettyTerm (TInj side t) = mparens funPA $
-  prettySide side <+> prettyTerm' 10 AR t
+  prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn Fact t)  = prettyTerm' 11 AL t <> text "!"
-prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' 11 AR t
+prettyTerm (TUn Fact t)  = prettyTerm' (1 + funPrec) InL t <> text "!"
+prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' (1 + funPrec) InR t
 prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   hsep
-  [ prettyTerm' (prec op) AL t1
+  [ prettyTerm' (prec op) InL t1
   , prettyBOp op
-  , prettyTerm' (prec op) AR t2
+  , prettyTerm' (prec op) InR t2
   ]
 prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
-    prettyTerm' (prec Eq) AL t
+    prettyTerm' (prec Eq) InL t
     : concatMap prettyLink lks
   where
     prettyLink (TLink op t2) =
       [ prettyBOp op
-      , prettyTerm' (prec op) AR t2
+      , prettyTerm' (prec op) InR t2
       ]
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \((x, unembed -> t1), t2) ->
@@ -185,57 +174,40 @@ prettyTerm (TLet bnd) = mparens initPA $
     [ text "let"
     , prettyName x
     , text "="
-    , prettyTerm' 0 AL t1
+    , prettyTerm' 0 InL t1
     , text "in"
-    , prettyTerm' 0 AL t2
+    , prettyTerm' 0 InL t2
     ]
 prettyTerm (TCase b)    = nest 2 (prettyBranches b)
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
-    prettyTyOp op <+> prettyTy' 10 AR ty
+    prettyTyOp op <+> prettyTy' funPrec InR ty
 
-prettyTerm' :: Prec -> Assoc -> Term -> Doc
+prettyTerm' :: Prec -> BFixity -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 
 prettySide :: Side -> Doc
-prettySide L = text "inl"
-prettySide R = text "inr"
+prettySide L = text "left"
+prettySide R = text "right"
 
 prettyTyOp :: TyOp -> Doc
 prettyTyOp Enumerate  = text "enumerate"
 prettyTyOp Count      = text "count"
 
 prettyUOp :: UOp -> Doc
-prettyUOp Neg   = text "-"
-prettyUOp Not   = text "not "
-prettyUOp Sqrt  = text "sqrt "
-prettyUOp Lg    = text "lg "
-prettyUOp Floor = text "floor "
-prettyUOp Ceil  = text "ceiling "
-prettyUOp Fact  = error "Impossible! prettyUOp Fact"
+prettyUOp op =
+  case M.lookup op uopMap of
+    Just (OpInfo _ (syn:_) _) ->
+      text $ syn ++ (if all isAlpha syn then " " else "")
+    _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
 
 prettyBOp :: BOp -> Doc
-prettyBOp Add     = text "+"
-prettyBOp Sub     = text "-"
-prettyBOp Mul     = text "*"
-prettyBOp Div     = text "/"
-prettyBOp IDiv    = text "//"
-prettyBOp Exp     = text "^"
-prettyBOp Eq      = text "="
-prettyBOp Neq     = text "/="
-prettyBOp Lt      = text "<"
-prettyBOp Gt      = text ">"
-prettyBOp Leq     = text "<="
-prettyBOp Geq     = text ">="
-prettyBOp And     = text "and"
-prettyBOp Or      = text "or"
-prettyBOp Mod     = text "mod"
-prettyBOp Divides = text "|"
-prettyBOp RelPm   = text "#"
-prettyBOp Binom   = text "choose"
-prettyBOp Cons    = text "::"
+prettyBOp op =
+  case M.lookup op bopMap of
+    Just (OpInfo _ (syn:_) _) -> text syn
+    _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches [] = error "Empty branches are disallowed."
@@ -298,13 +270,14 @@ prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"
 prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
 prettyValue (TyList ty) v = prettyList ty v
-prettyValue _ (VClos _ _)       = "<closure>"
+prettyValue _ (VClos _ _)       = "<function>"
 prettyValue _ (VThunk _ _)      = "<thunk>"
+prettyValue _ (VFun _)          = "<function>"
 prettyValue ty@(TyPair _ _) v   = "(" ++ prettyTuple ty v ++ ")"
 prettyValue (TySum ty1 ty2) (VCons i [v])
   = case i of
-      0 -> "inl " ++ prettyValue ty1 v
-      1 -> "inr " ++ prettyValue ty2 v
+      0 -> "left " ++ prettyValue ty1 v
+      1 -> "right " ++ prettyValue ty2 v
       _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
 prettyValue _ (VNum d r)
   | denominator r == 1 = show (numerator r)

@@ -25,6 +25,7 @@ module Disco.AST.Typed
        , AProperty
          -- * Branches and guards
        , ABranch, AGuards(..), AGuard(..)
+       , AQuals(..), AQual(..)
        )
        where
 
@@ -51,9 +52,11 @@ data ATerm where
   --   the type.
   ATBool  :: Bool -> ATerm
 
-  -- | The empty list.  The type is inherently ambiguous so we store
-  --   it here.
+  -- | A literal list.  The type would be ambiguous if the list was
+  --   empty.
   ATList :: Type -> [ATerm] -> ATerm
+
+  ATListComp :: Type -> Bind AQuals ATerm -> ATerm
 
   -- | A natural number.
   ATNat   :: Integer -> ATerm
@@ -150,11 +153,39 @@ data AGuard where
 
   deriving Show
 
+-- Note: very similar to guards
+--  maybe some generalization in the future?
+-- | A list of qualifiers in list comprehension.
+--   Special type needed to record the binding structure.
+data AQuals where
+
+  -- | The empty list of qualifiers
+  AQEmpty :: AQuals
+
+  -- | A qualifier followed by zero or more other qualifiers
+  --   this qualifier can bind variables in the subsequent qualifiers.
+  AQCons  :: Rebind AQual AQuals -> AQuals
+
+  deriving Show
+
+-- | A single qualifier in a list comprehension.
+data AQual where
+
+  -- | A binding qualifier (i.e. @x <- t@)
+  AQBind   :: Name ATerm -> Embed ATerm -> AQual
+
+  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  AQGuard  :: Embed ATerm -> AQual
+
+  deriving Show
+
 type AProperty = Bind [(Name ATerm, Type)] ATerm
 
-derive [''ATerm, ''ALink, ''AGuards, ''AGuard]
+derive [''ATerm, ''ALink, ''AGuards, ''AGuard, ''AQuals, ''AQual]
 
 instance Alpha ATerm
 instance Alpha ALink
 instance Alpha AGuards
 instance Alpha AGuard
+instance Alpha AQual
+instance Alpha AQuals

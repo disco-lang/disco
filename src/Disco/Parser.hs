@@ -60,7 +60,7 @@ module Disco.Parser
        )
        where
 
-import           Debug.Trace
+--import           Debug.Trace
 
 import           Unbound.LocallyNameless (Name, bind, embed, rebind,
                                           string2Name)
@@ -431,8 +431,8 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod", "divides", "choose", "sqrt", "lg"
-  , "enumerate", "count", "floor", "ceiling"
+  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
+  , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]
@@ -589,8 +589,10 @@ parseQuals = quals <$> (parseQual `sepBy` comma)
 
 parseQual :: Parser Qual
 parseQual =
-      try (QBind <$> ident <*> (reservedOp "<-" *> parseTerm))
-  <|> QGuard <$> parseTerm
+      try (QBind <$> ident <*> (selector *> (embed <$> parseTerm)))
+  <|> QGuard <$> embed <$> parseTerm
+  where
+    selector = reservedOp "<-" <|> reserved "in"
 
 tuple :: [Term] -> Term
 tuple []  = TUnit

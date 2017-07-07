@@ -217,10 +217,10 @@ data Quals where
 data Qual where
 
   -- | A binding qualifier (i.e. @x <- t@)
-  QBind   :: Name Term -> Term -> Qual
+  QBind   :: Name Term -> Embed Term -> Qual
 
   -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  QGuard  :: Term -> Qual
+  QGuard  :: Embed Term -> Qual
 
   deriving Show
 

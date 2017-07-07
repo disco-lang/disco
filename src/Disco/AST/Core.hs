@@ -27,6 +27,7 @@ module Disco.AST.Core
 
          -- * Case expressions and patterns
        , CBranch, CGuards(..), CPattern(..)
+       , CQuals(..), CQual(..)
        )
        where
 

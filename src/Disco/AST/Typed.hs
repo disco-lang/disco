@@ -114,24 +114,25 @@ data ALink where
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
-getType (ATVar ty _)     = ty
-getType ATUnit           = TyUnit
-getType (ATBool _)       = TyBool
-getType (ATNat _)        = TyN
-getType (ATRat _)        = TyQP
-getType (ATAbs ty _)     = ty
-getType (ATApp ty _ _)   = ty
-getType (ATTup ty _)     = ty
-getType (ATInj ty _ _)   = ty
-getType (ATUn ty _ _)    = ty
-getType (ATBin ty _ _ _) = ty
-getType (ATTyOp ty _ _)  = ty
-getType (ATChain ty _ _) = ty
-getType (ATList ty _)    = ty
-getType (ATLet ty _)     = ty
-getType (ATCase ty _)    = ty
-getType (ATAscr _ ty)    = ty
-getType (ATSub ty _)     = ty
+getType (ATVar ty _)      = ty
+getType ATUnit            = TyUnit
+getType (ATBool _)        = TyBool
+getType (ATNat _)         = TyN
+getType (ATRat _)         = TyQP
+getType (ATAbs ty _)      = ty
+getType (ATApp ty _ _)    = ty
+getType (ATTup ty _)      = ty
+getType (ATInj ty _ _)    = ty
+getType (ATUn ty _ _)     = ty
+getType (ATBin ty _ _ _)  = ty
+getType (ATTyOp ty _ _)   = ty
+getType (ATChain ty _ _)  = ty
+getType (ATList ty _)     = ty
+getType (ATListComp ty _) = ty
+getType (ATLet ty _)      = ty
+getType (ATCase ty _)     = ty
+getType (ATAscr _ ty)     = ty
+getType (ATSub ty _)      = ty
 
 -- | A branch of a case, consisting of a list of guards and a type-annotated term.
 type ABranch = Bind AGuards ATerm

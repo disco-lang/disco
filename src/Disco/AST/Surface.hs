@@ -122,7 +122,7 @@ data BOp = Add     -- ^ Addition (@+@)
          | Mod     -- ^ Modulo (@mod@)
          | Divides -- ^ Divisibility test (@|@)
          | RelPm   -- ^ Relative primality test (@#@)
-         | Binom   -- ^ Binomial coefficient (@binom@)
+         | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
   deriving (Show, Eq)
 

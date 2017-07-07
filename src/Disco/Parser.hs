@@ -681,7 +681,7 @@ parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
             , [ unary "floor" (TUn Floor)
               , unary "ceiling" (TUn Ceil)
               ]
-            , [ infixN "choose" (TBin Binom)
+            , [ infixN "choose" (TBin Choose)
               ]
             , [ infixL "*" (TBin Mul)
               , infixL "/" (TBin Div)

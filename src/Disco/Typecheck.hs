@@ -581,10 +581,16 @@ infer (TBin RelPm t1 t2) = do
     then return (ATBin TyBool RelPm at1 at2)
     else throwError RelPmQ
 
-infer (TBin Binom t1 t2) = do
-  at1 <- check t1 TyN     -- XXX for now.  Can handle negative or even Q arguments,
-  at2 <- check t2 TyN     -- but should we?
-  return $ ATBin TyN Binom at1 at2
+-- For now, a simple typing rule for multinomial coefficients that
+-- requires everything to be Nat.  However, they can be extended to
+-- handle negative or fractional arguments.
+infer (TBin Choose t1 t2) = do
+  at1 <- check t1 TyN
+
+  -- t2 can be either a Nat (a binomial coefficient)
+  -- or a list of Nat (a multinomial coefficient).
+  at2 <- check t2 TyN <|> check t2 (TyList TyN)
+  return $ ATBin TyN Choose at1 at2
 
 infer (TBin Cons t1 t2) = do
   at1 <- infer t1
@@ -679,7 +685,6 @@ inferTuple (t:ts) = do
   at <- infer t
   (ty, ats) <- inferTuple ts
   return (TyPair (getType at) ty, at:ats)
-
 
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.

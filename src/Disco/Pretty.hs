@@ -234,7 +234,7 @@ prettyBOp Or      = text "or"
 prettyBOp Mod     = text "mod"
 prettyBOp Divides = text "|"
 prettyBOp RelPm   = text "#"
-prettyBOp Binom   = text "choose"
+prettyBOp Choose  = text "choose"
 prettyBOp Cons    = text "::"
 
 prettyBranches :: [Branch] -> Doc

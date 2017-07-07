@@ -431,7 +431,7 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
-  , "enumerate", "count", "floor", "ceiling"
+  , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
   ]

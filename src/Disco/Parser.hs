@@ -428,7 +428,7 @@ reserved w = lexeme $ C.string w *> notFollowedBy alphaNumChar
 -- | The list of all reserved words.
 reservedWords :: [String]
 reservedWords =
-  [ "true", "false", "True", "False", "inl", "inr", "let", "in", "is"
+  [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count", "floor", "ceiling"
@@ -568,10 +568,10 @@ tuple []  = TUnit
 tuple [x] = x
 tuple t   = TTup t
 
--- | Parse an injection, i.e. either @inl@ or @inr@.
+-- | Parse an injection, i.e. either @left@ or @right@.
 parseInj :: Parser Side
 parseInj =
-  L <$ reserved "inl" <|> R <$ reserved "inr"
+  L <$ reserved "left" <|> R <$ reserved "right"
 
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
@@ -652,8 +652,8 @@ tuplePat t   = PTup t
 parsePattern :: Parser Pattern
 parsePattern = makeExprParser parseAtomicPattern table <?> "pattern"
   where
-    table = [ [ prefix "inl" (PInj L)
-              , prefix "inr" (PInj R)
+    table = [ [ prefix "left" (PInj L)
+              , prefix "right" (PInj R)
               , prefix "S"   PSucc
               ]
             , [ infixR "::" PCons ]

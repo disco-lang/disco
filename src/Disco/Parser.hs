@@ -67,7 +67,7 @@ import           Unbound.LocallyNameless (Name, bind, embed, rebind,
 import           Text.Megaparsec         hiding (runParser)
 import qualified Text.Megaparsec         as MP
 import qualified Text.Megaparsec.Char    as C
-import           Text.Megaparsec.Expr    hiding (Operator)
+import           Text.Megaparsec.Expr
 import qualified Text.Megaparsec.Lexer   as L
 import qualified Text.Megaparsec.String  as MP
 
@@ -665,59 +665,25 @@ parsePattern = makeExprParser parseAtomicPattern table <?> "pattern"
 parseExpr :: Parser Term
 parseExpr = fixChains <$> (makeExprParser parseAtom table <?> "expression")
   where
-    table = [ [ infixL ""  TJuxt
-              , unary "not" (TUn Not)
-              ]
-            , [ unary  "-" (TUn Neg)
-              ]
-            , [ post   "!" (TUn Fact)
-              ]
-            , [ infixR "^" (TBin Exp)
-              ]
-            , [ unary "sqrt" (TUn Sqrt)
-              ]
-            , [ unary "lg" (TUn Lg)
-              ]
-            , [ unary "floor" (TUn Floor)
-              , unary "ceiling" (TUn Ceil)
-              ]
-            , [ infixN "choose" (TBin Choose)
-              ]
-            , [ infixL "*" (TBin Mul)
-              , infixL "/" (TBin Div)
-              , infixL "%" (TBin Mod)
-              , infixL "mod" (TBin Mod)
-              , infixL "//" (TBin IDiv)
-              ]
-            , [ infixL "+" (TBin Add)
-              , infixL "-" (TBin Sub)
-              ]
-            , [ infixR "::" (TBin Cons)
-              ]
-            , [ infixR "="  (TBin Eq)
-              , infixR "/=" (TBin Neq)
-              , infixR "<"  (TBin Lt)
-              , infixR ">"  (TBin Gt)
-              , infixR "<=" (TBin Leq)
-              , infixR ">=" (TBin Geq)
-              , infixR "|"  (TBin Divides)
-              , infixR "#"  (TBin RelPm)
-              ]
-            , [ infixR "&&"  (TBin And)
-              , infixR "and" (TBin And)
-              , infixR "∧"   (TBin And)
-              ]
-            , [ infixR "||" (TBin Or)
-              , infixR "or" (TBin Or)
-              , infixR "∨"  (TBin Or)
-              ]
-            ]
+    table
+        -- special case for juxtaposition, with highest precedence
+      = [ InfixL (TJuxt <$ reservedOp "") ]
 
-    unary  name fun = Prefix (reservedOp name >> return fun)
-    post   name fun = Postfix (reservedOp name >> return fun)
-    infixL name fun = InfixL (reservedOp name >> return fun)
-    infixR name fun = InfixR (reservedOp name >> return fun)
-    infixN name fun = InfixN (reservedOp name >> return fun)
+        -- get all other operators from the opTable
+      : (map . concatMap) mkOpParser opTable
+
+    mkOpParser :: OpInfo -> [Operator (StateT ParserState MP.Parser) Term]
+    mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
+
+    withOpFixity (UOpF fx op) syn = (ufxParser fx) (reservedOp syn >> return (TUn op))
+    withOpFixity (BOpF fx op) syn = (bfxParser fx) (reservedOp syn >> return (TBin op))
+
+    ufxParser Pre  = Prefix
+    ufxParser Post = Postfix
+
+    bfxParser InL  = InfixL
+    bfxParser InR  = InfixR
+    bfxParser In   = InfixN
 
     isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides, RelPm]
 

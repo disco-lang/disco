@@ -27,9 +27,12 @@ module Disco.AST.Surface
          -- ** Declarations
        , Decl(..), declName, isDefn
 
+         -- * Operators
+       , UOp(..), BOp(..), UFixity(..), BFixity(..), OpFixity(..)
+       , OpInfo(..), opTable, uopMap, bopMap
+
          -- * Terms
-       , Side(..), UOp(..), BOp(..), Link(..)
-       , TyOp(..), Term(..)
+       , Side(..), Link(..), TyOp(..), Term(..)
 
          -- * Case expressions and patterns
        , Branch, Guards(..), Guard(..), Pattern(..)
@@ -38,7 +41,7 @@ module Disco.AST.Surface
 
 import qualified Data.Map                as M
 
-import           Unbound.LocallyNameless
+import           Unbound.LocallyNameless hiding (Fixity)
 
 import           Disco.Types
 
@@ -102,7 +105,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Lg    -- ^ Floor of base-2 logarithm (@lg@)
          | Floor -- ^ Floor of fractional type (@floor@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
@@ -124,7 +127,104 @@ data BOp = Add     -- ^ Addition (@+@)
          | RelPm   -- ^ Relative primality test (@#@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
+
+-- | Fixities of unary operators (either pre- or postfix).
+data UFixity
+  = Pre     -- ^ Unary prefix.
+  | Post    -- ^ Unary postfix.
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+-- | Fixity of infix binary operators (either left, right, or non-associative).
+data BFixity
+  = InL   -- ^ Left-associative infix.
+  | InR   -- ^ Right-associative infix.
+  | In    -- ^ Infix.
+  deriving (Eq, Ord, Enum, Bounded, Show)
+
+-- | Operators together with their fixity.
+data OpFixity =
+    UOpF UFixity UOp
+  | BOpF BFixity BOp
+  deriving (Eq, Show)
+
+-- | An @OpInfo@ record contains information about an operator, such
+--   as the operator itself, its fixity, a list of concrete syntax
+--   representations of the operator, and a numeric precedence level.
+data OpInfo =
+  OpInfo
+  { opFixity :: OpFixity
+  , opSyns   :: [String]
+  , opPrec   :: Int
+  }
+  deriving Show
+
+-- | The @opTable@ lists all the operators in the language, in order
+--   of precedence (highest precedence first).  Operators in the same
+--   list have the same precedence.  This table is used by both the
+--   parser and the pretty-printer.
+opTable :: [[OpInfo]]
+opTable =
+  assignPrecLevels $
+  [ [ uopInfo Pre  Not     ["not", "¬"]
+    ]
+  , [ uopInfo Pre  Neg     ["-"]
+    ]
+  , [ uopInfo Post Fact    ["!"]
+    ]
+  , [ bopInfo InR  Exp     ["^"]
+    ]
+  , [ uopInfo Pre  Sqrt    ["sqrt"]
+    ]
+  , [ uopInfo Pre  Lg      ["lg"]
+    ]
+  , [ uopInfo Pre  Floor   ["floor"]
+    , uopInfo Pre  Ceil    ["ceiling"]
+    ]
+  , [ bopInfo In   Binom   ["choose"]
+    ]
+  , [ bopInfo InL  Mul     ["*"]
+    , bopInfo InL  Div     ["/"]
+    , bopInfo InL  Mod     ["%"]
+    , bopInfo InL  Mod     ["mod"]
+    , bopInfo InL  IDiv    ["//"]
+    ]
+  , [ bopInfo InL  Add     ["+"]
+    , bopInfo InL  Sub     ["-"]
+    ]
+  , [ bopInfo InR  Cons    ["::"]
+    ]
+  , [ bopInfo InR  Eq      ["="]
+    , bopInfo InR  Neq     ["/="]
+    , bopInfo InR  Lt      ["<"]
+    , bopInfo InR  Gt      [">"]
+    , bopInfo InR  Leq     ["<="]
+    , bopInfo InR  Geq     [">="]
+    , bopInfo InR  Divides ["divides"]
+    , bopInfo InR  RelPm   ["#"]
+    ]
+  , [ bopInfo InR  And     ["and", "∧", "&&"]
+    ]
+  , [ bopInfo InR  Or      ["or", "∨", "||"]
+    ]
+  ]
+  where
+    uopInfo fx op syns = OpInfo (UOpF fx op) syns (-1)
+    bopInfo fx op syns = OpInfo (BOpF fx op) syns (-1)
+
+    assignPrecLevels table = zipWith assignPrecs (reverse [1 .. length table]) table
+    assignPrecs p ops      = map (assignPrec p) ops
+    assignPrec  p op       = op { opPrec = p }
+
+-- | A map from all unary operators to their associated 'OpInfo' records.
+uopMap :: M.Map UOp OpInfo
+uopMap = M.fromList $
+  [ (op, info) | opLevel <- opTable, info@(OpInfo (UOpF _ op) _ _) <- opLevel ]
+
+-- | A map from all binary operators to their associatied 'OpInfo' records.
+bopMap :: M.Map BOp OpInfo
+bopMap = M.fromList $
+  [ (op, info) | opLevel <- opTable, info@(OpInfo (BOpF _ op) _ _) <- opLevel ]
 
 -- | Type Operators
 data TyOp = Enumerate -- List all values of a type

@@ -149,6 +149,9 @@ prettyTerm (TTup ts)     = do
 prettyTerm (TList ts)    = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   brackets (hsep ds)
+prettyTerm (TListComp bqst) =
+  lunbind bqst $ \(qs,t) ->
+  brackets (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
@@ -228,6 +231,21 @@ prettyGuards (guardList -> gs)
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
+
+qualsList :: Quals -> [Qual]
+qualsList QEmpty = []
+qualsList (QCons (unrebind -> (q,qs))) = q : qualsList qs
+
+prettyQuals :: Quals -> Doc
+prettyQuals (qualsList -> qs) = do
+  ds <- punctuate (text ",") (map prettyQual qs)
+  hsep ds
+
+prettyQual :: Qual -> Doc
+prettyQual (QBind x (unembed -> t))
+  = hsep [prettyName x, text "in", prettyTerm' 0 InL t]
+prettyQual (QGuard (unembed -> t))
+  = prettyTerm' 0 InL t
 
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x) = prettyName x

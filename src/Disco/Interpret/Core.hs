@@ -113,6 +113,10 @@ data Value where
   --   arguments should be fully evaluated to RNF before being
   --   passed to the function.
   VFun   :: ValFun -> Value
+
+  -- | A delayed value, containing an @IM Value@ computation which can
+  --   be run later.
+  VDelay  :: ValDelay -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
@@ -122,6 +126,20 @@ newtype ValFun = ValFun (Value -> Value)
 
 instance Show ValFun where
   show _ = "<fun>"
+
+-- | A @ValDelay@ is just an @IM Value@ computation.  It is a
+--   @newtype@ just so we can have a custom @Show@ instance for it and
+--   then derive a @Show@ instance for the rest of the @Value@ type.
+newtype ValDelay = ValDelay (IM Value)
+
+instance Show ValDelay where
+  show _ = "<delay>"
+
+-- | Delay a computation, packaging it up
+delay :: IM Value -> IM Value
+delay imv = do
+  e <- getEnv
+  return (VDelay . ValDelay $ withEnv e imv)
 
 -- | A convenience function for creating a default @VNum@ value with a
 --   default (@Fractional@) flag.
@@ -137,8 +155,6 @@ type Env  = M.Map (Name Core) Value
 
 -- | A definition environment is a mapping fron names to core terms.
 type DefEnv = M.Map (Name Core) Core
-
-derive [''Value, ''ValFun]
 
 -- | Errors that can be generated during interpreting.
 data InterpError where
@@ -235,12 +251,14 @@ rnf c = mkThunk c >>= rnfV
 rnfV :: Value -> IM Value
 rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
 rnfV v@(VThunk _ _) = whnfV v >>= rnfV
+rnfV v@(VDelay _)   = whnfV v >>= rnfV
 rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
 whnfV :: Value -> IM Value
-whnfV (VThunk c e) = withEnv e $ whnf c
-whnfV v            = return v
+whnfV (VThunk c e)            = withEnv e $ whnf c
+whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
+whnfV v                       = return v
 
 -- | Reduce a Core expression to weak head normal form.
 whnf :: Core -> IM Value

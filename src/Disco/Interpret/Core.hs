@@ -135,7 +135,10 @@ newtype ValDelay = ValDelay (IM Value)
 instance Show ValDelay where
   show _ = "<delay>"
 
--- | Delay a computation, packaging it up
+-- | Delay an @IM Value@ computation by packaging it into a @VDelay@
+--   constructor.  When it is evaluated later, it will be run with the
+--   environment that was current at the time 'delay' was called,
+--   /not/ the one that is in effect later.
 delay :: IM Value -> IM Value
 delay imv = do
   e <- getEnv

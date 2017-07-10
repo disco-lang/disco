@@ -434,7 +434,7 @@ reservedWords =
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
-  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ"
+  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -742,6 +742,8 @@ parseAtomicType =
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
+  <|> TyQP   <$ (reserved "QP") -- TODO: come up with more/better ways to
+                                --       represent nonegative rationals.
     -- This explicitly allows "List List N" to parse as List (List N).
     -- Since we don't have arbitrary application of higher-kinded type
     -- expressions, only application of an explicit set of

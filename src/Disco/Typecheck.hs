@@ -67,11 +67,12 @@ import           Control.Lens            ((%~), (&), _1, _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Coerce
 import           Data.List               (group, partition, sort)
 import qualified Data.Map                as M
 
-import           Unbound.LocallyNameless hiding (comp)
-import           Unbound.LocallyNameless.Ops (unsafeUnbind)
+import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -194,7 +195,7 @@ extends ctx = local (joinCtx ctx)
 
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
-addDefn x b = modify (M.insert (translate x) b)
+addDefn x b = modify (M.insert (coerce x) b)
 
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
@@ -232,7 +233,7 @@ check (TAbs lam) ty@(TyArr ty1 ty2) = do
   lunbind lam $ \(x,t) -> do
   extend x ty1 $ do
   at <- check t ty2
-  return $ ATAbs ty (bind (translate x) at)
+  return $ ATAbs ty (bind (coerce x) at)
   -- We are trying to check an abstraction under a non-arrow type: error.
 check t@(TAbs _) ty = throwError (NotArrow t ty)
 
@@ -253,7 +254,7 @@ check (TLet l) ty =
     let ty1 = getType at1
     extend x ty1 $ do
       at2 <- check t2 ty
-      return $ ATLet ty (bind (translate x, embed at1) at2)
+      return $ ATLet ty (bind (coerce x, embed at1) at2)
 
 check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
@@ -444,7 +445,7 @@ infer :: Term -> TCM ATerm
   -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
   ty <- lookup x
-  return $ ATVar ty (translate x)
+  return $ ATVar ty (coerce x)
 
   -- A few trivial cases.
 infer TUnit         = return ATUnit
@@ -652,7 +653,7 @@ infer (TLet l) = do
   let ty1 = getType at1
   extend x ty1 $ do
   at2 <- infer t2
-  return $ ATLet (getType at2) (bind (translate x, embed at1) at2)
+  return $ ATLet (getType at2) (bind (coerce x, embed at1) at2)
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.
@@ -763,7 +764,7 @@ inferQual :: Qual -> TCM (AQual, Ctx)
 inferQual (QBind x (unembed -> t))  = do
   at <- infer t
   case getType at of
-    TyList ty -> return (AQBind (translate x) (embed at), singleCtx x ty)
+    TyList ty -> return (AQBind (coerce x) (embed at), singleCtx x ty)
     wrongTy   -> throwError $ NotList t wrongTy
 inferQual (QGuard (unembed -> t))   = do
   at <- check t TyBool
@@ -837,7 +838,7 @@ withTypeDecls decls k = do
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
   ty <- lookup x
-  prevDefn <- gets (M.lookup (translate x))
+  prevDefn <- gets (M.lookup (coerce x))
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do
@@ -872,7 +873,7 @@ checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 -- | XXX
 checkPropertyTypes :: DocMap -> TCM (M.Map (Name ATerm) [AProperty])
 checkPropertyTypes docs
-  = (M.fromList . (traverse . _1 %~ translate))
+  = (M.fromList . (traverse . _1 %~ coerce))
     <$> ((traverse . _2 . traverse) checkPropertyType) properties
   -- mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
   where
@@ -882,4 +883,4 @@ checkPropertyTypes docs
       lunbind prop $ \(binds, t) -> do
       extends (M.fromList binds) $ do
       at <- check t TyBool
-      return $ bind (binds & traverse . _1 %~ translate) at
+      return $ bind (binds & traverse . _1 %~ coerce) at

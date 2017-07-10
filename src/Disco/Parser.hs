@@ -62,8 +62,8 @@ module Disco.Parser
 
 --import           Debug.Trace
 
-import           Unbound.LocallyNameless (Name, bind, embed, rebind,
-                                          string2Name)
+import           Unbound.Generics.LocallyNameless (Name, bind, embed, rebind,
+                                                   string2Name)
 
 import           Text.Megaparsec         hiding (runParser)
 import qualified Text.Megaparsec         as MP

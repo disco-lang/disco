@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
@@ -29,7 +30,8 @@ module Disco.AST.Typed
        )
        where
 
-import           Unbound.LocallyNameless
+import           GHC.Generics (Generic)
+import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
 import           Disco.Types
@@ -103,14 +105,14 @@ data ATerm where
   --   subtyping judgment.  The term has the given type T because its
   --   type is a subtype of T.
   ATSub   :: Type -> ATerm -> ATerm
-  deriving Show
+  deriving (Show, Generic)
 
   -- TODO: I don't think we are currently very consistent about using ATSub everywhere
   --   subtyping is invoked.  I am not sure how much it matters.
 
 data ALink where
   ATLink :: BOp -> ATerm -> ALink
-  deriving Show
+  deriving (Show, Generic)
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
@@ -141,7 +143,7 @@ type ABranch = Bind AGuards ATerm
 data AGuards where
   AGEmpty :: AGuards
   AGCons  :: Rebind AGuard AGuards -> AGuards
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A single guard (@if@ or @when@) containing a type-annotated term.
 data AGuard where
@@ -152,7 +154,7 @@ data AGuard where
   -- | Pattern guard (@when term = pat@)
   AGPat  :: Embed ATerm -> Pattern -> AGuard
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- Note: very similar to guards
 --  maybe some generalization in the future?
@@ -167,7 +169,7 @@ data AQuals where
   --   this qualifier can bind variables in the subsequent qualifiers.
   AQCons  :: Rebind AQual AQuals -> AQuals
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A single qualifier in a list comprehension.
 data AQual where
@@ -178,11 +180,9 @@ data AQual where
   -- | A boolean guard qualfier (i.e. @x + y > 4@)
   AQGuard  :: Embed ATerm -> AQual
 
-  deriving Show
+  deriving (Show, Generic)
 
 type AProperty = Bind [(Name ATerm, Type)] ATerm
-
-derive [''ATerm, ''ALink, ''AGuards, ''AGuard, ''AQuals, ''AQual]
 
 instance Alpha ATerm
 instance Alpha ALink

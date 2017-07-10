@@ -1,0 +1,18 @@
+take : ℕ → List Q → List Q
+take n l =
+  { []               when n is 0
+  { []               when l is []
+
+  { x :: take n' xs  when l is x::xs
+                     when n is S n'
+
+repeat : Q → List Q
+repeat x = x :: repeat x
+
+downfrom : N -> List N
+downfrom 0     = []
+downfrom (S n) = (n+1) :: downfrom n
+
+even : N -> Bool
+even 0     = true
+even (S n) = not (even n)

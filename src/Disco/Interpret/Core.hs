@@ -289,6 +289,10 @@ whnf (CLet str b)   =
     Lazy   -> mkThunk t1
   extend (translate x) v1 $ whnf t2
 whnf (CCase bs)     = whnfCase bs
+whnf (CListComp b)  =
+  lunbind b $ \(qs, t) -> do
+    lcmp <- expandComp t qs
+    whnfV lcmp
 whnf (CType _)      = error "Called whnf on CType"
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -302,6 +306,63 @@ whnfApp (VClos c e) v =
   whnf t
 whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')
 whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
+
+------------------------------------------------------------
+-- Lists
+------------------------------------------------------------
+
+-- | A lazy foldr on lists represented as 'Value's.  The entire
+--   function is wrapped in a call to 'delay', so it does not actually
+--   reduce the list argument to whnf until (potentially) forced by a
+--   call to 'whnf' later.  That is, executing the resulting @IM
+--   Value@ just results in a 'VDelay'; forcing that @VDelay@ with
+--   'whnf' will then cause the foldr to actually start executing.
+vfoldr :: (Value -> Value -> IM Value) -> Value -> Value -> IM Value
+vfoldr f z xs = delay $ do
+  xs' <- whnfV xs
+  case xs' of
+    VCons 0 []      -> return z
+    VCons 1 [vh,vt] -> do
+      r <- vfoldr f z vt
+      f vh r
+    _               -> error $ "Impossible! Got " ++ show xs' ++ " in vfoldr"
+
+-- | Lazy append on 'Value' lists, implemented via 'vfoldr'.
+vappend :: Value -> Value -> IM Value
+vappend xs ys = vfoldr (\h t -> return $ VCons 1 [h,t]) ys xs
+
+-- | Lazy concat on 'Value' lists, implemented via 'vfoldr'.
+vconcat :: Value -> IM Value
+vconcat = vfoldr vappend (VCons 0 [])
+
+-- | Lazy map on 'Value' lists, implemented via 'vfoldr'.
+vmap :: (Value -> IM Value) -> Value -> IM Value
+vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
+
+-- | Expand a list comprehension to a lazy 'Value' list.
+expandComp :: Core -> CQuals -> IM Value
+
+-- [ t | ] = [ t ]
+expandComp t CQEmpty = do
+  c <- mkThunk t
+  return $ VCons 1 [c, VCons 0 []]
+
+-- [ t | q, qs ] = ...
+expandComp t (CQCons (unrebind -> (q,qs))) = do
+  case q of
+
+    -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
+    CQBind x (unembed -> lst) -> do
+      c <- mkThunk lst
+      vmap (\v -> extend x v $ expandComp t qs) c >>= vconcat
+
+    -- [ t | b, qs ] = if b then [ t | qs ] else []
+    CQGuard (unembed -> g)    -> do
+      v <- whnf g
+      case v of
+        VCons 0 [] {- False -} -> return $ VCons 0 []  {- Nil -}
+        VCons 1 [] {- True  -} -> expandComp t qs
+        _ -> error $ "Impossible! Got " ++ show v ++ " in expandComp CQGuard."
 
 ------------------------------------------------------------
 -- Case analysis

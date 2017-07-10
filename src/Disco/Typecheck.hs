@@ -210,6 +210,13 @@ check (TList xs) ty@(TyList eltTy) = do
 
 check (TList xs) ty            = throwError (NotList (TList xs) ty)
 
+check (TBin Cons x xs) ty@(TyList eltTy) = do
+  ax  <- check x  eltTy
+  axs <- check xs ty
+  return $ ATBin ty Cons ax axs
+
+check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
+
 check (TListComp bqt) ty@(TyList eltTy) = do
   lunbind bqt $ \(qs,t) -> do
   (aqs, cx) <- inferQuals qs

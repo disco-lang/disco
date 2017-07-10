@@ -9,3 +9,5 @@ take 10 [g | a in [1], b in [a,a,a,a], c in [b,b,b,b], d in [c,c,c,c], e in [d,d
 take 1 [x | x in [1,2], 1/(2-x) <= 1]
 take 5 [y | x in repeat 3, y in [1,2,3] ]
 [(x,y) | x in downfrom 10, even x, y in downfrom x, even y]
+:type [(x,y) | x in downfrom 10, even x, y in downfrom x, even y]
+:type [(x,y) | x <- downfrom 10, even x, y <- downfrom x, even y]

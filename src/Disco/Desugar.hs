@@ -118,6 +118,11 @@ desugarTerm (ATChain _ t1 links) = desugarChain t1 links
 desugarTerm (ATList _ es) = do
   des <- mapM desugarTerm es
   return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
+desugarTerm (ATListComp _ bqt) =
+  lunbind bqt $ \(qs, t) -> do
+  dt <- desugarTerm t
+  dqs <- desugarQuals qs
+  return $ CListComp (bind dqs dt)
 desugarTerm (ATLet _ t) =
   lunbind t $ \((x, unembed -> t1), t2) -> do
   dt1 <- desugarTerm t1
@@ -203,6 +208,21 @@ desugarGuards (AGCons (unrebind -> (ag, ags))) =
       c <- desugarTerm at
       cgs <- desugarGuards ags
       return $ CGCons (rebind (embed c, desugarPattern p) cgs)
+
+desugarQuals :: AQuals -> DSM CQuals
+desugarQuals AQEmpty                        = return CQEmpty
+desugarQuals (AQCons (unrebind -> (q,qs)))  = do
+  dq <- desugarQual q
+  dqs <- desugarQuals qs
+  return $ CQCons (rebind dq dqs)
+
+desugarQual :: AQual -> DSM CQual
+desugarQual (AQBind x (unembed -> t)) = do
+  dt <- desugarTerm t
+  return $ CQBind (translate x) (embed dt)
+desugarQual (AQGuard (unembed -> t))  = do
+  dt <- desugarTerm t
+  return $ CQGuard (embed dt)
 
 -- | Desugar a pattern.
 desugarPattern :: Pattern -> CPattern

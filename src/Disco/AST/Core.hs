@@ -27,6 +27,7 @@ module Disco.AST.Core
 
          -- * Case expressions and patterns
        , CBranch, CGuards(..), CPattern(..)
+       , CQuals(..), CQual(..)
        )
        where
 
@@ -63,6 +64,8 @@ data Core where
   --   constructor came from; if the program typechecked then we will
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
+
+  CListComp :: Bind CQuals Core -> Core
 
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core
@@ -145,6 +148,32 @@ data CGuards where
   CGCons  :: Rebind (Embed Core, CPattern) CGuards -> CGuards
   deriving Show
 
+-- Note: very similar to guards
+--  maybe some generalization in the future?
+-- | A list of qualifiers in list comprehension.
+--   Special type needed to record the binding structure.
+data CQuals where
+
+  -- | The empty list of qualifiers
+  CQEmpty :: CQuals
+
+  -- | A qualifier followed by zero or more other qualifiers
+  --   this qualifier can bind variables in the subsequent qualifiers.
+  CQCons  :: Rebind CQual CQuals -> CQuals
+
+  deriving Show
+
+-- | A single qualifier in a list comprehension.
+data CQual where
+
+  -- | A binding qualifier (i.e. @x <- t@)
+  CQBind   :: Name Core -> Embed Core -> CQual
+
+  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  CQGuard  :: Embed Core -> CQual
+
+  deriving Show
+
 -- | Core (desugared) patterns.  We only need variables, wildcards,
 --   natural numbers, and constructors.
 data CPattern where
@@ -167,7 +196,7 @@ data CPattern where
 
   deriving Show
 
-derive [''RationalDisplay, ''Core, ''Op, ''CPattern, ''CGuards]
+derive [''RationalDisplay, ''Core, ''Op, ''CPattern, ''CGuards, ''CQual, ''CQuals]
 
 instance Alpha Rational   -- XXX duplicate orphan!
 instance Alpha RationalDisplay
@@ -175,3 +204,5 @@ instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern
 instance Alpha CGuards
+instance Alpha CQual
+instance Alpha CQuals

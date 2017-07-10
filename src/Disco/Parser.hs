@@ -48,6 +48,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
+       , parseList, parseListComp, parseQuals, parseQual
        , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
@@ -59,7 +60,7 @@ module Disco.Parser
        )
        where
 
--- import           Debug.Trace
+--import           Debug.Trace
 
 import           Unbound.LocallyNameless (Name, bind, embed, rebind,
                                           string2Name)
@@ -550,7 +551,7 @@ term = whitespace *> parseTerm <* eof
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = -- trace "parseAtom" $
-      TList       <$> brackets (parseTerm `sepBy` comma)
+      brackets parseList
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
@@ -562,6 +563,36 @@ parseAtom = -- trace "parseAtom" $
   <|> TUn Ceil <$> cbrack parseTerm
 
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
+
+-- | Parse a list-ish thing, like a literal list or a list
+--   comprehension (not including the square brackets).
+parseList :: Parser Term
+parseList =
+      (try parseListComp <?> "list comprehension")
+  <|> TList <$> ((parseTerm `sepBy` comma) <?> "list literal")
+
+-- | Parse a list comprehension (without square brackets).
+--
+--   @t | q [,q]*@
+parseListComp :: Parser Term
+parseListComp = do
+  t <- parseTerm
+  _ <- symbol "|"
+  qs <- parseQuals
+  return (TListComp $ bind qs t)
+
+parseQuals :: Parser Quals
+parseQuals = quals <$> (parseQual `sepBy` comma)
+  where
+    quals :: [Qual] -> Quals
+    quals = foldr (\q qs -> QCons (rebind q qs)) QEmpty
+
+parseQual :: Parser Qual
+parseQual =
+      try (QBind <$> ident <*> (selector *> (embed <$> parseTerm)))
+  <|> QGuard <$> embed <$> parseTerm
+  where
+    selector = reservedOp "<-" <|> reserved "in"
 
 tuple :: [Term] -> Term
 tuple []  = TUnit

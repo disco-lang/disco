@@ -210,6 +210,21 @@ check (TList xs) ty@(TyList eltTy) = do
 
 check (TList xs) ty            = throwError (NotList (TList xs) ty)
 
+check (TBin Cons x xs) ty@(TyList eltTy) = do
+  ax  <- check x  eltTy
+  axs <- check xs ty
+  return $ ATBin ty Cons ax axs
+
+check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
+
+check (TListComp bqt) ty@(TyList eltTy) = do
+  lunbind bqt $ \(qs,t) -> do
+  (aqs, cx) <- inferQuals qs
+  extends cx $ do
+  at <- check t eltTy
+  return $ ATListComp ty (bind aqs at)
+
+check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
 
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.
@@ -612,6 +627,14 @@ infer (TList (e:es)) = do
   ates <- mapM (flip check ty) es
   return $ ATList (TyList ty) (ate : ates)
 
+infer (TListComp bqt) = do
+  lunbind bqt $ \(qs,t) -> do
+  (aqs, cx) <- inferQuals qs
+  extends cx $ do
+  at <- infer t
+  let ty = getType at
+  return $ ATListComp (TyList ty) (bind aqs at)
+
 infer (TTyOp Enumerate t) = do
   checkFinite t
   return $ ATTyOp (TyList t) Enumerate t
@@ -726,6 +749,25 @@ inferGuard (GPat (unembed -> t) p) = do
   at <- infer t
   ctx <- checkPattern p (getType at)
   return (AGPat (embed at) p, ctx)
+
+inferQuals :: Quals -> TCM (AQuals, Ctx)
+inferQuals QEmpty                        = return (AQEmpty, emptyCtx)
+inferQuals (QCons (unrebind -> (q,qs)))  = do
+  (aq, ctx) <- inferQual q
+  extends ctx $ do
+  (aqs, ctx') <- inferQuals qs
+  let ctx'' = joinCtx ctx ctx'
+  return (AQCons (rebind aq aqs), ctx'')
+
+inferQual :: Qual -> TCM (AQual, Ctx)
+inferQual (QBind x (unembed -> t))  = do
+  at <- infer t
+  case getType at of
+    TyList ty -> return (AQBind (translate x) (embed at), singleCtx x ty)
+    wrongTy   -> throwError $ NotList t wrongTy
+inferQual (QGuard (unembed -> t))   = do
+  at <- check t TyBool
+  return (AQGuard (embed at), emptyCtx)
 
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.

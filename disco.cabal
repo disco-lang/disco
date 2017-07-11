@@ -64,7 +64,7 @@ library
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,
                        containers >=0.5 && <0.6,
-                       unbound >= 0.4 && < 0.6,
+                       unbound-generics >= 0.3 && < 0.4,
                        lens >= 4.14 && < 4.16,
                        exact-combinatorics >= 0.2 && < 0.3,
                        integer-logarithms >= 1.0 && < 1.1
@@ -81,7 +81,7 @@ executable disco
                        mtl >=2.2 && <2.3,
                        megaparsec >= 5.0 && < 5.2,
                        containers >= 0.5 && < 0.6,
-                       unbound >= 0.4 && < 0.6,
+                       unbound-generics >= 0.3 && < 0.4,
                        lens >= 4.14 && < 4.16,
                        optparse-applicative >= 0.12 && < 0.15
 

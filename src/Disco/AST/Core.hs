@@ -1,11 +1,10 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans  #-}  -- for Alpha Rational
 
 -----------------------------------------------------------------------------
 -- |
@@ -31,14 +30,15 @@ module Disco.AST.Core
        )
        where
 
-import           Unbound.LocallyNameless
+import           GHC.Generics
+import           Unbound.Generics.LocallyNameless
 
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 -- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
 --   idea that the result should be displayed as a decimal if any
@@ -97,7 +97,7 @@ data Core where
   -- | A type.
   CType :: Type -> Core
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
@@ -130,7 +130,7 @@ data Op = OAdd     -- ^ Addition (@+@)
                    --   ordering relation.
         | OEnum
         | OCount
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind CGuards Core
@@ -146,7 +146,7 @@ data CGuards where
   --   pattern guards (@when@) in the surface language.  Boolean
   --   (@if@) guards are desugared to pattern matching on @true@.
   CGCons  :: Rebind (Embed Core, CPattern) CGuards -> CGuards
-  deriving Show
+  deriving (Show, Generic)
 
 -- Note: very similar to guards
 --  maybe some generalization in the future?
@@ -161,7 +161,7 @@ data CQuals where
   --   this qualifier can bind variables in the subsequent qualifiers.
   CQCons  :: Rebind CQual CQuals -> CQuals
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A single qualifier in a list comprehension.
 data CQual where
@@ -172,7 +172,7 @@ data CQual where
   -- | A boolean guard qualfier (i.e. @x + y > 4@)
   CQGuard  :: Embed Core -> CQual
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | Core (desugared) patterns.  We only need variables, wildcards,
 --   natural numbers, and constructors.
@@ -194,11 +194,8 @@ data CPattern where
   -- | A successor pattern, @S p@.
   CPSucc :: CPattern -> CPattern
 
-  deriving Show
+  deriving (Show, Generic)
 
-derive [''RationalDisplay, ''Core, ''Op, ''CPattern, ''CGuards, ''CQual, ''CQuals]
-
-instance Alpha Rational   -- XXX duplicate orphan!
 instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op

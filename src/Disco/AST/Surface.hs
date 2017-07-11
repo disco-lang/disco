@@ -1,11 +1,10 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans  #-}  -- for Alpha Rational
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,8 +41,9 @@ module Disco.AST.Surface
        where
 
 import qualified Data.Map                as M
+import           GHC.Generics (Generic)
 
-import           Unbound.LocallyNameless hiding (Fixity)
+import           Unbound.Generics.LocallyNameless
 
 import           Disco.Types
 
@@ -97,7 +97,7 @@ isDefn _       = False
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
-  deriving (Show, Eq, Enum)
+  deriving (Show, Eq, Enum, Generic)
 
 -- | Unary operators.
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
@@ -107,7 +107,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Lg    -- ^ Floor of base-2 logarithm (@lg@)
          | Floor -- ^ Floor of fractional type (@floor@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
 
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
@@ -129,26 +129,26 @@ data BOp = Add     -- ^ Addition (@+@)
          | RelPm   -- ^ Relative primality test (@#@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
 
 -- | Fixities of unary operators (either pre- or postfix).
 data UFixity
   = Pre     -- ^ Unary prefix.
   | Post    -- ^ Unary postfix.
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Generic)
 
 -- | Fixity of infix binary operators (either left, right, or non-associative).
 data BFixity
   = InL   -- ^ Left-associative infix.
   | InR   -- ^ Right-associative infix.
   | In    -- ^ Infix.
-  deriving (Eq, Ord, Enum, Bounded, Show)
+  deriving (Eq, Ord, Enum, Bounded, Show, Generic)
 
 -- | Operators together with their fixity.
 data OpFixity =
     UOpF UFixity UOp
   | BOpF BFixity BOp
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 -- | An @OpInfo@ record contains information about an operator, such
 --   as the operator itself, its fixity, a list of concrete syntax
@@ -231,7 +231,7 @@ bopMap = M.fromList $
 -- | Type Operators
 data TyOp = Enumerate -- List all values of a type
           | Count     -- Count how many values there are of a type
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 -- | Terms.
 data Term where
@@ -297,7 +297,7 @@ data Term where
 
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term
-  deriving Show
+  deriving (Show, Generic)
 
 -- Note: very similar to guards
 --  maybe some generalization in the future?
@@ -312,7 +312,7 @@ data Quals where
   --   this qualifier can bind variables in the subsequent qualifiers.
   QCons  :: Rebind Qual Quals -> Quals
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A single qualifier in a list comprehension.
 data Qual where
@@ -323,11 +323,11 @@ data Qual where
   -- | A boolean guard qualfier (i.e. @x + y > 4@)
   QGuard  :: Embed Term -> Qual
 
-  deriving Show
+  deriving (Show, Generic)
 
 data Link where
   TLink :: BOp -> Term -> Link
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
@@ -344,7 +344,7 @@ data Guards where
   -- | A single guard (@if@ or @when@) followed by more guards.
   GCons  :: Rebind Guard Guards -> Guards
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | A single guard in a branch: either an @if@ or a @when@.
 data Guard where
@@ -355,7 +355,7 @@ data Guard where
   -- | Pattern guard (@when term = pat@)
   GPat  :: Embed Term -> Pattern -> Guard
 
-  deriving Show
+  deriving (Show, Generic)
 
 -- | Patterns.
 data Pattern where
@@ -390,13 +390,9 @@ data Pattern where
   -- | List pattern @[p1, .., pn]@.
   PList :: [Pattern] -> Pattern
 
-  deriving Show
+  deriving (Show, Generic)
   -- TODO: figure out how to match on Z or Q!
 
-derive [''Side, ''UOp, ''BOp, ''TyOp, ''Term, ''Link,
-        ''Guards, ''Guard, ''Pattern, ''Qual, ''Quals]
-
-instance Alpha Rational   -- XXX orphan!
 instance Alpha Side
 instance Alpha UOp
 instance Alpha BOp
@@ -409,11 +405,21 @@ instance Alpha Pattern
 instance Alpha Quals
 instance Alpha Qual
 
-instance Subst Term Rational
-instance Subst Term Type
+-- Names for terms can't show up in Rational, Pattern, or Type
+instance Subst Term Rational where
+  subst _ _ = id
+  substs _  = id
+
+instance Subst Term Pattern where
+  subst _ _ = id
+  substs _  = id
+
+instance Subst Term Type where
+  subst _ _ = id
+  substs _  = id
+
 instance Subst Term Guards
 instance Subst Term Guard
-instance Subst Term Pattern
 instance Subst Term Quals
 instance Subst Term Qual
 instance Subst Term Side

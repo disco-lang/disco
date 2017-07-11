@@ -4,6 +4,7 @@
 import           Control.Lens             (makeLenses, use, (%=), (.=))
 import           Control.Monad.State
 import           Data.Char                (isSpace)
+import           Data.Coerce
 import           Data.List                (find, isPrefixOf)
 import qualified Data.Map                 as M
 import           Data.Maybe               (isJust)
@@ -11,7 +12,7 @@ import           Data.Maybe               (isJust)
 import qualified Options.Applicative      as O
 import           System.Console.Haskeline
 import           Text.Megaparsec          hiding (runParser)
-import           Unbound.LocallyNameless  hiding (rnf)
+import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -131,12 +132,12 @@ handleLet x t = do
     Left err -> io.print $ err   -- XXX pretty print
     Right (at, _) -> do
       replCtx   %= M.insert x (getType at)
-      replDefns %= M.insert (translate x) (runDSM $ desugarTerm at)
+      replDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
 handleShowDefn :: Name Term -> REPLStateIO String
 handleShowDefn x = do
   defns <- use replDefns
-  case M.lookup (translate x) defns of
+  case M.lookup (coerce x) defns of
     Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
 
@@ -157,7 +158,7 @@ handleLoad file = handle (fileNotFound file) $ do
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr   -- XXX pretty-print
         Right ((docMap, aprops, ctx), defns) -> do
-          let cdefns = M.mapKeys translate $ runDSM (mapM desugarDefn defns)
+          let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           replDefns .= cdefns
           replDocs  .= docMap
           replCtx   .= ctx

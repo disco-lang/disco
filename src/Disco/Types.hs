@@ -1,8 +1,10 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE DeriveGeneric         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +26,8 @@ module Disco.Types
        )
        where
 
-import           Unbound.LocallyNameless
+import           GHC.Generics (Generic)
+import           Unbound.Generics.LocallyNameless
 
 -- | Types.
 data Type where
@@ -69,7 +72,7 @@ data Type where
   -- | Lists
   TyList   :: Type -> Type
 
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 -- | Check whether a type is a numeric type (N, Z, or Q).
 isNumTy :: Type -> Bool
@@ -77,7 +80,7 @@ isNumTy ty = ty `elem` [TyN, TyZ, TyQP, TyQ]
 
 -- | Strictness of a function application or let-expression.
 data Strictness = Strict | Lazy
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
 -- | Numeric types are strict, others are lazy.
 strictness :: Type -> Strictness
@@ -89,8 +92,6 @@ strictness ty
 unpair :: Type -> [Type]
 unpair (TyPair ty1 ty2) = ty1 : unpair ty2
 unpair ty               = [ty]
-
-derive [''Type, ''Strictness]
 
 instance Alpha Type
 instance Alpha Strictness

@@ -62,12 +62,13 @@ module Disco.Interpret.Core
 import           Control.Lens                       ((%~), (.~), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Data.Coerce
 import           Data.List                          (find)
 import qualified Data.Map                           as M
 import           Data.Monoid
 import           Data.Ratio
 
-import           Unbound.LocallyNameless            hiding (enumerate, rnf, GT)
+import           Unbound.Generics.LocallyNameless
 
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
@@ -267,7 +268,7 @@ whnfV v                       = return v
 whnf :: Core -> IM Value
 whnf (CVar x) = do
   e <- getEnv
-  case (M.lookup (translate x) e) of
+  case (M.lookup (coerce x) e) of
     Just v  -> whnfV v
     Nothing -> do
       c <- getDefEnv
@@ -290,7 +291,7 @@ whnf (CLet str b)   =
   v1 <- case str of
     Strict -> whnf t1
     Lazy   -> mkThunk t1
-  extend (translate x) v1 $ whnf t2
+  extend (coerce x) v1 $ whnf t2
 whnf (CCase bs)     = whnfCase bs
 whnf (CListComp b)  =
   lunbind b $ \(qs, t) -> do
@@ -396,7 +397,7 @@ checkGuards (CGCons (unrebind -> ((unembed -> c, p), gs))) = do
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.
 match :: Value -> CPattern -> IM (Maybe Env)
-match v (CPVar x)     = return $ Just (M.singleton (translate x) v)
+match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
 match _ CPWild        = ok
 match v (CPCons i ps) = do
   VCons j vs <- whnfV v

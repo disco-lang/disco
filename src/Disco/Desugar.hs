@@ -34,7 +34,8 @@ module Disco.Desugar
 import           Control.Monad.Cont
 
 import           Data.Ratio
-import           Unbound.LocallyNameless
+import           Data.Coerce
+import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -95,13 +96,13 @@ desugarDefn def = do
 
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM Core
-desugarTerm (ATVar _ x)   = return $ CVar (translate x)
+desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
 desugarTerm ATUnit        = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
   lunbind lam $ \(x,t) -> do
   dt <- desugarTerm t
-  return $ CAbs (bind (translate x) dt)
+  return $ CAbs (bind (coerce x) dt)
 desugarTerm (ATApp ty t1 t2) =
   CApp (strictness ty) <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTup _ ts) = desugarTuples ts
@@ -127,7 +128,7 @@ desugarTerm (ATLet _ t) =
   lunbind t $ \((x, unembed -> t1), t2) -> do
   dt1 <- desugarTerm t1
   dt2 <- desugarTerm t2
-  return $ CLet (strictness (getType t1)) (bind (translate x, embed dt1) dt2)
+  return $ CLet (strictness (getType t1)) (bind (coerce x, embed dt1) dt2)
 desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugarTerm (ATAscr t _) = desugarTerm t
 desugarTerm (ATSub _ t)  = desugarTerm t
@@ -219,14 +220,14 @@ desugarQuals (AQCons (unrebind -> (q,qs)))  = do
 desugarQual :: AQual -> DSM CQual
 desugarQual (AQBind x (unembed -> t)) = do
   dt <- desugarTerm t
-  return $ CQBind (translate x) (embed dt)
+  return $ CQBind (coerce x) (embed dt)
 desugarQual (AQGuard (unembed -> t))  = do
   dt <- desugarTerm t
   return $ CQGuard (embed dt)
 
 -- | Desugar a pattern.
 desugarPattern :: Pattern -> CPattern
-desugarPattern (PVar x)      = CPVar (translate x)
+desugarPattern (PVar x)      = CPVar (coerce x)
 desugarPattern PWild         = CPWild
 desugarPattern PUnit         = CPCons 0 []
 desugarPattern (PBool b)     = CPCons (fromEnum b) []

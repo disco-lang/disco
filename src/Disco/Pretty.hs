@@ -10,7 +10,7 @@ import           Data.Ratio
 import qualified Data.Map                as M
 
 import qualified Text.PrettyPrint        as PP
-import           Unbound.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
+import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
                                           unembed, unrebind)
 
 import           Disco.AST.Core

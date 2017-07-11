@@ -446,13 +446,6 @@ integralizeTy TyQ   = TyZ
 integralizeTy TyQP  = TyN
 integralizeTy t     = error $ "Called integralizeTy on " ++ show t
 
--- | Given a list of ATerms, recursively generate a list of
---   corresponding types.
-getTypes :: [ATerm] -> [Type]
-getTypes [at]     = [getType at]
-getTypes (at:ats) = (getType at) : (getTypes ats)
-getTypes []       = error "Impossible! getTypes []"
-
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
 infer :: Term -> TCM ATerm
@@ -637,15 +630,9 @@ infer (TChain t1 links) = do
   alinks <- inferChain t1 links
   return $ ATChain TyBool at1 alinks
 
-{-infer (TList (e:es)) = do
-  ate  <- infer e
-  let ty = getType ate
-  ates <- mapM (flip infer ty) es
-  return $ ATList (TyList ty) (ate : ates) -}
-
-infer (TList es)  = do
-  ates <- inferList es
-  let tys = getTypes ates
+infer (TList es@(_:_))  = do
+  ates <- (mapM infer) es
+  let tys = (map getType) ates
   ty  <- lubs tys
   return $ ATList (TyList ty) ates
 
@@ -720,16 +707,6 @@ inferChain t1 (TLink op t2 : links) = do
   at2 <- infer t2
   _   <- check (TBin op t1 t2) TyBool
   (ATLink op at2 :) <$> inferChain t2 links
-
-inferList :: [Term] -> TCM [ATerm]
-inferList []  = error "Impossible! inferList []"
-inferList [t] = do
-  at <- infer t
-  return $ [at]
-inferList (t:ts)  = do
-  at <- infer t
-  ats <- inferList ts
-  return $ at:ats
 
 inferTuple :: [Term] -> TCM (Type, [ATerm])
 inferTuple []     = error "Impossible! inferTuple []"

@@ -5,6 +5,7 @@
 :type 3^(-2)
 :type (1/2)^(-2)
 :type (1/2)^3
+:type [1,2/3]
 
 -- Some things of type ℚ
 :type (-3) / 5
@@ -16,3 +17,4 @@
 :type (-3)^(-2)
 :type (-2/3)^(-2)
 :type (-1/2)^3
+:type [1,-1,2/3]

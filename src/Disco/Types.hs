@@ -6,8 +6,6 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE DeriveGeneric         #-}
 
-{-# OPTIONS_GHC -fno-warn-orphans  #-}  -- for Generic Rational
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types
@@ -28,7 +26,6 @@ module Disco.Types
        )
        where
 
-import           GHC.Real (Ratio(..))
 import           GHC.Generics (Generic)
 import           Unbound.Generics.LocallyNameless
 
@@ -95,8 +92,6 @@ strictness ty
 unpair :: Type -> [Type]
 unpair (TyPair ty1 ty2) = ty1 : unpair ty2
 unpair ty               = [ty]
-
-deriving instance Generic Rational
 
 instance Alpha Type
 instance Alpha Strictness

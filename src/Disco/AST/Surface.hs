@@ -405,11 +405,21 @@ instance Alpha Pattern
 instance Alpha Quals
 instance Alpha Qual
 
-instance Subst Term Rational
-instance Subst Term Type
+-- Names for terms can't show up in Rational, Pattern, or Type
+instance Subst Term Rational where
+  subst _ _ = id
+  substs _  = id
+
+instance Subst Term Pattern where
+  subst _ _ = id
+  substs _  = id
+
+instance Subst Term Type where
+  subst _ _ = id
+  substs _  = id
+
 instance Subst Term Guards
 instance Subst Term Guard
-instance Subst Term Pattern
 instance Subst Term Quals
 instance Subst Term Qual
 instance Subst Term Side

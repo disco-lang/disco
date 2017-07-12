@@ -42,7 +42,7 @@ repository.
   example, N * Q+ is a subtype of  Z * Q,  Z -> N  is a subtype of  N
   -> Z, and so on).
 
-** Coercion and type inference
+** TODO Coercion and type inference
 
    John C. Mitchell
    http://dl.acm.org/citation.cfm?id=800529&dl=ACM&coll=DL&CFID=781024363&CFTOKEN=74865356
@@ -84,6 +84,49 @@ repository.
    Section 6 is of particular relevance for disco; this is the section
    where they describe the algorithm for structural subtyping.
    Section 6.5 even mentions extending the system for polymorphism.
+
+   ...After looking at it more carefully and starting to implement the
+   given MATCH algorithm (in explore/sub) I realized this is not quite
+   what I thought.  The MATCH algorithm just tests whether a given set
+   of constraints is structurally sound, i.e. whether there is some
+   substitution which allows the subtype constraints to be directly
+   decomposed into a set of atomic constraints. But that doesn't solve
+   the problem of needing to then solve the constraints.  They cite a
+   paper by Wand which apparently gives a polynomial-time algorithm
+   but I haven't been able to get a copy of it yet.  In any case the
+   next paper (Traytel et al) seems much more promising.
+
+** Extending Hindley-Milner Type Inference with Coercive Structural Subtyping (2011)
+
+   Dmitriy Traytel, Stefan Berghofer, and Tobias Nipkow
+
+   Note there are two versions stored in reference/ : a shorter
+   version that was published in APLAS '11, and an extended version
+   with more detail.
+
+   At first glance this seems like exactly what we want.  It even
+   discusses an extension to include type classes in section 4.
+
+   Note they also cite Wand; should really get a copy of that.
+
+   - Going to try implementing this in explore/sub2.
+
+   - In disco at the moment we don't absolutely *need* to do coercion
+     insertion (Figure 3 in the paper, which is the final step): base
+     types in a subtype relationship always correspond to an actual
+     subset relationship and no conversion needs to be done, given how
+     the interpreter simply represents all numeric types with rational
+     values.  However, it seems easy enough, and would probably be
+     useful in later settings---for example if we wanted to compile
+     disco and represent natural numbers as register-sized integers
+     when possible, or if we wanted to move to a typed, fully
+     annotated core language that can be easily typechecked.
+
+** TODO On the complexity of type inference with coercion (1989)
+
+   Wand, M., O’Keefe, P.: On the complexity of type inference with
+   coercion.  In: FPCA ’89: Functional programming languages and
+   computer architecture. pp. 293–298. ACM, New York, NY, USA (1989)
 
 * Type constraints
 

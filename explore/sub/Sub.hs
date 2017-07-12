@@ -5,10 +5,15 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures             #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
+
+{-# OPTIONS_GHC -fno-warn-orphans       #-}
 
 -- STLC extended with a bit of arithmetic and some simple subtyping.
 
@@ -19,11 +24,15 @@ import           Parsing2
 import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
 
+import Data.Equivalence.Monad
+
+import Control.Arrow
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
 import qualified Data.Map    as M
 import           Data.Maybe
+import           Data.Void
 import           Text.Printf
 
 ------------------------------------------------------------
@@ -46,16 +55,47 @@ data Expr where
 
   deriving (Show, Generic)
 
-data Type where
-  TyNat  :: Type
-  TyInt  :: Type
-  TyFun  :: Type -> Type -> Type
-  TyPair :: Type -> Type -> Type
+data Atom' v where
+  AVar :: v -> Atom' v
+  ANat :: Atom' v
+  AInt :: Atom' v
   deriving (Show, Eq, Generic)
 
+type Atom = Atom' (Name Type)
+
+data Cons where
+  CArr  :: Cons
+  CPair :: Cons
+  deriving (Show, Eq, Generic)
+
+pattern TyVar :: v -> Type' v
+pattern TyVar v = TyAtom (AVar v)
+
+pattern TyNat :: Type' v
+pattern TyNat   = TyAtom ANat
+
+pattern TyInt :: Type' v
+pattern TyInt   = TyAtom AInt
+
+pattern TyFun :: Type' v -> Type' v -> Type' v
+pattern TyFun ty1 ty2 = TyCons CArr [ty1, ty2]
+
+pattern TyPair :: Type' v -> Type' v -> Type' v
+pattern TyPair ty1 ty2 = TyCons CPair [ty1, ty2]
+
+data Type' v where
+  TyAtom :: Atom' v -> Type' v
+  TyCons :: Cons -> [Type' v] -> Type' v
+  deriving (Show, Eq, Generic)
+
+type Type = Type' Void
+
+instance Alpha Cons
+instance Alpha v => Alpha (Atom' v)
 instance Alpha Op
 instance Alpha Expr
-instance Alpha Type
+instance Alpha v => Alpha (Type' v)
+instance Alpha Void
 
 instance Subst Expr Op where
   subst  _ _ = id
@@ -208,16 +248,34 @@ tm s = case parse expr s of
 newtype TC a = TC { unTC :: StateT Int (ReaderT Ctx (Except TypeError)) a }
   deriving (Functor, Applicative, Monad, MonadReader Ctx, MonadState Int, MonadError TypeError)
 
+-- (EquivM' s Atom)
+
 runTC :: TC a -> Either TypeError a
 runTC (TC t) = runExcept . flip runReaderT M.empty . flip evalStateT 0 $ t
 
 extend :: Name Expr -> Type -> TC a -> TC a
 extend x s = local (M.insert x s)
 
+newtype UVar = UVar Int
+  deriving (Eq, Ord)
+
+type UType = Type' UVar
+type UAtom = Atom' UVar
+
+newUVar :: TC UVar
+newUVar = do
+  i <- get
+  put (i+1)
+  return (UVar i)
+
+type USubst = M.Map UVar UType
+
 --------------------------------------------------
 -- Inference mode
 
-data SubC = Type :<: Type
+data SubC v = Type' v :<: Type' v
+
+data Polarity = Co | Contra
 
 data TypeError where
   Unbound  :: String -> TypeError
@@ -226,26 +284,73 @@ data TypeError where
   NotFunTy :: Type -> TypeError
   deriving Show
 
-checkNumTy :: Type -> TC ()
-checkNumTy TyNat = return ()
-checkNumTy TyInt = return ()
-checkNumTy ty    = throwError $ NonNum ty
+type MatchM s a = StateT ([SubC UVar], USubst) (EquivT' s UAtom TC) a
 
-lub :: Type -> Type -> TC Type
-lub t1 t2 | t1 == t2 = return t1
-lub TyNat TyInt = return TyInt
-lub TyInt TyNat = return TyInt
-lub t1@(TyFun t11 t12) t2@(TyFun t21 t22)
-  | t11 /= t21 = throwError $ NoLub t1 t2
-  | otherwise  = do
-      t2' <- lub t12 t22
-      return $ TyFun t11 t2'
+match :: [SubC UVar] -> TC USubst
+match initcs = snd <$> runEquivT' (flip execStateT (initcs, M.empty) match')
+  where
+    getC :: MatchM s [SubC UVar]
+    getC = fst <$> get
+
+    putC :: [SubC UVar] -> MatchM s ()
+    putC = modify . first . const
+
+    addC :: SubC UVar -> MatchM s ()
+    addC = modify . first . (:)
+
+    match' :: MatchM s ()
+    match' = do
+      getC >>= \case
+        []     -> return ()
+        (c:cs) -> putC cs >> matchOne c
+
+    matchOne :: SubC UVar -> MatchM s ()
+    matchOne (TyCons c1 tys1 :<: TyCons c2 tys2)
+      | c1 /= c2  = undefined   -- type mismatch error
+      | otherwise = decompose c1 tys1 tys2
+    matchOne (TyAtom a1 :<: TyAtom a2) = undefined
+
+    decompose :: Cons -> [UType] -> [UType] -> MatchM s ()
+    decompose c tys1 tys2 = zipWithM3_ constrain (polarities c) tys1 tys2
+
+    polarities :: Cons -> [Polarity]
+    polarities CArr  = [Contra, Co]
+    polarities CPair = [Co, Co]
+
+    constrain :: Polarity -> UType -> UType -> MatchM s ()
+    constrain Co     ty1 ty2 = addC (ty1 :<: ty2)
+    constrain Contra ty1 ty2 = addC (ty2 :<: ty1)
+
+    zipWithM3 :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+    zipWithM3 _ [] _ _ = return []
+    zipWithM3 _ _ [] _ = return []
+    zipWithM3 _ _ _ [] = return []
+    zipWithM3 f (a:as) (b:bs) (c:cs) = (:) <$> f a b c <*> zipWithM3 f as bs cs
+
+    zipWithM3_ f as bs cs = zipWithM3 f as bs cs >> return ()
+
+-- checkNumTy :: Type -> TC ()
+-- checkNumTy TyNat = return ()
+-- checkNumTy TyInt = return ()
+-- checkNumTy ty    = throwError $ NonNum ty
+
+-- lub :: Type -> Type -> TC Type
+-- lub t1 t2 | t1 == t2 = return t1
+-- lub TyNat TyInt = return TyInt
+-- lub TyInt TyNat = return TyInt
+-- lub t1@(TyFun t11 t12) t2@(TyFun t21 t22)
+--   | t11 /= t21 = throwError $ NoLub t1 t2
+--   | otherwise  = do
+--       t2' <- lub t12 t22
+--       return $ TyFun t11 t2'
+
+
 
 --------------------------------------------------
 -- Checking mode
 
-check :: Expr -> Type -> TC [SubC]
-check _ _ = undefined
+-- check :: Expr -> Type -> TC [SubC]
+-- check _ _ = undefined
 
 ------------------------------------------------------------
 -- Interpreter

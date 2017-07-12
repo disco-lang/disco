@@ -17,6 +17,7 @@ library
                        mtl >=2.2 && <2.3,
                        containers >=0.5 && <0.6,
                        unbound-generics,
+                       equivalence,
                        split,
                        lens,
                        parsec
@@ -29,6 +30,7 @@ executable sub
                        mtl >=2.2 && <2.3,
                        containers >=0.5 && <0.6,
                        unbound-generics,
+                       equivalence,
                        split,
                        lens,
                        parsec

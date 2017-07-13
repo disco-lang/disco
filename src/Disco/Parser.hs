@@ -567,17 +567,39 @@ parseAtom = -- trace "parseAtom" $
 -- | Parse a list-ish thing, like a literal list or a list
 --   comprehension (not including the square brackets).
 parseList :: Parser Term
-parseList =
-      (try parseListComp <?> "list comprehension")
-  <|> TList <$> ((parseTerm `sepBy` comma) <?> "list literal")
+parseList = nonEmptyList <|> return (TList [])
+  -- Careful to do this without backtracking, since backtracking can
+  -- lead to bad performance in certain pathological cases (for
+  -- example, a very deeply nested list).
 
--- | Parse a list comprehension (without square brackets).
+  where
+    -- Any non-empty list starts with a term, followed by some
+    -- remainder (which could either be the rest of a literal list, or
+    -- a list comprehension).  If there is no remainder just return a
+    -- singleton list.
+    nonEmptyList = do
+      t <- parseTerm
+      (listRemainder t <|> return (TList [t]))
+
+    -- The remainder of a list after the first term starts with either
+    -- a pipe (for a comprehension) or a comma (for a literal list).
+    listRemainder t = do
+      s <- (symbol "|" <|> comma)
+      case s of
+        "|" -> parseListComp t
+        "," -> do
+          -- Parse the rest of the terms in a literal list after the
+          -- first, and return them all together.
+          ts <- parseTerm `sepBy` comma
+          return $ TList (t:ts)
+        _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
+
+-- | Parse the part of a list comprehension after the | (without
+--   square brackets), i.e. a list of qualifiers.
 --
---   @t | q [,q]*@
-parseListComp :: Parser Term
-parseListComp = do
-  t <- parseTerm
-  _ <- symbol "|"
+--   @q [,q]*@
+parseListComp :: Term -> Parser Term
+parseListComp t = do
   qs <- parseQuals
   return (TListComp $ bind qs t)
 

@@ -1,2 +1,0 @@
-:load test/syntax002/juxt-mul.disco
-q 3 (4,5) 6

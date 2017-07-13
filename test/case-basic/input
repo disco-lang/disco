@@ -1,0 +1,6 @@
+:load test/case-basic/case-basic.disco
+foo (left [])
+foo (right true)
+foo (right false)
+foo (left [3])
+foo (left [4,2])

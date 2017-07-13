@@ -1,0 +1,13 @@
+:load test/list-comp/listcomp.disco
+[x | x in [1,2,3]]
+[x | x in [1,2,3], y in ([] : List Q)]
+[x+y+z | z in [1,2,3], x in [z,z+1], y in [10,20,30]]
+[(a,b,c) | a in downfrom 15, b in downfrom 15, c in downfrom 15, a^2 + b^2 = c^2]
+[g | a in [1], b in [a], c in [b], d in [c], e in [d], f in [e], g in [f]]
+[g | a in [1], b in [a,a], c in [b,b], d in [c,c], e in [d,d], f in [e,e], g in [f,f]]
+take 10 [g | a in [1], b in [a,a,a,a], c in [b,b,b,b], d in [c,c,c,c], e in [d,d,d,d], f in [e,e,e,e], g in [f,f,f,f]]
+take 1 [x | x in [1,2], 1/(2-x) <= 1]
+take 5 [y | x in repeat 3, y in [1,2,3] ]
+[(x,y) | x in downfrom 10, even x, y in downfrom x, even y]
+:type [(x,y) | x in downfrom 10, even x, y in downfrom x, even y]
+:type [(x,y) | x <- downfrom 10, even x, y <- downfrom x, even y]

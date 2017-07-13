@@ -27,13 +27,13 @@ main = do
 extractGroup :: FilePath -> String
 extractGroup = reverse . dropWhile (not . isDash) . takeWhile (not . isPathSeparator) . reverse
 
-extractNum :: FilePath -> String
-extractNum = reverse . takeWhile (not . isDash) . reverse
+extractName :: FilePath -> String
+extractName = reverse . takeWhile (not . isDash) . reverse
 
 mkGolden :: FilePath -> TestTree
 mkGolden relDir =
   goldenVsFile
-    (extractNum relDir)
+    (extractName relDir)
     (dir </> "expected")
     (dir </> "output")
     (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")) >> return ())

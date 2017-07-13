@@ -1,8 +1,0 @@
-:load test/syntax007/many-clauses.disco
-f 0
-f 1
-f 14
-f 15
-f 87
-f 100
-f 153

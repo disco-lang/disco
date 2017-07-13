@@ -19,6 +19,7 @@ library
                        unbound-generics,
                        split,
                        lens,
+                       fgl,
                        parsec
   default-language:    Haskell2010
 
@@ -31,6 +32,7 @@ executable sub2
                        unbound-generics,
                        split,
                        lens,
+                       fgl,
                        parsec
 
   default-language:    Haskell2010

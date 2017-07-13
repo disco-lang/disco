@@ -29,7 +29,7 @@ import qualified Prelude as P
 import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
 
-import Control.Lens (anyOf)
+import Control.Lens (anyOf, toListOf, each, (^..), over, both)
 import Control.Arrow
 import Control.Monad.State
 import Control.Monad.Reader
@@ -37,9 +37,15 @@ import Control.Monad.Except
 import Control.Monad.Writer
 import           Data.Either
 import qualified Data.Map    as M
+import qualified Data.Set    as S
+import           Data.Tuple
 import           Data.Maybe
 import           Data.Void
 import           Text.Printf
+
+import Data.Graph.Inductive.Graph
+import Data.Graph.Inductive.PatriciaTree
+import Data.Graph.Inductive.Query.DFS    (condensation)
 
 ------------------------------------------------------------
 -- Type declarations
@@ -68,7 +74,16 @@ data Atom where
   AVar :: Name Type -> Atom
   ANat :: Atom
   AInt :: Atom
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
+
+isVar :: Atom -> Bool
+isVar (AVar _) = True
+isVar _        = False
+
+isSub :: Atom -> Atom -> Bool
+isSub a1 a2 | a1 == a2 = True
+isSub ANat AInt = True
+isSub _ _ = False
 
 data Cons where
   CArr  :: Cons
@@ -160,6 +175,7 @@ data Eqn where
   (:=:) :: Type -> Type -> Eqn
   deriving (Eq, Show, Generic)
 
+instance Alpha Eqn
 instance Subst Type Eqn
 
 -- | Given a list of equations between types, return a substitution
@@ -281,6 +297,7 @@ data Ineqn where
   (:<:) :: Type -> Type -> Ineqn
   deriving (Eq, Show, Generic)
 
+instance Alpha Ineqn
 instance Subst Type Ineqn
 
 type Constraint = Either Eqn Ineqn
@@ -319,6 +336,7 @@ lookup x = do
 freshTy :: TC Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
+-- Step 1.
 infer :: Expr -> TC Type
 infer (EVar x) = lookup x
 infer (ENat i) = return TyNat
@@ -367,17 +385,29 @@ inferAndUnify e =
 -- fresh variables.  Start the computation with a call to 'avoid' with
 -- the free type variables already in the constraint set.
 
-type SimplifyM a = StateT ([Constraint], S) (Except TypeError) a
+type SimplifyM a = StateT ([Constraint], S) (ExceptT TypeError LFreshM) a
 
-simplify :: [Constraint] -> Either TypeError ([Constraint], S)
-simplify cs = runExcept (execStateT simplify' (cs, idS))
+-- This is the next step after doing inference & constraint
+-- generation.  After this step, the remaining constraints will all be
+-- atomic constraints, of the form (v1 < v2), (v < b), or (b < v),
+-- where v is a type variable and b is a base type.
+--
+-- Actually, there is one more step that should happen before this, to
+-- check weak unification (to ensure this algorithm will terminate).
+simplify :: [Constraint] -> Either TypeError ([(Atom, Atom)], S)
+simplify cs
+  = (fmap . first . map) extractAtoms
+  $ runLFreshM (runExceptT (execStateT simplify' (cs, idS)))
   where
+    extractAtoms (Right (TyAtom a1 :<: TyAtom a2)) = (a1, a2)
+    extractAtoms c = error $ "simplify left non-atomic or non-subtype constraint " ++ show c
+
     simplify' :: SimplifyM ()
-    simplify' = do
+    simplify' = avoid (toListOf fvAny cs) $ do
       mc <- pickSimplifiable
       case mc of
         Nothing -> return ()
-        Just s  -> simplifyOne s
+        Just s  -> simplifyOne s >> simplify'
 
     simplifyOne :: Constraint -> SimplifyM ()
     simplifyOne (Left eqn) =
@@ -387,9 +417,18 @@ simplify cs = runExcept (execStateT simplify' (cs, idS))
     simplifyOne (Right (TyCons c1 tys1 :<: TyCons c2 tys2))
       | c1 /= c2  = throwError NoUnify
       | otherwise = modify (first (zipWith3 variance (arity c1) tys1 tys2 ++))
-    simplifyOne (Right (TyVar a :<: TyCons c tys)) = undefined
-    simplifyOne (Right (TyCons c tys :<: TyVar a)) = undefined
-    simplifyOne (Right (TyAtom a1 :<: TyAtom a2))  = undefined
+    simplifyOne con@(Right (TyVar a :<: TyCons c tys)) = do
+      as <- mapM (const (TyVar <$> lfresh (string2Name "a"))) (arity c)
+      let s' = a |-> TyCons c as
+      modify ((substs s' . (con:)) *** (s'@@))
+    simplifyOne con@(Right (TyCons c tys :<: TyVar a)) = do
+      as <- mapM (const (TyVar <$> lfresh (string2Name "a"))) (arity c)
+      let s' = a |-> TyCons c as
+      modify ((substs s' . (con:)) *** (s'@@))
+    simplifyOne (Right (TyAtom a1 :<: TyAtom a2)) = do
+      case isSub a1 a2 of
+        True  -> return ()
+        False -> throwError NoUnify
 
     variance Co     ty1 ty2 = ty1 =<= ty2
     variance Contra ty1 ty2 = ty2 =<= ty1
@@ -412,10 +451,35 @@ simplify cs = runExcept (execStateT simplify' (cs, idS))
     simplifiable (Right (TyCons {} :<: TyCons {})) = True
     simplifiable (Right (TyVar  {} :<: TyCons {})) = True
     simplifiable (Right (TyCons {} :<: TyVar  {})) = True
-    simplifiable (Right (TyAtom {} :<: TyAtom {})) = True
+    simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = not (isVar a1) && not (isVar a2)
 
-    -- XXX what about  atom = cons? (should fail with unify error)
-    -- Or is that taken care of by the graph solving step?
+-- Given a list of atomic subtype constraints, build the corresponding
+-- constraint graph.
+mkConstraintGraph :: [(Atom, Atom)] -> Gr Atom ()
+mkConstraintGraph cs = mkGraph nodes edges
+  where
+    nodes   = zip [0..] (nubify $ (cs ^.. traverse . each))
+    nodeMap = M.fromList . map swap $ nodes
+    edges   = nubify $ map mkEdge cs
+    mkEdge  (a1,a2) = (getNode a1, getNode a2, ())
+    getNode = fromJust . flip M.lookup nodeMap
+    nubify :: Ord a => [a] -> [a]
+    nubify = S.toList . S.fromList
+
+-- Next step: eliminate strongly connected components in the
+-- constraint set by collapsing them (unifying all the types in the
+-- SCC). Can fail if the types in a SCC are not unifiable.  Returns
+-- the collapsed graph (which is now guaranteed to be DAG) and an
+-- updated substitution.
+elimCycles :: Gr Atom () -> S -> Either TypeError (Gr Atom (), S)
+elimCycles g s = undefined
+  where
+    nodeMap = M.fromList $ labNodes g   -- map   Int -> Atom
+
+    -- Condense each SCC into a node labeled by its list of atoms,
+    -- which will be unified
+    g' :: Gr [Atom] ()
+    g' = nmap (map (fromJust . flip M.lookup nodeMap)) . condensation $ g
 
 ------------------------------------------------------------
 -- Interpreter

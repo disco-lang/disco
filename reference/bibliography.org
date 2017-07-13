@@ -128,6 +128,10 @@ repository.
    coercion.  In: FPCA ’89: Functional programming languages and
    computer architecture. pp. 293–298. ACM, New York, NY, USA (1989)
 
+** TODO Type inference with structural subtyping: A faithful formalization of an efficient constraint solver (2003)
+   Vincent Simonet (APLAS 2003)
+
+   Should skim over this and take notes.
 * Type constraints
 
   Disco will have a system of type constraints, e.g. num T means type
@@ -158,3 +162,11 @@ repository.
 
    Useful general framework for thinking about/dealing with qualified,
    i.e. constrained, types.
+** TODO Type reconstruction for type classes (1993)
+
+   Tobias Nipkow and Christian Prehofer
+
+   Traytel et al. reference this paper when mentioning (in section 4)
+   that handling type classes / qualified types requires a unification
+   algorithm that can correctly handle type variables annotated with
+   sorts (sort = intersection of finitely many type classes).

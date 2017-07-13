@@ -168,6 +168,9 @@ x |-> t = [(x,t)]
 (@@) :: Subst a a => S' a -> S' a -> S' a
 s1 @@ s2 = (map . second) (substs s1) s2 ++ s1
 
+compose :: Subst a a => [S' a] -> S' a
+compose = foldr (@@) idS
+
 --------------------------------------------------
 -- Unification
 
@@ -185,27 +188,45 @@ instance Subst Type Eqn
 --   This is not the most efficient way to implement unification but
 --   it is simple.
 unify :: [Eqn] -> Maybe S
-unify [] = Just idS
-unify (e:es) = do
-  u <- unifyOne e
+unify = unify' (==)
+
+-- | Given a list of equations between types, return a substitution
+--   which makes all the equations equal *up to* identifying all base
+--   types.  So, for example, Int = Nat weakly unifies but Int = (Int
+--   -> Int) does not.  This is used to check whether subtyping
+--   constraints are structurally sound before doing constraint
+--   simplification/solving.
+weakUnify :: [Eqn] -> Maybe S
+weakUnify = unify' (\_ _ -> True)
+
+-- | Given a list of equations between types, return a substitution
+--   which makes all the equations satisfied (or fail if it is not
+--   possible), up to the given comparison on base types.
+unify' :: (Atom -> Atom -> Bool) -> [Eqn] -> Maybe S
+unify' _ [] = Just idS
+unify' atomEq (e:es) = do
+  u <- unifyOne atomEq e
   case u of
-    Left sub    -> (@@ sub) <$> unify (substs sub es)
-    Right newEs -> unify (newEs ++ es)
+    Left sub    -> (@@ sub) <$> unify' atomEq (substs sub es)
+    Right newEs -> unify' atomEq (newEs ++ es)
 
 occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (==x)
 
-unifyOne :: Eqn -> Maybe (Either S [Eqn])
-unifyOne (ty1 :=: ty2)
+unifyOne :: (Atom -> Atom -> Bool) -> Eqn -> Maybe (Either S [Eqn])
+unifyOne _ (ty1 :=: ty2)
   | ty1 == ty2 = return $ Left idS
-unifyOne (TyVar x :=: ty2)
+unifyOne _ (TyVar x :=: ty2)
   | occurs x ty2 = Nothing
   | otherwise    = Just $ Left (x |-> ty2)
-unifyOne (ty1 :=: x@(TyVar _))
-  = unifyOne (x :=: ty1)
-unifyOne (TyCons c1 tys1 :=: TyCons c2 tys2)
+unifyOne atomEq (ty1 :=: x@(TyVar _))
+  = unifyOne atomEq (x :=: ty1)
+unifyOne _ (TyCons c1 tys1 :=: TyCons c2 tys2)
   | c1 == c2  = return $ Right (zipWith (:=:) tys1 tys2)
   | otherwise = Nothing
+unifyOne atomEq (TyAtom a1 :=: TyAtom a2)
+  | atomEq a1 a2 = return $ Left idS
+  | otherwise    = Nothing
 
 -- exampleEqns :: [Eqn]
 -- exampleEqns =
@@ -297,6 +318,9 @@ data Ineqn where
   (:<:) :: Type -> Type -> Ineqn
   deriving (Eq, Show, Generic)
 
+toEqn :: Ineqn -> Eqn
+toEqn (ty1 :<: ty2) = ty1 :=: ty2
+
 instance Alpha Ineqn
 instance Subst Type Ineqn
 
@@ -381,11 +405,9 @@ inferAndUnify e =
           Nothing -> Left NoUnify
           Just s  -> Right (substs s ty, substs s ineqns)
 
--- XXX need to add LFreshM to SimplifyM, since we need to generate
--- fresh variables.  Start the computation with a call to 'avoid' with
--- the free type variables already in the constraint set.
-
 type SimplifyM a = StateT ([Constraint], S) (ExceptT TypeError LFreshM) a
+
+
 
 -- This is the next step after doing inference & constraint
 -- generation.  After this step, the remaining constraints will all be
@@ -394,6 +416,7 @@ type SimplifyM a = StateT ([Constraint], S) (ExceptT TypeError LFreshM) a
 --
 -- Actually, there is one more step that should happen before this, to
 -- check weak unification (to ensure this algorithm will terminate).
+-- For example, (^x.x x) causes this to loop.
 simplify :: [Constraint] -> Either TypeError ([(Atom, Atom)], S)
 simplify cs
   = (fmap . first . map) extractAtoms
@@ -471,15 +494,36 @@ mkConstraintGraph cs = mkGraph nodes edges
 -- SCC). Can fail if the types in a SCC are not unifiable.  Returns
 -- the collapsed graph (which is now guaranteed to be DAG) and an
 -- updated substitution.
-elimCycles :: Gr Atom () -> S -> Either TypeError (Gr Atom (), S)
-elimCycles g s = undefined
+--
+-- What's an example term that leads to a cycle?
+elimCycles :: Gr Atom () -> Either TypeError (Gr Atom (), S)
+elimCycles g
+  = maybe
+      (Left NoUnify)
+      (Right . (nmap fst &&& (compose . map (snd.snd) . labNodes)))
+      g'
   where
     nodeMap = M.fromList $ labNodes g   -- map   Int -> Atom
 
     -- Condense each SCC into a node labeled by its list of atoms,
     -- which will be unified
-    g' :: Gr [Atom] ()
-    g' = nmap (map (fromJust . flip M.lookup nodeMap)) . condensation $ g
+    sccGraph :: Gr [Atom] ()
+    sccGraph = nmap (map (fromJust . flip M.lookup nodeMap)) . condensation $ g
+
+    unifySCC :: [Atom] -> Maybe (Atom, S)
+    unifySCC [] = error "Impossible! unifySCC []"
+    unifySCC as@(a:_) = (flip substs a &&& id) <$> unify eqns
+      where
+        tys  = map TyAtom as
+        eqns = zipWith (:=:) tys (tail tys)
+
+    g' :: Maybe (Gr (Atom, S) ())
+    g' = sequenceGraph $ nmap unifySCC sccGraph
+
+    sequenceGraph :: Gr (Maybe a) b -> Maybe (Gr a b)
+    sequenceGraph g = case sequence (map snd $ labNodes g) of
+      Nothing -> Nothing
+      Just _  -> Just $ nmap fromJust g
 
 ------------------------------------------------------------
 -- Interpreter

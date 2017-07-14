@@ -680,7 +680,7 @@ solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
     -- (which should not be unified with each other).
 
     unifyWCC :: S' Atom -> S' Atom
-    unifyWCC s = concatMap mkEquateSubst wccVarGroups
+    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
       where
         wccVarGroups = filter (all isVar) . substs s $ wcc g
         mkEquateSubst (a : as) = map (\(AVar v) -> (coerce v, a)) as

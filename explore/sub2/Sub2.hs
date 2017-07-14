@@ -36,8 +36,9 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Writer
 import           Data.Either
+import           Data.Map (Map, (!))
 import qualified Data.Map    as M
-import           Data.Map ((!))
+import           Data.Set (Set)
 import qualified Data.Set    as S
 import           Data.Tuple
 import           Data.Maybe
@@ -46,7 +47,7 @@ import           Text.Printf
 
 import qualified Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree (Gr)
-import qualified Data.Graph.Inductive.Query.DFS as G (condensation)
+import qualified Data.Graph.Inductive.Query.DFS as G (condensation, topsort')
 
 ------------------------------------------------------------
 -- Type declarations
@@ -81,10 +82,39 @@ isVar :: Atom -> Bool
 isVar (AVar _) = True
 isVar _        = False
 
+isBase :: Atom -> Bool
+isBase = not . isVar
+
 isSub :: Atom -> Atom -> Bool
 isSub a1 a2 | a1 == a2 = True
 isSub ANat AInt = True
 isSub _ _ = False
+
+aglb2 :: Atom -> Atom -> Maybe Atom
+aglb2 a1 a2     | a1 == a2 = Just a1
+aglb2 AInt ANat = Just ANat
+aglb2 ANat AInt = Just ANat
+aglb2 _ _       = Nothing
+
+aglb :: [Atom] -> Maybe Atom
+aglb []  = Nothing
+aglb [a] = Just a
+aglb (a:as) = do
+  g <- aglb as
+  aglb2 a g
+
+alub2 :: Atom -> Atom -> Maybe Atom
+alub2 a1 a2     | a1 == a2 = Just a1
+alub2 AInt ANat = Just AInt
+alub2 ANat AInt = Just AInt
+alub2 _ _       = Nothing
+
+alub :: [Atom] -> Maybe Atom
+alub []  = Nothing
+alub [a] = Just a
+alub (a:as) = do
+  g <- alub as
+  alub2 a g
 
 data Cons where
   CArr  :: Cons
@@ -152,6 +182,12 @@ instance Subst Type Atom
 instance Subst Type Type where
   isvar (TyAtom (AVar x)) = Just (SubstName x)
   isvar _                 = Nothing
+instance (Ord a, Subst Type a) => Subst Type (Set a) where
+  subst x t = S.map (subst x t)
+  substs s  = S.map (substs s)
+instance (Ord k, Subst Type a) => Subst Type (Map k a) where
+  subst x t = M.map (subst x t)
+  substs s  = M.map (substs s)
 
 --------------------------------------------------
 -- Substitutions
@@ -313,7 +349,7 @@ tm s = case parse expr s of
 -- Type checker
 ------------------------------------------------------------
 
-type Ctx = M.Map (Name Expr) Type
+type Ctx = Map (Name Expr) Type
 
 data Ineqn where
   (:<:) :: Type -> Type -> Ineqn
@@ -475,7 +511,7 @@ simplify cs
     simplifiable (Right (TyCons {} :<: TyCons {})) = True
     simplifiable (Right (TyVar  {} :<: TyCons {})) = True
     simplifiable (Right (TyCons {} :<: TyVar  {})) = True
-    simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = not (isVar a1) && not (isVar a2)
+    simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = isBase a1 && isBase a2
 
 --------------------------------------------------
 -- Graphs
@@ -483,17 +519,17 @@ simplify cs
 -- Build a thin layer on top of Gr from fgl, which also allows
 -- referring to nodes by their label.
 
-data G a = G (Gr a ()) (M.Map a G.Node) (M.Map G.Node a)
+data G a = G (Gr a ()) (Map a G.Node) (Map G.Node a)
   deriving Show
 
 mkGraph :: Ord a => [a] -> [(a,a)] -> G a
-mkGraph vs es = G (G.mkGraph vs' es') aToNode nodeToA
+mkGraph vs es = G (G.mkGraph vs' es') a2n n2a
   where
     vs' = zip [0..] vs
-    nodeToA = M.fromList vs'
-    aToNode = M.fromList . map swap $ vs'
+    n2a = M.fromList vs'
+    a2n = M.fromList . map swap $ vs'
     es' = map mkEdge es
-    mkEdge (a1,a2) = (aToNode ! a1, aToNode ! a2, ())
+    mkEdge (a1,a2) = (a2n ! a1, a2n ! a2, ())
 
 nodes :: G a -> [a]
 nodes (G _ m _) = M.keys m
@@ -505,11 +541,11 @@ nmap :: Ord b => (a -> b) -> G a -> G b
 nmap f (G g m1 m2) = G (G.nmap f g) (M.mapKeys f m1) (M.map f m2)
 
 condensation :: Ord a => G a -> G [a]
-condensation (G g _ nodeToA) = G g' asToNode nodeToAs
+condensation (G g _ n2a) = G g' asToNode n2as
   where
-    g' = G.nmap (map (nodeToA !)) (G.condensation g)
+    g' = G.nmap (map (n2a !)) (G.condensation g)
     vs' = G.labNodes g'
-    nodeToAs = M.fromList vs'
+    n2as = M.fromList vs'
     asToNode = M.fromList . map swap $ vs'
 
 sequenceGraph :: Ord a => G (Maybe a) -> Maybe (G a)
@@ -517,9 +553,32 @@ sequenceGraph g = case sequence (nodes g) of
   Nothing -> Nothing
   Just _  -> Just $ nmap fromJust g
 
-reachable :: Ord a => a -> G a -> [a]
-reachable a (G g aToNode nodeToA) = undefined
---  G.reachable (aToNode
+-- Successors
+suc :: Ord a => G a -> a -> [a]
+suc (G g a2n n2a) = map (n2a !) . G.suc g . (a2n !)
+
+-- Predecessors
+pre :: Ord a => G a -> a -> [a]
+pre (G g a2n n2a) = map (n2a !) . G.pre g . (a2n !)
+
+-- To build sets of successors and predecessors, do a topological
+-- sort, then scan through in both directions.
+-- XXX add more comments.
+cessors :: Ord a => G a -> (Map a (Set a), Map a (Set a))
+cessors g@(G gg a2n n2a) = (succs, preds)
+  where
+    as = G.topsort' gg
+    succs = foldr collectSuccs M.empty as  -- build successors map
+    collectSuccs a m = M.insert a succsSet m
+      where
+        ss       = suc g a
+        succsSet = S.fromList ss `S.union` (S.unions $ map (m!) ss)
+
+    preds = foldr collectPreds M.empty (reverse as)  -- build predecessors map
+    collectPreds a m = M.insert a predsSet m
+      where
+        ss       = pre g a
+        predsSet = S.fromList ss `S.union` (S.unions $ map (m!) ss)
 
 --------------------------------------------------
 -- Build the constraint graph
@@ -559,18 +618,76 @@ elimCycles g
         tys  = map TyAtom as
         eqns = zipWith (:=:) tys (tail tys)
 
--- --------------------------------------------------
--- -- Constraint resolution
+--------------------------------------------------
+-- Constraint resolution
 
--- -- Given a DAG of atoms, build a map giving the predecessors and
--- -- successors of each type variable.
--- cessorsMap :: Gr Atom () -> M.Map (Name Type) (S.Set Atom, S.Set Atom)
--- cessorsMap g = M.fromList $ map (\v -> (v, ( , ))) vars
---   where
---     vars :: [Name Type]
---     vars = [ v | AVar v <- map snd (labNodes g) ]
+-- Build the set of successor and predecessor base types of each type
+-- variable in the constraint graph.  For each type variable, make
+-- sure the lub of its predecessors is <= the glb of its successors,
+-- and assign it one of the two: one or the other if it has only
+-- predecessors or only successors; if it has both default to the
+-- lower bound.
 
--- --    reachableL :: Gr a b -> 
+-- XXX Currently says ^x.x+1 has type Int -> Nat which is definitely
+-- wrong!  Should be either Int -> Int or Nat -> Nat.
+
+-- XXX comment
+solveConstraints :: G Atom -> Maybe S
+solveConstraints g = go ss ps
+  where
+    -- Get the successor and predecessor sets for all the type variables.
+    (ss, ps) = (onlyVars *** onlyVars) $ cessors g
+    onlyVars = M.filterWithKey (\a _ -> isVar a)
+
+    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe S
+    go succs preds
+
+      | null as   = Just idS  -- No variables left that can be solved
+      | otherwise = case solutions of
+          Nothing       -> Nothing
+
+          -- If we solved some variables this pass, delete them from the maps
+          -- and apply the resulting substitution to the remainder.
+          Just ss ->
+            let s = compose ss
+                deleteKeys ks m = foldr M.delete m ks
+            in  (@@ s) <$> go (substs s (deleteKeys as succs)) (substs s (deleteKeys as preds))
+
+      where
+        -- Get only the variables we can solve on this pass, which have
+        -- base types in their predecessor or successor set.
+        as = filter (\a -> any isBase (succs ! a) || any isBase (preds ! a)) (M.keys succs)
+
+        -- For each variable a, get the lub of its predecessors and
+        -- the glb of its successors.
+        solutions = mapM solveVar as
+
+        -- Solve for a variable, failing if it has no solution, otherwise returning
+        -- a substitution for it.
+        solveVar :: Atom -> Maybe S
+        solveVar a@(AVar v) =
+          case (filter isBase (S.toList $ succs ! a), filter isBase (S.toList $ preds ! a)) of
+            ([], []) ->
+              error $ "Impossible! solveConstraints.solveVar called on variable "
+                      ++ show a ++ " with no base type successors or predecessors"
+
+            -- Only successors.  Just assign a to their glb, if one exists.
+            (bsuccs, []) -> (\at -> (v |-> TyAtom at)) <$> aglb bsuccs
+
+            -- Only predecessors.  Just assign a to their lub.
+            ([], bpreds) -> (\at -> (v |-> TyAtom at)) <$> alub bpreds
+
+            -- Both successors and predecessors.  Both must have a
+            -- valid bound, and the bounds must not overlap.  Assign a
+            -- to the upper bound of its predecessors.
+            (bsuccs, bpreds) -> do
+              ub <- aglb bsuccs
+              lb <- alub bpreds
+              case isSub lb ub of
+                True  -> Just (v |-> TyAtom lb)
+                False -> Nothing
+
+        solveVar a = error $ "Impossible! solveConstraints.solveVar called on non-variable " ++ show a
 
 ------------------------------------------------------------
 -- Interpreter
@@ -581,7 +698,7 @@ data Value where
   VClosure :: Bind (Name Expr) Expr -> Env -> Value
   deriving Show
 
-type Env = M.Map (Name Expr) Value
+type Env = Map (Name Expr) Value
 
 extendV :: MonadReader Env m => Name Expr -> Value -> m a -> m a
 extendV x v = local (M.insert x v)

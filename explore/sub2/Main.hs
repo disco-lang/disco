@@ -33,6 +33,10 @@ tc s = case parse expr s of
                     print s''
                     print (substs s'' ty)
 
+                    case solveConstraints g' of
+                      Nothing -> putStrLn "No solution"
+                      Just s''' -> print (substs (s''' @@ s'') ty)
+
 main :: IO ()
 main = getLine >>= tc
 

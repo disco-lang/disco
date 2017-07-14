@@ -21,6 +21,10 @@
 
 module Sub2 where
 
+import Debug.Trace
+
+import Data.Coerce
+
 import           Parsing2
 
 import Prelude hiding (lookup)
@@ -28,6 +32,7 @@ import qualified Prelude as P
 
 import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
+import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import Control.Lens (anyOf, toListOf, each, (^..), over, both)
 import Control.Arrow
@@ -36,6 +41,7 @@ import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Writer
 import           Data.Either
+import           Data.List (intercalate)
 import           Data.Map (Map, (!))
 import qualified Data.Map    as M
 import           Data.Set (Set)
@@ -177,15 +183,21 @@ instance Subst Expr Expr where
   isvar (EVar x) = Just (SubstName x)
   isvar _        = Nothing
 
+instance Subst Atom Atom where
+  isvar (AVar x) = Just (SubstName (coerce x))
+  isvar _        = Nothing
+
 instance Subst Type Cons
 instance Subst Type Atom
 instance Subst Type Type where
   isvar (TyAtom (AVar x)) = Just (SubstName x)
   isvar _                 = Nothing
-instance (Ord a, Subst Type a) => Subst Type (Set a) where
+
+-- orphans
+instance (Ord a, Subst t a) => Subst t (Set a) where
   subst x t = S.map (subst x t)
   substs s  = S.map (substs s)
-instance (Ord k, Subst Type a) => Subst Type (Map k a) where
+instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
 
@@ -264,6 +276,7 @@ unifyOne _ (TyCons c1 tys1 :=: TyCons c2 tys2)
 unifyOne atomEq (TyAtom a1 :=: TyAtom a2)
   | atomEq a1 a2 = return $ Left idS
   | otherwise    = Nothing
+unifyOne _ _ = Nothing  -- Atom = Cons
 
 -- exampleEqns :: [Eqn]
 -- exampleEqns =
@@ -633,38 +646,61 @@ elimCycles g
 
 -- XXX comment
 solveConstraints :: G Atom -> Maybe S
-solveConstraints g = go ss ps
+solveConstraints g = convertSubst <$> go ss ps
   where
+    convertSubst :: S' Atom -> S
+    convertSubst = map (coerce *** TyAtom)
+
     -- Get the successor and predecessor sets for all the type variables.
     (ss, ps) = (onlyVars *** onlyVars) $ cessors g
     onlyVars = M.filterWithKey (\a _ -> isVar a)
 
-    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe S
-    go succs preds
+    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe (S' Atom)
+    go succs preds = traceShow (succs, preds) $ case as of
+      []    -> Just idS  -- No variables left that can be solved
+      (a:_) ->
 
-      | null as   = Just idS  -- No variables left that can be solved
-      | otherwise = case solutions of
+        -- Solve one variable at a time.  See below.
+        case solveVar a of
           Nothing       -> Nothing
 
-          -- If we solved some variables this pass, delete them from the maps
-          -- and apply the resulting substitution to the remainder.
-          Just ss ->
-            let s = compose ss
-                deleteKeys ks m = foldr M.delete m ks
-            in  (@@ s) <$> go (substs s (deleteKeys as succs)) (substs s (deleteKeys as preds))
+          -- If we solved for a, delete it from the maps and apply the
+          -- resulting substitution to the remainder.
+          Just s -> traceShow s $
+            (@@ s) <$> go (substs s (M.delete a succs)) (substs s (M.delete a preds))
 
       where
+        -- NOTE we can't solve a bunch in parallel!  Might end up
+        -- assigning them conflicting solutions if some depend on
+        -- others.  For example, consider the situation
+        --
+        --            Z
+        --            |
+        --            a3
+        --           /  \
+        --          a1   N
+        --
+        -- If we try to solve in parallel we will end up assigning a1
+        -- -> Z (since it only has base types as an upper bound) and
+        -- a3 -> N (since it has both upper and lower bounds, and by
+        -- default we pick the lower bound), but this is wrong since
+        -- we should have a1 < a3.
+        --
+        -- If instead we solve them one at a time, we could e.g. first
+        -- solve a1 -> Z, and then we would find a3 -> Z as well.
+        -- Alternately, if we first solve a3 -> N then we will have a1
+        -- -> N as well.
+        --
+        -- This exact graph comes from (^x.x+1) which was erroneously
+        -- being inferred to have type Z -> N.
+
         -- Get only the variables we can solve on this pass, which have
         -- base types in their predecessor or successor set.
         as = filter (\a -> any isBase (succs ! a) || any isBase (preds ! a)) (M.keys succs)
 
-        -- For each variable a, get the lub of its predecessors and
-        -- the glb of its successors.
-        solutions = mapM solveVar as
-
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.
-        solveVar :: Atom -> Maybe S
+        solveVar :: Atom -> Maybe (S' Atom)
         solveVar a@(AVar v) =
           case (filter isBase (S.toList $ succs ! a), filter isBase (S.toList $ preds ! a)) of
             ([], []) ->
@@ -672,10 +708,10 @@ solveConstraints g = go ss ps
                       ++ show a ++ " with no base type successors or predecessors"
 
             -- Only successors.  Just assign a to their glb, if one exists.
-            (bsuccs, []) -> (\at -> (v |-> TyAtom at)) <$> aglb bsuccs
+            (bsuccs, []) -> (coerce v |->) <$> aglb bsuccs
 
             -- Only predecessors.  Just assign a to their lub.
-            ([], bpreds) -> (\at -> (v |-> TyAtom at)) <$> alub bpreds
+            ([], bpreds) -> (coerce v |->) <$> alub bpreds
 
             -- Both successors and predecessors.  Both must have a
             -- valid bound, and the bounds must not overlap.  Assign a
@@ -684,7 +720,7 @@ solveConstraints g = go ss ps
               ub <- aglb bsuccs
               lb <- alub bpreds
               case isSub lb ub of
-                True  -> Just (v |-> TyAtom lb)
+                True  -> Just (coerce v |-> lb)
                 False -> Nothing
 
         solveVar a = error $ "Impossible! solveConstraints.solveVar called on non-variable " ++ show a
@@ -738,3 +774,98 @@ interp' (EApp fun arg) = do
 interpOp :: Op -> (Integer -> Integer -> Integer)
 interpOp Plus  = (+)
 interpOp Minus = (-)
+
+------------------------------------------------------------
+-- Pretty-printing
+------------------------------------------------------------
+
+type Prec = Int
+
+class Pretty p where
+  pretty :: p -> String
+  pretty = prettyPrec 0 L
+
+  prettyPrec :: Prec -> Associativity -> p -> String
+  prettyPrec _ _ = pretty
+
+instance Pretty Type where
+  prettyPrec _ _ TyNat     = "N"
+  prettyPrec _ _ TyInt     = "Z"
+  prettyPrec p _ (TyFun ty1 ty2) =
+    mparens (p > 0) $ prettyPrec 1 L ty1 ++ " -> " ++ prettyPrec 0 R ty2
+  prettyPrec _ _ (TyPair ty1 ty2) =
+    mparens True $ prettyPrec 0 L ty1 ++ ", " ++ prettyPrec 0 R ty2
+  prettyPrec _ _ (TyVar x) = show x
+
+instance Pretty Atom where
+  pretty ANat = "N"
+  pretty AInt = "Z"
+  pretty (AVar v) = show v
+
+mparens :: Bool -> String -> String
+mparens True  = ("("++) . (++")")
+mparens False = id
+
+data Associativity = L | R
+  deriving (Show, Eq)
+
+instance Pretty Op where
+  pretty Plus  = " + "
+  pretty Minus = " - "
+
+instance Pretty Expr where
+  prettyPrec _ _ (EVar x) = show x
+
+  prettyPrec _ _ (ENat i) = show i
+  prettyPrec p a (EApp (EApp EPlus e1) e2) =
+    mparens (p>1 || (p==1 && a == R)) $
+      (prettyPrec 1 L e1 ++ " + " ++ prettyPrec 1 R e2)
+  prettyPrec p a (EApp ENeg e) = "-" ++ prettyPrec 2 R e
+
+  prettyPrec p _ (ELam b) =
+    mparens (p>0) $
+      let (x,body) = unsafeUnbind b
+      in  ("^" ++ show x ++ ". " ++ prettyPrec 0 L body)
+  prettyPrec p a (EApp e1 e2) =
+    mparens (p>3 || (p==3 && a == R)) $
+      (prettyPrec 3 L e1 ++ " " ++ prettyPrec 3 R e2)
+
+instance Pretty Env where
+  pretty env = prettyList bindings
+    where
+      bindings = map prettyBinding (M.assocs env)
+      prettyBinding (x, v) = show x ++ " -> " ++ pretty v
+
+instance Pretty Value where
+  pretty (VInt n) = show n
+  pretty (VClosure b env)
+    = printf "<%s: %s %s>"
+      (show x) (pretty body) (pretty env)
+    where
+      (x, body) = unsafeUnbind b
+
+prettyList xs = "[" ++ intercalate ", " xs ++ "]"
+
+instance Pretty a => Pretty [a] where
+  pretty as = prettyList (map pretty as)
+
+instance (Pretty a, Pretty b) => Pretty (a,b) where
+  pretty (x,y) = "(" ++ pretty x ++ ", " ++ pretty y ++ ")"
+
+instance Pretty Eqn where
+  pretty (ty1 :=: ty2) = pretty ty1 ++ " = " ++ pretty ty2
+
+instance (Pretty a, Pretty b) => Pretty (Either a b) where
+  pretty (Left a)  = pretty a
+  pretty (Right b) = pretty b
+
+instance Pretty Ineqn where
+  pretty (ty1 :<: ty2) = pretty ty1 ++ " < " ++ pretty ty2
+
+instance Pretty a => Pretty (G a) where
+  pretty = prettyList . map prettyEdge . edges
+    where
+      prettyEdge (a1,a2) = pretty a1 ++ " >> " ++ pretty a2
+
+instance Pretty (Name Type) where
+  pretty = show

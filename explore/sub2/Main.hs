@@ -15,8 +15,8 @@ tc s = case parse expr s of
     case runTC (infer e) of
       Left err -> print err
       Right (ty, cs) -> do
-        print ty
-        print (map (either id toEqn) cs)
+        putStrLn $ pretty ty
+        putStrLn $ pretty cs
         case weakUnify (map (either id toEqn) cs) of
           Nothing -> putStrLn "No weak unifier."
           _       -> do
@@ -24,18 +24,19 @@ tc s = case parse expr s of
               Left err -> print err
               Right (atoms, sub) -> do
                 let g = mkConstraintGraph atoms
-                print g
+                putStrLn $ pretty g
                 case elimCycles g of
                   Left err -> print err
                   Right (g', s') -> do
-                    print g'
                     let s'' = (s' @@ sub)
-                    print s''
-                    print (substs s'' ty)
+                    putStrLn $ pretty s''
+                    putStrLn $ pretty (substs s'' ty)
 
                     case solveConstraints g' of
                       Nothing -> putStrLn "No solution"
-                      Just s''' -> print (substs (s''' @@ s'') ty)
+                      Just s''' -> do
+                        putStrLn $ pretty s'''
+                        putStrLn $ pretty (substs (s''' @@ s'') ty)
 
 main :: IO ()
 main = getLine >>= tc

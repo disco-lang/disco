@@ -53,7 +53,7 @@ import           Text.Printf
 
 import qualified Data.Graph.Inductive.Graph as G
 import Data.Graph.Inductive.PatriciaTree (Gr)
-import qualified Data.Graph.Inductive.Query.DFS as G (condensation, topsort')
+import qualified Data.Graph.Inductive.Query.DFS as G (condensation, topsort', components)
 
 ------------------------------------------------------------
 -- Type declarations
@@ -258,6 +258,11 @@ unify' atomEq (e:es) = do
   case u of
     Left sub    -> (@@ sub) <$> unify' atomEq (substs sub es)
     Right newEs -> unify' atomEq (newEs ++ es)
+
+equate :: [Type] -> Maybe S
+equate tys = unify eqns
+  where
+    eqns = zipWith (:=:) tys (tail tys)
 
 occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (==x)
@@ -573,6 +578,10 @@ condensation (G g _ n2a) = G g' asToNode n2as
     n2as = M.fromList vs'
     asToNode = M.fromList . map swap $ vs'
 
+-- Weakly connected components
+wcc :: Ord a => G a -> [[a]]
+wcc (G g a2n n2a) = (map . map) (n2a!) (G.components g)
+
 sequenceGraph :: Ord a => G (Maybe a) -> Maybe (G a)
 sequenceGraph g = case sequence (nodes g) of
   Nothing -> Nothing
@@ -638,10 +647,9 @@ elimCycles g
 
     unifySCC :: [Atom] -> Maybe (Atom, S)
     unifySCC [] = error "Impossible! unifySCC []"
-    unifySCC as@(a:_) = (flip substs a &&& id) <$> unify eqns
+    unifySCC as@(a:_) = (flip substs a &&& id) <$> equate tys
       where
         tys  = map TyAtom as
-        eqns = zipWith (:=:) tys (tail tys)
 
 --------------------------------------------------
 -- Constraint resolution
@@ -653,26 +661,42 @@ elimCycles g
 -- predecessors or only successors; if it has both default to the
 -- lower bound.
 
--- XXX Currently says ^x.x+1 has type Int -> Nat which is definitely
--- wrong!  Should be either Int -> Int or Nat -> Nat.
-
 -- XXX comment
 solveConstraints :: G Atom -> Maybe S
-solveConstraints g = convertSubst <$> go ss ps
+solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
   where
     convertSubst :: S' Atom -> S
     convertSubst = map (coerce *** TyAtom)
+
+    -- Final step: Unify-WCC. Take any remaining weakly connected
+    -- components of variables (which means that the WCC contains no
+    -- base types) and unify all the variables. An example where this
+    -- makes a difference is ^x. (^y.y) x where there are two type
+    -- variables generated, with one a subtype of the other, but no
+    -- other constraints on them.  Without the unify-WCC step it would
+    -- result in a1 -> a3 but really we should unify them to result in
+    -- a -> a.  As another example, (^x. (^y.y) x, ^x. (^y.y) x)
+    -- results in (a -> a, b -> b) since there are two disjoint WCCs
+    -- (which should not be unified with each other).
+
+    unifyWCC :: S' Atom -> S' Atom
+    unifyWCC s = concatMap mkEquateSubst wccVarGroups
+      where
+        wccVarGroups = filter (all isVar) . substs s $ wcc g
+        mkEquateSubst (a : as) = map (\(AVar v) -> (coerce v, a)) as
 
     -- Get the successor and predecessor sets for all the type variables.
     (ss, ps) = (onlyVars *** onlyVars) $ cessors g
     onlyVars = M.filterWithKey (\a _ -> isVar a)
 
     go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe (S' Atom)
-    go succs preds = traceShow (succs, preds) $ case as of
-      []    -> Just idS  -- No variables left that can be solved
+    go succs preds = case as of
+      -- No variables left that have base type constraints.
+      []    -> Just idS
+
+      -- Solve one variable at a time.  See below.
       (a:_) ->
 
-        -- Solve one variable at a time.  See below.
         case solveVar a of
           Nothing       -> Nothing
 
@@ -736,12 +760,6 @@ solveConstraints g = convertSubst <$> go ss ps
                 False -> Nothing
 
         solveVar a = error $ "Impossible! solveConstraints.solveVar called on non-variable " ++ show a
-
--- XXX final step: implement Unify-WCC.  An example where this makes a
--- difference is ^x. (^y.y) x where there are two type variables
--- generated, with one a subtype of the other, but no other
--- constraints on them.  Right now it results in a1 -> a3 but really
--- we should unify them to result in a -> a.
 
 ------------------------------------------------------------
 -- Interpreter

@@ -69,6 +69,10 @@ data Type where
   -- | Rationals
   TyQ      :: Type
 
+  -- | Finite type, single argument is a natural number
+  --   defining the exact number of inhabitants.
+  TyFin    :: Type -> Type
+
   -- | Lists
   TyList   :: Type -> Type
 
@@ -95,4 +99,3 @@ unpair ty               = [ty]
 
 instance Alpha Type
 instance Alpha Strictness
-

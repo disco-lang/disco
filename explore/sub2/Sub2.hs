@@ -68,6 +68,7 @@ data Expr where
   ENat  :: Integer -> Expr
   EPlus :: Expr
   ENeg  :: Expr
+  ESqrt :: Expr   -- requires argument to be Nat
 
   ELam  :: Bind (Name Expr) Expr -> Expr
   EApp  :: Expr -> Expr -> Expr
@@ -297,7 +298,7 @@ unifyOne _ _ = Nothing  -- Atom = Cons
 
 lexer :: TokenParser u
 lexer = makeTokenParser emptyDef
-  { reservedNames = ["let", "in", "fst", "snd"]
+  { reservedNames = ["let", "in", "fst", "snd", "sqrt"]
   , opStart       = oneOf "+-"
   , opLetter      = oneOf "+-"
   }
@@ -329,6 +330,7 @@ parseAtom
   <|> ENat  <$> natural
   <|> EFst  <$  reserved "fst"
   <|> ESnd  <$  reserved "snd"
+  <|> ESqrt <$  reserved "sqrt"
   <|> eLam  <$> (reservedOp "^" *> identifier)
             <*> (reservedOp "." *> parseExpr)
   <|> try (parens (EPair <$> parseExpr <*> (symbol "," *> parseExpr)))
@@ -430,6 +432,10 @@ infer ENeg     = do
   a <- freshTy
   tell [a =<= TyInt]
   return $ TyFun a TyInt
+infer ESqrt    = do
+  a <- freshTy
+  tell [a =<= TyNat]
+  return $ TyFun a a
 infer (ELam b) = do
   (x,body) <- unbind b
   tyIn  <- freshTy
@@ -632,7 +638,10 @@ mkConstraintGraph cs = mkGraph (nubify nodes) (nubify cs)
 -- the collapsed graph (which is now guaranteed to be DAG) and an
 -- updated substitution.
 --
--- What's an example term that leads to a cycle?
+-- What's an example term that leads to a cycle?  We can make one if
+-- we introduce sqrt with a trange typing rule: sqrt : a -> a as long
+-- as a < Nat.  Then sqrt 3 generates constraints Nat < a1 < Nat which
+-- is a cycle.  It seems to work.
 elimCycles :: G Atom -> Either TypeError (G Atom, S)
 elimCycles g
   = maybe

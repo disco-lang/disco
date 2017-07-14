@@ -37,15 +37,16 @@ import Control.Monad.Except
 import Control.Monad.Writer
 import           Data.Either
 import qualified Data.Map    as M
+import           Data.Map ((!))
 import qualified Data.Set    as S
 import           Data.Tuple
 import           Data.Maybe
 import           Data.Void
 import           Text.Printf
 
-import Data.Graph.Inductive.Graph
-import Data.Graph.Inductive.PatriciaTree
-import Data.Graph.Inductive.Query.DFS    (condensation)
+import qualified Data.Graph.Inductive.Graph as G
+import Data.Graph.Inductive.PatriciaTree (Gr)
+import qualified Data.Graph.Inductive.Query.DFS as G (condensation)
 
 ------------------------------------------------------------
 -- Type declarations
@@ -91,7 +92,7 @@ data Cons where
   -- F     :: Cons  -- XXX for testing
   -- G     :: Cons
   -- H     :: Cons
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 data Variance = Co | Contra
 
@@ -120,7 +121,7 @@ pattern TyPair ty1 ty2 = TyCons CPair [ty1, ty2]
 data Type where
   TyAtom :: Atom -> Type
   TyCons :: Cons -> [Type] -> Type
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Cons
 instance Alpha Atom
@@ -476,16 +477,59 @@ simplify cs
     simplifiable (Right (TyCons {} :<: TyVar  {})) = True
     simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = not (isVar a1) && not (isVar a2)
 
+--------------------------------------------------
+-- Graphs
+--
+-- Build a thin layer on top of Gr from fgl, which also allows
+-- referring to nodes by their label.
+
+data G a = G (Gr a ()) (M.Map a G.Node) (M.Map G.Node a)
+  deriving Show
+
+mkGraph :: Ord a => [a] -> [(a,a)] -> G a
+mkGraph vs es = G (G.mkGraph vs' es') aToNode nodeToA
+  where
+    vs' = zip [0..] vs
+    nodeToA = M.fromList vs'
+    aToNode = M.fromList . map swap $ vs'
+    es' = map mkEdge es
+    mkEdge (a1,a2) = (aToNode ! a1, aToNode ! a2, ())
+
+nodes :: G a -> [a]
+nodes (G _ m _) = M.keys m
+
+edges :: G a -> [(a,a)]
+edges (G g _ m) = map (\(n1,n2,()) -> (m ! n1, m ! n2)) (G.labEdges g)
+
+nmap :: Ord b => (a -> b) -> G a -> G b
+nmap f (G g m1 m2) = G (G.nmap f g) (M.mapKeys f m1) (M.map f m2)
+
+condensation :: Ord a => G a -> G [a]
+condensation (G g _ nodeToA) = G g' asToNode nodeToAs
+  where
+    g' = G.nmap (map (nodeToA !)) (G.condensation g)
+    vs' = G.labNodes g'
+    nodeToAs = M.fromList vs'
+    asToNode = M.fromList . map swap $ vs'
+
+sequenceGraph :: Ord a => G (Maybe a) -> Maybe (G a)
+sequenceGraph g = case sequence (nodes g) of
+  Nothing -> Nothing
+  Just _  -> Just $ nmap fromJust g
+
+reachable :: Ord a => a -> G a -> [a]
+reachable a (G g aToNode nodeToA) = undefined
+--  G.reachable (aToNode
+
+--------------------------------------------------
+-- Build the constraint graph
+
 -- Given a list of atomic subtype constraints, build the corresponding
 -- constraint graph.
-mkConstraintGraph :: [(Atom, Atom)] -> Gr Atom ()
-mkConstraintGraph cs = mkGraph nodes edges
+mkConstraintGraph :: [(Atom, Atom)] -> G Atom
+mkConstraintGraph cs = mkGraph (nubify nodes) (nubify cs)
   where
-    nodes   = zip [0..] (nubify $ (cs ^.. traverse . each))
-    nodeMap = M.fromList . map swap $ nodes
-    edges   = nubify $ map mkEdge cs
-    mkEdge  (a1,a2) = (getNode a1, getNode a2, ())
-    getNode = fromJust . flip M.lookup nodeMap
+    nodes   = cs ^.. traverse . each
     nubify :: Ord a => [a] -> [a]
     nubify = S.toList . S.fromList
 
@@ -496,19 +540,17 @@ mkConstraintGraph cs = mkGraph nodes edges
 -- updated substitution.
 --
 -- What's an example term that leads to a cycle?
-elimCycles :: Gr Atom () -> Either TypeError (Gr Atom (), S)
+elimCycles :: G Atom -> Either TypeError (G Atom, S)
 elimCycles g
   = maybe
       (Left NoUnify)
-      (Right . (nmap fst &&& (compose . map (snd.snd) . labNodes)))
+      (Right . (nmap fst &&& (compose . map snd . nodes)))
       g'
   where
-    nodeMap = M.fromList $ labNodes g   -- map   Int -> Atom
-
     -- Condense each SCC into a node labeled by its list of atoms,
     -- which will be unified
-    sccGraph :: Gr [Atom] ()
-    sccGraph = nmap (map (fromJust . flip M.lookup nodeMap)) . condensation $ g
+    g' :: Maybe (G (Atom, S))
+    g' = sequenceGraph $ nmap unifySCC (condensation g)
 
     unifySCC :: [Atom] -> Maybe (Atom, S)
     unifySCC [] = error "Impossible! unifySCC []"
@@ -517,13 +559,18 @@ elimCycles g
         tys  = map TyAtom as
         eqns = zipWith (:=:) tys (tail tys)
 
-    g' :: Maybe (Gr (Atom, S) ())
-    g' = sequenceGraph $ nmap unifySCC sccGraph
+-- --------------------------------------------------
+-- -- Constraint resolution
 
-    sequenceGraph :: Gr (Maybe a) b -> Maybe (Gr a b)
-    sequenceGraph g = case sequence (map snd $ labNodes g) of
-      Nothing -> Nothing
-      Just _  -> Just $ nmap fromJust g
+-- -- Given a DAG of atoms, build a map giving the predecessors and
+-- -- successors of each type variable.
+-- cessorsMap :: Gr Atom () -> M.Map (Name Type) (S.Set Atom, S.Set Atom)
+-- cessorsMap g = M.fromList $ map (\v -> (v, ( , ))) vars
+--   where
+--     vars :: [Name Type]
+--     vars = [ v | AVar v <- map snd (labNodes g) ]
+
+-- --    reachableL :: Gr a b -> 
 
 ------------------------------------------------------------
 -- Interpreter

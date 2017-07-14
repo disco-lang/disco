@@ -73,8 +73,8 @@ data Expr where
   EApp  :: Expr -> Expr -> Expr
 
   EPair :: Expr -> Expr -> Expr
-  EFst  :: Expr -> Expr
-  ESnd  :: Expr -> Expr
+  EFst  :: Expr
+  ESnd  :: Expr
 
   deriving (Show, Generic)
 
@@ -292,7 +292,7 @@ unifyOne _ _ = Nothing  -- Atom = Cons
 
 lexer :: TokenParser u
 lexer = makeTokenParser emptyDef
-  { reservedNames = ["let", "in"]
+  { reservedNames = ["let", "in", "fst", "snd"]
   , opStart       = oneOf "+-"
   , opLetter      = oneOf "+-"
   }
@@ -322,8 +322,11 @@ parseAtom :: Parser Expr
 parseAtom
   =   EVar  <$> identifier
   <|> ENat  <$> natural
+  <|> EFst  <$  reserved "fst"
+  <|> ESnd  <$  reserved "snd"
   <|> eLam  <$> (reservedOp "^" *> identifier)
             <*> (reservedOp "." *> parseExpr)
+  <|> try (parens (EPair <$> parseExpr <*> (symbol "," *> parseExpr)))
   <|> parens parseExpr
   where
     eLam x e = ELam (bind x e)
@@ -434,6 +437,15 @@ infer (EApp e1 e2) = do
   ty2 <- infer e2
   tell [ty1 === TyFun a b, ty2 =<= a]
   return b
+infer EFst = do
+  a <- freshTy
+  b <- freshTy
+  return (TyFun (TyPair a b) a)
+infer ESnd = do
+  a <- freshTy
+  b <- freshTy
+  return (TyFun (TyPair a b) b)
+infer (EPair e1 e2) = TyPair <$> infer e1 <*> infer e2
 
 -- Call infer, then unify any equations and apply the generated
 -- substitution. (Note, in a bidirectional system I don't think any
@@ -724,6 +736,12 @@ solveConstraints g = convertSubst <$> go ss ps
                 False -> Nothing
 
         solveVar a = error $ "Impossible! solveConstraints.solveVar called on non-variable " ++ show a
+
+-- XXX final step: implement Unify-WCC.  An example where this makes a
+-- difference is ^x. (^y.y) x where there are two type variables
+-- generated, with one a subtype of the other, but no other
+-- constraints on them.  Right now it results in a1 -> a3 but really
+-- we should unify them to result in a -> a.
 
 ------------------------------------------------------------
 -- Interpreter

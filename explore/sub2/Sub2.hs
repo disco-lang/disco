@@ -96,31 +96,31 @@ isSub a1 a2 | a1 == a2 = True
 isSub ANat AInt = True
 isSub _ _ = False
 
-aglb2 :: Atom -> Atom -> Maybe Atom
-aglb2 a1 a2     | a1 == a2 = Just a1
-aglb2 AInt ANat = Just ANat
-aglb2 ANat AInt = Just ANat
-aglb2 _ _       = Nothing
+ainf2 :: Atom -> Atom -> Maybe Atom
+ainf2 a1 a2     | a1 == a2 = Just a1
+ainf2 AInt ANat = Just ANat
+ainf2 ANat AInt = Just ANat
+ainf2 _ _       = Nothing
 
-aglb :: [Atom] -> Maybe Atom
-aglb []  = Nothing
-aglb [a] = Just a
-aglb (a:as) = do
-  g <- aglb as
-  aglb2 a g
+ainf :: [Atom] -> Maybe Atom
+ainf []  = Nothing
+ainf [a] = Just a
+ainf (a:as) = do
+  g <- ainf as
+  ainf2 a g
 
-alub2 :: Atom -> Atom -> Maybe Atom
-alub2 a1 a2     | a1 == a2 = Just a1
-alub2 AInt ANat = Just AInt
-alub2 ANat AInt = Just AInt
-alub2 _ _       = Nothing
+asup2 :: Atom -> Atom -> Maybe Atom
+asup2 a1 a2     | a1 == a2 = Just a1
+asup2 AInt ANat = Just AInt
+asup2 ANat AInt = Just AInt
+asup2 _ _       = Nothing
 
-alub :: [Atom] -> Maybe Atom
-alub []  = Nothing
-alub [a] = Just a
-alub (a:as) = do
-  g <- alub as
-  alub2 a g
+asup :: [Atom] -> Maybe Atom
+asup []  = Nothing
+asup [a] = Just a
+asup (a:as) = do
+  g <- asup as
+  asup2 a g
 
 data Cons where
   CArr  :: Cons
@@ -593,7 +593,7 @@ elimCycles g
 
 -- Build the set of successor and predecessor base types of each type
 -- variable in the constraint graph.  For each type variable, make
--- sure the lub of its predecessors is <= the glb of its successors,
+-- sure the sup of its predecessors is <= the inf of its successors,
 -- and assign it one of the two: one or the other if it has only
 -- predecessors or only successors; if it has both default to the
 -- lower bound.
@@ -680,18 +680,18 @@ solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
               error $ "Impossible! solveConstraints.solveVar called on variable "
                       ++ show a ++ " with no base type successors or predecessors"
 
-            -- Only successors.  Just assign a to their glb, if one exists.
-            (bsuccs, []) -> (coerce v |->) <$> aglb bsuccs
+            -- Only successors.  Just assign a to their inf, if one exists.
+            (bsuccs, []) -> (coerce v |->) <$> ainf bsuccs
 
-            -- Only predecessors.  Just assign a to their lub.
-            ([], bpreds) -> (coerce v |->) <$> alub bpreds
+            -- Only predecessors.  Just assign a to their sup.
+            ([], bpreds) -> (coerce v |->) <$> asup bpreds
 
             -- Both successors and predecessors.  Both must have a
             -- valid bound, and the bounds must not overlap.  Assign a
             -- to the upper bound of its predecessors.
             (bsuccs, bpreds) -> do
-              ub <- aglb bsuccs
-              lb <- alub bpreds
+              ub <- ainf bsuccs
+              lb <- asup bpreds
               case isSub lb ub of
                 True  -> Just (coerce v |-> lb)
                 False -> Nothing

@@ -26,6 +26,8 @@ import Debug.Trace
 import Data.Coerce
 
 import           Parsing2
+import qualified Graph as G
+import           Graph (Graph)
 
 import Prelude hiding (lookup)
 import qualified Prelude as P
@@ -46,14 +48,11 @@ import           Data.Map (Map, (!))
 import qualified Data.Map    as M
 import           Data.Set (Set)
 import qualified Data.Set    as S
-import           Data.Tuple
+import           Data.Foldable (Foldable)
+import qualified Data.Foldable as F
 import           Data.Maybe
 import           Data.Void
 import           Text.Printf
-
-import qualified Data.Graph.Inductive.Graph as G
-import Data.Graph.Inductive.PatriciaTree (Gr)
-import qualified Data.Graph.Inductive.Query.DFS as G (condensation, topsort', components)
 
 ------------------------------------------------------------
 -- Type declarations
@@ -218,8 +217,8 @@ x |-> t = [(x,t)]
 (@@) :: Subst a a => S' a -> S' a -> S' a
 s1 @@ s2 = (map . second) (substs s1) s2 ++ s1
 
-compose :: Subst a a => [S' a] -> S' a
-compose = foldr (@@) idS
+compose :: (Subst a a, Foldable t) => t (S' a) -> S' a
+compose = F.foldr (@@) idS
 
 --------------------------------------------------
 -- Unification
@@ -550,87 +549,14 @@ simplify cs
     simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = isBase a1 && isBase a2
 
 --------------------------------------------------
--- Graphs
---
--- Build a thin layer on top of Gr from fgl, which also allows
--- referring to nodes by their label.
-
-data G a = G (Gr a ()) (Map a G.Node) (Map G.Node a)
-  deriving Show
-
-mkGraph :: Ord a => [a] -> [(a,a)] -> G a
-mkGraph vs es = G (G.mkGraph vs' es') a2n n2a
-  where
-    vs' = zip [0..] vs
-    n2a = M.fromList vs'
-    a2n = M.fromList . map swap $ vs'
-    es' = map mkEdge es
-    mkEdge (a1,a2) = (a2n ! a1, a2n ! a2, ())
-
-nodes :: G a -> [a]
-nodes (G _ m _) = M.keys m
-
-edges :: G a -> [(a,a)]
-edges (G g _ m) = map (\(n1,n2,()) -> (m ! n1, m ! n2)) (G.labEdges g)
-
-nmap :: Ord b => (a -> b) -> G a -> G b
-nmap f (G g m1 m2) = G (G.nmap f g) (M.mapKeys f m1) (M.map f m2)
-
-condensation :: Ord a => G a -> G [a]
-condensation (G g _ n2a) = G g' asToNode n2as
-  where
-    g' = G.nmap (map (n2a !)) (G.condensation g)
-    vs' = G.labNodes g'
-    n2as = M.fromList vs'
-    asToNode = M.fromList . map swap $ vs'
-
--- Weakly connected components
-wcc :: Ord a => G a -> [[a]]
-wcc (G g a2n n2a) = (map . map) (n2a!) (G.components g)
-
-sequenceGraph :: Ord a => G (Maybe a) -> Maybe (G a)
-sequenceGraph g = case sequence (nodes g) of
-  Nothing -> Nothing
-  Just _  -> Just $ nmap fromJust g
-
--- Successors
-suc :: Ord a => G a -> a -> [a]
-suc (G g a2n n2a) = map (n2a !) . G.suc g . (a2n !)
-
--- Predecessors
-pre :: Ord a => G a -> a -> [a]
-pre (G g a2n n2a) = map (n2a !) . G.pre g . (a2n !)
-
--- To build sets of successors and predecessors, do a topological
--- sort, then scan through in both directions.
--- XXX add more comments.
-cessors :: Ord a => G a -> (Map a (Set a), Map a (Set a))
-cessors g@(G gg a2n n2a) = (succs, preds)
-  where
-    as = G.topsort' gg
-    succs = foldr collectSuccs M.empty as  -- build successors map
-    collectSuccs a m = M.insert a succsSet m
-      where
-        ss       = suc g a
-        succsSet = S.fromList ss `S.union` (S.unions $ map (m!) ss)
-
-    preds = foldr collectPreds M.empty (reverse as)  -- build predecessors map
-    collectPreds a m = M.insert a predsSet m
-      where
-        ss       = pre g a
-        predsSet = S.fromList ss `S.union` (S.unions $ map (m!) ss)
-
---------------------------------------------------
 -- Build the constraint graph
 
 -- Given a list of atomic subtype constraints, build the corresponding
 -- constraint graph.
-mkConstraintGraph :: [(Atom, Atom)] -> G Atom
-mkConstraintGraph cs = mkGraph (nubify nodes) (nubify cs)
+mkConstraintGraph :: [(Atom, Atom)] -> Graph Atom
+mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
   where
-    nodes   = cs ^.. traverse . each
-    nubify :: Ord a => [a] -> [a]
-    nubify = S.toList . S.fromList
+    nodes   = S.fromList $ cs ^.. traverse . each
 
 -- Next step: eliminate strongly connected components in the
 -- constraint set by collapsing them (unifying all the types in the
@@ -642,23 +568,25 @@ mkConstraintGraph cs = mkGraph (nubify nodes) (nubify cs)
 -- we introduce sqrt with a trange typing rule: sqrt : a -> a as long
 -- as a < Nat.  Then sqrt 3 generates constraints Nat < a1 < Nat which
 -- is a cycle.  It seems to work.
-elimCycles :: G Atom -> Either TypeError (G Atom, S)
+elimCycles :: Graph Atom -> Either TypeError (Graph Atom, S)
 elimCycles g
   = maybe
       (Left NoUnify)
-      (Right . (nmap fst &&& (compose . map snd . nodes)))
+      (Right . (G.map fst &&& (compose . S.map snd . G.nodes)))
       g'
   where
     -- Condense each SCC into a node labeled by its list of atoms,
     -- which will be unified
-    g' :: Maybe (G (Atom, S))
-    g' = sequenceGraph $ nmap unifySCC (condensation g)
+    g' :: Maybe (Graph (Atom, S))
+    g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: [Atom] -> Maybe (Atom, S)
-    unifySCC [] = error "Impossible! unifySCC []"
-    unifySCC as@(a:_) = (flip substs a &&& id) <$> equate tys
+    unifySCC :: Set Atom -> Maybe (Atom, S)
+    unifySCC atoms
+      | S.null atoms = error "Impossible! unifySCC on the empty set"
+      | otherwise    = (flip substs a &&& id) <$> equate tys
       where
-        tys  = map TyAtom as
+        as@(a:_) = S.toList atoms
+        tys      = map TyAtom as
 
 --------------------------------------------------
 -- Constraint resolution
@@ -671,7 +599,7 @@ elimCycles g
 -- lower bound.
 
 -- XXX comment
-solveConstraints :: G Atom -> Maybe S
+solveConstraints :: Graph Atom -> Maybe S
 solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
   where
     convertSubst :: S' Atom -> S
@@ -691,11 +619,11 @@ solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
     unifyWCC :: S' Atom -> S' Atom
     unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
       where
-        wccVarGroups = filter (all isVar) . substs s $ wcc g
-        mkEquateSubst (a : as) = map (\(AVar v) -> (coerce v, a)) as
+        wccVarGroups  = filter (all isVar) . substs s $ G.wcc g
+        mkEquateSubst = (\(a:as) -> map (\(AVar v) -> (coerce v, a)) as) . S.toList
 
     -- Get the successor and predecessor sets for all the type variables.
-    (ss, ps) = (onlyVars *** onlyVars) $ cessors g
+    (ss, ps) = (onlyVars *** onlyVars) $ G.cessors g
     onlyVars = M.filterWithKey (\a _ -> isVar a)
 
     go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe (S' Atom)
@@ -907,8 +835,8 @@ instance (Pretty a, Pretty b) => Pretty (Either a b) where
 instance Pretty Ineqn where
   pretty (ty1 :<: ty2) = pretty ty1 ++ " < " ++ pretty ty2
 
-instance Pretty a => Pretty (G a) where
-  pretty = prettyList . map prettyEdge . edges
+instance (Pretty a, Ord a) => Pretty (Graph a) where
+  pretty = prettyList . map prettyEdge . S.toList . G.edges
     where
       prettyEdge (a1,a2) = pretty a1 ++ " >> " ++ pretty a2
 

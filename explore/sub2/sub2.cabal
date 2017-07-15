@@ -11,7 +11,7 @@ cabal-version:       >=1.10
 
 library
   exposed-modules:     Sub2
-  other-modules:       Parsing2
+  other-modules:       Parsing2, Graph
   other-extensions:    DeriveFunctor, FlexibleInstances, GADTs, TemplateHaskell, TypeSynonymInstances, DeriveGeneric
   build-depends:       base >=4.9 && <4.10,
                        mtl >=2.2 && <2.3,
@@ -25,7 +25,7 @@ library
 
 executable sub2
   main-is:             Main.hs
-  other-modules:       Sub2, Parsing2
+  other-modules:       Sub2, Parsing2, Graph
   build-depends:       base >=4.9 && <4.10,
                        mtl >=2.2 && <2.3,
                        containers >=0.5 && <0.6,

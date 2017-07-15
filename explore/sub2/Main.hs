@@ -1,7 +1,13 @@
 import Parsing2
 
-import Sub2
+import Control.Monad.Except
+
 import Unbound.Generics.LocallyNameless
+
+import Sub2
+import Constraints
+import Unify
+import Solve
 
 eval :: String -> IO ()
 eval s = case parse expr s of
@@ -15,28 +21,9 @@ tc s = case parse expr s of
     case runTC (infer e) of
       Left err -> print err
       Right (ty, cs) -> do
-        putStrLn $ pretty ty
-        putStrLn $ pretty cs
-        case weakUnify (map (either id toEqn) cs) of
-          Nothing -> putStrLn "No weak unifier."
-          _       -> do
-            case simplify cs of
-              Left err -> print err
-              Right (atoms, sub) -> do
-                let g = mkConstraintGraph atoms
-                putStrLn $ pretty g
-                case elimCycles g of
-                  Left err -> print err
-                  Right (g', s') -> do
-                    let s'' = (s' @@ sub)
-                    putStrLn $ pretty s''
-                    putStrLn $ pretty (substs s'' ty)
-
-                    case solveConstraints g' of
-                      Nothing -> putStrLn "No solution"
-                      Just s''' -> do
-                        putStrLn $ pretty s'''
-                        putStrLn $ pretty (substs (s''' @@ s'') ty)
+        case runExcept (solveConstraints cs) of
+          Left err -> print err
+          Right s  -> putStrLn . pretty . substs s $ ty
 
 main :: IO ()
 main = getLine >>= tc

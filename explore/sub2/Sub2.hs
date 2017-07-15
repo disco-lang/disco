@@ -19,15 +19,34 @@
 -- Implementation of Traytel et al (APLAS 2011).  Just inference/type
 -- reconstruction (will try a bidirectional variant later).
 
-module Sub2 where
+-- Next steps:
+--
+--   1. Package up the entire inference process into a single function
+--      that can either generate an error or return an inferred type
+--      and a substitution.  Split out into module(s), try to
+--      generalize as much as possible.  Figure out what input we need
+--      (isSub function for base types, etc.) --- package in a record?
+--      Whole thing operates in a monad something like ReaderT Record
+--      (ExceptT Error) ?
+--
+--   2. Create a simple REPL wrapper.
+--
+--   3. Generalized version with qualified types and sorts.  (Add
+--      booleans; num, sub, finite; generalize arity function, etc.)
+--
+--   4. Bidirectional variant of the above.  Will now need two kinds
+--      of variables, skolem vars and unification vars.
 
-import Debug.Trace
+module Sub2 where
 
 import Data.Coerce
 
 import           Parsing2
 import qualified Graph as G
 import           Graph (Graph)
+import           Subst
+import           Types
+import           Constraints
 
 import Prelude hiding (lookup)
 import qualified Prelude as P
@@ -36,7 +55,6 @@ import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import Control.Lens (anyOf, toListOf, each, (^..), over, both)
 import Control.Arrow
 import Control.Monad.State
 import Control.Monad.Reader
@@ -48,8 +66,6 @@ import           Data.Map (Map, (!))
 import qualified Data.Map    as M
 import           Data.Set (Set)
 import qualified Data.Set    as S
-import           Data.Foldable (Foldable)
-import qualified Data.Foldable as F
 import           Data.Maybe
 import           Data.Void
 import           Text.Printf
@@ -67,7 +83,11 @@ data Expr where
   ENat  :: Integer -> Expr
   EPlus :: Expr
   ENeg  :: Expr
-  ESqrt :: Expr   -- requires argument to be Nat
+  ESqrt :: Expr
+
+  -- Introduced sqrt with a strange typing rule just to test out cycle
+  -- elimination:  sqrt has type a -> a as long as a <: Nat.  Then sqrt 3
+  -- generates constraints Nat <: a1 <: Nat which is a cycle.
 
   ELam  :: Bind (Name Expr) Expr -> Expr
   EApp  :: Expr -> Expr -> Expr
@@ -78,218 +98,18 @@ data Expr where
 
   deriving (Show, Generic)
 
-data Atom where
-  AVar :: Name Type -> Atom
-  ANat :: Atom
-  AInt :: Atom
-  deriving (Show, Eq, Ord, Generic)
-
-isVar :: Atom -> Bool
-isVar (AVar _) = True
-isVar _        = False
-
-isBase :: Atom -> Bool
-isBase = not . isVar
-
-isSub :: Atom -> Atom -> Bool
-isSub a1 a2 | a1 == a2 = True
-isSub ANat AInt = True
-isSub _ _ = False
-
-ainf2 :: Atom -> Atom -> Maybe Atom
-ainf2 a1 a2     | a1 == a2 = Just a1
-ainf2 AInt ANat = Just ANat
-ainf2 ANat AInt = Just ANat
-ainf2 _ _       = Nothing
-
-ainf :: [Atom] -> Maybe Atom
-ainf []  = Nothing
-ainf [a] = Just a
-ainf (a:as) = do
-  g <- ainf as
-  ainf2 a g
-
-asup2 :: Atom -> Atom -> Maybe Atom
-asup2 a1 a2     | a1 == a2 = Just a1
-asup2 AInt ANat = Just AInt
-asup2 ANat AInt = Just AInt
-asup2 _ _       = Nothing
-
-asup :: [Atom] -> Maybe Atom
-asup []  = Nothing
-asup [a] = Just a
-asup (a:as) = do
-  g <- asup as
-  asup2 a g
-
-data Cons where
-  CArr  :: Cons
-  CPair :: Cons
-  -- F     :: Cons  -- XXX for testing
-  -- G     :: Cons
-  -- H     :: Cons
-  deriving (Show, Eq, Ord, Generic)
-
-data Variance = Co | Contra
-
-arity :: Cons -> [Variance]
-arity CArr  = [Contra, Co]
-arity CPair = [Co, Co]
-
-pattern TyVar :: Name Type -> Type
-pattern TyVar v = TyAtom (AVar v)
-
-var :: String -> Type
-var x = TyVar (string2Name x)
-
-pattern TyNat :: Type
-pattern TyNat   = TyAtom ANat
-
-pattern TyInt :: Type
-pattern TyInt   = TyAtom AInt
-
-pattern TyFun :: Type -> Type -> Type
-pattern TyFun ty1 ty2 = TyCons CArr [ty1, ty2]
-
-pattern TyPair :: Type -> Type -> Type
-pattern TyPair ty1 ty2 = TyCons CPair [ty1, ty2]
-
-data Type where
-  TyAtom :: Atom -> Type
-  TyCons :: Cons -> [Type] -> Type
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha Cons
-instance Alpha Atom
 instance Alpha Op
 instance Alpha Expr
-instance Alpha Type
-instance Alpha Void
-
-------------------------------------------------------------
--- Substitutions and unification
-------------------------------------------------------------
-
---------------------------------------------------
--- Subst instances
 
 instance Subst Expr Op where
-  subst  _ _ = id
-  substs _   = id
-instance Subst Expr Type where
   subst  _ _ = id
   substs _   = id
 instance Subst Expr Expr where
   isvar (EVar x) = Just (SubstName x)
   isvar _        = Nothing
-
-instance Subst Atom Atom where
-  isvar (AVar x) = Just (SubstName (coerce x))
-  isvar _        = Nothing
-
-instance Subst Type Cons
-instance Subst Type Atom
-instance Subst Type Type where
-  isvar (TyAtom (AVar x)) = Just (SubstName x)
-  isvar _                 = Nothing
-
--- orphans
-instance (Ord a, Subst t a) => Subst t (Set a) where
-  subst x t = S.map (subst x t)
-  substs s  = S.map (substs s)
-instance (Ord k, Subst t a) => Subst t (Map k a) where
-  subst x t = M.map (subst x t)
-  substs s  = M.map (substs s)
-
---------------------------------------------------
--- Substitutions
-
-type S' a = [(Name a, a)]
-
-type S = S' Type
-
-idS :: S' a
-idS = []
-
-(|->) :: Name a -> a -> S' a
-x |-> t = [(x,t)]
-
-(@@) :: Subst a a => S' a -> S' a -> S' a
-s1 @@ s2 = (map . second) (substs s1) s2 ++ s1
-
-compose :: (Subst a a, Foldable t) => t (S' a) -> S' a
-compose = F.foldr (@@) idS
-
---------------------------------------------------
--- Unification
-
-data Eqn where
-  (:=:) :: Type -> Type -> Eqn
-  deriving (Eq, Show, Generic)
-
-instance Alpha Eqn
-instance Subst Type Eqn
-
--- | Given a list of equations between types, return a substitution
---   which makes all the equations satisfied (or fail if it is not
---   possible).
---
---   This is not the most efficient way to implement unification but
---   it is simple.
-unify :: [Eqn] -> Maybe S
-unify = unify' (==)
-
--- | Given a list of equations between types, return a substitution
---   which makes all the equations equal *up to* identifying all base
---   types.  So, for example, Int = Nat weakly unifies but Int = (Int
---   -> Int) does not.  This is used to check whether subtyping
---   constraints are structurally sound before doing constraint
---   simplification/solving.
-weakUnify :: [Eqn] -> Maybe S
-weakUnify = unify' (\_ _ -> True)
-
--- | Given a list of equations between types, return a substitution
---   which makes all the equations satisfied (or fail if it is not
---   possible), up to the given comparison on base types.
-unify' :: (Atom -> Atom -> Bool) -> [Eqn] -> Maybe S
-unify' _ [] = Just idS
-unify' atomEq (e:es) = do
-  u <- unifyOne atomEq e
-  case u of
-    Left sub    -> (@@ sub) <$> unify' atomEq (substs sub es)
-    Right newEs -> unify' atomEq (newEs ++ es)
-
-equate :: [Type] -> Maybe S
-equate tys = unify eqns
-  where
-    eqns = zipWith (:=:) tys (tail tys)
-
-occurs :: Name Type -> Type -> Bool
-occurs x = anyOf fv (==x)
-
-unifyOne :: (Atom -> Atom -> Bool) -> Eqn -> Maybe (Either S [Eqn])
-unifyOne _ (ty1 :=: ty2)
-  | ty1 == ty2 = return $ Left idS
-unifyOne _ (TyVar x :=: ty2)
-  | occurs x ty2 = Nothing
-  | otherwise    = Just $ Left (x |-> ty2)
-unifyOne atomEq (ty1 :=: x@(TyVar _))
-  = unifyOne atomEq (x :=: ty1)
-unifyOne _ (TyCons c1 tys1 :=: TyCons c2 tys2)
-  | c1 == c2  = return $ Right (zipWith (:=:) tys1 tys2)
-  | otherwise = Nothing
-unifyOne atomEq (TyAtom a1 :=: TyAtom a2)
-  | atomEq a1 a2 = return $ Left idS
-  | otherwise    = Nothing
-unifyOne _ _ = Nothing  -- Atom = Cons
-
--- exampleEqns :: [Eqn]
--- exampleEqns =
---   [ TyCons G [var "x2"] :=: var "x1"
---   , TyCons F [var "x1", TyCons H [var "x1"], var "x2"]
---     :=:
---     TyCons F [TyCons G [var "x3"], var "x4", var "x3"]
---   ]
+instance Subst Expr Type where
+  subst  _ _ = id
+  substs _   = id
 
 ------------------------------------------------------------
 -- Parser
@@ -373,24 +193,6 @@ tm s = case parse expr s of
 
 type Ctx = Map (Name Expr) Type
 
-data Ineqn where
-  (:<:) :: Type -> Type -> Ineqn
-  deriving (Eq, Show, Generic)
-
-toEqn :: Ineqn -> Eqn
-toEqn (ty1 :<: ty2) = ty1 :=: ty2
-
-instance Alpha Ineqn
-instance Subst Type Ineqn
-
-type Constraint = Either Eqn Ineqn
-
-(===) :: Type -> Type -> Constraint
-ty1 === ty2 = Left (ty1 :=: ty2)
-
-(=<=) :: Type -> Type -> Constraint
-ty1 =<= ty2 = Right (ty1 :<: ty2)
-
 --------------------------------------------------
 -- Type checking monad
 
@@ -400,10 +202,10 @@ data TypeError where
   Unknown :: TypeError
   deriving (Show)
 
-newtype TC a = TC { unTC :: WriterT [Constraint] (ReaderT Ctx (ExceptT TypeError FreshM)) a }
-  deriving (Functor, Applicative, Monad, MonadWriter [Constraint], MonadReader Ctx, MonadError TypeError, Fresh)
+newtype TC a = TC { unTC :: WriterT [Constraint Type] (ReaderT Ctx (ExceptT TypeError FreshM)) a }
+  deriving (Functor, Applicative, Monad, MonadWriter [Constraint Type], MonadReader Ctx, MonadError TypeError, Fresh)
 
-runTC :: TC a -> Either TypeError (a, [Constraint])
+runTC :: TC a -> Either TypeError (a, [Constraint Type])
 runTC (TC t) = runFreshM . runExceptT . flip runReaderT M.empty . runWriterT $ t
 
 extend :: Name Expr -> Type -> TC a -> TC a
@@ -419,7 +221,6 @@ lookup x = do
 freshTy :: TC Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
--- Step 1.
 infer :: Expr -> TC Type
 infer (EVar x) = lookup x
 infer (ENat i) = return TyNat
@@ -456,247 +257,6 @@ infer ESnd = do
   b <- freshTy
   return (TyFun (TyPair a b) b)
 infer (EPair e1 e2) = TyPair <$> infer e1 <*> infer e2
-
--- Call infer, then unify any equations and apply the generated
--- substitution. (Note, in a bidirectional system I don't think any
--- equations will be generated?)
---
--- Actually I am not sure this is what we are supposed to do.  Leaving
--- it here for reference.  But instead we should just leave all the
--- equations together and then start simplifying them. (Does it
--- matter?)
-inferAndUnify :: Expr -> Either TypeError (Type, [Ineqn])
-inferAndUnify e =
-  case runTC (infer e) of
-    Left err         -> Left err
-    Right (ty, cons) ->
-      let (eqns, ineqns) = partitionEithers cons
-          ms = unify eqns
-      in
-        case ms of
-          Nothing -> Left NoUnify
-          Just s  -> Right (substs s ty, substs s ineqns)
-
-type SimplifyM a = StateT ([Constraint], S) (ExceptT TypeError LFreshM) a
-
-
-
--- This is the next step after doing inference & constraint
--- generation.  After this step, the remaining constraints will all be
--- atomic constraints, of the form (v1 < v2), (v < b), or (b < v),
--- where v is a type variable and b is a base type.
---
--- Actually, there is one more step that should happen before this, to
--- check weak unification (to ensure this algorithm will terminate).
--- For example, (^x.x x) causes this to loop.
-simplify :: [Constraint] -> Either TypeError ([(Atom, Atom)], S)
-simplify cs
-  = (fmap . first . map) extractAtoms
-  $ runLFreshM (runExceptT (execStateT simplify' (cs, idS)))
-  where
-    extractAtoms (Right (TyAtom a1 :<: TyAtom a2)) = (a1, a2)
-    extractAtoms c = error $ "simplify left non-atomic or non-subtype constraint " ++ show c
-
-    simplify' :: SimplifyM ()
-    simplify' = avoid (toListOf fvAny cs) $ do
-      mc <- pickSimplifiable
-      case mc of
-        Nothing -> return ()
-        Just s  -> simplifyOne s >> simplify'
-
-    simplifyOne :: Constraint -> SimplifyM ()
-    simplifyOne (Left eqn) =
-      case unify [eqn] of
-        Nothing -> throwError NoUnify
-        Just s' -> modify (substs s' *** (s' @@))
-    simplifyOne (Right (TyCons c1 tys1 :<: TyCons c2 tys2))
-      | c1 /= c2  = throwError NoUnify
-      | otherwise = modify (first (zipWith3 variance (arity c1) tys1 tys2 ++))
-    simplifyOne con@(Right (TyVar a :<: TyCons c tys)) = do
-      as <- mapM (const (TyVar <$> lfresh (string2Name "a"))) (arity c)
-      let s' = a |-> TyCons c as
-      modify ((substs s' . (con:)) *** (s'@@))
-    simplifyOne con@(Right (TyCons c tys :<: TyVar a)) = do
-      as <- mapM (const (TyVar <$> lfresh (string2Name "a"))) (arity c)
-      let s' = a |-> TyCons c as
-      modify ((substs s' . (con:)) *** (s'@@))
-    simplifyOne (Right (TyAtom a1 :<: TyAtom a2)) = do
-      case isSub a1 a2 of
-        True  -> return ()
-        False -> throwError NoUnify
-
-    variance Co     ty1 ty2 = ty1 =<= ty2
-    variance Contra ty1 ty2 = ty2 =<= ty1
-
-    pickSimplifiable :: SimplifyM (Maybe Constraint)
-    pickSimplifiable = do
-      cs <- fst <$> get
-      case pick simplifiable cs of
-        Nothing     -> return Nothing
-        Just (a,as) -> modify (first (const as)) >> return (Just a)
-
-    pick :: (a -> Bool) -> [a] -> Maybe (a,[a])
-    pick _ [] = Nothing
-    pick p (a:as)
-      | p a       = Just (a,as)
-      | otherwise = second (a:) <$> pick p as
-
-    simplifiable :: Constraint -> Bool
-    simplifiable (Left _) = True
-    simplifiable (Right (TyCons {} :<: TyCons {})) = True
-    simplifiable (Right (TyVar  {} :<: TyCons {})) = True
-    simplifiable (Right (TyCons {} :<: TyVar  {})) = True
-    simplifiable (Right (TyAtom a1 :<: TyAtom a2)) = isBase a1 && isBase a2
-
---------------------------------------------------
--- Build the constraint graph
-
--- Given a list of atomic subtype constraints, build the corresponding
--- constraint graph.
-mkConstraintGraph :: [(Atom, Atom)] -> Graph Atom
-mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
-  where
-    nodes   = S.fromList $ cs ^.. traverse . each
-
--- Next step: eliminate strongly connected components in the
--- constraint set by collapsing them (unifying all the types in the
--- SCC). Can fail if the types in a SCC are not unifiable.  Returns
--- the collapsed graph (which is now guaranteed to be DAG) and an
--- updated substitution.
---
--- What's an example term that leads to a cycle?  We can make one if
--- we introduce sqrt with a trange typing rule: sqrt : a -> a as long
--- as a < Nat.  Then sqrt 3 generates constraints Nat < a1 < Nat which
--- is a cycle.  It seems to work.
-elimCycles :: Graph Atom -> Either TypeError (Graph Atom, S)
-elimCycles g
-  = maybe
-      (Left NoUnify)
-      (Right . (G.map fst &&& (compose . S.map snd . G.nodes)))
-      g'
-  where
-    -- Condense each SCC into a node labeled by its list of atoms,
-    -- which will be unified
-    g' :: Maybe (Graph (Atom, S))
-    g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
-
-    unifySCC :: Set Atom -> Maybe (Atom, S)
-    unifySCC atoms
-      | S.null atoms = error "Impossible! unifySCC on the empty set"
-      | otherwise    = (flip substs a &&& id) <$> equate tys
-      where
-        as@(a:_) = S.toList atoms
-        tys      = map TyAtom as
-
---------------------------------------------------
--- Constraint resolution
-
--- Build the set of successor and predecessor base types of each type
--- variable in the constraint graph.  For each type variable, make
--- sure the sup of its predecessors is <= the inf of its successors,
--- and assign it one of the two: one or the other if it has only
--- predecessors or only successors; if it has both default to the
--- lower bound.
-
--- XXX comment
-solveConstraints :: Graph Atom -> Maybe S
-solveConstraints g = (convertSubst . unifyWCC) <$> go ss ps
-  where
-    convertSubst :: S' Atom -> S
-    convertSubst = map (coerce *** TyAtom)
-
-    -- Final step: Unify-WCC. Take any remaining weakly connected
-    -- components of variables (which means that the WCC contains no
-    -- base types) and unify all the variables. An example where this
-    -- makes a difference is ^x. (^y.y) x where there are two type
-    -- variables generated, with one a subtype of the other, but no
-    -- other constraints on them.  Without the unify-WCC step it would
-    -- result in a1 -> a3 but really we should unify them to result in
-    -- a -> a.  As another example, (^x. (^y.y) x, ^x. (^y.y) x)
-    -- results in (a -> a, b -> b) since there are two disjoint WCCs
-    -- (which should not be unified with each other).
-
-    unifyWCC :: S' Atom -> S' Atom
-    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
-      where
-        wccVarGroups  = filter (all isVar) . substs s $ G.wcc g
-        mkEquateSubst = (\(a:as) -> map (\(AVar v) -> (coerce v, a)) as) . S.toList
-
-    -- Get the successor and predecessor sets for all the type variables.
-    (ss, ps) = (onlyVars *** onlyVars) $ G.cessors g
-    onlyVars = M.filterWithKey (\a _ -> isVar a)
-
-    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> Maybe (S' Atom)
-    go succs preds = case as of
-      -- No variables left that have base type constraints.
-      []    -> Just idS
-
-      -- Solve one variable at a time.  See below.
-      (a:_) ->
-
-        case solveVar a of
-          Nothing       -> Nothing
-
-          -- If we solved for a, delete it from the maps and apply the
-          -- resulting substitution to the remainder.
-          Just s -> traceShow s $
-            (@@ s) <$> go (substs s (M.delete a succs)) (substs s (M.delete a preds))
-
-      where
-        -- NOTE we can't solve a bunch in parallel!  Might end up
-        -- assigning them conflicting solutions if some depend on
-        -- others.  For example, consider the situation
-        --
-        --            Z
-        --            |
-        --            a3
-        --           /  \
-        --          a1   N
-        --
-        -- If we try to solve in parallel we will end up assigning a1
-        -- -> Z (since it only has base types as an upper bound) and
-        -- a3 -> N (since it has both upper and lower bounds, and by
-        -- default we pick the lower bound), but this is wrong since
-        -- we should have a1 < a3.
-        --
-        -- If instead we solve them one at a time, we could e.g. first
-        -- solve a1 -> Z, and then we would find a3 -> Z as well.
-        -- Alternately, if we first solve a3 -> N then we will have a1
-        -- -> N as well.
-        --
-        -- This exact graph comes from (^x.x+1) which was erroneously
-        -- being inferred to have type Z -> N.
-
-        -- Get only the variables we can solve on this pass, which have
-        -- base types in their predecessor or successor set.
-        as = filter (\a -> any isBase (succs ! a) || any isBase (preds ! a)) (M.keys succs)
-
-        -- Solve for a variable, failing if it has no solution, otherwise returning
-        -- a substitution for it.
-        solveVar :: Atom -> Maybe (S' Atom)
-        solveVar a@(AVar v) =
-          case (filter isBase (S.toList $ succs ! a), filter isBase (S.toList $ preds ! a)) of
-            ([], []) ->
-              error $ "Impossible! solveConstraints.solveVar called on variable "
-                      ++ show a ++ " with no base type successors or predecessors"
-
-            -- Only successors.  Just assign a to their inf, if one exists.
-            (bsuccs, []) -> (coerce v |->) <$> ainf bsuccs
-
-            -- Only predecessors.  Just assign a to their sup.
-            ([], bpreds) -> (coerce v |->) <$> asup bpreds
-
-            -- Both successors and predecessors.  Both must have a
-            -- valid bound, and the bounds must not overlap.  Assign a
-            -- to the upper bound of its predecessors.
-            (bsuccs, bpreds) -> do
-              ub <- ainf bsuccs
-              lb <- asup bpreds
-              case isSub lb ub of
-                True  -> Just (coerce v |-> lb)
-                False -> Nothing
-
-        solveVar a = error $ "Impossible! solveConstraints.solveVar called on non-variable " ++ show a
 
 ------------------------------------------------------------
 -- Interpreter
@@ -825,14 +385,14 @@ instance Pretty a => Pretty [a] where
 instance (Pretty a, Pretty b) => Pretty (a,b) where
   pretty (x,y) = "(" ++ pretty x ++ ", " ++ pretty y ++ ")"
 
-instance Pretty Eqn where
+instance Pretty t => Pretty (Eqn t) where
   pretty (ty1 :=: ty2) = pretty ty1 ++ " = " ++ pretty ty2
 
 instance (Pretty a, Pretty b) => Pretty (Either a b) where
   pretty (Left a)  = pretty a
   pretty (Right b) = pretty b
 
-instance Pretty Ineqn where
+instance Pretty t => Pretty (Ineqn t) where
   pretty (ty1 :<: ty2) = pretty ty1 ++ " < " ++ pretty ty2
 
 instance (Pretty a, Ord a) => Pretty (Graph a) where

@@ -47,6 +47,7 @@ import           Graph (Graph)
 import           Subst
 import           Types
 import           Constraints
+import           Solve
 
 import Prelude hiding (lookup)
 import qualified Prelude as P
@@ -55,11 +56,11 @@ import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import Control.Arrow
 import Control.Monad.State
 import Control.Monad.Reader
 import Control.Monad.Except
 import Control.Monad.Writer
+import           Data.Bifunctor
 import           Data.Either
 import           Data.List (intercalate)
 import           Data.Map (Map, (!))
@@ -198,7 +199,7 @@ type Ctx = Map (Name Expr) Type
 
 data TypeError where
   Unbound :: Name Expr -> TypeError
-  NoUnify :: TypeError
+  SolveErr :: SolveError -> TypeError
   Unknown :: TypeError
   deriving (Show)
 
@@ -257,6 +258,13 @@ infer ESnd = do
   b <- freshTy
   return (TyFun (TyPair a b) b)
 infer (EPair e1 e2) = TyPair <$> infer e1 <*> infer e2
+
+inferTopLevel :: Expr -> Either TypeError Type
+inferTopLevel e = do
+  (ty, cs) <- runTC (infer e)
+  s <- first SolveErr $ runExcept (solveConstraints cs)
+  return $ substs s ty
+
 
 ------------------------------------------------------------
 -- Interpreter

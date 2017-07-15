@@ -1,10 +1,14 @@
 import Parsing2
 
 import Control.Monad.Except
+import Data.Bifunctor
 
 import Unbound.Generics.LocallyNameless
 
+import Text.Parsec.Error (ParseError)
+
 import Sub2
+import Types
 import Constraints
 import Unify
 import Solve
@@ -14,19 +18,22 @@ eval s = case parse expr s of
   Left err -> print err
   Right e -> print $ interp e
 
-tc :: String -> IO ()
-tc s = case parse expr s of
-  Left err -> print err
-  Right e -> do
-    case runTC (infer e) of
-      Left err -> print err
-      Right (ty, cs) -> do
-        case runExcept (solveConstraints cs) of
-          Left err -> print err
-          Right s  -> putStrLn . pretty . substs s $ ty
+tcIO :: String -> IO ()
+tcIO = either print (putStrLn . pretty) . tc
+
+data Error =
+  P ParseError | T TypeError
+  deriving Show
+
+(<!>) = flip first
+
+tc :: String -> Either Error Type
+tc s = do
+  e <- parse expr s <!> P
+  inferTopLevel e <!> T
 
 main :: IO ()
-main = getLine >>= tc
+main = getLine >>= tcIO
 
 {-
 Example: (^f.f 3 + f (-5))  generates the type:

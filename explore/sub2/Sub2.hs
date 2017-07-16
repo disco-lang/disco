@@ -21,14 +21,6 @@
 
 -- Next steps:
 --
---   1. Package up the entire inference process into a single function
---      that can either generate an error or return an inferred type
---      and a substitution.  Split out into module(s), try to
---      generalize as much as possible.  Figure out what input we need
---      (isSub function for base types, etc.) --- package in a record?
---      Whole thing operates in a monad something like ReaderT Record
---      (ExceptT Error) ?
---
 --   2. Create a simple REPL wrapper.
 --
 --   3. Generalized version with qualified types and sorts.  (Add
@@ -259,12 +251,11 @@ infer ESnd = do
   return (TyFun (TyPair a b) b)
 infer (EPair e1 e2) = TyPair <$> infer e1 <*> infer e2
 
-inferTopLevel :: Expr -> Either TypeError Type
+inferTopLevel :: Expr -> Either TypeError Sigma
 inferTopLevel e = do
   (ty, cs) <- runTC (infer e)
   s <- first SolveErr $ runExcept (solveConstraints cs)
-  return $ substs s ty
-
+  return . generalize . substs s $ ty
 
 ------------------------------------------------------------
 -- Interpreter
@@ -410,3 +401,10 @@ instance (Pretty a, Ord a) => Pretty (Graph a) where
 
 instance Pretty (Name Type) where
   pretty = show
+
+instance Pretty Sigma where
+  pretty (Forall b)
+    | null vs   = pretty ty
+    | otherwise = "∀" ++ intercalate ", " (map pretty vs) ++ ". " ++ pretty ty
+    where
+      (vs,ty) = unsafeUnbind b

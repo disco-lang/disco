@@ -14,9 +14,12 @@ import qualified Data.Map     as M
 import           Data.Set     (Set)
 import qualified Data.Set     as S
 
-import Unbound.Generics.LocallyNameless
+import           Control.Lens (toListOf)
+import           Data.Set.Lens (setOf)
 
-import Subst
+import           Unbound.Generics.LocallyNameless
+
+import           Subst
 
 ------------------------------------------------------------
 -- Atomic types
@@ -138,3 +141,16 @@ pattern TyFun ty1 ty2 = TyCons CArr [ty1, ty2]
 pattern TyPair :: Type -> Type -> Type
 pattern TyPair ty1 ty2 = TyCons CPair [ty1, ty2]
 
+------------------------------------------------------------
+-- Sigma types
+------------------------------------------------------------
+
+data Sigma where
+  Forall :: Bind [Name Type] Type -> Sigma
+  deriving (Show, Generic)
+
+instance Alpha Sigma
+instance Subst Type Sigma
+
+generalize :: Type -> Sigma
+generalize ty = Forall (bind (S.toList $ setOf fv ty) ty)

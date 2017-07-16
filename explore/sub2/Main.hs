@@ -27,7 +27,7 @@ data Error =
 
 (<!>) = flip first
 
-tc :: String -> Either Error Type
+tc :: String -> Either Error Sigma
 tc s = do
   e <- parse expr s <!> P
   inferTopLevel e <!> T

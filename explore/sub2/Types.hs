@@ -14,6 +14,7 @@ import qualified Data.Map     as M
 import           Data.Set     (Set)
 import qualified Data.Set     as S
 
+import           Control.Arrow ((***))
 import           Control.Lens (toListOf)
 import           Data.Set.Lens (setOf)
 
@@ -118,6 +119,9 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
   substs s  = M.map (substs s)
 
 type S = S' Type
+
+atomToTypeSubst :: S' Atom -> S' Type
+atomToTypeSubst = map (coerce *** TyAtom)
 
 ------------------------------------------------------------
 -- Convenience

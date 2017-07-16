@@ -1,5 +1,6 @@
 module Unify where
 
+import Data.Coerce
 import Control.Lens (anyOf)
 
 import Unbound.Generics.LocallyNameless
@@ -60,3 +61,10 @@ unifyOne atomEq (TyAtom a1 :=: TyAtom a2)
   | atomEq a1 a2 = return $ Left idS
   | otherwise    = Nothing
 unifyOne _ _ = Nothing  -- Atom = Cons
+
+unifyAtoms :: [Atom] -> Maybe (S' Atom)
+unifyAtoms = fmap convert . equate . map TyAtom
+  where
+    -- Guaranteed that this will get everything in the list, since we
+    -- started with all atoms.
+    convert s = [(coerce x, a) | (x, TyAtom a) <- s]

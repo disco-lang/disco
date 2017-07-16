@@ -19,7 +19,7 @@ import Solve
 eval :: String -> IO ()
 eval s = case parse expr s of
   Left err -> print err
-  Right e -> print $ interp e
+  Right e -> putStrLn . pretty $ interp e
 
 tcIO :: String -> IO ()
 tcIO = either print (putStrLn . pretty) . tc

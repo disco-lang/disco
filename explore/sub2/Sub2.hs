@@ -269,7 +269,7 @@ data Value where
   VFst     :: Value
   VSnd     :: Value
   VClosure :: Bind (Name Expr) Expr -> Env -> Value
-  deriving Show
+  VFun     :: (Value -> Value) -> Value
 
 type Env = Map (Name Expr) Value
 
@@ -283,17 +283,15 @@ interp :: Expr -> Value
 interp = runLFreshM . flip runReaderT M.empty . interp'
 
 interp' :: Expr -> ReaderT Env LFreshM Value
-interp' (EVar x) = (fromJust . M.lookup x) <$> ask
-interp' (ENat n) = return $ VInt n
-interp' EPlus    = return VPlus
-interp' ENeg     = return VNeg
-interp' (EPair e1 e2) = do
-  v1 <- interp' e1
-  v2 <- interp' e2
-  return $ VPair v1 v2
-interp' EFst = return VFst
-interp' ESnd = return VSnd
-interp' (ELam b) = VClosure b <$> ask
+interp' (EVar x)       = (fromJust . M.lookup x) <$> ask
+interp' (ENat n)       = return $ VInt n
+interp' EPlus          = return $ VFun (\(VInt i) -> VFun (\(VInt j) -> VInt (i+j)))
+interp' ENeg           = return $ VFun (\(VInt i) -> VInt (-i))
+interp' ESqrt          = return $ VFun (\(VInt i) -> VInt $ round (sqrt (fromIntegral i)))
+interp' (EPair e1 e2)  = VPair <$> interp' e1 <*> interp' e2
+interp' EFst           = return $ VFun (\(VPair v1 _) -> v1)
+interp' ESnd           = return $ VFun (\(VPair _ v2) -> v2)
+interp' (ELam b)       = VClosure b <$> ask
 interp' (EApp fun arg) = do
   vf <- interp' fun
   va <- interp' arg
@@ -303,23 +301,8 @@ interp' (EApp fun arg) = do
       lunbind b $ \(x,body) ->
       extendV x va $ do
         interp' body
-    VPlus ->
-      case va of
-        VInt i -> return (VPlus1 i)
-    VPlus1 i ->
-      case va of
-        VInt j -> return (VInt (i+j))
-    VNeg ->
-      case va of
-        VInt i -> return (VInt (-i))
-    VFst ->
-      case va of
-        VPair v1 _ -> return v1
-    VSnd ->
-      case va of
-        VPair _ v2 -> return v2
+    VFun f -> return (f va)
     _ -> error $ printf "Impossible! interp' EApp with (%s) (%s)" (show fun) (show arg)
-interp' e = error $ "interp' " ++ show e
 
 interpOp :: Op -> (Integer -> Integer -> Integer)
 interpOp Plus  = (+)
@@ -386,6 +369,8 @@ instance Pretty Expr where
   prettyPrec _ _ EFst = "fst"
   prettyPrec _ _ ESnd = "snd"
 
+  prettyPrec _ _ ESqrt = "sqrt"
+
 instance Pretty Env where
   pretty env = prettyList bindings
     where
@@ -399,6 +384,7 @@ instance Pretty Value where
       (show x) (pretty body) (pretty env)
     where
       (x, body) = unsafeUnbind b
+  pretty (VFun _) = "<fun>"
   pretty (VPair v1 v2) = printf "(%s, %s)" (pretty v1) (pretty v2)
 
 prettyList xs = "[" ++ intercalate ", " xs ++ "]"

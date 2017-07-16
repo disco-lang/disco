@@ -80,7 +80,9 @@ solveConstraints cs = do
   -- variables in any remaining weakly connected components.
   θ_sol       <- solveGraph g'
 
-  return (θ_sol @@ θ_cyc @@ θ_simp)
+  let θ_final = (θ_sol @@ θ_cyc @@ θ_simp)
+
+  return θ_final
 
 ------------------------------------------------------------
 -- Step 2: constraint simplification
@@ -227,19 +229,18 @@ mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
 elimCycles :: Graph Atom -> Except SolveError (Graph Atom, S)
 elimCycles g
   = maybeError NoUnify
-  $ (G.map fst &&& (compose . S.map snd . G.nodes)) <$> g'
+  $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (Atom, S))
+    g' :: Maybe (Graph (Atom, S' Atom))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set Atom -> Maybe (Atom, S)
+    unifySCC :: Set Atom -> Maybe (Atom, S' Atom)
     unifySCC atoms
       | S.null atoms = error "Impossible! unifySCC on the empty set"
-      | otherwise    = (flip substs a &&& id) <$> equate tys
+      | otherwise    = (flip substs a &&& id) <$> unifyAtoms as
       where
         as@(a:_) = S.toList atoms
-        tys      = map TyAtom as
 
 ------------------------------------------------------------
 -- Steps 5 and 6: Constraint resolution

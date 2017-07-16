@@ -20,7 +20,8 @@ library
                        split,
                        lens,
                        fgl,
-                       parsec
+                       parsec,
+                       haskeline
   default-language:    Haskell2010
 
 executable sub2
@@ -33,6 +34,7 @@ executable sub2
                        split,
                        lens,
                        fgl,
-                       parsec
+                       parsec,
+                       haskeline
 
   default-language:    Haskell2010

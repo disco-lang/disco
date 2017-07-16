@@ -21,8 +21,6 @@
 
 -- Next steps:
 --
---   2. Create a simple REPL wrapper.
---
 --   3. Generalized version with qualified types and sorts.  (Add
 --      booleans; num, sub, finite; generalize arity function, etc.)
 --
@@ -263,6 +261,13 @@ inferTopLevel e = do
 
 data Value where
   VInt     :: Integer -> Value
+
+  VPlus    :: Value
+  VPlus1   :: Integer -> Value
+  VNeg     :: Value
+  VPair    :: Value -> Value -> Value
+  VFst     :: Value
+  VSnd     :: Value
   VClosure :: Bind (Name Expr) Expr -> Env -> Value
   deriving Show
 
@@ -280,17 +285,14 @@ interp = runLFreshM . flip runReaderT M.empty . interp'
 interp' :: Expr -> ReaderT Env LFreshM Value
 interp' (EVar x) = (fromJust . M.lookup x) <$> ask
 interp' (ENat n) = return $ VInt n
-interp' (EApp (EApp EPlus ea) eb) = do
-  va <- interp' ea
-  vb <- interp' eb
-  case (va, vb) of
-    (VInt na, VInt nb) -> return $ VInt (na + nb)
-    _ -> error "Impossible! interp' EBin on non-Ints"
-interp' (EApp ENeg ea) = do
-  va <- interp' ea
-  case va of
-    VInt na -> return $ VInt (-na)
-    _ -> error "Impossible! interp' ENeg on non-Int"
+interp' EPlus    = return VPlus
+interp' ENeg     = return VNeg
+interp' (EPair e1 e2) = do
+  v1 <- interp' e1
+  v2 <- interp' e2
+  return $ VPair v1 v2
+interp' EFst = return VFst
+interp' ESnd = return VSnd
 interp' (ELam b) = VClosure b <$> ask
 interp' (EApp fun arg) = do
   vf <- interp' fun
@@ -301,7 +303,23 @@ interp' (EApp fun arg) = do
       lunbind b $ \(x,body) ->
       extendV x va $ do
         interp' body
+    VPlus ->
+      case va of
+        VInt i -> return (VPlus1 i)
+    VPlus1 i ->
+      case va of
+        VInt j -> return (VInt (i+j))
+    VNeg ->
+      case va of
+        VInt i -> return (VInt (-i))
+    VFst ->
+      case va of
+        VPair v1 _ -> return v1
+    VSnd ->
+      case va of
+        VPair _ v2 -> return v2
     _ -> error $ printf "Impossible! interp' EApp with (%s) (%s)" (show fun) (show arg)
+interp' e = error $ "interp' " ++ show e
 
 interpOp :: Op -> (Integer -> Integer -> Integer)
 interpOp Plus  = (+)
@@ -362,6 +380,12 @@ instance Pretty Expr where
     mparens (p>3 || (p==3 && a == R)) $
       (prettyPrec 3 L e1 ++ " " ++ prettyPrec 3 R e2)
 
+  prettyPrec _ _ (EPair e1 e2) =
+    mparens True $
+      (prettyPrec 0 L e1 ++ ", " ++ prettyPrec 0 R e2)
+  prettyPrec _ _ EFst = "fst"
+  prettyPrec _ _ ESnd = "snd"
+
 instance Pretty Env where
   pretty env = prettyList bindings
     where
@@ -375,6 +399,7 @@ instance Pretty Value where
       (show x) (pretty body) (pretty env)
     where
       (x, body) = unsafeUnbind b
+  pretty (VPair v1 v2) = printf "(%s, %s)" (pretty v1) (pretty v2)
 
 prettyList xs = "[" ++ intercalate ", " xs ++ "]"
 

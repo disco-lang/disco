@@ -2,6 +2,9 @@ import Parsing2
 
 import Control.Monad.Except
 import Data.Bifunctor
+import Data.List (isPrefixOf)
+
+import System.Console.Haskeline
 
 import Unbound.Generics.LocallyNameless
 
@@ -33,7 +36,32 @@ tc s = do
   inferTopLevel e <!> T
 
 main :: IO ()
-main = getLine >>= tcIO
+main = do
+  let settings = defaultSettings
+        { historyFile = Just ".sub2_history" }
+  runInputT settings loop
+
+  where
+    loop :: InputT IO ()
+    loop = do
+      minput <- getInputLine "> "
+      case minput of
+        Nothing -> return ()
+        Just input
+          | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
+              liftIO $ putStrLn "Goodbye!"
+              return ()
+          | otherwise -> do
+              case parse expr input of
+                Left err -> liftIO (print err)
+                Right e  -> do
+                  liftIO (putStr $ pretty e)
+                  case inferTopLevel e of
+                    Left err -> liftIO (putStrLn "" >> print err)
+                    Right ty -> do
+                      liftIO (putStrLn $ " : " ++ pretty ty)
+                      liftIO (putStrLn $ pretty (interp e))
+              loop
 
 {-
 Example: (^f.f 3 + f (-5))  generates the type:

@@ -71,7 +71,7 @@ data Type where
 
   -- | Finite type, single argument is a natural number
   --   defining the exact number of inhabitants.
-  TyFin    :: Type -> Type
+  TyFin    :: Int -> Type
 
   -- | Lists
   TyList   :: Type -> Type
@@ -80,7 +80,7 @@ data Type where
 
 -- | Check whether a type is a numeric type (N, Z, or Q).
 isNumTy :: Type -> Bool
-isNumTy ty = ty `elem` [TyN, TyZ, TyQP, TyQ]
+isNumTy ty = ty `elem` [TyN, TyZ, TyQP, TyQ, TyFin]
 
 -- | Strictness of a function application or let-expression.
 data Strictness = Strict | Lazy

@@ -29,6 +29,10 @@
 
 module Sub2 where
 
+
+import Debug.Trace
+
+
 import Data.Coerce
 
 import           Parsing2
@@ -212,6 +216,10 @@ lookup x = do
 freshTy :: TC Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
+-- DEBUG
+-- prettyTy :: Expr -> Type -> String
+-- prettyTy e t = pretty e ++ " : " ++ pretty t
+
 infer :: Expr -> TC Type
 infer (EVar x) = lookup x
 infer (ENat i) = return TyNat
@@ -222,6 +230,7 @@ infer EPlus    = do
 infer ENeg     = do
   a <- freshTy
   tell [a =<= TyInt]
+--  traceM (prettyTy ENeg $ TyFun a TyInt)  -- DEBUG
   return $ TyFun a TyInt
 infer ESqrt    = do
   a <- freshTy
@@ -231,23 +240,35 @@ infer (ELam b) = do
   (x,body) <- unbind b
   tyIn  <- freshTy
   tyOut <- extend x tyIn $ infer body
+--  traceM (prettyTy (ELam b) (TyFun tyIn tyOut))  -- DEBUG
   return $ TyFun tyIn tyOut
 infer (EApp e1 e2) = do
-  a <- freshTy
-  b <- freshTy
   ty1 <- infer e1
   ty2 <- infer e2
-  tell [ty1 === TyFun a b, ty2 =<= a]
+  b <- constrainApp ty1 ty2
+--  traceM (prettyTy (EApp e1 e2) b)  -- DEBUG
   return b
 infer EFst = do
   a <- freshTy
   b <- freshTy
+  -- traceM (prettyTy (EFst) (TyFun (TyPair a b) a))  -- DEBUG
   return (TyFun (TyPair a b) a)
 infer ESnd = do
   a <- freshTy
   b <- freshTy
+  -- traceM (prettyTy (ESnd) (TyFun (TyPair a b) b))  -- DEBUG
   return (TyFun (TyPair a b) b)
 infer (EPair e1 e2) = TyPair <$> infer e1 <*> infer e2
+
+constrainApp :: Type -> Type -> TC Type
+constrainApp (TyFun ty1 ty2) argTy = do
+  tell [argTy =<= ty1]
+  return ty2
+constrainApp funTy argTy = do
+  a <- freshTy
+  b <- freshTy
+  tell [funTy === TyFun a b, argTy =<= a]
+  return b
 
 inferTopLevel :: Expr -> Either TypeError Sigma
 inferTopLevel e = do
@@ -369,6 +390,8 @@ instance Pretty Expr where
   prettyPrec _ _ EFst = "fst"
   prettyPrec _ _ ESnd = "snd"
 
+  prettyPrec _ _ EPlus = "+"
+  prettyPrec _ _ ENeg  = "-"
   prettyPrec _ _ ESqrt = "sqrt"
 
 instance Pretty Env where

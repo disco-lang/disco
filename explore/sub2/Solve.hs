@@ -8,6 +8,12 @@ module Solve
   ( solveConstraints, SolveError(..) )
   where
 
+
+
+-- import Debug.Trace
+-- import Data.List (intercalate)
+-- import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+
 import           Data.Coerce
 
 import           Control.Arrow ((***), (&&&), first, second)
@@ -193,12 +199,8 @@ simplify cs
     -- Given a subtyping constraint between a variable and a type
     -- constructor, expand the variable into the same constructor
     -- applied to fresh type variables.
-    simplifyOne con@(Right (TyVar a :<: TyCons c tys)) = do
-      as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
-      let s' = a |-> TyCons c as
-      modify ((substs s' . (con:)) *** (s'@@))
-    simplifyOne (Right (c@(TyCons {}) :<: v@(TyVar {})))
-      = simplifyOne (Right (v :<: c))
+    simplifyOne con@(Right (TyVar a    :<: TyCons c _)) = expandStruct a c con
+    simplifyOne con@(Right (TyCons c _ :<: TyVar a   )) = expandStruct a c con
 
     -- Given a subtyping constraint between two base types, just check
     -- whether the first is indeed a subtype of the second.  (Note
@@ -211,11 +213,19 @@ simplify cs
         True  -> return ()
         False -> throwError NoUnify
 
+    expandStruct :: Name Type -> Cons -> Constraint Type -> SimplifyM ()
+    expandStruct a c con = do
+      as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
+      let s' = a |-> TyCons c as
+      modify ((substs s' . (con:)) *** (s'@@))
+
+
     -- Create a subtyping constraint based on the variance of a type
     -- constructor argument position: in the usual order for
     -- covariant, and reversed for contravariant.
     variance Co     ty1 ty2 = ty1 =<= ty2
     variance Contra ty1 ty2 = ty2 =<= ty1
+
 
 ------------------------------------------------------------
 -- Step 3: Build constraint graph
@@ -393,6 +403,8 @@ solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
 
 
 - ^p. (snd p, fst p)
+
+- (^f.^x. f (f x)) (^p. (snd p, fst p)) (2, -2)
 
 -}
 

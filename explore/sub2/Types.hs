@@ -9,6 +9,7 @@ module Types where
 import           Data.Coerce  (coerce)
 import           GHC.Generics (Generic)
 
+import           Data.List    (nub)
 import           Data.Map     (Map, (!))
 import qualified Data.Map     as M
 import           Data.Set     (Set)
@@ -157,4 +158,8 @@ instance Alpha Sigma
 instance Subst Type Sigma
 
 generalize :: Type -> Sigma
-generalize ty = Forall (bind (S.toList $ setOf fv ty) ty)
+generalize ty = Forall (bind newvs (substs newvsubst ty))
+  where
+    fvlist = nub $ toListOf fv ty
+    newvs  = take (length fvlist) $ map (string2Name . (:[])) ['a' .. 'z']
+    newvsubst = zip fvlist (map TyVar newvs)

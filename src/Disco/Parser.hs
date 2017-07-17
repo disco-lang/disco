@@ -433,7 +433,8 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
+  , "Void", "Unit", "Bool"
+  , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
   ]
 

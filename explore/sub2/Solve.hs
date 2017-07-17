@@ -1,4 +1,8 @@
-{-# LANGUAGE GADTSyntax #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTSyntax            #-}
+{-# LANGUAGE PartialTypeSignatures #-}
+
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 
 module Solve
   ( solveConstraints, SolveError(..) )
@@ -88,7 +92,7 @@ solveConstraints cs = do
 -- Step 2: constraint simplification
 ------------------------------------------------------------
 
-type SimplifyM a = StateT ([Constraint Type], S) (LFreshMT (Except SolveError)) a
+type SimplifyM a = StateT ([Constraint Type], S) (FreshMT (Except SolveError)) a
 
 -- | This step does unification of equality constraints, as well as
 --   structural decomposition of subtyping constraints.  For example,
@@ -104,8 +108,13 @@ type SimplifyM a = StateT ([Constraint Type], S) (LFreshMT (Except SolveError)) 
 simplify :: [Constraint Type] -> Except SolveError ([(Atom, Atom)], S)
 simplify cs
   = (fmap . first . map) extractAtoms
-  $ runLFreshMT (execStateT simplify' (cs, idS))
+  $ contFreshMT (execStateT simplify' (cs, idS)) n
   where
+
+    n = succ . maximum0 . map (name2Integer :: Name Type -> _) . toListOf fv $ cs
+
+    maximum0 [] = 0
+    maximum0 xs = maximum xs
 
     -- Extract the type atoms from an atomic constraint.
     extractAtoms (Right (TyAtom a1 :<: TyAtom a2)) = (a1, a2)
@@ -114,11 +123,21 @@ simplify cs
     -- Iterate picking one simplifiable constraint and simplifying it
     -- until none are left.
     simplify' :: SimplifyM ()
-    simplify' = avoid (toListOf fvAny cs) $ do
+    simplify' = do
+      -- q <- gets fst
+      -- traceM (pretty q)
+      -- traceM ""
+
       mc <- pickSimplifiable
       case mc of
         Nothing -> return ()
-        Just s  -> simplifyOne s >> simplify'
+        Just s  -> do
+
+          -- traceM (pretty s)
+          -- traceM "---------------------------------------"
+
+          simplifyOne s
+          simplify'
 
     -- Pick out one simplifiable constraint, removing it from the list
     -- of constraints in the state.  Return Nothing if no more
@@ -175,7 +194,7 @@ simplify cs
     -- constructor, expand the variable into the same constructor
     -- applied to fresh type variables.
     simplifyOne con@(Right (TyVar a :<: TyCons c tys)) = do
-      as <- mapM (const (TyVar <$> lfresh (string2Name "a"))) (arity c)
+      as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
       let s' = a |-> TyCons c as
       modify ((substs s' . (con:)) *** (s'@@))
     simplifyOne (Right (c@(TyCons {}) :<: v@(TyVar {})))
@@ -277,11 +296,8 @@ elimCycles g
 --   Instead, we unify the two type variables and the resulting type
 --   is @forall a. a -> a@.
 solveGraph :: Graph Atom -> Except SolveError S
-solveGraph g = (convertSubst . unifyWCC) <$> go ss ps
+solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
   where
-    convertSubst :: S' Atom -> S
-    convertSubst = map (coerce *** TyAtom)
-
     unifyWCC :: S' Atom -> S' Atom
     unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
       where
@@ -368,4 +384,15 @@ solveGraph g = (convertSubst . unifyWCC) <$> go ss ps
                 False -> Nothing
 
         solveVar a = error $ "Impossible! solveGraph.solveVar called on non-variable " ++ show a
+
+------------------------------------------------------------
+
+{-
+
+- (^f.^x.f (f x)) (^x. x)
+
+
+- ^p. (snd p, fst p)
+
+-}
 

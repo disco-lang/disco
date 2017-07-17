@@ -71,7 +71,7 @@ data Type where
 
   -- | Finite type, single argument is a natural number
   --   defining the exact number of inhabitants.
-  TyFin    :: Int -> Type
+  TyFin    :: Integer -> Type
 
   -- | Lists
   TyList   :: Type -> Type

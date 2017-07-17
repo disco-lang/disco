@@ -777,7 +777,7 @@ parseAtomicType =
 
 -- | Parse a type.
 parseType :: Parser Type
-parseType = parseTypeExpr <|> parseAtomicType
+parseType = parseTypeExpr <|> parseFiniteType <|> parseAtomicType
 
 -- | Parse a type expression built out of binary operators.
 parseTypeExpr :: Parser Type
@@ -794,6 +794,12 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
+
+parseFiniteType :: Parser Type
+parseFiniteType = parseFiniteType' <$ (reserved "Fin" <|> reserved "ℤ" <|> reserved "Z")
+
+parseFiniteType' :: Parser Type
+parseFiniteType' = TyFin <$> natural
 
 parseTyOp :: Parser TyOp
 parseTyOp =

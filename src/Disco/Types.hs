@@ -80,7 +80,8 @@ data Type where
 
 -- | Check whether a type is a numeric type (N, Z, or Q).
 isNumTy :: Type -> Bool
-isNumTy ty = ty `elem` [TyN, TyZ, TyQP, TyQ, TyFin]
+isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
+isNumTy (TyFin _) = True
 
 -- | Strictness of a function application or let-expression.
 data Strictness = Strict | Lazy

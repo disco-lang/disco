@@ -362,9 +362,10 @@ numLub at1 at2 = do
 
 -- | Decide whether a type is finite.
 isFinite :: Type -> Bool
-isFinite TyVoid = True
-isFinite TyUnit = True
-isFinite TyBool = True
+isFinite TyVoid     = True
+isFinite TyUnit     = True
+isFinite TyBool     = True
+isFinite (TyFin _)  = True
 isFinite (TyPair ty1 ty2) = isFinite ty1 && isFinite ty2
 isFinite (TySum ty1 ty2)  = isFinite ty1 && isFinite ty2
 isFinite (TyArr ty1 ty2)  = isFinite ty1 && isFinite ty2
@@ -379,13 +380,14 @@ checkFinite ty
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
 isDecidable (TyVar _) = error "isDecidable TyVar"
-isDecidable TyVoid = True
-isDecidable TyUnit = True
-isDecidable TyBool = True
-isDecidable TyN    = True
-isDecidable TyZ    = True
-isDecidable TyQP   = True
-isDecidable TyQ    = True
+isDecidable TyVoid    = True
+isDecidable TyUnit    = True
+isDecidable TyBool    = True
+isDecidable TyN       = True
+isDecidable TyZ       = True
+isDecidable TyQP      = True
+isDecidable TyQ       = True
+isDecidable (TyFin _) = True
 isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
@@ -401,13 +403,14 @@ checkDecidable ty
 -- | Check whether the given type has a total order.
 isOrdered :: Type -> Bool
 isOrdered (TyVar _) = error "isOrdered TyVar"
-isOrdered TyVoid = True
-isOrdered TyUnit = True
-isOrdered TyBool = True
-isOrdered TyN    = True
-isOrdered TyZ    = True
-isOrdered TyQP   = True
-isOrdered TyQ    = True
+isOrdered TyVoid    = True
+isOrdered TyUnit    = True
+isOrdered TyBool    = True
+isOrdered TyN       = True
+isOrdered TyZ       = True
+isOrdered TyQP      = True
+isOrdered TyQ       = True
+isOrdered (TyFin _) = True
 isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2

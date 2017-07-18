@@ -762,6 +762,7 @@ parseAtomicType =
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Bool" <|> reserved "B")
+  <|> TyFin  <$> ((reserved "Fin" <|> reserved "ℤ" <|> reserved "Z") *> natural)
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
@@ -777,7 +778,7 @@ parseAtomicType =
 
 -- | Parse a type.
 parseType :: Parser Type
-parseType = parseTypeExpr <|> parseFiniteType <|> parseAtomicType
+parseType = parseTypeExpr <|> parseAtomicType
 
 -- | Parse a type expression built out of binary operators.
 parseTypeExpr :: Parser Type
@@ -794,12 +795,6 @@ parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
-
-parseFiniteType :: Parser Type
-parseFiniteType = parseFiniteType' <$ (reserved "Fin" <|> reserved "ℤ" <|> reserved "Z")
-
-parseFiniteType' :: Parser Type
-parseFiniteType' = TyFin <$> natural
 
 parseTyOp :: Parser TyOp
 parseTyOp =

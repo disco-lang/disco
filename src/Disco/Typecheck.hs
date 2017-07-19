@@ -106,6 +106,7 @@ data TCError
   | CantInfer Term         -- ^ We were asked to infer the type of the
                            --   term, but its type cannot be inferred
   | NotNum ATerm           -- ^ The term is expected to have a numeric type but it doesn't
+  | NotNumTy Type          -- ^ The type should be numeric, but is not.
   | IncompatibleTypes Type Type  -- ^ The types should have a lub
                                  -- (i.e. common supertype) but they
                                  -- don't.
@@ -129,6 +130,8 @@ data TCError
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
+  | NotInFinTy Term Type   -- ^ Every member of a finite type must be less than the number of
+                           --   members of the type.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -267,12 +270,12 @@ check (TBin Add t1 t2) ty =
       at1 <- check t1 ty
       at2 <- check t2 ty
       return $ ATBin ty Add at1 at2
-    else error "checked add with non-numeric type" -- TODO: change this error
+    else throwError (NotNumTy ty)
 
 check (TNat x) (TyFin n) =
   if (x < n)
     then return $ ATNat x
-    else error "numeric literal >= finite type" -- TODO: change this error
+    else throwError (NotInFinTy (TNat x) (TyFin n))
 
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.

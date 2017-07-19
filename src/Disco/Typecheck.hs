@@ -260,6 +260,20 @@ check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
   return (ATCase ty bs')
 
+-- Need to add new cases due to finite types
+check (TBin Add t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty Add at1 at2
+    else error "checked add with non-numeric type" -- TODO: change this error
+
+check (TNat x) (TyFin n) =
+  if (x < n)
+    then return $ ATNat x
+    else error "numeric literal >= finite type" -- TODO: change this error
+
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.
 check t ty = do

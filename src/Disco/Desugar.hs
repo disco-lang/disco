@@ -151,6 +151,7 @@ desugarUOp Ceil   c = COp OCeil   [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core
+desugarBOp (TyFin n) _ Add c1 c2 = COp (OMAdd (TyFin n)) [c1, c2]
 desugarBOp _  _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
 desugarBOp _  _ Mul     c1 c2 = COp OMul [c1, c2]

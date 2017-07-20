@@ -61,7 +61,7 @@ data ATerm where
   ATListComp :: Type -> Bind AQuals ATerm -> ATerm
 
   -- | A natural number.
-  ATNat   :: Integer -> ATerm
+  ATNat   :: Type -> Integer -> ATerm
 
   -- | A nonnegative rational number (parsed and displayed as a
   --   decimal).
@@ -119,7 +119,7 @@ getType :: ATerm -> Type
 getType (ATVar ty _)      = ty
 getType ATUnit            = TyUnit
 getType (ATBool _)        = TyBool
-getType (ATNat _)         = TyN
+getType (ATNat ty _)      = ty
 getType (ATRat _)         = TyQP
 getType (ATAbs ty _)      = ty
 getType (ATApp ty _ _)    = ty

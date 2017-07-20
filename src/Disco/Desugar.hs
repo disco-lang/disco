@@ -108,7 +108,7 @@ desugarTerm (ATApp ty t1 t2) =
 desugarTerm (ATTup _ ts) = desugarTuples ts
 desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
-desugarTerm (ATNat n) = return $ CNum Fraction (n%1)
+desugarTerm (ATNat _ n) = return $ CNum Fraction (n%1)
 desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn _ op t) =
   desugarUOp op <$> desugarTerm t

@@ -132,6 +132,7 @@ data TCError
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
   | NotInFinTy Term Type   -- ^ Every member of a finite type must be less than the number of
                            --   members of the type.
+  | NotSubtractive Type
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -272,9 +273,37 @@ check (TBin Add t1 t2) ty =
       return $ ATBin ty Add at1 at2
     else throwError (NotNumTy ty)
 
+-- Checking multiplication is the same as addition
+-- (since it is repeated addition)
+check (TBin Mul t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty Mul at1 at2
+    else throwError (NotNumTy ty)
+
+{-
+-- Checking exponentiation is also the same as multiplication
+-- and addition (since it is repeated multiplication)
+check (TBin Exp t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty Exp at1 at2
+    else throwError (NotNumTy ty)
+-}
+
+check (TBin Sub t1 t2) ty = do
+  checkSubtractive ty
+  at1 <- check t1 ty
+  at2 <- check t2 ty
+  return $ ATBin ty Sub at1 at2
+
 check (TNat x) (TyFin n) =
   if (x < n)
-    then return $ ATNat x
+    then return $ ATNat (TyFin n) x
     else throwError (NotInFinTy (TNat x) (TyFin n))
 
   -- Finally, to check anything else, we can infer its type and then
@@ -376,6 +405,21 @@ numLub at1 at2 = do
   checkNumTy at1
   checkNumTy at2
   lub (getType at1) (getType at2)
+
+-- | Decide whether a type supports subtraction
+isSubtractive :: Type -> Bool
+isSubtractive TyZ       = True
+isSubtractive TyQ       = True
+isSubtractive (TyFin _) = True
+isSubtractive _         = False
+
+checkSubtractive :: Type -> TCM ()
+checkSubtractive ty =
+  if (isNumTy ty)
+    then case isSubtractive ty of
+      True  -> return ()
+      False -> throwError $ NotSubtractive ty
+  else throwError $ NotNumTy ty
 
 -- | Decide whether a type is finite.
 isFinite :: Type -> Bool
@@ -479,7 +523,7 @@ infer (TVar x)      = do
   -- A few trivial cases.
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
-infer (TNat n)      = return $ ATNat n
+infer (TNat n)      = return $ ATNat TyN n
 infer (TRat r)      = return $ ATRat r
 
 infer (TJuxt t t')   = do

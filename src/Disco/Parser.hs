@@ -762,7 +762,7 @@ parseAtomicType =
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Bool" <|> reserved "B")
-  <|> TyFin  <$> ((reserved "Fin" <|> reserved "ℤ" <|> reserved "Z") *> natural)
+  <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
@@ -775,6 +775,10 @@ parseAtomicType =
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> parens parseType
+
+parseTyFin :: Parser Type
+parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
+         <|> TyFin  <$> (lexeme (C.string "Z" <|> C.string "ℤ") *> natural)
 
 -- | Parse a type.
 parseType :: Parser Type

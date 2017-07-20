@@ -134,6 +134,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMAdd Type
         | OMMul Type
         | OMSub Type
+        | OMNeg Type
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

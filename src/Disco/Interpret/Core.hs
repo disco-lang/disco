@@ -456,9 +456,11 @@ whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
 whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
-whnfOp (OMAdd ty) = modArith (+) ty
-whnfOp (OMMul ty) = modArith (*) ty
-whnfOp (OMSub ty) = modArith (-) ty
+whnfOp (OMAdd ty) = modArithBin (+) ty
+whnfOp (OMMul ty) = modArithBin (*) ty
+whnfOp (OMSub ty) = modArithBin (-) ty
+whnfOp (OMNeg ty) = modArithUn negate ty
+
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -482,12 +484,20 @@ uNumOp f [c] = do
   return $ VNum d (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
-modArith :: (Rational -> Rational -> Rational) -> Type -> [Core] -> IM Value
-modArith op (TyFin n) [c1,c2] = do
+-- | For performing a modular unary operation within a finite type
+modArithUn :: (Rational -> Rational) -> Type -> [Core] -> IM Value
+modArithUn op (TyFin n) [c] = do
+  VNum _ r <- whnf c
+  modOp (op r) (n % 1)
+modArithUn _ _ _ = error "modArithUn error (either too many Cores or type other than TyFin)"
+
+-- | For performing a modular binary operation within a finite type.
+modArithBin :: (Rational -> Rational -> Rational) -> Type -> [Core] -> IM Value
+modArithBin op (TyFin n) [c1,c2] = do
   VNum _ r1 <- whnf c1
   VNum _ r2 <- whnf c2
   modOp (op r1 r2) (n % 1)
-modArith _ _ _ = error "Error in modArith (either too many Cores or type other than TyFin)"
+modArithBin _ _ _ = error "modArithBin error (either wrong # of Cores or type other than TyFin)"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value

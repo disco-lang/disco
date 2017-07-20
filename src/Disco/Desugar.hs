@@ -110,8 +110,8 @@ desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
 desugarTerm (ATNat _ n) = return $ CNum Fraction (n%1)
 desugarTerm (ATRat r) = return $ CNum Decimal r
-desugarTerm (ATUn _ op t) =
-  desugarUOp op <$> desugarTerm t
+desugarTerm (ATUn ty op t) =
+  desugarUOp ty op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) (getType t2) op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
@@ -140,14 +140,17 @@ desugarTuples [t]     = desugarTerm t
 desugarTuples (t:ts)  = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
 
 -- | Desugar a unary operator application.
-desugarUOp :: UOp -> Core -> Core
-desugarUOp Neg    c = COp ONeg    [c]
-desugarUOp Not    c = COp ONot    [c]
-desugarUOp Fact   c = COp OFact   [c]
-desugarUOp Sqrt   c = COp OSqrt   [c]
-desugarUOp Lg     c = COp OLg     [c]
-desugarUOp Floor  c = COp OFloor  [c]
-desugarUOp Ceil   c = COp OCeil   [c]
+desugarUOp :: Type -> UOp -> Core -> Core
+-- Special ops for modular arithmetic in finite types
+desugarUOp (TyFin n) Neg c = COp (OMNeg (TyFin n)) [c]
+
+desugarUOp _ Neg    c = COp ONeg    [c]
+desugarUOp _ Not    c = COp ONot    [c]
+desugarUOp _ Fact   c = COp OFact   [c]
+desugarUOp _ Sqrt   c = COp OSqrt   [c]
+desugarUOp _ Lg     c = COp OLg     [c]
+desugarUOp _ Floor  c = COp OFloor  [c]
+desugarUOp _ Ceil   c = COp OCeil   [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core

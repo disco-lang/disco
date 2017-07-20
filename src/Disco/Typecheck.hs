@@ -301,6 +301,11 @@ check (TBin Sub t1 t2) ty = do
   at2 <- check t2 ty
   return $ ATBin ty Sub at1 at2
 
+check (TUn Neg t) ty = do
+  checkSubtractive ty
+  at <- check t ty
+  return $ ATUn ty Neg at
+
 check (TNat x) (TyFin n) =
   if (x < n)
     then return $ ATNat (TyFin n) x

@@ -132,6 +132,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OCount
     -- Need some new operators for doing arithmetic with finite types
         | OMAdd Type
+        | OMMul Type
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

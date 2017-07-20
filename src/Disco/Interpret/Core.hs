@@ -458,6 +458,7 @@ whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
 whnfOp (OMAdd ty) = modArith (+) ty
 whnfOp (OMMul ty) = modArith (*) ty
+whnfOp (OMSub ty) = modArith (-) ty
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value

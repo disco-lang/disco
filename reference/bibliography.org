@@ -1,3 +1,9 @@
+* FP & discrete math
+** CS Report to the CUPM Curriculum Foundations Workshop in Physics and CS
+   https://www.cs.swarthmore.edu/~cfk/cupm2.pdf
+
+   Good summary of key concepts that students should see in discrete
+   math.  A good source of ideas for disco features and examples.
 * Why does mathematical convention deal so ineptly with multisets?
 
   Math stackexchange question with some good insights and interesting responses:

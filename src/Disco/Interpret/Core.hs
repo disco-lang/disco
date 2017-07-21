@@ -462,7 +462,6 @@ whnfOp (OMMul n) = modArithBin (*) n
 whnfOp (OMSub n) = modArithBin (-) n
 whnfOp (OMNeg n) = modArithUn negate n
 whnfOp (OMDiv n) = modDiv n
--- OMDiv -> a/b :: Zp -> modOp (a * (invertMod b)) (p % 1)
 -- OMExp -> a^b :: Zn -> powerMod a b n
 
 -- | Perform a numeric binary operation.
@@ -508,8 +507,8 @@ modDiv n [c1,c2] = do
   VNum _ a <- whnf c1
   VNum _ b <- whnf c2
   case invertMod (numerator b) n of
-    Just b' -> return $ vnum (a * (b' % 1))
-    Nothing -> error "invertMod returned `Nothing` in modDiv"
+    Just b' -> modOp (a * (b' % 1)) (n % 1)
+    Nothing -> throwError DivByZero
 modDiv _ _ = error "wrong # of cores in modDiv"
 
 -- | Perform a count on the number of values for the given type.

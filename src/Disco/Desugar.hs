@@ -142,7 +142,7 @@ desugarTuples (t:ts)  = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
 -- | Desugar a unary operator application.
 desugarUOp :: Type -> UOp -> Core -> Core
 -- Special ops for modular arithmetic in finite types
-desugarUOp (TyFin n) Neg c = COp (OMNeg (TyFin n)) [c]
+desugarUOp (TyFin n) Neg c = COp (OMNeg n) [c]
 
 desugarUOp _ Neg    c = COp ONeg    [c]
 desugarUOp _ Not    c = COp ONot    [c]
@@ -155,9 +155,9 @@ desugarUOp _ Ceil   c = COp OCeil   [c]
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core
 -- Special ops for modular arithmetic in finite types
-desugarBOp (TyFin n) _ Add c1 c2 = COp (OMAdd  (TyFin n)) [c1, c2]
-desugarBOp (TyFin n) _ Mul c1 c2 = COp (OMMul  (TyFin n)) [c1, c2]
-desugarBOp (TyFin n) _ Sub c1 c2 = COp (OMSub (TyFin n)) [c1, c2]
+desugarBOp (TyFin n) _ Add c1 c2 = COp (OMAdd n) [c1, c2]
+desugarBOp (TyFin n) _ Mul c1 c2 = COp (OMMul n) [c1, c2]
+desugarBOp (TyFin n) _ Sub c1 c2 = COp (OMSub n) [c1, c2]
 
 desugarBOp _  _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]

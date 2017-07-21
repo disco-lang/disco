@@ -131,10 +131,10 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OEnum
         | OCount
     -- Need some new operators for doing arithmetic with finite types
-        | OMAdd Type
-        | OMMul Type
-        | OMSub Type
-        | OMNeg Type
+        | OMAdd Integer
+        | OMMul Integer
+        | OMSub Integer
+        | OMNeg Integer
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

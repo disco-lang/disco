@@ -457,6 +457,7 @@ whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
 whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
+-- Modular operations, for finite types
 whnfOp (OMAdd n) = modArithBin (+) n
 whnfOp (OMMul n) = modArithBin (*) n
 whnfOp (OMSub n) = modArithBin (-) n
@@ -530,6 +531,7 @@ countOp' :: Type -> Integer
 countOp' TyVoid            = 0
 countOp' TyUnit            = 1
 countOp' TyBool            = 2
+countOp' (TyFin n)         = n
 countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
 countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
 countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
@@ -538,12 +540,12 @@ countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is i
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> IM Value
-enumOp [CType ty] = return $ (convert (enumerate ty))
+enumOp [CType ty] = return $ (enumOp' (enumerate ty))
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
-convert :: [Value] -> Value
-convert []       = VCons 0 []
-convert (x : xs) = VCons 1 [x, convert xs]
+enumOp' :: [Value] -> Value
+enumOp' []       = VCons 0 []
+enumOp' (x : xs) = VCons 1 [x, enumOp' xs]
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals

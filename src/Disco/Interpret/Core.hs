@@ -74,6 +74,7 @@ import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Math.NumberTheory.Logarithms       (integerLog2)
+import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
 import           Disco.AST.Core
 import           Disco.Types
@@ -460,7 +461,9 @@ whnfOp (OMAdd n) = modArithBin (+) n
 whnfOp (OMMul n) = modArithBin (*) n
 whnfOp (OMSub n) = modArithBin (-) n
 whnfOp (OMNeg n) = modArithUn negate n
-
+whnfOp (OMDiv n) = modDiv n
+-- OMDiv -> a/b :: Zp -> modOp (a * (invertMod b)) (p % 1)
+-- OMExp -> a^b :: Zn -> powerMod a b n
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -498,6 +501,16 @@ modArithBin op n [c1,c2] = do
   VNum _ r2 <- whnf c2
   modOp (op r1 r2) (n % 1)
 modArithBin _ _ _ = error "modArithBin error (wrong # of Cores)"
+
+-- | For performing modular division within a finite type.
+modDiv :: Integer -> [Core] -> IM Value
+modDiv n [c1,c2] = do
+  VNum _ a <- whnf c1
+  VNum _ b <- whnf c2
+  case invertMod (numerator b) n of
+    Just b' -> return $ vnum (a * (b' % 1))
+    Nothing -> error "invertMod returned `Nothing` in modDiv"
+modDiv _ _ = error "wrong # of cores in modDiv"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value

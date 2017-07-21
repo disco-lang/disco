@@ -78,6 +78,8 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
+import           Math.NumberTheory.Primes.Testing   (isPrime)
+
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
 --   function being defined.  For example, given the concrete syntax
@@ -133,6 +135,7 @@ data TCError
   | NotInFinTy Term Type   -- ^ Every member of a finite type must be less than the number of
                            --   members of the type.
   | NotSubtractive Type
+  | NotFractional Type
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -283,6 +286,12 @@ check (TBin Mul t1 t2) ty =
       return $ ATBin ty Mul at1 at2
     else throwError (NotNumTy ty)
 
+check (TBin Div t1 t2) ty = do
+  _ <- checkFractional ty
+  at1 <- check t1 ty
+  at2 <- check t2 ty
+  return $ ATBin ty Div at1 at2
+
 {-
 -- Checking exponentiation is also the same as multiplication
 -- and addition (since it is repeated multiplication)
@@ -293,16 +302,19 @@ check (TBin Exp t1 t2) ty =
       at2 <- check t2 ty
       return $ ATBin ty Exp at1 at2
     else throwError (NotNumTy ty)
+
+if a^b :: t, then a :: t, b :: Z (fractional t)
+else if a^b :: t, then a :: t, b :: N (non fractional t)
 -}
 
 check (TBin Sub t1 t2) ty = do
-  checkSubtractive ty
+  _ <- checkSubtractive ty
   at1 <- check t1 ty
   at2 <- check t2 ty
   return $ ATBin ty Sub at1 at2
 
 check (TUn Neg t) ty = do
-  checkSubtractive ty
+  _ <- checkSubtractive ty
   at <- check t ty
   return $ ATUn ty Neg at
 
@@ -411,6 +423,21 @@ numLub at1 at2 = do
   checkNumTy at2
   lub (getType at1) (getType at2)
 
+-- | Decide whether a type supports division
+isFractional :: Type -> Bool
+isFractional TyQ        = True
+isFractional TyQP       = True
+isFractional (TyFin n)  = isPrime n
+isFractional _          = False
+
+checkFractional :: Type -> TCM Type
+checkFractional ty =
+  if (isNumTy ty)
+    then case isFractional ty of
+      True  -> return ty
+      False -> throwError $ NotFractional ty
+    else throwError $ NotNumTy ty
+
 -- | Decide whether a type supports subtraction
 isSubtractive :: Type -> Bool
 isSubtractive TyZ       = True
@@ -418,11 +445,11 @@ isSubtractive TyQ       = True
 isSubtractive (TyFin _) = True
 isSubtractive _         = False
 
-checkSubtractive :: Type -> TCM ()
+checkSubtractive :: Type -> TCM Type
 checkSubtractive ty =
   if (isNumTy ty)
     then case isSubtractive ty of
-      True  -> return ()
+      True  -> return ty
       False -> throwError $ NotSubtractive ty
   else throwError $ NotNumTy ty
 
@@ -560,14 +587,15 @@ infer (TBin Sub t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   num3 <- numLub at1 at2
-  num4 <- lub num3 TyZ
+  num4 <- lub num3 TyZ <|> checkSubtractive num3
   return $ ATBin num4 Sub at1 at2
 
   -- Negation is similar to subtraction.
 infer (TUn Neg t) = do
   at <- infer t
   checkNumTy at
-  num2 <- lub (getType at) TyZ
+  let ty = getType at
+  num2 <- lub ty TyZ <|> checkSubtractive ty
   return $ ATUn num2 Neg at
 
 infer (TUn Sqrt t) = do
@@ -620,7 +648,7 @@ infer (TBin Exp t1 t2) = do
     -- For example, (-3)^(-5) has type Q (= lub Z Q+)
     -- but 3^(-5) has type Q+.
     TyZ -> do
-      res <- lub (getType at1) TyQP
+      res <- lub (getType at1) TyQP <|> checkFractional (getType at1)
       return $ ATBin res Exp at1 at2
     TyQ -> throwError ExpQ
     _   -> error "Impossible! getType at2 is not num type after checkNumTy"

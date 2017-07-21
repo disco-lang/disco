@@ -158,6 +158,8 @@ desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core
 desugarBOp (TyFin n) _ Add c1 c2 = COp (OMAdd n) [c1, c2]
 desugarBOp (TyFin n) _ Mul c1 c2 = COp (OMMul n) [c1, c2]
 desugarBOp (TyFin n) _ Sub c1 c2 = COp (OMSub n) [c1, c2]
+desugarBOp (TyFin n) _ Div c1 c2 = COp (OMDiv n) [c1, c2]
+desugarBOp (TyFin n) _ Exp c1 c2 = COp (OMExp n) [c1, c2]
 
 desugarBOp _  _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]

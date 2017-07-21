@@ -292,20 +292,15 @@ check (TBin Div t1 t2) ty = do
   at2 <- check t2 ty
   return $ ATBin ty Div at1 at2
 
-{-
--- Checking exponentiation is also the same as multiplication
--- and addition (since it is repeated multiplication)
 check (TBin Exp t1 t2) ty =
   if (isNumTy ty)
     then do
+      -- if a^b :: fractional t, then a :: t, b :: Z
+      -- else if a^b :: non-fractional t, then a :: t, b :: N
       at1 <- check t1 ty
-      at2 <- check t2 ty
+      at2 <- check t2 (if isFractional ty then TyZ else TyN)
       return $ ATBin ty Exp at1 at2
     else throwError (NotNumTy ty)
-
-if a^b :: t, then a :: t, b :: Z (fractional t)
-else if a^b :: t, then a :: t, b :: N (non fractional t)
--}
 
 check (TBin Sub t1 t2) ty = do
   _ <- checkSubtractive ty
@@ -623,7 +618,7 @@ infer (TBin Div t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   num3 <- numLub at1 at2
-  num4 <- lub num3 TyQP
+  num4 <- lub num3 TyQP <|> checkFractional num3
   return $ ATBin num4 Div at1 at2
 
  -- Very similar to division

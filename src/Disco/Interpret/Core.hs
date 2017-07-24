@@ -766,6 +766,8 @@ enumerate TyVoid           = []
 enumerate TyUnit           = [VCons 0 []]
 enumerate TyBool           = [VCons 0 [], VCons 1 []]
 
+enumerate (TyFin n)        = map enumTyFin [0..(n-1)]
+
 -- To enumerate a pair type, take the Cartesian product of enumerations.
 enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
 
@@ -796,6 +798,11 @@ enumerate (TyArr ty1 ty2)  = map mkFun (sequence (vs2 <$ vs1))
     fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
 
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
+
+-- Used for more effecient enumeration of finite types
+enumTyFin :: Integer -> Value
+enumTyFin n = VNum Fraction (n%1)
+enumTyFin _ = error "Impossible! `enumTyFin _`!"
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

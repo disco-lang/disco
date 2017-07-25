@@ -108,7 +108,7 @@ desugarTerm (ATApp ty t1 t2) =
 desugarTerm (ATTup _ ts) = desugarTuples ts
 desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
-desugarTerm (ATNat _ n) = return $ CNum Fraction (n%1)
+desugarTerm (ATNat ty n)  = desugarNat ty n
 desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn ty op t) =
   desugarUOp ty op <$> desugarTerm t
@@ -132,6 +132,13 @@ desugarTerm (ATLet _ t) =
 desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugarTerm (ATAscr t _) = desugarTerm t
 desugarTerm (ATSub _ t)  = desugarTerm t
+
+-- | Desugar a natural number. A separate function is needed in
+--   case the number is of a finite type, in which case we must
+--   mod it by its type.
+desugarNat :: Type -> Integer -> DSM Core
+desugarNat (TyFin n) x  = return $ CNum Fraction ((x `mod` n) % 1)
+desugarNat _ x          = return $ CNum Fraction (x % 1)
 
 -- | Desugar a tuple to nested pairs.
 desugarTuples :: [ATerm] -> DSM Core

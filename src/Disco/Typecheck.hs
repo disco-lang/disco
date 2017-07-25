@@ -132,8 +132,6 @@ data TCError
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
-  | NotInFinTy Term Type   -- ^ Every member of a finite type must be less than the number of
-                           --   members of the type.
   | NotSubtractive Type
   | NotFractional Type
   | NoError                -- ^ Not an error.  The identity of the
@@ -314,9 +312,7 @@ check (TUn Neg t) ty = do
   return $ ATUn ty Neg at
 
 check (TNat x) (TyFin n) =
-  if (x < n)
-    then return $ ATNat (TyFin n) x
-    else throwError (NotInFinTy (TNat x) (TyFin n))
+  return $ ATNat (TyFin n) x
 
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.

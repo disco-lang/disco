@@ -802,7 +802,6 @@ enumerate _ = []  -- other cases shouldn't happen if the program type checks
 -- Used for more effecient enumeration of finite types
 enumTyFin :: Integer -> Value
 enumTyFin n = VNum Fraction (n%1)
-enumTyFin _ = error "Impossible! `enumTyFin _`!"
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

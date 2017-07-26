@@ -433,7 +433,8 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool", "Nat", "Natural", "Int", "Integer", "Rational"
+  , "Void", "Unit", "Bool"
+  , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
   ]
 
@@ -761,6 +762,7 @@ parseAtomicType =
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Bool" <|> reserved "B")
+  <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
@@ -773,6 +775,10 @@ parseAtomicType =
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> parens parseType
+
+parseTyFin :: Parser Type
+parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
+         <|> TyFin  <$> (lexeme (C.string "Z" <|> C.string "ℤ") *> natural)
 
 -- | Parse a type.
 parseType :: Parser Type

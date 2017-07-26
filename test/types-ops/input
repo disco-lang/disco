@@ -7,3 +7,12 @@ enumerate (Bool -> Bool)
 enumerate (Bool * Bool + Bool)
 enumerate (Unit + Bool)
 enumerate (Void * Unit)
+count Z5
+count (Z5 * Z4)
+count (Z3 + Z6)
+count (Z3 -> Z2)
+count (Z3 + Z4 -> Z2)
+enumerate Z10
+enumerate (Z2 * Z3)
+enumerate (Z2 -> Z2)
+enumerate (Z3 + Z4)

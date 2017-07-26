@@ -74,6 +74,7 @@ import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Math.NumberTheory.Logarithms       (integerLog2)
+import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
 import           Disco.AST.Core
 import           Disco.Types
@@ -456,6 +457,13 @@ whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
 whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
+-- Modular operations, for finite types
+whnfOp (OMAdd n) = modArithBin (+) n
+whnfOp (OMMul n) = modArithBin (*) n
+whnfOp (OMSub n) = modArithBin (-) n
+whnfOp (OMNeg n) = modArithUn negate n
+whnfOp (OMDiv n) = modDiv n
+whnfOp (OMExp n) = modExp n
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
@@ -479,6 +487,41 @@ uNumOp f [c] = do
   return $ VNum d (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
+-- | For performing a modular unary operation within a finite type
+modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> IM Value
+modArithUn op n [c] = do
+  VNum _ r <- whnf c
+  modOp (op r) (n % 1)
+modArithUn _ _ _ = error "Impossible! modArithUn error (too many Cores)"
+
+-- | For performing a modular binary operation within a finite type.
+modArithBin :: (Rational -> Rational -> Rational) -> Integer -> [Core] -> IM Value
+modArithBin op n [c1,c2] = do
+  VNum _ r1 <- whnf c1
+  VNum _ r2 <- whnf c2
+  modOp (op r1 r2) (n % 1)
+modArithBin _ _ _ = error "Impossible! modArithBin error (wrong # of Cores)"
+
+-- | For performing modular division within a finite type.
+modDiv :: Integer -> [Core] -> IM Value
+modDiv n [c1,c2] = do
+  VNum _ a <- whnf c1
+  VNum _ b <- whnf c2
+  case invertMod (numerator b) n of
+    Just b' -> modOp (a * (b' % 1)) (n % 1)
+    Nothing -> throwError DivByZero
+modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
+
+-- | For performing modular exponentiation within a finite type.
+modExp :: Integer -> [Core] -> IM Value
+modExp n [c1,c2] = do
+  VNum _ r1 <- whnf c1
+  VNum _ r2 <- whnf c2
+  let a = numerator r1
+  let b = numerator r2
+  return $ vnum ((powerModInteger a b n) % 1)
+modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
+
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> IM Value
 countOp [CType ty]  = return $ vnum ((countOp' ty) % 1)
@@ -488,6 +531,7 @@ countOp' :: Type -> Integer
 countOp' TyVoid            = 0
 countOp' TyUnit            = 1
 countOp' TyBool            = 2
+countOp' (TyFin n)         = n
 countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
 countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
 countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
@@ -496,12 +540,12 @@ countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is i
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> IM Value
-enumOp [CType ty] = return $ (convert (enumerate ty))
+enumOp [CType ty] = return $ (enumOp' (enumerate ty))
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
-convert :: [Value] -> Value
-convert []       = VCons 0 []
-convert (x : xs) = VCons 1 [x, convert xs]
+enumOp' :: [Value] -> Value
+enumOp' []       = VCons 0 []
+enumOp' (x : xs) = VCons 1 [x, enumOp' xs]
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
@@ -722,6 +766,8 @@ enumerate TyVoid           = []
 enumerate TyUnit           = [VCons 0 []]
 enumerate TyBool           = [VCons 0 [], VCons 1 []]
 
+enumerate (TyFin n)        = map enumTyFin [0..(n-1)]
+
 -- To enumerate a pair type, take the Cartesian product of enumerations.
 enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
 
@@ -752,6 +798,10 @@ enumerate (TyArr ty1 ty2)  = map mkFun (sequence (vs2 <$ vs1))
     fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
 
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
+
+-- Used for more effecient enumeration of finite types
+enumTyFin :: Integer -> Value
+enumTyFin n = VNum Fraction (n%1)
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

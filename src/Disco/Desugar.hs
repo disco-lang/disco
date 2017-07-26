@@ -108,10 +108,10 @@ desugarTerm (ATApp ty t1 t2) =
 desugarTerm (ATTup _ ts) = desugarTuples ts
 desugarTerm (ATInj _ s t) =
   CCons (fromEnum s) <$> mapM desugarTerm [t]
-desugarTerm (ATNat n) = return $ CNum Fraction (n%1)
+desugarTerm (ATNat ty n)  = desugarNat ty n
 desugarTerm (ATRat r) = return $ CNum Decimal r
-desugarTerm (ATUn _ op t) =
-  desugarUOp op <$> desugarTerm t
+desugarTerm (ATUn ty op t) =
+  desugarUOp ty op <$> desugarTerm t
 desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) (getType t2) op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
@@ -133,6 +133,13 @@ desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugarTerm (ATAscr t _) = desugarTerm t
 desugarTerm (ATSub _ t)  = desugarTerm t
 
+-- | Desugar a natural number. A separate function is needed in
+--   case the number is of a finite type, in which case we must
+--   mod it by its type.
+desugarNat :: Type -> Integer -> DSM Core
+desugarNat (TyFin n) x  = return $ CNum Fraction ((x `mod` n) % 1)
+desugarNat _ x          = return $ CNum Fraction (x % 1)
+
 -- | Desugar a tuple to nested pairs.
 desugarTuples :: [ATerm] -> DSM Core
 desugarTuples []      = error "Impossible! desugarTuples []"
@@ -140,17 +147,27 @@ desugarTuples [t]     = desugarTerm t
 desugarTuples (t:ts)  = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
 
 -- | Desugar a unary operator application.
-desugarUOp :: UOp -> Core -> Core
-desugarUOp Neg    c = COp ONeg    [c]
-desugarUOp Not    c = COp ONot    [c]
-desugarUOp Fact   c = COp OFact   [c]
-desugarUOp Sqrt   c = COp OSqrt   [c]
-desugarUOp Lg     c = COp OLg     [c]
-desugarUOp Floor  c = COp OFloor  [c]
-desugarUOp Ceil   c = COp OCeil   [c]
+desugarUOp :: Type -> UOp -> Core -> Core
+-- Special ops for modular arithmetic in finite types
+desugarUOp (TyFin n) Neg c = COp (OMNeg n) [c]
+
+desugarUOp _ Neg    c = COp ONeg    [c]
+desugarUOp _ Not    c = COp ONot    [c]
+desugarUOp _ Fact   c = COp OFact   [c]
+desugarUOp _ Sqrt   c = COp OSqrt   [c]
+desugarUOp _ Lg     c = COp OLg     [c]
+desugarUOp _ Floor  c = COp OFloor  [c]
+desugarUOp _ Ceil   c = COp OCeil   [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core
+-- Special ops for modular arithmetic in finite types
+desugarBOp (TyFin n) _ Add c1 c2 = COp (OMAdd n) [c1, c2]
+desugarBOp (TyFin n) _ Mul c1 c2 = COp (OMMul n) [c1, c2]
+desugarBOp (TyFin n) _ Sub c1 c2 = COp (OMSub n) [c1, c2]
+desugarBOp (TyFin n) _ Div c1 c2 = COp (OMDiv n) [c1, c2]
+desugarBOp (TyFin n) _ Exp c1 c2 = COp (OMExp n) [c1, c2]
+
 desugarBOp _  _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
 desugarBOp _  _ Mul     c1 c2 = COp OMul [c1, c2]

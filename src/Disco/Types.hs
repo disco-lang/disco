@@ -69,6 +69,10 @@ data Type where
   -- | Rationals
   TyQ      :: Type
 
+  -- | Finite type, single argument is a natural number
+  --   defining the exact number of inhabitants.
+  TyFin    :: Integer -> Type
+
   -- | Lists
   TyList   :: Type -> Type
 
@@ -76,7 +80,8 @@ data Type where
 
 -- | Check whether a type is a numeric type (N, Z, or Q).
 isNumTy :: Type -> Bool
-isNumTy ty = ty `elem` [TyN, TyZ, TyQP, TyQ]
+isNumTy (TyFin _) = True
+isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
 
 -- | Strictness of a function application or let-expression.
 data Strictness = Strict | Lazy
@@ -95,4 +100,3 @@ unpair ty               = [ty]
 
 instance Alpha Type
 instance Alpha Strictness
-

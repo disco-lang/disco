@@ -130,6 +130,13 @@ data Op = OAdd     -- ^ Addition (@+@)
                    --   ordering relation.
         | OEnum
         | OCount
+    -- Need some new operators for doing arithmetic with finite types
+        | OMAdd Integer
+        | OMMul Integer
+        | OMSub Integer
+        | OMNeg Integer
+        | OMDiv Integer
+        | OMExp Integer
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

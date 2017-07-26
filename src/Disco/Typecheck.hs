@@ -78,6 +78,8 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
+import           Math.NumberTheory.Primes.Testing   (isPrime)
+
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
 --   function being defined.  For example, given the concrete syntax
@@ -106,6 +108,7 @@ data TCError
   | CantInfer Term         -- ^ We were asked to infer the type of the
                            --   term, but its type cannot be inferred
   | NotNum ATerm           -- ^ The term is expected to have a numeric type but it doesn't
+  | NotNumTy Type          -- ^ The type should be numeric, but is not.
   | IncompatibleTypes Type Type  -- ^ The types should have a lub
                                  -- (i.e. common supertype) but they
                                  -- don't.
@@ -129,6 +132,8 @@ data TCError
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
+  | NotSubtractive Type
+  | NotFractional Type
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -260,6 +265,55 @@ check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
   return (ATCase ty bs')
 
+-- Need to add new cases due to finite types
+check (TBin Add t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty Add at1 at2
+    else throwError (NotNumTy ty)
+
+-- Checking multiplication is the same as addition
+-- (since it is repeated addition)
+check (TBin Mul t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty Mul at1 at2
+    else throwError (NotNumTy ty)
+
+check (TBin Div t1 t2) ty = do
+  _ <- checkFractional ty
+  at1 <- check t1 ty
+  at2 <- check t2 ty
+  return $ ATBin ty Div at1 at2
+
+check (TBin Exp t1 t2) ty =
+  if (isNumTy ty)
+    then do
+      -- if a^b :: fractional t, then a :: t, b :: Z
+      -- else if a^b :: non-fractional t, then a :: t, b :: N
+      at1 <- check t1 ty
+      at2 <- check t2 (if isFractional ty then TyZ else TyN)
+      return $ ATBin ty Exp at1 at2
+    else throwError (NotNumTy ty)
+
+check (TBin Sub t1 t2) ty = do
+  _ <- checkSubtractive ty
+  at1 <- check t1 ty
+  at2 <- check t2 ty
+  return $ ATBin ty Sub at1 at2
+
+check (TUn Neg t) ty = do
+  _ <- checkSubtractive ty
+  at <- check t ty
+  return $ ATUn ty Neg at
+
+check (TNat x) (TyFin n) =
+  return $ ATNat (TyFin n) x
+
   -- Finally, to check anything else, we can infer its type and then
   -- check that the inferred type is a subtype of the given type.
 check t ty = do
@@ -360,11 +414,42 @@ numLub at1 at2 = do
   checkNumTy at2
   lub (getType at1) (getType at2)
 
+-- | Decide whether a type supports division
+isFractional :: Type -> Bool
+isFractional TyQ        = True
+isFractional TyQP       = True
+isFractional (TyFin n)  = isPrime n
+isFractional _          = False
+
+checkFractional :: Type -> TCM Type
+checkFractional ty =
+  if (isNumTy ty)
+    then case isFractional ty of
+      True  -> return ty
+      False -> throwError $ NotFractional ty
+    else throwError $ NotNumTy ty
+
+-- | Decide whether a type supports subtraction
+isSubtractive :: Type -> Bool
+isSubtractive TyZ       = True
+isSubtractive TyQ       = True
+isSubtractive (TyFin _) = True
+isSubtractive _         = False
+
+checkSubtractive :: Type -> TCM Type
+checkSubtractive ty =
+  if (isNumTy ty)
+    then case isSubtractive ty of
+      True  -> return ty
+      False -> throwError $ NotSubtractive ty
+  else throwError $ NotNumTy ty
+
 -- | Decide whether a type is finite.
 isFinite :: Type -> Bool
-isFinite TyVoid = True
-isFinite TyUnit = True
-isFinite TyBool = True
+isFinite TyVoid     = True
+isFinite TyUnit     = True
+isFinite TyBool     = True
+isFinite (TyFin _)  = True
 isFinite (TyPair ty1 ty2) = isFinite ty1 && isFinite ty2
 isFinite (TySum ty1 ty2)  = isFinite ty1 && isFinite ty2
 isFinite (TyArr ty1 ty2)  = isFinite ty1 && isFinite ty2
@@ -379,13 +464,14 @@ checkFinite ty
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
 isDecidable (TyVar _) = error "isDecidable TyVar"
-isDecidable TyVoid = True
-isDecidable TyUnit = True
-isDecidable TyBool = True
-isDecidable TyN    = True
-isDecidable TyZ    = True
-isDecidable TyQP   = True
-isDecidable TyQ    = True
+isDecidable TyVoid    = True
+isDecidable TyUnit    = True
+isDecidable TyBool    = True
+isDecidable TyN       = True
+isDecidable TyZ       = True
+isDecidable TyQP      = True
+isDecidable TyQ       = True
+isDecidable (TyFin _) = True
 isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
 isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
@@ -401,13 +487,14 @@ checkDecidable ty
 -- | Check whether the given type has a total order.
 isOrdered :: Type -> Bool
 isOrdered (TyVar _) = error "isOrdered TyVar"
-isOrdered TyVoid = True
-isOrdered TyUnit = True
-isOrdered TyBool = True
-isOrdered TyN    = True
-isOrdered TyZ    = True
-isOrdered TyQP   = True
-isOrdered TyQ    = True
+isOrdered TyVoid    = True
+isOrdered TyUnit    = True
+isOrdered TyBool    = True
+isOrdered TyN       = True
+isOrdered TyZ       = True
+isOrdered TyQP      = True
+isOrdered TyQ       = True
+isOrdered (TyFin _) = True
 isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
 isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2
@@ -459,7 +546,7 @@ infer (TVar x)      = do
   -- A few trivial cases.
 infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
-infer (TNat n)      = return $ ATNat n
+infer (TNat n)      = return $ ATNat TyN n
 infer (TRat r)      = return $ ATRat r
 
 infer (TJuxt t t')   = do
@@ -491,14 +578,15 @@ infer (TBin Sub t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   num3 <- numLub at1 at2
-  num4 <- lub num3 TyZ
+  num4 <- lub num3 TyZ <|> checkSubtractive num3
   return $ ATBin num4 Sub at1 at2
 
   -- Negation is similar to subtraction.
 infer (TUn Neg t) = do
   at <- infer t
   checkNumTy at
-  num2 <- lub (getType at) TyZ
+  let ty = getType at
+  num2 <- lub ty TyZ <|> checkSubtractive ty
   return $ ATUn num2 Neg at
 
 infer (TUn Sqrt t) = do
@@ -526,7 +614,7 @@ infer (TBin Div t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   num3 <- numLub at1 at2
-  num4 <- lub num3 TyQP
+  num4 <- lub num3 TyQP <|> checkFractional num3
   return $ ATBin num4 Div at1 at2
 
  -- Very similar to division
@@ -551,7 +639,7 @@ infer (TBin Exp t1 t2) = do
     -- For example, (-3)^(-5) has type Q (= lub Z Q+)
     -- but 3^(-5) has type Q+.
     TyZ -> do
-      res <- lub (getType at1) TyQP
+      res <- lub (getType at1) TyQP <|> checkFractional (getType at1)
       return $ ATBin res Exp at1 at2
     TyQ -> throwError ExpQ
     _   -> error "Impossible! getType at2 is not num type after checkNumTy"

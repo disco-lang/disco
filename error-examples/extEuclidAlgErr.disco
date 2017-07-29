@@ -1,0 +1,13 @@
+-- Running this code gives the following error:
+-- Juxtaposition 
+-- (ATVar (TyArr (TyPair TyN TyN) (TyArr (TyPair TyN TyN) TyN)) inverse) 
+-- (TTup [TVar newt,TBin Sub (TVar t) (TBin Mul (TVar q) (TVar newt))])
+
+
+-- Implemented using Extended Euclidean Algorithm (reference:
+-- https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Computing_multiplicative_inverses_in_modular_structures)
+inverse : (N * N) -> (N * N) -> N
+inverse (t,newt) (r,newr) = 
+	let q = r // newr
+	in { t						if newr=0
+	   { inverse (newt, t-q*newt) (newr,r-q*newr)	otherwise

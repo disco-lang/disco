@@ -1,0 +1,24 @@
+-- Loading this program from the Disco REPL gives the following error:
+
+-- `Juxtaposition 
+--  (ATApp (TyArr TyN (TyArr TyN TyN)) (ATVar (TyArr TyN (TyArr TyN (TyArr TyN TyN))) modPower) 
+--  (ATBin TyN Exp (ATVar TyN n) (ATNat TyN 2))) (TBin Div (TVar p) (TNat 2))`
+
+-- The error is fixed by changing each of `(p/2)` and `((p-1)/2)` to `(p//2)`
+
+
+-- modPower : n -> power -> modulus -> nat
+-- Exponentiating by squaring algorithm reference:
+-- https://simple.wikipedia.org/wiki/Exponentiation_by_squaring
+modPower : Nat -> Nat -> Nat -> Nat
+modPower n p m = 
+	{ 1						if p=0
+	{ n % m						if p=1
+	{ (modPower (n^2) (p/2) m) % m			if (even p)
+	{ (n * (modPower (n^2) ((p-1)/2) m)) % m	if (p>2) && (odd p)
+
+even : Z -> B
+even x = 2 divides x
+
+odd : Z -> B
+odd x = ¬(2 divides x)

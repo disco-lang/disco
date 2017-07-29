@@ -1,0 +1,5 @@
+abs : Z -> N
+abs x =
+  { abs (-x)      if x < 0
+  { 0             when x is 0
+  { 1 + abs (x-1) otherwise

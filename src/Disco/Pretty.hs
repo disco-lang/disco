@@ -3,19 +3,20 @@
 
 module Disco.Pretty where
 
-import           Control.Applicative     hiding (empty)
+import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
-import           Data.Char               (toLower, isAlpha)
+import           Data.Char                        (isAlpha, toLower)
+import qualified Data.Map                         as M
 import           Data.Ratio
-import qualified Data.Map                as M
 
-import qualified Text.PrettyPrint        as PP
-import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind, runLFreshM,
-                                          unembed, unrebind)
+import qualified Text.PrettyPrint                 as PP
+import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind,
+                                                   runLFreshM, unembed,
+                                                   unrebind)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Interpret.Core    (Value(..))
+import           Disco.Interpret.Core             (Value (..))
 import           Disco.Types
 
 
@@ -182,7 +183,7 @@ prettyTerm (TLet bnd) = mparens initPA $
     , text "in"
     , prettyTerm' 0 InL t2
     ]
-prettyTerm (TCase b)    = nest 2 (prettyBranches b)
+prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
@@ -214,11 +215,15 @@ prettyBOp op =
     _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 prettyBranches :: [Branch] -> Doc
-prettyBranches [] = error "Empty branches are disallowed."
-prettyBranches bs = foldr ($+$) empty (map prettyBranch bs)
+prettyBranches []     = error "Empty branches are disallowed."
+prettyBranches (b:bs) =
+  prettyBranch False b
+  $+$
+  foldr ($+$) empty (map (prettyBranch True) bs)
 
-prettyBranch :: Branch -> Doc
-prettyBranch br = lunbind br $ (\(gs,t) -> text "{" <+> prettyTerm t <+> prettyGuards gs)
+prettyBranch :: Bool -> Branch -> Doc
+prettyBranch com br = lunbind br $ \(gs,t) ->
+  (if com then (text "," <+>) else id) (prettyTerm t <+> prettyGuards gs)
 
 guardList :: Guards -> [Guard]
 guardList GEmpty = []

@@ -6,14 +6,14 @@
 !!!   fib 12 = 144
 fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
-  { n when
-  {     n
-  {       is 0 {- a comment -}   -- note how a single branch can be
-                                 -- broken across multiple lines starting
-                                 -- with {
-  { n                  when {- another comment -} n is 1  -- comment
-  { fib m + fib (m+1)  when n is S (S m)
+  {? n when
+        n
+          is 0 {- a comment -}   -- note how a single branch can be
+                                 -- broken across multiple lines
+  ,  n                  when {- another comment -} n is 1  -- comment
+  ,  fib m + fib (m+1)  when n is S (S m)
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise
     -- since that doesn't pass the type checker: it doesn't believe
     -- that (n-1) and (n-2) are natural numbers.
+  ?}

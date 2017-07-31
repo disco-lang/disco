@@ -1,10 +1,7 @@
 take : ℕ → List Q → List Q
-take n l =
-  { []               when n is 0
-  { []               when l is []
-
-  { x :: take n' xs  when l is x::xs
-                     when n is S n'
+take 0 _  = []
+take _ [] = []
+take (S n') (x :: xs) = x :: take n' xs
 
 repeat : Q → List Q
 repeat x = x :: repeat x

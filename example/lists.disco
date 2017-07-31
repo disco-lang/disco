@@ -6,9 +6,8 @@
 !!!   foldr (x -> y -> x + y) 0 [] = 0
 
 foldr : (ℕ → ℚ → ℚ) → ℚ → List ℕ → ℚ
-foldr f z l =
-  { z                   when l is []
-  { f x (foldr f z xs)  when l is x::xs
+foldr f z []      = z
+foldr f z (x::xs) = f x (foldr f z xs)
 
 ||| Append two lists into a single list.
 
@@ -17,23 +16,20 @@ foldr f z l =
 !!!   append ([1,2,3],[4,5,6]) = [1,2,3,4,5,6]
 
 append : List ℕ × List ℕ → List ℕ
-append (xs, ys) =
-  { ys                   when xs is []
-  { x :: append(xs',ys)  when xs is x :: xs'
+append ([]    , ys) = ys
+append (x::xs', ys) = x :: append(xs',ys)
 
 ||| Flatten a list of lists into a single list.
 
 !!!   concat [[1,2],[3],[],[4,5,6]] = [1,2,3,4,5,6]
 
 concat : List List ℕ → List ℕ
-concat lls =
-  { []                    when lls is []
-  { append(l, concat ls)  when lls is (l :: ls)
+concat []      = []
+concat (l::ls) = append(l, concat ls)
 
 map : (ℤ → Bool) → List ℤ → List Bool
-map f l =
-  { []               when l is []
-  { f x :: map f xs  when l is x :: xs
+map f []      = []
+map f (x::xs) = f x :: map f xs
 
 ||| Take the first n elements of a list.
 !!!   take 1 [true, false, true] = [true]

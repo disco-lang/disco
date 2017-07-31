@@ -65,20 +65,20 @@ module Disco.Parser
 import           Unbound.Generics.LocallyNameless (Name, bind, embed, rebind,
                                                    string2Name)
 
-import           Text.Megaparsec         hiding (runParser)
-import qualified Text.Megaparsec         as MP
-import qualified Text.Megaparsec.Char    as C
+import           Text.Megaparsec                  hiding (runParser)
+import qualified Text.Megaparsec                  as MP
+import qualified Text.Megaparsec.Char             as C
 import           Text.Megaparsec.Expr
-import qualified Text.Megaparsec.Lexer   as L
-import qualified Text.Megaparsec.String  as MP
+import qualified Text.Megaparsec.Lexer            as L
+import qualified Text.Megaparsec.String           as MP
 
-import           Control.Applicative     (many, (<|>))
-import           Control.Lens            hiding (op)
+import           Control.Applicative              (many, (<|>))
+import           Control.Lens                     hiding (op)
 import           Control.Monad.State
-import           Data.Char               (isDigit, isSpace)
-import           Data.Either             (isRight)
-import qualified Data.Map                as M
-import           Data.Maybe              (catMaybes)
+import           Data.Char                        (isDigit, isSpace)
+import           Data.Either                      (isRight)
+import qualified Data.Map                         as M
+import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
 import           Text.Printf
 
@@ -656,14 +656,8 @@ parseLet =
 
 -- | Parse a case expression.
 parseCase :: Parser Term
-parseCase = do
-  open "{"
-  whitespace
-  open ""
-  c <- TCase <$> parseBranch `sepBy` sep
-  close
-  close
-  return c
+parseCase = between (symbol "{?") (symbol "?}") $
+  TCase <$> parseBranch `sepBy` comma
 
 -- | Parse one branch of a case expression.
 parseBranch :: Parser Branch

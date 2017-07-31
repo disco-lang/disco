@@ -5,3 +5,13 @@ zipWithN : (N -> N -> N) -> List N -> List N -> List N
 zipWithN _ []        _         = []
 zipWithN _ _         []        = []
 zipWithN f (m :: ms) (n :: ns) = f m n :: zipWithN f ms ns
+
+-- Another example of a function defined by pattern-matching
+-- clauses. This one has the feature that it has the same name (ys) in
+-- two of the clauses, which was causing problems for the way we
+-- handle name resolution (the implementation of 'lunbinds' in
+-- Desugar.desugarDefn was wrong).
+
+append : List ℕ × List ℕ → List ℕ
+append ([]    , ys) = ys
+append (x::xs', ys) = x :: append(xs',ys)

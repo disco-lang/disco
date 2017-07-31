@@ -1,0 +1,10 @@
+:type floor 0
+:type floor (1/2)
+:type floor (-1)
+:type floor (-1/2)
+:type floor (2 : Z7)
+:type abs 0
+:type abs (1/2)
+:type abs (-1)
+:type abs (-1/2)
+:type abs (2 : Z7)

@@ -1,0 +1,10 @@
+floor 0 : ℕ
+floor (1 / 2) : ℕ
+floor -1 : ℤ
+floor (-1 / 2) : ℤ
+floor (2 : ℤ7) : ℤ7
+abs 0 : ℕ
+abs (1 / 2) : ℚ⁺
+abs -1 : ℕ
+abs (-1 / 2) : ℚ⁺
+abs (2 : ℤ7) : ℤ7

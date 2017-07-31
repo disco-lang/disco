@@ -11,7 +11,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 7.10.2, GHC == 8.0.1, GHC == 8.2.1
+tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
 
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      -- The custom build script also adds all the test files

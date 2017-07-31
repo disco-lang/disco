@@ -1,24 +1,25 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-import           Control.Lens             (makeLenses, use, (%=), (.=))
+import           Control.Lens                     (makeLenses, use, (%=), (.=))
 import           Control.Monad.State
-import           Data.Char                (isSpace)
+import           Data.Char                        (isSpace)
 import           Data.Coerce
-import           Data.List                (find, isPrefixOf)
-import qualified Data.Map                 as M
-import           Data.Maybe               (isJust)
+import           Data.List                        (find, isPrefixOf)
+import qualified Data.Map                         as M
+import           Data.Maybe                       (isJust)
 
-import qualified Options.Applicative      as O
+import qualified Options.Applicative              as O
 import           System.Console.Haskeline
-import           Text.Megaparsec          hiding (runParser)
+import           System.Exit
+import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core     (Value (..), rnf, runIM')
+import           Disco.Interpret.Core             (Value (..), rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck
@@ -119,7 +120,7 @@ handleCMD s =
     handleLine (Parse t)     = io.print $ t
     handleLine (Pretty t)    = io.putStrLn $ renderDoc (prettyTerm t)
     handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
-    handleLine (Load file)   = handleLoad file
+    handleLine (Load file)   = handleLoad file >> return ()
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = io.putStrLn $ "Help!"
@@ -147,35 +148,36 @@ handleDesugar t = do
     Left err -> return.show $ err
     Right at -> return.show.runDSM.desugarTerm $ at
 
-handleLoad :: FilePath -> REPLStateIO ()
-handleLoad file = handle (fileNotFound file) $ do
+handleLoad :: FilePath -> REPLStateIO Bool
+handleLoad file = handle (\e -> fileNotFound file e >> return False) $ do
   io . putStrLn $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left err -> io $ putStrLn (parseErrorPretty err)
+    Left err -> io $ putStrLn (parseErrorPretty err) >> return False
     Right p  ->
       case runTCM (checkModule p) of
-        Left tcErr         -> io $ print tcErr   -- XXX pretty-print
+        Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           replDefns .= cdefns
           replDocs  .= docMap
           replCtx   .= ctx
-          runAllTests aprops
+          t <- runAllTests aprops
           io . putStrLn $ "Loaded."
+          return t
 
-runAllTests :: M.Map (Name ATerm) [AProperty] -> REPLStateIO ()
+runAllTests :: M.Map (Name ATerm) [AProperty] -> REPLStateIO Bool
 runAllTests aprops
-  | M.null aprops = return ()
+  | M.null aprops = return True
   | otherwise     = do
       io $ putStrLn "Running tests..."
-      mapM_ runTests (M.assocs aprops)
+      and <$> mapM runTests (M.assocs aprops)
 
-runTests :: (Name ATerm, [AProperty]) -> REPLStateIO ()
+runTests :: (Name ATerm, [AProperty]) -> REPLStateIO Bool
 runTests (n, props) =
   case props of
-    [] -> return ()
+    [] -> return True
     _  -> do
       io $ putStr ("  " ++ name2String n ++ ": ")
       bs <- mapM runTest props
@@ -183,6 +185,7 @@ runTests (n, props) =
         True  -> io $ putStrLn "OK"
         False -> io $ putStrLn "One or more tests failed."
           -- XXX Get more informative test results.  If test fails
+      return (and bs)
           -- pretty-print the expression that failed.  In addition, if
           -- test term looks like an equality test, report expected
           -- and actual values.
@@ -235,8 +238,9 @@ banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
 
 data DiscoOpts = DiscoOpts
-  { evaluate :: Maybe String
-  , cmdFile  :: Maybe String
+  { evaluate  :: Maybe String
+  , cmdFile   :: Maybe String
+  , checkFile :: Maybe String
   }
 
 discoOpts :: O.Parser DiscoOpts
@@ -257,6 +261,13 @@ discoOpts = DiscoOpts
           , O.metavar "FILE"
           ])
       )
+  <*> optional (
+        O.strOption (mconcat
+          [ O.long "check"
+          , O.help "check a file without starting the interactive REPL"
+          , O.metavar "FILE"
+          ])
+      )
 
 discoInfo :: O.ParserInfo DiscoOpts
 discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
@@ -266,17 +277,22 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   ]
 
 fileNotFound :: FilePath -> IOException -> REPLStateIO ()
-fileNotFound file _ = liftIO . putStrLn $ "File not found: " ++ file
+fileNotFound file _ = io . putStrLn $ "File not found: " ++ file
 
 main :: IO ()
 main = do
   opts <- O.execParser discoInfo
 
-  let batch = any isJust [evaluate opts, cmdFile opts]
+  let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
   flip evalStateT initREPLState $ do
+    case checkFile opts of
+      Just file -> do
+        res <- handleLoad file
+        io $ if res then exitSuccess else exitFailure
+      Nothing   -> return ()
     case cmdFile opts of
       Just file -> handle (fileNotFound file) $ do
         cmds <- io $ readFile file
@@ -296,6 +312,6 @@ main = do
         Nothing -> return ()
         Just input
           | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
-              liftIO $ putStrLn "Goodbye!"
+              io $ putStrLn "Goodbye!"
               return ()
           | otherwise -> (lift.handleCMD $ input) >> loop

@@ -33,8 +33,8 @@ module Disco.Desugar
 
 import           Control.Monad.Cont
 
-import           Data.Ratio
 import           Data.Coerce
+import           Data.Ratio
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
@@ -158,6 +158,7 @@ desugarUOp _ Sqrt   c = COp OSqrt   [c]
 desugarUOp _ Lg     c = COp OLg     [c]
 desugarUOp _ Floor  c = COp OFloor  [c]
 desugarUOp _ Ceil   c = COp OCeil   [c]
+desugarUOp _ Abs    c = COp OAbs    [c]
 
 -- | Desugar a binary operator application.
 desugarBOp :: Type -> Type -> BOp -> Core -> Core -> Core

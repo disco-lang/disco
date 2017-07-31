@@ -40,8 +40,8 @@ module Disco.AST.Surface
        )
        where
 
-import qualified Data.Map                as M
-import           GHC.Generics (Generic)
+import qualified Data.Map                         as M
+import           GHC.Generics                     (Generic)
 
 import           Unbound.Generics.LocallyNameless
 
@@ -107,6 +107,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Lg    -- ^ Floor of base-2 logarithm (@lg@)
          | Floor -- ^ Floor of fractional type (@floor@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
+         | Abs   -- ^ Absolute value (@abs@)
   deriving (Show, Eq, Ord, Generic)
 
 -- | Binary operators.
@@ -182,6 +183,7 @@ opTable =
     ]
   , [ uopInfo Pre  Floor   ["floor"]
     , uopInfo Pre  Ceil    ["ceiling"]
+    , uopInfo Pre  Abs     ["abs"]
     ]
   , [ bopInfo In   Choose   ["choose"]
     ]

@@ -59,17 +59,18 @@ module Disco.Typecheck
        )
        where
 
-import           Prelude                 hiding (lookup)
+import           Prelude                                 hiding (lookup)
 
-import           Control.Applicative     ((<|>))
-import           Control.Arrow           ((&&&))
-import           Control.Lens            ((%~), (&), _1, _2)
+import           Control.Applicative                     ((<|>))
+import           Control.Arrow                           ((&&&))
+import           Control.Lens                            ((%~), (&), _1, _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
 import           Data.Coerce
-import           Data.List               (group, partition, sort)
-import qualified Data.Map                as M
+import           Data.List                               (group, partition,
+                                                          sort)
+import qualified Data.Map                                as M
 
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -78,7 +79,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Types
 
-import           Math.NumberTheory.Primes.Testing   (isPrime)
+import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
@@ -527,12 +528,21 @@ checkNumTy at =
      then return ()
      else throwError (NotNum at)
 
+-- | Convert a numeric type to its greatest subtype that does not
+--   support division.  In particular this is used for the typing rule
+--   of the floor and ceiling functions.
 integralizeTy :: Type -> Type
-integralizeTy TyN   = TyN
-integralizeTy TyZ   = TyZ
 integralizeTy TyQ   = TyZ
 integralizeTy TyQP  = TyN
-integralizeTy t     = error $ "Called integralizeTy on " ++ show t
+integralizeTy t     = t
+
+-- | Convert a numeric type to its greatest subtype that does not
+--   support subtraction.  In particular this is used for the typing
+--   rule of the absolute value function.
+positivizeTy :: Type -> Type
+positivizeTy TyZ  = TyN
+positivizeTy TyQ  = TyQP
+positivizeTy t    = t
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
@@ -608,6 +618,11 @@ infer (TUn Ceil t) = do
   checkNumTy at
   let num2 = getType at
   return $ ATUn (integralizeTy num2) Ceil at
+
+infer (TUn Abs t) = do
+  at <- infer t
+  checkNumTy at
+  return $ ATUn (positivizeTy (getType at)) Abs at
 
   -- Division is similar to subtraction; we must take the lub with Q+.
 infer (TBin Div t1 t2) = do

@@ -440,6 +440,7 @@ whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OLg      = lgOp
 whnfOp OFloor   = uNumOp floorOp
 whnfOp OCeil    = uNumOp ceilOp
+whnfOp OAbs     = uNumOp abs
 whnfOp OMul     = numOp (*)
 whnfOp ODiv     = numOp' divOp
 whnfOp OExp     = numOp (\m n -> m ^^ numerator n)

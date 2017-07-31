@@ -312,6 +312,6 @@ main = do
         Nothing -> return ()
         Just input
           | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
-              io $ putStrLn "Goodbye!"
+              liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> (lift.handleCMD $ input) >> loop

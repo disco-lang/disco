@@ -1,2 +1,0 @@
-:load test/syntax-juxt_app/juxt-app.disco
-f (x -> x^2) (3,4) 2

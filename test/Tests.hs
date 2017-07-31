@@ -25,10 +25,10 @@ main = do
     mkGroup ds@(d:_) = testGroup (extractGroup d) $ map mkGolden ds
 
 extractGroup :: FilePath -> String
-extractGroup = reverse . dropWhile (not . isDash) . takeWhile (not . isPathSeparator) . reverse
+extractGroup = takeWhile (/='-')
 
 extractName :: FilePath -> String
-extractName = reverse . takeWhile (not . isDash) . reverse
+extractName = takeWhile (not . isPathSeparator) . drop 1 . dropWhile (/='-')
 
 mkGolden :: FilePath -> TestTree
 mkGolden relDir =
@@ -39,7 +39,3 @@ mkGolden relDir =
     (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")) >> return ())
   where
     dir = "test" </> relDir
-
-isDash :: Char -> Bool
-isDash '-'  = True
-isDash _    = False

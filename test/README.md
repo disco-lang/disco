@@ -11,8 +11,8 @@ Adding a new test case
 Adding a new test case is easy.
 
 1. Create a directory for the new test, with a prefix denoting the
-   general category of the test, and a three-digit number sequentially
-   after the highest existing number in that category.
+   general category of the test, a hyphen, and then an arbitrary name
+   describing the content of the test.
 
 2. In that directory, you must create two files:
 
@@ -30,7 +30,7 @@ Adding a new test case is easy.
     `.disco` files to be `:load`ed by a command in `input`.  (Be aware
     that the test suite runs from the root directory of the
     repository, so you will have to write something like `:load
-    test/category099/foo.disco`.)
+    test/category-name/foo.disco`.)
 
 Dealing with mass test suite breakage
 -------------------------------------

@@ -1,6 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
+import           Control.Arrow                    ((&&&))
 import           Control.Lens                     (makeLenses, use, (%=), (.=))
 import           Control.Monad.State
 import           Data.Char                        (isSpace)
@@ -22,6 +23,7 @@ import           Disco.Desugar
 import           Disco.Interpret.Core             (Value (..), rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
+import           Disco.Property
 import           Disco.Typecheck
 
 type CDefns = M.Map (Name Core) Core
@@ -172,35 +174,29 @@ runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
       io $ putStrLn "Running tests..."
-      and <$> mapM runTests (M.assocs aprops)
-
-runTests :: (Name ATerm, [AProperty]) -> REPLStateIO Bool
-runTests (n, props) =
-  case props of
-    [] -> return True
-    _  -> do
+      and <$> mapM (uncurry runTestsIO) (M.assocs aprops)
+      -- XXX eventually this should be moved into Disco.Property and
+      -- use a logging framework?
+  where
+    runTestsIO :: Name ATerm -> [AProperty] -> REPLStateIO Bool
+    runTestsIO n props = do
+      defns <- use replDefns
       io $ putStr ("  " ++ name2String n ++ ": ")
-      bs <- mapM runTest props
-      case and bs of
-        True  -> io $ putStrLn "OK"
-        False -> io $ putStrLn "One or more tests failed."
-          -- XXX Get more informative test results.  If test fails
-      return (and bs)
-          -- pretty-print the expression that failed.  In addition, if
-          -- test term looks like an equality test, report expected
-          -- and actual values.
+      let results  = map (id &&& runTest defns) props
+          failures = filter (not . testIsOK . snd) results
+      forM failures (uncurry prettyTestFailure)
+      when (null failures) (io $ putStrLn "OK")
+      return (null failures)
 
-runTest :: AProperty -> REPLStateIO Bool
-runTest aprop = do
-  defns <- use replDefns
-  let res = runIM' defns $ do
-        lunbind aprop $ \(_binds, at) -> do
-          rnf . runDSM $ desugarTerm at
-  case res of
-    Left err -> (io . print $ err) >> return False
-    Right v  -> case v of
-      VCons 1 [] -> return True
-      _          -> return False
+prettyTestFailure :: AProperty -> TestResult -> REPLStateIO ()
+prettyTestFailure _ TestOK = return ()
+prettyTestFailure prop (TestRuntimeFailure interpErr) = io $ print (prop, interpErr)
+prettyTestFailure prop TestFalse  = io $ print prop
+prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
+  io $ putStrLn ("While testing " ++ show prop)
+  io $ putStrLn ("  Expected: " ++ prettyValue ty2 v2)
+  io $ putStrLn ("  But got:  " ++ prettyValue ty1 v1)
+
 
 handleDocs :: Name Term -> REPLStateIO ()
 handleDocs x = do

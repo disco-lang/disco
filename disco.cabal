@@ -37,6 +37,7 @@ library
                        Disco.AST.Typed
                        Disco.Parser
                        Disco.Pretty
+                       Disco.Property
                        Disco.Desugar
                        Disco.Interpret.Core
                        Disco.Typecheck

@@ -43,3 +43,5 @@ nsf/.diagrams_cache
 .disco_history
 /src/highlight.js
 /src/style.css
+
+docs/_build

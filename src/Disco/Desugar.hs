@@ -77,7 +77,7 @@ desugarDefn def = do
 
   where
     lunbinds :: (Alpha a, Alpha b) => [Bind a b] -> ([(a,b)] -> DSM r) -> DSM r
-    lunbinds bs cont = mapM (flip lunbind return) bs >>= cont
+    lunbinds bs k = mapM (flip lunbind return) bs >>= k
 
     mkBranch :: [Name Core] -> ATerm -> [Pattern] -> DSM CBranch
     mkBranch xs b ps = do

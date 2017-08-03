@@ -401,17 +401,19 @@ expandEllipsis cs ell = do
   end <- traverse whnf ell
   let (ds,rs)   = unzip (map fromVNum vs)
       (d, end') = traverse fromVNum end
-  return . toDiscoList . map (VNum (mconcat ds <> d)) $ enum rs end'
+  return . toDiscoList . map (VNum (mconcat ds <> d)) $ enumEllipsis rs end'
   where
     fromVNum (VNum d r) = (d,r)
     fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
 
-enum :: (Enum a, Num a, Ord a) => [a] -> Ellipsis a -> [a]
-enum [] _         = error "Impossible! Disco.Interpret.Core.enum []"
-enum [x] Forever  = [x ..]
-enum [x] (Until y) = [x .. y]
-enum xs Forever   = babbage xs
-enum xs (Until y)
+enumEllipsis :: (Enum a, Num a, Ord a) => [a] -> Ellipsis a -> [a]
+enumEllipsis [] _          = error "Impossible! Disco.Interpret.Core.enumEllipsis []"
+enumEllipsis [x] Forever   = [x ..]
+enumEllipsis [x] (Until y)
+  | x <= y    = [x .. y]
+  | otherwise = [x, pred x .. y]
+enumEllipsis xs Forever    = babbage xs
+enumEllipsis xs (Until y)
   | d > 0     = takeWhile (<= y) nums
   | d < 0     = takeWhile (>= y) nums
   | otherwise = nums

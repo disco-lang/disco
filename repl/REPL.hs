@@ -20,7 +20,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core             (Value (..), rnf, runIM')
+import           Disco.Interpret.Core             (rnf, runIM')
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
@@ -184,7 +184,7 @@ runAllTests aprops
       io $ putStr ("  " ++ name2String n ++ ": ")
       let results  = map (id &&& runTest defns) props
           failures = filter (not . testIsOK . snd) results
-      forM failures (uncurry prettyTestFailure)
+      forM_ failures (uncurry prettyTestFailure)
       when (null failures) (io $ putStrLn "OK")
       return (null failures)
 

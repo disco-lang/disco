@@ -63,7 +63,6 @@ indexP : ℕ -> List (ℕ×ℕ) -> ℕ×ℕ
 indexP 0 (p::_) = p
 indexP (S n') (_::l') = indexP n' l'
 
--- Why is this so slow?
 fib2 : ℕ → ℕ
 fib2 n = {? x when (indexP n (iterateP fib2_helper (0,1))) is (x,_) ?}
 

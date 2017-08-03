@@ -28,11 +28,14 @@ module Disco.Interpret.Core
 
          -- * Interpreter monad
        , Env, DefEnv
+       , Memory, initMemory
        , InterpError(..)
        , IM, runIM, runIM'
-       , emptyEnv, extend, extends, getEnv, withEnv, getDefEnv
+       , emptyEnv, extend, extends, getEnv, withEnv
+       , allocate
 
          -- * Evaluation
+       , delay
        , mkThunk
        , mkEnum
 
@@ -59,12 +62,16 @@ module Disco.Interpret.Core
        )
        where
 
-import           Control.Lens                       ((%~), (.~), _1)
+import           Control.Lens                       ((<+=), (%=), makeLenses, use)
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Control.Monad.State
 import           Data.Coerce
 import           Data.List                          (find)
+import           Data.Map                           (Map)
 import qualified Data.Map                           as M
+import           Data.IntMap.Lazy                   (IntMap, (!))
+import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.Monoid
 import           Data.Ratio
 
@@ -105,6 +112,14 @@ data Value where
   --   its environment.
   VThunk :: Core -> Env -> Value
 
+  -- | An indirection, i.e. a pointer to an entry in the value table.
+  --   This is how we get graph reduction.  When we create a thunk, we
+  --   put it in a new entry in the value table, and return a VIndir.
+  --   The VIndir can get copied but all the copies refer to the same
+  --   thunk, which will only be evaluated once, the first time the
+  --   value is demanded.
+  VIndir :: Loc -> Value
+
   -- | A literal function value.  @VFun@ is only used when
   --   enumerating function values in order to decide comparisons at
   --   higher-order function types.  For example, in order to
@@ -138,29 +153,27 @@ newtype ValDelay = ValDelay (IM Value)
 instance Show ValDelay where
   show _ = "<delay>"
 
--- | Delay an @IM Value@ computation by packaging it into a @VDelay@
---   constructor.  When it is evaluated later, it will be run with the
---   environment that was current at the time 'delay' was called,
---   /not/ the one that is in effect later.
-delay :: IM Value -> IM Value
-delay imv = do
-  e <- getEnv
-  return (VDelay . ValDelay $ withEnv e imv)
-
--- | A convenience function for creating a default @VNum@ value with a
---   default (@Fractional@) flag.
-vnum :: Rational -> Value
-vnum = VNum mempty
-
 ------------------------------------------------------------
 -- Environments & errors
 ------------------------------------------------------------
 
+type Loc = Int
+
 -- | An environment is a mapping from names to values.
-type Env  = M.Map (Name Core) Value
+type Env  = Map (Name Core) Value
 
 -- | A definition environment is a mapping fron names to core terms.
-type DefEnv = M.Map (Name Core) Core
+type DefEnv = Map (Name Core) Core
+
+-- | A memory is a mapping from "locations" (uniquely generated
+--   identifiers) to values.  It also keeps track of the next
+--   unused location.  We keep track of a memory during evaluation,
+--   and can create new memory locations to store things that should
+--   only be evaluated once.
+data Memory = Memory { _memStore :: IntMap Value, _nextLoc :: Loc }
+
+initMemory :: Memory
+initMemory = Memory IntMap.empty 0
 
 -- | Errors that can be generated during interpreting.
 data InterpError where
@@ -195,7 +208,9 @@ data InterpError where
 -- | The interpreter monad.  Combines read-only access to an
 --   environment, and the ability to throw @InterpErrors@ and generate
 --   fresh names.
-type IM = ReaderT (Env, DefEnv) (ExceptT InterpError LFreshM)
+type IM = StateT Memory (ReaderT Env (ExceptT InterpError LFreshM))
+
+makeLenses ''Memory
 
 -- | Run a computation in the @IM@ monad, starting in the empty
 --   environment.
@@ -205,44 +220,86 @@ runIM = runIM' M.empty
 -- | Run a computation in the @IM@ monad, starting in a given
 --   environment of definitions.
 runIM' :: DefEnv -> IM a -> Either InterpError a
-runIM' cenv = runLFreshM . runExceptT . flip runReaderT (M.empty, cenv)
+runIM' cenv im = runLFreshM . runExceptT . flip runReaderT M.empty . flip evalStateT initMemory
+  $ do
+
+      -- Take the environment mapping names to definitions, and turn
+      -- each one into an indirection to a thunk stored in memory.
+      env <- traverse mkThunk cenv
+
+      -- Top-level definitions are allowed to be recursive, so each
+      -- one of those thunks should actually have the environment
+      -- 'env' as its environment, so all the top-level definitions
+      -- can mutually refer to each other.
+      --
+      -- For now we know that the only things we have stored in memory
+      -- are the thunks we just made, so just iterate through them and
+      -- replace their environments.
+      memStore %= IntMap.map (replaceThunkEnv env)
+
+      -- Finally, run the given IM computation with the initial
+      -- environment we just built.
+      local (const env) im
+  where
+    replaceThunkEnv e (VThunk c _) = VThunk c e
+    replaceThunkEnv _ v            = v
 
 -- | The empty environment.
-emptyEnv :: (Env, DefEnv)
-emptyEnv = (M.empty, M.empty)
+emptyEnv :: Env
+emptyEnv = M.empty
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
 extend :: Name Core -> Value -> IM a -> IM a
-extend x v = avoid [AnyName x] . local (_1 %~ M.insert x v)
+extend x v = avoid [AnyName x] . local (M.insert x v)
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
 extends :: Env -> IM a -> IM a
-extends e' = avoid (map AnyName (M.keys e')) . local (_1 %~ M.union e')
+extends e' = avoid (map AnyName (M.keys e')) . local (M.union e')
 
 -- | Get the current environment.
 getEnv :: IM Env
-getEnv = fst <$> ask
+getEnv = ask
 
 -- | Run an @IM@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
 withEnv :: Env -> IM a -> IM a
-withEnv e = local (_1 .~ e)
+withEnv = local . const
 
--- | Get the current definition environment.
-getDefEnv :: IM DefEnv
-getDefEnv = snd <$> ask
+-- | Allocate a new memory cell for the given value, and return its
+--   'Loc'.
+allocate :: Value -> IM Loc
+allocate v = do
+  loc <- nextLoc <+= 1
+  memStore %= IntMap.insert loc v
+  return loc
 
 ------------------------------------------------------------
 -- Evaluation
 ------------------------------------------------------------
 
+-- | Delay an @IM Value@ computation by packaging it into a @VDelay@
+--   constructor.  When it is evaluated later, it will be run with the
+--   environment that was current at the time 'delay' was called,
+--   /not/ the one that is in effect later.
+delay :: IM Value -> IM Value
+delay imv = do
+  e <- getEnv
+  return (VDelay . ValDelay $ withEnv e imv)
+
+-- | A convenience function for creating a default @VNum@ value with a
+--   default (@Fractional@) flag.
+vnum :: Rational -> Value
+vnum = VNum mempty
+
 -- | Create a thunk by packaging up a @Core@ expression with the
---   current environment.
+--   current environment.  The thunk is stored in a new location in
+--   memory, and the returned value consists of an indirection
+--   referring to its location.
 mkThunk :: Core -> IM Value
-mkThunk c = VThunk c <$> getEnv
+mkThunk c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
 
 -- | Turn any instance of @Enum@ into a @Value@, by creating a
 --   constructor with an index corresponding to the enum value.
@@ -258,13 +315,27 @@ rnfV :: Value -> IM Value
 rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
 rnfV v@(VThunk _ _) = whnfV v >>= rnfV
 rnfV v@(VDelay _)   = whnfV v >>= rnfV
+rnfV v@(VIndir _)   = whnfV v >>= rnfV
 rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
 whnfV :: Value -> IM Value
 whnfV (VThunk c e)            = withEnv e $ whnf c
 whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
+whnfV (VIndir loc)            = whnfIndir loc
 whnfV v                       = return v
+
+-- | Reduce the value stored at the given location to WHNF.  We need a
+--   special function for this, because in addition to returning the
+--   reduced value, we also update the memory location to contain it.
+--   That way if anything else refers to the same location, it will
+--   not need to be re-evaluated later.
+whnfIndir :: Loc -> IM Value
+whnfIndir loc = do
+  m <- use memStore
+  v <- whnfV (m ! loc)
+  memStore %= IntMap.insert loc v
+  return v
 
 -- | Reduce a Core expression to weak head normal form.
 whnf :: Core -> IM Value
@@ -272,11 +343,7 @@ whnf (CVar x) = do
   e <- getEnv
   case (M.lookup (coerce x) e) of
     Just v  -> whnfV v
-    Nothing -> do
-      c <- getDefEnv
-      case (M.lookup x c) of
-        Just core -> whnf core
-        Nothing   -> throwError $ UnboundError x
+    Nothing -> throwError $ UnboundError x
 
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
 whnf (CNum d n)     = return $ VNum d n

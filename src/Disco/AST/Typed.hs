@@ -56,8 +56,9 @@ data ATerm where
 
   -- | A literal list.  The type would be ambiguous if the list was
   --   empty.
-  ATList :: Type -> [ATerm] -> ATerm
+  ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 
+  -- | A list comprehension.
   ATListComp :: Type -> Bind AQuals ATerm -> ATerm
 
   -- | A natural number.
@@ -129,7 +130,7 @@ getType (ATUn ty _ _)     = ty
 getType (ATBin ty _ _ _)  = ty
 getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
-getType (ATList ty _)     = ty
+getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty

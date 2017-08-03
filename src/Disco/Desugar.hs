@@ -116,9 +116,11 @@ desugarTerm (ATBin _ op t1 t2) =
   desugarBOp (getType t1) (getType t2) op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
-desugarTerm (ATList _ es) = do
+desugarTerm (ATList _ es mell) = do
   des <- mapM desugarTerm es
-  return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
+  case mell of
+    Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
+    Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
   dt <- desugarTerm t

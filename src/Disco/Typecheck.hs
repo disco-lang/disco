@@ -211,11 +211,12 @@ check (TTup ts) ty = do
   ats <- checkTuple ts ty
   return $ ATTup ty ats
 
-check (TList xs) ty@(TyList eltTy) = do
-  axs <- mapM (flip check eltTy) xs
-  return $ ATList ty axs
+check (TList xs ell) ty@(TyList eltTy) = do
+  axs  <- mapM (flip check eltTy) xs
+  aell <- checkEllipsis ell eltTy
+  return $ ATList ty axs aell
 
-check (TList xs) ty            = throwError (NotList (TList xs) ty)
+check l@(TList _ _) ty            = throwError (NotList l ty)
 
 check (TBin Cons x xs) ty@(TyList eltTy) = do
   ax  <- check x  eltTy
@@ -333,6 +334,11 @@ checkTuple (t:ts) (TyPair ty1 ty2) = do
   ats <- checkTuple ts ty2
   return (at:ats)
 checkTuple ts ty = throwError $ NotTuple (TTup ts) ty
+
+checkEllipsis :: Maybe (Ellipsis Term) -> Type -> TCM (Maybe (Ellipsis ATerm))
+checkEllipsis Nothing          _  = return Nothing
+checkEllipsis (Just Forever)   _  = return (Just Forever)
+checkEllipsis (Just (Until t)) ty = (Just . Until) <$> check t ty
 
 -- | Check the type of a branch, returning a type-annotated branch.
 checkBranch :: Type -> Branch -> TCM ABranch
@@ -734,11 +740,12 @@ infer (TChain t1 links) = do
   alinks <- inferChain t1 links
   return $ ATChain TyBool at1 alinks
 
-infer (TList es@(_:_))  = do
+infer (TList es@(_:_) ell)  = do
   ates <- (mapM infer) es
-  let tys = (map getType) ates
+  aell <- inferEllipsis ell
+  let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
   ty  <- lubs tys
-  return $ ATList (TyList ty) ates
+  return $ ATList (TyList ty) ates aell
 
 infer (TListComp bqt) = do
   lunbind bqt $ \(qs,t) -> do
@@ -811,6 +818,11 @@ inferChain t1 (TLink op t2 : links) = do
   at2 <- infer t2
   _   <- check (TBin op t1 t2) TyBool
   (ATLink op at2 :) <$> inferChain t2 links
+
+inferEllipsis :: Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm))
+inferEllipsis (Just (Until t)) = (Just . Until) <$> infer t
+inferEllipsis (Just Forever)   = return $ Just Forever
+inferEllipsis Nothing          = return Nothing
 
 inferTuple :: [Term] -> TCM (Type, [ATerm])
 inferTuple []     = error "Impossible! inferTuple []"

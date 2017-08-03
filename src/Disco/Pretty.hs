@@ -148,9 +148,13 @@ prettyTerm (TJuxt t1 t2) = mparens funPA $
 prettyTerm (TTup ts)     = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   parens (hsep ds)
-prettyTerm (TList ts)    = do
+prettyTerm (TList ts e)  = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
-  brackets (hsep ds)
+  let pe = case e of
+             Nothing        -> []
+             Just Forever   -> [text ".."]
+             Just (Until t) -> [text "..", prettyTerm t]
+  brackets (hsep (ds ++ pe))
 prettyTerm (TListComp bqst) =
   lunbind bqst $ \(qs,t) ->
   brackets (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])

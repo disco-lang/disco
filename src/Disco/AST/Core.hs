@@ -33,6 +33,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Surface (Ellipsis)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -65,7 +66,11 @@ data Core where
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
+  -- | A list comprehension.
   CListComp :: Bind CQuals Core -> Core
+
+  -- | A list with an ellipsis.
+  CEllipsis :: [Core] -> Ellipsis Core -> Core
 
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core

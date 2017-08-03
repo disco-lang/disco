@@ -1,4 +1,7 @@
+{-# LANGUAGE DeriveFunctor         #-}
+{-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
@@ -33,7 +36,7 @@ module Disco.AST.Surface
          -- * Terms
        , Side(..), Link(..)
        , Qual(..), Quals(..)
-       , TyOp(..), Term(..)
+       , TyOp(..), Ellipsis(..), Term(..)
 
          -- * Case expressions and patterns
        , Branch, Guards(..), Guard(..), Pattern(..)
@@ -286,7 +289,7 @@ data Term where
   TChain :: Term -> [Link] -> Term
 
   -- | A literal list.
-  TList :: [Term] -> Term
+  TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 
   -- | List comprehension.
   TListComp :: Bind Quals Term -> Term
@@ -300,6 +303,13 @@ data Term where
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term
   deriving (Show, Generic)
+
+-- | An ellipsis is an "omitted" part of a literal list, of the form
+--   @..@ or @.. t@.
+data Ellipsis t where
+  Forever ::      Ellipsis t   -- @..@
+  Until   :: t -> Ellipsis t   -- @.. t@
+  deriving (Show, Generic, Functor, Foldable, Traversable)
 
 -- Note: very similar to guards
 --  maybe some generalization in the future?
@@ -401,6 +411,7 @@ instance Alpha BOp
 instance Alpha TyOp
 instance Alpha Link
 instance Alpha Term
+instance Alpha t => Alpha (Ellipsis t)
 instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
@@ -429,6 +440,7 @@ instance Subst Term BOp
 instance Subst Term UOp
 instance Subst Term TyOp
 instance Subst Term Link
+instance Subst Term (Ellipsis Term)
 instance Subst Term Term where
   isvar (TVar x) = Just (SubstName x)
   isvar _ = Nothing

@@ -38,7 +38,7 @@ module Disco.Parser
 
          -- ** Punctuation
        , parens, braces, angles, brackets
-       , semi, comma, colon, dot
+       , semi, comma, colon, dot, pipe
        , mapsTo
 
          -- * Disco parser
@@ -48,7 +48,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseList, parseListComp, parseQuals, parseQual
+       , parseList, parseEllipsis, parseListComp, parseQuals, parseQual
        , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
@@ -371,11 +371,15 @@ brackets  = between (symbol "[") (symbol "]")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
-semi, comma, colon, dot :: Parser String
+semi, comma, colon, dot, pipe :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
+pipe      = symbol "|"
+
+ellipsis :: Parser String
+ellipsis  = concat <$> ((:) <$> dot <*> some dot)
 
 -- | The symbol that separates the variable binder from the body of a
 --   lambda (either @↦@, @->@, or @|->@).
@@ -568,7 +572,7 @@ parseAtom = -- trace "parseAtom" $
 -- | Parse a list-ish thing, like a literal list or a list
 --   comprehension (not including the square brackets).
 parseList :: Parser Term
-parseList = nonEmptyList <|> return (TList [])
+parseList = nonEmptyList <|> return (TList [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
@@ -580,20 +584,38 @@ parseList = nonEmptyList <|> return (TList [])
     -- singleton list.
     nonEmptyList = do
       t <- parseTerm
-      (listRemainder t <|> return (TList [t]))
+      (listRemainder t <|> singletonList t)
+
+    singletonList t = TList [t] <$> optionMaybe parseEllipsis
 
     -- The remainder of a list after the first term starts with either
     -- a pipe (for a comprehension) or a comma (for a literal list).
     listRemainder t = do
-      s <- (symbol "|" <|> comma)
+      s <- pipe <|> comma
       case s of
         "|" -> parseListComp t
         "," -> do
           -- Parse the rest of the terms in a literal list after the
-          -- first, and return them all together.
+          -- first, then an optional ellipsis, and return everything together.
           ts <- parseTerm `sepBy` comma
-          return $ TList (t:ts)
+          e  <- optionMaybe parseEllipsis
+          return $ TList (t:ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
+
+parseEllipsis :: Parser (Ellipsis Term)
+parseEllipsis = do
+  _ <- ellipsis
+  maybe Forever Until <$> optionMaybe parseTerm
+
+{-
+
+list          ::= '[' listContents ']'
+listContents  ::= nonEmptyList | <empty>
+nonEmptyList  ::= t [ell] | t listRemainder
+ell           ::= '..' [t]
+listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
+
+-}
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.

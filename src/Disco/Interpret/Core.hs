@@ -76,6 +76,7 @@ import           Math.Combinatorics.Exact.Factorial (factorial)
 import           Math.NumberTheory.Logarithms       (integerLog2)
 import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
+import           Disco.AST.Surface (Ellipsis(..))
 import           Disco.AST.Core
 import           Disco.Types
 
@@ -298,6 +299,7 @@ whnf (CListComp b)  =
   lunbind b $ \(qs, t) -> do
     lcmp <- expandComp t qs
     whnfV lcmp
+whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CType _)      = error "Called whnf on CType"
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -315,6 +317,9 @@ whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 ------------------------------------------------------------
 -- Lists
 ------------------------------------------------------------
+
+--------------------------------------------------
+-- Utilities
 
 -- | A lazy foldr on lists represented as 'Value's.  The entire
 --   function is wrapped in a call to 'delay', so it does not actually
@@ -344,6 +349,9 @@ vconcat = vfoldr vappend (VCons 0 [])
 vmap :: (Value -> IM Value) -> Value -> IM Value
 vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
 
+--------------------------------------------------
+-- List comprehensions
+
 -- | Expand a list comprehension to a lazy 'Value' list.
 expandComp :: Core -> CQuals -> IM Value
 
@@ -368,6 +376,70 @@ expandComp t (CQCons (unrebind -> (q,qs))) = do
         VCons 0 [] {- False -} -> return $ VCons 0 []  {- Nil -}
         VCons 1 [] {- True  -} -> expandComp t qs
         _ -> error $ "Impossible! Got " ++ show v ++ " in expandComp CQGuard."
+
+--------------------------------------------------
+-- Polynomial sequences [a,b,c,d .. e]
+
+-- Note, in order to reduce an ellipsis with an end value to WHNF we
+-- have to evaluate ALL the elements first, because of examples like
+--
+--   [1, 3, 5, 7 .. 0] = []
+--
+-- The above example shows that we can't just lazily output the first
+-- few elements and deal with the ellipsis when we get to it.  We have
+-- to evaluate all the elements even to know whether the list is empty
+-- or not.
+--
+-- However, when the end value is omitted, the resulting list will
+-- always begin with the listed values before the '..', so we can
+-- output them lazily, and evaluate them only when we need them to
+-- compute the rest of the values.
+
+expandEllipsis :: [Core] -> Ellipsis Core -> IM Value
+expandEllipsis cs ell = do
+  vs  <- mapM whnf cs
+  end <- traverse whnf ell
+  let (ds,rs)   = unzip (map fromVNum vs)
+      (d, end') = traverse fromVNum end
+  return . toDiscoList . map (VNum (mconcat ds <> d)) $ enum rs end'
+  where
+    fromVNum (VNum d r) = (d,r)
+    fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
+
+enum :: (Enum a, Num a, Ord a) => [a] -> Ellipsis a -> [a]
+enum [] _         = error "Impossible! Disco.Interpret.Core.enum []"
+enum [x] Forever  = [x ..]
+enum [x] (Until y) = [x .. y]
+enum xs Forever   = babbage xs
+enum xs (Until y)
+  | d > 0     = takeWhile (<= y) nums
+  | d < 0     = takeWhile (>= y) nums
+  | otherwise = nums
+  where
+    d    = constdiff xs
+    nums = babbage xs
+
+-- | Extend a sequence infinitely by interpolating it as a polynomial
+--   sequence, via forward differences.  Essentially the same
+--   algorithm used by Babbage's famous Difference Engine.
+babbage :: Num a => [a] -> [a]
+babbage []     = []
+babbage [x]    = repeat x
+babbage (x:xs) = scanl (+) x (babbage (diff (x:xs)))
+
+-- | Compute the forward difference of the given sequence, that is,
+--   differences of consecutive pairs of elements.
+diff :: Num a => [a] -> [a]
+diff xs = zipWith (-) (tail xs) xs
+
+-- | Take forward differences until the result is constant, and return
+--   the constant.  The sign of the constant difference tells us the
+--   limiting behavior of the sequence.
+constdiff :: (Eq a, Num a) => [a] -> a
+constdiff [] = error "Impossible! Disco.Interpret.Core.constdiff []"
+constdiff (x:xs)
+  | all (==x) xs = x
+  | otherwise    = constdiff (diff (x:xs))
 
 ------------------------------------------------------------
 -- Case analysis
@@ -541,12 +613,14 @@ countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is i
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> IM Value
-enumOp [CType ty] = return $ (enumOp' (enumerate ty))
+enumOp [CType ty] = return $ (toDiscoList (enumerate ty))
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
-enumOp' :: [Value] -> Value
-enumOp' []       = VCons 0 []
-enumOp' (x : xs) = VCons 1 [x, enumOp' xs]
+-- | Convert a Haskell list of Values into a Value representing a
+-- disco list.
+toDiscoList :: [Value] -> Value
+toDiscoList []       = VCons 0 []
+toDiscoList (x : xs) = VCons 1 [x, toDiscoList xs]
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals

@@ -842,9 +842,9 @@ parseAtomicType =
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
-  <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
   <|> TyQP   <$ (reserved "QP" <|> reserved "ℚ⁺") -- TODO: come up with more/better ways to
                                                   --       represent nonegative rationals.
+  <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
     -- This explicitly allows "List List N" to parse as List (List N).
     -- Since we don't have arbitrary application of higher-kinded type
     -- expressions, only application of an explicit set of

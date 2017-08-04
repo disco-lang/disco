@@ -1,0 +1,8 @@
+[1 : N, 1 : Nat, 1 : Natural, 1 : ℕ]
+[-1 : Z, -1 : Int, -1 : Integer, -1 : ℤ]
+[1/2 : QP, 1/2 : ℚ⁺]
+[-1/2 : Q, -1/2 : Rational, -1/2 : ℚ]
+[true : B, true : Bool]
+[() : Unit]
+[] : List Void
+[3 : Fin 5, 3 : Z 5, 3 : Z5, 3 : ℤ 5, 3 : ℤ5]

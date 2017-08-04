@@ -33,6 +33,9 @@ module Disco.Typecheck
          -- ** Errors
        , TCError(..)
 
+         -- * Type predicates
+       , isSubtractive, isFractional
+
          -- * Type checking
        , check, checkPattern, ok, checkDefn
        , checkPropertyTypes
@@ -57,6 +60,8 @@ module Disco.Typecheck
        , inferCase, inferBranch, inferGuards
        )
        where
+
+-- import Debug.Trace
 
 import           Prelude                                 hiding (lookup)
 
@@ -304,12 +309,19 @@ check (TBin Exp t1 t2) ty =
       return $ ATBin ty Exp at1 at2
     else throwError (NotNumTy ty)
 
+-- XXX comment me: special case for N, Q+ with runtime check
+-- XXX should probably make this an opt-in feature
 check (TBin Sub t1 t2) ty = do
-  _ <- checkSubtractive ty
+  when (not (isNumTy ty)) $ throwError (NotNumTy ty)
+  -- when (not (isSubtractive ty)) $ do
+  --   traceM $ "Warning: checking subtraction at type " ++ show ty
+  --   traceShowM $ (TBin Sub t1 t2)
+    -- XXX emit warning re: subtraction on N or Q+
   at1 <- check t1 ty
   at2 <- check t2 ty
   return $ ATBin ty Sub at1 at2
 
+-- XXX comment me: not the same special case for Neg as for Sub
 check (TUn Neg t) ty = do
   _ <- checkSubtractive ty
   at <- check t ty

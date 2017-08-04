@@ -109,6 +109,7 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
+        | OPosSub  -- ^ Runtime-checked subtraction on positive numbers
         | OSqrt    -- ^ Integer square root (@sqrt@)
         | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor   -- ^ Floor of fractional type (@floor@)

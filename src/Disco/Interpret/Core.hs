@@ -187,6 +187,9 @@ data InterpError where
   -- | Division by zero.
   DivByZero     ::              InterpError
 
+  -- | Underflow, e.g. (2 - 3 : Nat)
+  Underflow     ::              InterpError
+
   -- | Taking the base-2 logarithm of zero.
   LgOfZero      ::              InterpError
 
@@ -577,6 +580,7 @@ noMatch = return Nothing
 whnfOp :: Op -> [Core] -> IM Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
+whnfOp OPosSub  = numOp' posSubOp
 whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OLg      = lgOp
 whnfOp OFloor   = uNumOp floorOp
@@ -736,6 +740,13 @@ lgOp' n = return $ vnum (toInteger (integerLog2 (numerator n)) % 1)
 divOp :: Rational -> Rational -> IM Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
+
+-- | Perform a checked subtraction on positive values.  Throw an
+--   underflow error if the second argument is greater than the first.
+posSubOp :: Rational -> Rational -> IM Value
+posSubOp m n
+  | n > m     = throwError Underflow
+  | otherwise = return $ vnum (m - n)
 
 -- | Perform a mod operation; throw division by zero error if the
 --   second argument is zero.  Although this function takes two

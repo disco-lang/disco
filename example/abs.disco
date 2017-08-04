@@ -1,5 +1,13 @@
+||| This was an example of how you could implement an absolute value
+||| function with the type Z -> N even if it is not built into the
+||| language.  The problem is that it is rather inefficient: since it
+||| builds up the answer by adding 1 repeatedly, it takes time
+||| proportional to its result.  absolute value is now built into disco
+||| so this is here just as a curiosity.
+
 abs : Z -> N
 abs x =
-  { abs (-x)      if x < 0
-  { 0             when x is 0
-  { 1 + abs (x-1) otherwise
+  {? abs (-x)      if x < 0,
+     0             when x is 0,
+     1 + abs (x-1) otherwise
+  ?}

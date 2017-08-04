@@ -92,4 +92,3 @@ map2 f (x::xs) = (f x) :: (map f xs)
 -- Features that would be helpful:
 --  even, odd, and isPrime functions (as part of some standard library)
 --  some sort of `random` module with several different functions
---  abs value and/or subtraction on Ns

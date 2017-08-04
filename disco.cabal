@@ -32,6 +32,7 @@ source-repository head
 
 library
   exposed-modules:
+                       Disco.Syntax.Operators
                        Disco.AST.Core
                        Disco.AST.Surface
                        Disco.AST.Typed

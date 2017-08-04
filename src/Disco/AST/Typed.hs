@@ -34,6 +34,7 @@ import           GHC.Generics (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
+import           Disco.Syntax.Operators
 import           Disco.Types
 
 -- TODO: Should probably really do this with a 2-level/open recursion

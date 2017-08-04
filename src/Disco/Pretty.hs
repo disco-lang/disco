@@ -16,6 +16,7 @@ import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.Syntax.Operators
 import           Disco.Interpret.Core             (Value (..))
 import           Disco.Types
 

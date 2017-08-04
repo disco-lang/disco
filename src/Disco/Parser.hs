@@ -83,6 +83,7 @@ import           Data.Ratio
 import           Text.Printf
 
 import           Disco.AST.Surface
+import           Disco.Syntax.Operators
 import           Disco.Types
 
 ------------------------------------------------------------

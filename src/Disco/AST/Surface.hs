@@ -29,27 +29,23 @@ module Disco.AST.Surface
          -- ** Declarations
        , Decl(..), declName, isDefn
 
-         -- * Operators
-       , UOp(..), BOp(..), UFixity(..), BFixity(..), OpFixity(..)
-       , OpInfo(..), opTable, uopMap, bopMap, uPrec, bPrec, funPrec
-
          -- * Terms
        , Side(..), Link(..)
        , Qual(..), Quals(..)
-       , TyOp(..), Ellipsis(..), Term(..)
+       , Ellipsis(..), Term(..)
 
          -- * Case expressions and patterns
        , Branch, Guards(..), Guard(..), Pattern(..)
        )
        where
 
-import           Data.Map                         (Map, (!))
-import qualified Data.Map                         as M
+import           Data.Map                         (Map)
 import           GHC.Generics                     (Generic)
 
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Types
+import           Disco.Syntax.Operators
 
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
@@ -102,154 +98,6 @@ isDefn _       = False
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
-
--- | Unary operators.
-data UOp = Neg   -- ^ Arithmetic negation (@-@)
-         | Not   -- ^ Logical negation (@not@)
-         | Fact  -- ^ Factorial (@!@)
-         | Sqrt  -- ^ Integer square root (@sqrt@)
-         | Lg    -- ^ Floor of base-2 logarithm (@lg@)
-         | Floor -- ^ Floor of fractional type (@floor@)
-         | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
-         | Abs   -- ^ Absolute value (@abs@)
-  deriving (Show, Eq, Ord, Generic)
-
--- | Binary operators.
-data BOp = Add     -- ^ Addition (@+@)
-         | Sub     -- ^ Subtraction (@-@)
-         | Mul     -- ^ Multiplication (@*@)
-         | Div     -- ^ Division (@/@)
-         | Exp     -- ^ Exponentiation (@^@)
-         | IDiv    -- ^ Integer division (@//@)
-         | Eq      -- ^ Equality test (@==@)
-         | Neq     -- ^ Not-equal (@/=@)
-         | Lt      -- ^ Less than (@<@)
-         | Gt      -- ^ Greater than (@>@)
-         | Leq     -- ^ Less than or equal (@<=@)
-         | Geq     -- ^ Greater than or equal (@>=@)
-         | And     -- ^ Logical and (@&&@ / @and@)
-         | Or      -- ^ Logical or (@||@ / @or@)
-         | Mod     -- ^ Modulo (@mod@)
-         | Divides -- ^ Divisibility test (@|@)
-         | RelPm   -- ^ Relative primality test (@#@)
-         | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
-         | Cons    -- ^ List cons (@::@)
-  deriving (Show, Eq, Ord, Generic)
-
--- | Fixities of unary operators (either pre- or postfix).
-data UFixity
-  = Pre     -- ^ Unary prefix.
-  | Post    -- ^ Unary postfix.
-  deriving (Eq, Ord, Enum, Bounded, Show, Generic)
-
--- | Fixity of infix binary operators (either left, right, or non-associative).
-data BFixity
-  = InL   -- ^ Left-associative infix.
-  | InR   -- ^ Right-associative infix.
-  | In    -- ^ Infix.
-  deriving (Eq, Ord, Enum, Bounded, Show, Generic)
-
--- | Operators together with their fixity.
-data OpFixity =
-    UOpF UFixity UOp
-  | BOpF BFixity BOp
-  deriving (Eq, Show, Generic)
-
--- | An @OpInfo@ record contains information about an operator, such
---   as the operator itself, its fixity, a list of concrete syntax
---   representations of the operator, and a numeric precedence level.
-data OpInfo =
-  OpInfo
-  { opFixity :: OpFixity
-  , opSyns   :: [String]
-  , opPrec   :: Int
-  }
-  deriving Show
-
--- | The @opTable@ lists all the operators in the language, in order
---   of precedence (highest precedence first).  Operators in the same
---   list have the same precedence.  This table is used by both the
---   parser and the pretty-printer.
-opTable :: [[OpInfo]]
-opTable =
-  assignPrecLevels $
-  [ [ uopInfo Pre  Not     ["not", "¬"]
-    ]
-  , [ uopInfo Pre  Neg     ["-"]
-    ]
-  , [ uopInfo Post Fact    ["!"]
-    ]
-  , [ bopInfo InR  Exp     ["^"]
-    ]
-  , [ uopInfo Pre  Sqrt    ["sqrt"]
-    ]
-  , [ uopInfo Pre  Lg      ["lg"]
-    ]
-  , [ uopInfo Pre  Floor   ["floor"]
-    , uopInfo Pre  Ceil    ["ceiling"]
-    , uopInfo Pre  Abs     ["abs"]
-    ]
-  , [ bopInfo In   Choose   ["choose"]
-    ]
-  , [ bopInfo InL  Mul     ["*"]
-    , bopInfo InL  Div     ["/"]
-    , bopInfo InL  Mod     ["%"]
-    , bopInfo InL  Mod     ["mod"]
-    , bopInfo InL  IDiv    ["//"]
-    ]
-  , [ bopInfo InL  Add     ["+"]
-    , bopInfo InL  Sub     ["-"]
-    ]
-  , [ bopInfo InR  Cons    ["::"]
-    ]
-  , [ bopInfo InR  Eq      ["="]
-    , bopInfo InR  Neq     ["/="]
-    , bopInfo InR  Lt      ["<"]
-    , bopInfo InR  Gt      [">"]
-    , bopInfo InR  Leq     ["<="]
-    , bopInfo InR  Geq     [">="]
-    , bopInfo InR  Divides ["divides"]
-    , bopInfo InR  RelPm   ["#"]
-    ]
-  , [ bopInfo InR  And     ["and", "∧", "&&"]
-    ]
-  , [ bopInfo InR  Or      ["or", "∨", "||"]
-    ]
-  ]
-  where
-    uopInfo fx op syns = OpInfo (UOpF fx op) syns (-1)
-    bopInfo fx op syns = OpInfo (BOpF fx op) syns (-1)
-
-    assignPrecLevels table = zipWith assignPrecs (reverse [1 .. length table]) table
-    assignPrecs p ops      = map (assignPrec p) ops
-    assignPrec  p op       = op { opPrec = p }
-
--- | A map from all unary operators to their associated 'OpInfo' records.
-uopMap :: Map UOp OpInfo
-uopMap = M.fromList $
-  [ (op, info) | opLevel <- opTable, info@(OpInfo (UOpF _ op) _ _) <- opLevel ]
-
--- | A map from all binary operators to their associatied 'OpInfo' records.
-bopMap :: Map BOp OpInfo
-bopMap = M.fromList $
-  [ (op, info) | opLevel <- opTable, info@(OpInfo (BOpF _ op) _ _) <- opLevel ]
-
--- | A convenient function for looking up the precedence of a unary operator.
-uPrec :: UOp -> Int
-uPrec = opPrec . (uopMap !)
-
--- | A convenient function for looking up the precedence of a binary operator.
-bPrec :: BOp -> Int
-bPrec = opPrec . (bopMap !)
-
--- | The precedence level of function application.
-funPrec :: Int
-funPrec = length opTable
-
--- | Type Operators
-data TyOp = Enumerate -- List all values of a type
-          | Count     -- Count how many values there are of a type
-  deriving (Show, Eq, Generic)
 
 -- | Terms.
 data Term where
@@ -423,9 +271,6 @@ data Pattern where
   -- TODO: figure out how to match on Z or Q!
 
 instance Alpha Side
-instance Alpha UOp
-instance Alpha BOp
-instance Alpha TyOp
 instance Alpha Link
 instance Alpha Term
 instance Alpha t => Alpha (Ellipsis t)

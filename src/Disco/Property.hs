@@ -18,7 +18,7 @@ import Unbound.Generics.LocallyNameless (Name, lunbind)
 import qualified Data.Map as M
 
 import Disco.Types
-import Disco.AST.Surface (BOp(..))
+import Disco.Syntax.Operators (BOp(..))
 import Disco.AST.Typed
 import Disco.AST.Core
 import Disco.Interpret.Core

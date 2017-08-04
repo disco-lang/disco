@@ -40,6 +40,7 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Syntax.Operators
 import           Disco.Typecheck
 import           Disco.Types
 

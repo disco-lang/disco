@@ -76,6 +76,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Syntax.Operators
 import           Disco.Types
 
 import           Math.NumberTheory.Primes.Testing        (isPrime)

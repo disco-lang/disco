@@ -1,3 +1,22 @@
+||| The greatest common divisor of two natural numbers.
+|||
+||| If we take the word "greatest" to refer to the usual less-than
+||| relation on natural numbers, then gcd(0,0) would be undefined:
+||| every natural number evenly divides 0, and there is no greatest
+||| natural number.  However, we should instead think of the
+||| divisibility relation: gcd is really the meet (greatest lower
+||| bound) in the divisibility lattice on the natural numbers.  That
+||| is, gcd(a,b) = d if for every d' such that d' evenly divides both
+||| a and b, we have that d' also evenly divides (NOT "is less than"!)
+||| d.  Under this definition, gcd(0,0) is perfectly well defined and
+||| equal to 0.  0 is in fact the "greatest" natural number under the
+||| divisibility relation, because it is divisible by every natural
+||| number.
+
+!!! gcd(7,6)   = 1
+!!! gcd(12,18) = 6
+!!! gcd(0,0)   = 0
+
 gcd : N * N -> N
 gcd(a,0) = a
 gcd(a,b) = gcd(b, a mod b)

@@ -91,9 +91,6 @@ instance Ord PA where
 initPA :: PA
 initPA = PA 0 InL
 
-funPrec :: Prec
-funPrec = length opTable
-
 funPA :: PA
 funPA = PA funPrec InL
 
@@ -138,12 +135,13 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
+prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(x,body) ->
   hsep [prettyName x, text "↦", prettyTerm' 0 InL body]
-prettyTerm (TJuxt t1 t2) = mparens funPA $
+prettyTerm (TApp t1 t2)  = mparens funPA $
   prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
 prettyTerm (TTup ts)     = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)

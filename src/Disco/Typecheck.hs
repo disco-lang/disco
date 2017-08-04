@@ -52,7 +52,6 @@ module Disco.Typecheck
 
          -- * Type inference
        , infer
-       , inferFunApp, inferMulApp
        , inferComp
          -- ** Case analysis
        , inferCase, inferBranch, inferGuards
@@ -206,6 +205,8 @@ addDefn x b = modify (M.insert (coerce x) b)
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM ATerm
+
+check (TParens t) ty = check t ty
 
 check (TTup ts) ty = do
   ats <- checkTuple ts ty
@@ -554,6 +555,8 @@ positivizeTy t    = t
 --   with all subterms annotated.
 infer :: Term -> TCM ATerm
 
+infer (TParens t)   = infer t
+
   -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
   ty <- lookup x
@@ -565,9 +568,13 @@ infer (TBool b)     = return $ ATBool b
 infer (TNat n)      = return $ ATNat TyN n
 infer (TRat r)      = return $ ATRat r
 
-infer (TJuxt t t')   = do
+  -- Infer the type of a function application by inferring the
+  -- function type and then checking the argument type.
+infer (TApp t t')   = do
   at <- infer t
-  inferFunApp at t' <|> inferMulApp at t' <|> throwError (Juxtaposition at t')
+  (ty1, ty2) <- getFunTy at
+  at' <- check t' ty1
+  return $ ATApp ty2 at at'
 
   -- To infer the type of a pair, just infer the types of both components.
 infer (TTup ts) = do
@@ -786,24 +793,9 @@ infer (TCase bs) = inferCase bs
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
 
--- | Try to infer the type of a function application.
-inferFunApp :: ATerm -> Term -> TCM ATerm
-inferFunApp at t' = do
-  (ty1, ty2) <- getFunTy at
-  at' <- check t' ty1
-  return $ ATApp ty2 at at'
-
--- | Try to infer the type of a multiplication.
-inferMulApp :: ATerm -> Term -> TCM ATerm
-inferMulApp at t' = do
-  at' <- infer t'
-  num3 <- numLub at at'
-  return $ ATBin num3 Mul at at'
-
--- | Infer the type
--- A comparison always has type Bool, but we have to make sure
-  -- the subterms are OK. We must check that their types are
-  -- compatible and have a total order.
+-- | Infer the type of a comparison. A comparison always has type
+--   Bool, but we have to make sure the subterms are OK. We must check
+--   that their types are compatible and have a total order.
 inferComp :: BOp -> Term -> Term -> TCM ATerm
 inferComp comp t1 t2 = do
   at1 <- infer t1

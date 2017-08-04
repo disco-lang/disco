@@ -31,7 +31,7 @@ module Disco.AST.Surface
 
          -- * Operators
        , UOp(..), BOp(..), UFixity(..), BFixity(..), OpFixity(..)
-       , OpInfo(..), opTable, uopMap, bopMap
+       , OpInfo(..), opTable, uopMap, bopMap, uPrec, bPrec, funPrec
 
          -- * Terms
        , Side(..), Link(..)
@@ -43,6 +43,7 @@ module Disco.AST.Surface
        )
        where
 
+import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
 import           GHC.Generics                     (Generic)
 
@@ -64,7 +65,7 @@ data TopLevel = TLDoc DocThing | TLDecl Decl
 type Docs = [DocThing]
 
 -- | A 'DocMap' is a mapping from names to documentation.
-type DocMap = M.Map (Name Term) Docs
+type DocMap = Map (Name Term) Docs
 
 -- | An item of documentation.
 data DocThing
@@ -224,14 +225,26 @@ opTable =
     assignPrec  p op       = op { opPrec = p }
 
 -- | A map from all unary operators to their associated 'OpInfo' records.
-uopMap :: M.Map UOp OpInfo
+uopMap :: Map UOp OpInfo
 uopMap = M.fromList $
   [ (op, info) | opLevel <- opTable, info@(OpInfo (UOpF _ op) _ _) <- opLevel ]
 
 -- | A map from all binary operators to their associatied 'OpInfo' records.
-bopMap :: M.Map BOp OpInfo
+bopMap :: Map BOp OpInfo
 bopMap = M.fromList $
   [ (op, info) | opLevel <- opTable, info@(OpInfo (BOpF _ op) _ _) <- opLevel ]
+
+-- | A convenient function for looking up the precedence of a unary operator.
+uPrec :: UOp -> Int
+uPrec = opPrec . (uopMap !)
+
+-- | A convenient function for looking up the precedence of a binary operator.
+bPrec :: BOp -> Int
+bPrec = opPrec . (bopMap !)
+
+-- | The precedence level of function application.
+funPrec :: Int
+funPrec = length opTable
 
 -- | Type Operators
 data TyOp = Enumerate -- List all values of a type
@@ -243,6 +256,11 @@ data Term where
 
   -- | A variable.
   TVar   :: Name Term -> Term
+
+  -- | Explicit parentheses.  We need to keep track of these in order
+  --   to syntactically distinguish multiplication and function
+  --   application.
+  TParens :: Term -> Term
 
   -- | The unit value, (), of type Unit.
   TUnit  :: Term
@@ -259,9 +277,8 @@ data Term where
      -- the -> looks like a type arrow.  Could perhaps require
      -- parens i.e.  (x : Int) -> body ?
 
-  -- | Juxtaposition (can be either function application or
-  --   multiplication).
-  TJuxt  :: Term -> Term -> Term
+  -- | Function application.
+  TApp  :: Term -> Term -> Term
 
   -- | An ordered pair, @(x,y)@.
   TTup   :: [Term] -> Term

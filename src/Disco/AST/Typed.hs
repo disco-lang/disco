@@ -71,9 +71,7 @@ data ATerm where
   -- | Anonymous function, with its type.
   ATAbs   :: Type -> Bind (Name ATerm) ATerm -> ATerm
 
-  -- | A function application, with its type.  Note that typechecking
-  --   disambiguates juxtaposition, so at this stage we know for sure
-  --   whether we have a function application or a multiplication.
+  -- | A function application, with its type.
   ATApp   :: Type -> ATerm -> ATerm -> ATerm
 
   -- | An n-tuple.

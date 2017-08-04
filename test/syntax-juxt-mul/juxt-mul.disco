@@ -1,2 +1,8 @@
-q : ℕ → ℕ×ℕ → ℕ → ℤ          -- unicode syntax is allowed
-q g (x,y) z = x + g y - z    -- here g y is multiplication
+x : Nat
+x = 5
+
+y : Nat
+y = 2
+
+f : Nat -> Nat
+f x = x + 1

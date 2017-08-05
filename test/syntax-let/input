@@ -2,3 +2,5 @@ let x = 3, y = 5 in x + y
 let x = 3 in let y = x + 1 in x*y
 let x = 2, y = x + 3, z = 2y + x + 1 in z^3*x + y
 :type let x = 2, y = x + 3, z = 2y + x + 1 in z^3*x + y
+let x : N = 5 - 3 in x + x
+:type let x : N = 5 - 3 in x + x

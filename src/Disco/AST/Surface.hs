@@ -38,7 +38,7 @@ module Disco.AST.Surface
        , Telescope(..), foldTelescope, toTelescope, fromTelescope
 
          -- ** Expressions
-       , Side(..), Link(..), Binding
+       , Side(..), Link(..), Binding(..)
 
          -- ** Lists
        , Qual(..), Ellipsis(..)
@@ -241,7 +241,8 @@ data Qual where
   deriving (Show, Generic)
 
 -- | A binding is a name along with its definition.
-type Binding = (Name Term, Embed Term)
+data Binding = Binding (Maybe Type) (Name Term) (Embed Term)
+  deriving (Show, Generic)
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
@@ -298,6 +299,7 @@ data Pattern where
 instance Alpha Side
 instance Alpha Link
 instance Alpha Term
+instance Alpha Binding
 instance Alpha t => Alpha (Ellipsis t)
 instance Alpha Guard
 instance Alpha Pattern
@@ -317,6 +319,7 @@ instance Subst Term Type where
   substs _  = id
 
 instance Subst Term b => Subst Term (Telescope b)
+instance Subst Term Binding
 instance Subst Term Guard
 instance Subst Term Qual
 instance Subst Term Side

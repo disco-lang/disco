@@ -662,7 +662,7 @@ parseTerm' =
   <|> parseExpr
   <|> parseAtom
 
--- | Parse a let expression (@let x = t1 in t2@).
+-- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term
 parseLet =
   TLet <$>
@@ -670,8 +670,14 @@ parseLet =
       (bind
         <$> (toTelescope <$> (parseBinding `sepBy` comma))
         <*> (reserved "in" *> parseTerm)))
-  where
-    parseBinding = (,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))
+
+-- | Parse a single binding (@x [ : ty ] = t@).
+parseBinding :: Parser Binding
+parseBinding = do
+  x   <- ident
+  mty <- optionMaybe (symbol ":" *> parseType)
+  t   <- symbol "=" *> (embed <$> parseTerm)
+  return $ Binding mty x t
 
 -- | Parse a case expression.
 parseCase :: Parser Term

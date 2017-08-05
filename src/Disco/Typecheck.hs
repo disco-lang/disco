@@ -813,10 +813,16 @@ infer (TCase bs) = inferCase bs
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
 
-
+-- | Infer the type of a binding (@x [: ty] = t@), returning a
+--   type-annotated binding along with a (singleton) context for the
+--   bound variable.  The optional type annotation on the variable
+--   determines whether we use inference or checking mode for the
+--   body.
 inferBinding :: Binding -> TCM (ABinding, Ctx)
-inferBinding (x, unembed -> t) = do
-  at <- infer t
+inferBinding (Binding mty x (unembed -> t)) = do
+  at <- case mty of
+    Just ty -> check t ty
+    Nothing -> infer t
   return ((coerce x, embed at), singleCtx x (getType at))
 
 -- | Infer the type of a comparison. A comparison always has type

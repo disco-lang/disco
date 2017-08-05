@@ -186,7 +186,10 @@ prettyTerm (TLet bnd) = mparens initPA $
       ]
   where
     prettyBinding :: Binding -> Doc
-    prettyBinding (x, unembed -> t) = hsep [prettyName x, text "=", prettyTerm' 0 InR t]
+    prettyBinding (Binding Nothing x (unembed -> t))
+      = hsep [prettyName x, text "=", prettyTerm' 0 InR t]
+    prettyBinding (Binding (Just ty) x (unembed -> t))
+      = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InR t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?

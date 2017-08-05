@@ -1,8 +1,12 @@
 f : (N -> N) -> N * N -> N -> Z
 f g (x,y) z = x + g y - z   -- here g y is function application
 
-q : ℕ → ℕ×ℕ → ℕ → ℤ          -- unicode syntax is allowed
-q g (x,y) z = x + g y - z    -- here g y is multiplication
+-- This used to be allowed, but now function application is
+-- *syntactically* disambiguated from multiplication.  'g y' must be
+-- function application because the left-hand term is a variable.
+-- q : ℕ → ℕ×ℕ → ℕ → ℤ
+-- q g (x,y) z = x + g y - z    -- here g y is multiplication
+
 
 ||| A naive implementation of the fibonacci function.
 !!!   fib 0 = 0
@@ -12,17 +16,16 @@ q g (x,y) z = x + g y - z    -- here g y is multiplication
 !!!   fib 12 = 144
 fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
-  { n when
-  {     n
-  {       is 0 {- a comment -}   -- note how a single branch can be
-                                -- broken across multiple lines starting
-                                -- with {
-  { n                  when {- another comment -} n is 1  -- comment
-  { fib m + fib (m+1)  when n is S (S m)
+  {? n when
+        n
+          is 0 {- a comment -}
+  ,  n                  when {- another comment -} n is 1  -- comment
+  ,  fib m + fib (m+1)  when n is S (S m)
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise
     -- since that doesn't pass the type checker: it doesn't believe
     -- that (n-1) and (n-2) are natural numbers.
+  ?}
 
 -- Mutually recursive functions.  The order of declarations and
 -- definitions does not matter.
@@ -30,8 +33,10 @@ isEven : N -> Bool
 isOdd  : N -> Bool
 
 -- We can either write a definition explicitly using a case...
-isEven n = { true      when n is 0
-           { isOdd m   when n is S m
+isEven n =
+  {? true      when n is 0
+  ,  isOdd m   when n is S m
+  ?}
 
 -- Or we can directly define by cases like this (which is just syntax
 -- sugar for something like the former).
@@ -43,9 +48,10 @@ isOdd (S m) = isEven m
 
 fact : N -> N
 fact n =
-  { 1            when n is 0
-  { n * fact m   when n is S m
+  {? 1            when n is 0,
+     n * fact m   when n is S m
+  ?}
 
 fact2 : N -> N
-fact2 0 = 1
+fact2 0     = 1
 fact2 (S m) = (m + 1) * fact2 m

@@ -11,8 +11,7 @@ import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (LFreshM, Name, Embed, lunbind,
-                                                   runLFreshM, unembed,
-                                                   unrebind)
+                                                   runLFreshM, unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -231,25 +230,17 @@ prettyBranch :: Bool -> Branch -> Doc
 prettyBranch com br = lunbind br $ \(gs,t) ->
   (if com then (text "," <+>) else id) (prettyTerm t <+> prettyGuards gs)
 
-guardList :: Guards -> [Guard]
-guardList GEmpty = []
-guardList (GCons (unrebind -> (g,gs))) = g : guardList gs
-
-prettyGuards :: Guards -> Doc
-prettyGuards GEmpty                     = text "otherwise"
-prettyGuards (guardList -> gs)
+prettyGuards :: Telescope Guard -> Doc
+prettyGuards TelEmpty                     = text "otherwise"
+prettyGuards (fromTelescope -> gs)
   = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
 
-qualsList :: Quals -> [Qual]
-qualsList QEmpty = []
-qualsList (QCons (unrebind -> (q,qs))) = q : qualsList qs
-
-prettyQuals :: Quals -> Doc
-prettyQuals (qualsList -> qs) = do
+prettyQuals :: Telescope Qual -> Doc
+prettyQuals (fromTelescope -> qs) = do
   ds <- punctuate (text ",") (map prettyQual qs)
   hsep ds
 

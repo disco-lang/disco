@@ -25,8 +25,7 @@ module Disco.AST.Typed
 
        , AProperty
          -- * Branches and guards
-       , ABranch, AGuards(..), AGuard(..)
-       , AQuals(..), AQual(..)
+       , ABranch, AGuard(..), AQual(..)
        )
        where
 
@@ -60,7 +59,7 @@ data ATerm where
   ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 
   -- | A list comprehension.
-  ATListComp :: Type -> Bind AQuals ATerm -> ATerm
+  ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 
   -- | A natural number.
   ATNat   :: Type -> Integer -> ATerm
@@ -137,13 +136,7 @@ getType (ATAscr _ ty)     = ty
 getType (ATSub ty _)      = ty
 
 -- | A branch of a case, consisting of a list of guards and a type-annotated term.
-type ABranch = Bind AGuards ATerm
-
--- | A list of guards.
-data AGuards where
-  AGEmpty :: AGuards
-  AGCons  :: Rebind AGuard AGuards -> AGuards
-  deriving (Show, Generic)
+type ABranch = Bind (Telescope AGuard) ATerm
 
 -- | A single guard (@if@ or @when@) containing a type-annotated term.
 data AGuard where
@@ -158,18 +151,6 @@ data AGuard where
 
 -- Note: very similar to guards
 --  maybe some generalization in the future?
--- | A list of qualifiers in list comprehension.
---   Special type needed to record the binding structure.
-data AQuals where
-
-  -- | The empty list of qualifiers
-  AQEmpty :: AQuals
-
-  -- | A qualifier followed by zero or more other qualifiers
-  --   this qualifier can bind variables in the subsequent qualifiers.
-  AQCons  :: Rebind AQual AQuals -> AQuals
-
-  deriving (Show, Generic)
 
 -- | A single qualifier in a list comprehension.
 data AQual where
@@ -186,7 +167,5 @@ type AProperty = Bind [(Name ATerm, Type)] ATerm
 
 instance Alpha ATerm
 instance Alpha ALink
-instance Alpha AGuards
 instance Alpha AGuard
 instance Alpha AQual
-instance Alpha AQuals

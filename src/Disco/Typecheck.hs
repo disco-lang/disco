@@ -57,7 +57,7 @@ module Disco.Typecheck
        , infer
        , inferComp
          -- ** Case analysis
-       , inferCase, inferBranch, inferGuards
+       , inferCase, inferBranch
        )
        where
 
@@ -235,7 +235,7 @@ check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
 check (TListComp bqt) ty@(TyList eltTy) = do
   lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferQuals qs
+  (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
   at <- check t eltTy
   return $ ATListComp ty (bind aqs at)
@@ -366,7 +366,7 @@ checkEllipsis (Just (Until t)) ty = (Just . Until) <$> check t ty
 checkBranch :: Type -> Branch -> TCM ABranch
 checkBranch ty b =
   lunbind b $ \(gs, t) -> do
-  (ags, ctx) <- inferGuards gs
+  (ags, ctx) <- inferTelescope inferGuard gs
   extends ctx $ do
   at <- check t ty
   return $ bind ags at
@@ -777,7 +777,7 @@ infer (TList es@(_:_) ell)  = do
 
 infer (TListComp bqt) = do
   lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferQuals qs
+  (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
   at <- infer t
   let ty = getType at
@@ -871,21 +871,26 @@ inferCase bs = do
 inferBranch :: Branch -> TCM (Type, ABranch)
 inferBranch b =
   lunbind b $ \(gs, t) -> do
-  (ags, ctx) <- inferGuards gs
+  (ags, ctx) <- inferTelescope inferGuard gs
   extends ctx $ do
   at <- infer t
   return $ (getType at, bind ags at)
 
--- | Infer the type of a list of guards, returning the type-annotated
---   list of guards along with a context of types for variables bound
---   by the guards.
-inferGuards :: Guards -> TCM (AGuards, Ctx)
-inferGuards GEmpty                       = return (AGEmpty, emptyCtx)
-inferGuards (GCons (unrebind -> (g,gs))) = do
-  (ag, ctx) <- inferGuard g
-  extends ctx $ do
-  (ags, ctx') <- inferGuards gs
-  return (AGCons (rebind ag ags), ctx `joinCtx` ctx')
+-- | Infer the type of a telescope, given a way to infer the type of
+--   each item along with a context of variables it binds; each such
+--   context is then added to the overall context when inferring
+--   subsequent items in the telescope.
+inferTelescope
+  :: (Alpha b, Alpha tyb)
+  => (b -> TCM (tyb, Ctx)) -> Telescope b -> TCM (Telescope tyb, Ctx)
+inferTelescope inferOne tel = first toTelescope <$> go (fromTelescope tel)
+  where
+    go []     = return ([], emptyCtx)
+    go (b:bs) = do
+      (tyb, ctx) <- inferOne b
+      extends ctx $ do
+      (tybs, ctx') <- go bs
+      return (tyb:tybs, ctx `joinCtx` ctx')
 
 -- | Infer the type of a guard, returning the type-annotated guard
 --   along with a context of types for any variables bound by the guard.
@@ -897,15 +902,6 @@ inferGuard (GPat (unembed -> t) p) = do
   at <- infer t
   ctx <- checkPattern p (getType at)
   return (AGPat (embed at) p, ctx)
-
-inferQuals :: Quals -> TCM (AQuals, Ctx)
-inferQuals QEmpty                        = return (AQEmpty, emptyCtx)
-inferQuals (QCons (unrebind -> (q,qs)))  = do
-  (aq, ctx) <- inferQual q
-  extends ctx $ do
-  (aqs, ctx') <- inferQuals qs
-  let ctx'' = joinCtx ctx ctx'
-  return (AQCons (rebind aq aqs), ctx'')
 
 inferQual :: Qual -> TCM (AQual, Ctx)
 inferQual (QBind x (unembed -> t))  = do

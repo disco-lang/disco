@@ -48,7 +48,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseList, parseEllipsis, parseListComp, parseQuals, parseQual
+       , parseList, parseEllipsis, parseListComp, parseQual
        , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
@@ -62,7 +62,7 @@ module Disco.Parser
 
 --import           Debug.Trace
 
-import           Unbound.Generics.LocallyNameless (Name, bind, embed, rebind,
+import           Unbound.Generics.LocallyNameless (Name, bind, embed,
                                                    string2Name)
 
 import           Text.Megaparsec                  hiding (runParser)
@@ -624,14 +624,8 @@ listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
 --   @q [,q]*@
 parseListComp :: Term -> Parser Term
 parseListComp t = do
-  qs <- parseQuals
+  qs <- toTelescope <$> (parseQual `sepBy` comma)
   return (TListComp $ bind qs t)
-
-parseQuals :: Parser Quals
-parseQuals = quals <$> (parseQual `sepBy` comma)
-  where
-    quals :: [Qual] -> Quals
-    quals = foldr (\q qs -> QCons (rebind q qs)) QEmpty
 
 parseQual :: Parser Qual
 parseQual =
@@ -688,10 +682,8 @@ parseBranch = flip bind <$> parseTerm <*> parseGuards
 
 -- | Parse the list of guards in a branch.  @otherwise@ can be used
 --   interchangeably with an empty list of guards.
-parseGuards :: Parser Guards
-parseGuards = (GEmpty <$ reserved "otherwise") <|> (guards <$> many parseGuard)
-  where
-    guards = foldr (\g gs -> GCons $ rebind g gs) GEmpty
+parseGuards :: Parser (Telescope Guard)
+parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parseGuard)
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard

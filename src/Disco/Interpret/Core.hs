@@ -83,7 +83,7 @@ import           Math.Combinatorics.Exact.Factorial (factorial)
 import           Math.NumberTheory.Logarithms       (integerLog2)
 import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
-import           Disco.AST.Surface (Ellipsis(..))
+import           Disco.AST.Surface (Ellipsis(..), fromTelescope)
 import           Disco.AST.Core
 import           Disco.Types
 
@@ -361,7 +361,7 @@ whnf (COp op cs)    = whnfOp op cs
 whnf (CCase bs)     = whnfCase bs
 whnf (CListComp b)  =
   lunbind b $ \(qs, t) -> do
-    lcmp <- expandComp t qs
+    lcmp <- expandComp t (fromTelescope qs)
     whnfV lcmp
 whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CType _)      = error "Called whnf on CType"
@@ -417,15 +417,15 @@ vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
 -- List comprehensions
 
 -- | Expand a list comprehension to a lazy 'Value' list.
-expandComp :: Core -> CQuals -> IM Value
+expandComp :: Core -> [CQual] -> IM Value
 
 -- [ t | ] = [ t ]
-expandComp t CQEmpty = do
+expandComp t [] = do
   c <- mkThunk t
   return $ VCons 1 [c, VCons 0 []]
 
 -- [ t | q, qs ] = ...
-expandComp t (CQCons (unrebind -> (q,qs))) = do
+expandComp t (q:qs) = do
   case q of
 
     -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
@@ -516,7 +516,7 @@ whnfCase :: [CBranch] -> IM Value
 whnfCase []     = throwError NonExhaustive
 whnfCase (b:bs) = do
   lunbind b $ \(gs, t) -> do
-  res <- checkGuards gs
+  res <- checkGuards (fromTelescope gs)
   case res of
     Nothing -> whnfCase bs
     Just e' -> extends e' $ whnf t
@@ -524,9 +524,9 @@ whnfCase (b:bs) = do
 -- | Check a chain of guards on one branch of a case.  Returns
 --   @Nothing@ if the guards fail to match, or a resulting environment
 --   of bindings if they do match.
-checkGuards :: CGuards -> IM (Maybe Env)
-checkGuards CGEmpty = ok
-checkGuards (CGCons (unrebind -> ((unembed -> c, p), gs))) = do
+checkGuards :: [(Embed Core, CPattern)] -> IM (Maybe Env)
+checkGuards [] = ok
+checkGuards ((unembed -> c, p) : gs) = do
   v <- mkThunk c
   res <- match v p
   case res of

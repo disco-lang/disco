@@ -25,15 +25,14 @@ module Disco.AST.Core
        , Op(..)
 
          -- * Case expressions and patterns
-       , CBranch, CGuards(..), CPattern(..)
-       , CQuals(..), CQual(..)
+       , CBranch, CPattern(..), CQual(..)
        )
        where
 
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Surface (Ellipsis)
+import           Disco.AST.Surface (Ellipsis, Telescope)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -67,7 +66,7 @@ data Core where
   CCons :: Int -> [Core] -> Core
 
   -- | A list comprehension.
-  CListComp :: Bind CQuals Core -> Core
+  CListComp :: Bind (Telescope CQual) Core -> Core
 
   -- | A list with an ellipsis.
   CEllipsis :: [Core] -> Ellipsis Core -> Core
@@ -142,35 +141,7 @@ data Op = OAdd     -- ^ Addition (@+@)
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.
-type CBranch = Bind CGuards Core
-
--- | A list of guards.
-data CGuards where
-
-  -- | Empty list of guards (/i.e./ @otherwise@).
-  CGEmpty :: CGuards
-
-  -- | A single guard followed by a list of guards.  Note there is
-  --   only one kind of guard in the core language, corresponding to
-  --   pattern guards (@when@) in the surface language.  Boolean
-  --   (@if@) guards are desugared to pattern matching on @true@.
-  CGCons  :: Rebind (Embed Core, CPattern) CGuards -> CGuards
-  deriving (Show, Generic)
-
--- Note: very similar to guards
---  maybe some generalization in the future?
--- | A list of qualifiers in list comprehension.
---   Special type needed to record the binding structure.
-data CQuals where
-
-  -- | The empty list of qualifiers
-  CQEmpty :: CQuals
-
-  -- | A qualifier followed by zero or more other qualifiers
-  --   this qualifier can bind variables in the subsequent qualifiers.
-  CQCons  :: Rebind CQual CQuals -> CQuals
-
-  deriving (Show, Generic)
+type CBranch = Bind (Telescope (Embed Core, CPattern)) Core
 
 -- | A single qualifier in a list comprehension.
 data CQual where
@@ -209,6 +180,4 @@ instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern
-instance Alpha CGuards
 instance Alpha CQual
-instance Alpha CQuals

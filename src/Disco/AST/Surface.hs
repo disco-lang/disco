@@ -8,6 +8,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -30,12 +31,20 @@ module Disco.AST.Surface
        , Decl(..), declName, isDefn
 
          -- * Terms
-       , Side(..), Link(..)
-       , Qual(..), Quals(..)
-       , Ellipsis(..), Term(..)
 
-         -- * Case expressions and patterns
-       , Branch, Guards(..), Guard(..), Pattern(..)
+       , Term(..)
+
+         -- ** Telescopes
+       , Telescope(..), foldTelescope, toTelescope, fromTelescope
+
+         -- ** Expressions
+       , Side(..), Link(..)
+
+         -- ** Lists
+       , Qual(..), Ellipsis(..)
+
+         -- ** Case expressions and patterns
+       , Branch, Guard(..), Pattern(..)
        )
        where
 
@@ -94,6 +103,43 @@ declName (DDefn x _) = x
 isDefn :: Decl -> Bool
 isDefn DDefn{} = True
 isDefn _       = False
+
+------------------------------------------------------------
+-- Telescopes
+------------------------------------------------------------
+
+-- | A telescope is essentially a list, except that each item can bind
+--   names in the rest of the list.
+data Telescope b where
+
+  -- | The empty telescope.
+  TelEmpty :: Telescope b
+
+  -- | A binder of type @b@ followed by zero or more @b@'s.  This @b@
+  --   can bind variables in the subsequent @b@'s.
+  TelCons  :: Rebind b (Telescope b) -> Telescope b
+  deriving (Show, Generic)
+
+instance Alpha b => Alpha (Telescope b)
+
+-- | Fold a telescope given a combining function and a value for the
+--   empty telescope.
+foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
+foldTelescope _ z TelEmpty = z
+foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
+
+-- | Convert a list to a telescope.
+toTelescope :: Alpha b => [b] -> Telescope b
+toTelescope []     = TelEmpty
+toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
+
+-- | Convert a telescope to a list.
+fromTelescope :: Alpha b => Telescope b -> [b]
+fromTelescope = foldTelescope (:) []
+
+------------------------------------------------------------
+-- Terms
+------------------------------------------------------------
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
@@ -157,7 +203,7 @@ data Term where
   TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 
   -- | List comprehension.
-  TListComp :: Bind Quals Term -> Term
+  TListComp :: Bind (Telescope Qual) Term -> Term
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet   :: Bind [(Name Term, Embed Term)] Term -> Term
@@ -169,6 +215,10 @@ data Term where
   TAscr  :: Term -> Type -> Term
   deriving (Show, Generic)
 
+data Link where
+  TLink :: BOp -> Term -> Link
+  deriving (Show, Generic)
+
 -- | An ellipsis is an "omitted" part of a literal list, of the form
 --   @..@ or @.. t@.
 data Ellipsis t where
@@ -176,20 +226,8 @@ data Ellipsis t where
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
--- Note: very similar to guards
+-- Note: very similar to guards-
 --  maybe some generalization in the future?
--- | A list of qualifiers in list comprehension.
---   Special type needed to record the binding structure.
-data Quals where
-
-  -- | The empty list of qualifiers
-  QEmpty :: Quals
-
-  -- | A qualifier followed by zero or more other qualifiers
-  --   this qualifier can bind variables in the subsequent qualifiers.
-  QCons  :: Rebind Qual Quals -> Quals
-
-  deriving (Show, Generic)
 
 -- | A single qualifier in a list comprehension.
 data Qual where
@@ -202,26 +240,10 @@ data Qual where
 
   deriving (Show, Generic)
 
-data Link where
-  TLink :: BOp -> Term -> Link
-  deriving (Show, Generic)
-
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
 --   over subsequent guards.
-type Branch = Bind Guards Term
-
--- | A list of guards.  Variables bound in each guard scope over
---   subsequent ones.
-data Guards where
-
-  -- | The empty list of guards, /i.e./ @otherwise@.
-  GEmpty :: Guards
-
-  -- | A single guard (@if@ or @when@) followed by more guards.
-  GCons  :: Rebind Guard Guards -> Guards
-
-  deriving (Show, Generic)
+type Branch = Bind (Telescope Guard) Term
 
 -- | A single guard in a branch: either an @if@ or a @when@.
 data Guard where
@@ -274,10 +296,8 @@ instance Alpha Side
 instance Alpha Link
 instance Alpha Term
 instance Alpha t => Alpha (Ellipsis t)
-instance Alpha Guards
 instance Alpha Guard
 instance Alpha Pattern
-instance Alpha Quals
 instance Alpha Qual
 
 -- Names for terms can't show up in Rational, Pattern, or Type
@@ -293,9 +313,8 @@ instance Subst Term Type where
   subst _ _ = id
   substs _  = id
 
-instance Subst Term Guards
+instance Subst Term b => Subst Term (Telescope b)
 instance Subst Term Guard
-instance Subst Term Quals
 instance Subst Term Qual
 instance Subst Term Side
 instance Subst Term BOp

@@ -86,10 +86,8 @@ desugarDefn def = do
       let ps' = map desugarPattern ps
       return $ bind (mkGuards xs ps') b'
 
-    mkGuards :: [Name Core] -> [CPattern] -> CGuards
-    mkGuards [] _ = CGEmpty
-    mkGuards (x:xs) (p:ps) = CGCons (rebind (embed (CVar x), p) (mkGuards xs ps))
-    mkGuards _ _ = error "Impossible! mkGuards given lists of different lengths"
+    mkGuards :: [Name Core] -> [CPattern] -> Telescope (Embed Core, CPattern)
+    mkGuards xs ps = toTelescope (zip (map (embed . CVar) xs) ps)
 
     mkFunction :: [Name Core] -> Core -> Core
     mkFunction [] c     = c
@@ -226,28 +224,24 @@ desugarBranch b =
   return $ bind cgs c
 
 -- | Desugar a list of guards.
-desugarGuards :: AGuards -> DSM CGuards
-desugarGuards AGEmpty = return CGEmpty
-desugarGuards (AGCons (unrebind -> (ag, ags))) =
-  case ag of
-
-    -- Boolean guards are desugared to a pattern-match on @true@.
-    AGBool (unembed -> at) -> do
+desugarGuards :: Telescope AGuard -> DSM (Telescope (Embed Core, CPattern))
+desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
+  where
+    -- A Boolean guard is desugared to a pattern-match on @true@.
+    desugarGuard (AGBool (unembed -> at)) = do
       c <- desugarTerm at
-      cgs <- desugarGuards ags
-      return $ CGCons (rebind (embed c, CPCons (fromEnum True) []) cgs)
-    AGPat (unembed -> at) p -> do
+      return $ (embed c, CPCons (fromEnum True) [])
+    desugarGuard (AGPat (unembed -> at) p) = do
       c <- desugarTerm at
-      cgs <- desugarGuards ags
-      return $ CGCons (rebind (embed c, desugarPattern p) cgs)
+      return $ (embed c, desugarPattern p)
 
-desugarQuals :: AQuals -> DSM CQuals
-desugarQuals AQEmpty                        = return CQEmpty
-desugarQuals (AQCons (unrebind -> (q,qs)))  = do
-  dq <- desugarQual q
-  dqs <- desugarQuals qs
-  return $ CQCons (rebind dq dqs)
+-- | Desugar a telescope of list comprehension qualifiers.
+desugarQuals :: Telescope AQual -> DSM (Telescope CQual)
+desugarQuals qs = toTelescope <$> mapM desugarQual (fromTelescope qs)
 
+-- | Desugar a single list comprehension qualifier.  We just translate
+--   it directly into its Core counterpart, recursively desugaring
+--   terms.
 desugarQual :: AQual -> DSM CQual
 desugarQual (AQBind x (unembed -> t)) = do
   dt <- desugarTerm t

@@ -79,7 +79,7 @@ data DocThing
   deriving Show
 
 -- | A property is a universally quantified term of the form
---   @forall (v1 : T1) (v2 : T2). term@.
+--   @forall v1 : T1, v2 : T2. term@.
 type Property = Bind [(Name Term, Type)] Term
 
 -- | A declaration is either a type declaration or a definition.

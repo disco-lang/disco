@@ -441,6 +441,7 @@ reservedWords =
   , "Void", "Unit", "Bool"
   , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
+  , "forall"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -535,10 +536,23 @@ parseProperties = do
   -- trace ("start properties") $ return ()
   open "!!!"
   whitespace
-  ps <- block (bind [] <$> parseTerm)
+  ps <- block parseProperty
   close
   -- trace ("end properties") $ return ()
   return ps
+
+-- | Parse a property, of the form
+--
+--   @forall x1 : ty1, ..., xn : tyn. term@.
+parseProperty :: Parser Property
+parseProperty = bind
+  <$> (parseUniversal <|> return [])
+  <*> parseTerm
+  where
+    parseUniversal =
+         (() <$ symbol "∀" <|> reserved "forall")
+      *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
+      <* dot
 
 -- | Parse a single declaration (either a type declaration or
 --   single definition clause).
@@ -675,7 +689,7 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (symbol ":" *> parseType)
+  mty <- optionMaybe (colon *> parseType)
   t   <- symbol "=" *> (embed <$> parseTerm)
   return $ Binding mty x t
 

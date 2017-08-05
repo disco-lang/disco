@@ -299,6 +299,14 @@ check (TBin Div t1 t2) ty = do
   at2 <- check t2 ty
   return $ ATBin ty Div at1 at2
 
+check (TBin IDiv t1 t2) ty = do
+  if (isNumTy ty)
+    then do
+      at1 <- check t1 ty   -- should this be lub of ty and TyQP?
+      at2 <- check t2 ty   -- lub of ty and TyQP?
+      return $ ATBin ty IDiv at1 at2
+    else throwError (NotNumTy ty)
+
 check (TBin Exp t1 t2) ty =
   if (isNumTy ty)
     then do

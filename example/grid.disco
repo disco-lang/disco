@@ -1,12 +1,68 @@
-sqIso : Nat * Nat -> Nat
+-- Some isomorphisms between ℕ and ℕ×ℕ.
+
+||| An isomorphism between ℕ and ℕ×ℕ, counting off "by squares", like this:
+|||
+||| 0 3 8
+||| 1 2 7
+||| 4 5 6
+|||
+||| and so on, where the first column contains the square numbers.
+||| sqIso' is the inverse.
+
+!!! all (n -> sqIso (sqIso' n) = n) [0 .. 100]
+
+sqIso : ℕ×ℕ → ℕ
 sqIso (x,y) =
   {? y^2 + x           if x <= y,
      (x+1)^2 - 1 - y   otherwise
   ?}
 
-sqIso' : Nat -> Nat * Nat
+||| Inverse direction of the square isomorphism.
+sqIso' : ℕ → ℕ×ℕ
 sqIso' n =
   let r = sqrt n
   in  {? (n - r^2, r)            if  n <= r^2 + r,
          (r, (r+1)^2 - 1 - n)    otherwise
       ?}
+
+||| The classic "diagonal" isomorphism:
+|||
+||| 0 2 5
+||| 1 4
+||| 3
+|||
+||| where the first column contains the triangular numbers.
+
+!!! all (n -> diagIso (diagIso' n) = n) [0 .. 100]
+
+diagIso : ℕ×ℕ → ℕ
+diagIso (x,y) = (x+y)*(x+y+1)//2 + x
+
+diagIso' : ℕ → ℕ×ℕ
+diagIso' n =
+     let d = (sqrt(1 + 8n) - 1)//2 : N
+  in let t = d*(d+1)//2
+  in (n - t, d - (n - t))
+
+
+||| Every POSITIVE n can be decomposed into a power of two times an
+||| odd number, n = 2^x (2y + 1).  This creates an isomorphism n <->
+||| (x,y).
+|||
+||| This is actually an isomorphism between {n | n : ℕ, n > 0} and ℕ×ℕ,
+||| but at the moment the disco type system doesn't let us say that.
+
+!!! all (n -> powerIso (powerIso' n) = n) [1 .. 100]
+
+powerIso : ℕ×ℕ → ℕ
+powerIso (x,y) = 2^x * (2y + 1)
+
+powerIso' : ℕ → ℕ×ℕ
+powerIso' n =
+  {? (0, n//2)  if not (2 divides n),
+     (x+1,y)    when powerIso' (n//2) is (x,y)
+  ?}
+
+all : (N -> B) -> List N -> B
+all _ [] = True
+all p (n::ns) = p n and all p ns

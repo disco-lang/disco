@@ -10,7 +10,7 @@ import qualified Data.Map                         as M
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind,
+import           Unbound.Generics.LocallyNameless (LFreshM, Name, Embed, lunbind,
                                                    runLFreshM, unembed,
                                                    unrebind)
 
@@ -177,15 +177,18 @@ prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
       , prettyTerm' (prec op) InR t2
       ]
 prettyTerm (TLet bnd) = mparens initPA $
-  lunbind bnd $ \((x, unembed -> t1), t2) ->
-  hsep
-    [ text "let"
-    , prettyName x
-    , text "="
-    , prettyTerm' 0 InL t1
-    , text "in"
-    , prettyTerm' 0 InL t2
-    ]
+  lunbind bnd $ \(bs, t2) -> do
+    ds <- punctuate (text ",") (map prettyBinding bs)
+    hsep
+      [ text "let"
+      , hsep ds
+      , text "in"
+      , prettyTerm' 0 InL t2
+      ]
+  where
+    prettyBinding :: (Name Term, Embed Term) -> Doc
+    prettyBinding (x, unembed -> t) = hsep [prettyName x, text "=", prettyTerm' 0 InR t]
+
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)

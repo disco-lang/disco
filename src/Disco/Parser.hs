@@ -674,7 +674,7 @@ parseLet =
   TLet <$>
     (reserved "let" *>
       (bind
-        <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm)))
+        <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))) `sepBy` comma
         <*> (reserved "in" *> parseTerm)))
 
 -- | Parse a case expression.

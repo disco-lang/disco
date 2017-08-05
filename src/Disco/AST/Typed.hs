@@ -93,7 +93,7 @@ data ATerm where
   ATChain :: Type -> ATerm -> [ALink] -> ATerm
 
   -- | A (non-recursive) let expression.
-  ATLet   :: Type -> Bind (Name ATerm, Embed ATerm) ATerm -> ATerm
+  ATLet   :: Type -> Bind [(Name ATerm, Embed ATerm)] ATerm -> ATerm
 
   -- | A case expression.
   ATCase  :: Type -> [ABranch] -> ATerm

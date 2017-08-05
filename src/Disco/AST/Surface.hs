@@ -159,8 +159,8 @@ data Term where
   -- | List comprehension.
   TListComp :: Bind Quals Term -> Term
 
-  -- | A (non-recursive) let expression, @let x = t1 in t2@.
-  TLet   :: Bind (Name Term, Embed Term) Term -> Term
+  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
+  TLet   :: Bind [(Name Term, Embed Term)] Term -> Term
 
   -- | A case expression.
   TCase  :: [Branch] -> Term

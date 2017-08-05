@@ -91,11 +91,6 @@ data Core where
   --   correct number of arguments.
   COp   :: Op -> [Core] -> Core
 
-  -- | Non-recursive let @let x = t1 in t2@, with a strictness
-  --   annotation to determine whether @t1@ should be evaluated before
-  --   evaluating @t2@.
-  CLet  :: Strictness -> Bind (Name Core, Embed Core) Core -> Core
-
   -- | A case expression.
   CCase :: [CBranch] -> Core
 

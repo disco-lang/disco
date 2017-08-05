@@ -358,12 +358,6 @@ whnf (CApp str c1 c2) = do
     Lazy   -> mkThunk c2
   whnfApp v1 v2
 whnf (COp op cs)    = whnfOp op cs
-whnf (CLet str b)   =
-  lunbind b $ \((x, unembed -> t1), t2) -> do
-  v1 <- case str of
-    Strict -> whnf t1
-    Lazy   -> mkThunk t1
-  extend (coerce x) v1 $ whnf t2
 whnf (CCase bs)     = whnfCase bs
 whnf (CListComp b)  =
   lunbind b $ \(qs, t) -> do

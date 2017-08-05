@@ -71,6 +71,7 @@ import           Control.Lens                            ((%~), (&), _1, _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
+import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
@@ -263,12 +264,11 @@ check (TInj R t) ty@(TySum _ ty2) = do
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
 check (TLet l) ty =
-  lunbind l $ \((x, unembed -> t1), t2) -> do
-    at1 <- infer t1
-    let ty1 = getType at1
-    extend x ty1 $ do
+  lunbind l $ \(bs, t2) -> do
+    (as, ctx) <- inferBindings bs
+    extends ctx $ do
       at2 <- check t2 ty
-      return $ ATLet ty (bind (coerce x, embed at1) at2)
+      return $ ATLet ty (bind as at2)
 
 check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
@@ -795,12 +795,11 @@ infer (TTyOp Count t) = do
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.
 infer (TLet l) = do
-  lunbind l $ \((x, unembed -> t1), t2) -> do
-  at1 <- infer t1
-  let ty1 = getType at1
-  extend x ty1 $ do
+  lunbind l $ \(bs, t2) -> do
+  (as, ctx) <- inferBindings bs
+  extends ctx $ do
   at2 <- infer t2
-  return $ ATLet (getType at2) (bind (coerce x, embed at1) at2)
+  return $ ATLet (getType at2) (bind as at2)
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.
@@ -813,6 +812,17 @@ infer (TCase bs) = inferCase bs
 
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
+
+
+inferBindings :: [(Name Term, Embed Term)] -> TCM ([(Name ATerm, Embed ATerm)], Ctx)
+inferBindings bs = do
+  as <- mapM inferBinding bs
+  return ((map . first) coerce as, M.fromList $ map (second (getType . unembed)) as)
+
+inferBinding :: (Name Term, Embed Term) -> TCM (Name Term, Embed ATerm)
+inferBinding (x, unembed -> t) = do
+  at <- infer t
+  return (x, embed at)
 
 -- | Infer the type of a comparison. A comparison always has type
 --   Bool, but we have to make sure the subterms are OK. We must check

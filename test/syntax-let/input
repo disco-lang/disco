@@ -1,0 +1,2 @@
+let x = 3, y = 5 in x + y
+let x = 3 in let y = x + 1 in x*y

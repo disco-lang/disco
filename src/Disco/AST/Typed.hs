@@ -21,11 +21,13 @@
 
 module Disco.AST.Typed
        ( -- * Type-annotated terms
-         ATerm(..), ALink(..), getType
+         ATerm(..), ALink(..), ABinding, AProperty
 
-       , AProperty
          -- * Branches and guards
        , ABranch, AGuard(..), AQual(..)
+
+         -- * Utilities
+       , getType
        )
        where
 
@@ -92,7 +94,7 @@ data ATerm where
   ATChain :: Type -> ATerm -> [ALink] -> ATerm
 
   -- | A (non-recursive) let expression.
-  ATLet   :: Type -> Bind [(Name ATerm, Embed ATerm)] ATerm -> ATerm
+  ATLet   :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
 
   -- | A case expression.
   ATCase  :: Type -> [ABranch] -> ATerm
@@ -113,27 +115,7 @@ data ALink where
   ATLink :: BOp -> ATerm -> ALink
   deriving (Show, Generic)
 
--- | Get the type at the root of an 'ATerm'.
-getType :: ATerm -> Type
-getType (ATVar ty _)      = ty
-getType ATUnit            = TyUnit
-getType (ATBool _)        = TyBool
-getType (ATNat ty _)      = ty
-getType (ATRat _)         = TyQP
-getType (ATAbs ty _)      = ty
-getType (ATApp ty _ _)    = ty
-getType (ATTup ty _)      = ty
-getType (ATInj ty _ _)    = ty
-getType (ATUn ty _ _)     = ty
-getType (ATBin ty _ _ _)  = ty
-getType (ATTyOp ty _ _)   = ty
-getType (ATChain ty _ _)  = ty
-getType (ATList ty _ _)   = ty
-getType (ATListComp ty _) = ty
-getType (ATLet ty _)      = ty
-getType (ATCase ty _)     = ty
-getType (ATAscr _ ty)     = ty
-getType (ATSub ty _)      = ty
+type ABinding = (Name ATerm, Embed ATerm)
 
 -- | A branch of a case, consisting of a list of guards and a type-annotated term.
 type ABranch = Bind (Telescope AGuard) ATerm
@@ -169,3 +151,30 @@ instance Alpha ATerm
 instance Alpha ALink
 instance Alpha AGuard
 instance Alpha AQual
+
+------------------------------------------------------------
+-- getType
+------------------------------------------------------------
+
+-- | Get the type at the root of an 'ATerm'.
+getType :: ATerm -> Type
+getType (ATVar ty _)      = ty
+getType ATUnit            = TyUnit
+getType (ATBool _)        = TyBool
+getType (ATNat ty _)      = ty
+getType (ATRat _)         = TyQP
+getType (ATAbs ty _)      = ty
+getType (ATApp ty _ _)    = ty
+getType (ATTup ty _)      = ty
+getType (ATInj ty _ _)    = ty
+getType (ATUn ty _ _)     = ty
+getType (ATBin ty _ _ _)  = ty
+getType (ATTyOp ty _ _)   = ty
+getType (ATChain ty _ _)  = ty
+getType (ATList ty _ _)   = ty
+getType (ATListComp ty _) = ty
+getType (ATLet ty _)      = ty
+getType (ATCase ty _)     = ty
+getType (ATAscr _ ty)     = ty
+getType (ATSub ty _)      = ty
+

@@ -668,8 +668,10 @@ parseLet =
   TLet <$>
     (reserved "let" *>
       (bind
-        <$> ((,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))) `sepBy` comma
+        <$> (toTelescope <$> (parseBinding `sepBy` comma))
         <*> (reserved "in" *> parseTerm)))
+  where
+    parseBinding = (,) <$> ident <*> (symbol "=" *> (embed <$> parseTerm))
 
 -- | Parse a case expression.
 parseCase :: Parser Term

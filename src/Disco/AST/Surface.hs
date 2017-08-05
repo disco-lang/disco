@@ -38,7 +38,7 @@ module Disco.AST.Surface
        , Telescope(..), foldTelescope, toTelescope, fromTelescope
 
          -- ** Expressions
-       , Side(..), Link(..)
+       , Side(..), Link(..), Binding
 
          -- ** Lists
        , Qual(..), Ellipsis(..)
@@ -206,7 +206,7 @@ data Term where
   TListComp :: Bind (Telescope Qual) Term -> Term
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
-  TLet   :: Bind [(Name Term, Embed Term)] Term -> Term
+  TLet   :: Bind (Telescope Binding) Term -> Term
 
   -- | A case expression.
   TCase  :: [Branch] -> Term
@@ -239,6 +239,9 @@ data Qual where
   QGuard  :: Embed Term -> Qual
 
   deriving (Show, Generic)
+
+-- | A binding is a name along with its definition.
+type Binding = (Name Term, Embed Term)
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes

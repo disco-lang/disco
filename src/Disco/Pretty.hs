@@ -10,7 +10,7 @@ import qualified Data.Map                         as M
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (LFreshM, Name, Embed, lunbind,
+import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind,
                                                    runLFreshM, unembed)
 
 import           Disco.AST.Core
@@ -177,7 +177,7 @@ prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
       ]
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \(bs, t2) -> do
-    ds <- punctuate (text ",") (map prettyBinding bs)
+    ds <- punctuate (text ",") (map prettyBinding (fromTelescope bs))
     hsep
       [ text "let"
       , hsep ds
@@ -185,7 +185,7 @@ prettyTerm (TLet bnd) = mparens initPA $
       , prettyTerm' 0 InL t2
       ]
   where
-    prettyBinding :: (Name Term, Embed Term) -> Doc
+    prettyBinding :: Binding -> Doc
     prettyBinding (x, unembed -> t) = hsep [prettyName x, text "=", prettyTerm' 0 InR t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"

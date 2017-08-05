@@ -71,7 +71,7 @@ import           Control.Lens                            ((%~), (&), _1, _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Bifunctor                          (first, second)
+import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
@@ -265,7 +265,7 @@ check t@(TInj _ _) ty = throwError (NotSum t ty)
 
 check (TLet l) ty =
   lunbind l $ \(bs, t2) -> do
-    (as, ctx) <- inferBindings bs
+    (as, ctx) <- inferTelescope inferBinding bs
     extends ctx $ do
       at2 <- check t2 ty
       return $ ATLet ty (bind as at2)
@@ -796,7 +796,7 @@ infer (TTyOp Count t) = do
   -- t2 in an extended context.
 infer (TLet l) = do
   lunbind l $ \(bs, t2) -> do
-  (as, ctx) <- inferBindings bs
+  (as, ctx) <- inferTelescope inferBinding bs
   extends ctx $ do
   at2 <- infer t2
   return $ ATLet (getType at2) (bind as at2)
@@ -814,15 +814,10 @@ infer (TCase bs) = inferCase bs
 infer t = throwError (CantInfer t)
 
 
-inferBindings :: [(Name Term, Embed Term)] -> TCM ([(Name ATerm, Embed ATerm)], Ctx)
-inferBindings bs = do
-  as <- mapM inferBinding bs
-  return ((map . first) coerce as, M.fromList $ map (second (getType . unembed)) as)
-
-inferBinding :: (Name Term, Embed Term) -> TCM (Name Term, Embed ATerm)
+inferBinding :: Binding -> TCM (ABinding, Ctx)
 inferBinding (x, unembed -> t) = do
   at <- infer t
-  return (x, embed at)
+  return ((coerce x, embed at), singleCtx x (getType at))
 
 -- | Infer the type of a comparison. A comparison always has type
 --   Bool, but we have to make sure the subterms are OK. We must check

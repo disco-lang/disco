@@ -1,0 +1,24 @@
+-- Prime Number Test:
+--
+-- Citation: "The Haskell Road to Logic, Maths, and Programming, 2nd
+-- Edition, pages 4 - 11"
+
+-- ldf calculates the least common divisor of n that is at least k.
+
+ldf : Z -> Z -> Z
+ldf k n =
+  {? k            if k divides n,
+     n            if k^2 > n,
+     ldf (k+1) n  otherwise
+  ?}
+
+-- ld calculates the least divisor of n.
+ld : Z -> Z
+ld = ldf 2
+
+-- Tests whether n is a prime or not.
+isPrime : Z -> Bool
+isPrime n =
+  {? false      if n <= 1,
+     ld n = n   otherwise
+  ?}

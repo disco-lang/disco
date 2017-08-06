@@ -32,7 +32,7 @@ module Disco.Eval
          -- * Disco monad
 
        , Disco, runDisco
-       , emptyEnv, extend, extends, getEnv, withEnv
+       , extendEnv, extendsEnv, getEnv, withEnv
        , allocate
        , delay, mkThunk
 
@@ -43,13 +43,13 @@ import           Control.Lens                       ((<+=), (%=), makeLenses)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Map                           (Map)
 import qualified Data.Map                           as M
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
 
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Context                      (Ctx)
 import           Disco.AST.Core
 
 ------------------------------------------------------------
@@ -122,10 +122,11 @@ instance Show ValDelay where
 -- Environments
 ------------------------------------------------------------
 
-type Loc = Int
-
 -- | An environment is a mapping from names to values.
-type Env  = Map (Name Core) Value
+type Env  = Ctx Core Value
+
+-- XXX
+type Loc = Int
 
 -- | A memory is a mapping from "locations" (uniquely generated
 --   identifiers) to values.  It also keeps track of the next
@@ -186,19 +187,15 @@ makeLenses ''Memory
 runDisco :: Disco a -> Either InterpError a
 runDisco = runLFreshM . runExceptT . flip runReaderT M.empty . flip evalStateT initMemory
 
--- | The empty environment.
-emptyEnv :: Env
-emptyEnv = M.empty
-
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extend :: Name Core -> Value -> Disco a -> Disco a
-extend x v = avoid [AnyName x] . local (M.insert x v)
+extendEnv :: Name Core -> Value -> Disco a -> Disco a
+extendEnv x v = avoid [AnyName x] . local (M.insert x v)
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extends :: Env -> Disco a -> Disco a
-extends e' = avoid (map AnyName (M.keys e')) . local (M.union e')
+extendsEnv :: Env -> Disco a -> Disco a
+extendsEnv e' = avoid (map AnyName (M.keys e')) . local (M.union e')
 
 -- | Get the current environment.
 getEnv :: Disco Env

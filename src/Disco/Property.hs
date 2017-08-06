@@ -48,7 +48,7 @@ testIsOK _ = False
 runTest :: M.Map (Name Core) Core -> AProperty -> TestResult
 runTest defs aprop = either TestRuntimeFailure mconcat $ runDisco $ withDefs defs $ do
   lunbind aprop $ \(binds, at) ->
-    for (testCases binds) $ \env -> extends env $ do
+    for (testCases binds) $ \env -> extendsEnv env $ do
       case getEquatands at of
         Nothing        -> do
           v <- evalTerm at

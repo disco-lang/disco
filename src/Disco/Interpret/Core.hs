@@ -16,7 +16,7 @@
 module Disco.Interpret.Core
        (
          -- * Evaluation
-         DefEnv, withDefs
+         withDefs
 
        , delay
        , vnum
@@ -55,7 +55,6 @@ import           Control.Monad.Except               (throwError)
 import           Control.Monad.Reader               (local)
 import           Data.Coerce                        (coerce)
 import           Data.List                          (find)
-import           Data.Map                           (Map)
 import qualified Data.Map                           as M
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
@@ -70,6 +69,7 @@ import           Math.Combinatorics.Exact.Factorial (factorial)
 import           Math.NumberTheory.Logarithms       (integerLog2)
 import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
+import           Disco.Context
 import           Disco.Eval
 import           Disco.AST.Surface (Ellipsis(..), fromTelescope)
 import           Disco.AST.Core
@@ -79,12 +79,9 @@ import           Disco.Types
 -- Evaluation
 ------------------------------------------------------------
 
--- | A definition environment is a mapping fron names to core terms.
-type DefEnv = Map (Name Core) Core
-
 -- | Run a @Disco@ computation with a top-level environment of
 --   (potentially recursive) definitions.
-withDefs :: DefEnv -> Disco a -> Disco a
+withDefs :: Ctx Core Core -> Disco a -> Disco a
 withDefs cenv im = do
 
   -- Take the environment mapping names to definitions, and turn

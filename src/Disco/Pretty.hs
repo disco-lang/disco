@@ -7,6 +7,7 @@ import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
 import           Data.Char                        (isAlpha, toLower)
 import qualified Data.Map                         as M
+import           Data.Maybe                       (fromJust)
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
@@ -373,6 +374,11 @@ digitalExpansion b n d = (prefix,rep)
     longDivStep (_, r) = ((b*r) `divMod` d)
     res       = tail $ iterate longDivStep (0,n)
     digits    = map fst res
-    Just lims = findRep res
+    lims      = fromJust $ findRep res
+                -- fromJust is OK here: the remainders in the long
+                -- division algorithm are limited to [0,d), so by the
+                -- Pigeonhole Principle they must eventually repeat,
+                -- so findRep is guaranteed to find a repeat.
+
     rep       = slice lims digits
     prefix    = take (fst lims) digits

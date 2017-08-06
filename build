@@ -1,2 +1,2 @@
 #!/bin/sh
-stack build --fast --file-watch --ghc-options='-Wall'
+stack build --fast --file-watch --ghc-options='-Wall -Wincomplete-uni-patterns'

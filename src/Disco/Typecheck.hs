@@ -975,7 +975,10 @@ withTypeDecls decls k = do
     ((x,_):_) -> throwError (DuplicateDecls x)
     []        -> extends declCtx k
   where
-    declCtx = M.fromList (map (\(DType x ty) -> (x,ty)) decls)
+    declCtx = M.fromList $ map getDType decls
+
+    getDType (DType x ty) = (x,ty)
+    getDType d            = error $ "Impossible! withTypeDecls.getDType called on non-DType: " ++ show d
 
 -- | Type check a top-level definition. Precondition: only called on
 --   'DDefn's.

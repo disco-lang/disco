@@ -21,17 +21,15 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Eval                       (runDisco)
-import           Disco.Interpret.Core             (rnf, withDefs)
+import           Disco.Interpret.Core             (rnf, withDefs, DefEnv)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 
-type CDefns = M.Map (Name Core) Core
-
 data REPLState = REPLState
   { _replCtx   :: Ctx
-  , _replDefns :: CDefns
+  , _replDefns :: DefEnv
   , _replDocs  :: DocMap
   }
 

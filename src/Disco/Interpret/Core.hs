@@ -36,6 +36,7 @@ module Disco.Interpret.Core
 
          -- * Evaluation
        , delay
+       , vnum
        , mkThunk
        , mkEnum
 
@@ -58,6 +59,10 @@ module Disco.Interpret.Core
 
          -- * Comparison testing
        , ltOp, primValOrd, decideOrdFor, decideOrdForClosures
+
+         -- * Lists
+
+       , toDiscoList  -- XXX export more
 
        )
        where

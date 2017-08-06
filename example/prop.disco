@@ -1,0 +1,4 @@
+
+!!! ∀ x : N, y : N. plus x y = plus y x
+plus : N -> N -> N
+plus x y = x + y

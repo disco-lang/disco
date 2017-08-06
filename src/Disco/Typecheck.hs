@@ -27,9 +27,6 @@ module Disco.Typecheck
          TCM, runTCM, evalTCM, execTCM
          -- ** Definitions
        , Defn, Defns
-         -- ** Contexts
-       , Ctx, emptyCtx, singleCtx, joinCtx, joinCtxs
-       , lookup, extend, extends, addDefn
          -- ** Errors
        , TCError(..)
 
@@ -80,6 +77,7 @@ import qualified Data.Map                                as M
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           Disco.Context
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators
@@ -97,8 +95,8 @@ type Defn  = [Bind [Pattern] ATerm]
 -- | A map from names to definitions.
 type Defns = M.Map (Name ATerm) Defn
 
--- | A typing context, /i.e./ a map from names to types.
-type Ctx = M.Map (Name Term) Type
+-- | A typing context is a mapping from term names to types.
+type TyCtx = Ctx Term Type
 
 -- | Potential typechecking errors.
 data TCError
@@ -153,7 +151,7 @@ instance Monoid TCError where
 -- | Type checking monad. Maintains a context of variable types and a
 --   set of definitions, and can throw @TCError@s and generate fresh
 --   names.
-type TCM = StateT Defns (ReaderT Ctx (ExceptT TCError LFreshM))
+type TCM = StateT Defns (ReaderT TyCtx (ExceptT TCError LFreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError (a, Defns)
@@ -169,45 +167,13 @@ evalTCM = fmap fst . runTCM
 execTCM :: TCM a -> Either TCError Defns
 execTCM = fmap snd . runTCM
 
--- | The empty context.
-emptyCtx :: Ctx
-emptyCtx = M.empty
-
--- | A singleton context, mapping a name to a type.
-singleCtx :: Name Term -> Type -> Ctx
-singleCtx = M.singleton
-
--- | Join two contexts (left-biased).
-joinCtx :: Ctx -> Ctx -> Ctx
-joinCtx = M.union
-
--- | Join a list of contexts (left-biased).
-joinCtxs :: [Ctx] -> Ctx
-joinCtxs = M.unions
-
--- | Look up a name in the context, either returning its type or
---   throwing an unbound variable exception if it is not found.
-lookup :: Name Term -> TCM Type
-lookup x = do
-  ctx <- ask
-  case M.lookup x ctx of
-    Nothing -> throwError (Unbound x)
-    Just ty -> return ty
-
--- | Run a @TCM@ computation in a context extended with a new binding.
---   The new binding shadows any old binding for the same name.
-extend :: Name Term -> Type -> TCM a -> TCM a
-extend x ty = local (M.insert x ty)
-
--- | Run a @TCM@ computation in a context extended with an additional
---   context.  Bindings in the additional context shadow any bindings
---   with the same names in the existing context.
-extends :: Ctx -> TCM a -> TCM a
-extends ctx = local (joinCtx ctx)
-
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
 addDefn x b = modify (M.insert (coerce x) b)
+
+-- XXX
+lookupTy :: Name Term -> TCM Type
+lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
@@ -580,7 +546,7 @@ infer (TParens t)   = infer t
 
   -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
-  ty <- lookup x
+  ty <- lookupTy x
   return $ ATVar ty (coerce x)
 
   -- A few trivial cases.
@@ -818,7 +784,7 @@ infer t = throwError (CantInfer t)
 --   bound variable.  The optional type annotation on the variable
 --   determines whether we use inference or checking mode for the
 --   body.
-inferBinding :: Binding -> TCM (ABinding, Ctx)
+inferBinding :: Binding -> TCM (ABinding, TyCtx)
 inferBinding (Binding mty x (unembed -> t)) = do
   at <- case mty of
     Just ty -> check t ty
@@ -883,7 +849,7 @@ inferBranch b =
 --   subsequent items in the telescope.
 inferTelescope
   :: (Alpha b, Alpha tyb)
-  => (b -> TCM (tyb, Ctx)) -> Telescope b -> TCM (Telescope tyb, Ctx)
+  => (b -> TCM (tyb, TyCtx)) -> Telescope b -> TCM (Telescope tyb, TyCtx)
 inferTelescope inferOne tel = first toTelescope <$> go (fromTelescope tel)
   where
     go []     = return ([], emptyCtx)
@@ -895,7 +861,7 @@ inferTelescope inferOne tel = first toTelescope <$> go (fromTelescope tel)
 
 -- | Infer the type of a guard, returning the type-annotated guard
 --   along with a context of types for any variables bound by the guard.
-inferGuard :: Guard -> TCM (AGuard, Ctx)
+inferGuard :: Guard -> TCM (AGuard, TyCtx)
 inferGuard (GBool (unembed -> t)) = do
   at <- check t TyBool
   return (AGBool (embed at), emptyCtx)
@@ -904,7 +870,7 @@ inferGuard (GPat (unembed -> t) p) = do
   ctx <- checkPattern p (getType at)
   return (AGPat (embed at) p, ctx)
 
-inferQual :: Qual -> TCM (AQual, Ctx)
+inferQual :: Qual -> TCM (AQual, TyCtx)
 inferQual (QBind x (unembed -> t))  = do
   at <- infer t
   case getType at of
@@ -916,7 +882,7 @@ inferQual (QGuard (unembed -> t))   = do
 
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
-checkPattern :: Pattern -> Type -> TCM Ctx
+checkPattern :: Pattern -> Type -> TCM TyCtx
 checkPattern (PVar x) ty                    = return $ singleCtx x ty
 checkPattern PWild    _                     = ok
 checkPattern PUnit TyUnit                   = ok
@@ -935,7 +901,7 @@ checkPattern (PList ps) (TyList ty) =
 
 checkPattern p ty = throwError (PatternType p ty)
 
-checkTuplePat :: [Pattern] -> Type -> TCM [Ctx]
+checkTuplePat :: [Pattern] -> Type -> TCM [TyCtx]
 checkTuplePat [] _   = error "Impossible! checkTuplePat []"
 checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
   ctx <- checkPattern p ty
@@ -948,12 +914,12 @@ checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
 
 -- | Successfully return the empty context.  A convenience method for
 --   checking patterns that bind no variables.
-ok :: TCM Ctx
+ok :: TCM TyCtx
 ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (DocMap, M.Map (Name ATerm) [AProperty], Ctx)
+checkModule :: Module -> TCM (DocMap, M.Map (Name ATerm) [AProperty], TyCtx)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
@@ -984,7 +950,7 @@ withTypeDecls decls k = do
 --   'DDefn's.
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
-  ty <- lookup x
+  ty <- lookupTy x
   prevDefn <- gets (M.lookup (coerce x))
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)

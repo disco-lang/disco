@@ -16,9 +16,10 @@ import           System.Exit
 import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Types
+import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval                       (runDisco)
 import           Disco.Interpret.Core             (rnf, withDefs, DefEnv)
@@ -28,7 +29,7 @@ import           Disco.Property
 import           Disco.Typecheck
 
 data REPLState = REPLState
-  { _replCtx   :: Ctx
+  { _replCtx   :: Ctx Term Type
   , _replDefns :: DefEnv
   , _replDocs  :: DocMap
   }

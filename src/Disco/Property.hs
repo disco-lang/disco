@@ -46,7 +46,7 @@ testIsOK _ = False
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
 runTest :: M.Map (Name Core) Core -> AProperty -> TestResult
-runTest defs aprop = either TestRuntimeFailure mconcat $ runIM $ withDefs defs $ do
+runTest defs aprop = either TestRuntimeFailure mconcat $ runDisco $ withDefs defs $ do
   lunbind aprop $ \(binds, at) ->
     for (testCases binds) $ \env -> extends env $ do
       case getEquatands at of

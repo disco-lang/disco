@@ -31,7 +31,7 @@ module Disco.Eval
 
          -- * Disco monad
 
-       , IM, runIM
+       , Disco, runDisco
        , emptyEnv, extend, extends, getEnv, withEnv
        , allocate
        , delay, mkThunk
@@ -97,7 +97,7 @@ data Value where
   --   passed to the function.
   VFun   :: ValFun -> Value
 
-  -- | A delayed value, containing an @IM Value@ computation which can
+  -- | A delayed value, containing a @Disco Value@ computation which can
   --   be run later.
   VDelay  :: ValDelay -> Value
   deriving Show
@@ -110,10 +110,10 @@ newtype ValFun = ValFun (Value -> Value)
 instance Show ValFun where
   show _ = "<fun>"
 
--- | A @ValDelay@ is just an @IM Value@ computation.  It is a
+-- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (IM Value)
+newtype ValDelay = ValDelay (Disco Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
@@ -177,14 +177,14 @@ data InterpError where
 -- | The interpreter monad.  Combines read-only access to an
 --   environment, and the ability to throw @InterpErrors@ and generate
 --   fresh names.
-type IM = StateT Memory (ReaderT Env (ExceptT InterpError LFreshM))
+type Disco = StateT Memory (ReaderT Env (ExceptT InterpError LFreshM))
 
 makeLenses ''Memory
 
--- | Run a computation in the @IM@ monad, starting in the empty
+-- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
-runIM :: IM a -> Either InterpError a
-runIM = runLFreshM . runExceptT . flip runReaderT M.empty . flip evalStateT initMemory
+runDisco :: Disco a -> Either InterpError a
+runDisco = runLFreshM . runExceptT . flip runReaderT M.empty . flip evalStateT initMemory
 
 -- | The empty environment.
 emptyEnv :: Env
@@ -192,37 +192,37 @@ emptyEnv = M.empty
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extend :: Name Core -> Value -> IM a -> IM a
+extend :: Name Core -> Value -> Disco a -> Disco a
 extend x v = avoid [AnyName x] . local (M.insert x v)
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extends :: Env -> IM a -> IM a
+extends :: Env -> Disco a -> Disco a
 extends e' = avoid (map AnyName (M.keys e')) . local (M.union e')
 
 -- | Get the current environment.
-getEnv :: IM Env
+getEnv :: Disco Env
 getEnv = ask
 
--- | Run an @IM@ computation with a /replaced/ (not extended)
+-- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Env -> IM a -> IM a
+withEnv :: Env -> Disco a -> Disco a
 withEnv = local . const
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.
-allocate :: Value -> IM Loc
+allocate :: Value -> Disco Loc
 allocate v = do
   loc <- nextLoc <+= 1
   memStore %= IntMap.insert loc v
   return loc
 
--- | Delay an @IM Value@ computation by packaging it into a @VDelay@
+-- | Delay a @Disco Value@ computation by packaging it into a @VDelay@
 --   constructor.  When it is evaluated later, it will be run with the
 --   environment that was current at the time 'delay' was called,
 --   /not/ the one that is in effect later.
-delay :: IM Value -> IM Value
+delay :: Disco Value -> Disco Value
 delay imv = do
   e <- getEnv
   return (VDelay . ValDelay $ withEnv e imv)
@@ -231,5 +231,5 @@ delay imv = do
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkThunk :: Core -> IM Value
+mkThunk :: Core -> Disco Value
 mkThunk c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))

@@ -82,8 +82,9 @@ import           Disco.Types
 -- | A definition environment is a mapping fron names to core terms.
 type DefEnv = Map (Name Core) Core
 
--- | XXX comment me
-withDefs :: DefEnv -> IM a -> IM a
+-- | Run a @Disco@ computation with a top-level environment of
+--   (potentially recursive) definitions.
+withDefs :: DefEnv -> Disco a -> Disco a
 withDefs cenv im = do
 
   -- Take the environment mapping names to definitions, and turn
@@ -100,7 +101,7 @@ withDefs cenv im = do
   -- replace their environments.
   memStore %= IntMap.map (replaceThunkEnv env)
 
-  -- Finally, run the given IM computation with the initial
+  -- Finally, run the given Disco computation with the initial
   -- environment we just built.
   local (const env) im
 
@@ -120,11 +121,11 @@ mkEnum :: Enum e => e -> Value
 mkEnum e = VCons (fromEnum e) []
 
 -- | Evaluate a Core expression to reduced normal form.
-rnf :: Core -> IM Value
+rnf :: Core -> Disco Value
 rnf c = mkThunk c >>= rnfV
 
 -- | Reduce a value to reduced normal form.
-rnfV :: Value -> IM Value
+rnfV :: Value -> Disco Value
 rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
 rnfV v@(VThunk _ _) = whnfV v >>= rnfV
 rnfV v@(VDelay _)   = whnfV v >>= rnfV
@@ -132,7 +133,7 @@ rnfV v@(VIndir _)   = whnfV v >>= rnfV
 rnfV v              = return v
 
 -- | Reduce a value to weak head normal form.
-whnfV :: Value -> IM Value
+whnfV :: Value -> Disco Value
 whnfV (VThunk c e)            = withEnv e $ whnf c
 whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
 whnfV (VIndir loc)            = whnfIndir loc
@@ -143,7 +144,7 @@ whnfV v                       = return v
 --   reduced value, we also update the memory location to contain it.
 --   That way if anything else refers to the same location, it will
 --   not need to be re-evaluated later.
-whnfIndir :: Loc -> IM Value
+whnfIndir :: Loc -> Disco Value
 whnfIndir loc = do
   m <- use memStore
   v <- whnfV (m ! loc)
@@ -151,7 +152,7 @@ whnfIndir loc = do
   return v
 
 -- | Reduce a Core expression to weak head normal form.
-whnf :: Core -> IM Value
+whnf :: Core -> Disco Value
 whnf (CVar x) = do
   e <- getEnv
   case (M.lookup (coerce x) e) of
@@ -179,7 +180,7 @@ whnf (CType _)      = error "Called whnf on CType"
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
 --   (which means it must be a closure, or a @VFun@).
-whnfApp :: Value -> Value -> IM Value
+whnfApp :: Value -> Value -> Disco Value
 whnfApp (VClos c e) v =
   lunbind c $ \(x,t) -> do
   withEnv e           $ do
@@ -198,10 +199,10 @@ whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 -- | A lazy foldr on lists represented as 'Value's.  The entire
 --   function is wrapped in a call to 'delay', so it does not actually
 --   reduce the list argument to whnf until (potentially) forced by a
---   call to 'whnf' later.  That is, executing the resulting @IM
+--   call to 'whnf' later.  That is, executing the resulting @Disco
 --   Value@ just results in a 'VDelay'; forcing that @VDelay@ with
 --   'whnf' will then cause the foldr to actually start executing.
-vfoldr :: (Value -> Value -> IM Value) -> Value -> Value -> IM Value
+vfoldr :: (Value -> Value -> Disco Value) -> Value -> Value -> Disco Value
 vfoldr f z xs = delay $ do
   xs' <- whnfV xs
   case xs' of
@@ -212,22 +213,22 @@ vfoldr f z xs = delay $ do
     _               -> error $ "Impossible! Got " ++ show xs' ++ " in vfoldr"
 
 -- | Lazy append on 'Value' lists, implemented via 'vfoldr'.
-vappend :: Value -> Value -> IM Value
+vappend :: Value -> Value -> Disco Value
 vappend xs ys = vfoldr (\h t -> return $ VCons 1 [h,t]) ys xs
 
 -- | Lazy concat on 'Value' lists, implemented via 'vfoldr'.
-vconcat :: Value -> IM Value
+vconcat :: Value -> Disco Value
 vconcat = vfoldr vappend (VCons 0 [])
 
 -- | Lazy map on 'Value' lists, implemented via 'vfoldr'.
-vmap :: (Value -> IM Value) -> Value -> IM Value
+vmap :: (Value -> Disco Value) -> Value -> Disco Value
 vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
 
 --------------------------------------------------
 -- List comprehensions
 
 -- | Expand a list comprehension to a lazy 'Value' list.
-expandComp :: Core -> [CQual] -> IM Value
+expandComp :: Core -> [CQual] -> Disco Value
 
 -- [ t | ] = [ t ]
 expandComp t [] = do
@@ -269,7 +270,7 @@ expandComp t (q:qs) = do
 -- output them lazily, and evaluate them only when we need them to
 -- compute the rest of the values.
 
-expandEllipsis :: [Core] -> Ellipsis Core -> IM Value
+expandEllipsis :: [Core] -> Ellipsis Core -> Disco Value
 expandEllipsis cs ell = do
   vs  <- mapM whnf cs
   end <- traverse whnf ell
@@ -322,7 +323,7 @@ constdiff (x:xs)
 ------------------------------------------------------------
 
 -- | Reduce a case expression to weak head normal form.
-whnfCase :: [CBranch] -> IM Value
+whnfCase :: [CBranch] -> Disco Value
 whnfCase []     = throwError NonExhaustive
 whnfCase (b:bs) = do
   lunbind b $ \(gs, t) -> do
@@ -334,7 +335,7 @@ whnfCase (b:bs) = do
 -- | Check a chain of guards on one branch of a case.  Returns
 --   @Nothing@ if the guards fail to match, or a resulting environment
 --   of bindings if they do match.
-checkGuards :: [(Embed Core, CPattern)] -> IM (Maybe Env)
+checkGuards :: [(Embed Core, CPattern)] -> Disco (Maybe Env)
 checkGuards [] = ok
 checkGuards ((unembed -> c, p) : gs) = do
   v <- mkThunk c
@@ -345,7 +346,7 @@ checkGuards ((unembed -> c, p) : gs) = do
 
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.
-match :: Value -> CPattern -> IM (Maybe Env)
+match :: Value -> CPattern -> Disco (Maybe Env)
 match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
 match _ CPWild        = ok
 match v (CPCons i ps) = do
@@ -369,11 +370,11 @@ match v (CPSucc p) = do
     False -> noMatch
 
 -- | Convenience function: successfully match with no bindings.
-ok :: IM (Maybe Env)
+ok :: Disco (Maybe Env)
 ok = return $ Just M.empty
 
 -- | Convenience function: fail to match.
-noMatch :: IM (Maybe Env)
+noMatch :: Disco (Maybe Env)
 noMatch = return Nothing
 
 ------------------------------------------------------------
@@ -381,7 +382,7 @@ noMatch = return Nothing
 ------------------------------------------------------------
 
 -- | Reduce an operator application to WHNF.
-whnfOp :: Op -> [Core] -> IM Value
+whnfOp :: Op -> [Core] -> Disco Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
 whnfOp OPosSub  = numOp' posSubOp
@@ -416,13 +417,13 @@ whnfOp (OMDiv n) = modDiv n
 whnfOp (OMExp n) = modExp n
 
 -- | Perform a numeric binary operation.
-numOp :: (Rational -> Rational -> Rational) -> [Core] -> IM Value
+numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco Value
 numOp (#) = numOp' (\m n -> return (vnum (m # n)))
 
 -- | A more general version of 'numOp' where the binary operation has
---   a result in the @IM@ monad (/e.g./ for operations which can throw
+--   a result in the @Disco@ monad (/e.g./ for operations which can throw
 --   a division by zero error).
-numOp' :: (Rational -> Rational -> IM Value) -> [Core] -> IM Value
+numOp' :: (Rational -> Rational -> Disco Value) -> [Core] -> Disco Value
 numOp' (#) cs = do
   [VNum d1 m, VNum d2 n] <- mapM whnf cs     -- If the program type checked this can
   res <- m # n                               -- never go wrong.
@@ -431,21 +432,21 @@ numOp' (#) cs = do
     _        -> return res                   --   the combination of the input flags.
 
 -- | Perform a numeric unary operation.
-uNumOp :: (Rational -> Rational) -> [Core] -> IM Value
+uNumOp :: (Rational -> Rational) -> [Core] -> Disco Value
 uNumOp f [c] = do
   VNum d m <- whnf c
   return $ VNum d (f m)
 uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
 
 -- | For performing a modular unary operation within a finite type
-modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> IM Value
+modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> Disco Value
 modArithUn op n [c] = do
   VNum _ r <- whnf c
   modOp (op r) (n % 1)
 modArithUn _ _ _ = error "Impossible! modArithUn error (too many Cores)"
 
 -- | For performing a modular binary operation within a finite type.
-modArithBin :: (Rational -> Rational -> Rational) -> Integer -> [Core] -> IM Value
+modArithBin :: (Rational -> Rational -> Rational) -> Integer -> [Core] -> Disco Value
 modArithBin op n [c1,c2] = do
   VNum _ r1 <- whnf c1
   VNum _ r2 <- whnf c2
@@ -453,7 +454,7 @@ modArithBin op n [c1,c2] = do
 modArithBin _ _ _ = error "Impossible! modArithBin error (wrong # of Cores)"
 
 -- | For performing modular division within a finite type.
-modDiv :: Integer -> [Core] -> IM Value
+modDiv :: Integer -> [Core] -> Disco Value
 modDiv n [c1,c2] = do
   VNum _ a <- whnf c1
   VNum _ b <- whnf c2
@@ -463,7 +464,7 @@ modDiv n [c1,c2] = do
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 
 -- | For performing modular exponentiation within a finite type.
-modExp :: Integer -> [Core] -> IM Value
+modExp :: Integer -> [Core] -> Disco Value
 modExp n [c1,c2] = do
   VNum _ r1 <- whnf c1
   VNum _ r2 <- whnf c2
@@ -473,7 +474,7 @@ modExp n [c1,c2] = do
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
-countOp :: [Core] -> IM Value
+countOp :: [Core] -> Disco Value
 countOp [CType ty]  = return $ vnum ((countOp' ty) % 1)
 countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 
@@ -489,7 +490,7 @@ countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
 countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is infinite."
 
 -- | Perform an enumeration of the values of a given type.
-enumOp :: [Core] -> IM Value
+enumOp :: [Core] -> Disco Value
 enumOp [CType ty] = return $ (toDiscoList (enumerate ty))
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
@@ -529,25 +530,25 @@ ceilOp :: Rational -> Rational
 ceilOp n  = (ceiling n) % 1
 
 -- | Perform a base-2 logarithmic operation
-lgOp :: [Core] -> IM Value
+lgOp :: [Core] -> Disco Value
 lgOp [c] = do
   VNum _ m <- whnf c
   lgOp' m
 lgOp cs = error $ "Impossible! lgOp on " ++ show cs
 
-lgOp' :: Rational -> IM Value
+lgOp' :: Rational -> Disco Value
 lgOp' 0 = throwError LgOfZero
 lgOp' n = return $ vnum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
-divOp :: Rational -> Rational -> IM Value
+divOp :: Rational -> Rational -> Disco Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
 
 -- | Perform a checked subtraction on positive values.  Throw an
 --   underflow error if the second argument is greater than the first.
-posSubOp :: Rational -> Rational -> IM Value
+posSubOp :: Rational -> Rational -> Disco Value
 posSubOp m n
   | n > m     = throwError Underflow
   | otherwise = return $ vnum (m - n)
@@ -556,7 +557,7 @@ posSubOp m n
 --   second argument is zero.  Although this function takes two
 --   'Rational' arguments, note that if the disco program typechecks
 --   then the arguments must in fact be integers.
-modOp :: Rational -> Rational -> IM Value
+modOp :: Rational -> Rational -> Disco Value
 modOp m n
   | n == 0    = throwError DivByZero
   | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
@@ -564,20 +565,20 @@ modOp m n
                 -- called on integral things.
 
 -- | Perform a boolean operation.
-boolOp :: (Bool -> Bool -> Bool) -> [Core] -> IM Value
+boolOp :: (Bool -> Bool -> Bool) -> [Core] -> Disco Value
 boolOp (#) cs = do
   [VCons i [], VCons j []] <- mapM whnf cs
   return . mkEnum $ toEnum i # toEnum j
 
 -- | Test whether one number divides another.
-divides :: Rational -> Rational -> IM Value
+divides :: Rational -> Rational -> Disco Value
 divides 0 0 = return $ mkEnum True
 divides 0 _ = return $ mkEnum False
 divides x y = return . mkEnum $ denominator (y / x) == 1
 
 -- | Test relative primality.  Note that if the disco program
 --   typechecks, the arguments here will always be integers.
-relPm :: Rational -> Rational -> IM Value
+relPm :: Rational -> Rational -> Disco Value
 relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 
 -- | Binomial coefficient.  The arguments will always be natural
@@ -585,7 +586,7 @@ relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 binom :: Rational -> Rational -> Rational
 binom (numerator -> n) (numerator -> k) = choose n k % 1
 
-multinomOp :: [Core] -> IM Value
+multinomOp :: [Core] -> Disco Value
 multinomOp [c1, c2] = do
   VNum _ n <- whnf c1
   ks       <- rnf  c2
@@ -609,7 +610,7 @@ fact :: Rational -> Rational
 fact (numerator -> n) = factorial (fromIntegral n) % 1
 
 -- | Perform boolean negation.
-notOp :: [Core] -> IM Value
+notOp :: [Core] -> Disco Value
 notOp [c] = do
   VCons i [] <- whnf c
   return . mkEnum . not . toEnum $ i
@@ -620,13 +621,13 @@ notOp _ = error "Impossible! notOp called on list of length /= 1"
 ------------------------------------------------------------
 
 -- | Test two expressions for equality at the given type.
-eqOp :: Type -> [Core] -> IM Value
+eqOp :: Type -> [Core] -> Disco Value
 eqOp ty cs = do
   [v1, v2] <- mapM mkThunk cs
   mkEnum <$> decideEqFor ty v1 v2
 
 -- | Lazily decide equality of two values at the given type.
-decideEqFor :: Type -> Value -> Value -> IM Bool
+decideEqFor :: Type -> Value -> Value -> Disco Bool
 
 -- To decide equality at a pair type:
 decideEqFor (TyPair ty1 ty2) v1 v2 = do
@@ -764,7 +765,7 @@ enumTyFin n = VNum Fraction (n%1)
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need
---   to be in the @IM@ monad, because no evaluation needs to happen.
+--   to be in the @Disco@ monad, because no evaluation needs to happen.
 decideEqForRnf :: Type -> Value -> Value -> Bool
 decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
@@ -777,7 +778,7 @@ decideEqForRnf _ v1 v2 = primValEq v1 v2
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
 --   functions @f1@ and @f2@ produce the same output (of type @ty@) on
 --   all inputs in @vs@.
-decideEqForClosures :: Type -> Value -> Value -> [Value] -> IM Bool
+decideEqForClosures :: Type -> Value -> Value -> [Value] -> Disco Bool
 decideEqForClosures ty2 clos1 clos2 = go
   where
 
@@ -815,13 +816,13 @@ primValEq _ _                       = False
 
 -- | Test two expressions to see whether the first is less than the
 --   second at the given type.
-ltOp :: Type -> [Core] -> IM Value
+ltOp :: Type -> [Core] -> Disco Value
 ltOp ty cs = do
   [v1, v2] <- mapM mkThunk cs
   (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
 
 -- | Lazily decide the ordering of two values at the given type.
-decideOrdFor :: Type -> Value -> Value -> IM Ordering
+decideOrdFor :: Type -> Value -> Value -> Disco Ordering
 
 -- To decide the ordering of two pairs:
 decideOrdFor (TyPair ty1 ty2) v1 v2 = do
@@ -906,7 +907,7 @@ decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 --   differ; the ordering of those outputs is immediately returned
 --   without evaluating the functions on any further values in @vs@.
 --   Returns @EQ@ if the functions are equal on all values in @vs@.
-decideOrdForClosures :: Type -> Value -> Value -> [Value] -> IM Ordering
+decideOrdForClosures :: Type -> Value -> Value -> [Value] -> Disco Ordering
 decideOrdForClosures ty2 clos1 clos2 = go
   where
 

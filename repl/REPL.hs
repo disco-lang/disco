@@ -20,7 +20,8 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Desugar
-import           Disco.Interpret.Core             (rnf, runIM')
+import           Disco.Eval                       (runIM)
+import           Disco.Interpret.Core             (rnf, withDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
@@ -219,7 +220,7 @@ evalTerm t = do
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
-      in case runIM' defns (rnf c) of
+      in case runIM (withDefs defns (rnf c)) of
            Left err -> return.show $ err
            Right v  -> return $ prettyValue ty v
 

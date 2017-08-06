@@ -25,6 +25,7 @@ import Disco.Syntax.Operators (BOp(..))
 import Disco.AST.Typed
 import Disco.AST.Core
 import Disco.Interpret.Core
+import Disco.Eval
 import Disco.Desugar
 
 data TestResult
@@ -45,7 +46,7 @@ testIsOK _ = False
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
 runTest :: M.Map (Name Core) Core -> AProperty -> TestResult
-runTest defns aprop = either TestRuntimeFailure mconcat $ runIM' defns $ do
+runTest defs aprop = either TestRuntimeFailure mconcat $ runIM $ withDefs defs $ do
   lunbind aprop $ \(binds, at) ->
     for (testCases binds) $ \env -> extends env $ do
       case getEquatands at of

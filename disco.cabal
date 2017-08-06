@@ -40,6 +40,7 @@ library
                        Disco.Pretty
                        Disco.Property
                        Disco.Desugar
+                       Disco.Eval
                        Disco.Interpret.Core
                        Disco.Typecheck
                        Disco.Types

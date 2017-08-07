@@ -1,6 +1,17 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE ViewPatterns              #-}
 
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Pretty
+-- Copyright   :  (c) 2016-2017 disco team (see LICENSE)
+-- License     :  BSD-style (see LICENSE)
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Various pretty-printing facilities for disco.
+--
+-----------------------------------------------------------------------------
+
 module Disco.Pretty where
 
 import           System.IO                        (hFlush, stdout)

@@ -720,10 +720,29 @@ infer (TBin Choose t1 t2) = do
   at2 <- check t2 TyN <|> check t2 (TyList TyN)
   return $ ATBin TyN Choose at1 at2
 
+-- To infer the type of a cons:
 infer (TBin Cons t1 t2) = do
+
+  -- First, infer the type of the first argument (a list element).
   at1 <- infer t1
-  at2 <- check t2 (TyList (getType at1))
-  return $ ATBin (TyList (getType at1)) Cons at1 at2
+
+  case t2 of
+    -- If the second argument is the empty list, just assign it the
+    -- type inferred from the first element.
+    TList [] Nothing -> do
+      let ty1 = getType at1
+      return $ ATBin (TyList ty1) Cons at1 (ATList (TyList ty1) [] Nothing)
+
+    -- Otherwise, infer the type of the second argument...
+    _ -> do
+      at2 <- infer t2
+      case (getType at2) of
+
+        -- ...make sure it is a list, and find the lub of the element types.
+        TyList ty2 -> do
+          elTy <- lub (getType at1) ty2
+          return $ ATBin (TyList elTy) Cons at1 at2
+        ty -> throwError (NotList t2 ty)
 
 infer (TUn Fact t) = do
   at <- check t TyN
@@ -735,7 +754,7 @@ infer (TChain t1 links) = do
   return $ ATChain TyBool at1 alinks
 
 infer (TList es@(_:_) ell)  = do
-  ates <- (mapM infer) es
+  ates <- mapM infer es
   aell <- inferEllipsis ell
   let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
   ty  <- lubs tys

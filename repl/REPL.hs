@@ -30,8 +30,18 @@ import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 
+------------------------------------------------------------
+-- Utilities
+------------------------------------------------------------
+
 io :: MonadIO m => IO a -> m a
 io i = liftIO i
+
+iputStrLn :: MonadIO m => String -> m ()
+iputStrLn = io . putStrLn
+
+iprint :: (MonadIO m, Show a) => a -> m ()
+iprint = io . print
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -99,16 +109,16 @@ handleCMD s =
     handleLine :: REPLExpr -> Disco ()
 
     handleLine (Let x t)     = handleLet x t
-    handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
-    handleLine (Eval t)      = (evalTerm t) >>= (io.putStrLn)
-    handleLine (ShowDefn x)  = handleShowDefn x >>= (io.putStrLn)
-    handleLine (Parse t)     = io.print $ t
-    handleLine (Pretty t)    = io.putStrLn $ renderDoc (prettyTerm t)
-    handleLine (Desugar t)   = handleDesugar t >>= (io.putStrLn)
+    handleLine (TypeCheck t) = handleTypeCheck t        >>= iputStrLn
+    handleLine (Eval t)      = (evalTerm t)             >>= iputStrLn
+    handleLine (ShowDefn x)  = handleShowDefn x         >>= iputStrLn
+    handleLine (Parse t)     = iprint $ t
+    handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
+    handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
     handleLine (Load file)   = handleLoad file >> return ()
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
-    handleLine Help          = io.putStrLn $ "Help!"
+    handleLine Help          = iputStrLn "Help!"
 
 handleLet :: Name Term -> Term -> Disco ()
 handleLet x t = do
@@ -194,7 +204,8 @@ handleDocs x = do
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
-      io . putStrLn $ show x ++ " : " ++ renderDoc (prettyTy ty)
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyTy ty]
+      io . putStrLn $ p
       case M.lookup x docs of
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
@@ -215,7 +226,7 @@ handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
     Left err -> return.show $ err
-    Right at -> return . renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
+    Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
 
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"

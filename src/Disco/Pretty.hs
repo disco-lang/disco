@@ -11,8 +11,8 @@ import           Data.Maybe                       (fromJust)
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (LFreshM, Name, lunbind,
-                                                   runLFreshM, unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind,
+                                                   unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -98,7 +98,7 @@ funPA = PA funPrec InL
 arrPA :: PA
 arrPA = PA 1 InR
 
-type Doc = ReaderT PA LFreshM PP.Doc
+type Doc = ReaderT PA Disco PP.Doc
 
 --------------------------------------------------
 
@@ -283,8 +283,8 @@ prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
 
 ------------------------------------------------------------
 
-renderDoc :: Doc -> String
-renderDoc = PP.render . runLFreshM . flip runReaderT initPA
+renderDoc :: Doc -> Disco String
+renderDoc = fmap PP.render . flip runReaderT initPA
 
 ------------------------------------------------------------
 -- Pretty-printing values

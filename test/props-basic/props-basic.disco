@@ -1,0 +1,23 @@
+||| This is a foozle function.
+
+!!! foo 3 = 5
+!!! foo 9 = 28
+!!! foo 12 = 25
+!!! ∀ n:Nat. foo (n+10) = 2n+21
+
+foo : N -> N
+foo 3 = 5
+foo 9 = 28
+foo n = 2n + 1
+
+||| Reverse a list.
+!!! reverse [3,6,7] = [7,6,3]
+!!! ∀ a:N, b:N. reverse [a,b] = [b,a]
+!!! ∀ xs:List N. reverse (reverse xs) = xs
+
+reverse : List N -> List N
+reverse = revHelper []
+
+revHelper : List N -> List N -> List N
+revHelper rev [] = rev
+revHelper rev (x :: xs) = revHelper (x :: rev) xs

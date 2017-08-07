@@ -1,4 +1,4 @@
-:load test/syntax-inrange/inRange.disco
+:load test/syntax-chain/inRange.disco
 inRange 2 5 0
 inRange 2 5 8
 inRange 2 5 2

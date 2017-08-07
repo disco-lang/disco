@@ -1,0 +1,2 @@
+:load test/syntax-comment/fib.disco
+fib 15

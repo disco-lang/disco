@@ -1,3 +1,0 @@
-:load test/syntax-fact/fact.disco
-fact 10
-fact2 10

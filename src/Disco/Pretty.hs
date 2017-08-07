@@ -3,6 +3,8 @@
 
 module Disco.Pretty where
 
+import           System.IO                        (hFlush, stdout)
+
 import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
 import           Data.Char                        (isAlpha, toLower)
@@ -14,10 +16,11 @@ import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (Name, lunbind,
                                                    unembed)
 
+import           Disco.Interpret.Core             (whnfV)
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
-import           Disco.Eval                       (Value(..), Disco)
+import           Disco.Eval                       (Value(..), Disco, iputStr, iputStrLn, io)
 import           Disco.Types
 
 
@@ -290,46 +293,66 @@ renderDoc = fmap PP.render . flip runReaderT initPA
 -- Pretty-printing values
 ------------------------------------------------------------
 
--- XXX see https://github.com/disco-lang/disco/issues/46
--- new type should be something like
---
---   prettyValue :: Type -> Value -> (String -> IO ()) -> Disco ()
---
--- with a callback to say what to do with the Strings produced along the way.
+-- | Pretty-printing of values, with output interleaved lazily with
+--   evaluation.  This version actually prints the values on the console, followed
+--   by a newline.  For a more general version, see 'prettyValueWith'.
+prettyValue :: Type -> Value -> Disco ()
+prettyValue ty v = do
+  prettyValueWith (\s -> iputStr s >> io (hFlush stdout)) ty v
+  iputStrLn ""
 
--- | Basic pretty-printing of values.
-prettyValue :: Type -> Value -> String
-prettyValue TyUnit (VCons 0 []) = "()"
-prettyValue TyBool (VCons i []) = map toLower (show (toEnum i :: Bool))
-prettyValue (TyList ty) v = prettyList ty v
-prettyValue _ (VClos _ _)       = "<function>"
-prettyValue _ (VThunk _ _)      = "<thunk>"
-prettyValue _ (VFun _)          = "<function>"
-prettyValue ty@(TyPair _ _) v   = "(" ++ prettyTuple ty v ++ ")"
-prettyValue (TySum ty1 ty2) (VCons i [v])
+-- | Pretty-printing of values, with output interleaved lazily with
+--   evaluation.  Takes a continuation that specifies how the output
+--   should be processed (which will be called many times as the
+--   output is produced incrementally).
+prettyValueWith :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyValueWith k ty = whnfV >=> prettyWHNF k ty
+
+-- | Pretty-print a value which is already guaranteed to be in weak
+--   head normal form.
+prettyWHNF :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyWHNF out TyUnit          (VCons 0 []) = out "()"
+prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
+prettyWHNF out (TyList ty)     v            = prettyList out ty v
+prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
+prettyWHNF out (TySum ty1 ty2) (VCons i [v])
   = case i of
-      0 -> "left " ++ prettyValue ty1 v
-      1 -> "right " ++ prettyValue ty2 v
-      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyValue"
-prettyValue _ (VNum d r)
-  | denominator r == 1 = show (numerator r)
+      0 -> out "left "  >> prettyWHNF out ty1 v
+      1 -> out "right " >> prettyWHNF out ty2 v
+      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyWHNF"
+prettyWHNF out _ (VNum d r)
+  | denominator r == 1 = out $ show (numerator r)
   | otherwise          = case d of
-      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
-      Decimal  -> prettyDecimal r
+      Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> out $ prettyDecimal r
 
-prettyValue _ _ = error "Impossible! No matching case in prettyValue"
+prettyWHNF out _ (VFun _) = out "<function>"
 
-prettyList :: Type -> Value -> String
-prettyList ty v = "[" ++ go v
+prettyWHNF _ _ _ = error "Impossible! No matching case in prettyValue"
+-- XXX throw a real error
+-- prettyWHNF out _ (VClos _ _)       =
+-- prettyWHNF _ (VThunk _ _)      = "<thunk>"
+
+prettyList :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyList out ty v = out "[" >> go v
   where
-    go (VCons 0 []) = "]"
-    go (VCons 1 [hd, VCons 0 []]) = prettyValue ty hd ++ "]"
-    go (VCons 1 [hd, tl])         = prettyValue ty hd ++ ", " ++ go tl
+    go (VCons 0 []) = out "]"
+    go (VCons 1 [hd, tl]) = do
+      prettyValueWith out ty hd
+      tlWHNF <- whnfV tl
+      case tlWHNF of
+        VCons 1 _ -> out ", "
+        _         -> return ()
+      go tlWHNF
+
     go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
 
-prettyTuple :: Type -> Value -> String
-prettyTuple (TyPair ty1 ty2) (VCons 0 [v1, v2]) = prettyValue ty1 v1 ++ ", " ++ prettyTuple ty2 v2
-prettyTuple ty v = prettyValue ty v
+prettyTuple :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyTuple out (TyPair ty1 ty2) (VCons 0 [v1, v2]) = do
+  prettyValueWith out ty1 v1
+  out ", "
+  whnfV v2 >>= prettyTuple out ty2
+prettyTuple out ty v = prettyValueWith out ty v
 
 --------------------------------------------------
 -- Pretty-printing decimals

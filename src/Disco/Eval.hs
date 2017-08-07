@@ -2,6 +2,7 @@
 {-# LANGUAGE TemplateHaskell          #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
+  -- For MonadException instances, see below.
 
 -----------------------------------------------------------------------------
 -- |
@@ -43,6 +44,7 @@ module Disco.Eval
        , Disco
 
          -- ** Utilities
+       , io, iputStrLn, iputStr, iprint
        , runDisco
        , allocate, delay, mkThunk
 
@@ -282,6 +284,18 @@ makeLenses ''DiscoState
 ------------------------------------------------------------
 -- Utilities
 ------------------------------------------------------------
+
+io :: MonadIO m => IO a -> m a
+io i = liftIO i
+
+iputStrLn :: MonadIO m => String -> m ()
+iputStrLn = io . putStrLn
+
+iputStr :: MonadIO m => String -> m ()
+iputStr = io . putStr
+
+iprint :: (MonadIO m, Show a) => a -> m ()
+iprint = io . print
 
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.

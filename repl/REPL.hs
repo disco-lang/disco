@@ -24,24 +24,11 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
-import           Disco.Interpret.Core             (rnf, withDefs)
+import           Disco.Interpret.Core             (withDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
-
-------------------------------------------------------------
--- Utilities
-------------------------------------------------------------
-
-io :: MonadIO m => IO a -> m a
-io i = liftIO i
-
-iputStrLn :: MonadIO m => String -> m ()
-iputStrLn = io . putStrLn
-
-iprint :: (MonadIO m, Show a) => a -> m ()
-iprint = io . print
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -110,7 +97,7 @@ handleCMD s =
 
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t        >>= iputStrLn
-    handleLine (Eval t)      = (evalTerm t)             >>= iputStrLn
+    handleLine (Eval t)      = evalTerm t
     handleLine (ShowDefn x)  = handleShowDefn x         >>= iputStrLn
     handleLine (Parse t)     = iprint $ t
     handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
@@ -192,9 +179,9 @@ prettyTestFailure :: AProperty -> TestResult -> Disco ()
 prettyTestFailure _ TestOK = return ()
 prettyTestFailure prop TestFalse  = io $ print prop
 prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
-  io $ putStrLn ("While testing " ++ show prop)    -- XXX pretty-print
-  io $ putStrLn ("  Expected: " ++ prettyValue ty2 v2)
-  io $ putStrLn ("  But got:  " ++ prettyValue ty1 v1)
+  iputStrLn $ "While testing " ++ show prop    -- XXX pretty-print
+  iputStr     "  Expected: " >> prettyValue ty2 v2
+  iputStrLn   "  But got:  " >> prettyValue ty1 v1
 
   -- XXX to pretty-print an 'AProperty' we probably want to erase it
   -- to a Property first and then pretty-print.  But to do that we
@@ -215,16 +202,16 @@ handleDocs x = do
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
 
-evalTerm :: Term -> Disco String
+evalTerm :: Term -> Disco ()
 evalTerm t = do
   ctx   <- use topCtx
   defns <- use topDefns
   case evalTCM (extends ctx $ infer t) of
-    Left err -> return.show $ err    -- XXX pretty-print
+    Left err -> iprint err    -- XXX pretty-print
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
-      in prettyValue ty <$> (withDefs defns $ rnf c)
+      in (withDefs defns $ mkThunk c) >>= prettyValue ty
          -- XXX should do this 'withDefs' once and for all when
          -- loading a file etc, instead of here each time we evaluate
          -- a term.  Right now, top-level values declared in a file

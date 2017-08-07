@@ -114,6 +114,9 @@ arrPA = PA 1 InR
 
 type Doc = ReaderT PA Disco PP.Doc
 
+renderDoc :: Doc -> Disco String
+renderDoc = fmap PP.render . flip runReaderT initPA
+
 --------------------------------------------------
 
 prettyTy :: Type -> Doc
@@ -295,10 +298,19 @@ prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
       = lunbind b $ \(ps, t) ->
         (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
-------------------------------------------------------------
+prettyProperty :: Property -> Doc
+prettyProperty prop =
+  lunbind prop $ \(vars, t) ->
+  case vars of
+    [] -> prettyTerm t
+    _  -> do
+      dvars <- punctuate (text ",") (map prettyTyBind vars)
+      text "∀" <+> hsep dvars <> text "." <+> prettyTerm t
+  where
+    prettyTyBind (x,ty) = hsep [prettyName x, text ":", prettyTy ty]
 
-renderDoc :: Doc -> Disco String
-renderDoc = fmap PP.render . flip runReaderT initPA
+
+------------------------------------------------------------
 
 ------------------------------------------------------------
 -- Pretty-printing values

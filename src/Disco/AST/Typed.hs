@@ -21,7 +21,7 @@
 
 module Disco.AST.Typed
        ( -- * Type-annotated terms
-         ATerm(..), ALink(..), ABinding, AProperty
+         ATerm(..), ALink(..), ABinding(..), AProperty
 
          -- * Branches and guards
        , ABranch, AGuard(..), AQual(..)
@@ -48,6 +48,9 @@ data ATerm where
   -- | A variable together with its type.
   ATVar   :: Type -> Name ATerm -> ATerm
 
+  -- | A (non-recursive) let expression.
+  ATLet   :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
+
   -- | The unit value.  We don't bother explicitly storing @TyUnit@
   --   here.
   ATUnit  :: ATerm
@@ -55,13 +58,6 @@ data ATerm where
   -- | A boolean value. Again, we don't bother explicitly storing
   --   the type.
   ATBool  :: Bool -> ATerm
-
-  -- | A literal list.  The type would be ambiguous if the list was
-  --   empty.
-  ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
-
-  -- | A list comprehension.
-  ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 
   -- | A natural number.
   ATNat   :: Type -> Integer -> ATerm
@@ -82,40 +78,39 @@ data ATerm where
   -- | A sum type injection.
   ATInj   :: Type -> Side -> ATerm -> ATerm
 
+  -- | A case expression.
+  ATCase  :: Type -> [ABranch] -> ATerm
+
   -- | A unary operator application.
   ATUn    :: Type -> UOp -> ATerm -> ATerm
 
   -- | A binary operator application.
   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
 
+  -- | A chained comparison.
+  ATChain :: Type -> ATerm -> [ALink] -> ATerm
+
   -- | A type operator application.
   ATTyOp  :: Type -> TyOp -> Type -> ATerm
 
-  ATChain :: Type -> ATerm -> [ALink] -> ATerm
+  -- | A literal list.  The type would be ambiguous if the list was
+  --   empty.
+  ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 
-  -- | A (non-recursive) let expression.
-  ATLet   :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
-
-  -- | A case expression.
-  ATCase  :: Type -> [ABranch] -> ATerm
+  -- | A list comprehension.
+  ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 
   -- | Type ascription.
   ATAscr  :: ATerm -> Type -> ATerm
 
-  -- | @ATSub@ is used to record the fact that we made use of a
-  --   subtyping judgment.  The term has the given type T because its
-  --   type is a subtype of T.
-  ATSub   :: Type -> ATerm -> ATerm
   deriving (Show, Generic)
-
-  -- TODO: I don't think we are currently very consistent about using ATSub everywhere
-  --   subtyping is invoked.  I am not sure how much it matters.
 
 data ALink where
   ATLink :: BOp -> ATerm -> ALink
   deriving (Show, Generic)
 
-type ABinding = (Name ATerm, Embed ATerm)
+data ABinding = ABinding (Maybe Type) (Name ATerm) (Embed ATerm)
+  deriving (Show, Generic)
 
 -- | A branch of a case, consisting of a list of guards and a type-annotated term.
 type ABranch = Bind (Telescope AGuard) ATerm
@@ -148,6 +143,7 @@ data AQual where
 type AProperty = Bind [(Name ATerm, Type)] ATerm
 
 instance Alpha ATerm
+instance Alpha ABinding
 instance Alpha ALink
 instance Alpha AGuard
 instance Alpha AQual
@@ -176,5 +172,4 @@ getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 getType (ATAscr _ ty)     = ty
-getType (ATSub ty _)      = ty
 

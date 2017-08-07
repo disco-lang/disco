@@ -129,12 +129,11 @@ desugarTerm (ATLet _ t) =
   lunbind t $ \(bs, t2) -> desugarTerm $ desugarLet (fromTelescope bs) t2
 desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
 desugarTerm (ATAscr t _) = desugarTerm t
-desugarTerm (ATSub _ t)  = desugarTerm t
 
 -- | Desugar a let into application of a chain of lambdas.
 desugarLet :: [ABinding] -> ATerm -> ATerm
 desugarLet [] t = t
-desugarLet ((x,unembed -> t1) : ls) t =
+desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   ATApp (getType t)
     (ATAbs (TyArr (getType t1) TyUnit {- Wrong but shouldn't matter -})
            (bind x (desugarLet ls t))

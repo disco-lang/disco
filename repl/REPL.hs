@@ -168,26 +168,33 @@ runAllTests aprops
     runTests :: Name ATerm -> [AProperty] -> Disco Bool
     runTests n props = do
       defns <- use topDefns
-      io $ putStr ("  " ++ name2String n ++ ": ")
+      iputStr ("  " ++ name2String n ++ ":")
       results <- sequenceA . fmap sequenceA $ map (id &&& runTest defns) props
       let failures = filter (not . testIsOK . snd) results
-      forM_ failures (uncurry prettyTestFailure)
-      when (null failures) (io $ putStrLn "OK")
+      case null failures of
+        True  -> iputStrLn " OK"
+        False -> do
+          iputStrLn ""
+          forM_ failures (uncurry prettyTestFailure)
       return (null failures)
 
+-- XXX redo with message framework, with proper support for indentation etc.
 prettyTestFailure :: AProperty -> TestResult -> Disco ()
 prettyTestFailure _ TestOK = return ()
-prettyTestFailure prop TestFalse  = io $ print prop
+prettyTestFailure prop TestFalse  = do
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  iputStr "  - Test is false: " >> iputStrLn dp
 prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
-  iputStrLn $ "While testing " ++ show prop    -- XXX pretty-print
-  iputStr     "  Expected: " >> prettyValue ty2 v2
-  iputStrLn   "  But got:  " >> prettyValue ty1 v1
-
-  -- XXX to pretty-print an 'AProperty' we probably want to erase it
-  -- to a Property first and then pretty-print.  But to do that we
-  -- probably want to unify the ASTs first.  Or, we can keep the
-  -- original untypechecked Property around just so we can
-  -- pretty-print it if there's an error.
+  iputStr     "  - Test result mismatch for: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  iputStrLn dp
+  iputStr     "    - Expected: " >> prettyValue ty2 v2
+  iputStr     "    - But got:  " >> prettyValue ty1 v1
+prettyTestFailure prop (TestRuntimeFailure err) = do
+  iputStr     "  - Test failed: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  iputStrLn dp
+  iputStr     "    " >> iprint err
 
 handleDocs :: Name Term -> Disco ()
 handleDocs x = do

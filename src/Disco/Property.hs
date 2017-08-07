@@ -16,6 +16,7 @@ module Disco.Property
 import Unbound.Generics.LocallyNameless (Name, lunbind)
 
 import Control.Monad
+import Control.Monad.Except
 import Data.Coerce
 import qualified Data.Map as M
 import Data.Traversable (for)
@@ -32,6 +33,7 @@ import Disco.Desugar
 data TestResult
   = TestOK
   | TestFalse
+  | TestRuntimeFailure InterpError
   | TestEqualityFailure Value Type Value Type
 
 instance Monoid TestResult where
@@ -45,8 +47,12 @@ testIsOK _ = False
 
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
+
+-- XXX don't reload defs every time?
 runTest :: Ctx Core Core -> AProperty -> Disco TestResult
-runTest defs aprop = fmap mconcat . withDefs defs $ do
+runTest defs aprop
+  = flip catchError (return . TestRuntimeFailure) . fmap mconcat
+    . withDefs defs $ do
   lunbind aprop $ \(binds, at) ->
     for (testCases binds) $ \env -> extendsEnv env $ do
       case getEquatands at of

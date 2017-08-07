@@ -35,7 +35,7 @@ module Disco.AST.Surface
        , Term(..)
 
          -- ** Telescopes
-       , Telescope(..), foldTelescope, toTelescope, fromTelescope
+       , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
 
          -- ** Expressions
        , Side(..), Link(..), Binding(..)
@@ -125,6 +125,10 @@ foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
 foldTelescope _ z TelEmpty = z
 foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
 
+-- | Map over a telescope.
+mapTelescope :: (Alpha a, Alpha b) => (a -> b) -> Telescope a -> Telescope b
+mapTelescope f = toTelescope . map f . fromTelescope
+
 -- | Convert a list to a telescope.
 toTelescope :: Alpha b => [b] -> Telescope b
 toTelescope []     = TelEmpty
@@ -148,6 +152,9 @@ data Term where
   -- | A variable.
   TVar   :: Name Term -> Term
 
+  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
+  TLet   :: Bind (Telescope Binding) Term -> Term
+
   -- | Explicit parentheses.  We need to keep track of these in order
   --   to syntactically distinguish multiplication and function
   --   application.
@@ -158,6 +165,12 @@ data Term where
 
   -- | True or false.
   TBool  :: Bool -> Term
+
+  -- | A natural number.
+  TNat   :: Integer -> Term
+
+  -- | A nonnegative rational number, parsed as a decimal.
+  TRat   :: Rational -> Term
 
   -- | An anonymous function.
   TAbs   :: Bind (Name Term) Term -> Term
@@ -171,17 +184,14 @@ data Term where
   -- | Function application.
   TApp  :: Term -> Term -> Term
 
-  -- | An ordered pair, @(x,y)@.
+  -- | An n-tuple, @(t1, ..., tn)@.
   TTup   :: [Term] -> Term
 
   -- | An injection into a sum type.
   TInj   :: Side -> Term -> Term
 
-  -- | A natural number.
-  TNat   :: Integer -> Term
-
-  -- | A nonnegative rational number, parsed as a decimal.
-  TRat   :: Rational -> Term
+  -- | A case expression.
+  TCase  :: [Branch] -> Term
 
   -- | An application of a unary operator.
   TUn    :: UOp -> Term -> Term
@@ -189,24 +199,18 @@ data Term where
   -- | An application of a binary operator.
   TBin   :: BOp -> Term -> Term -> Term
 
-  -- | An application of a type operator.
-  TTyOp  :: TyOp -> Type -> Term
-
   -- | A chained comparison.  Should contain only comparison
   --   operators.
   TChain :: Term -> [Link] -> Term
+
+  -- | An application of a type operator.
+  TTyOp  :: TyOp -> Type -> Term
 
   -- | A literal list.
   TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 
   -- | List comprehension.
   TListComp :: Bind (Telescope Qual) Term -> Term
-
-  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
-  TLet   :: Bind (Telescope Binding) Term -> Term
-
-  -- | A case expression.
-  TCase  :: [Branch] -> Term
 
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term

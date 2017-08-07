@@ -26,7 +26,7 @@ module Disco.Typecheck
        ( -- * Type checking monad
          TCM, runTCM, evalTCM, execTCM
          -- ** Definitions
-       , Defn, Defns
+       , Defn, DefnCtx
          -- ** Errors
        , TCError(..)
 
@@ -55,6 +55,10 @@ module Disco.Typecheck
        , inferComp
          -- ** Case analysis
        , inferCase, inferBranch
+
+         -- * Erasure
+       , erase
+       , eraseProperty
        )
        where
 
@@ -93,7 +97,7 @@ import           Math.NumberTheory.Primes.Testing        (isPrime)
 type Defn  = [Bind [Pattern] ATerm]
 
 -- | A map from names to definitions.
-type Defns = M.Map (Name ATerm) Defn
+type DefnCtx = Ctx ATerm Defn
 
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Type
@@ -151,10 +155,10 @@ instance Monoid TCError where
 -- | Type checking monad. Maintains a context of variable types and a
 --   set of definitions, and can throw @TCError@s and generate fresh
 --   names.
-type TCM = StateT Defns (ReaderT TyCtx (ExceptT TCError LFreshM))
+type TCM = StateT DefnCtx (ReaderT TyCtx (ExceptT TCError LFreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
-runTCM :: TCM a -> Either TCError (a, Defns)
+runTCM :: TCM a -> Either TCError (a, DefnCtx)
 runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
 
 -- | Run a 'TCM' computation starting in the empty context, returning
@@ -164,7 +168,7 @@ evalTCM = fmap fst . runTCM
 
 -- | Run a 'TCM' computation starting in the empty context, returning
 --   only the resulting definitions.
-execTCM :: TCM a -> Either TCError Defns
+execTCM :: TCM a -> Either TCError DefnCtx
 execTCM = fmap snd . runTCM
 
 -- | Add a definition to the set of current definitions.
@@ -342,15 +346,10 @@ checkBranch ty b =
 --   as the input, or it may be wrapped in 'ATSub' if we made a
 --   nontrivial use of subtyping.
 checkSub :: ATerm -> Type -> TCM ATerm
-checkSub at ty = do
-  let ty' = getType at
-  if (isSub ty' ty)
-   then
-     if (ty' == ty)
-       then return at
-       else return (ATSub ty at)
-   else
-     throwError (Mismatch ty at)
+checkSub at ty =
+  case isSub (getType at) ty of
+    True  -> return at
+    False -> throwError (Mismatch ty at)
 
 -- | Check whether one type is a subtype of another (we have decidable
 --   subtyping).
@@ -808,7 +807,7 @@ inferBinding (Binding mty x (unembed -> t)) = do
   at <- case mty of
     Just ty -> check t ty
     Nothing -> infer t
-  return ((coerce x, embed at), singleCtx x (getType at))
+  return $ (ABinding mty (coerce x) (embed at), singleCtx x (getType at))
 
 -- | Infer the type of a comparison. A comparison always has type
 --   Bool, but we have to make sure the subterms are OK. We must check
@@ -1016,3 +1015,52 @@ checkPropertyTypes docs
       extends (M.fromList binds) $ do
       at <- check t TyBool
       return $ bind (binds & traverse . _1 %~ coerce) at
+
+------------------------------------------------------------
+-- Erasure
+------------------------------------------------------------
+
+erase :: ATerm -> Term
+erase (ATVar _ x)           = TVar (coerce x)
+erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)
+  where (tel,at) = unsafeUnbind bs
+erase ATUnit                = TUnit
+erase (ATBool b)            = TBool b
+erase (ATNat _ i)           = TNat i
+erase (ATRat r)             = TRat r
+erase (ATAbs _ b)           = TAbs $ bind (coerce x) (erase at)
+  where (x,at) = unsafeUnbind b
+erase (ATApp _ t1 t2)       = TApp (erase t1) (erase t2)
+erase (ATTup _ ats)         = TTup (map erase ats)
+erase (ATInj _ s at)        = TInj s (erase at)
+erase (ATCase _ brs)        = TCase (map eraseBranch brs)
+erase (ATUn _ uop at)       = TUn uop (erase at)
+erase (ATBin _ bop at1 at2) = TBin bop (erase at1) (erase at2)
+erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
+erase (ATTyOp _ op ty)      = TTyOp op ty
+erase (ATList _ ats aell)   = TList (map erase ats) ((fmap . fmap) erase aell)
+erase (ATListComp _ b)      = TListComp $ bind (mapTelescope eraseQual tel) (erase at)
+  where (tel,at) = unsafeUnbind b
+erase (ATAscr at ty)        = TAscr (erase at) ty
+
+eraseBinding :: ABinding -> Binding
+eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))
+
+eraseBranch :: ABranch -> Branch
+eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)
+  where (tel,at) = unsafeUnbind b
+
+eraseGuard :: AGuard -> Guard
+eraseGuard (AGBool (unembed -> at))  = GBool (embed (erase at))
+eraseGuard (AGPat (unembed -> at) p) = GPat (embed (erase at)) p
+
+eraseLink :: ALink -> Link
+eraseLink (ATLink bop at) = TLink bop (erase at)
+
+eraseQual :: AQual -> Qual
+eraseQual (AQBind x (unembed -> at)) = QBind (coerce x) (embed (erase at))
+eraseQual (AQGuard (unembed -> at))  = QGuard (embed (erase at))
+
+eraseProperty :: AProperty -> Property
+eraseProperty b = bind ((map . first) coerce xs) (erase at)
+  where (xs, at) = unsafeUnbind b

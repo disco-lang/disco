@@ -169,17 +169,17 @@ handleLoad file = do
           io . putStrLn $ "Loaded."
           return t
 
-runAllTests :: M.Map (Name ATerm) [AProperty] -> Disco Bool
+runAllTests :: Ctx ATerm [AProperty] -> Disco Bool
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
       io $ putStrLn "Running tests..."
-      and <$> mapM (uncurry runTestsIO) (M.assocs aprops)
+      and <$> mapM (uncurry runTests) (M.assocs aprops)
       -- XXX eventually this should be moved into Disco.Property and
       -- use a logging framework?
   where
-    runTestsIO :: Name ATerm -> [AProperty] -> Disco Bool
-    runTestsIO n props = do
+    runTests :: Name ATerm -> [AProperty] -> Disco Bool
+    runTests n props = do
       defns <- use topDefns
       io $ putStr ("  " ++ name2String n ++ ": ")
       results <- sequenceA . fmap sequenceA $ map (id &&& runTest defns) props
@@ -192,10 +192,15 @@ prettyTestFailure :: AProperty -> TestResult -> Disco ()
 prettyTestFailure _ TestOK = return ()
 prettyTestFailure prop TestFalse  = io $ print prop
 prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
-  io $ putStrLn ("While testing " ++ show prop)
+  io $ putStrLn ("While testing " ++ show prop)    -- XXX pretty-print
   io $ putStrLn ("  Expected: " ++ prettyValue ty2 v2)
   io $ putStrLn ("  But got:  " ++ prettyValue ty1 v1)
 
+  -- XXX to pretty-print an 'AProperty' we probably want to erase it
+  -- to a Property first and then pretty-print.  But to do that we
+  -- probably want to unify the ASTs first.  Or, we can keep the
+  -- original untypechecked Property around just so we can
+  -- pretty-print it if there's an error.
 
 handleDocs :: Name Term -> Disco ()
 handleDocs x = do
@@ -215,7 +220,7 @@ evalTerm t = do
   ctx   <- use topCtx
   defns <- use topDefns
   case evalTCM (extends ctx $ infer t) of
-    Left err -> return.show $ err
+    Left err -> return.show $ err    -- XXX pretty-print
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
@@ -225,7 +230,7 @@ handleTypeCheck :: Term -> Disco String
 handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
-    Left err -> return.show $ err
+    Left err -> return.show $ err    -- XXX pretty-print
     Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
 
 banner :: String

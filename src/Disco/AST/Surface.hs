@@ -305,30 +305,3 @@ instance Alpha t => Alpha (Ellipsis t)
 instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Qual
-
--- Names for terms can't show up in Rational, Pattern, or Type
-instance Subst Term Rational where
-  subst _ _ = id
-  substs _  = id
-
-instance Subst Term Pattern where
-  subst _ _ = id
-  substs _  = id
-
-instance Subst Term Type where
-  subst _ _ = id
-  substs _  = id
-
-instance Subst Term b => Subst Term (Telescope b)
-instance Subst Term Binding
-instance Subst Term Guard
-instance Subst Term Qual
-instance Subst Term Side
-instance Subst Term BOp
-instance Subst Term UOp
-instance Subst Term TyOp
-instance Subst Term Link
-instance Subst Term (Ellipsis Term)
-instance Subst Term Term where
-  isvar (TVar x) = Just (SubstName x)
-  isvar _ = Nothing

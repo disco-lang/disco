@@ -290,6 +290,13 @@ renderDoc = fmap PP.render . flip runReaderT initPA
 -- Pretty-printing values
 ------------------------------------------------------------
 
+-- XXX see https://github.com/disco-lang/disco/issues/46
+-- new type should be something like
+--
+--   prettyValue :: Type -> Value -> (String -> IO ()) -> Disco ()
+--
+-- with a callback to say what to do with the Strings produced along the way.
+
 -- | Basic pretty-printing of values.
 prettyValue :: Type -> Value -> String
 prettyValue TyUnit (VCons 0 []) = "()"

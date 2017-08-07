@@ -225,6 +225,11 @@ evalTerm t = do
       let ty = getType at
           c  = runDSM $ desugarTerm at
       in prettyValue ty <$> (withDefs defns $ rnf c)
+         -- XXX should do this 'withDefs' once and for all when
+         -- loading a file etc, instead of here each time we evaluate
+         -- a term.  Right now, top-level values declared in a file
+         -- (e.g. an infinite list) will be re-evaluated from scratch
+         -- every time a new expression is to be evaluated.
 
 handleTypeCheck :: Term -> Disco String
 handleTypeCheck t = do

@@ -919,7 +919,7 @@ ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (DocMap, M.Map (Name ATerm) [AProperty], TyCtx)
+checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
@@ -984,7 +984,7 @@ checkDefn (DDefn x clauses) = do
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | XXX
-checkPropertyTypes :: DocMap -> TCM (M.Map (Name ATerm) [AProperty])
+checkPropertyTypes :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
 checkPropertyTypes docs
   = (M.fromList . (traverse . _1 %~ coerce))
     <$> ((traverse . _2 . traverse) checkPropertyType) properties

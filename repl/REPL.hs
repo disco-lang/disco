@@ -2,8 +2,11 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (makeLenses, use, (%=), (.=))
-import           Control.Monad.State
+import           Control.Lens                     (use, (%=), (.=))
+import           Control.Monad                    (when, forM_)
+import           Control.Monad.Except             (catchError)
+import           Control.Monad.IO.Class           (MonadIO(..))
+import           Control.Monad.Trans.Class        (MonadTrans(..))
 import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf)
@@ -11,44 +14,23 @@ import qualified Data.Map                         as M
 import           Data.Maybe                       (isJust)
 
 import qualified Options.Applicative              as O
-import           System.Console.Haskeline
+import           System.Console.Haskeline         as H
 import           System.Exit
 import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.AST.Core
-import           Disco.Types
 import           Disco.Context
 import           Disco.Desugar
-import           Disco.Eval                       (runDisco)
+import           Disco.Eval
 import           Disco.Interpret.Core             (rnf, withDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 
-data REPLState = REPLState
-  { _replCtx   :: Ctx Term Type
-  , _replDefns :: Ctx Core Core
-  , _replDocs  :: DocMap
-  }
-
-makeLenses ''REPLState
-
-initREPLState :: REPLState
-initREPLState = REPLState M.empty M.empty M.empty
-
-type REPLStateIO = StateT REPLState IO
-
--- HDE: Is there a way around this?
-instance MonadException m => MonadException (StateT s m) where
-    controlIO f = StateT $ \s -> controlIO $ \(RunIO run) -> let
-                    run' = RunIO (fmap (StateT . const) . run . flip runStateT s)
-                    in fmap (flip runStateT s) $ f run'
-
-io :: IO a -> REPLStateIO a
+io :: MonadIO m => IO a -> m a
 io i = liftIO i
 
 ------------------------------------------------------------------------
@@ -107,14 +89,14 @@ parseLine s = case (runParser lineParser "" s) of
                 Left err -> Left $ (parseErrorPretty err)
                 Right l -> Right l
 
-handleCMD :: String -> REPLStateIO ()
+handleCMD :: String -> Disco ()
 handleCMD "" = return ()
 handleCMD s =
     case (parseLine s) of
       Left msg -> io $ putStrLn msg
-      Right l -> handleLine l
+      Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
   where
-    handleLine :: REPLExpr -> REPLStateIO ()
+    handleLine :: REPLExpr -> Disco ()
 
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t >>= (io.putStrLn)
@@ -128,31 +110,38 @@ handleCMD s =
     handleLine Nop           = return ()
     handleLine Help          = io.putStrLn $ "Help!"
 
-handleLet :: Name Term -> Term -> REPLStateIO ()
+handleLet :: Name Term -> Term -> Disco ()
 handleLet x t = do
-  ctx <- use replCtx
+  ctx <- use topCtx
   let mat = runTCM (extends ctx $ infer t)
   case mat of
     Left err -> io.print $ err   -- XXX pretty print
     Right (at, _) -> do
-      replCtx   %= M.insert x (getType at)
-      replDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
+      topCtx   %= M.insert x (getType at)
+      topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
-handleShowDefn :: Name Term -> REPLStateIO String
+handleShowDefn :: Name Term -> Disco String
 handleShowDefn x = do
-  defns <- use replDefns
+  defns <- use topDefns
   case M.lookup (coerce x) defns of
     Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
 
-handleDesugar :: Term -> REPLStateIO String
+handleDesugar :: Term -> Disco String
 handleDesugar t = do
   case evalTCM (infer t) of
     Left err -> return.show $ err
     Right at -> return.show.runDSM.desugarTerm $ at
 
-handleLoad :: FilePath -> REPLStateIO Bool
-handleLoad file = handle (\e -> fileNotFound file e >> return False) $ do
+loadFile :: FilePath -> Disco (Maybe String)
+loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
+
+fileNotFound :: FilePath -> IOException -> IO ()
+fileNotFound file _ = putStrLn $ "File not found: " ++ file
+
+
+handleLoad :: FilePath -> Disco Bool
+handleLoad file = do
   io . putStrLn $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
   let mp = runParser wholeModule file str
@@ -163,14 +152,14 @@ handleLoad file = handle (\e -> fileNotFound file e >> return False) $ do
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
-          replDefns .= cdefns
-          replDocs  .= docMap
-          replCtx   .= ctx
+          topDefns .= cdefns
+          topDocs  .= docMap
+          topCtx   .= ctx
           t <- runAllTests aprops
           io . putStrLn $ "Loaded."
           return t
 
-runAllTests :: M.Map (Name ATerm) [AProperty] -> REPLStateIO Bool
+runAllTests :: M.Map (Name ATerm) [AProperty] -> Disco Bool
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
@@ -179,19 +168,18 @@ runAllTests aprops
       -- XXX eventually this should be moved into Disco.Property and
       -- use a logging framework?
   where
-    runTestsIO :: Name ATerm -> [AProperty] -> REPLStateIO Bool
+    runTestsIO :: Name ATerm -> [AProperty] -> Disco Bool
     runTestsIO n props = do
-      defns <- use replDefns
+      defns <- use topDefns
       io $ putStr ("  " ++ name2String n ++ ": ")
-      let results  = map (id &&& runTest defns) props
-          failures = filter (not . testIsOK . snd) results
+      results <- sequenceA . fmap sequenceA $ map (id &&& runTest defns) props
+      let failures = filter (not . testIsOK . snd) results
       forM_ failures (uncurry prettyTestFailure)
       when (null failures) (io $ putStrLn "OK")
       return (null failures)
 
-prettyTestFailure :: AProperty -> TestResult -> REPLStateIO ()
+prettyTestFailure :: AProperty -> TestResult -> Disco ()
 prettyTestFailure _ TestOK = return ()
-prettyTestFailure prop (TestRuntimeFailure interpErr) = io $ print (prop, interpErr)
 prettyTestFailure prop TestFalse  = io $ print prop
 prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
   io $ putStrLn ("While testing " ++ show prop)
@@ -199,10 +187,10 @@ prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
   io $ putStrLn ("  But got:  " ++ prettyValue ty1 v1)
 
 
-handleDocs :: Name Term -> REPLStateIO ()
+handleDocs :: Name Term -> Disco ()
 handleDocs x = do
-  ctx  <- use replCtx
-  docs <- use replDocs
+  ctx  <- use topCtx
+  docs <- use topDocs
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
@@ -211,22 +199,20 @@ handleDocs x = do
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
 
-evalTerm :: Term -> REPLStateIO String
+evalTerm :: Term -> Disco String
 evalTerm t = do
-  ctx   <- use replCtx
-  defns <- use replDefns
+  ctx   <- use topCtx
+  defns <- use topDefns
   case evalTCM (extends ctx $ infer t) of
     Left err -> return.show $ err
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
-      in case runDisco . withDefs defns $ rnf c of
-           Left err -> return.show $ err
-           Right v  -> return $ prettyValue ty v
+      in prettyValue ty <$> (withDefs defns $ rnf c)
 
-handleTypeCheck :: Term -> REPLStateIO String
+handleTypeCheck :: Term -> Disco String
 handleTypeCheck t = do
-  ctx <- use replCtx
+  ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
     Left err -> return.show $ err
     Right at -> return . renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
@@ -273,9 +259,6 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   , O.header "disco v0.1"
   ]
 
-fileNotFound :: FilePath -> IOException -> REPLStateIO ()
-fileNotFound file _ = io . putStrLn $ "File not found: " ++ file
-
 main :: IO ()
 main = do
   opts <- O.execParser discoInfo
@@ -284,16 +267,18 @@ main = do
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  flip evalStateT initREPLState $ do
+  res <- runDisco $ do
     case checkFile opts of
       Just file -> do
         res <- handleLoad file
         io $ if res then exitSuccess else exitFailure
       Nothing   -> return ()
     case cmdFile opts of
-      Just file -> handle (fileNotFound file) $ do
-        cmds <- io $ readFile file
-        mapM_ handleCMD (lines cmds)
+      Just file -> do
+        mcmds <- loadFile file
+        case mcmds of
+          Nothing -> return ()
+          Just cmds -> mapM_ handleCMD (lines cmds)
       Nothing   -> return ()
     case evaluate opts of
       Just str -> handleCMD str
@@ -301,14 +286,32 @@ main = do
 
     when (not batch) $ runInputT settings loop
 
+  case res of
+
+    -- All disco exceptions should be caught and handled by this point.
+    Left err -> do
+      putStrLn $ "Uncaught error: " ++ show err
+      putStrLn $ "Please report this as a bug: https://github.com/disco-lang/disco/issues"
+    Right () -> return ()
+
   where
-    loop :: InputT REPLStateIO ()
+
+    ctrlC :: InputT Disco a -> SomeException -> InputT Disco a
+    ctrlC act e = do
+      io $ putStrLn (show e)
+      act
+
+    withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
+
+    loop :: InputT Disco ()
     loop = do
-      minput <- getInputLine "Disco> "
+      minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of
         Nothing -> return ()
         Just input
           | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
               liftIO $ putStrLn "Goodbye!"
               return ()
-          | otherwise -> (lift.handleCMD $ input) >> loop
+          | otherwise -> do
+              withCtrlC (return ()) $ (lift . handleCMD $ input)
+              loop

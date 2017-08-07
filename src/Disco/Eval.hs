@@ -1,6 +1,8 @@
 {-# LANGUAGE GADTs                    #-}
 {-# LANGUAGE TemplateHaskell          #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans     #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Eval
@@ -22,35 +24,46 @@ module Disco.Eval
 
          -- * Environments
 
-       , Env
-       , Loc, Memory(..), memStore, nextLoc, initMemory
+       , Env, extendEnv, extendsEnv, getEnv, withEnv
 
          -- * Errors
 
        , InterpError(..)
 
+         -- * Disco monad state
+
+       , Loc, DiscoState(..), initDiscoState
+
+         -- ** Lenses
+
+       , topCtx, topDefns, topDocs, memory, nextLoc
+
          -- * Disco monad
 
-       , Disco, runDisco
-       , extendEnv, extendsEnv, getEnv, withEnv
-       , allocate
-       , delay, mkThunk
+       , Disco
+
+         -- ** Utilities
+       , runDisco
+       , allocate, delay, mkThunk
 
        )
        where
 
 import           Control.Lens                       ((<+=), (%=), makeLenses)
-import           Control.Monad.Except
+import           Control.Monad.Trans.Except
 import           Control.Monad.Reader
-import           Control.Monad.State
-import qualified Data.Map                           as M
+import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
 
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.Context                      (Ctx)
+import           System.Console.Haskeline.MonadException
+
+import           Disco.Context
+import           Disco.Types
 import           Disco.AST.Core
+import           Disco.AST.Surface
 
 ------------------------------------------------------------
 -- Values
@@ -125,18 +138,25 @@ instance Show ValDelay where
 -- | An environment is a mapping from names to values.
 type Env  = Ctx Core Value
 
--- XXX
-type Loc = Int
+-- | Locally extend the environment with a new name -> value mapping,
+--   (shadowing any existing binding for the given name).
+extendEnv :: Name Core -> Value -> Disco a -> Disco a
+extendEnv x v = avoid [AnyName x] . extend x v
 
--- | A memory is a mapping from "locations" (uniquely generated
---   identifiers) to values.  It also keeps track of the next
---   unused location.  We keep track of a memory during evaluation,
---   and can create new memory locations to store things that should
---   only be evaluated once.
-data Memory = Memory { _memStore :: IntMap Value, _nextLoc :: Loc }
+-- | Locally extend the environment with another environment.
+--   Bindings in the new environment shadow bindings in the old.
+extendsEnv :: Env -> Disco a -> Disco a
+extendsEnv e' = avoid (map AnyName (names e')) . extends e'
 
-initMemory :: Memory
-initMemory = Memory IntMap.empty 0
+-- | Get the current environment.
+getEnv :: Disco Env
+getEnv = ask
+
+-- | Run a @Disco@ computation with a /replaced/ (not extended)
+--   environment.  This is used for evaluating things such as closures
+--   and thunks that come with their own environment.
+withEnv :: Env -> Disco a -> Disco a
+withEnv = local . const
 
 ------------------------------------------------------------
 -- Errors
@@ -172,47 +192,108 @@ data InterpError where
   deriving Show
 
 ------------------------------------------------------------
--- Interpreter monad
+-- Disco monad state
 ------------------------------------------------------------
 
--- | The interpreter monad.  Combines read-only access to an
---   environment, and the ability to throw @InterpErrors@ and generate
---   fresh names.
-type Disco = StateT Memory (ReaderT Env (ExceptT InterpError LFreshM))
+-- | A location in memory is represented by an @Int@.
+type Loc = Int
 
-makeLenses ''Memory
+-- | The various pieces of state tracked by the 'Disco' monad.
+data DiscoState = DiscoState
+  {
+    _topCtx   :: Ctx Term Type
+    -- ^ Top-level type environment.
+
+  , _topDefns :: Ctx Core Core
+    -- ^ Environment of top-level definitions.
+
+  , _topDocs  :: Ctx Term Docs
+    -- ^ Top-level documentation.
+
+  , _memory   :: IntMap Value
+    -- ^ A memory is a mapping from "locations" (uniquely generated
+    --   identifiers) to values.  It also keeps track of the next
+    --   unused location.  We keep track of a memory during
+    --   evaluation, and can create new memory locations to store
+    --   things that should only be evaluated once.
+
+  , _nextLoc  :: Loc
+    -- ^ The next available (unused) memory location.
+  }
+
+-- | The initial state for the @Disco@ monad.
+initDiscoState :: DiscoState
+initDiscoState = DiscoState
+  { _topCtx   = emptyCtx
+  , _topDefns = emptyCtx
+  , _topDocs  = emptyCtx
+  , _memory   = IntMap.empty
+  , _nextLoc  = 0
+  }
+
+------------------------------------------------------------
+-- Disco monad
+------------------------------------------------------------
+
+-- | The main monad used by the Disco REPL, and by the interpreter and
+--   pretty printer.
+--
+--   * Keeps track of state such as current top-level definitions,
+--     types, and documentation, and memory for allocation of thunks.
+--   * Keeps track of a read-only environment for binding local
+--     variables to their values.
+--   * Can throw 'InterpError' exceptions
+--   * Can generate fresh names
+--   * Can do I/O
+type Disco = StateT DiscoState (ReaderT Env (ExceptT InterpError (LFreshMT IO)))
+
+
+------------------------------------------------------------
+-- Some instances needed to ensure that Disco is an instance of the
+-- MonadException class from haskeline.
+
+-- Orphan instance, since it doesn't really seem sensible for either
+-- unbound-generics or haskeline to depend on the other.
+instance MonadException m => MonadException (LFreshMT m) where
+  controlIO f = LFreshMT $ controlIO $ \(RunIO run) -> let
+                  run' = RunIO (fmap LFreshMT . run . unLFreshMT)
+                  in unLFreshMT <$> f run'
+
+
+-- We need this orphan instance too.  It would seem to make sense for
+-- haskeline to provide an instance for ExceptT, but see:
+--   https://github.com/judah/haskeline/issues/18
+--   https://github.com/judah/haskeline/pull/22
+--
+-- Idris does the same thing,
+--   https://github.com/idris-lang/Idris-dev/blob/5d7388bb3c71fe56b7c09c0b31a94d44bf9f4f25/src/Idris/Output.hs#L38
+
+instance MonadException m => MonadException (ExceptT e m) where
+  controlIO f = ExceptT $ controlIO $ \(RunIO run) -> let
+                  run' = RunIO (fmap ExceptT . run . runExceptT)
+                  in runExceptT <$> f run'
+
+------------------------------------------------------------
+-- Lenses for state
+------------------------------------------------------------
+
+makeLenses ''DiscoState
+
+------------------------------------------------------------
+-- Utilities
+------------------------------------------------------------
 
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
-runDisco :: Disco a -> Either InterpError a
-runDisco = runLFreshM . runExceptT . flip runReaderT M.empty . flip evalStateT initMemory
-
--- | Locally extend the environment with a new name -> value mapping,
---   (shadowing any existing binding for the given name).
-extendEnv :: Name Core -> Value -> Disco a -> Disco a
-extendEnv x v = avoid [AnyName x] . local (M.insert x v)
-
--- | Locally extend the environment with another environment.
---   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Env -> Disco a -> Disco a
-extendsEnv e' = avoid (map AnyName (M.keys e')) . local (M.union e')
-
--- | Get the current environment.
-getEnv :: Disco Env
-getEnv = ask
-
--- | Run a @Disco@ computation with a /replaced/ (not extended)
---   environment.  This is used for evaluating things such as closures
---   and thunks that come with their own environment.
-withEnv :: Env -> Disco a -> Disco a
-withEnv = local . const
+runDisco :: Disco a -> IO (Either InterpError a)
+runDisco = runLFreshMT . runExceptT . flip runReaderT emptyCtx . flip evalStateT initDiscoState
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.
 allocate :: Value -> Disco Loc
 allocate v = do
   loc <- nextLoc <+= 1
-  memStore %= IntMap.insert loc v
+  memory %= IntMap.insert loc v
   return loc
 
 -- | Delay a @Disco Value@ computation by packaging it into a @VDelay@

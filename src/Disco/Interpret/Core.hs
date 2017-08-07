@@ -96,7 +96,7 @@ withDefs cenv im = do
   -- For now we know that the only things we have stored in memory
   -- are the thunks we just made, so just iterate through them and
   -- replace their environments.
-  memStore %= IntMap.map (replaceThunkEnv env)
+  memory %= IntMap.map (replaceThunkEnv env)
 
   -- Finally, run the given Disco computation with the initial
   -- environment we just built.
@@ -143,9 +143,9 @@ whnfV v                       = return v
 --   not need to be re-evaluated later.
 whnfIndir :: Loc -> Disco Value
 whnfIndir loc = do
-  m <- use memStore
+  m <- use memory
   v <- whnfV (m ! loc)
-  memStore %= IntMap.insert loc v
+  memory %= IntMap.insert loc v
   return v
 
 -- | Reduce a Core expression to weak head normal form.

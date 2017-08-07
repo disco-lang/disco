@@ -20,6 +20,7 @@ import Data.Coerce
 import qualified Data.Map as M
 import Data.Traversable (for)
 
+import Disco.Context
 import Disco.Types
 import Disco.Syntax.Operators (BOp(..))
 import Disco.AST.Typed
@@ -30,7 +31,6 @@ import Disco.Desugar
 
 data TestResult
   = TestOK
-  | TestRuntimeFailure  InterpError
   | TestFalse
   | TestEqualityFailure Value Type Value Type
 
@@ -45,8 +45,8 @@ testIsOK _ = False
 
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
-runTest :: M.Map (Name Core) Core -> AProperty -> TestResult
-runTest defs aprop = either TestRuntimeFailure mconcat $ runDisco $ withDefs defs $ do
+runTest :: Ctx Core Core -> AProperty -> Disco TestResult
+runTest defs aprop = fmap mconcat . withDefs defs $ do
   lunbind aprop $ \(binds, at) ->
     for (testCases binds) $ \env -> extendsEnv env $ do
       case getEquatands at of

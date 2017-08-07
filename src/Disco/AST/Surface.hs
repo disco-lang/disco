@@ -26,7 +26,7 @@ module Disco.AST.Surface
        ( -- * Modules
          Module(..), TopLevel(..)
          -- ** Documentation
-       , Docs, DocMap, DocThing(..), Property
+       , Docs, DocThing(..), Property
          -- ** Declarations
        , Decl(..), declName, isDefn
 
@@ -48,17 +48,17 @@ module Disco.AST.Surface
        )
        where
 
-import           Data.Map                         (Map)
 import           GHC.Generics                     (Generic)
 
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Context
 import           Disco.Types
 import           Disco.Syntax.Operators
 
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
-data Module = Module [Decl] DocMap
+data Module = Module [Decl] (Ctx Term Docs)
   deriving Show
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
@@ -68,9 +68,6 @@ data TopLevel = TLDoc DocThing | TLDecl Decl
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]
-
--- | A 'DocMap' is a mapping from names to documentation.
-type DocMap = Map (Name Term) Docs
 
 -- | An item of documentation.
 data DocThing

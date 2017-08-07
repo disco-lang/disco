@@ -14,7 +14,7 @@
 
 module Disco.Context
        (
-         Ctx, emptyCtx, singleCtx, joinCtx, joinCtxs
+         Ctx, names, emptyCtx, singleCtx, joinCtx, joinCtxs
        , lookup, extend, extends
 
        ) where
@@ -28,6 +28,10 @@ import           Unbound.Generics.LocallyNameless
 
 -- | A context maps names to things.
 type Ctx a b = M.Map (Name a) b
+
+-- | Return a list of the names bound in the context.
+names :: Ctx a b -> [Name a]
+names = M.keys
 
 -- | The empty context.
 emptyCtx :: Ctx a b

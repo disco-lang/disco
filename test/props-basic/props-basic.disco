@@ -21,3 +21,34 @@ reverse = revHelper []
 revHelper : List N -> List N -> List N
 revHelper rev [] = rev
 revHelper rev (x :: xs) = revHelper (x :: rev) xs
+
+
+reverseU : List Unit -> List Unit
+reverseU = revHelperU []
+
+revHelperU : List Unit -> List Unit -> List Unit
+revHelperU rev [] = rev
+revHelperU rev (x :: xs) = revHelperU (x :: rev) xs
+
+toBin : N -> List Bool
+toBin 0 = []
+toBin 1 = []
+toBin n = {? false if 2 divides n, true otherwise ?} :: toBin (n // 2)
+
+fromBin : List Bool -> N
+fromBin [] = 1
+fromBin (false :: bs) = 2 fromBin bs
+fromBin (true  :: bs) = 2 fromBin bs + 1
+
+!!! ∀ v:Void. 2 = 3    -- this is true!
+!!! ∀ u:Unit. u = u    -- there is only one Unit type
+!!! ∀ l:List Void. 2 = 3
+!!! ∀ l:List Unit. l = reverseU l
+!!! ∀ bs : List Bool. toBin (fromBin bs) = bs
+!!! ∀ q : QP. q >= 0
+
+x : N
+x = 0
+
+  -- This is just here to give us something to attach arbitrary test
+  -- properties to.

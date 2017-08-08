@@ -54,6 +54,8 @@ testIsOK _ = False
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
 
+-- XXX do shrinking for randomly generated test cases
+
 -- XXX don't reload defs every time?
 runTest :: Int -> Ctx Core Core -> AProperty -> Disco TestResult
 runTest n defs aprop
@@ -105,13 +107,24 @@ testCases n binds = do
 -- Random test case generation
 ------------------------------------------------------------
 
--- | A random generator of disco values.
+-- | A generator of disco values.
 data DiscoGen where
 
   -- | A @DiscoGen@ contains a QuickCheck generator of an
   --   existentially quantified type, and a way to turn that type into a
   --   disco 'Value'.
   DiscoGen :: QC.Gen a -> (a -> Value) -> DiscoGen
+
+  -- | Alternatively, a @Universe@ has a list of all values of the
+  --   given type.
+  Universe :: [Value] -> DiscoGen
+
+-- | Convert a 'Universe'-style 'DiscoGen' into a generator-style one,
+--   unless it is empty.
+fromUniverse :: DiscoGen -> DiscoGen
+fromUniverse g@(DiscoGen _ _) = g
+fromUniverse (Universe [])    = Universe []
+fromUniverse (Universe vs)    = DiscoGen (QC.elements vs) id
 
 -- | Create the 'DiscoGen' for a given type.
 discoGenerator :: Type -> DiscoGen
@@ -128,8 +141,14 @@ discoGenerator TyQ  = DiscoGen
   (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
 
-discoGenerator (TyList ty) = case discoGenerator ty of
+discoGenerator (TyList ty)  = case fromUniverse $ discoGenerator ty of
+  Universe _ {- empty -}   -> Universe []
   DiscoGen tyGen tyToValue -> DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
+
+discoGenerator ty@(TyVar _) = error $ "discoGenerator " ++ show ty
+discoGenerator TyVoid       = Universe []
+discoGenerator TyUnit       = Universe [VCons 0 []]
+discoGenerator TyBool       = Universe [VCons 0 [], VCons 1 []]
 
 -- | @genValues n ty@ generates a sequence of @n@ increasingly complex
 --   values of type @ty@, using the 'DiscoGen' for @ty@.
@@ -138,6 +157,7 @@ genValues n ty = case discoGenerator ty of
   DiscoGen gen toValue -> do
     as <- generate n gen
     return $ map toValue as
+  Universe vs -> return vs
 
 -- | Use a QuickCheck generator to generate a given number of
 --   increasingly complex values of a given type.  Like the @sample'@

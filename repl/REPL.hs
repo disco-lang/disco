@@ -165,11 +165,14 @@ runAllTests aprops
       -- XXX eventually this should be moved into Disco.Property and
       -- use a logging framework?
   where
+    numSamples :: Int
+    numSamples = 50   -- XXX make this configurable somehow
+
     runTests :: Name ATerm -> [AProperty] -> Disco Bool
     runTests n props = do
       defns <- use topDefns
       iputStr ("  " ++ name2String n ++ ":")
-      results <- sequenceA . fmap sequenceA $ map (id &&& runTest defns) props
+      results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples defns) props
       let failures = filter (not . testIsOK . snd) results
       case null failures of
         True  -> iputStrLn " OK"

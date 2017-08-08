@@ -9,7 +9,7 @@
 ||| and so on, where the first column contains the square numbers.
 ||| sqIso' is the inverse.
 
-!!! all (n -> sqIso (sqIso' n) = n) [0 .. 100]
+!!! ∀ n : Nat. sqIso (sqIso' n) = n
 
 sqIso : ℕ×ℕ → ℕ
 sqIso (x,y) =
@@ -33,7 +33,7 @@ sqIso' n =
 |||
 ||| where the first column contains the triangular numbers.
 
-!!! all (n -> diagIso (diagIso' n) = n) [0 .. 100]
+!!! ∀ n : Nat. diagIso (diagIso' n) = n
 
 diagIso : ℕ×ℕ → ℕ
 diagIso (x,y) = (x+y)*(x+y+1)//2 + x
@@ -52,7 +52,17 @@ diagIso' n =
 ||| This is actually an isomorphism between {n | n : ℕ, n > 0} and ℕ×ℕ,
 ||| but at the moment the disco type system doesn't let us say that.
 
-!!! all (n -> powerIso (powerIso' n) = n) [1 .. 100]
+-- We have to be careful not to call powerIso' 0 because it gets stuck
+-- in infinite recursion!  One way would is to write the test as follows:
+
+!!! forall n:Nat. powerIso (powerIso' (n+1)) = (n+1)
+
+-- Alternatively, we can write
+
+--- ∀ n : Nat. n = 0 or powerIso (powerIso' n) = n
+
+-- (This version doesn't work yet since 'or' is not properly
+-- lazy/short-circuiting.)
 
 powerIso : ℕ×ℕ → ℕ
 powerIso (x,y) = 2^x * (2y + 1)

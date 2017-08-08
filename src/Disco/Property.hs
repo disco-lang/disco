@@ -1,3 +1,4 @@
+{-# LANGUAGE GADTs #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -15,7 +16,10 @@ module Disco.Property
 
 import Unbound.Generics.LocallyNameless (Name, lunbind)
 
-import Control.Monad
+import qualified Test.QuickCheck as QC
+
+import Data.List (transpose)
+import Data.Ratio
 import Control.Monad.Except
 import Data.Coerce
 import qualified Data.Map as M
@@ -45,16 +49,19 @@ testIsOK :: TestResult -> Bool
 testIsOK TestOK = True
 testIsOK _ = False
 
+-- XXX comment me
+
 -- XXX if there is a quantifier, present it as a counterexample rather
 -- than just an equality test failure
 
 -- XXX don't reload defs every time?
-runTest :: Ctx Core Core -> AProperty -> Disco TestResult
-runTest defs aprop
+runTest :: Int -> Ctx Core Core -> AProperty -> Disco TestResult
+runTest n defs aprop
   = flip catchError (return . TestRuntimeFailure) . fmap mconcat
     . withDefs defs $ do
-  lunbind aprop $ \(binds, at) ->
-    for (testCases binds) $ \env -> extendsEnv env $ do
+  lunbind aprop $ \(binds, at) -> do
+    envs <- testCases n binds
+    for envs $ \env -> extendsEnv env $ do
       case getEquatands at of
         Nothing        -> do
           v <- evalTerm at
@@ -76,16 +83,66 @@ getEquatands :: ATerm -> Maybe (ATerm, ATerm)
 getEquatands (ATBin _ Eq at1 at2) = Just (at1, at2)
 getEquatands _                    = Nothing
 
--- XXX just something simple for now.  Later do this a la QuickCheck,
--- with randomness and shrinking.
-testCases :: [(Name ATerm, Type)] -> [Env]
-testCases binds = map (M.fromList . zip ys) (mapM genExamples tys)
+-- | @testCases n bindings@ generates environments in which to conduct
+--   tests.  If @bindings@ is empty, only one test is necessary, and
+--   @testCases@ returns a singleton list with the empty environment.
+--   Otherwise, @testCases@ generates @n@ environments; in each
+--   environment the given names are bound to values of the
+--   appropriate types.  The values in the first environment are
+--   simplest; they become increasingly complex as the environments
+--   progress.
+testCases :: Int -> [(Name ATerm, Type)] -> Disco [Env]
+testCases _ []    = return [M.empty]
+testCases n binds = do
+  valLists <- mapM (genValues n) tys
+  return $ map (M.fromList . zip ys) $ transpose valLists
   where
     (xs, tys) = unzip binds
     ys :: [Name Core]
     ys = map coerce xs
-    genExamples :: Type -> [Value]
-    genExamples TyN = map vnum [0 .. 10]
-    genExamples TyZ = map vnum ([0 .. 10] ++ [-1, -2 .. -10])
-    genExamples (TyList ty) =
-      map toDiscoList ([0 .. 2] >>= \n -> replicateM n (genExamples ty))
+
+------------------------------------------------------------
+-- Random test case generation
+------------------------------------------------------------
+
+-- | A random generator of disco values.
+data DiscoGen where
+
+  -- | A @DiscoGen@ contains a QuickCheck generator of an
+  --   existentially quantified type, and a way to turn that type into a
+  --   disco 'Value'.
+  DiscoGen :: QC.Gen a -> (a -> Value) -> DiscoGen
+
+-- | Create the 'DiscoGen' for a given type.
+discoGenerator :: Type -> DiscoGen
+discoGenerator TyN = DiscoGen
+  (QC.arbitrary :: QC.Gen (QC.NonNegative Integer))
+  (vnum . (%1) . QC.getNonNegative)
+discoGenerator TyZ = DiscoGen
+  (QC.arbitrary :: QC.Gen Integer)
+  (vnum . (%1))
+discoGenerator TyQP = DiscoGen
+  (QC.arbitrary :: QC.Gen (QC.NonNegative Integer, QC.Positive Integer))
+  (\(QC.NonNegative m, QC.Positive n) -> vnum (m % (n+1)))
+discoGenerator TyQ  = DiscoGen
+  (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
+  (\(m, QC.Positive n) -> vnum (m % (n+1)))
+
+discoGenerator (TyList ty) = case discoGenerator ty of
+  DiscoGen tyGen tyToValue -> DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
+
+-- | @genValues n ty@ generates a sequence of @n@ increasingly complex
+--   values of type @ty@, using the 'DiscoGen' for @ty@.
+genValues :: Int -> Type -> Disco [Value]
+genValues n ty = case discoGenerator ty of
+  DiscoGen gen toValue -> do
+    as <- generate n gen
+    return $ map toValue as
+
+-- | Use a QuickCheck generator to generate a given number of
+--   increasingly complex values of a given type.  Like the @sample'@
+--   function from QuickCheck, but the number of values is
+--   configurable, and it lives in the @Disco@ monad.
+generate :: Int -> QC.Gen a -> Disco [a]
+generate n gen = io . QC.generate $ sequence [QC.resize m gen | m <- [0 .. n]]
+

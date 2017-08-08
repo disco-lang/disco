@@ -33,6 +33,11 @@ import Disco.AST.Core
 import Disco.Interpret.Core
 import Disco.Eval
 import Disco.Desugar
+-- XXX make TestResult more informative:
+--   - if it succeeded, was it tested exhaustively, or randomly?
+--   - if the latter, how many examples were used?
+--   - If a random test failed, what were the inputs that produced
+--     the counterexample?
 
 data TestResult
   = TestOK

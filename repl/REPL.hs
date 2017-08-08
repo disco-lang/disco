@@ -156,6 +156,8 @@ handleLoad file = do
           io . putStrLn $ "Loaded."
           return t
 
+-- XXX - Move this to Property module.
+--     - Return a structured summary of the results, not a Bool.
 runAllTests :: Ctx ATerm [AProperty] -> Disco Bool
 runAllTests aprops
   | M.null aprops = return True

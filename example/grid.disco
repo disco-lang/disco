@@ -57,12 +57,10 @@ diagIso' n =
 
 !!! forall n:Nat. powerIso (powerIso' (n+1)) = (n+1)
 
--- Alternatively, we can write
+-- Alternatively, since 'or' is lazy (i.e. "short-circuiting"), we can
+-- write
 
---- ∀ n : Nat. n = 0 or powerIso (powerIso' n) = n
-
--- (This version doesn't work yet since 'or' is not properly
--- lazy/short-circuiting.)
+!!! ∀ n : Nat. n = 0 or powerIso (powerIso' n) = n
 
 powerIso : ℕ×ℕ → ℕ
 powerIso (x,y) = 2^x * (2y + 1)

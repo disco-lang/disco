@@ -111,6 +111,58 @@ desugarTerm (ATNat ty n)  = desugarNat ty n
 desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn ty op t) =
   desugarUOp ty op <$> desugarTerm t
+desugarTerm (ATBin _ And t1 t2) = do
+  x <- lfresh (string2Name "b")
+  y <- lfresh (string2Name "c")
+  let ty1 = TyArr TyBool TyBool
+      ty2 = TyArr TyBool ty1
+
+  -- t1 and t2 ==> (b -> c -> {? c if b, false otherwise ?}) t1 t2
+  desugarTerm $
+    ATApp TyBool
+      (ATApp ty1
+        (ATAbs ty2
+          (bind x
+            (ATAbs ty1
+              (bind y
+                (ATCase TyBool
+                  [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATVar TyBool y)
+                  , bind (toTelescope []) (ATBool False)
+                  ]
+                )
+              )
+            )
+          )
+        )
+        t1
+      )
+      t2
+desugarTerm (ATBin _ Or t1 t2) = do
+  x <- lfresh (string2Name "b")
+  y <- lfresh (string2Name "c")
+  let ty1 = TyArr TyBool TyBool
+      ty2 = TyArr TyBool ty1
+
+  -- t1 or t2 ==> (b -> c -> {? true if b, c otherwise ?}) t1 t2
+  desugarTerm $
+    ATApp TyBool
+      (ATApp ty1
+        (ATAbs ty2
+          (bind x
+            (ATAbs ty1
+              (bind y
+                (ATCase TyBool
+                  [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATBool True)
+                  , bind (toTelescope []) (ATVar TyBool y)
+                  ]
+                )
+              )
+            )
+          )
+        )
+        t1
+      )
+      t2
 desugarTerm (ATBin ty op t1 t2) =
   desugarBOp (getType t1) (getType t2) ty op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t

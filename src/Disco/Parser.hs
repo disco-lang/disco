@@ -581,7 +581,7 @@ parseAtom = -- trace "parseAtom" $
   <|> parseTypeOp
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
-
+  <|> parseCase
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
 -- | Parse a list-ish thing, like a literal list or a list
@@ -672,7 +672,6 @@ parseTerm' :: Parser Term
 parseTerm' =
       TAbs <$> try (bind <$> ident <*> (mapsTo *> parseTerm'))
   <|> parseLet
-  <|> parseCase
   <|> parseExpr
   <|> parseAtom
 

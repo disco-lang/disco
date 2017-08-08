@@ -14,25 +14,25 @@
 module Disco.Property
        where
 
-import Unbound.Generics.LocallyNameless (Name, lunbind)
+import           Unbound.Generics.LocallyNameless (Name, lunbind)
 
-import qualified Test.QuickCheck as QC
+import qualified Test.QuickCheck                  as QC
 
-import Data.List (transpose)
-import Data.Ratio
-import Control.Monad.Except
-import Data.Coerce
-import qualified Data.Map as M
-import Data.Traversable (for)
+import           Control.Monad.Except
+import           Data.Coerce
+import           Data.List                        (transpose)
+import qualified Data.Map                         as M
+import           Data.Ratio
+import           Data.Traversable                 (for)
 
-import Disco.Context
-import Disco.Types
-import Disco.Syntax.Operators (BOp(..))
-import Disco.AST.Typed
-import Disco.AST.Core
-import Disco.Interpret.Core
-import Disco.Eval
-import Disco.Desugar
+import           Disco.AST.Core
+import           Disco.AST.Typed
+import           Disco.Context
+import           Disco.Desugar
+import           Disco.Eval
+import           Disco.Interpret.Core
+import           Disco.Syntax.Operators           (BOp (..))
+import           Disco.Types
 -- XXX make TestResult more informative:
 --   - if it succeeded, was it tested exhaustively, or randomly?
 --   - if the latter, how many examples were used?

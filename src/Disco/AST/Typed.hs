@@ -67,7 +67,7 @@ data ATerm where
   ATRat   :: Rational -> ATerm
 
   -- | Anonymous function, with its type.
-  ATAbs   :: Type -> Bind (Name ATerm) ATerm -> ATerm
+  ATAbs   :: Type -> Bind (Name ATerm, Embed (Maybe Type)) ATerm -> ATerm
 
   -- | A function application, with its type.
   ATApp   :: Type -> ATerm -> ATerm -> ATerm

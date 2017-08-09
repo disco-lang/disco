@@ -157,8 +157,14 @@ prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    = mparens initPA $
-  lunbind bnd $ \(x,body) ->
-  hsep [prettyName x, text "↦", prettyTerm' 0 InL body]
+  lunbind bnd $ \((x,unembed -> mty),body) ->
+  case mty of
+    Nothing -> hsep [prettyName x, text "↦", prettyTerm' 0 InL body]
+    Just ty -> hsep
+      [ text "(" <> prettyName x <> text ":" <> prettyTy ty <> text ")"
+      , text "↦"
+      , prettyTerm' 0 InL body
+      ]
 prettyTerm (TApp t1 t2)  = mparens funPA $
   prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
 prettyTerm (TTup ts)     = do

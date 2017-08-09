@@ -1,0 +1,6 @@
+let f = (x:N) -> x + 1 in f 3
+:type let f = (x:N) -> x + 1 in f
+let f = x -> x + 1 : N -> N in f 3
+:type let f = x -> x + 1 : N -> N in f
+let g = (x:N) -> (b:B) -> {? x*x if b, x+2 otherwise ?} in (g 3 true, g 6 false)
+let q = (f : (N -> N) -> N) -> f ((x:N) -> x*x) in q (g -> g 1 + g 2)

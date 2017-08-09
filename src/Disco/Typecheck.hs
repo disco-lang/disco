@@ -215,10 +215,18 @@ check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
   -- To check that an abstraction has an arrow type, check that the
   -- body has the return type under an extended context.
 check (TAbs lam) ty@(TyArr ty1 ty2) = do
-  lunbind lam $ \(x,t) -> do
-  extend x ty1 $ do
-  at <- check t ty2
-  return $ ATAbs ty (bind (coerce x) at)
+  lunbind lam $ \((x,unembed -> mty),t) -> do
+    case mty of
+      Nothing -> extend x ty1 $ do
+        at <- check t ty2
+        return $ ATAbs ty (bind (coerce x, embed mty) at)
+      Just annTy -> do
+        case isSub ty1 annTy of
+          False -> throwError $ Mismatch ty1 (ATVar annTy (coerce x))
+          True  -> extend x annTy $ do
+            at <- check t ty2
+            return $ ATAbs ty (bind (coerce x, embed mty) at)
+
   -- We are trying to check an abstraction under a non-arrow type: error.
 check t@(TAbs _) ty = throwError (NotArrow t ty)
 
@@ -553,6 +561,16 @@ infer TUnit         = return ATUnit
 infer (TBool b)     = return $ ATBool b
 infer (TNat n)      = return $ ATNat TyN n
 infer (TRat r)      = return $ ATRat r
+
+  -- We can infer the type of a lambda if the variable is annotated
+  -- with a type.
+infer (TAbs lam)    =
+  lunbind lam $ \((x, unembed -> mty), t) ->
+  case mty of
+    Nothing -> throwError (CantInfer (TAbs lam))
+    Just ty -> extend x ty $ do
+      at <- infer t
+      return $ ATAbs (TyArr ty (getType at)) (bind (coerce x, embed (Just ty)) at)
 
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.

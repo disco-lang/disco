@@ -173,13 +173,7 @@ data Term where
   TRat   :: Rational -> Term
 
   -- | An anonymous function.
-  TAbs   :: Bind (Name Term) Term -> Term
-
-     -- Note, could add an optional type annotation to TAbs,
-     -- problem is I don't know what would be a good concrete syntax!
-     -- x : Int -> body  is tricky because when parsing the type,
-     -- the -> looks like a type arrow.  Could perhaps require
-     -- parens i.e.  (x : Int) -> body ?
+  TAbs   :: Bind (Name Term, Embed (Maybe Type)) Term -> Term
 
   -- | Function application.
   TApp  :: Term -> Term -> Term

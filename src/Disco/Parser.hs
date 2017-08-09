@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf      #-}
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
@@ -63,7 +64,7 @@ module Disco.Parser
 --import           Debug.Trace
 
 import           Unbound.Generics.LocallyNameless (Name, bind, embed,
-                                                   string2Name)
+                                                   string2Name, Embed)
 
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
@@ -670,10 +671,17 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' =
-      TAbs <$> try (bind <$> ident <*> (mapsTo *> parseTerm'))
+      TAbs <$> try (bind <$> parseLambdaArg <*> (mapsTo *> parseTerm'))
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
+
+-- | Parse an argument to a lambda, either a variable or a binding of
+--   the form @(x:ty)@.
+parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
+parseLambdaArg =
+      parens ((,) <$> ident <*> (symbol ":" *> ((embed . Just) <$> parseType)))
+  <|> (, embed Nothing) <$> ident
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term

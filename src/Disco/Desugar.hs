@@ -99,7 +99,7 @@ desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
 desugarTerm ATUnit        = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
-  lunbind lam $ \(x,t) -> do
+  lunbind lam $ \((x, _), t) -> do
   dt <- desugarTerm t
   return $ CAbs (bind (coerce x) dt)
 desugarTerm (ATApp ty t1 t2) =
@@ -122,9 +122,9 @@ desugarTerm (ATBin _ And t1 t2) = do
     ATApp TyBool
       (ATApp ty1
         (ATAbs ty2
-          (bind x
+          (bind (x, embed Nothing)
             (ATAbs ty1
-              (bind y
+              (bind (y, embed Nothing)
                 (ATCase TyBool
                   [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATVar TyBool y)
                   , bind (toTelescope []) (ATBool False)
@@ -148,9 +148,9 @@ desugarTerm (ATBin _ Or t1 t2) = do
     ATApp TyBool
       (ATApp ty1
         (ATAbs ty2
-          (bind x
+          (bind (x, embed Nothing)
             (ATAbs ty1
-              (bind y
+              (bind (y, embed Nothing)
                 (ATCase TyBool
                   [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATBool True)
                   , bind (toTelescope []) (ATVar TyBool y)
@@ -188,7 +188,7 @@ desugarLet [] t = t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   ATApp (getType t)
     (ATAbs (TyArr (getType t1) TyUnit {- Wrong but shouldn't matter -})
-           (bind x (desugarLet ls t))
+           (bind (x, embed Nothing) (desugarLet ls t))
     )
     t1
 

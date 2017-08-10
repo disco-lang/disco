@@ -14,25 +14,30 @@
 module Disco.Property
        where
 
-import Unbound.Generics.LocallyNameless (Name, lunbind)
+import           Unbound.Generics.LocallyNameless (Name, lunbind)
 
-import qualified Test.QuickCheck as QC
+import qualified Test.QuickCheck                  as QC
 
-import Data.List (transpose)
-import Data.Ratio
-import Control.Monad.Except
-import Data.Coerce
-import qualified Data.Map as M
-import Data.Traversable (for)
+import           Control.Monad.Except
+import           Data.Coerce
+import           Data.List                        (transpose)
+import qualified Data.Map                         as M
+import           Data.Ratio
+import           Data.Traversable                 (for)
 
-import Disco.Context
-import Disco.Types
-import Disco.Syntax.Operators (BOp(..))
-import Disco.AST.Typed
-import Disco.AST.Core
-import Disco.Interpret.Core
-import Disco.Eval
-import Disco.Desugar
+import           Disco.AST.Core
+import           Disco.AST.Typed
+import           Disco.Context
+import           Disco.Desugar
+import           Disco.Eval
+import           Disco.Interpret.Core
+import           Disco.Syntax.Operators           (BOp (..))
+import           Disco.Types
+-- XXX make TestResult more informative:
+--   - if it succeeded, was it tested exhaustively, or randomly?
+--   - if the latter, how many examples were used?
+--   - If a random test failed, what were the inputs that produced
+--     the counterexample?
 
 data TestResult
   = TestOK
@@ -116,15 +121,19 @@ data DiscoGen where
   DiscoGen :: QC.Gen a -> (a -> Value) -> DiscoGen
 
   -- | Alternatively, a @Universe@ has a list of all values of the
-  --   given type.
-  Universe :: [Value] -> DiscoGen
+  --   given type, along with a cached size.  Invariant: the Integer
+  --   is equal to the length of the list.
+  Universe :: Integer -> [Value] -> DiscoGen
+
+emptyUniverse :: DiscoGen
+emptyUniverse = Universe 0 []
 
 -- | Convert a 'Universe'-style 'DiscoGen' into a generator-style one,
 --   unless it is empty.
 fromUniverse :: DiscoGen -> DiscoGen
 fromUniverse g@(DiscoGen _ _) = g
-fromUniverse (Universe [])    = Universe []
-fromUniverse (Universe vs)    = DiscoGen (QC.elements vs) id
+fromUniverse (Universe 0 [])  = emptyUniverse
+fromUniverse (Universe _ vs)  = DiscoGen (QC.elements vs) id
 
 -- | Create the 'DiscoGen' for a given type.
 discoGenerator :: Type -> DiscoGen
@@ -142,13 +151,28 @@ discoGenerator TyQ  = DiscoGen
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
 
 discoGenerator (TyList ty)  = case fromUniverse $ discoGenerator ty of
-  Universe _ {- empty -}   -> Universe []
+  Universe _ _ {- empty -} -> emptyUniverse
   DiscoGen tyGen tyToValue -> DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
 
 discoGenerator ty@(TyVar _) = error $ "discoGenerator " ++ show ty
-discoGenerator TyVoid       = Universe []
-discoGenerator TyUnit       = Universe [VCons 0 []]
-discoGenerator TyBool       = Universe [VCons 0 [], VCons 1 []]
+discoGenerator TyVoid       = emptyUniverse
+discoGenerator TyUnit       = Universe 1 [VCons 0 []]
+discoGenerator TyBool       = Universe 2 [VCons 0 [], VCons 1 []]
+discoGenerator (TyPair ty1 ty2) =
+  case (discoGenerator ty1, discoGenerator ty2) of
+    (Universe 0 _, _) -> emptyUniverse
+    (_, Universe 0 _) -> emptyUniverse
+    (Universe n1 vs1, Universe n2 vs2)
+      | n1 * n2 <= 32 {- XXX configurable? -} ->
+        Universe (n1*n2) [vPair v1 v2 | v1 <- vs1, v2 <- vs2]
+    (g1, g2) ->
+      case (fromUniverse g1, fromUniverse g2) of
+        (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
+          DiscoGen
+            ((,) <$> gen1 <*> gen2)
+            (\(a,b) -> vPair (toValue1 a) (toValue2 b))
+  where
+    vPair v1 v2 = VCons 0 [v1, v2]
 
 -- | @genValues n ty@ generates a sequence of @n@ increasingly complex
 --   values of type @ty@, using the 'DiscoGen' for @ty@.
@@ -157,7 +181,7 @@ genValues n ty = case discoGenerator ty of
   DiscoGen gen toValue -> do
     as <- generate n gen
     return $ map toValue as
-  Universe vs -> return vs
+  Universe _ vs -> return vs
 
 -- | Use a QuickCheck generator to generate a given number of
 --   increasingly complex values of a given type.  Like the @sample'@

@@ -2,5 +2,11 @@ Loading test/props-basic/props-basic.disco...
 Running tests...
   foo: OK
   reverse: OK
-  x: OK
+  x:
+  - Test result mismatch for: ∀ bs : Bool × Bool. {? b1 when bs is (b1, b2) if b1 
+                       , false otherwise
+                    ?} = {? (b1 and b2) when bs is (b1, b2) 
+                         ?}
+    - Expected: false
+    - But got:  true
 Loaded.

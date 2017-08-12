@@ -117,24 +117,57 @@ vnum = VNum mempty
 mkEnum :: Enum e => e -> Value
 mkEnum e = VCons (fromEnum e) []
 
--- | Evaluate a Core expression to reduced normal form.
+--------------------------------------------------
+-- Reduced normal form
+--------------------------------------------------
+
+-- | Evaluate a @Core@ expression to reduced normal form, i.e. keep
+--   reducing under constructors as much as possible.  In practice,
+--   all this function actually does is turn the @Core@ expression
+--   into a thunk and then call 'rnfV'.
 rnf :: Core -> Disco Value
 rnf c = mkThunk c >>= rnfV
 
--- | Reduce a value to reduced normal form.
+-- | Reduce a value to reduced normal form, i.e. keep reducing under
+--   constructors as much as possible.
 rnfV :: Value -> Disco Value
+
+-- The value is a constructor: keep the constructor and recursively
+-- reduce all its contents.
 rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
+
+-- If the value is a thunk (i.e. unevaluated expression), a delayed
+-- computation, or an indirection (i.e. a pointer to a value), reduce
+-- it one step using 'whnfV' and then recursively continue reducing
+-- the result.
 rnfV v@(VThunk _ _) = whnfV v >>= rnfV
 rnfV v@(VDelay _)   = whnfV v >>= rnfV
 rnfV v@(VIndir _)   = whnfV v >>= rnfV
+
+-- Otherwise, the value is already in reduced normal form (for
+-- example, it could be a number or a function).
 rnfV v              = return v
 
--- | Reduce a value to weak head normal form.
+-- | Reduce a value to weak head normal form, that is, reduce it just
+--   enough to find out what its top-level constructor is.
 whnfV :: Value -> Disco Value
+
+-- If the value is a thunk, use its stored environment and evaluate
+-- the expression to WHNF.
 whnfV (VThunk c e)            = withEnv e $ whnf c
+
+-- If it is a delayed computation, we can't delay any longer: run it
+-- and reduce the result to WHNF.
 whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
+
+-- If it is an indirection, call 'whnfIndir' which will look up the
+-- value it points to and reduce it.
 whnfV (VIndir loc)            = whnfIndir loc
+
+-- Otherwise, the value is already in WHNF (it is a number, a
+-- function, or a constructor).
 whnfV v                       = return v
+
 
 -- | Reduce the value stored at the given location to WHNF.  We need a
 --   special function for this, because in addition to returning the
@@ -143,40 +176,68 @@ whnfV v                       = return v
 --   not need to be re-evaluated later.
 whnfIndir :: Loc -> Disco Value
 whnfIndir loc = do
-  m <- use memory
-  v <- whnfV (m ! loc)
-  memory %= IntMap.insert loc v
-  return v
+  m <- use memory                   -- Get the memory map
+  v <- whnfV (m ! loc)              -- Look up the given location and reduce it to WHNF
+  memory %= IntMap.insert loc v     -- Update memory with the reduced value
+  return v                          -- Finally, return the value.
 
--- | Reduce a Core expression to weak head normal form.
+
+-- | Reduce a Core expression to weak head normal form.  This is where
+--   the real work of interpreting happens.
 whnf :: Core -> Disco Value
+
+-- To reduce a variable, look it up in the environment and reduce the
+-- result.
 whnf (CVar x) = do
   e <- getEnv
   case (M.lookup (coerce x) e) of
     Just v  -> whnfV v
-    Nothing -> throwError $ UnboundError x
+    Nothing -> error $ "Unbound variable while interpreting!"
+      -- We should never encounter an unbound variable at this stage if the program
+      -- already typechecked.
 
+-- A constructor is already in WHNF, so just turn its contents into
+-- thunks to be evaluated later when they are demanded.
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
+
+-- A number is in WHNF, just turn it into a VNum.
 whnf (CNum d n)     = return $ VNum d n
+
+-- A lambda abstraction is already in WHNF; just package it up as a
+-- closure with the current environment.
 whnf (CAbs b)       = VClos b <$> getEnv
+
+-- To reduce an application:
 whnf (CApp str c1 c2) = do
+
+  -- First reduce the function to WHNF
   v1 <- whnf c1
+
+  -- Then either reduce the argument or turn it into a thunk,
+  -- depending on whether the application is strict or lazy
   v2 <- case str of
     Strict -> whnf c2       -- for types with strict evaluation, whnf = full reduction
     Lazy   -> mkThunk c2
+
+  -- Finally, call 'whnfApp' to do the application.
   whnfApp v1 v2
-whnf (COp op cs)    = whnfOp op cs
-whnf (CCase bs)     = whnfCase bs
+
+-- List comprehensions and ellipses, case expressions, and operators
+-- all have their own function to do reduction.
 whnf (CListComp b)  =
   lunbind b $ \(qs, t) -> do
     lcmp <- expandComp t (fromTelescope qs)
     whnfV lcmp
 whnf (CEllipsis ts ell) = expandEllipsis ts ell
+whnf (CCase bs)     = whnfCase bs
+whnf (COp op cs)    = whnfOp op cs
+
+
 whnf (CType _)      = error "Called whnf on CType"
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
---   (which means it must be a closure, or a @VFun@).
+--   (which means it must be either a closure or a @VFun@).
 whnfApp :: Value -> Value -> Disco Value
 whnfApp (VClos c e) v =
   lunbind c $ \(x,t) -> do

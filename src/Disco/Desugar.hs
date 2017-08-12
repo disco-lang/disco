@@ -99,9 +99,7 @@ desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
 desugarTerm ATUnit        = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
-  lunbind lam $ \((x, _), t) -> do
-  dt <- desugarTerm t
-  return $ CAbs (bind (coerce x) dt)
+  lunbind lam $ \(args, t) -> desugarLambda (map fst args) <$> desugarTerm t
 desugarTerm (ATApp ty t1 t2) =
   CApp (strictness ty) <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTup _ ts) = desugarTuples ts
@@ -122,15 +120,11 @@ desugarTerm (ATBin _ And t1 t2) = do
     ATApp TyBool
       (ATApp ty1
         (ATAbs ty2
-          (bind (x, embed Nothing)
-            (ATAbs ty1
-              (bind (y, embed Nothing)
-                (ATCase TyBool
-                  [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATVar TyBool y)
-                  , bind (toTelescope []) (ATBool False)
-                  ]
-                )
-              )
+          (bind [(x, embed Nothing), (y, embed Nothing)]
+            (ATCase TyBool
+              [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATVar TyBool y)
+              , bind (toTelescope []) (ATBool False)
+              ]
             )
           )
         )
@@ -148,15 +142,11 @@ desugarTerm (ATBin _ Or t1 t2) = do
     ATApp TyBool
       (ATApp ty1
         (ATAbs ty2
-          (bind (x, embed Nothing)
-            (ATAbs ty1
-              (bind (y, embed Nothing)
-                (ATCase TyBool
-                  [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATBool True)
-                  , bind (toTelescope []) (ATVar TyBool y)
-                  ]
-                )
-              )
+          (bind [(x, embed Nothing), (y, embed Nothing)]
+            (ATCase TyBool
+              [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATBool True)
+              , bind (toTelescope []) (ATVar TyBool y)
+              ]
             )
           )
         )
@@ -188,9 +178,18 @@ desugarLet [] t = t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   ATApp (getType t)
     (ATAbs (TyArr (getType t1) TyUnit {- Wrong but shouldn't matter -})
-           (bind (x, embed Nothing) (desugarLet ls t))
+           (bind [(x, embed Nothing)] (desugarLet ls t))
     )
     t1
+
+-- | Desugar a lambda from a list of argument names and the desugared
+--   @Core@ expression for its body. It will be desugared to a chain
+--   of one-argument lambdas.
+desugarLambda :: [Name ATerm] -> Core -> Core
+desugarLambda args c = go args
+  where
+    go []     = c
+    go (x:xs) = CAbs (bind (coerce x) (go xs))
 
 -- | Desugar a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must

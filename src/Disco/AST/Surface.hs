@@ -173,7 +173,7 @@ data Term where
   TRat   :: Rational -> Term
 
   -- | An anonymous function.
-  TAbs   :: Bind (Name Term, Embed (Maybe Type)) Term -> Term
+  TAbs   :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 
   -- | Function application.
   TApp  :: Term -> Term -> Term

@@ -21,7 +21,7 @@ module Disco.Syntax.Operators
 
          -- * Operator tables and lookup
        , opTable, uopMap, bopMap
-       , uPrec, bPrec, funPrec
+       , uPrec, bPrec, assoc, funPrec
 
        ) where
 
@@ -190,6 +190,12 @@ uPrec = opPrec . (uopMap !)
 -- | A convenient function for looking up the precedence of a binary operator.
 bPrec :: BOp -> Int
 bPrec = opPrec . (bopMap !)
+
+assoc :: BOp -> BFixity
+assoc op =
+  case M.lookup op bopMap of
+    Just (OpInfo (BOpF fx _) _ _) -> fx
+    _                             -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 -- | The precedence level of function application.
 funPrec :: Int

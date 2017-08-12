@@ -671,7 +671,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' =
-      TAbs <$> try (bind <$> parseLambdaArg <*> (mapsTo *> parseTerm'))
+      TAbs <$> try (bind <$> some parseLambdaArg <*> (mapsTo *> parseTerm'))
   <|> parseLet
   <|> parseExpr
   <|> parseAtom

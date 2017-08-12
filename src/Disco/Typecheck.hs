@@ -175,7 +175,8 @@ execTCM = fmap snd . runTCM
 addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
 addDefn x b = modify (M.insert (coerce x) b)
 
--- XXX
+-- | Look up the type of a variable in the context.  Throw an "unbound
+--   variable" error if it is not found.
 lookupTy :: Name Term -> TCM Type
 lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 
@@ -212,38 +213,41 @@ check (TListComp bqt) ty@(TyList eltTy) = do
 
 check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
 
-  -- To check that an abstraction has an arrow type, check that the
-  -- body has the return type under an extended context.
-check (TAbs lam) ty@(TyArr ty1 ty2) = do
-  lunbind lam $ \((x,unembed -> mty),t) -> do
-    case mty of
-      Nothing -> extend x ty1 $ do
-        at <- check t ty2
-        return $ ATAbs ty (bind (coerce x, embed mty) at)
-      Just annTy -> do
-        case isSub ty1 annTy of
-          False -> throwError $ Mismatch ty1 (ATVar annTy (coerce x))
-          True  -> extend x annTy $ do
-            at <- check t ty2
-            return $ ATAbs ty (bind (coerce x, embed mty) at)
+-- To check an abstraction:
+check (TAbs lam) ty = do
+  lunbind lam $ \(args, t) -> do
+    -- First check that the given type is of the form ty1 -> ty2 ->
+    -- ... -> resTy, where the types ty1, ty2 ... match up with any
+    -- types declared for the arguments to the lambda (e.g.  (x:tyA)
+    -- (y:tyB) -> ...).
+    (ctx, resTy) <- checkArgs args ty
 
-  -- We are trying to check an abstraction under a non-arrow type: error.
-check t@(TAbs _) ty = throwError (NotArrow t ty)
+    -- Then check the type of the body under a context extended with
+    -- types for all the arguments.
+    extends ctx $ do
+    at <- check t resTy
+    return $ ATAbs ty (bind ((map . first) coerce args) at)
 
-  -- To check an injection has a sum type, recursively check the
-  -- relevant type.
+-- To check an injection has a sum type, recursively check the
+-- relevant type.
 check (TInj L t) ty@(TySum ty1 _) = do
   at <- check t ty1
   return $ ATInj ty L at
 check (TInj R t) ty@(TySum _ ty2) = do
   at <- check t ty2
   return $ ATInj ty R at
-  -- Trying to check an injection under a non-sum type: error.
+
+-- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
+-- To check a let expression:
 check (TLet l) ty =
   lunbind l $ \(bs, t2) -> do
+
+    -- Infer the types of all the variables bound by the let...
     (as, ctx) <- inferTelescope inferBinding bs
+
+    -- ...then check the body under an extended context.
     extends ctx $ do
       at2 <- check t2 ty
       return $ ATLet ty (bind as at2)
@@ -252,23 +256,19 @@ check (TCase bs) ty = do
   bs' <- mapM (checkBranch ty) bs
   return (ATCase ty bs')
 
--- Need to add new cases due to finite types
-check (TBin Add t1 t2) ty =
-  if (isNumTy ty)
-    then do
-      at1 <- check t1 ty
-      at2 <- check t2 ty
-      return $ ATBin ty Add at1 at2
-    else throwError (NotNumTy ty)
+-- Once upon a time, when we only had types N, Z, Q+, and Q, we could
+-- always infer the type of anything numeric, so we didn't need
+-- checking cases for Add, Mul, etc.  But now we could have e.g.  (a +
+-- b) : Z13, in which case we need to push the checking type (in the
+-- example, Z13) through the operator to check the arguments.
 
--- Checking multiplication is the same as addition
--- (since it is repeated addition)
-check (TBin Mul t1 t2) ty =
+-- Checking addition and multiplication is the same.
+check (TBin op t1 t2) ty | op `elem` [Add, Mul] =
   if (isNumTy ty)
     then do
       at1 <- check t1 ty
       at2 <- check t2 ty
-      return $ ATBin ty Mul at1 at2
+      return $ ATBin ty op at1 at2
     else throwError (NotNumTy ty)
 
 check (TBin Div t1 t2) ty = do
@@ -280,7 +280,7 @@ check (TBin Div t1 t2) ty = do
 check (TBin IDiv t1 t2) ty = do
   if (isNumTy ty)
     then do
-      at1 <- check t1 ty   -- should this be lub of ty and TyQP?
+      at1 <- check t1 ty   -- XXX should this be lub of ty and TyQP?
       at2 <- check t2 ty   -- lub of ty and TyQP?
       return $ ATBin ty IDiv at1 at2
     else throwError (NotNumTy ty)
@@ -307,7 +307,9 @@ check (TBin Sub t1 t2) ty = do
   at2 <- check t2 ty
   return $ ATBin ty Sub at1 at2
 
--- XXX comment me: not the same special case for Neg as for Sub
+-- Note, we don't have the same special case for Neg as for Sub, since
+-- unlike subtraction, which can sometimes make sense on N or QP, it
+-- never makes sense to negate a value of type N or QP.
 check (TUn Neg t) ty = do
   _ <- checkSubtractive ty
   at <- check t ty
@@ -316,11 +318,62 @@ check (TUn Neg t) ty = do
 check (TNat x) (TyFin n) =
   return $ ATNat (TyFin n) x
 
-  -- Finally, to check anything else, we can infer its type and then
-  -- check that the inferred type is a subtype of the given type.
+
+-- Finally, to check anything else, we can fall back to inferring its
+-- type and then check that the inferred type is a *subtype* of the
+-- given type.
 check t ty = do
   at <- infer t
   checkSub at ty
+
+
+-- | Given the variables and their optional type annotations in the
+--   head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
+--   type at which we are checking the lambda, ensure that the type is
+--   of the form @ty1 -> ty2 -> ... -> resTy@, and that there are
+--   enough @ty1@, @ty2@, ... to match all the arguments.  Also check
+--   that each binding with a type annotation matches the
+--   corresponding ty_i component from the checking type: in
+--   particular, the ty_i must be a subtype of the type annotation.
+--   If it succeeds, return a context binding variables to their types
+--   (taken either from their annotation or from the type to be
+--   checked, as appropriate) which we can use to extend when checking
+--   the body, along with the result type of the function.
+checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> TCM (TyCtx, Type)
+
+-- If we're all out of arguments, the remaining checking type is the
+-- result, and there are no variables to bind in the context.
+checkArgs [] ty = return (emptyCtx, ty)
+
+-- Take the next variable and its annotation; the checking type must
+-- be a function type ty1 -> ty2.
+checkArgs ((x, unembed -> mty) : args) (TyArr ty1 ty2) = do
+
+  -- Figure out the type of x:
+  xTy <- case mty of
+
+    -- If it has no annotation, just take the input type ty1.
+    Nothing    -> return ty1
+
+    -- If it does have an annotation, make sure the input type is a
+    -- subtype of it.
+    Just annTy ->
+      case isSub ty1 annTy of
+        False -> throwError $ Mismatch ty1 (ATVar annTy (coerce x))
+        True  -> return annTy
+
+  -- Check the rest of the arguments under the type ty2, returning a
+  -- context with the rest of the arguments and the final result type.
+  (ctx, resTy) <- checkArgs args ty2
+
+  -- Pass the result type through, and add x with its type to the
+  -- generated context.
+  return (singleCtx x xTy `joinCtx` ctx, resTy)
+
+-- Otherwise, we are trying to check some lambda arguments under a
+-- non-arrow type.
+checkArgs args ty = error $ "checkArgs --- Make a better error here!"
+
 
 -- | Check the types of terms in a tuple against a nested
 --   pair type.
@@ -565,12 +618,18 @@ infer (TRat r)      = return $ ATRat r
   -- We can infer the type of a lambda if the variable is annotated
   -- with a type.
 infer (TAbs lam)    =
-  lunbind lam $ \((x, unembed -> mty), t) ->
-  case mty of
-    Nothing -> throwError (CantInfer (TAbs lam))
-    Just ty -> extend x ty $ do
-      at <- infer t
-      return $ ATAbs (TyArr ty (getType at)) (bind (coerce x, embed (Just ty)) at)
+  lunbind lam $ \(args, t) -> do
+    let (xs, mtys) = unzip args
+    case sequence (map unembed mtys) of
+      Nothing  -> throwError (CantInfer (TAbs lam))
+      Just tys -> extends (M.fromList $ zip xs tys) $ do
+        at <- infer t
+        return $ ATAbs (mkFunTy tys (getType at))
+                       (bind (zip (map coerce xs) (map (embed . Just) tys)) at)
+  where
+    -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
+    mkFunTy :: [Type] -> Type -> Type
+    mkFunTy tys out = foldr TyArr out tys
 
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.

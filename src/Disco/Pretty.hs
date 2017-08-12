@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TypeFamilies              #-}
 {-# LANGUAGE ViewPatterns              #-}
 
 -----------------------------------------------------------------------------
@@ -82,20 +83,11 @@ punctuate p ds = do
 
 type Prec = Int
 
-prec :: BOp -> Prec
-prec op =
-  case M.lookup op bopMap of
-    Just (OpInfo _ _ p) -> p
-    _                   -> error $ "BOp " ++ show op ++ " not in bopMap!"
-
-assoc :: BOp -> BFixity
-assoc op =
-  case M.lookup op bopMap of
-    Just (OpInfo (BOpF fx _) _ _) -> fx
-    _                             -> error $ "BOp " ++ show op ++ " not in bopMap!"
+ugetPA :: UOp -> PA
+ugetPA op = PA (uPrec op) In
 
 getPA :: BOp -> PA
-getPA op = PA (prec op) (assoc op)
+getPA op = PA (bPrec op) (assoc op)
 
 data PA = PA Prec BFixity
   deriving (Show, Eq)
@@ -157,14 +149,12 @@ prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    = mparens initPA $
-  lunbind bnd $ \((x,unembed -> mty),body) ->
-  case mty of
-    Nothing -> hsep [prettyName x, text "↦", prettyTerm' 0 InL body]
-    Just ty -> hsep
-      [ text "(" <> prettyName x <> text ":" <> prettyTy ty <> text ")"
-      , text "↦"
-      , prettyTerm' 0 InL body
-      ]
+  lunbind bnd $ \(args, body) ->
+  hsep (map prettyArg args) <+> text "↦" <+> prettyTerm' 0 InL body
+  where
+    prettyArg (x, unembed -> mty) = case mty of
+      Nothing -> prettyName x
+      Just ty -> text "(" <> prettyName x <+> text ":" <+> prettyTy ty <> text ")"
 prettyTerm (TApp t1 t2)  = mparens funPA $
   prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
 prettyTerm (TTup ts)     = do
@@ -184,20 +174,21 @@ prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
 prettyTerm (TUn Fact t)  = prettyTerm' (1 + funPrec) InL t <> text "!"
-prettyTerm (TUn op t)    = prettyUOp op <> prettyTerm' (1 + funPrec) InR t
+prettyTerm (TUn op t)    = mparens (ugetPA op) $
+  prettyUOp op <> prettyTerm' (1 + funPrec) InR t
 prettyTerm (TBin op t1 t2) = mparens (getPA op) $
   hsep
-  [ prettyTerm' (prec op) InL t1
+  [ prettyTerm' (bPrec op) InL t1
   , prettyBOp op
-  , prettyTerm' (prec op) InR t2
+  , prettyTerm' (bPrec op) InR t2
   ]
 prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
-    prettyTerm' (prec Eq) InL t
+    prettyTerm' (bPrec Eq) InL t
     : concatMap prettyLink lks
   where
     prettyLink (TLink op t2) =
       [ prettyBOp op
-      , prettyTerm' (prec op) InR t2
+      , prettyTerm' (bPrec op) InR t2
       ]
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \(bs, t2) -> do
@@ -211,9 +202,9 @@ prettyTerm (TLet bnd) = mparens initPA $
   where
     prettyBinding :: Binding -> Doc
     prettyBinding (Binding Nothing x (unembed -> t))
-      = hsep [prettyName x, text "=", prettyTerm' 0 InR t]
+      = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
     prettyBinding (Binding (Just ty) x (unembed -> t))
-      = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InR t]
+      = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InL t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?

@@ -1,0 +1,4 @@
+{? x when (0, 0/0) is (S x, 3) ?}
+{? x when (0, 0/0) is (S x, 3), 2 otherwise ?}
+{? x when [1,2,3/0] is [x,3,5], 2 otherwise ?}
+{? x when [1,2,3/0] is [x,2,5], 2 otherwise ?}

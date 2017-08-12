@@ -350,11 +350,7 @@ match v (CPCons i ps) = do
   VCons j vs <- whnfV v
   case i == j of
     False -> noMatch
-    True  -> do
-      res <- sequence <$> zipWithM match vs ps
-      case res of
-        Nothing -> noMatch
-        Just es -> return $ Just (M.unions es)
+    True  -> matchPatterns vs ps
 match v (CPNat n)     = do
   VNum _ m <- whnfV v
   case m == n % 1 of
@@ -365,6 +361,18 @@ match v (CPSucc p) = do
   case n > 0 of
     True  -> match (vnum (n-1)) p
     False -> noMatch
+
+-- | Lazily match a list of values against a list of patterns
+--   pairwise, returning @Nothing@ as soon as one match fails, and
+--   returning an environment of bindings if all succeed.
+matchPatterns :: [Value] -> [CPattern] -> Disco (Maybe Env)
+matchPatterns []     _      = return (Just emptyCtx)
+matchPatterns (v:vs) (p:ps) = do
+  res <- match v p
+  case res of
+    Nothing -> noMatch
+    Just e  -> (fmap.fmap) (joinCtx e) $ matchPatterns vs ps
+matchPatterns _ _ = error "Different number of values and patterns in matchPatterns!"
 
 -- | Convenience function: successfully match with no bindings.
 ok :: Disco (Maybe Env)

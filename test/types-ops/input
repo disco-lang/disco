@@ -3,10 +3,16 @@ count Unit
 count Bool
 count (Bool + Bool -> Bool)
 count (Bool * Bool)
+count (List Void)
+count (List (Void * Void + Void))
+count (List Unit)
 enumerate (Bool -> Bool)
 enumerate (Bool * Bool + Bool)
 enumerate (Unit + Bool)
 enumerate (Void * Unit)
+enumerate (List Void)
+enumerate (List (Void * Void + Void))
+enumerate (List Unit)
 count Z5
 count (Z5 * Z4)
 count (Z3 + Z6)

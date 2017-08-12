@@ -541,19 +541,23 @@ modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> Disco Value
-countOp [CType ty]  = return $ vnum ((countOp' ty) % 1)
+countOp [CType ty]  = return $ vnum ((countType ty) % 1)
 countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 
-countOp' :: Type -> Integer
-countOp' TyVoid            = 0
-countOp' TyUnit            = 1
-countOp' TyBool            = 2
-countOp' (TyFin n)         = n
-countOp' (TyArr ty1 ty2)   = (countOp' ty2) ^ (countOp' ty1)
-countOp' (TyPair ty1 ty2)  = (countOp' ty1) * (countOp' ty2)
-countOp' (TySum ty1 ty2)   = (countOp' ty1) + (countOp' ty2)
--- All other types are infinite
-countOp' t                 = error $ "Impossible! The type " ++ show t ++ " is infinite."
+countType :: Type -> Integer
+countType TyVoid            = 0
+countType TyUnit            = 1
+countType TyBool            = 2
+countType (TyFin n)         = n
+countType (TyArr  ty1 ty2)  = (countType ty2) ^ (countType ty1)
+countType (TyPair ty1 ty2)  = (countType ty1) * (countType ty2)
+countType (TySum  ty1 ty2)  = (countType ty1) + (countType ty2)
+countType (TyList ty)       = 1
+  -- The only way for @count (List ty)@ to typecheck is if @ty@ is empty,
+  -- in which case there is one list of type @List ty@, namely, the empty list.
+
+-- All other types are infinite.
+countType t                 = error $ "Impossible! The type " ++ show t ++ " is infinite."
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> Disco Value
@@ -822,6 +826,12 @@ enumerate (TyArr ty1 ty2)  = map mkFun (sequence (vs2 <$ vs1))
     -- just in case it ever happens
     fromJust' _ (Just x) = x
     fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
+
+enumerate (TyList _ty) = [VCons 0 []]
+  -- Right now, the only way for this to typecheck is if @ty@ is
+  -- empty.  Perhaps in the future we'll allow 'enumerate' to work on
+  -- countably infinite types, in which case we would need to change
+  -- this.
 
 enumerate _ = []  -- other cases shouldn't happen if the program type checks
 

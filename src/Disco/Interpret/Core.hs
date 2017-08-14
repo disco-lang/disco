@@ -33,7 +33,7 @@ module Disco.Interpret.Core
 
          -- ** Operations
        , whnfOp, numOp, numOp', uNumOp, divOp, modOp, boolOp
-       , divides, relPm, binom, fact, notOp
+       , divides, binom, fact, notOp
 
          -- * Equality testing
        , eqOp, primValEq, enumerate
@@ -465,7 +465,6 @@ whnfOp OAnd     = boolOp (&&)
 whnfOp OOr      = boolOp (||)
 whnfOp OMod     = numOp' modOp
 whnfOp ODivides = numOp' divides
-whnfOp ORelPm   = numOp' relPm
 whnfOp OBinom   = numOp binom
 whnfOp OMultinom = multinomOp
 whnfOp OFact    = uNumOp fact
@@ -645,11 +644,6 @@ divides :: Rational -> Rational -> Disco Value
 divides 0 0 = return $ mkEnum True
 divides 0 _ = return $ mkEnum False
 divides x y = return . mkEnum $ denominator (y / x) == 1
-
--- | Test relative primality.  Note that if the disco program
---   typechecks, the arguments here will always be integers.
-relPm :: Rational -> Rational -> Disco Value
-relPm (numerator -> x) (numerator -> y) = return . mkEnum $ gcd x y == 1
 
 -- | Binomial coefficient.  The arguments will always be natural
 --   numbers.

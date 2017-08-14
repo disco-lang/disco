@@ -63,7 +63,6 @@ data BOp = Add     -- ^ Addition (@+@)
          | Or      -- ^ Logical or (@||@ / @or@)
          | Mod     -- ^ Modulo (@mod@)
          | Divides -- ^ Divisibility test (@|@)
-         | RelPm   -- ^ Relative primality test (@#@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
   deriving (Show, Eq, Ord, Generic)
@@ -158,7 +157,6 @@ opTable =
     , bopInfo InR  Leq     ["<="]
     , bopInfo InR  Geq     [">="]
     , bopInfo InR  Divides ["divides"]
-    , bopInfo InR  RelPm   ["#"]
     ]
   , [ bopInfo InR  And     ["and", "∧", "&&"]
     ]

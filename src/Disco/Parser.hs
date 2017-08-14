@@ -550,7 +550,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     bfxParser InR  = InfixR
     bfxParser In   = InfixN
 
-    isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides, RelPm]
+    isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides]
 
     fixChains (TUn op t) = TUn op (fixChains t)
     fixChains (TBin op t1 (TBin op' t21 t22))

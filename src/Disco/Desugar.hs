@@ -246,7 +246,6 @@ desugarBOp _  _ _ And     c1 c2 = COp OAnd [c1, c2]
 desugarBOp _  _ _ Or      c1 c2 = COp OOr  [c1, c2]
 desugarBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
 desugarBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
-desugarBOp _  _ _ RelPm   c1 c2 = COp ORelPm [c1, c2]
 desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
 
 desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]

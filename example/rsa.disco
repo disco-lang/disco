@@ -25,9 +25,13 @@ getKeys (S p1) (S p2) =
 -- guess -> totient -> e
 getPubExp : N -> N -> N
 getPubExp e totient =
-  {? e                          if e # totient
+  {? e                          if gcd(e, totient) = 1
    , getPubExp (e+1) totient    otherwise
   ?}
+
+gcd : N*N -> N
+gcd (a, 0) = a
+gcd (a, b) = gcd (b, a mod b)
 
 getPrivExp : N -> N -> N
 getPrivExp e totient =

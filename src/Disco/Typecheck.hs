@@ -58,11 +58,10 @@ module Disco.Typecheck
 
          -- * Erasure
        , erase
-       , eraseProperty
+       , eraseBinding, eraseBranch, eraseGuard
+       , eraseLink, eraseQual, eraseProperty
        )
        where
-
--- import Debug.Trace
 
 import           Prelude                                 hiding (lookup)
 
@@ -136,7 +135,6 @@ data TCError
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
   | ModQ                   -- ^ Can't do mod on rationals.
   | ExpQ                   -- ^ Can't exponentiate by a rational.
-  | RelPmQ                 -- ^ Can't ask about relative primality of rationals.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
@@ -786,14 +784,6 @@ infer (TBin Divides t1 t2) = do
   _ <- numLub at1 at2
   return (ATBin TyBool Divides at1 at2)
 
-infer (TBin RelPm t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty <- numLub at1 at2
-  if (isSub ty TyZ)
-    then return (ATBin TyBool RelPm at1 at2)
-    else throwError RelPmQ
-
 -- For now, a simple typing rule for multinomial coefficients that
 -- requires everything to be Nat.  However, they can be extended to
 -- handle negative or fractional arguments.
@@ -1117,6 +1107,7 @@ checkProperty prop = do
 -- Erasure
 ------------------------------------------------------------
 
+-- | Erase all the type annotations from a term.
 erase :: ATerm -> Term
 erase (ATVar _ x)           = TVar (coerce x)
 erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)

@@ -1,0 +1,10 @@
+||| This is some documentation.
+|||
+||| More documentation after a blank line.
+
+!!! x = 3 -- A property
+
+||| Yet more documentation.
+
+x : Nat
+x = 3

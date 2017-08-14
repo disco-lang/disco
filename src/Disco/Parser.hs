@@ -19,23 +19,17 @@
 
 module Disco.Parser
        ( -- * Parser type
-         ParserState(..), initParserState, Parser, runParser
+         Parser, runParser
 
          -- ** Parser utilities
 
-       , tabStack, numActive, isSep
-       , getColumn, pushTab
+       , getColumn
 
          -- * Lexer
 
-         -- ** Layout
-       , open, sep, close, block
-       , requireSep, requireClose, requireVirtual
-
          -- ** Basic lexemes
-       , consumeWhitespace
-       , whitespace, lexeme, symbol, reservedOp
-       , natural, reserved, reservedWords, identifier, ident
+       , sc, lexeme, symbol, reservedOp
+       , natural, reserved, reservedWords, ident
 
          -- ** Punctuation
        , parens, braces, angles, brackets
@@ -45,7 +39,7 @@ module Disco.Parser
          -- * Disco parser
 
          -- ** Modules
-       , wholeModule, parseModule, parseDecl
+       , wholeModule, parseModule, parseTopLevel, parseDecl
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
@@ -61,26 +55,25 @@ module Disco.Parser
        )
        where
 
---import           Debug.Trace
-
 import           Unbound.Generics.LocallyNameless (Name, bind, embed,
                                                    string2Name, Embed)
 
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
-import qualified Text.Megaparsec.Char             as C
+import           Text.Megaparsec.Char
 import           Text.Megaparsec.Expr
-import qualified Text.Megaparsec.Lexer            as L
-import qualified Text.Megaparsec.String           as MP
+import qualified Text.Megaparsec.Char.Lexer       as L
+import qualified Text.Megaparsec.Pos              as MP
 
 import           Control.Applicative              (many, (<|>))
-import           Control.Lens                     hiding (op)
+import           Control.Lens                     (makeLenses, (.=), use)
 import           Control.Monad.State
 import           Data.Char                        (isDigit, isSpace)
 import           Data.Either                      (isRight)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
+import           Data.Void
 import           Text.Printf
 
 import           Disco.AST.Surface
@@ -90,274 +83,69 @@ import           Disco.Types
 ------------------------------------------------------------
 -- Lexer
 
--- | Custom parser state.
+-- Some of the basic setup code for the parser taken from
+-- https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
+
+-- | Extra custom state for the parser.
 data ParserState = ParserState
-  { _tabStack  :: [(Pos, String)]   -- ^ Stack of alignment columns.
-                                    --   Each column has a position
-                                    --   and a delimiter which should
-                                    --   always appear in that column.
-                                    --   The delimiter may be the
-                                    --   empty string.
-  , _numActive :: Int               -- ^ Number of currently active
-                                    --   open blocks. May be larger
-                                    --   than the size of the
-                                    --   tabStack, in which case we
-                                    --   expect to encounter some
-                                    --   virtual 'close' tokens.
-  , _isSep     :: Bool              -- ^ Whether we are expecting to
-                                    --   see a virtual separator
-                                    --   token.
+  { _indentLevel :: Maybe Pos  -- ^ When this is @Just p@, everything
+                               --   should be indented more than column
+                               --   @p@.
   }
 
 makeLenses ''ParserState
 
--- | The initial parser state: empty tab stack, no active blocks, and
---   not expecting a separator.
 initParserState :: ParserState
-initParserState = ParserState [] 0 False
+initParserState = ParserState Nothing
 
--- | A parser is a megaparsec parser with some custom state added.
-type Parser a = StateT ParserState MP.Parser a
+-- | A parser is just a megaparsec parser of strings.  Megaparsec can
+--   keep track of indentation.  For now we have no custom errors.
+type Parser = StateT ParserState (MP.Parsec Void String)
 
 -- | Run a parser from the initial state.
-runParser :: Parser a -> FilePath -> String -> Either (ParseError Char Dec) a
+runParser :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
 runParser = MP.runParser . flip evalStateT initParserState
 
 -- | Get the current column.
 getColumn :: Parser Pos
 getColumn = sourceColumn <$> getPosition
 
--- | Push a new alignment column on the stack.
-pushTab :: (Pos, String) -> Parser ()
-pushTab t = tabStack %= (t:)
+-- | @indented p@ is just like @p@, except that every token must not
+--   start in the first column.
+indented :: Parser a -> Parser a
+indented p = do
+  indentLevel .= Just pos1
+  res <- p
+  indentLevel .= Nothing
+  return res
 
--- | Open a new block corresponding to a new alignment column at the
---   current column.  The string argument is the delimiter we expect
---   to always see at this column for the duration of the block (which
---   may be empty).
-open :: String -> Parser ()
-open delim = do
-  col <- getColumn      -- remember the current column
-  _ <- string delim     -- parse the delimiter
-  pushTab (col, delim)  -- push the new column on the stack
-  numActive += 1        -- increment the number of active blocks
-  -- trace ("open " ++ delim) $ return ()
+-- | @requireIndent p@ possibly requires @p@ to be indented, depending
+--   on the current '_indentLevel'.  Used in the definition of
+--   'lexeme' and 'symbol'.
+requireIndent :: Parser a -> Parser a
+requireIndent p = do
+  l <- use indentLevel
+  case l of
+    Just pos -> L.indentGuard sc GT pos >> p
+    _        -> p
 
--- | A virtual separator token.  Occurs between subsequent things
---   which both start in the same alignment column.
-sep :: Parser ()
-sep = do
-
-  -- The implementation is actually simple: make sure we are expecting
-  -- a separator here.  If so, reset the separator flag; if not, fail.
-  s <- use isSep
-  when (not s) $
-    fail
-      (concat
-      [ "The parser required a separator but none was found.\n"
-      , "Please report this as a bug: https://github.com/disco-lang/disco/issues"
-      ])
-
-  isSep .= False
-  -- pos <- getPosition
-  -- trace ("sep " ++ show pos) $ return ()
-
--- | A virutal close token, used at the end of a block.
-close :: Parser ()
-close = eof <|> do
-  -- pos <- getPosition
-  n   <- use numActive
-  stk <- use tabStack
-  case (length stk < n) of
-    True  -> do numActive -= 1
-                -- trace ("close " ++ show pos) (return ())
-    False -> fail $ concat
-               [ "The parser required a close but the stack is empty.\n"
-               , "Please report this as a bug: https://github.com/disco-lang/disco/issues"
-               ]
-      -- I hope this failure mode will only occur if there is a bug in
-      -- the parser, not with incorrect user syntax.
-
--- | Parse an indented block, with individual items parsed by the
---   given parser.  For example, something like
---
---   @
---      item1
---      item2 item2
---        item2 item2 item2
---      item3
---   @
---
---   The current column when 'block' is first invoked is taken as the
---   alignment column for the block.
-block :: Parser a -> Parser [a]
-block item = open "" *> (item `sepBy` sep) <* close
-
--- | See if a virtual separator token is required, and fail if so.
---   This is called right before parsing any other (non-virtual)
---   token, which means that when isSep is set to true, the parser is
---   /forced/ to choose a virtual separator token.
-requireSep :: Parser ()
-requireSep = do
-  s <- use isSep
-  when s $ fail "Missing separator"  -- XXX better error message.  Can this happen?
-
--- | See if a virtual close token is required, and fail if so.  This
---   is called right before parsing any other (non-virtual) token,
---   which means that when the indentation has decreased, the parser
---   is /forced/ to choose the required number of virtual close
---   tokens.
-requireClose :: Parser ()
-requireClose = do
-  n   <- use numActive
-  stk <- use tabStack
-  -- trace ("requireClose: " ++ show n ++ " " ++ show stk) $ return ()
-  when (n > length stk) $
-    fail "Encountered a dedented token, but the block is not ready to close."
-      -- XXX better error message
-
--- | Possibly require virtual separator and close tokens.
-requireVirtual :: Parser ()
-requireVirtual = requireSep >> requireClose
-
--- | Consume whitespace and deal with indentation and layout.  This is
---   where the magic happens, and needs to be invoked after every
---   token.
-whitespace :: Parser ()
-whitespace = do
-
-  -- Eat up actual whitespace (including newlines) and comments
-  consumeWhitespace
-
-  -- Find out what column we ended up in, and the current stack.
-  col <- getColumn
-  stk <- use tabStack
-
-  -- pos <- getPosition
-  -- trace ("whitespace: " ++ show pos ++ " " ++ show stk) $ return ()
-
-  -- Get the rightmost alignment column.
-  let rightmost = case stk of { ((p,_):_) -> p; _ -> unsafePos 1 }
-
-  -- If current column is greater than the rightmost alignment, do
-  -- nothing; if <=, try to consume alignment delimiters, adjust the
-  -- stack of alignments appropriately, require separators and/or
-  -- block closes, etc.
-  when (col <= rightmost) $ do
-    let tabs = reverse stk         -- Get the alignment stack in
-                                   -- reverse so we can process it
-                                   -- L->R
-    go tabs tabs rightmost
-  where
-
-    -- If there are no more alignments to consume, we are either at
-    -- the rightmost alignment right before some non-whitespace (if
-    -- the delimiter is the empty string), or right before the EOL
-    go orig [] rm
-      = try (eol >> consumeWhitespace >> go orig orig rm)
-                                      -- Try consuming the EOL and any
-                                      -- subsequent WS chars and
-                                      -- starting over on the next
-                                      -- line with non-whitespace
-        <|>
-        (do col <- getColumn          -- Otherwise, require a separator
-            isSep .= (col == rm))     -- if we are in the rightmost
-                                      -- alignment column (but
-                                      -- otherwise we are past the
-                                      -- rightmost alignment column
-                                      -- and this is just a
-                                      -- continuation of the previous
-                                      -- line)
-
-    go orig ts@((tabcol, delim) : moreTabs) rm = do
-      col <- getColumn
-
-      -- Check if we are at the end of the line, without consuming anything.
-      atEOL <- isRight <$> observing (lookAhead eol)
-
-      -- Check our relationship to the next alignment column.
-      if
-         -- If all remaining delimiters are empty, it's OK to be at
-         -- EOL, even if it comes in a column before the next
-         -- alignment. Just consume it and start again on the next
-         -- line.
-         | all (\(_,d) -> null d) ts && atEOL -> eol >> consumeWhitespace >> go orig orig rm
-
-         -- If we're past it but the delimiter for that column was empty,
-         -- no problem: just keep processing the next alignment column
-         | (col > tabcol && null delim) -> go orig moreTabs rm
-
-         -- Otherwise, there should have been a delimiter in that column
-         -- but there wasn't, so fail.
-         | col > tabcol                 ->
-             fail $
-             printf
-               (concat
-                  [ "There should be a '%s' in column %d to match the previous line, "
-                  , "but I didn't find one.\nPlease check your indentation."
-                  ]
-               )
-               delim
-               (unPos tabcol)
-
-         -- If we're at the next alignment column, try to consume the delimiter
-         -- followed by whitespace on the same line, then continue processing columns.
-         -- If we don't find the delimiter, consider that block closed.
-         | col == tabcol                ->
-             (do _ <- try (string delim)
-                 consumeLineWhitespace
-                 go orig moreTabs rm
-             )
-             <|>
-             closeBlocks col
-
-         -- If we're before the next alignment column, then we need to
-         -- close some blocks, and possibly require a separator.
-         | col < tabcol                 -> closeBlocks col
-
-      where
-        closeBlocks col = do
-
-          -- Drop any remaining alignment columns.  Some 'close'
-          -- operations will be required to get the number of
-          -- active blocks equal to the size of the stack again.
-          tabStack %= drop (length ts)
-
-          -- We should require a separator if the current column is
-          -- equal to the column now on top of the stack.
-          stk <- use tabStack
-          let acol = case stk of
-                       []        -> unsafePos 1
-                       ((p,_):_) -> p
-          isSep .= (col == acol)
-
--- | Generically consume whitespace, including comments.  The first
---   argument specifies which actual whitespace characters to consume.
-consumeWhitespace' :: Parser Char -> Parser ()
-consumeWhitespace' sc = L.space (sc *> pure ()) lineComment blockComment
+-- | Generically consume whitespace, including comments.
+sc :: Parser ()
+sc = L.space space1 lineComment blockComment
   where
     lineComment  = L.skipLineComment "--"
     blockComment = L.skipBlockComment "{-" "-}"
 
--- | Consume whitespace, including comments, but do not consume
---   newline characters.
-consumeLineWhitespace :: Parser ()
-consumeLineWhitespace = consumeWhitespace' (satisfy (\c -> isSpace c && c `notElem` "\r\n"))
-
--- | Consume whitespace, including comments and newlines.
-consumeWhitespace :: Parser ()
-consumeWhitespace = consumeWhitespace' C.spaceChar
-
 -- | Parse a lexeme, that is, a parser followed by consuming
---   whitespace (and dealing with layout/indentation appropriately).
+--   whitespace.
 lexeme :: Parser a -> Parser a
-lexeme p = requireVirtual >> L.lexeme whitespace p
+lexeme p = requireIndent $ L.lexeme sc p
 
 -- | Parse a given string as a lexeme.
 symbol :: String -> Parser String
-symbol s = requireVirtual >> L.symbol whitespace s
+symbol s = requireIndent $ L.symbol sc s
 
--- | Like 'symbol', but discard the result.
+-- | Parse a reserved operator.
 reservedOp :: String -> Parser ()
 reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
@@ -390,7 +178,7 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 
 -- | Parse a natural number.
 natural :: Parser Integer
-natural = lexeme L.integer
+natural = lexeme L.decimal
 
 -- | Parse a nonnegative decimal of the form @xxx.yyyy[zzz]@, where
 --   the @y@s and bracketed @z@s are optional.  For example, this
@@ -430,7 +218,7 @@ decimal = lexeme (readDecimal <$> some digit <* char '.'
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
-reserved w = lexeme $ C.string w *> notFollowedBy alphaNumChar
+reserved w = lexeme $ string w *> notFollowedBy alphaNumChar
 
 -- | The list of all reserved words.
 reservedWords :: [String]
@@ -471,17 +259,14 @@ optionMaybe p = (Just <$> p) <|> pure Nothing
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
 wholeModule :: Parser Module
-wholeModule = whitespace *> L.nonIndented consumeWhitespace parseModule <* eof
+wholeModule = between sc eof parseModule
 
 -- | Parse an entire module (a list of declarations ended by
 --   semicolons).
 parseModule :: Parser Module
 parseModule = do
-  sep
-  topLevel <- parseTopLevel `sepBy` sep
-  -- traceShow topLevel $ return ()
+  topLevel <- many parseTopLevel
   let theMod = mkModule topLevel
-  --traceShow theMod $
   return theMod
   where
     groupTLs _ [] = []
@@ -517,61 +302,59 @@ parseTopLevel = TLDoc <$> parseDocThing <|> TLDecl <$> parseDecl
 --   (checked examples/properties).
 parseDocThing :: Parser DocThing
 parseDocThing
-  =   DocString     <$> parseDocString
-  <|> DocProperties <$> parseProperties
+  =   DocString     <$> some parseDocString
+  <|> DocProperties <$> some parseProperty
 
--- | Parse a documentation group beginning with @|||@.
-parseDocString :: Parser [String]
-parseDocString = do
-  -- trace ("start docString") $ return ()
-  open "|||"
-  whitespace
-  ss <- block (requireVirtual *> manyTill anyChar eol <* whitespace)
-  close
-  -- trace ("end docString") $ return ()
-  return ss
+-- XXX make DocProperties into just DocProperty?  No particular need
+-- to have a list of them when declarations are already in a list.
 
--- | Parse a group of examples/properties beginning with @!!!@.
-parseProperties :: Parser [Property]
-parseProperties = do
-  -- trace ("start properties") $ return ()
-  open "!!!"
-  whitespace
-  ps <- block parseProperty
-  close
-  -- trace ("end properties") $ return ()
-  return ps
+-- | Parse one line of documentation beginning with @|||@.
+parseDocString :: Parser String
+parseDocString = L.nonIndented sc $
+  string "|||"
+  *> takeWhileP Nothing (`elem` " \t")
+  *> takeWhileP Nothing (`notElem` "\r\n") <* sc
 
--- | Parse a property, of the form
+  -- Note we use string "|||" rather than symbol "|||" because we
+  -- don't want it to consume whitespace afterwards (in particular a
+  -- line with ||| by itself would cause symbol "|||" to consume the
+  -- newline).
+
+-- | Parse a top-level property/unit test, of the form
 --
---   @forall x1 : ty1, ..., xn : tyn. term@.
+--   @!!! forall x1 : ty1, ..., xn : tyn. term@.
+--
+--   The forall is optional.
 parseProperty :: Parser Property
-parseProperty = bind
-  <$> (parseUniversal <|> return [])
-  <*> parseTerm
+parseProperty = L.nonIndented sc $ do
+  symbol "!!!"
+  indented $ do
+    bind
+      <$> (parseUniversal <|> return [])
+      <*> parseTerm
   where
     parseUniversal =
          (() <$ symbol "∀" <|> reserved "forall")
       *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
       <* dot
 
--- | Parse a single declaration (either a type declaration or
---   single definition clause).
+-- | Parse a single top-level declaration (either a type declaration
+--   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl =
-      try (DType <$> ident <*> (colon *> parseType))
+      try (DType <$> ident <*> (indented $ colon *> parseType))
   <|>      DDefn
            <$> ident
-           <*> ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+           <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
 term :: Parser Term
-term = whitespace *> parseTerm <* eof
+term = between sc eof parseTerm
 
 -- | Parse an atomic term.
 parseAtom :: Parser Term
-parseAtom = -- trace "parseAtom" $
+parseAtom =
       brackets parseList
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
@@ -768,7 +551,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
         -- get all other operators from the opTable
       : (map . concatMap) mkOpParser opTable
 
-    mkOpParser :: OpInfo -> [Operator (StateT ParserState MP.Parser) Term]
+    mkOpParser :: OpInfo -> [Operator Parser Term]
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 
     withOpFixity (UOpF fx op) syn = (ufxParser fx) (reservedOp syn >> return (TUn op))
@@ -876,7 +659,7 @@ parseAtomicType =
 
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
-         <|> TyFin  <$> (lexeme (C.string "Z" <|> C.string "ℤ") *> natural)
+         <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
 -- | Parse a type.
 parseType :: Parser Type

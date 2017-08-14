@@ -1,0 +1,2 @@
+:load test/syntax-doc/syntax-doc.disco
+:doc x

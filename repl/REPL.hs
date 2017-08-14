@@ -17,6 +17,7 @@ import qualified Options.Applicative              as O
 import           System.Console.Haskeline         as H
 import           System.Exit
 import           Text.Megaparsec                  hiding (runParser)
+import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
@@ -54,7 +55,7 @@ letParser = Let
   <*> (symbol "=" *> term)
 
 commandParser :: Parser REPLExpr
-commandParser = (symbol ":" *> many lowerChar) >>= parseCommandArgs
+commandParser = (symbol ":" *> many C.lowerChar) >>= parseCommandArgs
 
 parseCommandArgs :: String -> Parser REPLExpr
 parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
@@ -62,23 +63,23 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     parsers =
       [ ("type",    TypeCheck <$> term)
-      , ("defn",    ShowDefn  <$> (whitespace *> ident))
+      , ("defn",    ShowDefn  <$> (sc *> ident))
       , ("parse",   Parse     <$> term)
       , ("pretty",  Pretty    <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
-      , ("doc",     Doc       <$> (whitespace *> ident))
+      , ("doc",     Doc       <$> (sc *> ident))
       , ("help",    return Help)
       ]
 
 fileParser :: Parser FilePath
-fileParser = many spaceChar *> many (satisfy (not . isSpace))
+fileParser = many C.spaceChar *> many (C.satisfy (not . isSpace))
 
 lineParser :: Parser REPLExpr
 lineParser
   =   commandParser
-  <|> try (Nop <$ (consumeWhitespace <* eof))
-  <|> try (Eval <$> (consumeWhitespace *> parseTerm <* eof))
+  <|> try (Nop <$ (sc <* eof))
+  <|> try (Eval <$> term)
   <|> letParser
 
 parseLine :: String -> Either String REPLExpr

@@ -299,11 +299,8 @@ parseTopLevel = TLDoc <$> parseDocThing <|> TLDecl <$> parseDecl
 --   (checked examples/properties).
 parseDocThing :: Parser DocThing
 parseDocThing
-  =   DocString     <$> some parseDocString
-  <|> DocProperties <$> some parseProperty
-
--- XXX make DocProperties into just DocProperty?  No particular need
--- to have a list of them when declarations are already in a list.
+  =   DocString   <$> some parseDocString
+  <|> DocProperty <$> parseProperty
 
 -- | Parse one line of documentation beginning with @|||@.
 parseDocString :: Parser String

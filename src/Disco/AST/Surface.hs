@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveFoldable        #-}
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleContexts      #-}
@@ -53,8 +53,8 @@ import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Context
-import           Disco.Types
 import           Disco.Syntax.Operators
+import           Disco.Types
 
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
@@ -71,8 +71,10 @@ type Docs = [DocThing]
 
 -- | An item of documentation.
 data DocThing
-  = DocString     [String]      -- ^ A documentation string, i.e. a block of @||| text@ items
-  | DocProperties [Property]    -- ^ A group of examples/properties of the form @!!! property@
+  = DocString   [String]    -- ^ A documentation string, i.e. a block
+                            --   of @||| text@ items
+  | DocProperty Property    -- ^ An example/doctest/property of the
+                            --   form @!!! forall (x1:ty1) ... . property@
   deriving Show
 
 -- | A property is a universally quantified term of the form

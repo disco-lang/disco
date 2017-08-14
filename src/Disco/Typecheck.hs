@@ -35,7 +35,7 @@ module Disco.Typecheck
 
          -- * Type checking
        , check, checkPattern, ok, checkDefn
-       , checkPropertyTypes
+       , checkProperties, checkProperty
 
          -- ** Whole modules
        , checkModule, withTypeDecls
@@ -1028,7 +1028,7 @@ checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
-    aprops <- checkPropertyTypes docs
+    aprops <- checkProperties docs
     (docs,aprops,) <$> ask
 
 -- | Run a type checking computation in the context of some type
@@ -1087,20 +1087,31 @@ checkDefn (DDefn x clauses) = do
 
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
--- | XXX
-checkPropertyTypes :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
-checkPropertyTypes docs
-  = (M.fromList . (traverse . _1 %~ coerce))
-    <$> ((traverse . _2 . traverse) checkPropertyType) properties
-  -- mapM_ (\(n, ps) -> mapM_ checkPropertyType ps) properties
+-- | Given a context mapping names to documentation, extract the
+--   properties attached to each name and typecheck them.
+checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
+checkProperties docs =
+  (M.mapKeys coerce . M.filter (not.null))
+    <$> (traverse . traverse) checkProperty properties
   where
-    properties = [ (n, ps) | (n, DocProperties ps) <- concatMap sequence . M.assocs $ docs ]
-    checkPropertyType :: Property -> TCM AProperty
-    checkPropertyType prop = do
-      lunbind prop $ \(binds, t) -> do
-      extends (M.fromList binds) $ do
-      at <- check t TyBool
-      return $ bind (binds & traverse . _1 %~ coerce) at
+    properties :: Ctx Term [Property]
+    properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
+
+-- | Check the types of the terms embedded in a property.
+checkProperty :: Property -> TCM AProperty
+checkProperty prop = do
+
+  -- A property looks like  forall (x1:ty1) ... (xn:tyn). term.
+  lunbind prop $ \(binds, t) -> do
+
+  -- Extend the context with (x1:ty1) ... (xn:tyn) ...
+  extends (M.fromList binds) $ do
+
+  -- ... and check that the term has type Bool.
+  at <- check t TyBool
+
+  -- We just have to fix up the types of the variables.
+  return $ bind (binds & traverse . _1 %~ coerce) at
 
 ------------------------------------------------------------
 -- Erasure

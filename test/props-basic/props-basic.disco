@@ -60,9 +60,11 @@ plusIsoR n =
 !!! ∀ bs : B * B. {? b1 when bs is (b1,b2) if b2, false otherwise ?}
                 = {? b1 and b2 when bs is (b1,b2) ?}
 !!! ∀ x : N + N. plusIsoR (plusIso x) = x
+!!! ∀ x : Z5. x + (5 : Z5) = x
+!!! ∀ x : Z1000. x * (1000 : Z1000) = (0 : Z1000)
 
 x : N
 x = 0
 
-  -- This is just here to give us something to attach arbitrary test
+  -- x is just here to give us something to attach arbitrary test
   -- properties to.

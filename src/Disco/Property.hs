@@ -150,6 +150,12 @@ discoGenerator TyQ  = DiscoGen
   (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
 
+discoGenerator (TyFin n)
+  | n <= 32   = Universe n (map (vnum . (%1)) [0 .. n-1])
+  | otherwise = DiscoGen
+      (QC.choose (0,n-1) :: QC.Gen Integer)
+      (\n -> vnum (n%1))
+
 discoGenerator (TyList ty)  = case fromUniverse $ discoGenerator ty of
   Universe _ _ {- empty -} -> emptyUniverse
   DiscoGen tyGen tyToValue -> DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)

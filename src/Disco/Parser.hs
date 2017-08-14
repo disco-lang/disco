@@ -21,10 +21,6 @@ module Disco.Parser
        ( -- * Parser type
          Parser, runParser
 
-         -- ** Parser utilities
-
-       , getColumn
-
          -- * Lexer
 
          -- ** Basic lexemes
@@ -102,10 +98,6 @@ type Parser = StateT ParserState (MP.Parsec Void String)
 -- | Run a parser from the initial state.
 runParser :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
 runParser = MP.runParser . flip evalStateT initParserState
-
--- | Get the current column.
-getColumn :: Parser Pos
-getColumn = sourceColumn <$> getPosition
 
 -- | @indented p@ is just like @p@, except that every token must not
 --   start in the first column.

@@ -215,6 +215,17 @@ discoGenerator (TySum ty1 ty2) =
 discoGenerator (TyArr _ty1 _ty2) =
   error "discoGenerator is not yet implemented for TyArr"
 
+-- discoGenerator (TyArr ty1 ty2) =
+--   case (discoGenerator ty1, discoGenerator ty2) of
+--     (Universe n1 vs1, Universe n2 vs2)
+--       | n2^n1 <= 32 ->
+--         Universe (n2^n1) undefined  --- use existing enumerate function
+--       -- Note the above case will catch empty universes, since in that
+--       -- case n2^n1 will be either 0 or 1.
+--     (g1, g2) ->
+--       case (fromUniverse g1, fromUniverse g2) of
+--         (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
+
 -- | @genValues n ty@ generates a sequence of @n@ increasingly complex
 --   values of type @ty@, using the 'DiscoGen' for @ty@.
 genValues :: Int -> Type -> Disco [Value]

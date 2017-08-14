@@ -173,6 +173,22 @@ discoGenerator (TyPair ty1 ty2) =
             (\(a,b) -> vPair (toValue1 a) (toValue2 b))
   where
     vPair v1 v2 = VCons 0 [v1, v2]
+discoGenerator (TySum ty1 ty2) =
+  case (discoGenerator ty1, discoGenerator ty2) of
+    (Universe n1 vs1, Universe n2 vs2)
+      | n1 + n2 <= 32 ->
+        Universe (n1 + n2)
+          (map vLeft vs1 ++ map vRight vs2)
+    (g1, g2) ->
+      case (fromUniverse g1, fromUniverse g2) of
+        (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
+          DiscoGen
+            (QC.choose (0 :: Double, 1) >>= \r ->
+               if r < 0.5 then Left <$> gen1 else Right <$> gen2)
+            (either (vLeft . toValue1) (vRight . toValue2))
+  where
+    vLeft  v = VCons 0 [v]
+    vRight v = VCons 1 [v]
 
 -- | @genValues n ty@ generates a sequence of @n@ increasingly complex
 --   values of type @ty@, using the 'DiscoGen' for @ty@.

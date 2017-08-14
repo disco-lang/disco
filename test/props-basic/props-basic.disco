@@ -40,6 +40,16 @@ fromBin [] = 1
 fromBin (false :: bs) = 2 fromBin bs
 fromBin (true  :: bs) = 2 fromBin bs + 1
 
+plusIso : N + N -> N
+plusIso (left n) = 2n
+plusIso (right n) = 2n + 1
+
+plusIsoR : N -> N + N
+plusIsoR n =
+  {? left  (n // 2)   if 2 divides n
+   , right (n // 2)   otherwise
+  ?}
+
 !!! ∀ v:Void. 2 = 3    -- this is true!
 !!! ∀ u:Unit. u = u    -- there is only one Unit type
 !!! ∀ l:List Void. 2 = 3
@@ -49,6 +59,7 @@ fromBin (true  :: bs) = 2 fromBin bs + 1
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0
 !!! ∀ bs : B * B. {? b1 when bs is (b1,b2) if b2, false otherwise ?}
                 = {? b1 and b2 when bs is (b1,b2) ?}
+!!! ∀ x : N + N. plusIsoR (plusIso x) = x
 
 x : N
 x = 0

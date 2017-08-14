@@ -68,7 +68,7 @@ import           Prelude                                 hiding (lookup)
 
 import           Control.Applicative                     ((<|>))
 import           Control.Arrow                           ((&&&))
-import           Control.Lens                            ((%~), (&), _1, _2)
+import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State

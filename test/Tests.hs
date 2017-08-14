@@ -1,15 +1,16 @@
 module Main where
 
-import qualified Data.ByteString as BS
-import           Control.Monad     (filterM)
-import           Data.Char         (isDigit)
-import           Data.Function     (on)
-import           Data.List         (groupBy, sort)
-import           System.Directory  (doesDirectoryExist, getDirectoryContents)
-import           System.FilePath   (isPathSeparator, (</>))
-import           System.IO         (hGetContents)
-import           System.Process    (system, createProcess, shell, std_out
-                                   ,StdStream(CreatePipe))
+import           Control.Monad              (filterM)
+import qualified Data.ByteString            as BS
+import           Data.Function              (on)
+import           Data.List                  (groupBy, sort)
+import           System.Directory           (doesDirectoryExist,
+                                             getDirectoryContents)
+import           System.FilePath            (isPathSeparator, (</>))
+import           System.IO                  (hGetContents)
+import           System.Process             (StdStream (CreatePipe),
+                                             createProcess, shell, std_out,
+                                             system)
 import           Text.Printf
 
 import           Test.Tasty
@@ -26,7 +27,10 @@ main = do
   let testTree = testGroup "disco" $ map mkGroup testDirs'
   defaultMain testTree
   where
-    mkGroup ds@(d:_) = testGroup (extractGroup d) $ map mkGolden ds
+    mkGroup ds = testGroup (extractGroup (head ds)) $ map mkGolden ds
+      -- (head ds) is safe since mkGroup is called on testDirs', which
+      -- is the output of groupBy, so each element of testDirs' will
+      -- be a non-empty list.
 
 extractGroup :: FilePath -> String
 extractGroup = takeWhile (/='-')

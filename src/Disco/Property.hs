@@ -154,7 +154,7 @@ discoGenerator (TyFin n)
   | n <= 32   = Universe n (map (vnum . (%1)) [0 .. n-1])
   | otherwise = DiscoGen
       (QC.choose (0,n-1) :: QC.Gen Integer)
-      (\n -> vnum (n%1))
+      (vnum . (%1))
 
 discoGenerator (TyList ty)  = case fromUniverse $ discoGenerator ty of
   Universe _ _ {- empty -} -> emptyUniverse
@@ -177,6 +177,10 @@ discoGenerator (TyPair ty1 ty2) =
           DiscoGen
             ((,) <$> gen1 <*> gen2)
             (\(a,b) -> vPair (toValue1 a) (toValue2 b))
+        _ -> error "discoGenerator TyPair: this case should be impossible"
+             -- Impossible since we already checked for empty
+             -- universes, and other than empty universes,
+             -- fromUniverse always returns a DiscoGen.
   where
     vPair v1 v2 = VCons 0 [v1, v2]
 discoGenerator (TySum ty1 ty2) =
@@ -195,6 +199,9 @@ discoGenerator (TySum ty1 ty2) =
   where
     vLeft  v = VCons 0 [v]
     vRight v = VCons 1 [v]
+
+discoGenerator (TyArr ty1 ty2) =
+  error "discoGenerator is not yet implemented for TyArr"
 
 -- | @genValues n ty@ generates a sequence of @n@ increasingly complex
 --   values of type @ty@, using the 'DiscoGen' for @ty@.

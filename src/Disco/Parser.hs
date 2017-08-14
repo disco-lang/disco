@@ -55,26 +55,23 @@ module Disco.Parser
        )
        where
 
-import           Unbound.Generics.LocallyNameless (Name, bind, embed,
-                                                   string2Name, Embed)
+import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
+                                                   string2Name)
 
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
 import           Text.Megaparsec.Char
-import           Text.Megaparsec.Expr
 import qualified Text.Megaparsec.Char.Lexer       as L
-import qualified Text.Megaparsec.Pos              as MP
+import           Text.Megaparsec.Expr
 
 import           Control.Applicative              (many, (<|>))
-import           Control.Lens                     (makeLenses, (.=), use)
+import           Control.Lens                     (makeLenses, use, (.=))
 import           Control.Monad.State
-import           Data.Char                        (isDigit, isSpace)
-import           Data.Either                      (isRight)
+import           Data.Char                        (isDigit)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
 import           Data.Void
-import           Text.Printf
 
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
@@ -327,7 +324,7 @@ parseDocString = L.nonIndented sc $
 --   The forall is optional.
 parseProperty :: Parser Property
 parseProperty = L.nonIndented sc $ do
-  symbol "!!!"
+  _ <- symbol "!!!"
   indented $ do
     bind
       <$> (parseUniversal <|> return [])

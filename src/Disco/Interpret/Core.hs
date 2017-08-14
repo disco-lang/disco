@@ -49,15 +49,14 @@ module Disco.Interpret.Core
        )
        where
 
-import           Control.Lens                       ((%=), use)
-import           Control.Monad                      (zipWithM)
+import           Control.Lens                       (use, (%=))
 import           Control.Monad.Except               (throwError)
 import           Control.Monad.Reader               (local)
 import           Data.Coerce                        (coerce)
-import           Data.List                          (find)
-import qualified Data.Map                           as M
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
+import           Data.List                          (find)
+import qualified Data.Map                           as M
 import           Data.Monoid
 import           Data.Ratio
 
@@ -69,10 +68,11 @@ import           Math.Combinatorics.Exact.Factorial (factorial)
 import           Math.NumberTheory.Logarithms       (integerLog2)
 import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
 
+import           Disco.AST.Core
+import           Disco.AST.Surface                  (Ellipsis (..),
+                                                     fromTelescope)
 import           Disco.Context
 import           Disco.Eval
-import           Disco.AST.Surface (Ellipsis(..), fromTelescope)
-import           Disco.AST.Core
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -552,7 +552,7 @@ countType (TyFin n)         = n
 countType (TyArr  ty1 ty2)  = (countType ty2) ^ (countType ty1)
 countType (TyPair ty1 ty2)  = (countType ty1) * (countType ty2)
 countType (TySum  ty1 ty2)  = (countType ty1) + (countType ty2)
-countType (TyList ty)       = 1
+countType (TyList _)        = 1
   -- The only way for @count (List ty)@ to typecheck is if @ty@ is empty,
   -- in which case there is one list of type @List ty@, namely, the empty list.
 

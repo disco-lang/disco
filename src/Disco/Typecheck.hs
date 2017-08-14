@@ -81,9 +81,9 @@ import qualified Data.Map                                as M
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Disco.Context
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
 
@@ -372,7 +372,7 @@ checkArgs ((x, unembed -> mty) : args) (TyArr ty1 ty2) = do
 
 -- Otherwise, we are trying to check some lambda arguments under a
 -- non-arrow type.
-checkArgs args ty = error $ "checkArgs --- Make a better error here!"
+checkArgs _args _ty = error $ "checkArgs --- Make a better error here!"
 
 
 -- | Check the types of terms in a tuple against a nested

@@ -139,7 +139,7 @@ isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
 isEmptyTy :: Type -> Bool
 isEmptyTy TyVoid           = True
 isEmptyTy (TyFin 0)        = True
-isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy _                = False
 

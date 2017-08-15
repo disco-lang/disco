@@ -130,12 +130,12 @@ countType _                 = Nothing
 -- Type predicates
 --------------------------------------------------
 
--- | Check whether a type is a numeric type (N, Z, or Q).
+-- | Check whether a type is a numeric type (N, Z, Q+, Q, or Zn).
 isNumTy :: Type -> Bool
 isNumTy (TyFin _) = True
 isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
 
--- | Decide whether a type is empty.
+-- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
 isEmptyTy TyVoid           = True
 isEmptyTy (TyFin 0)        = True
@@ -163,7 +163,6 @@ isSubtractive _         = False
 
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
-isDecidable (TyVar _)         = error "isDecidable TyVar"
 isDecidable TyVoid            = True
 isDecidable TyUnit            = True
 isDecidable TyBool            = True
@@ -172,14 +171,15 @@ isDecidable TyZ               = True
 isDecidable TyQP              = True
 isDecidable TyQ               = True
 isDecidable (TyFin _)         = True
-isDecidable (TyPair ty1 ty2)  = isDecidable ty1 && isDecidable ty2
 isDecidable (TySum  ty1 ty2)  = isDecidable ty1 && isDecidable ty2
-isDecidable (TyArr  ty1 ty2)  = isFinite    ty1 && isDecidable ty2
+isDecidable (TyPair ty1 ty2)  = isDecidable ty1 && isDecidable ty2
 isDecidable (TyList ty)       = isDecidable ty
+isDecidable (TyArr  ty1 ty2)  = isFinite    ty1 && isDecidable ty2
+
+isDecidable (TyVar _)         = error "isDecidable TyVar"
 
 -- | Check whether the given type has a decidable total order.
 isOrdered :: Type -> Bool
-isOrdered (TyVar _)         = error "isOrdered TyVar"
 isOrdered TyVoid            = True
 isOrdered TyUnit            = True
 isOrdered TyBool            = True
@@ -188,10 +188,12 @@ isOrdered TyZ               = True
 isOrdered TyQP              = True
 isOrdered TyQ               = True
 isOrdered (TyFin _)         = True
-isOrdered (TyPair ty1 ty2)  = isOrdered ty1 && isOrdered ty2
 isOrdered (TySum  ty1 ty2)  = isOrdered ty1 && isOrdered ty2
-isOrdered (TyArr  ty1 ty2)  = isFinite ty1 && isOrdered ty1 && isOrdered ty2
+isOrdered (TyPair ty1 ty2)  = isOrdered ty1 && isOrdered ty2
 isOrdered (TyList ty)       = isOrdered ty
+isOrdered (TyArr  ty1 ty2)  = isFinite ty1 && isOrdered ty1 && isOrdered ty2
+
+isOrdered (TyVar _)         = error "isOrdered TyVar"
 
 --------------------------------------------------
 -- Strictness

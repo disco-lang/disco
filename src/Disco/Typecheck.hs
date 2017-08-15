@@ -461,6 +461,8 @@ numLub at1 at2 = do
   checkNumTy at2
   lub (getType at1) (getType at2)
 
+-- | Check whether the given type supports division, and throw an
+--   error if not.
 checkFractional :: Type -> TCM Type
 checkFractional ty =
   if (isNumTy ty)
@@ -469,6 +471,8 @@ checkFractional ty =
       False -> throwError $ NotFractional ty
     else throwError $ NotNumTy ty
 
+-- | Check whether the given type supports subtraction, and throw an
+--   error if not.
 checkSubtractive :: Type -> TCM Type
 checkSubtractive ty =
   if (isNumTy ty)
@@ -476,8 +480,6 @@ checkSubtractive ty =
       True  -> return ty
       False -> throwError $ NotSubtractive ty
   else throwError $ NotNumTy ty
-
--- XXX move isFinite, etc. to Disco.Types
 
 -- | Check whether the given type is finite, and throw an error if not.
 checkFinite :: Type -> TCM ()

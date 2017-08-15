@@ -57,6 +57,7 @@ import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.List                          (find)
 import qualified Data.Map                           as M
+import           Data.Maybe                         (fromJust)
 import           Data.Monoid
 import           Data.Ratio
 
@@ -540,23 +541,8 @@ modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: [Core] -> Disco Value
-countOp [CType ty]  = return $ vnum ((countType ty) % 1)
+countOp [CType ty]  = return $ vnum ((fromJust $ countType ty) % 1)
 countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
-
-countType :: Type -> Integer
-countType TyVoid            = 0
-countType TyUnit            = 1
-countType TyBool            = 2
-countType (TyFin n)         = n
-countType (TyArr  ty1 ty2)  = (countType ty2) ^ (countType ty1)
-countType (TyPair ty1 ty2)  = (countType ty1) * (countType ty2)
-countType (TySum  ty1 ty2)  = (countType ty1) + (countType ty2)
-countType (TyList _)        = 1
-  -- The only way for @count (List ty)@ to typecheck is if @ty@ is empty,
-  -- in which case there is one list of type @List ty@, namely, the empty list.
-
--- All other types are infinite.
-countType t                 = error $ "Impossible! The type " ++ show t ++ " is infinite."
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: [Core] -> Disco Value

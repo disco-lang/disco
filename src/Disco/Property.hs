@@ -33,55 +33,60 @@ import           Disco.Eval
 import           Disco.Interpret.Core
 import           Disco.Syntax.Operators           (BOp (..))
 import           Disco.Types
--- XXX make TestResult more informative:
---   - if it succeeded, was it tested exhaustively, or randomly?
---   - if the latter, how many examples were used?
---   - If a random test failed, what were the inputs that produced
---     the counterexample?
+
+-- XXX comment these
+
+data SuccessType
+  = Exhaustive
+  | Randomized Integer
 
 data TestResult
-  = TestOK
-  | TestFalse
+  = TestOK SuccessType
   | TestRuntimeFailure InterpError
-  | TestEqualityFailure Value Type Value Type
+  | TestFalse                            Env
+  | TestEqualityFailure Type Value Value Env
+
+instance Monoid SuccessType where
+  mempty = Exhaustive
+  Exhaustive `mappend` s = s
+  s `mappend` Exhaustive = s
+  Randomized m `mappend` Randomized n = Randomized (m + n)
 
 instance Monoid TestResult where
-  mempty = TestOK
-  TestOK `mappend` r = r
-  r `mappend` _      = r
+  mempty = TestOK mempty
+  TestOK s1 `mappend` TestOK s2 = TestOK (s1 `mappend` s2)
+  TestOK _ `mappend` r          = r
+  r        `mappend` _          = r
 
 testIsOK :: TestResult -> Bool
-testIsOK TestOK = True
-testIsOK _ = False
-
--- XXX comment me
-
--- XXX if there is a quantifier, present it as a counterexample rather
--- than just an equality test failure
+testIsOK (TestOK {}) = True
+testIsOK _           = False
 
 -- XXX do shrinking for randomly generated test cases
 
 -- XXX don't reload defs every time?
+
+-- XXX comment me
 runTest :: Int -> Ctx Core Core -> AProperty -> Disco TestResult
 runTest n defs aprop
   = flip catchError (return . TestRuntimeFailure) . fmap mconcat
     . withDefs defs $ do
   lunbind aprop $ \(binds, at) -> do
-    envs <- testCases n binds
+    (exhaustive, envs) <- testCases n binds
     for envs $ \env -> extendsEnv env $ do
       case getEquatands at of
         Nothing        -> do
           v <- evalTerm at
           case v of
-            VCons 1 [] -> return TestOK
-            _          -> return TestFalse
+            VCons 1 [] -> return $ TestOK (Randomized 1)
+            _          -> return $ TestFalse env
         Just (at1,at2) -> do
           v1 <- evalTerm at1
           v2 <- evalTerm at2
           v <- decideEqFor (getType at1) v1 v2
           case v of
-            True  -> return TestOK
-            False -> return $ TestEqualityFailure v1 (getType at1) v2 (getType at2)
+            True  -> return $ TestOK (Randomized 1)
+            False -> return $ TestEqualityFailure (getType at1) v1 v2 env
   where
     evalTerm = rnf . runDSM . desugarTerm
 
@@ -90,19 +95,33 @@ getEquatands :: ATerm -> Maybe (ATerm, ATerm)
 getEquatands (ATBin _ Eq at1 at2) = Just (at1, at2)
 getEquatands _                    = Nothing
 
--- | @testCases n bindings@ generates environments in which to conduct
---   tests.  If @bindings@ is empty, only one test is necessary, and
---   @testCases@ returns a singleton list with the empty environment.
---   Otherwise, @testCases@ generates @n@ environments; in each
---   environment the given names are bound to values of the
---   appropriate types.  The values in the first environment are
---   simplest; they become increasingly complex as the environments
---   progress.
-testCases :: Int -> [(Name ATerm, Type)] -> Disco [Env]
-testCases _ []    = return [M.empty]
-testCases n binds = do
-  valLists <- mapM (genValues n) tys
-  return $ map (M.fromList . zip ys) $ transpose valLists
+-- | @testCases n bindings@ generates at most n environments in which
+--   to conduct tests.
+--
+--   * If @bindings@ is empty, only one test is
+--     necessary, and @testCases@ returns a singleton list with the
+--     empty environment.
+--
+--   * If the number of all possible combinations of values for
+--     @bindings@ is at most @n@, then one environment is generated
+--     for each combination, and @True@ is returned to signal that the
+--     tests are exhaustive.
+--
+--   * Otherwise, @testCases@ generates exactly @n@ environments; in
+--     each environment the given names are bound to randomly chosen
+--     values.  The values in the first environment are simplest; they
+--     become increasingly complex as the environments progress.
+testCases :: Int -> [(Name ATerm, Type)] -> Disco (Bool, [Env])
+testCases _ []    = return (True, [M.empty])
+testCases n binds
+  | Just m <- fmap product . sequence . map countType $ tys
+  , m <= (fromIntegral n)
+  = return $ (True, map (M.fromList . zip ys) $ mapM enumerate tys)
+    -- The above mapM is in the list monad!
+
+  | otherwise = do
+      valLists <- mapM (genValues n) tys
+      return $ (False, map (M.fromList . zip ys) $ transpose valLists)
   where
     (xs, tys) = unzip binds
     ys :: [Name Core]
@@ -115,31 +134,24 @@ testCases n binds = do
 -- | A generator of disco values.
 data DiscoGen where
 
+  -- | A generator for an uninhabited type.
+  EmptyGen :: DiscoGen
+
   -- | A @DiscoGen@ contains a QuickCheck generator of an
-  --   existentially quantified type, and a way to turn that type into a
-  --   disco 'Value'.
+  --   existentially quantified type, and a way to turn that type into
+  --   a disco 'Value'.
   DiscoGen :: QC.Gen a -> (a -> Value) -> DiscoGen
 
-  -- | Alternatively, a @Universe@ has a list of all values of the
-  --   given type, along with a cached size.  Invariant: the Integer
-  --   is equal to the length of the list.
-  Universe :: Integer -> [Value] -> DiscoGen
+emptyGenerator :: DiscoGen
+emptyGenerator = EmptyGen
 
--- | The universe with no values.
-emptyUniverse :: DiscoGen
-emptyUniverse = Universe 0 []
+unitGenerator :: DiscoGen
+unitGenerator = DiscoGen (return ()) (const (VCons 0 []))
 
 -- | Map a function over the values generated by a 'DiscoGen'.
 mapDiscoGen :: (Value -> Value) -> DiscoGen -> DiscoGen
+mapDiscoGen _ EmptyGen = EmptyGen
 mapDiscoGen f (DiscoGen gen toValue) = DiscoGen gen (f . toValue)
-mapDiscoGen f (Universe n vs)        = Universe n (map f vs)
-
--- | Convert a 'Universe'-style 'DiscoGen' into a generator-style one,
---   unless it is empty.
-fromUniverse :: DiscoGen -> DiscoGen
-fromUniverse g@(DiscoGen _ _) = g
-fromUniverse (Universe 0 [])  = emptyUniverse
-fromUniverse (Universe _ vs)  = DiscoGen (QC.elements vs) id
 
 -- | Create the 'DiscoGen' for a given type.
 discoGenerator :: Type -> DiscoGen
@@ -156,84 +168,56 @@ discoGenerator TyQ  = DiscoGen
   (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
 
-discoGenerator (TyFin n)
-  | n <= 32   = Universe n (map (vnum . (%1)) [0 .. n-1])
-  | otherwise = DiscoGen
-      (QC.choose (0,n-1) :: QC.Gen Integer)
-      (vnum . (%1))
-
-discoGenerator (TyList ty)  = case fromUniverse $ discoGenerator ty of
-  Universe _ _ {- empty -} -> emptyUniverse
-  DiscoGen tyGen tyToValue -> DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
+discoGenerator (TyFin 0) = emptyGenerator
+discoGenerator (TyFin n) = DiscoGen
+  (QC.choose (0,n-1) :: QC.Gen Integer)
+  (vnum . (%1))
 
 discoGenerator ty@(TyVar _) = error $ "discoGenerator " ++ show ty
-discoGenerator TyVoid       = emptyUniverse
-discoGenerator TyUnit       = Universe 1 [VCons 0 []]
-discoGenerator TyBool       = Universe 2 [VCons 0 [], VCons 1 []]
-discoGenerator (TyPair ty1 ty2) =
-  case (discoGenerator ty1, discoGenerator ty2) of
-    (Universe 0 _, _) -> emptyUniverse
-    (_, Universe 0 _) -> emptyUniverse
-    (Universe n1 vs1, Universe n2 vs2)
-      | n1 * n2 <= 32 {- XXX configurable? -} ->
-        Universe (n1*n2) [vPair v1 v2 | v1 <- vs1, v2 <- vs2]
-    (g1, g2) ->
-      case (fromUniverse g1, fromUniverse g2) of
-        (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
-          DiscoGen
-            ((,) <$> gen1 <*> gen2)
-            (\(a,b) -> vPair (toValue1 a) (toValue2 b))
-        _ -> error "discoGenerator TyPair: this case should be impossible"
-             -- Impossible since we already checked for empty
-             -- universes, and other than empty universes,
-             -- fromUniverse always returns a DiscoGen.
-  where
-    vPair v1 v2 = VCons 0 [v1, v2]
+
+discoGenerator TyVoid       = emptyGenerator
+discoGenerator TyUnit       = DiscoGen (return ()) (const (VCons 0 []))
+discoGenerator TyBool       = DiscoGen (QC.elements [False, True]) mkEnum
+
 discoGenerator (TySum ty1 ty2) =
   case (discoGenerator ty1, discoGenerator ty2) of
-    (Universe 0 _,  g2) -> mapDiscoGen vRight g2
-    (g1, Universe 0 _ ) -> mapDiscoGen vLeft  g1
-    (Universe n1 vs1, Universe n2 vs2)
-      | n1 + n2 <= 32 ->
-        Universe (n1 + n2)
-          (map vLeft vs1 ++ map vRight vs2)
-    (g1, g2) ->
-      case (fromUniverse g1, fromUniverse g2) of
-        (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
-          DiscoGen
-            (QC.choose (0 :: Double, 1) >>= \r ->
-               if r < 0.5 then Left <$> gen1 else Right <$> gen2)
-            (either (vLeft . toValue1) (vRight . toValue2))
-        _ -> error "discoGenerator TySum: this case should be impossible"
-             -- Impossible since we already checked for empty
-             -- universes, and other than empty universes,
-             -- fromUniverse always returns a DiscoGen.
+    (g1, EmptyGen) -> mapDiscoGen vLeft  g1
+    (EmptyGen, g2) -> mapDiscoGen vRight g2
+    (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
+      DiscoGen
+        (QC.choose (0 :: Double, 1) >>= \r ->
+            if r < 0.5 then Left <$> gen1 else Right <$> gen2)
+        (either (vLeft . toValue1) (vRight . toValue2))
   where
     vLeft  v = VCons 0 [v]
     vRight v = VCons 1 [v]
 
+discoGenerator (TyPair ty1 ty2) =
+  case (discoGenerator ty1, discoGenerator ty2) of
+    (EmptyGen, _) -> EmptyGen
+    (_, EmptyGen) -> EmptyGen
+    (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
+      DiscoGen
+        ((,) <$> gen1 <*> gen2)
+        (\(a,b) -> VCons 0 [toValue1 a, toValue2 b])
+
+discoGenerator (TyList ty) =
+  case discoGenerator ty of
+    EmptyGen -> unitGenerator
+    DiscoGen tyGen tyToValue ->
+      DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
+
 discoGenerator (TyArr _ty1 _ty2) =
   error "discoGenerator is not yet implemented for TyArr"
 
--- discoGenerator (TyArr ty1 ty2) =
---   case (discoGenerator ty1, discoGenerator ty2) of
---     (Universe n1 vs1, Universe n2 vs2)
---       | n2^n1 <= 32 ->
---         Universe (n2^n1) undefined  --- use existing enumerate function
---       -- Note the above case will catch empty universes, since in that
---       -- case n2^n1 will be either 0 or 1.
---     (g1, g2) ->
---       case (fromUniverse g1, fromUniverse g2) of
---         (DiscoGen gen1 toValue1, DiscoGen gen2 toValue2) ->
-
--- | @genValues n ty@ generates a sequence of @n@ increasingly complex
---   values of type @ty@, using the 'DiscoGen' for @ty@.
+-- | @genValues n ty@ generates a random sequence of @n@ increasingly
+--   complex values of type @ty@, using the 'DiscoGen' for @ty@.
 genValues :: Int -> Type -> Disco [Value]
 genValues n ty = case discoGenerator ty of
+  EmptyGen -> return []
   DiscoGen gen toValue -> do
     as <- generate n gen
     return $ map toValue as
-  Universe _ vs -> return vs
 
 -- | Use a QuickCheck generator to generate a given number of
 --   increasingly complex values of a given type.  Like the @sample'@

@@ -497,13 +497,7 @@ checkSubtractive ty =
       False -> throwError $ NotSubtractive ty
   else throwError $ NotNumTy ty
 
--- | Decide whether a type is empty.
-isEmpty :: Type -> Bool
-isEmpty TyVoid           = True
-isEmpty (TyFin 0)        = True
-isEmpty (TyPair ty1 ty2) = isEmpty ty1 && isEmpty ty2
-isEmpty (TySum ty1 ty2)  = isEmpty ty1 && isEmpty ty2
-isEmpty _                = False
+-- XXX move isFinite, etc. to Disco.Types
 
 -- | Decide whether a type is finite.
 isFinite :: Type -> Bool
@@ -514,7 +508,7 @@ isFinite (TyFin _)        = True
 isFinite (TyPair ty1 ty2) = isFinite ty1 && isFinite ty2
 isFinite (TySum  ty1 ty2) = isFinite ty1 && isFinite ty2
 isFinite (TyArr  ty1 ty2) = isFinite ty1 && isFinite ty2
-isFinite (TyList ty)      = isEmpty ty
+isFinite (TyList ty)      = isEmptyTy ty
 isFinite _ = False
 
 -- | Check whether the given type is finite, and throw an error if not.

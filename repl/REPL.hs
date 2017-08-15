@@ -185,22 +185,29 @@ runAllTests aprops
       return (null failures)
 
 -- XXX redo with message framework, with proper support for indentation etc.
+-- XXX also move it to Property or Pretty or somewhere like that
 prettyTestFailure :: AProperty -> TestResult -> Disco ()
-prettyTestFailure _ TestOK = return ()
-prettyTestFailure prop TestFalse  = do
+prettyTestFailure _ (TestOK {}) = return ()
+prettyTestFailure prop (TestFalse env) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStr "  - Test is false: " >> iputStrLn dp
-prettyTestFailure prop (TestEqualityFailure v1 ty1 v2 ty2) = do
+  prettyCounterexample env
+prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do
   iputStr     "  - Test result mismatch for: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
-  iputStr     "    - Expected: " >> prettyValue ty2 v2
-  iputStr     "    - But got:  " >> prettyValue ty1 v1
+  iputStr     "    - Expected: " >> prettyValue ty v2
+  iputStr     "    - But got:  " >> prettyValue ty v1
+  prettyCounterexample env
 prettyTestFailure prop (TestRuntimeFailure err) = do
   iputStr     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
   iputStr     "    " >> iprint err
+
+-- XXX fix me
+prettyCounterexample :: Env -> Disco ()
+prettyCounterexample _env = return ()
 
 handleDocs :: Name Term -> Disco ()
 handleDocs x = do

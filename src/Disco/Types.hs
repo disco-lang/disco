@@ -20,7 +20,9 @@
 module Disco.Types
        ( Type(..)
 
-       , isNumTy, Strictness(..), strictness
+       , isNumTy, isEmptyTy, countType
+
+       , Strictness(..), strictness
 
        , unpair
        )
@@ -82,6 +84,30 @@ data Type where
 isNumTy :: Type -> Bool
 isNumTy (TyFin _) = True
 isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
+
+-- | Decide whether a type is empty.
+isEmptyTy :: Type -> Bool
+isEmptyTy TyVoid           = True
+isEmptyTy (TyFin 0)        = True
+isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy _                = False
+
+countType :: Type -> Maybe Integer
+countType TyVoid            = Just 0
+countType TyUnit            = Just 1
+countType TyBool            = Just 2
+countType (TyFin n)         = Just n
+countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
+countType (TyPair ty1 ty2)  = (*) <$> countType ty1 <*> countType ty2
+countType (TyArr  ty1 ty2)  = (^) <$> countType ty2 <*> countType ty1
+countType (TyList ty)
+  | isEmptyTy ty            = Just 1
+  | otherwise               = Nothing
+
+-- All other types are infinite. (TyN, TyZ, TyQ, TyQP)
+countType _                 = Nothing
+
 
 -- | Strictness of a function application or let-expression.
 data Strictness = Strict | Lazy

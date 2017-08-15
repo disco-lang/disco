@@ -10,6 +10,7 @@ import           Control.Monad.Trans.Class        (MonadTrans(..))
 import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf)
+import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (isJust)
 
@@ -19,6 +20,7 @@ import           System.Exit
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -30,6 +32,7 @@ import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
+import           Disco.Types
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -191,23 +194,37 @@ prettyTestFailure _ (TestOK {}) = return ()
 prettyTestFailure prop (TestFalse env) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStr "  - Test is false: " >> iputStrLn dp
-  prettyCounterexample env
+  let qTys = M.fromList . fst . unsafeUnbind $ prop
+  prettyCounterexample qTys env
 prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do
   iputStr     "  - Test result mismatch for: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
   iputStr     "    - Expected: " >> prettyValue ty v2
   iputStr     "    - But got:  " >> prettyValue ty v1
-  prettyCounterexample env
+  let qTys = M.fromList . fst . unsafeUnbind $ prop
+  prettyCounterexample qTys env
 prettyTestFailure prop (TestRuntimeFailure err) = do
   iputStr     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
   iputStr     "    " >> iprint err
 
--- XXX fix me
-prettyCounterexample :: Env -> Disco ()
-prettyCounterexample _env = return ()
+-- XXX comment, move somewhere else
+prettyCounterexample :: Ctx ATerm Type -> Env -> Disco ()
+prettyCounterexample ctx env
+  | M.null env = return ()
+  | otherwise  = do
+      iputStrLn "    Counterexample:"
+      let maxNameLen = maximum . map (length . name2String) $ M.keys env
+      mapM_ (prettyBinding maxNameLen) $ M.assocs env
+  where
+    prettyBinding maxNameLen (x,v) = do
+      iputStr "      "
+      iputStr =<< (renderDoc . prettyName $ coerce x)
+      iputStr (replicate (maxNameLen - length (name2String x)) ' ')
+      iputStr " = "
+      prettyValue (ctx ! coerce x) v
 
 handleDocs :: Name Term -> Disco ()
 handleDocs x = do

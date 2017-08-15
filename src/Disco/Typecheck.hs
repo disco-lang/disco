@@ -24,7 +24,7 @@
 
 module Disco.Typecheck
        ( -- * Type checking monad
-         TCM, runTCM, evalTCM, execTCM
+         TCM, TyCtx, runTCM, evalTCM, execTCM
          -- ** Definitions
        , Defn, DefnCtx
          -- ** Errors

@@ -73,19 +73,20 @@ runTest n defs aprop
     . withDefs defs $ do
   lunbind aprop $ \(binds, at) -> do
     (exhaustive, envs) <- testCases n binds
+    let success = if exhaustive then Exhaustive else Randomized 1
     for envs $ \env -> extendsEnv env $ do
       case getEquatands at of
         Nothing        -> do
           v <- evalTerm at
           case v of
-            VCons 1 [] -> return $ TestOK (Randomized 1)
+            VCons 1 [] -> return $ TestOK success
             _          -> return $ TestFalse env
         Just (at1,at2) -> do
           v1 <- evalTerm at1
           v2 <- evalTerm at2
           v <- decideEqFor (getType at1) v1 v2
           case v of
-            True  -> return $ TestOK (Randomized 1)
+            True  -> return $ TestOK success
             False -> return $ TestEqualityFailure (getType at1) v1 v2 env
   where
     evalTerm = rnf . runDSM . desugarTerm

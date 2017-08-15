@@ -6,6 +6,12 @@
 1
 1
 Infinite (TyList TyUnit)
+0
+0
+1
+0
+1
+[]
 [<function>, <function>, <function>, <function>]
 [left (false, false), left (false, true), left (true, false), left (true, true), right false, right true]
 [left (), right false, right true]
@@ -13,6 +19,11 @@ Infinite (TyList TyUnit)
 [[]]
 [[]]
 Infinite (TyList TyUnit)
+[]
+[]
+[<function>]
+[]
+[<function>]
 5
 20
 9

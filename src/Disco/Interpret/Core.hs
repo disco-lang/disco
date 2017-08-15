@@ -786,7 +786,10 @@ enumerate (TySum ty1 ty2)  =
 -- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
 -- values from the enumeration of @ty2@, and make a function by
 -- zipping each one together with the values of @ty1@.
-enumerate (TyArr ty1 ty2)  = map mkFun (sequence (vs2 <$ vs1))
+enumerate (TyArr ty1 ty2)
+  | isEmptyTy ty1 = [VFun (ValFun $ \_ -> error "void!!")]
+  | isEmptyTy ty2 = []
+  | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
   where
     vs1 = enumerate ty1
     vs2 = enumerate ty2
@@ -809,8 +812,10 @@ enumerate (TyList _ty) = [VCons 0 []]
   -- countably infinite types, in which case we would need to change
   -- this.
 
-enumerate _ = []  -- other cases shouldn't happen if the program type checks
-
+enumerate _ = []   -- The only way other cases can happen at the
+                   -- moment is in evaluating something like enumerate
+                   -- (Nat * Void), in which case it doesn't matter if
+                   -- we give back an empty list for Nat.
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

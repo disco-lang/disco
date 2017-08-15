@@ -24,7 +24,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isEmptyTy
+       , isNumTy, isEmptyTy, isFinite
        , isSubtractive, isFractional
 
        -- * Strictness
@@ -37,10 +37,11 @@ module Disco.Types
        )
        where
 
-import           GHC.Generics (Generic)
+import           Data.Maybe                       (isJust)
+import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
-import           Math.NumberTheory.Primes.Testing        (isPrime)
+import           Math.NumberTheory.Primes.Testing (isPrime)
 
 --------------------------------------------------
 -- Disco types
@@ -98,6 +99,33 @@ data Type where
 instance Alpha Type
 
 --------------------------------------------------
+-- Counting inhabitants
+--------------------------------------------------
+
+-- | Compute the number of inhabitants of a type.  @Nothing@ means the
+--   type is countably infinite.
+countType :: Type -> Maybe Integer
+countType TyVoid            = Just 0
+countType TyUnit            = Just 1
+countType TyBool            = Just 2
+countType (TyFin n)         = Just n
+countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
+countType (TyPair ty1 ty2)
+  | isEmptyTy ty1 = Just 0
+  | isEmptyTy ty2 = Just 0
+  | otherwise     = (*) <$> countType ty1 <*> countType ty2
+countType (TyArr  ty1 ty2)
+  | isEmptyTy ty1 = Just 1
+  | isEmptyTy ty2 = Just 0
+  | otherwise     = (^) <$> countType ty2 <*> countType ty1
+countType (TyList ty)
+  | isEmptyTy ty            = Just 1
+  | otherwise               = Nothing
+
+-- All other types are infinite. (TyN, TyZ, TyQ, TyQP)
+countType _                 = Nothing
+
+--------------------------------------------------
 -- Type predicates
 --------------------------------------------------
 
@@ -113,6 +141,10 @@ isEmptyTy (TyFin 0)        = True
 isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy _                = False
+
+-- | Decide whether a type is finite.
+isFinite :: Type -> Bool
+isFinite ty = isJust (countType ty)
 
 -- | Decide whether a type supports division.
 isFractional :: Type -> Bool
@@ -147,24 +179,6 @@ strictness ty
 --------------------------------------------------
 -- Utilities
 --------------------------------------------------
-
--- | Compute the number of inhabitants of a type.  @Nothing@ means the
---   type is countably infinite.
-countType :: Type -> Maybe Integer
-countType TyVoid            = Just 0
-countType TyUnit            = Just 1
-countType TyBool            = Just 2
-countType (TyFin n)         = Just n
-countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
-countType (TyPair ty1 ty2)  = (*) <$> countType ty1 <*> countType ty2
-countType (TyArr  ty1 ty2)  = (^) <$> countType ty2 <*> countType ty1
-countType (TyList ty)
-  | isEmptyTy ty            = Just 1
-  | otherwise               = Nothing
-
--- All other types are infinite. (TyN, TyZ, TyQ, TyQP)
-countType _                 = Nothing
-
 
 -- | Decompose T1 * (T2 * ( ... )) into a list of types.
 unpair :: Type -> [Type]

@@ -30,9 +30,6 @@ module Disco.Typecheck
          -- ** Errors
        , TCError(..)
 
-         -- * Type predicates
-       , isSubtractive, isFractional
-
          -- * Type checking
        , check, checkPattern, ok, checkDefn
        , checkProperties, checkProperty
@@ -85,8 +82,6 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-
-import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
@@ -467,13 +462,6 @@ numLub at1 at2 = do
   checkNumTy at2
   lub (getType at1) (getType at2)
 
--- | Decide whether a type supports division
-isFractional :: Type -> Bool
-isFractional TyQ        = True
-isFractional TyQP       = True
-isFractional (TyFin n)  = isPrime n
-isFractional _          = False
-
 checkFractional :: Type -> TCM Type
 checkFractional ty =
   if (isNumTy ty)
@@ -481,13 +469,6 @@ checkFractional ty =
       True  -> return ty
       False -> throwError $ NotFractional ty
     else throwError $ NotNumTy ty
-
--- | Decide whether a type supports subtraction
-isSubtractive :: Type -> Bool
-isSubtractive TyZ       = True
-isSubtractive TyQ       = True
-isSubtractive (TyFin _) = True
-isSubtractive _         = False
 
 checkSubtractive :: Type -> TCM Type
 checkSubtractive ty =

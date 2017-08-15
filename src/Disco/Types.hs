@@ -18,18 +18,33 @@
 -----------------------------------------------------------------------------
 
 module Disco.Types
-       ( Type(..)
+       (
+       -- * Disco language types
+         Type(..)
 
-       , isNumTy, isEmptyTy, countType
+       -- * Type predicates
 
+       , isNumTy, isEmptyTy
+       , isSubtractive, isFractional
+
+       -- * Strictness
        , Strictness(..), strictness
 
+       -- * Utilities
+       , countType
        , unpair
+
        )
        where
 
 import           GHC.Generics (Generic)
 import           Unbound.Generics.LocallyNameless
+
+import           Math.NumberTheory.Primes.Testing        (isPrime)
+
+--------------------------------------------------
+-- Disco types
+--------------------------------------------------
 
 -- | Types.
 data Type where
@@ -80,6 +95,12 @@ data Type where
 
   deriving (Show, Eq, Generic)
 
+instance Alpha Type
+
+--------------------------------------------------
+-- Type predicates
+--------------------------------------------------
+
 -- | Check whether a type is a numeric type (N, Z, or Q).
 isNumTy :: Type -> Bool
 isNumTy (TyFin _) = True
@@ -93,6 +114,42 @@ isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy _                = False
 
+-- | Decide whether a type supports division.
+isFractional :: Type -> Bool
+isFractional TyQ        = True
+isFractional TyQP       = True
+isFractional (TyFin n)  = isPrime n
+isFractional _          = False
+
+-- | Decide whether a type supports subtraction.
+isSubtractive :: Type -> Bool
+isSubtractive TyZ       = True
+isSubtractive TyQ       = True
+isSubtractive (TyFin _) = True
+isSubtractive _         = False
+
+--------------------------------------------------
+-- Strictness
+--------------------------------------------------
+
+-- | Strictness of a function application or let-expression.
+data Strictness = Strict | Lazy
+  deriving (Eq, Show, Generic)
+
+instance Alpha Strictness
+
+-- | Numeric types are strict, others are lazy.
+strictness :: Type -> Strictness
+strictness ty
+  | isNumTy ty = Strict
+  | otherwise  = Lazy
+
+--------------------------------------------------
+-- Utilities
+--------------------------------------------------
+
+-- | Compute the number of inhabitants of a type.  @Nothing@ means the
+--   type is countably infinite.
 countType :: Type -> Maybe Integer
 countType TyVoid            = Just 0
 countType TyUnit            = Just 1
@@ -109,20 +166,7 @@ countType (TyList ty)
 countType _                 = Nothing
 
 
--- | Strictness of a function application or let-expression.
-data Strictness = Strict | Lazy
-  deriving (Eq, Show, Generic)
-
--- | Numeric types are strict, others are lazy.
-strictness :: Type -> Strictness
-strictness ty
-  | isNumTy ty = Strict
-  | otherwise  = Lazy
-
 -- | Decompose T1 * (T2 * ( ... )) into a list of types.
 unpair :: Type -> [Type]
 unpair (TyPair ty1 ty2) = ty1 : unpair ty2
 unpair ty               = [ty]
-
-instance Alpha Type
-instance Alpha Strictness

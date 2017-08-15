@@ -34,17 +34,35 @@ import           Disco.Interpret.Core
 import           Disco.Syntax.Operators           (BOp (..))
 import           Disco.Types
 
--- XXX comment these
+--------------------------------------------------
+-- Test results
+--------------------------------------------------
 
+-- | Test success can come either from exhaustively testing all
+--   possible inputs, or from succeeding on a number of randomly
+--   chosen inputs.
 data SuccessType
   = Exhaustive
   | Randomized Integer
 
+-- | The possible outcomes of a test.
 data TestResult
   = TestOK SuccessType
+    -- ^ The test succeeded.
+
   | TestRuntimeFailure InterpError
+    -- ^ The test failed at runtime.
+
   | TestFalse                            Env
+    -- ^ The test evaluated to false.  The @Env@ records the
+    --   particular inputs which caused the failure, /i.e./ a
+    --   counterexample.
+
   | TestEqualityFailure Type Value Value Env
+    -- ^ The test was an equality test, and evaluated to false.
+    --   Records the type at which equality was tested and the two
+    --   values we got on either side of the =, as well as the
+    --   counterexample which led to the failure.
 
 instance Monoid SuccessType where
   mempty = Exhaustive
@@ -66,7 +84,8 @@ testIsOK _           = False
 
 -- XXX don't reload defs every time?
 
--- XXX comment me
+-- | @runTest n defs prop@ test property @prop@, using at most @n@
+--   randomly generated inputs, given the definitions in @defs@.
 runTest :: Int -> Ctx Core Core -> AProperty -> Disco TestResult
 runTest n defs aprop
   = flip catchError (return . TestRuntimeFailure) . fmap mconcat

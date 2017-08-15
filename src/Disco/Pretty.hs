@@ -349,9 +349,8 @@ prettyWHNF out _ (VNum d r)
 prettyWHNF out _ (VFun _) = out "<function>"
 
 prettyWHNF _ _ _ = error "Impossible! No matching case in prettyValue"
--- XXX throw a real error
--- prettyWHNF out _ (VClos _ _)       =
--- prettyWHNF _ (VThunk _ _)      = "<thunk>"
+
+
 
 prettyList :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyList out ty v = out "[" >> go v

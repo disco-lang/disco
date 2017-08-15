@@ -17,8 +17,6 @@ module Disco.Interpret.Core
        (
          -- * Evaluation
          withDefs
-
-       , delay
        , vnum
        , mkEnum
 
@@ -26,16 +24,9 @@ module Disco.Interpret.Core
        , rnf, rnfV
 
          -- ** Weak head reduction
-       , whnf, whnfV, whnfApp
+       , whnf, whnfV
 
-         -- ** Case analysis and pattern-matching
-       , whnfCase, checkGuards, match, ok, noMatch
-
-         -- ** Operations
-       , whnfOp, numOp, numOp', uNumOp, divOp, modOp, boolOp
-       , divides, binom, fact, notOp
-
-         -- * Equality testing
+         -- * Equality testing and enumeration
        , eqOp, primValEq, enumerate
        , decideEqFor, decideEqForRnf, decideEqForClosures
 
@@ -44,7 +35,8 @@ module Disco.Interpret.Core
 
          -- * Lists
 
-       , toDiscoList  -- XXX export more
+       , toDiscoList
+       , vfoldr, vappend, vconcat, vmap
 
        )
        where
@@ -148,6 +140,10 @@ rnfV v@(VIndir _)   = whnfV v >>= rnfV
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
 rnfV v              = return v
+
+--------------------------------------------------
+-- Weak head normal form (WHNF)
+--------------------------------------------------
 
 -- | Reduce a value to weak head normal form, that is, reduce it just
 --   enough to find out what its top-level constructor is.
@@ -254,6 +250,12 @@ whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 
 --------------------------------------------------
 -- Utilities
+
+-- | Convert a Haskell list of Values into a Value representing a
+-- disco list.
+toDiscoList :: [Value] -> Value
+toDiscoList []       = VCons 0 []
+toDiscoList (x : xs) = VCons 1 [x, toDiscoList xs]
 
 -- | A lazy foldr on lists represented as 'Value's.  The entire
 --   function is wrapped in a call to 'delay', so it does not actually
@@ -548,12 +550,6 @@ countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 enumOp :: [Core] -> Disco Value
 enumOp [CType ty] = return $ (toDiscoList (enumerate ty))
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
-
--- | Convert a Haskell list of Values into a Value representing a
--- disco list.
-toDiscoList :: [Value] -> Value
-toDiscoList []       = VCons 0 []
-toDiscoList (x : xs) = VCons 1 [x, toDiscoList xs]
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals

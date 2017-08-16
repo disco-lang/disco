@@ -1,0 +1,13 @@
+-- Turing machines.
+
+-- would be nice to have type synonyms like this
+
+type Tape a = (List a, a, List a)
+
+-- Takes blank element to extend tape with if necessary.
+left : a -> Tape a -> Tape a
+left blank ([]   , a, rs) = ([], blank, a :: rs)
+left _     (l::ls, a, rs) = (ls, l    , a :: rs)
+
+-- right ...
+

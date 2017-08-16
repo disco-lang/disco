@@ -272,8 +272,17 @@ check (TBin Div t1 t2) ty = do
 check (TBin IDiv t1 t2) ty = do
   if (isNumTy ty)
     then do
-      at1 <- check t1 ty   -- XXX should this be lub of ty and TyQP?
-      at2 <- check t2 ty   -- lub of ty and TyQP?
+      -- We are trying to check that (x // y) has type @ty@. Checking
+      -- that x and y in turn have type @ty@ would be too restrictive:
+      -- For example, for (x // y) to have type Nat it need not be the
+      -- case that x and y also have type Nat.  It is enough in this
+      -- case for them to have type Q+.  On the other hand, if (x //
+      -- y) : Z5 then x and y must also have type Z5.  So we check at
+      -- the lub of ty and Q+ if it exists, or ty otherwise.
+      ty' <- lub ty TyQP <|> return ty
+
+      at1 <- check t1 ty'
+      at2 <- check t2 ty'
       return $ ATBin ty IDiv at1 at2
     else throwError (NotNumTy ty)
 

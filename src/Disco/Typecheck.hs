@@ -296,14 +296,19 @@ check (TBin Exp t1 t2) ty =
       return $ ATBin ty Exp at1 at2
     else throwError (NotNumTy ty)
 
--- XXX comment me: special case for N, Q+ with runtime check
--- XXX should probably make this an opt-in feature
+-- Notice here we only check that ty is numeric, *not* that it is
+-- subtractive.  As a special case, we allow subtraction to typecheck
+-- at any numeric type; when a subtraction is performed at type N or
+-- Q+, it incurs a runtime check that the result is positive.
+
+-- XXX should make this an opt-in feature rather than on by default.
 check (TBin Sub t1 t2) ty = do
   when (not (isNumTy ty)) $ throwError (NotNumTy ty)
+
   -- when (not (isSubtractive ty)) $ do
   --   traceM $ "Warning: checking subtraction at type " ++ show ty
   --   traceShowM $ (TBin Sub t1 t2)
-    -- XXX emit warning re: subtraction on N or Q+
+    -- XXX emit a proper warning re: subtraction on N or Q+
   at1 <- check t1 ty
   at2 <- check t2 ty
   return $ ATBin ty Sub at1 at2

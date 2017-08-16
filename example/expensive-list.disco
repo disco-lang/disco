@@ -1,0 +1,31 @@
+-- This module illustrates how evaluation of top-level values is
+-- memoized automatically.  If you :load expensive-list.disco
+-- and then evaluate
+--
+--   take 100 expensiveList
+--
+-- it takes a little while to print out the first 100 numbers, and
+-- slows down as it goes, since each n requires O(n) time to compute.
+--
+-- However, if you then enter 'take 100 expensiveList' a second time,
+-- it will print immediately, because the previously evaluated part of
+-- the list is retained in memory.  If you enter 'take 120
+-- expensiveList', it will immediately print out the first 100 numbers
+-- and then slowly progress through the numbers not yet evaluated.
+
+
+expensiveList : List N
+expensiveList = map expensiveId [0 ..]
+
+expensiveId : N -> N
+expensiveId 0     = 0
+expensiveId (S n) = 1 + expensiveId n
+
+map : (N -> N) -> List N -> List N
+map _ [] = []
+map f (x :: xs) = f x :: map f xs
+
+take : N -> List N -> List N
+take 0 _ = []
+take _ [] = []
+take (S n) (x::xs) = x :: take n xs

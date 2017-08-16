@@ -27,7 +27,7 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
-import           Disco.Interpret.Core             (withDefs)
+import           Disco.Interpret.Core             (loadDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
@@ -140,7 +140,6 @@ loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
-
 handleLoad :: FilePath -> Disco Bool
 handleLoad file = do
   io . putStrLn $ "Loading " ++ file ++ "..."
@@ -153,16 +152,18 @@ handleLoad file = do
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
-          topDefns .= cdefns
           topDocs  .= docMap
           topCtx   .= ctx
-          t <- runAllTests aprops
+          loadDefs cdefns
+
+          t <- withTopEnv $ runAllTests aprops
           io . putStrLn $ "Loaded."
           return t
 
--- XXX - Move this to Property module.
---     - Return a structured summary of the results, not a Bool.
-runAllTests :: Ctx ATerm [AProperty] -> Disco Bool
+-- XXX Return a structured summary of the results, not a Bool;
+-- separate out results generation and pretty-printing.  Then move it
+-- to the Property module.
+runAllTests :: Ctx ATerm [AProperty] -> Disco Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
@@ -170,15 +171,15 @@ runAllTests aprops
       and <$> mapM (uncurry runTests) (M.assocs aprops)
       -- XXX eventually this should be moved into Disco.Property and
       -- use a logging framework?
+
   where
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
     runTests :: Name ATerm -> [AProperty] -> Disco Bool
     runTests n props = do
-      defns <- use topDefns
       iputStr ("  " ++ name2String n ++ ":")
-      results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples defns) props
+      results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples) props
       let failures = filter (not . testIsOK . snd) results
       case null failures of
         True  -> iputStrLn " OK"
@@ -248,12 +249,7 @@ evalTerm t = do
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
-      in (withDefs defns $ mkThunk c) >>= prettyValue ty
-         -- XXX should do this 'withDefs' once and for all when
-         -- loading a file etc, instead of here each time we evaluate
-         -- a term.  Right now, top-level values declared in a file
-         -- (e.g. an infinite list) will be re-evaluated from scratch
-         -- every time a new expression is to be evaluated.
+      in (withTopEnv $ mkThunk c) >>= prettyValue ty
 
 handleTypeCheck :: Term -> Disco String
 handleTypeCheck t = do

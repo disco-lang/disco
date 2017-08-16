@@ -85,11 +85,10 @@ testIsOK _           = False
 -- XXX don't reload defs every time?
 
 -- | @runTest n defs prop@ test property @prop@, using at most @n@
---   randomly generated inputs, given the definitions in @defs@.
-runTest :: Int -> Ctx Core Core -> AProperty -> Disco TestResult
-runTest n defs aprop
-  = flip catchError (return . TestRuntimeFailure) . fmap mconcat
-    . withDefs defs $ do
+--   randomly generated inputs.
+runTest :: Int -> AProperty -> Disco TestResult
+runTest n aprop
+  = flip catchError (return . TestRuntimeFailure) . fmap mconcat $ do
   lunbind aprop $ \(binds, at) -> do
     (exhaustive, envs) <- testCases n binds
     let success = if exhaustive then Exhaustive else Randomized 1

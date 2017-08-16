@@ -16,7 +16,7 @@
 module Disco.Interpret.Core
        (
          -- * Evaluation
-         withDefs
+         loadDefs
        , vnum
        , mkEnum
 
@@ -41,7 +41,7 @@ module Disco.Interpret.Core
        )
        where
 
-import           Control.Lens                       (use, (%=))
+import           Control.Lens                       (use, (%=), (.=))
 import           Control.Monad.Except               (throwError)
 import           Control.Monad.Reader               (local)
 import           Data.Coerce                        (coerce)
@@ -72,10 +72,13 @@ import           Disco.Types
 -- Evaluation
 ------------------------------------------------------------
 
--- | Run a @Disco@ computation with a top-level environment of
---   (potentially recursive) definitions.
-withDefs :: Ctx Core Core -> Disco a -> Disco a
-withDefs cenv im = do
+-- | Load a top-level environment of (potentially recursive)
+--   definitions into memory.
+loadDefs :: Ctx Core Core -> Disco ()
+loadDefs cenv = do
+
+  -- Clear out any leftover memory.
+  memory .= IntMap.empty
 
   -- Take the environment mapping names to definitions, and turn
   -- each one into an indirection to a thunk stored in memory.
@@ -91,9 +94,9 @@ withDefs cenv im = do
   -- replace their environments.
   memory %= IntMap.map (replaceThunkEnv env)
 
-  -- Finally, run the given Disco computation with the initial
-  -- environment we just built.
-  local (const env) im
+  -- Finally, set the top-level environment to the one we just
+  -- created.
+  topEnv .= env
 
   where
     replaceThunkEnv e (VThunk c _) = VThunk c e

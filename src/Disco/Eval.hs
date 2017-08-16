@@ -25,7 +25,7 @@ module Disco.Eval
 
          -- * Environments
 
-       , Env, extendEnv, extendsEnv, getEnv, withEnv
+       , Env, extendEnv, extendsEnv, getEnv, withEnv, withTopEnv
 
          -- * Errors
 
@@ -37,7 +37,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, memory, nextLoc
+       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc
 
          -- * Disco monad
 
@@ -51,7 +51,7 @@ module Disco.Eval
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), makeLenses)
+import           Control.Lens                       ((<+=), (%=), makeLenses, use)
 import           Control.Monad.Trans.Except
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Strict
@@ -207,7 +207,12 @@ data DiscoState = DiscoState
     -- ^ Top-level type environment.
 
   , _topDefns :: Ctx Core Core
-    -- ^ Environment of top-level definitions.
+    -- ^ Environment of top-level definitions.  Set by 'loadDefs'.
+
+  , _topEnv   :: Env
+    -- ^ Top-level environment mapping names to values (which all
+    --   start as indirections to thunks).  Set by 'loadDefs'.
+    --   Use it when evaluating with 'withTopEnv'.
 
   , _topDocs  :: Ctx Term Docs
     -- ^ Top-level documentation.
@@ -229,6 +234,7 @@ initDiscoState = DiscoState
   { _topCtx   = emptyCtx
   , _topDefns = emptyCtx
   , _topDocs  = emptyCtx
+  , _topEnv   = emptyCtx
   , _memory   = IntMap.empty
   , _nextLoc  = 0
   }
@@ -325,3 +331,12 @@ delay imv = do
 --   referring to its location.
 mkThunk :: Core -> Disco Value
 mkThunk c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
+
+-- | Run a computation with the top-level environment used as the
+--   current local environment.  For example, this is used every time
+--   we start evaluating an expression entered at the command line.
+withTopEnv :: Disco a -> Disco a
+withTopEnv m = do
+  env <- use topEnv
+  withEnv env m
+

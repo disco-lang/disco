@@ -27,7 +27,6 @@ import           Data.Traversable                 (for)
 
 import           Disco.AST.Core
 import           Disco.AST.Typed
-import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
 import           Disco.Interpret.Core

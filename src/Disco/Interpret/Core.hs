@@ -43,7 +43,6 @@ module Disco.Interpret.Core
 
 import           Control.Lens                       (use, (%=), (.=))
 import           Control.Monad.Except               (throwError)
-import           Control.Monad.Reader               (local)
 import           Data.Coerce                        (coerce)
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap

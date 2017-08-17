@@ -54,6 +54,7 @@ module Disco.Eval
 import           Control.Lens                       ((<+=), (%=), makeLenses, use)
 import           Control.Monad.Trans.Except
 import           Control.Monad.Reader
+import           Control.Monad.Writer
 import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
@@ -253,8 +254,9 @@ initDiscoState = DiscoState
 --   * Can throw 'InterpError' exceptions
 --   * Can generate fresh names
 --   * Can do I/O
-type Disco = StateT DiscoState (ReaderT Env (ExceptT InterpError (LFreshMT IO)))
+type Disco = StateT DiscoState (ReaderT Env (ExceptT InterpError (WriterT MessageLog (LFreshMT IO))))
 
+type MessageLog = ()
 
 ------------------------------------------------------------
 -- Some instances needed to ensure that Disco is an instance of the
@@ -305,8 +307,13 @@ iprint = io . print
 
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
-runDisco :: Disco a -> IO (Either InterpError a)
-runDisco = runLFreshMT . runExceptT . flip runReaderT emptyCtx . flip evalStateT initDiscoState
+runDisco :: Disco a -> IO (Either InterpError a, MessageLog)
+runDisco
+  = runLFreshMT
+  . runWriterT
+  . runExceptT
+  . flip runReaderT emptyCtx
+  . flip evalStateT initDiscoState
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.

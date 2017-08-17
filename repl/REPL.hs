@@ -308,7 +308,7 @@ main = do
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  res <- runDisco $ do
+  (res, _log) <- runDisco $ do
     case checkFile opts of
       Just file -> do
         res <- handleLoad file
@@ -334,6 +334,8 @@ main = do
       putStrLn $ "Uncaught error: " ++ show err
       putStrLn $ "Please report this as a bug: https://github.com/disco-lang/disco/issues"
     Right () -> return ()
+
+  -- XXX pretty-print log messages here
 
   where
 

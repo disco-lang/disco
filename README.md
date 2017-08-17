@@ -8,10 +8,14 @@ Design principles:
 * Includes those features, and *only* those features, useful in the
   context of a discrete math course. This is *not* intended to be a
   general-purpose language.
-* Syntax is as close to standard *mathematical* practice as possible.
+* Syntax is as close to standard *mathematical* practice as possible,
+  to make it easier for mathematicians to pick up, and to reduce as
+  much as possible the incongruity between the language and the
+  mathematics being explored and modeled.
 * Tooling, error messages, etc. are very important---the language
   needs to be accessible to undergrads with no prior programming
-  experience.
+  experience. (However, this principle is, as of yet, only
+  that---there is no tooling or nice error messages to speak of.)
 
 Feel free to look around, ask questions, etc.  You can even contribute
 some code if you like---collaborators are most welcome.  However, note

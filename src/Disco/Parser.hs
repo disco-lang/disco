@@ -47,7 +47,7 @@ module Disco.Parser
        , parsePattern, parseAtomicPattern
 
          -- ** Types
-       , parseType, parseTypeExpr, parseAtomicType
+       , parseType, parseAtomicType
        )
        where
 
@@ -625,7 +625,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
 
 -- | Parse an atomic type.
 parseAtomicType :: Parser Type
-parseAtomicType =
+parseAtomicType = (
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Bool" <|> reserved "B")
@@ -643,17 +643,15 @@ parseAtomicType =
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> parens parseType
 
+  ) <?> "type"
+
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
--- | Parse a type.
-parseType :: Parser Type
-parseType = parseTypeExpr <|> parseAtomicType
-
 -- | Parse a type expression built out of binary operators.
-parseTypeExpr :: Parser Type
-parseTypeExpr = makeExprParser parseAtomicType table <?> "type expression"
+parseType :: Parser Type
+parseType = makeExprParser parseAtomicType table
   where
     table = [ [ infixR "*" TyPair
               , infixR "×" TyPair ]

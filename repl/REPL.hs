@@ -86,9 +86,10 @@ lineParser
   <|> letParser
 
 parseLine :: String -> Either String REPLExpr
-parseLine s = case (runParser lineParser "" s) of
-                Left err -> Left $ (parseErrorPretty err)
-                Right l -> Right l
+parseLine s =
+  case (runParser lineParser "" s) of
+    Left err -> Left $ parseErrorPretty' s err
+    Right l  -> Right l
 
 handleCMD :: String -> Disco ()
 handleCMD "" = return ()
@@ -146,7 +147,7 @@ handleLoad file = do
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left err -> io $ putStrLn (parseErrorPretty err) >> return False
+    Left err -> io $ putStrLn (parseErrorPretty' str err) >> return False
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False

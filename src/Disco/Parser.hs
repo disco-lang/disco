@@ -167,7 +167,7 @@ mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
 
 -- | Parse a natural number.
 natural :: Parser Integer
-natural = lexeme L.decimal
+natural = lexeme L.decimal <?> "natural number"
 
 -- | Parse a nonnegative decimal of the form @xxx.yyyy[zzz]@, where
 --   the @y@s and bracketed @z@s are optional.  For example, this
@@ -226,7 +226,7 @@ reservedWords =
 --   a letter and continuing with alphanumerics, underscores, and
 --   apostrophes.
 identifier :: Parser String
-identifier = (lexeme . try) (p >>= check)
+identifier = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> letterChar <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
@@ -274,7 +274,7 @@ parseModule = do
         matchDefn (DDefn x' _) = x == x'
         matchDefn _ = False
         getClauses (DDefn _ cs) = cs
-        getClauses _ = error "Impossible!"
+        getClauses _ = error "Impossible! parseModule.defnGroups.getClauses on non-DDefn"
           -- Impossible since we only call getClauses on things that
           -- passed matchDefn
 
@@ -282,9 +282,12 @@ parseModule = do
       where
         (decls, docs) = unzip $ groupTLs [] tls
 
--- | Parse a top level item (either documentation or a declaration).
+-- | Parse a top level item (either documentation or a declaration),
+--   which must start at the left margin.
 parseTopLevel :: Parser TopLevel
-parseTopLevel = TLDoc <$> parseDocThing <|> TLDecl <$> parseDecl
+parseTopLevel = L.nonIndented sc $
+      TLDoc  <$> parseDocThing
+  <|> TLDecl <$> parseDecl
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@
@@ -296,7 +299,7 @@ parseDocThing
 
 -- | Parse one line of documentation beginning with @|||@.
 parseDocString :: Parser String
-parseDocString = L.nonIndented sc $
+parseDocString = label "documentation" $ L.nonIndented sc $
   string "|||"
   *> takeWhileP Nothing (`elem` " \t")
   *> takeWhileP Nothing (`notElem` "\r\n") <* sc
@@ -312,7 +315,7 @@ parseDocString = L.nonIndented sc $
 --
 --   The forall is optional.
 parseProperty :: Parser Property
-parseProperty = L.nonIndented sc $ do
+parseProperty = label "property" $ L.nonIndented sc $ do
   _ <- symbol "!!!"
   indented $ do
     bind
@@ -327,20 +330,45 @@ parseProperty = L.nonIndented sc $ do
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
 parseDecl :: Parser Decl
-parseDecl =
-      try (DType <$> ident <*> (indented $ colon *> parseType))
-  <|>      DDefn
-           <$> ident
-           <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+parseDecl = try parseTyDecl <|> parseDefn
+
+-- | Parse a top-level type declaration of the form @x : ty@.
+parseTyDecl :: Parser Decl
+parseTyDecl = label "type declaration" $
+  DType <$> ident <*> (indented $ colon *> parseType)
+
+-- | Parse a definition of the form @x pat1 .. patn = t@.
+parseDefn :: Parser Decl
+parseDefn = label "definition" $
+  DDefn
+  <$> ident
+  <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
 term :: Parser Term
 term = between sc eof parseTerm
 
+-- | Parse a term, consisting of a @parseTerm'@ optionally
+--   followed by an ascription.
+parseTerm :: Parser Term
+parseTerm = -- trace "parseTerm" $
+  (ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType))
+  where
+    ascribe t Nothing   = t
+    ascribe t (Just ty) = TAscr t ty
+
+-- | Parse a non-atomic, non-ascribed term.
+parseTerm' :: Parser Term
+parseTerm' = label "expression" $
+      TAbs <$> try (bind <$> some parseLambdaArg <*> (mapsTo *> parseTerm'))
+  <|> parseLet
+  <|> parseExpr
+  <|> parseAtom
+
 -- | Parse an atomic term.
 parseAtom :: Parser Term
-parseAtom =
+parseAtom = label "expression" $
       brackets parseList
   <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
@@ -435,23 +463,6 @@ parseInj :: Parser Side
 parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
--- | Parse a term, consisting of a @parseTerm'@ optionally
---   followed by an ascription.
-parseTerm :: Parser Term
-parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType))
-  where
-    ascribe t Nothing   = t
-    ascribe t (Just ty) = TAscr t ty
-
--- | Parse a non-atomic, non-ascribed term.
-parseTerm' :: Parser Term
-parseTerm' =
-      TAbs <$> try (bind <$> some parseLambdaArg <*> (mapsTo *> parseTerm'))
-  <|> parseLet
-  <|> parseExpr
-  <|> parseAtom
-
 -- | Parse an argument to a lambda, either a variable or a binding of
 --   the form @(x:ty)@.
 parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
@@ -502,7 +513,7 @@ parseGuard =
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern
-parseAtomicPattern =
+parseAtomicPattern = label "pattern" $
       PVar <$> ident
   <|> PWild <$ symbol "_"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
@@ -518,7 +529,7 @@ tuplePat t   = PTup t
 
 -- | Parse a pattern.
 parsePattern :: Parser Pattern
-parsePattern = makeExprParser parseAtomicPattern table <?> "pattern"
+parsePattern = makeExprParser parseAtomicPattern table
   where
     table = [ [ prefix "left" (PInj L)
               , prefix "right" (PInj R)
@@ -655,7 +666,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
 
 -- | Parse an atomic type.
 parseAtomicType :: Parser Type
-parseAtomicType = (
+parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Bool" <|> reserved "B")
@@ -672,8 +683,6 @@ parseAtomicType = (
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> parens parseType
-
-  ) <?> "type"
 
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)

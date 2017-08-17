@@ -159,7 +159,7 @@ pipe      = symbol "|"
 
 -- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String
-ellipsis  = concat <$> ((:) <$> dot <*> some dot)
+ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 
 -- | The symbol that separates the variable binder from the body of a
 --   lambda (either @↦@, @->@, or @|->@).
@@ -354,7 +354,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (colon *> parseType))
+  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseType))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -445,11 +445,14 @@ parseListComp t = do
 -- | Parse a qualifier in a comprehension: either a binder @x in t@ or
 --   a guard @t@.
 parseQual :: Parser Qual
-parseQual =
-      try (QBind <$> ident <*> (selector *> (embed <$> parseTerm)))
-  <|> QGuard <$> embed <$> parseTerm
+parseQual = try parseSelection <|> parseQualGuard
   where
+    parseSelection = label "membership expression (x in ...)" $
+      QBind <$> ident <*> (selector *> (embed <$> parseTerm))
     selector = reservedOp "<-" <|> reserved "in"
+
+    parseQualGuard = label "boolean expression" $
+      QGuard <$> embed <$> parseTerm
 
 -- | Turn a parenthesized list of zero or more terms into the
 --   appropriate syntax node: zero terms @()@ is a TUnit; one term

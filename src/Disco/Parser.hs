@@ -384,6 +384,9 @@ parseAtom = label "expression" $
 
 -- | Parse a list-ish thing, like a literal list or a list
 --   comprehension (not including the square brackets).
+--
+--   Note eventually this should be generalized to parse the innards
+--   of literal lists, sets, or multisets.
 parseList :: Parser Term
 parseList = nonEmptyList <|> return (TList [] Nothing)
   -- Careful to do this without backtracking, since backtracking can

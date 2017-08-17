@@ -591,10 +591,16 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     fixJuxtMul (TBin op t1 t2) = fixPrec $ TBin op (fixJuxtMul t1) (fixJuxtMul t2)
 
     -- Possibly turn a TApp into a multiplication, if the LHS looks
-    -- like a multiplicative term.
+    -- like a multiplicative term.  However, we must be sure to
+    -- *first* recursively fix the subterms (particularly the
+    -- left-hand one) *before* doing this analysis.  See
+    -- https://github.com/disco-lang/disco/issues/71 .
     fixJuxtMul (TApp t1 t2)
-      | isMultiplicativeTerm t1 = fixPrec $ TBin Mul (fixJuxtMul t1) (fixJuxtMul t2)
-      | otherwise               = fixPrec $ TApp (fixJuxtMul t1) (fixJuxtMul t2)
+      | isMultiplicativeTerm t1' = fixPrec $ TBin Mul t1' t2'
+      | otherwise                = fixPrec $ TApp     t1' t2'
+      where
+        t1' = fixJuxtMul t1
+        t2' = fixJuxtMul t2
 
     -- Otherwise we can stop recursing, since anything other than TUn,
     -- TBin, or TApp could not have been produced by the expression
@@ -602,8 +608,8 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     fixJuxtMul t = t
 
     -- A multiplicative term is one that looks like either a natural
-    -- number literal, or an explicitly parenthesized unary or binary
-    -- operation.  For example, 3, (-2), and (x + 5) are all
+    -- number literal, or a unary or binary operation (optionally
+    -- parenthesized).  For example, 3, (-2), and (x + 5) are all
     -- multiplicative terms, so 3x, (-2)x, and (x + 5)x all get parsed
     -- as multiplication.  On the other hand, (x y) is always parsed
     -- as function application, even if x and y both turn out to have
@@ -613,6 +619,8 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
     isMultiplicativeTerm (TNat _)            = True
+    isMultiplicativeTerm (TUn {})            = True
+    isMultiplicativeTerm (TBin {})           = True
     isMultiplicativeTerm (TParens (TUn  {})) = True
     isMultiplicativeTerm (TParens (TBin {})) = True
     isMultiplicativeTerm _                   = False

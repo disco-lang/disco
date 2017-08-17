@@ -40,8 +40,8 @@ toBin n = {? false if 2 divides n, true otherwise ?} :: toBin (n // 2)
 
 fromBin : List Bool -> N
 fromBin [] = 1
-fromBin (false :: bs) = 2 fromBin bs
-fromBin (true  :: bs) = 2 fromBin bs + 1
+fromBin (false :: bs) = 2 (fromBin bs)
+fromBin (true  :: bs) = 2 (fromBin bs) + 1
 
 plusIso : N + N -> N
 plusIso (left n) = 2n

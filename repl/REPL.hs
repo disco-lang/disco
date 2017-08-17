@@ -244,7 +244,6 @@ handleDocs x = do
 evalTerm :: Term -> Disco ()
 evalTerm t = do
   ctx   <- use topCtx
-  defns <- use topDefns
   case evalTCM (extends ctx $ infer t) of
     Left err -> iprint err    -- XXX pretty-print
     Right at ->

@@ -258,7 +258,8 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
 * Next steps
 
-  + QuickCheck support for tests
+  + Message logging framework
+  + Start writing documentation
   + Function properties/annotations
     + Idempotent, etc.
     + Memoization

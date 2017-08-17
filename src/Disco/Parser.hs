@@ -157,6 +157,7 @@ colon     = symbol ":"
 dot       = symbol "."
 pipe      = symbol "|"
 
+-- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String
 ellipsis  = concat <$> ((:) <$> dot <*> some dot)
 
@@ -387,6 +388,13 @@ parseAtom = label "expression" $
 --
 --   Note eventually this should be generalized to parse the innards
 --   of literal lists, sets, or multisets.
+--
+--   > list          ::= '[' listContents ']'
+--   > listContents  ::= nonEmptyList | <empty>
+--   > nonEmptyList  ::= t [ell] | t listRemainder
+--   > ell           ::= '..' [t]
+--   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
+
 parseList :: Parser Term
 parseList = nonEmptyList <|> return (TList [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
@@ -397,7 +405,7 @@ parseList = nonEmptyList <|> return (TList [] Nothing)
     -- Any non-empty list starts with a term, followed by some
     -- remainder (which could either be the rest of a literal list, or
     -- a list comprehension).  If there is no remainder just return a
-    -- singleton list.
+    -- singleton list, optionally with an ellipsis.
     nonEmptyList = do
       t <- parseTerm
       (listRemainder t <|> singletonList t)
@@ -418,20 +426,12 @@ parseList = nonEmptyList <|> return (TList [] Nothing)
           return $ TList (t:ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
 
+-- | Parse an ellipsis at the end of a literal list, of the form
+--   @.. [t]@.  Any number > 1 of dots may be used, just for fun.
 parseEllipsis :: Parser (Ellipsis Term)
 parseEllipsis = do
   _ <- ellipsis
   maybe Forever Until <$> optionMaybe parseTerm
-
-{-
-
-list          ::= '[' listContents ']'
-listContents  ::= nonEmptyList | <empty>
-nonEmptyList  ::= t [ell] | t listRemainder
-ell           ::= '..' [t]
-listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
-
--}
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.

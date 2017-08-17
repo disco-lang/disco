@@ -123,11 +123,11 @@ opTable =
   assignPrecLevels $
   [ [ uopInfo Pre  Not     ["not", "¬"]
     ]
-  , [ uopInfo Pre  Neg     ["-"]
-    ]
   , [ uopInfo Post Fact    ["!"]
     ]
   , [ bopInfo InR  Exp     ["^"]
+    ]
+  , [ uopInfo Pre  Neg     ["-"]
     ]
   , [ uopInfo Pre  Sqrt    ["sqrt"]
     ]

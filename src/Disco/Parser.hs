@@ -411,6 +411,8 @@ parseListComp t = do
   qs <- toTelescope <$> (parseQual `sepBy` comma)
   return (TListComp $ bind qs t)
 
+-- | Parse a qualifier in a comprehension: either a binder @x in t@ or
+--   a guard @t@.
 parseQual :: Parser Qual
 parseQual =
       try (QBind <$> ident <*> (selector *> (embed <$> parseTerm)))
@@ -418,6 +420,11 @@ parseQual =
   where
     selector = reservedOp "<-" <|> reserved "in"
 
+-- | Turn a parenthesized list of zero or more terms into the
+--   appropriate syntax node: zero terms @()@ is a TUnit; one term
+--   @(t)@ is just the term itself (but we record the fact that it was
+--   parenthesized, in order to correctly turn juxtaposition into
+--   multiplication); two or more terms @(t1,t2,...)@ are a tuple.
 tuple :: [Term] -> Term
 tuple []  = TUnit
 tuple [x] = TParens x
@@ -552,6 +559,9 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
 
     isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides]
 
+    -- Comparison chains like 3 < x < 5 first get parsed as 3 < (x <
+    -- 5), which does not make sense.  This function looks for such
+    -- nested comparison operators and turns them into a TChain.
     fixChains (TUn op t) = TUn op (fixChains t)
     fixChains (TBin op t1 (TBin op' t21 t22))
       | isChainable op && isChainable op' = TChain t1 (TLink op t21 : getLinks op' t22)
@@ -569,14 +579,14 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
 
     -- Find juxtapositions (parsed as function application) which
     -- syntactically have either a literal Nat or a parenthesized
-    -- expression as the LHS, and turn them into multiplications.
-    -- Then fix up the parse tree appropriately by rotating newly
-    -- created multiplications up until their precedence is higher
-    -- than the thing above them.
+    -- expression containing an operator as the LHS, and turn them
+    -- into multiplications.  Then fix up the parse tree by rotating
+    -- newly created multiplications up until their precedence is
+    -- higher than the thing above them.
 
     fixJuxtMul :: Term -> Term
 
-    -- Just recurse through TUn or TBin.  Fix up precedence on the way back up.
+    -- Just recurse through TUn or TBin and fix precedence on the way back up.
     fixJuxtMul (TUn op t)      = fixPrec $ TUn op (fixJuxtMul t)
     fixJuxtMul (TBin op t1 t2) = fixPrec $ TBin op (fixJuxtMul t1) (fixJuxtMul t2)
 
@@ -585,10 +595,22 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     fixJuxtMul (TApp t1 t2)
       | isMultiplicativeTerm t1 = fixPrec $ TBin Mul (fixJuxtMul t1) (fixJuxtMul t2)
       | otherwise               = fixPrec $ TApp (fixJuxtMul t1) (fixJuxtMul t2)
+
+    -- Otherwise we can stop recursing, since anything other than TUn,
+    -- TBin, or TApp could not have been produced by the expression
+    -- parser.
     fixJuxtMul t = t
 
-    -- A multiplicative term is either a Nat literal, or an explicitly
-    -- parenthesized unary or binary operation.
+    -- A multiplicative term is one that looks like either a natural
+    -- number literal, or an explicitly parenthesized unary or binary
+    -- operation.  For example, 3, (-2), and (x + 5) are all
+    -- multiplicative terms, so 3x, (-2)x, and (x + 5)x all get parsed
+    -- as multiplication.  On the other hand, (x y) is always parsed
+    -- as function application, even if x and y both turn out to have
+    -- numeric types; a variable like x does not count as a
+    -- multiplicative term.  Likewise, (x y) z is parsed as function
+    -- application, since (x y) is not a multiplicative term: it is
+    -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
     isMultiplicativeTerm (TNat _)            = True
     isMultiplicativeTerm (TParens (TUn  {})) = True

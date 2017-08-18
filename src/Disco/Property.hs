@@ -49,7 +49,7 @@ data TestResult
   = TestOK SuccessType
     -- ^ The test succeeded.
 
-  | TestRuntimeFailure InterpError
+  | TestRuntimeFailure IErr
     -- ^ The test failed at runtime.
 
   | TestFalse                            Env
@@ -85,7 +85,7 @@ testIsOK _           = False
 
 -- | @runTest n defs prop@ test property @prop@, using at most @n@
 --   randomly generated inputs.
-runTest :: Int -> AProperty -> Disco TestResult
+runTest :: Int -> AProperty -> Disco IErr TestResult
 runTest n aprop
   = flip catchError (return . TestRuntimeFailure) . fmap mconcat $ do
   lunbind aprop $ \(binds, at) -> do
@@ -129,7 +129,7 @@ getEquatands _                    = Nothing
 --     each environment the given names are bound to randomly chosen
 --     values.  The values in the first environment are simplest; they
 --     become increasingly complex as the environments progress.
-testCases :: Int -> [(Name ATerm, Type)] -> Disco (Bool, [Env])
+testCases :: Int -> [(Name ATerm, Type)] -> Disco e (Bool, [Env])
 testCases _ []    = return (True, [M.empty])
 testCases n binds
   | Just m <- fmap product . sequence . map countType $ tys
@@ -230,7 +230,7 @@ discoGenerator (TyArr _ty1 _ty2) =
 
 -- | @genValues n ty@ generates a random sequence of @n@ increasingly
 --   complex values of type @ty@, using the 'DiscoGen' for @ty@.
-genValues :: Int -> Type -> Disco [Value]
+genValues :: Int -> Type -> Disco e [Value]
 genValues n ty = case discoGenerator ty of
   EmptyGen -> return []
   DiscoGen gen toValue -> do
@@ -241,6 +241,6 @@ genValues n ty = case discoGenerator ty of
 --   increasingly complex values of a given type.  Like the @sample'@
 --   function from QuickCheck, but the number of values is
 --   configurable, and it lives in the @Disco@ monad.
-generate :: Int -> QC.Gen a -> Disco [a]
+generate :: Int -> QC.Gen a -> Disco e [a]
 generate n gen = io . QC.generate $ sequence [QC.resize m gen | m <- [0 .. n]]
 

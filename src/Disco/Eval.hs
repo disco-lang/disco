@@ -29,7 +29,7 @@ module Disco.Eval
 
          -- * Errors
 
-       , InterpError(..)
+       , IErr(..)
 
          -- * Disco monad state
 
@@ -130,7 +130,7 @@ instance Show ValFun where
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (Disco Value)
+newtype ValDelay = ValDelay (Disco IErr Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
@@ -144,22 +144,22 @@ type Env  = Ctx Core Value
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extendEnv :: Name Core -> Value -> Disco a -> Disco a
+extendEnv :: Name Core -> Value -> Disco e a -> Disco e a
 extendEnv x v = avoid [AnyName x] . extend x v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Env -> Disco a -> Disco a
+extendsEnv :: Env -> Disco e a -> Disco e a
 extendsEnv e' = avoid (map AnyName (names e')) . extends e'
 
 -- | Get the current environment.
-getEnv :: Disco Env
+getEnv :: Disco e Env
 getEnv = ask
 
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Env -> Disco a -> Disco a
+withEnv :: Env -> Disco e a -> Disco e a
 withEnv = local . const
 
 ------------------------------------------------------------
@@ -167,31 +167,31 @@ withEnv = local . const
 ------------------------------------------------------------
 
 -- | Errors that can be generated during interpreting.
-data InterpError where
+data IErr where
 
   -- | An unbound name.
-  UnboundError  :: Name Core -> InterpError
+  UnboundError  :: Name Core -> IErr
 
   -- | v should be a number, but isn't.
-  NotANum       :: Value     -> InterpError
+  NotANum       :: Value     -> IErr
 
   -- | Division by zero.
-  DivByZero     ::              InterpError
+  DivByZero     ::              IErr
 
   -- | Underflow, e.g. (2 - 3 : Nat)
-  Underflow     ::              InterpError
+  Underflow     ::              IErr
 
   -- | Taking the base-2 logarithm of zero.
-  LgOfZero      ::              InterpError
+  LgOfZero      ::              IErr
 
   -- | v should be a boolean, but isn't.
-  NotABool      :: Value     -> InterpError
+  NotABool      :: Value     -> IErr
 
   -- | Non-exhaustive case analysis.
-  NonExhaustive ::              InterpError
+  NonExhaustive ::              IErr
 
   -- | Internal error for features not yet implemented.
-  Unimplemented :: String    -> InterpError
+  Unimplemented :: String    -> IErr
 
   deriving Show
 
@@ -252,10 +252,11 @@ initDiscoState = DiscoState
 --     types, and documentation, and memory for allocation of thunks.
 --   * Keeps track of a read-only environment for binding local
 --     variables to their values.
---   * Can throw 'InterpError' exceptions
+--   * Can throw exceptions of type @e@
+--   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-type Disco = StateT DiscoState (ReaderT Env (ExceptT InterpError (WriterT (MessageLog InterpError) (LFreshMT IO))))
+type Disco e = StateT DiscoState (ReaderT Env (ExceptT e (WriterT (MessageLog e) (LFreshMT IO))))
 
 ------------------------------------------------------------
 -- Some instances needed to ensure that Disco is an instance of the
@@ -306,7 +307,7 @@ iprint = io . print
 
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
-runDisco :: Disco a -> IO (Either InterpError a, MessageLog InterpError)
+runDisco :: Disco e a -> IO (Either e a, MessageLog e)
 runDisco
   = runLFreshMT
   . runWriterT
@@ -316,17 +317,17 @@ runDisco
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.
-allocate :: Value -> Disco Loc
+allocate :: Value -> Disco e Loc
 allocate v = do
   loc <- nextLoc <+= 1
   memory %= IntMap.insert loc v
   return loc
 
--- | Delay a @Disco Value@ computation by packaging it into a @VDelay@
+-- | Delay a @Disco e Value@ computation by packaging it into a @VDelay@
 --   constructor.  When it is evaluated later, it will be run with the
 --   environment that was current at the time 'delay' was called,
 --   /not/ the one that is in effect later.
-delay :: Disco Value -> Disco Value
+delay :: Disco IErr Value -> Disco IErr Value
 delay imv = do
   e <- getEnv
   return (VDelay . ValDelay $ withEnv e imv)
@@ -335,13 +336,13 @@ delay imv = do
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkThunk :: Core -> Disco Value
+mkThunk :: Core -> Disco e Value
 mkThunk c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
 
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
-withTopEnv :: Disco a -> Disco a
+withTopEnv :: Disco e a -> Disco e a
 withTopEnv m = do
   env <- use topEnv
   withEnv env m

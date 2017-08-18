@@ -32,9 +32,8 @@ import           Disco.Interpret.Core             (whnfV)
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
-import           Disco.Eval                       (Value(..), Disco, iputStr, iputStrLn, io)
+import           Disco.Eval                       (Value(..), Disco, iputStr, iputStrLn, io, IErr)
 import           Disco.Types
-
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -104,9 +103,9 @@ funPA = PA funPrec InL
 arrPA :: PA
 arrPA = PA 1 InR
 
-type Doc = ReaderT PA Disco PP.Doc
+type Doc = ReaderT PA (Disco IErr) PP.Doc
 
-renderDoc :: Doc -> Disco String
+renderDoc :: Doc -> Disco IErr String
 renderDoc = fmap PP.render . flip runReaderT initPA
 
 --------------------------------------------------
@@ -316,7 +315,7 @@ prettyProperty prop =
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  This version actually prints the values on the console, followed
 --   by a newline.  For a more general version, see 'prettyValueWith'.
-prettyValue :: Type -> Value -> Disco ()
+prettyValue :: Type -> Value -> Disco IErr ()
 prettyValue ty v = do
   prettyValueWith (\s -> iputStr s >> io (hFlush stdout)) ty v
   iputStrLn ""
@@ -325,12 +324,12 @@ prettyValue ty v = do
 --   evaluation.  Takes a continuation that specifies how the output
 --   should be processed (which will be called many times as the
 --   output is produced incrementally).
-prettyValueWith :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyValueWith :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
-prettyWHNF :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
@@ -352,7 +351,7 @@ prettyWHNF _ _ _ = error "Impossible! No matching case in prettyValue"
 
 
 
-prettyList :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v
   where
     go (VCons 0 []) = out "]"
@@ -366,7 +365,7 @@ prettyList out ty v = out "[" >> go v
 
     go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
 
-prettyTuple :: (String -> Disco ()) -> Type -> Value -> Disco ()
+prettyTuple :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyTuple out (TyPair ty1 ty2) (VCons 0 [v1, v2]) = do
   prettyValueWith out ty1 v1
   out ", "

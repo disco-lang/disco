@@ -91,14 +91,17 @@ parseLine s =
     Left err -> Left $ parseErrorPretty' s err
     Right l  -> Right l
 
-handleCMD :: String -> Disco ()
+-- XXX eventually this should switch from using IErr specifically to
+-- an umbrella error type in which IErr can be embedded, along with
+-- e.g. parse or type errors
+handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
 handleCMD s =
     case (parseLine s) of
       Left msg -> io $ putStrLn msg
       Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
   where
-    handleLine :: REPLExpr -> Disco ()
+    handleLine :: REPLExpr -> Disco IErr ()
 
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t        >>= iputStrLn
@@ -112,7 +115,7 @@ handleCMD s =
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
 
-handleLet :: Name Term -> Term -> Disco ()
+handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
   let mat = runTCM (extends ctx $ infer t)
@@ -122,26 +125,26 @@ handleLet x t = do
       topCtx   %= M.insert x (getType at)
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
-handleShowDefn :: Name Term -> Disco String
+handleShowDefn :: Name Term -> Disco IErr String
 handleShowDefn x = do
   defns <- use topDefns
   case M.lookup (coerce x) defns of
     Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
 
-handleDesugar :: Term -> Disco String
+handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
   case evalTCM (infer t) of
     Left err -> return.show $ err
     Right at -> return.show.runDSM.desugarTerm $ at
 
-loadFile :: FilePath -> Disco (Maybe String)
+loadFile :: FilePath -> Disco IErr (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
-handleLoad :: FilePath -> Disco Bool
+handleLoad :: FilePath -> Disco IErr Bool
 handleLoad file = do
   io . putStrLn $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
@@ -164,7 +167,7 @@ handleLoad file = do
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
 -- to the Property module.
-runAllTests :: Ctx ATerm [AProperty] -> Disco Bool  -- (Ctx ATerm [TestResult])
+runAllTests :: Ctx ATerm [AProperty] -> Disco IErr Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
@@ -177,7 +180,7 @@ runAllTests aprops
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
-    runTests :: Name ATerm -> [AProperty] -> Disco Bool
+    runTests :: Name ATerm -> [AProperty] -> Disco IErr Bool
     runTests n props = do
       iputStr ("  " ++ name2String n ++ ":")
       results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples) props
@@ -191,7 +194,7 @@ runAllTests aprops
 
 -- XXX redo with message framework, with proper support for indentation etc.
 -- XXX also move it to Property or Pretty or somewhere like that
-prettyTestFailure :: AProperty -> TestResult -> Disco ()
+prettyTestFailure :: AProperty -> TestResult -> Disco IErr ()
 prettyTestFailure _ (TestOK {}) = return ()
 prettyTestFailure prop (TestFalse env) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
@@ -213,7 +216,7 @@ prettyTestFailure prop (TestRuntimeFailure err) = do
   iputStr     "    " >> iprint err
 
 -- XXX comment, move somewhere else
-prettyCounterexample :: Ctx ATerm Type -> Env -> Disco ()
+prettyCounterexample :: Ctx ATerm Type -> Env -> Disco IErr ()
 prettyCounterexample ctx env
   | M.null env = return ()
   | otherwise  = do
@@ -228,7 +231,7 @@ prettyCounterexample ctx env
       iputStr " = "
       prettyValue (ctx ! coerce x) v
 
-handleDocs :: Name Term -> Disco ()
+handleDocs :: Name Term -> Disco IErr ()
 handleDocs x = do
   ctx  <- use topCtx
   docs <- use topDocs
@@ -241,7 +244,7 @@ handleDocs x = do
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
 
-evalTerm :: Term -> Disco ()
+evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
   case evalTCM (extends ctx $ infer t) of
@@ -251,7 +254,7 @@ evalTerm t = do
           c  = runDSM $ desugarTerm at
       in (withTopEnv $ mkThunk c) >>= prettyValue ty
 
-handleTypeCheck :: Term -> Disco String
+handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
@@ -339,14 +342,14 @@ main = do
 
   where
 
-    ctrlC :: InputT Disco a -> SomeException -> InputT Disco a
+    ctrlC :: InputT (Disco e) a -> SomeException -> InputT (Disco e) a
     ctrlC act e = do
       io $ putStrLn (show e)
       act
 
     withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
 
-    loop :: InputT Disco ()
+    loop :: InputT (Disco IErr) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of

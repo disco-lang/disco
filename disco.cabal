@@ -37,6 +37,7 @@ library
                        Disco.AST.Surface
                        Disco.AST.Typed
                        Disco.Context
+                       Disco.Messages
                        Disco.Parser
                        Disco.Pretty
                        Disco.Property

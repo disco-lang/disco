@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor    #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,7 +17,9 @@ module Disco.Messages where
 
 import Unbound.Generics.LocallyNameless
 
-import Data.Sequence
+import           Control.Monad.Writer
+import           Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
 import Disco.AST.Surface
 import Disco.AST.Typed
@@ -51,3 +54,6 @@ data Message e = Message MessageLevel (MessageBody e)
   deriving (Show, Functor)
 
 type MessageLog e = Seq (Message e)
+
+emptyMessageLog :: MessageLog e
+emptyMessageLog = Seq.empty

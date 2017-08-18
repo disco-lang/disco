@@ -45,19 +45,23 @@ module Disco.Eval
 
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
-       , runDisco
+       , emitMessage, info, warning, err, panic, debug
+       , runDisco, catchAsMessage
+
+         -- ** Memory/environment utilities
        , allocate, delay, mkThunk
 
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), makeLenses, use)
+import           Control.Lens                       ((<+=), (%=), (<>=), makeLenses, use)
 import           Control.Monad.Trans.Except
+import           Control.Monad.Except               (catchError)
 import           Control.Monad.Reader
-import           Control.Monad.Writer
 import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
+import qualified Data.Sequence as Seq
 
 import           Unbound.Generics.LocallyNameless
 
@@ -203,42 +207,45 @@ data IErr where
 type Loc = Int
 
 -- | The various pieces of state tracked by the 'Disco' monad.
-data DiscoState = DiscoState
+data DiscoState e = DiscoState
   {
-    _topCtx   :: Ctx Term Type
+    _topCtx     :: Ctx Term Type
     -- ^ Top-level type environment.
 
-  , _topDefns :: Ctx Core Core
+  , _topDefns   :: Ctx Core Core
     -- ^ Environment of top-level definitions.  Set by 'loadDefs'.
 
-  , _topEnv   :: Env
+  , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDefs'.
     --   Use it when evaluating with 'withTopEnv'.
 
-  , _topDocs  :: Ctx Term Docs
+  , _topDocs    :: Ctx Term Docs
     -- ^ Top-level documentation.
 
-  , _memory   :: IntMap Value
+  , _memory     :: IntMap Value
     -- ^ A memory is a mapping from "locations" (uniquely generated
     --   identifiers) to values.  It also keeps track of the next
     --   unused location.  We keep track of a memory during
     --   evaluation, and can create new memory locations to store
     --   things that should only be evaluated once.
 
-  , _nextLoc  :: Loc
+  , _nextLoc    :: Loc
     -- ^ The next available (unused) memory location.
+
+  , _messageLog :: MessageLog e
   }
 
 -- | The initial state for the @Disco@ monad.
-initDiscoState :: DiscoState
+initDiscoState :: DiscoState e
 initDiscoState = DiscoState
-  { _topCtx   = emptyCtx
-  , _topDefns = emptyCtx
-  , _topDocs  = emptyCtx
-  , _topEnv   = emptyCtx
-  , _memory   = IntMap.empty
-  , _nextLoc  = 0
+  { _topCtx     = emptyCtx
+  , _topDefns   = emptyCtx
+  , _topDocs    = emptyCtx
+  , _topEnv     = emptyCtx
+  , _memory     = IntMap.empty
+  , _nextLoc    = 0
+  , _messageLog = emptyMessageLog
   }
 
 ------------------------------------------------------------
@@ -256,7 +263,7 @@ initDiscoState = DiscoState
 --   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-type Disco e = StateT DiscoState (ReaderT Env (ExceptT e (WriterT (MessageLog e) (LFreshMT IO))))
+type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
 
 ------------------------------------------------------------
 -- Some instances needed to ensure that Disco is an instance of the
@@ -305,15 +312,34 @@ iputStr = io . putStr
 iprint :: (MonadIO m, Show a) => a -> m ()
 iprint = io . print
 
+emitMessage :: MessageLevel -> MessageBody e -> Disco e ()
+emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
+
+info, warning, err, panic, debug :: MessageBody e -> Disco e ()
+info    = emitMessage Info
+warning = emitMessage Warning
+err     = emitMessage Error
+panic   = emitMessage Panic
+debug   = emitMessage Debug
+
+
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
-runDisco :: Disco e a -> IO (Either e a, MessageLog e)
+runDisco :: Disco e a -> IO (Either e a)
 runDisco
   = runLFreshMT
-  . runWriterT
   . runExceptT
   . flip runReaderT emptyCtx
   . flip evalStateT initDiscoState
+
+-- | Run a @Disco@ computation; if it throws an exception, catch it
+--   and turn it into a message.
+catchAsMessage :: Disco e () -> Disco e ()
+catchAsMessage m = m `catchError` (err . Item)
+
+------------------------------------------------------------
+-- Memory/environment utilities
+------------------------------------------------------------
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.

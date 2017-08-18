@@ -88,7 +88,7 @@ lineParser
 parseLine :: String -> Either String REPLExpr
 parseLine s =
   case (runParser lineParser "" s) of
-    Left err -> Left $ parseErrorPretty' s err
+    Left  e  -> Left $ parseErrorPretty' s e
     Right l  -> Right l
 
 -- XXX eventually this should switch from using IErr specifically to
@@ -120,7 +120,7 @@ handleLet x t = do
   ctx <- use topCtx
   let mat = runTCM (extends ctx $ infer t)
   case mat of
-    Left err -> io.print $ err   -- XXX pretty print
+    Left e -> io.print $ e   -- XXX pretty print
     Right (at, _) -> do
       topCtx   %= M.insert x (getType at)
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
@@ -135,7 +135,7 @@ handleShowDefn x = do
 handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
   case evalTCM (infer t) of
-    Left err -> return.show $ err
+    Left e   -> return.show $ e
     Right at -> return.show.runDSM.desugarTerm $ at
 
 loadFile :: FilePath -> Disco IErr (Maybe String)
@@ -150,7 +150,7 @@ handleLoad file = do
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left err -> io $ putStrLn (parseErrorPretty' str err) >> return False
+    Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
@@ -209,11 +209,11 @@ prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do
   iputStr     "    - But got:  " >> prettyValue ty v1
   let qTys = M.fromList . fst . unsafeUnbind $ prop
   prettyCounterexample qTys env
-prettyTestFailure prop (TestRuntimeFailure err) = do
+prettyTestFailure prop (TestRuntimeFailure e) = do
   iputStr     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
-  iputStr     "    " >> iprint err
+  iputStr     "    " >> iprint e
 
 -- XXX comment, move somewhere else
 prettyCounterexample :: Ctx ATerm Type -> Env -> Disco IErr ()
@@ -248,7 +248,7 @@ evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
   case evalTCM (extends ctx $ infer t) of
-    Left err -> iprint err    -- XXX pretty-print
+    Left e   -> iprint e    -- XXX pretty-print
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
@@ -258,7 +258,7 @@ handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
-    Left err -> return.show $ err    -- XXX pretty-print
+    Left e   -> return.show $ e    -- XXX pretty-print
     Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
 
 banner :: String
@@ -311,7 +311,7 @@ main = do
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  (res, _log) <- runDisco $ do
+  res <- runDisco $ do
     case checkFile opts of
       Just file -> do
         res <- handleLoad file
@@ -333,8 +333,8 @@ main = do
   case res of
 
     -- All disco exceptions should be caught and handled by this point.
-    Left err -> do
-      putStrLn $ "Uncaught error: " ++ show err
+    Left e   -> do
+      putStrLn $ "Uncaught error: " ++ show e
       putStrLn $ "Please report this as a bug: https://github.com/disco-lang/disco/issues"
     Right () -> return ()
 

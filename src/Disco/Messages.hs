@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveFunctor    #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -17,6 +18,7 @@ module Disco.Messages where
 
 import Unbound.Generics.LocallyNameless
 
+import           Control.Lens (makeLenses)
 import           Control.Monad.Writer
 import           Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -45,15 +47,15 @@ data Report
   | RSub   Report
   deriving (Show)
 
-data MessageBody e
-  = Msg  Report
-  | Item e
-  deriving (Show, Functor)
+data Message = Message
+  { _messageLevel :: MessageLevel
+  , _messageBody  :: Report
+  }
+  deriving (Show)
 
-data Message e = Message MessageLevel (MessageBody e)
-  deriving (Show, Functor)
+makeLenses ''Message
 
-type MessageLog e = Seq (Message e)
+type MessageLog = Seq Message
 
-emptyMessageLog :: MessageLog e
+emptyMessageLog :: MessageLog
 emptyMessageLog = Seq.empty

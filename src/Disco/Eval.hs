@@ -1,5 +1,7 @@
+{-# LANGUAGE DeriveFunctor            #-}
 {-# LANGUAGE GADTs                    #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -37,7 +39,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc
+       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, messageLog
 
          -- * Disco monad
 
@@ -46,7 +48,10 @@ module Disco.Eval
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
        , emitMessage, info, warning, err, panic, debug
-       , runDisco, catchAsMessage
+       , runDisco
+       , catchMessage, catchEither, injectErrors, noErrors
+       , printAndClearMessages, printMessages
+       , formatMessages, formatMessage
 
          -- ** Memory/environment utilities
        , allocate, delay, mkThunk
@@ -54,14 +59,20 @@ module Disco.Eval
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), (<>=), makeLenses, use)
+import           Control.Lens                       ((<+=), (%=), (.=),
+                                                     (<>=), makeLenses, use)
 import           Control.Monad.Trans.Except
-import           Control.Monad.Except               (catchError)
+import           Control.Monad.Except               (catchError, throwError)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Strict
+import           Data.Bifunctor                     (bimap)
+import qualified Data.Foldable                      as F
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
-import qualified Data.Sequence as Seq
+import           Data.List                          (intercalate)
+import qualified Data.Sequence                      as Seq
+import           Data.Void
+import           Unsafe.Coerce
 
 import           Unbound.Generics.LocallyNameless
 
@@ -207,7 +218,7 @@ data IErr where
 type Loc = Int
 
 -- | The various pieces of state tracked by the 'Disco' monad.
-data DiscoState e = DiscoState
+data DiscoState = DiscoState
   {
     _topCtx     :: Ctx Term Type
     -- ^ Top-level type environment.
@@ -233,11 +244,13 @@ data DiscoState e = DiscoState
   , _nextLoc    :: Loc
     -- ^ The next available (unused) memory location.
 
-  , _messageLog :: MessageLog e
+  , _messageLog :: MessageLog
+    -- ^ A log of emitted messages (errors, warnings, etc.)
   }
+  deriving Show
 
 -- | The initial state for the @Disco@ monad.
-initDiscoState :: DiscoState e
+initDiscoState :: DiscoState
 initDiscoState = DiscoState
   { _topCtx     = emptyCtx
   , _topDefns   = emptyCtx
@@ -263,7 +276,7 @@ initDiscoState = DiscoState
 --   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
+type Disco e = StateT DiscoState (ReaderT Env (ExceptT e (LFreshMT IO)))
 
 ------------------------------------------------------------
 -- Some instances needed to ensure that Disco is an instance of the
@@ -312,10 +325,10 @@ iputStr = io . putStr
 iprint :: (MonadIO m, Show a) => a -> m ()
 iprint = io . print
 
-emitMessage :: MessageLevel -> MessageBody e -> Disco e ()
+emitMessage :: MessageLevel -> Report -> Disco e ()
 emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
 
-info, warning, err, panic, debug :: MessageBody e -> Disco e ()
+info, warning, err, panic, debug :: Report -> Disco e ()
 info    = emitMessage Info
 warning = emitMessage Warning
 err     = emitMessage Error
@@ -326,16 +339,104 @@ debug   = emitMessage Debug
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
 runDisco :: Disco e a -> IO (Either e a)
-runDisco
+runDisco = (fmap . fmap) fst . runDisco' initDiscoState emptyCtx
+
+-- XXX
+runDisco' :: DiscoState -> Env -> Disco e a -> IO (Either e (a, DiscoState))
+runDisco' st ctx
   = runLFreshMT
   . runExceptT
-  . flip runReaderT emptyCtx
-  . flip evalStateT initDiscoState
+  . flip runReaderT ctx
+  . flip runStateT st
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
---   and turn it into a message.
-catchAsMessage :: Disco e () -> Disco e ()
-catchAsMessage m = m `catchError` (err . Item)
+--   and turn it into an error message using the given rendering
+--   function, and also return it.  This is like 'catchEither', but
+--   also adds the rendered error to the message log. The resulting
+--   computation is statically guaranteed to throw no exceptions.
+catchMessage :: (e -> Disco Void Report) -> Disco e a -> Disco Void (Either e a)
+catchMessage render m = do
+  res <- catchEither m
+  either (render >=> err) (const $ return ()) res
+
+  return res
+
+-- -- | Modify the current 'MessageLog' to turn each @e@ item into a
+-- --   'Report'.  Suitable for calling just prior to outputting messages
+-- --   to the user.  Note that the result is statically guaranteed to
+-- --   have only 'Report' values in the message log.
+-- renderMessages :: (e -> Disco Void Report) -> Disco e a -> Disco e a
+-- renderMessages render m = do
+--   st  <- get
+--   ctx <- ask
+
+--   res <- io $ runDisco' (absurd <$> st) ctx m
+
+--   case res of
+--     Left x         -> throwError x
+--     Right (a, st') -> do
+
+--       -- In theory, since the report rendering is happening in the
+--       -- Disco monad, it could alter the state, but any changes it
+--       -- made would be wiped out when we call 'put' with the result.
+--       -- In practice, however, the only reason the report rendering is
+--       -- in the Disco monad at all is to be able to take advantage of
+--       -- fresh name generation for pretty-printing, so this shouldn't
+--       -- be a problem.
+--       put =<< (messageLog . traverse . messageBody) renderBody st'
+
+--       return a
+--   where
+--     -- renderBody :: Report e -> DiscoM Void x (Report Void)
+--     renderBody (Item e) = Msg <$> render e
+--     renderBody (Msg  r) = return (Msg r)
+
+
+-- | Run a @Disco@ computation; if it throws an exception, catch it
+--   and return it as @Left@.  For a version which also adds a
+--   rendered version of the error to the message log, see
+--   'catchMessage'.  The resulting computation is statically
+--   guaranteed to throw no exceptions.
+catchEither  :: Disco e a -> Disco Void (Either e a)
+catchEither m = unsafeCoerce $ (Right <$> m) `catchError` (return . Left)
+
+-- XXX
+injectErrors :: (e1 -> e2) -> Disco e1 a -> Disco e2 a
+injectErrors inj m = do
+  st  <- get
+  ctx <- ask
+
+  -- m' :: ExceptT e1 (LFreshMT IO) (a, DiscoState)
+  let m' = flip runReaderT ctx . flip runStateT st $ m
+
+  (a, st') <- lift . lift $ mapExceptT (fmap (bimap inj id)) m'
+
+  put st'
+  return a
+
+-- XXX
+noErrors :: Disco Void a -> Disco void a
+noErrors = injectErrors absurd
+
+printAndClearMessages :: Disco void ()
+printAndClearMessages = do
+  printMessages
+  messageLog .= Seq.empty
+
+-- XXX
+printMessages :: Disco void ()
+printMessages = do
+  msgs <- use messageLog
+  ls   <- formatMessages (F.toList msgs)
+  iputStr $ unlines ls
+
+formatMessages :: [Message] -> Disco void [String]
+formatMessages msgs = do
+  fmts <- mapM formatMessage msgs
+  return $ intercalate ["\n"] fmts
+
+formatMessage :: Message -> Disco void [String]
+formatMessage (Message Error (RTxt s)) = return [s]
 
 ------------------------------------------------------------
 -- Memory/environment utilities

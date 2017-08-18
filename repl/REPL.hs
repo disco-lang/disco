@@ -4,7 +4,7 @@
 import           Control.Arrow                    ((&&&))
 import           Control.Lens                     (use, (%=), (.=))
 import           Control.Monad                    (when, forM_)
-import           Control.Monad.Except             (catchError)
+import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (MonadIO(..))
 import           Control.Monad.Trans.Class        (MonadTrans(..))
 import           Data.Char                        (isSpace)
@@ -13,6 +13,7 @@ import           Data.List                        (find, isPrefixOf)
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (isJust)
+import           Data.Void
 
 import qualified Options.Applicative              as O
 import           System.Console.Haskeline         as H
@@ -27,12 +28,28 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
+import           Disco.Messages
 import           Disco.Interpret.Core             (loadDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 import           Disco.Types
+
+------------------------------------------------------------
+-- Errors
+------------------------------------------------------------
+
+-- XXX comment
+data Err
+  = IErr_ IErr
+  | SErr  String   -- for now
+  deriving Show
+
+-- XXX improve me
+renderErr :: Err -> Disco Void Report
+renderErr (IErr_ e) = return . RTxt $ show e
+renderErr (SErr s)  = return . RTxt $ s
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -91,17 +108,14 @@ parseLine s =
     Left  e  -> Left $ parseErrorPretty' s e
     Right l  -> Right l
 
--- XXX eventually this should switch from using IErr specifically to
--- an umbrella error type in which IErr can be embedded, along with
--- e.g. parse or type errors
-handleCMD :: String -> Disco IErr ()
+handleCMD :: String -> Disco Void ()
 handleCMD "" = return ()
 handleCMD s =
     case (parseLine s) of
       Left msg -> io $ putStrLn msg
-      Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
+      Right l  -> outputMessages $ handleLine l
   where
-    handleLine :: REPLExpr -> Disco IErr ()
+    handleLine :: REPLExpr -> Disco Err ()
 
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t        >>= iputStrLn
@@ -110,12 +124,18 @@ handleCMD s =
     handleLine (Parse t)     = iprint $ t
     handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
     handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
-    handleLine (Load file)   = handleLoad file >> return ()
+    handleLine (Load file)   = handleLoad file
+                             >> return ()  -- don't care if tests failed
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
 
-handleLet :: Name Term -> Term -> Disco IErr ()
+outputMessages :: Disco Err () -> Disco Void ()
+outputMessages m = do
+  _ <- catchMessage renderErr $ m
+  printAndClearMessages
+
+handleLet :: Name Term -> Term -> Disco void ()
 handleLet x t = do
   ctx <- use topCtx
   let mat = runTCM (extends ctx $ infer t)
@@ -125,42 +145,46 @@ handleLet x t = do
       topCtx   %= M.insert x (getType at)
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
-handleShowDefn :: Name Term -> Disco IErr String
+handleShowDefn :: Name Term -> Disco void String
 handleShowDefn x = do
   defns <- use topDefns
   case M.lookup (coerce x) defns of
     Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
 
-handleDesugar :: Term -> Disco IErr String
+handleDesugar :: Term -> Disco void String
 handleDesugar t = do
   case evalTCM (infer t) of
     Left e   -> return.show $ e
     Right at -> return.show.runDSM.desugarTerm $ at
 
-loadFile :: FilePath -> Disco IErr (Maybe String)
+-- XXX change to use a message instead of printing
+loadFile :: FilePath -> Disco void (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
-handleLoad :: FilePath -> Disco IErr Bool
+-- XXX comment.  Return a Bool since if tests fail we don't want to
+-- throw an exception, loading the file should still succeed; but we
+-- need to know that tests failed so we can fail if in --check mode.
+handleLoad :: FilePath -> Disco Err Bool
 handleLoad file = do
   io . putStrLn $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
+    Left e   -> throwError (SErr (parseErrorPretty' str e))
     Right p  ->
       case runTCM (checkModule p) of
-        Left tcErr         -> io $ print tcErr >> return False
+        Left tcErr         -> throwError (SErr (show tcErr))
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           topDocs  .= docMap
           topCtx   .= ctx
           loadDefs cdefns
 
-          t <- withTopEnv $ runAllTests aprops
+          t <- injectErrors IErr_ $ withTopEnv $ runAllTests aprops
           io . putStrLn $ "Loaded."
           return t
 
@@ -231,7 +255,7 @@ prettyCounterexample ctx env
       iputStr " = "
       prettyValue (ctx ! coerce x) v
 
-handleDocs :: Name Term -> Disco IErr ()
+handleDocs :: Name Term -> Disco Err ()
 handleDocs x = do
   ctx  <- use topCtx
   docs <- use topDocs
@@ -244,7 +268,7 @@ handleDocs x = do
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
         _ -> return ()
 
-evalTerm :: Term -> Disco IErr ()
+evalTerm :: Term -> Disco Err ()
 evalTerm t = do
   ctx   <- use topCtx
   case evalTCM (extends ctx $ infer t) of
@@ -252,9 +276,10 @@ evalTerm t = do
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
-      in (withTopEnv $ mkThunk c) >>= prettyValue ty
+      in  injectErrors IErr_ $
+            (withTopEnv $ mkThunk c) >>= prettyValue ty
 
-handleTypeCheck :: Term -> Disco IErr String
+handleTypeCheck :: Term -> Disco Err String
 handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (infer t)) of
@@ -314,8 +339,12 @@ main = do
   res <- runDisco $ do
     case checkFile opts of
       Just file -> do
-        res <- handleLoad file
-        io $ if res then exitSuccess else exitFailure
+        res <- catchMessage renderErr $ handleLoad file
+        printAndClearMessages
+        io $ case res of
+          Right True -> exitSuccess
+          _          -> exitFailure
+
       Nothing   -> return ()
     case cmdFile opts of
       Just file -> do
@@ -349,7 +378,7 @@ main = do
 
     withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
 
-    loop :: InputT (Disco IErr) ()
+    loop :: InputT (Disco Void) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of

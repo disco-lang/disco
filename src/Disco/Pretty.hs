@@ -23,6 +23,7 @@ import           Data.Char                        (isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (fromJust)
 import           Data.Ratio
+import           Data.Void
 
 import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (Name, lunbind,
@@ -32,7 +33,7 @@ import           Disco.Interpret.Core             (whnfV)
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
-import           Disco.Eval                       (Value(..), Disco, iputStr, iputStrLn, io, IErr)
+import           Disco.Eval
 import           Disco.Types
 
 --------------------------------------------------
@@ -103,10 +104,10 @@ funPA = PA funPrec InL
 arrPA :: PA
 arrPA = PA 1 InR
 
-type Doc = ReaderT PA (Disco IErr) PP.Doc
+type Doc = ReaderT PA (Disco Void) PP.Doc
 
-renderDoc :: Doc -> Disco IErr String
-renderDoc = fmap PP.render . flip runReaderT initPA
+renderDoc :: Doc -> Disco void String
+renderDoc = noErrors . fmap PP.render . flip runReaderT initPA
 
 --------------------------------------------------
 

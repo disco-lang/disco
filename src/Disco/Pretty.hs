@@ -48,6 +48,12 @@ hcat ds  = PP.hcat <$> sequence ds
 hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
 
+sep  :: Monad f => [f PP.Doc] -> f PP.Doc
+sep ds   = PP.sep <$> sequence ds
+
+hang :: Monad f => f PP.Doc -> Int -> f PP.Doc -> f PP.Doc
+hang d1 n d2 = PP.hang <$> d1 <*> pure n <*> d2
+
 parens :: Functor f => f PP.Doc -> f PP.Doc
 parens   = fmap PP.parens
 
@@ -209,7 +215,7 @@ prettyTerm (TLet bnd) = mparens initPA $
     prettyBinding (Binding (Just ty) x (unembed -> t))
       = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InL t]
 
-prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
+prettyTerm (TCase b)    = hang (text "{?") 3 (prettyBranches b) <+> text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
 prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
@@ -241,20 +247,17 @@ prettyBOp op =
     _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 prettyBranches :: [Branch] -> Doc
-prettyBranches []     = error "Empty branches are disallowed."
-prettyBranches (b:bs) =
-  prettyBranch False b
-  $+$
-  foldr ($+$) empty (map (prettyBranch True) bs)
+prettyBranches [] = error "Empty branches are disallowed."
+prettyBranches bs = punctuate (text ",") (map prettyBranch bs) >>= sep
 
-prettyBranch :: Bool -> Branch -> Doc
-prettyBranch com br = lunbind br $ \(gs,t) ->
-  (if com then (text "," <+>) else id) (prettyTerm t <+> prettyGuards gs)
+prettyBranch :: Branch -> Doc
+prettyBranch br = lunbind br $ \(gs,t) ->
+  hang (prettyTerm t) 2 (prettyGuards gs)
 
 prettyGuards :: Telescope Guard -> Doc
-prettyGuards TelEmpty                     = text "otherwise"
-prettyGuards (fromTelescope -> gs)
-  = foldr (\g r -> prettyGuard g <+> r) (text "") gs
+prettyGuards TelEmpty              = text "otherwise"
+prettyGuards (fromTelescope -> gs) = sep (map prettyGuard gs)
+--  = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))

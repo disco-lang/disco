@@ -3,7 +3,7 @@
 
 import           Control.Arrow                    ((&&&))
 import           Control.Lens                     (use, (%=), (.=))
-import           Control.Monad                    (when, forM_)
+import           Control.Monad                    (when, forM_, void, (>=>))
 import           Control.Monad.Except             (throwError)
 import           Control.Monad.IO.Class           (MonadIO(..))
 import           Control.Monad.Trans.Class        (MonadTrans(..))
@@ -13,7 +13,6 @@ import           Data.List                        (find, isPrefixOf)
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (isJust)
-import           Data.Void
 
 import qualified Options.Applicative              as O
 import           System.Console.Haskeline         as H
@@ -42,21 +41,21 @@ import           Disco.Types
 
 -- XXX comment
 data Err
-  = IErr_ IErr
-  | SErr  String   -- for now
+  = IErr_  IErr
+  | StrErr String
   deriving Show
 
 -- XXX improve me
 renderErr :: Err -> Disco void Report
-renderErr (IErr_ e) = return . RTxt $ show e
-renderErr (SErr s)  = return . RTxt $ s
+renderErr (IErr_ e)  = return . RTxt $ show e
+renderErr (StrErr s) = return . RTxt $ s
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
 ------------------------------------------------------------------------
 
 data REPLExpr =
-   Let (Name Term) Term         -- Toplevel let-expression: for the REPL
+   Let (Name Term) Term         -- Top-level let-expression: for the REPL
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
  | ShowDefn (Name Term)         -- Show a variable's definition
@@ -102,18 +101,16 @@ lineParser
   <|> try (Eval <$> term)
   <|> letParser
 
-parseLine :: String -> Either String REPLExpr
+parseLine :: String -> Disco Err REPLExpr
 parseLine s =
   case (runParser lineParser "" s) of
-    Left  e  -> Left $ parseErrorPretty' s e
-    Right l  -> Right l
+    Left  e  -> throwError (StrErr $ parseErrorPretty' s e)
+    Right l  -> return l
 
 handleCMD :: String -> Disco void ()
 handleCMD "" = return ()
-handleCMD s =
-    case (parseLine s) of
-      Left msg -> io $ putStrLn msg
-      Right l  -> outputMessages $ handleLine l
+handleCMD s = outputMessages $ parseLine >=> handleLine $ s
+
   where
     handleLine :: REPLExpr -> Disco Err ()
 
@@ -174,10 +171,10 @@ handleLoad file = do
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left e   -> throwError (SErr (parseErrorPretty' str e))
+    Left e   -> throwError (StrErr (parseErrorPretty' str e))
     Right p  ->
       case runTCM (checkModule p) of
-        Left tcErr         -> throwError (SErr (show tcErr))
+        Left tcErr         -> throwError (StrErr (show tcErr))
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           topDocs  .= docMap
@@ -338,7 +335,7 @@ main = do
   when (not batch) $ putStr banner
 
   -- Note this returns a result of  (Either void ()), so it must be a Right ()
-  _ <- runDisco $ do
+  void $ runDisco $ do
     case checkFile opts of
       Just file -> do
         res <- catchMessage renderErr $ handleLoad file

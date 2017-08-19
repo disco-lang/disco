@@ -42,6 +42,9 @@ import           Disco.Types
 vcat :: Monad f => [f PP.Doc] -> f PP.Doc
 vcat ds  = PP.vcat <$> sequence ds
 
+hcat :: Monad f => [f PP.Doc] -> f PP.Doc
+hcat ds  = PP.hcat <$> sequence ds
+
 hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
 

@@ -47,11 +47,10 @@ module Disco.Eval
 
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
-       , emitMessage, info, warning, err, panic, debug
-       , runDisco
-       , catchMessage, catchEither, injectErrors, noErrors
-       , printAndClearMessages, printMessages
-       , formatMessages, formatMessage
+       , runDisco, runDisco'
+
+         -- ** Error utilities
+       , catchEither, injectErrors, noErrors
 
          -- ** Memory/environment utilities
        , allocate, delay, mkThunk
@@ -69,8 +68,6 @@ import           Data.Bifunctor                     (bimap)
 import qualified Data.Foldable                      as F
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
-import           Data.List                          (intercalate)
-import qualified Data.Sequence                      as Seq
 import           Data.Void
 import           Unsafe.Coerce
 
@@ -325,17 +322,6 @@ iputStr = io . putStr
 iprint :: (MonadIO m, Show a) => a -> m ()
 iprint = io . print
 
-emitMessage :: MessageLevel -> Report -> Disco e ()
-emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
-
-info, warning, err, panic, debug :: Report -> Disco e ()
-info    = emitMessage Info
-warning = emitMessage Warning
-err     = emitMessage Error
-panic   = emitMessage Panic
-debug   = emitMessage Debug
-
-
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
 runDisco :: Disco e a -> IO (Either e a)
@@ -349,17 +335,9 @@ runDisco' st ctx
   . flip runReaderT ctx
   . flip runStateT st
 
--- | Run a @Disco@ computation; if it throws an exception, catch it
---   and turn it into an error message using the given rendering
---   function, and also return it.  This is like 'catchEither', but
---   also adds the rendered error to the message log. The resulting
---   computation is statically guaranteed to throw no exceptions.
-catchMessage :: (e -> Disco Void Report) -> Disco e a -> Disco void (Either e a)
-catchMessage render m = do
-  res <- catchEither m
-  either ((noErrors . render) >=> err) (const $ return ()) res
-
-  return res
+------------------------------------------------------------
+-- Dealing with errors
+------------------------------------------------------------
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and return it as @Left@.  For a version which also adds a
@@ -386,26 +364,6 @@ injectErrors inj m = do
 -- XXX
 noErrors :: Disco Void a -> Disco void a
 noErrors = injectErrors absurd
-
-printAndClearMessages :: Disco void ()
-printAndClearMessages = do
-  printMessages
-  messageLog .= Seq.empty
-
--- XXX
-printMessages :: Disco void ()
-printMessages = do
-  msgs <- use messageLog
-  ls   <- formatMessages (F.toList msgs)
-  iputStr $ unlines ls
-
-formatMessages :: [Message] -> Disco void [String]
-formatMessages msgs = do
-  fmts <- mapM formatMessage msgs
-  return $ intercalate ["\n"] fmts
-
-formatMessage :: Message -> Disco void [String]
-formatMessage (Message Error (RTxt s)) = return [s]
 
 ------------------------------------------------------------
 -- Memory/environment utilities

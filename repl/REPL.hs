@@ -29,6 +29,7 @@ import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
 import           Disco.Messages
+import           Disco.MessageLog
 import           Disco.Interpret.Core             (loadDefs)
 import           Disco.Parser
 import           Disco.Pretty
@@ -53,17 +54,18 @@ data Err
   | RawReport  Report                          -- ^ A structured error message
   deriving Show
 
--- XXX improve me
-renderErr :: Err -> Disco void Report
-renderErr (InterpErr e)  = return . RTxt $ show e
-renderErr (ParseErr s e) = return . RTxt $ parseErrorPretty' s e
-renderErr (RawErr s)     = return . RTxt $ s
-renderErr (RawReport r)  = return r
+-- | Format an 'Err' value as a 'Report', for display to the user.
+formatErr :: Err -> Disco void Report
+formatErr (InterpErr e)  = return . RTxt $ show e
+formatErr (ParseErr s e) = return . RTxt $ parseErrorPretty' s e
+formatErr (RawErr s)     = return . RTxt $ s
+formatErr (RawReport r)  = return r
 
--- XXX comment
+-- | Print all pending messages to the console, and delete them from
+--   the message queue.
 outputMessages :: Disco Err () -> Disco void ()
 outputMessages m = do
-  _ <- catchMessage renderErr $ m
+  _ <- catchMessage formatErr $ m
   printAndClearMessages
 
 ------------------------------------------------------------------------
@@ -71,17 +73,17 @@ outputMessages m = do
 ------------------------------------------------------------------------
 
 data REPLExpr =
-   Let (Name Term) Term         -- Top-level let-expression: for the REPL
- | TypeCheck Term               -- Typecheck a term
- | Eval Term                    -- Evaluate a term
- | ShowDefn (Name Term)         -- Show a variable's definition
- | Parse Term                   -- Show the parsed AST
- | Pretty Term                  -- Pretty-print a term
- | Desugar Term                 -- Show a desugared term
- | Load FilePath                -- Load a file.
- | Doc (Name Term)              -- Show documentation.
- | Nop                          -- No-op, e.g. if the user just enters a comment
- | Help
+   Let (Name Term) Term         -- ^ Top-level let-expression: for the REPL
+ | TypeCheck Term               -- ^ Typecheck a term
+ | Eval Term                    -- ^ Evaluate a term
+ | ShowDefn (Name Term)         -- ^ Show a variable's definition
+ | Parse Term                   -- ^ Show the parsed AST
+ | Pretty Term                  -- ^ Pretty-print a term
+ | Desugar Term                 -- ^ Show a desugared term
+ | Load FilePath                -- ^ Load a file.
+ | Doc (Name Term)              -- ^ Show documentation.
+ | Nop                          -- ^ No-op, e.g. if the user just enters a comment
+ | Help                         -- ^ Display help
  deriving Show
 
 letParser :: Parser REPLExpr
@@ -206,14 +208,14 @@ fileNotFound file _ = putStrLn $ "File not found: " ++ file
 -- need to know that tests failed so we can fail if in --check mode.
 handleLoad :: FilePath -> Disco Err Bool
 handleLoad file = do
-  io . putStrLn $ "Loading " ++ file ++ "..."
+  info $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
     Left e   -> throwError $ ParseErr str e
     Right p  ->
       case runTCM (checkModule p) of
-        Left tcErr         -> throwError (RawErr (show tcErr))
+        Left tcErr         -> throwError $ RawErr (show tcErr)   -- XXX
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           topDocs  .= docMap
@@ -221,7 +223,7 @@ handleLoad file = do
           loadDefs cdefns
 
           t <- injectErrors InterpErr $ withTopEnv $ runAllTests aprops
-          io . putStrLn $ "Loaded."
+          info $ "Loaded."
           return t
 
 -- XXX comment
@@ -230,7 +232,10 @@ handleDocs x = do
   ctx  <- use topCtx
   docs <- use topDocs
   case M.lookup x ctx of
-    Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
+    Nothing -> errR $ RSeq [ RTxt "No documentation found for "
+                           , RName (AnyName x)
+                           , RTxt "."
+                           ]
     Just ty -> do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyTy ty]
       io . putStrLn $ p
@@ -249,7 +254,7 @@ runAllTests :: Ctx ATerm [AProperty] -> Disco IErr Bool  -- (Ctx ATerm [TestResu
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
-      io $ putStrLn "Running tests..."
+      info $ "Running tests..."
       and <$> mapM (uncurry runTests) (M.assocs aprops)
       -- XXX eventually this should be moved into Disco.Property and
       -- use a logging framework?
@@ -382,7 +387,7 @@ main = do
     -- the load results.
     case checkFile opts of
       Just file -> do
-        res <- catchMessage renderErr $ handleLoad file
+        res <- catchMessage formatErr $ handleLoad file
         printAndClearMessages
         io $ case res of
           Right True -> exitSuccess

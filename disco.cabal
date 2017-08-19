@@ -38,6 +38,7 @@ library
                        Disco.AST.Typed
                        Disco.Context
                        Disco.Messages
+                       Disco.MessageLog
                        Disco.Parser
                        Disco.Pretty
                        Disco.Property

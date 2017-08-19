@@ -47,7 +47,7 @@ data Err
   deriving Show
 
 -- XXX improve me
-renderErr :: Err -> Disco Void Report
+renderErr :: Err -> Disco void Report
 renderErr (IErr_ e) = return . RTxt $ show e
 renderErr (SErr s)  = return . RTxt $ s
 
@@ -108,7 +108,7 @@ parseLine s =
     Left  e  -> Left $ parseErrorPretty' s e
     Right l  -> Right l
 
-handleCMD :: String -> Disco Void ()
+handleCMD :: String -> Disco void ()
 handleCMD "" = return ()
 handleCMD s =
     case (parseLine s) of
@@ -130,7 +130,7 @@ handleCMD s =
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
 
-outputMessages :: Disco Err () -> Disco Void ()
+outputMessages :: Disco Err () -> Disco void ()
 outputMessages m = do
   _ <- catchMessage renderErr $ m
   printAndClearMessages
@@ -336,7 +336,9 @@ main = do
       settings = defaultSettings
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
-  res <- runDisco $ do
+
+  -- Note this returns a result of  (Either void ()), so it must be a Right ()
+  _ <- runDisco $ do
     case checkFile opts of
       Just file -> do
         res <- catchMessage renderErr $ handleLoad file
@@ -359,16 +361,6 @@ main = do
 
     when (not batch) $ runInputT settings loop
 
-  case res of
-
-    -- All disco exceptions should be caught and handled by this point.
-    Left e   -> do
-      putStrLn $ "Uncaught error: " ++ show e
-      putStrLn $ "Please report this as a bug: https://github.com/disco-lang/disco/issues"
-    Right () -> return ()
-
-  -- XXX pretty-print log messages here
-
   where
 
     ctrlC :: InputT (Disco e) a -> SomeException -> InputT (Disco e) a
@@ -378,7 +370,7 @@ main = do
 
     withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
 
-    loop :: InputT (Disco Void) ()
+    loop :: InputT (Disco void) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of

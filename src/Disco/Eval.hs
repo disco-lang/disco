@@ -354,50 +354,19 @@ runDisco' st ctx
 --   function, and also return it.  This is like 'catchEither', but
 --   also adds the rendered error to the message log. The resulting
 --   computation is statically guaranteed to throw no exceptions.
-catchMessage :: (e -> Disco Void Report) -> Disco e a -> Disco Void (Either e a)
+catchMessage :: (e -> Disco Void Report) -> Disco e a -> Disco void (Either e a)
 catchMessage render m = do
   res <- catchEither m
-  either (render >=> err) (const $ return ()) res
+  either ((noErrors . render) >=> err) (const $ return ()) res
 
   return res
-
--- -- | Modify the current 'MessageLog' to turn each @e@ item into a
--- --   'Report'.  Suitable for calling just prior to outputting messages
--- --   to the user.  Note that the result is statically guaranteed to
--- --   have only 'Report' values in the message log.
--- renderMessages :: (e -> Disco Void Report) -> Disco e a -> Disco e a
--- renderMessages render m = do
---   st  <- get
---   ctx <- ask
-
---   res <- io $ runDisco' (absurd <$> st) ctx m
-
---   case res of
---     Left x         -> throwError x
---     Right (a, st') -> do
-
---       -- In theory, since the report rendering is happening in the
---       -- Disco monad, it could alter the state, but any changes it
---       -- made would be wiped out when we call 'put' with the result.
---       -- In practice, however, the only reason the report rendering is
---       -- in the Disco monad at all is to be able to take advantage of
---       -- fresh name generation for pretty-printing, so this shouldn't
---       -- be a problem.
---       put =<< (messageLog . traverse . messageBody) renderBody st'
-
---       return a
---   where
---     -- renderBody :: Report e -> DiscoM Void x (Report Void)
---     renderBody (Item e) = Msg <$> render e
---     renderBody (Msg  r) = return (Msg r)
-
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and return it as @Left@.  For a version which also adds a
 --   rendered version of the error to the message log, see
 --   'catchMessage'.  The resulting computation is statically
 --   guaranteed to throw no exceptions.
-catchEither  :: Disco e a -> Disco Void (Either e a)
+catchEither  :: Disco e a -> Disco void (Either e a)
 catchEither m = unsafeCoerce $ (Right <$> m) `catchError` (return . Left)
 
 -- XXX

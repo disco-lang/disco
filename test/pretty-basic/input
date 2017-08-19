@@ -1,0 +1,3 @@
+:type (l : List N) -> {? x when l is (x::_), 5 otherwise ?}
+:type let x = 3, y = 6, g = 2, f = 9, q = 22, a = 121345678790, ll = [1,2,3,4,5,6,7,8,9,10] in x+y+g+f+q+a
+:type (x:N) -> [2x + 3x^2 + 19, 44x^4 - 33x^3 + 22x^2 - 11x + 5, 169 * sqrt x + x*x*x, 59x^59 + x - x + x - x + x]

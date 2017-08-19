@@ -255,11 +255,11 @@ prettyBranch br = lunbind br $ \(gs,t) ->
 prettyGuards :: Telescope Guard -> Doc
 prettyGuards TelEmpty              = text "otherwise"
 prettyGuards (fromTelescope -> gs) = sep (map prettyGuard gs)
---  = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
-prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
+prettyGuard (GPat et p) = hsep
+  [ text "when", prettyTerm (unembed et), text "is", prettyPattern p ]
 
 prettyQuals :: Telescope Qual -> Doc
 prettyQuals (fromTelescope -> qs) = do
@@ -273,23 +273,20 @@ prettyQual (QGuard (unembed -> t))
   = prettyTerm' 0 InL t
 
 prettyPattern :: Pattern -> Doc
-prettyPattern (PVar x) = prettyName x
-prettyPattern PWild = text "_"
-prettyPattern PUnit = text "()"
-prettyPattern (PBool b) = text $ map toLower $ show b
-prettyPattern (PTup ts) = do
+prettyPattern (PVar x)      = prettyName x
+prettyPattern PWild         = text "_"
+prettyPattern PUnit         = text "()"
+prettyPattern (PBool b)     = text $ map toLower $ show b
+prettyPattern (PTup ts)     = do
   ds <- punctuate (text ",") (map prettyPattern ts)
   parens (hsep ds)
-prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
-prettyPattern (PNat n) = integer n
-prettyPattern (PSucc p) = text "S" <+> prettyPattern p
-prettyPattern (PCons {}) = error "prettyPattern PCons unimplemented"
-prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
-
-------------------------------------------------------------
-
--- prettyModule :: Module -> Doc
--- prettyModule = foldr ($+$) empty . map prettyDecl
+prettyPattern (PInj s p)    = prettySide s <+> prettyPattern p
+prettyPattern (PNat n)      = integer n
+prettyPattern (PSucc p)     = text "S" <+> prettyPattern p
+prettyPattern (PCons p1 p2) = prettyPattern p1 <+> text "::" <+> prettyPattern p2
+prettyPattern (PList ps)    = do
+  ds <- punctuate (text ",") (map prettyPattern ps)
+  brackets (hsep ds)
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
@@ -309,9 +306,6 @@ prettyProperty prop =
       text "∀" <+> hsep dvars <> text "." <+> prettyTerm t
   where
     prettyTyBind (x,ty) = hsep [prettyName x, text ":", prettyTy ty]
-
-
-------------------------------------------------------------
 
 ------------------------------------------------------------
 -- Pretty-printing values

@@ -175,7 +175,7 @@ prettyTerm (TList ts e)  = do
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  brackets (hsep (ds ++ pe))
+  brackets (sep (ds ++ pe))
 prettyTerm (TListComp bqst) =
   lunbind bqst $ \(qs,t) ->
   brackets (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
@@ -202,11 +202,9 @@ prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
 prettyTerm (TLet bnd) = mparens initPA $
   lunbind bnd $ \(bs, t2) -> do
     ds <- punctuate (text ",") (map prettyBinding (fromTelescope bs))
-    hsep
-      [ text "let"
-      , hsep ds
-      , text "in"
-      , prettyTerm' 0 InL t2
+    sep
+      [ hang (text "let") 4 (sep ds)
+      , hang (text "in") 4 (prettyTerm' 0 InL t2)
       ]
   where
     prettyBinding :: Binding -> Doc

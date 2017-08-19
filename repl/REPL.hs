@@ -13,6 +13,7 @@ import           Data.List                        (find, isPrefixOf)
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (isJust)
+import           Data.Void
 
 import qualified Options.Applicative              as O
 import           System.Console.Haskeline         as H
@@ -35,20 +36,35 @@ import           Disco.Property
 import           Disco.Typecheck
 import           Disco.Types
 
+-- XXX most of the stuff in here should be moved to libraries under
+-- src/Disco/REPL/...
+
 ------------------------------------------------------------
--- Errors
+-- Top-level errors
 ------------------------------------------------------------
 
--- XXX comment
+-- | This type simply allows embedding all the different errors we can
+--   get from various phases of the implementation into a single
+--   top-level error type for the REPL.
 data Err
-  = IErr_  IErr
-  | StrErr String
+  = InterpErr  IErr                            -- ^ Runtime interpreter error
+  | ParseErr   String (ParseError Char Void)   -- ^ String that was being parsed + error
+  | RawErr     String                          -- ^ A simple string error message
+  | RawReport  Report                          -- ^ A structured error message
   deriving Show
 
 -- XXX improve me
 renderErr :: Err -> Disco void Report
-renderErr (IErr_ e)  = return . RTxt $ show e
-renderErr (StrErr s) = return . RTxt $ s
+renderErr (InterpErr e)  = return . RTxt $ show e
+renderErr (ParseErr s e) = return . RTxt $ parseErrorPretty' s e
+renderErr (RawErr s)     = return . RTxt $ s
+renderErr (RawReport r)  = return r
+
+-- XXX comment
+outputMessages :: Disco Err () -> Disco void ()
+outputMessages m = do
+  _ <- catchMessage renderErr $ m
+  printAndClearMessages
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -104,12 +120,17 @@ lineParser
 parseLine :: String -> Disco Err REPLExpr
 parseLine s =
   case (runParser lineParser "" s) of
-    Left  e  -> throwError (StrErr $ parseErrorPretty' s e)
+    Left  e  -> throwError $ ParseErr s e
     Right l  -> return l
 
-handleCMD :: String -> Disco void ()
-handleCMD "" = return ()
-handleCMD s = outputMessages $ parseLine >=> handleLine $ s
+------------------------------------------------------------
+-- REPL command handlers
+------------------------------------------------------------
+
+-- XXX
+handleCommand :: String -> Disco void ()
+handleCommand "" = return ()
+handleCommand s = outputMessages $ parseLine >=> handleLine $ s
 
   where
     handleLine :: REPLExpr -> Disco Err ()
@@ -121,17 +142,17 @@ handleCMD s = outputMessages $ parseLine >=> handleLine $ s
     handleLine (Parse t)     = iprint $ t
     handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
     handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
-    handleLine (Load file)   = handleLoad file
-                             >> return ()  -- don't care if tests failed
+    handleLine (Load file)   = handleLoad file >> return ()
+           -- handleLoad returns a Bool to indicate success or failure
+           -- of any test properties, but we don't care here.  Test
+           -- failure messages will be printed, and the file will
+           -- still load.
+
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
 
-outputMessages :: Disco Err () -> Disco void ()
-outputMessages m = do
-  _ <- catchMessage renderErr $ m
-  printAndClearMessages
-
+-- XXX this doesn't work at the moment!  It never parses.
 handleLet :: Name Term -> Term -> Disco void ()
 handleLet x t = do
   ctx <- use topCtx
@@ -141,6 +162,24 @@ handleLet x t = do
     Right (at, _) -> do
       topCtx   %= M.insert x (getType at)
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
+
+handleTypeCheck :: Term -> Disco Err String
+handleTypeCheck t = do
+  ctx <- use topCtx
+  case (evalTCM $ extends ctx (infer t)) of
+    Left e   -> return.show $ e    -- XXX pretty-print
+    Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
+
+evalTerm :: Term -> Disco Err ()
+evalTerm t = do
+  ctx   <- use topCtx
+  case evalTCM (extends ctx $ infer t) of
+    Left e   -> iprint e    -- XXX pretty-print
+    Right at ->
+      let ty = getType at
+          c  = runDSM $ desugarTerm at
+      in  injectErrors InterpErr $
+            (withTopEnv $ mkThunk c) >>= prettyValue ty
 
 handleShowDefn :: Name Term -> Disco void String
 handleShowDefn x = do
@@ -171,19 +210,37 @@ handleLoad file = do
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
-    Left e   -> throwError (StrErr (parseErrorPretty' str e))
+    Left e   -> throwError $ ParseErr str e
     Right p  ->
       case runTCM (checkModule p) of
-        Left tcErr         -> throwError (StrErr (show tcErr))
+        Left tcErr         -> throwError (RawErr (show tcErr))
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           topDocs  .= docMap
           topCtx   .= ctx
           loadDefs cdefns
 
-          t <- injectErrors IErr_ $ withTopEnv $ runAllTests aprops
+          t <- injectErrors InterpErr $ withTopEnv $ runAllTests aprops
           io . putStrLn $ "Loaded."
           return t
+
+-- XXX comment
+handleDocs :: Name Term -> Disco Err ()
+handleDocs x = do
+  ctx  <- use topCtx
+  docs <- use topDocs
+  case M.lookup x ctx of
+    Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
+    Just ty -> do
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyTy ty]
+      io . putStrLn $ p
+      case M.lookup x docs of
+        Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
+        _ -> return ()
+
+------------------------------------------------------------
+-- Running tests
+------------------------------------------------------------
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
@@ -252,39 +309,9 @@ prettyCounterexample ctx env
       iputStr " = "
       prettyValue (ctx ! coerce x) v
 
-handleDocs :: Name Term -> Disco Err ()
-handleDocs x = do
-  ctx  <- use topCtx
-  docs <- use topDocs
-  case M.lookup x ctx of
-    Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
-    Just ty -> do
-      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyTy ty]
-      io . putStrLn $ p
-      case M.lookup x docs of
-        Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
-        _ -> return ()
-
-evalTerm :: Term -> Disco Err ()
-evalTerm t = do
-  ctx   <- use topCtx
-  case evalTCM (extends ctx $ infer t) of
-    Left e   -> iprint e    -- XXX pretty-print
-    Right at ->
-      let ty = getType at
-          c  = runDSM $ desugarTerm at
-      in  injectErrors IErr_ $
-            (withTopEnv $ mkThunk c) >>= prettyValue ty
-
-handleTypeCheck :: Term -> Disco Err String
-handleTypeCheck t = do
-  ctx <- use topCtx
-  case (evalTCM $ extends ctx (infer t)) of
-    Left e   -> return.show $ e    -- XXX pretty-print
-    Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
-
-banner :: String
-banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
+------------------------------------------------------------
+-- Command-line options
+------------------------------------------------------------
 
 data DiscoOpts = DiscoOpts
   { evaluate  :: Maybe String
@@ -313,6 +340,7 @@ discoOpts = DiscoOpts
   <*> optional (
         O.strOption (mconcat
           [ O.long "check"
+          , O.short 'c'
           , O.help "check a file without starting the interactive REPL"
           , O.metavar "FILE"
           ])
@@ -321,9 +349,16 @@ discoOpts = DiscoOpts
 discoInfo :: O.ParserInfo DiscoOpts
 discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   [ O.fullDesc
-  , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
+  , O.progDesc "Command-line interface for Disco, a functional programming language for discrete mathematics."
   , O.header "disco v0.1"
   ]
+
+------------------------------------------------------------
+-- Main
+------------------------------------------------------------
+
+banner :: String
+banner = "Welcome to Disco!\n\nA functional programming language for discrete mathematics.\n\n"
 
 main :: IO ()
 main = do
@@ -334,8 +369,17 @@ main = do
             { historyFile = Just ".disco_history" }
   when (not batch) $ putStr banner
 
-  -- Note this returns a result of  (Either void ()), so it must be a Right ()
   void $ runDisco $ do
+    -- Note runDisco here returns a result of (Either void ()), so it
+    -- must be Right (), so we can throw it away.
+
+    -- At this point we have to pick the right mode based on the
+    -- command-line flags:
+
+    -- 1. Are we checking a file, i.e. making sure it loads with no
+    -- type errors and all tests pass?  If so, load it, but then exit
+    -- without starting the REPL, and with an exit code depending on
+    -- the load results.
     case checkFile opts of
       Just file -> do
         res <- catchMessage renderErr $ handleLoad file
@@ -345,17 +389,22 @@ main = do
           _          -> exitFailure
 
       Nothing   -> return ()
+
+    -- 2. Are we executing a file as a sequence of REPL commands?
     case cmdFile opts of
       Just file -> do
         mcmds <- loadFile file
         case mcmds of
           Nothing -> return ()
-          Just cmds -> mapM_ handleCMD (lines cmds)
+          Just cmds -> mapM_ handleCommand (lines cmds)
       Nothing   -> return ()
+
+    -- Are we evaluating a single expression/command?
     case evaluate opts of
-      Just str -> handleCMD str
+      Just str -> handleCommand str
       Nothing  -> return ()
 
+    -- Otherwise, start the REPL.
     when (not batch) $ runInputT settings loop
 
   where
@@ -365,8 +414,12 @@ main = do
       io $ putStrLn (show e)
       act
 
+    -- Resume after a Ctrl-C interrupt; so Ctrl-C only stops
+    -- evaluation of the current expression and drops us back to the
+    -- disco prompt, rather than killing the whole process.
     withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
 
+    -- The REPL proper.
     loop :: InputT (Disco void) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
@@ -377,5 +430,5 @@ main = do
               liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> do
-              withCtrlC (return ()) $ (lift . handleCMD $ input)
+              withCtrlC (return ()) $ (lift . handleCommand $ input)
               loop

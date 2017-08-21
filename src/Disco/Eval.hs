@@ -310,24 +310,34 @@ makeLenses ''DiscoState
 -- Utilities
 ------------------------------------------------------------
 
+-- | A shorter synonym for 'liftIO'.  Used to lift an 'IO' computation
+--   into the 'Disco' monad (or other instances of 'MonadIO').
 io :: MonadIO m => IO a -> m a
 io i = liftIO i
 
+-- | A lifted version of 'putStrLn' that works in any 'MonadIO'
+--   instance (such as the 'Disco' monad).
 iputStrLn :: MonadIO m => String -> m ()
 iputStrLn = io . putStrLn
 
+-- | A lifted version of 'putStr' that works in any 'MonadIO'
+--   instance (such as the 'Disco' monad).
 iputStr :: MonadIO m => String -> m ()
 iputStr = io . putStr
 
+-- | A lifted version of 'print' that works in any 'MonadIO'
+--   instance (such as the 'Disco' monad).
 iprint :: (MonadIO m, Show a) => a -> m ()
 iprint = io . print
 
--- | Run a computation in the @Disco@ monad, starting in the empty
---   environment.
+-- | Run a computation in the @Disco@ monad, starting with a default
+--   initial state and an empty environment.
 runDisco :: Disco e a -> IO (Either e a)
 runDisco = (fmap . fmap) fst . runDisco' initDiscoState emptyCtx
 
--- XXX
+-- | Run a computation in the @Disco@ monad, starting in a given
+--   'DiscoState' and 'Env'.  Returns the final 'DiscoState' along
+--   with the result of the computation.
 runDisco' :: DiscoState -> Env -> Disco e a -> IO (Either e (a, DiscoState))
 runDisco' st ctx
   = runLFreshMT

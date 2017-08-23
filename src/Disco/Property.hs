@@ -79,9 +79,8 @@ testIsOK :: TestResult -> Bool
 testIsOK (TestOK {}) = True
 testIsOK _           = False
 
--- XXX do shrinking for randomly generated test cases
 
--- XXX don't reload defs every time?
+-- XXX do shrinking for randomly generated test cases
 
 -- | @runTest n defs prop@ test property @prop@, using at most @n@
 --   randomly generated inputs.

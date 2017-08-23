@@ -23,6 +23,9 @@ module Disco.MessageLog
     -- $msgR
   , infoR, warningR, errR, panicR, debugR
 
+    -- * Buffering
+  , disableMessageBuffering
+
     -- * Turning exceptions into messages
   , catchMessage
 
@@ -45,10 +48,18 @@ import           Disco.Eval
 import           Disco.Pretty
 import           Disco.Typecheck (erase)
 
--- | Emit a message of the given severity level, by appending it to
---   the message log.
+-- | Emit a message of the given severity level, either by appending
+--   it to the message log, or immediately outputting it, depending on
+--   the current 'bufferMessages' setting.
 emitMessage :: MessageLevel -> Report -> Disco e ()
-emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
+emitMessage lev body = do
+  let msg = Message lev body
+  buf <- use bufferMessages
+  case buf of
+    True  -> messageLog <>= Seq.singleton msg
+    False -> do
+      d <- renderDoc $ formatMessage msg
+      iputStrLn d
 
 -- $msg
 -- Convenient functions for generating a message of a given
@@ -71,6 +82,16 @@ warningR = emitMessage Warning
 errR     = emitMessage Error
 panicR   = emitMessage Panic
 debugR   = emitMessage Debug
+
+-- | Locally disable message buffering within the given @Disco@
+--   computation.
+disableMessageBuffering :: Disco e a -> Disco e a
+disableMessageBuffering m = do
+  b <- use bufferMessages
+  bufferMessages .= False
+  a <- m
+  bufferMessages .= b
+  return a
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and turn it into an error message using the given rendering

@@ -39,7 +39,8 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, messageLog
+       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc
+       , messageLog, curIndent, bufferMessages
 
          -- * Disco monad
 
@@ -243,6 +244,16 @@ data DiscoState = DiscoState
 
   , _messageLog :: MessageLog
     -- ^ A log of emitted messages (errors, warnings, etc.)
+
+  , _curIndent  :: Int
+    -- ^ Current indent level.  Any emitted messages will have this
+    --   much indentation added.  Measured in *levels*, not spaces.
+
+  , _bufferMessages :: Bool
+    -- ^ Should messages be buffered?  If True (the default), emitted
+    --   messages are simply added to the message log to be processed
+    --   later.  If False, emitted messages never go in the message
+    --   log, but are formatted and output immediately.
   }
   deriving Show
 
@@ -256,6 +267,8 @@ initDiscoState = DiscoState
   , _memory     = IntMap.empty
   , _nextLoc    = 0
   , _messageLog = emptyMessageLog
+  , _curIndent  = 0
+  , _bufferMessages = True
   }
 
 ------------------------------------------------------------

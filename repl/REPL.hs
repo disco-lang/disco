@@ -208,7 +208,7 @@ fileNotFound file _ = putStrLn $ "File not found: " ++ file
 -- need to know that tests failed so we can fail if in --check mode.
 handleLoad :: FilePath -> Disco Err Bool
 handleLoad file = do
-  info $ "Loading " ++ file ++ "..."
+  disableMessageBuffering $ info $ "Loading " ++ file ++ "..."
   str <- io $ readFile file
   let mp = runParser wholeModule file str
   case mp of
@@ -253,7 +253,7 @@ handleDocs x = do
 runAllTests :: Ctx ATerm [AProperty] -> Disco IErr Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
   | M.null aprops = return True
-  | otherwise     = do
+  | otherwise     = disableMessageBuffering $ do
       info $ "Running tests..."
       and <$> mapM (uncurry runTests) (M.assocs aprops)
       -- XXX eventually this should be moved into Disco.Property and

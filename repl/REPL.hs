@@ -176,7 +176,7 @@ evalTerm :: Term -> Disco Err ()
 evalTerm t = do
   ctx   <- use topCtx
   case evalTCM (extends ctx $ infer t) of
-    Left e   -> iprint e    -- XXX pretty-print
+    Left e   -> iprint e    -- XXX change TCM to run on top of Disco, and use catchMessage
     Right at ->
       let ty = getType at
           c  = runDSM $ desugarTerm at

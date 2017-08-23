@@ -6,17 +6,27 @@
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  byorgey@gmail.com
 --
--- XXX
+-- Utilities for dealing with the message log stored by the 'Disco'
+-- monad.
 --
 -----------------------------------------------------------------------------
 
 module Disco.MessageLog
   (
-    emitMessage, info, warning, err, panic, debug
+    -- * Generating messages
+
+    emitMessage
+
+    -- $msg
+  , info, warning, err, panic, debug
+
+    -- $msgR
   , infoR, warningR, errR, panicR, debugR
 
+    -- * Turning exceptions into messages
   , catchMessage
 
+    -- * Formatting messages
   , printAndClearMessages, printMessages
   , formatMessages, formatMessage
   ) where
@@ -35,10 +45,14 @@ import           Disco.Eval
 import           Disco.Pretty
 import           Disco.Typecheck (erase)
 
--- XXX comment everything!
-
+-- | Emit a message of the given severity level, by appending it to
+--   the message log.
 emitMessage :: MessageLevel -> Report -> Disco e ()
 emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
+
+-- $msg
+-- Convenient functions for generating a message of a given
+-- severity level from a single @String@.
 
 info, warning, err, panic, debug :: String -> Disco e ()
 info     = infoR    . RTxt
@@ -46,6 +60,10 @@ warning  = warningR . RTxt
 err      = errR     . RTxt
 panic    = panicR   . RTxt
 debug    = debugR   . RTxt
+
+-- $msgR
+-- Convenient functions for generating a message of a given
+-- severity level from a 'Report'.
 
 infoR, warningR, errR, panicR, debugR :: Report -> Disco e ()
 infoR    = emitMessage Info
@@ -66,12 +84,18 @@ catchMessage render m = do
 
   return res
 
+-- | Print all the messages in the message log to the console, and
+--   also delete them from the log.  Hence this action is idempotent,
+--   i.e. @printAndClearMessages >> printAndClearMessages =
+--   printAndClearMessages@.
 printAndClearMessages :: Disco void ()
 printAndClearMessages = do
   printMessages
   messageLog .= Seq.empty
 
--- XXX
+-- | Print all the messages in the message log to the console, but do
+--   not remove them from the message log.  Hence calling this twice
+--   will print all the messages twice.
 printMessages :: Disco void ()
 printMessages = do
   msgs <- use messageLog
@@ -80,9 +104,11 @@ printMessages = do
     s    <- renderDoc f
     iputStrLn s
 
+-- | Pretty-print a list of messages.
 formatMessages :: [Message] -> Doc
 formatMessages = vcat . map formatMessage
 
+-- | Pretty-print a single message.
 formatMessage :: Message -> Doc
 formatMessage (Message lvl (RTxt s)) = text (formatLevel lvl <:> s)
   where
@@ -90,6 +116,7 @@ formatMessage (Message lvl (RTxt s)) = text (formatLevel lvl <:> s)
     (<:>) lbl = ((lbl ++ ": ") ++)
 formatMessage (Message _ rpt) = formatReport rpt
 
+-- | Pretty-print a @MessageLevel@.
 formatLevel :: MessageLevel -> String
 formatLevel Info    = ""
 formatLevel Warning = "Warning"
@@ -97,6 +124,10 @@ formatLevel Error   = "Error"
 formatLevel Panic   = "Panic!"
 formatLevel Debug   = "DEBUG"
 
+
+-- XXX take the current indent level into account, once it is added.
+
+-- | Pretty-print a 'Report'.
 formatReport :: Report -> Doc
 formatReport (RTxt s)            = text s
 formatReport (RName (AnyName x)) = prettyName $ coerce x

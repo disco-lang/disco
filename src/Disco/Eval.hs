@@ -357,7 +357,11 @@ runDisco' st ctx
 catchEither  :: Disco e a -> Disco void (Either e a)
 catchEither m = unsafeCoerce $ (Right <$> m) `catchError` (return . Left)
 
--- XXX
+-- | Turn exceptions of type @e1@ into exceptions of type @e2@.  This
+--   is primarily intended to be used for injecting errors of type
+--   @e1@ from some subsystem (typechecking, parsing, etc.) into a
+--   bigger type @e2@ which can contain embedded errors of type @e1@
+--   (and probably others as well).
 injectErrors :: (e1 -> e2) -> Disco e1 a -> Disco e2 a
 injectErrors inj m = do
   st  <- get
@@ -371,8 +375,10 @@ injectErrors inj m = do
   put st'
   return a
 
--- XXX
-noErrors :: Disco Void a -> Disco void a
+-- | If a computation is statically guaranteed to throw no errors,
+--   then we can treat it as a computation which throws any type of
+--   errors we like.
+noErrors :: Disco Void a -> Disco e a
 noErrors = injectErrors absurd
 
 ------------------------------------------------------------

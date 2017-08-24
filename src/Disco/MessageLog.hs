@@ -23,8 +23,9 @@ module Disco.MessageLog
     -- $msgR
   , infoR, warningR, errR, panicR, debugR
 
-    -- * Buffering
+    -- * Buffering and indenting
   , disableMessageBuffering
+  , indentMessages
 
     -- * Turning exceptions into messages
   , catchMessage
@@ -34,7 +35,7 @@ module Disco.MessageLog
   , formatMessages, formatMessage
   ) where
 
-import           Control.Lens  (use, (.=), (<>=))
+import           Control.Lens  (use, (.=), (<>=), (+=), (-=))
 import           Control.Monad ((>=>), when)
 import           Data.Coerce   (coerce)
 import qualified Data.Foldable as F
@@ -50,16 +51,23 @@ import           Disco.Typecheck (erase)
 
 -- | Emit a message of the given severity level, either by appending
 --   it to the message log, or immediately outputting it, depending on
---   the current 'bufferMessages' setting.
+--   the current 'bufferMessages' setting.  The message is indented by
+--   the current indent level.
 emitMessage :: MessageLevel -> Report -> Disco e ()
 emitMessage lev body = do
-  let msg = Message lev body
+  i <- use curIndent
+  let msg = Message lev (indentReport i body)
+
   buf <- use bufferMessages
   case buf of
     True  -> messageLog <>= Seq.singleton msg
     False -> do
       d <- renderDoc $ formatMessage msg
       iputStrLn d
+
+  where
+    indentReport 0 = id
+    indentReport n = RSub . indentReport (n-1)
 
 -- $msg
 -- Convenient functions for generating a message of a given
@@ -91,6 +99,15 @@ disableMessageBuffering m = do
   bufferMessages .= False
   a <- m
   bufferMessages .= b
+  return a
+
+-- | Run the given @Disco@ computation, locally indenting any messages
+--   it generates by one more level.
+indentMessages :: Disco e a -> Disco e a
+indentMessages m = do
+  curIndent += 1
+  a <- m
+  curIndent -= 1
   return a
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it

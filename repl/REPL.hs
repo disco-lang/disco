@@ -264,16 +264,26 @@ runAllTests aprops
     numSamples = 50   -- XXX make this configurable somehow
 
     runTests :: Name ATerm -> [AProperty] -> Disco IErr Bool
-    runTests n props = do
-      iputStr ("  " ++ name2String n ++ ":")
+    runTests n props = indentMessages $ do
       results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples) props
       let failures = filter (not . testIsOK . snd) results
       case null failures of
-        True  -> iputStrLn " OK"
+        True  -> infoR $ RSeq [rName n, RTxt ": OK"]
         False -> do
-          iputStrLn ""
+          infoR $ RSeq [rName n, RTxt ":"]
           forM_ failures (uncurry prettyTestFailure)
       return (null failures)
+
+     -- XXX Still figuring out how to report and format test results
+     -- in the right way.  Something with collapsible messages?  In
+     -- general we do want to support reports with interactively
+     -- explorable levels of detail.  Maybe sub-reports can be somehow
+     -- marked as "collapsed" or "expanded"?  Then instead of deleting
+     -- messages we just put them in some structure so we know they
+     -- have been dealt with but can still be referred to by the user.
+     -- Then some sort of mechanism for expanding/re-showing certain
+     -- messages.
+
 
 -- XXX redo with message framework, with proper support for indentation etc.
 -- XXX also move it to Property or Pretty or somewhere like that

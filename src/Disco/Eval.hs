@@ -59,14 +59,12 @@ module Disco.Eval
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), (.=),
-                                                     (<>=), makeLenses, use)
+import           Control.Lens                       ((<+=), (%=), makeLenses, use)
 import           Control.Monad.Trans.Except
-import           Control.Monad.Except               (catchError, throwError)
+import           Control.Monad.Except               (catchError)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.State.Strict
 import           Data.Bifunctor                     (bimap)
-import qualified Data.Foldable                      as F
 import           Data.IntMap.Lazy                   (IntMap)
 import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.Void

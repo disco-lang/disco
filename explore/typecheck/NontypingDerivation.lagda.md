@@ -1,4 +1,37 @@
-module Typecheck where
+Recently I've been thinking about how to generate good error messages
+(in the context of developing a
+[functional teaching language for discrete mathematics](https://github.com/disco-lang/disco)).
+I have a lot of thoughts on the topic, but wanted to share a cute way
+to think about one aspect of the problem.  I make no claims as to its
+originality---indeed, as I will point out later, I have found several
+publications containing similar ideas, and it may be well-known
+folklore in certain circles.  But I had never seen it written down in
+quite this explicit form.
+
+Here is the situation: we have some term $t$, and we are trying to
+infer or check its type.  If this succeeds, it is well-established
+practice to return not just a type, or
+([God forbid](https://existentialtype.wordpress.com/2011/03/15/boolean-blindness/))
+a Boolean, but rather to return the AST of the term where every
+subterm has been decorated with its type.  What this really amounts
+to---and a better way to think about it---is that we return a *typing
+derivation* constituting a proof that the given term has a certain
+type.  Since the structure of typing derivations usually closely
+mirrors the structure of the terms being typed, we can easily convert
+back and forth between an annotated AST and a typing derivation.
+
+Now, what if type checking goes wrong?  In this case we need to return
+some kind of error.  We are *not* content to have a simple, opaque
+error like `Couldn't match type Int with type Fizz -> Buzz`, generated
+from somewhere deep in the bowels of the type checker.  We'd like to
+include more information to help the user figure out what the problem
+is.  So where do we get this information, and what information do we
+include?
+
+
+
+```
+module nontyping-derivation where
 
 open import Relation.Binary.PropositionalEquality
 
@@ -291,3 +324,4 @@ check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj�
 ¬⊢-⊬ {_} {Γ} {t} {τ} ¬Γ⊢t∶τ with check Γ t τ
 ¬⊢-⊬ ¬Γ⊢t∶τ | inj₁ Γ⊢t∶τ = ⊥-elim (¬Γ⊢t∶τ Γ⊢t∶τ)
 ¬⊢-⊬ ¬Γ⊢t∶τ | inj₂ Γ⊬t∶τ = Γ⊬t∶τ
+```

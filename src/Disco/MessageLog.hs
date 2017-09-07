@@ -162,9 +162,6 @@ formatLevel Error   = "Error"
 formatLevel Panic   = "Panic!"
 formatLevel Debug   = "DEBUG"
 
-
--- XXX take the current indent level into account, once it is added.
-
 -- | Pretty-print a 'Report'.
 formatReport :: Report -> Doc
 formatReport (RTxt s)            = text s

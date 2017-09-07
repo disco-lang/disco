@@ -291,7 +291,7 @@ prettyTestFailure :: AProperty -> TestResult -> Disco IErr ()
 prettyTestFailure _ (TestOK {}) = return ()
 prettyTestFailure prop (TestFalse env) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStr "  - Test is false: " >> iputStrLn dp
+  infoR (RSeq [RTxt "- Test is false: ", RTxt dp])
   let qTys = M.fromList . fst . unsafeUnbind $ prop
   prettyCounterexample qTys env
 prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do

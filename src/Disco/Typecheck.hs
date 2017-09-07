@@ -931,8 +931,12 @@ checkPattern (PTup ps) ty                   =
   joinCtxs <$> checkTuplePat ps ty
 checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
 checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
-checkPattern (PNat _)   ty | isSub TyN ty   = ok
-  -- we can match any supertype of TyN against a Nat pattern
+
+-- we can match any supertype of TyN against a Nat pattern, OR
+-- any TyFin.
+checkPattern (PNat _) ty | isSub TyN ty = ok
+checkPattern (PNat _) (TyFin _)         = ok
+
 checkPattern (PSucc p)  TyN                 = checkPattern p TyN
 checkPattern (PCons p1 p2) (TyList ty)      =
   joinCtx <$> checkPattern p1 ty <*> checkPattern p2 (TyList ty)

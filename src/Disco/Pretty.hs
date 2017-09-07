@@ -336,8 +336,8 @@ prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (TySum ty1 ty2) (VCons i [v])
   = case i of
-      0 -> out "left "  >> prettyWHNF out ty1 v
-      1 -> out "right " >> prettyWHNF out ty2 v
+      0 -> out "left "  >> prettyValueWith out ty1 v
+      1 -> out "right " >> prettyValueWith out ty2 v
       _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyWHNF"
 prettyWHNF out _ (VNum d r)
   | denominator r == 1 = out $ show (numerator r)
@@ -347,8 +347,8 @@ prettyWHNF out _ (VNum d r)
 
 prettyWHNF out _ (VFun _) = out "<function>"
 
-prettyWHNF _ _ _ = error "Impossible! No matching case in prettyValue"
-
+prettyWHNF _ ty v = error $
+  "Impossible! No matching case in prettyValue for " ++ show v ++ ": " ++ show ty
 
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()

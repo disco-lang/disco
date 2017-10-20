@@ -26,14 +26,13 @@ import           Data.Ratio
 import           Data.Void
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind,
-                                                   unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
 
-import           Disco.Interpret.Core             (whnfV)
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Syntax.Operators
 import           Disco.Eval
+import           Disco.Interpret.Core             (whnfV)
+import           Disco.Syntax.Operators
 import           Disco.Types
 
 --------------------------------------------------
@@ -312,8 +311,9 @@ prettyProperty prop =
 ------------------------------------------------------------
 
 -- | Pretty-printing of values, with output interleaved lazily with
---   evaluation.  This version actually prints the values on the console, followed
---   by a newline.  For a more general version, see 'prettyValueWith'.
+--   evaluation.  This version actually prints the values on the
+--   console, followed by a newline.  For a more general version, see
+--   'prettyValueWith'.
 prettyValue :: Type -> Value -> Disco IErr ()
 prettyValue ty v = do
   prettyValueWith (\s -> iputStr s >> io (hFlush stdout)) ty v

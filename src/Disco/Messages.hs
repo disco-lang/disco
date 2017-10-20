@@ -16,16 +16,16 @@
 
 module Disco.Messages where
 
-import Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless
 
-import           Control.Lens (makeLenses)
-import           Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
-import           Data.Typeable (Typeable)
+import           Control.Lens                     (makeLenses)
+import           Data.Sequence                    (Seq)
+import qualified Data.Sequence                    as Seq
+import           Data.Typeable                    (Typeable)
 
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.AST.Core
+import           Disco.AST.Core
+import           Disco.AST.Surface
+import           Disco.AST.Typed
 
 data MessageLevel
   = Info
@@ -36,7 +36,8 @@ data MessageLevel
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 data Report
-  = RTxt   String
+  = REmpty
+  | RTxt   String
   | RName  AnyName
   | RTerm  Term
   | RPat   Pattern

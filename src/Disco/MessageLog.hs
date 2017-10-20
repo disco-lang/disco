@@ -35,19 +35,19 @@ module Disco.MessageLog
   , formatMessages, formatMessage
   ) where
 
-import           Control.Lens  (use, (.=), (<>=), (+=), (-=))
-import           Control.Monad ((>=>), when)
-import           Data.Coerce   (coerce)
-import qualified Data.Foldable as F
-import qualified Data.Sequence as Seq
+import           Control.Lens                     (use, (+=), (-=), (.=), (<>=))
+import           Control.Monad                    (when, (>=>))
+import           Data.Coerce                      (coerce)
+import qualified Data.Foldable                    as F
+import qualified Data.Sequence                    as Seq
 import           Data.Void
 
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.Messages
 import           Disco.Eval
+import           Disco.Messages
 import           Disco.Pretty
-import           Disco.Typecheck (erase)
+import           Disco.Typecheck                  (erase)
 
 -- | Emit a message of the given severity level, either by appending
 --   it to the message log, or immediately outputting it, depending on
@@ -164,6 +164,7 @@ formatLevel Debug   = "DEBUG"
 
 -- | Pretty-print a 'Report'.
 formatReport :: Report -> Doc
+formatReport REmpty              = empty
 formatReport (RTxt s)            = text s
 formatReport (RName (AnyName x)) = prettyName $ coerce x
 formatReport (RTerm t)           = prettyTerm t

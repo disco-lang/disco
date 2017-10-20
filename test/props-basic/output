@@ -2,5 +2,9 @@ Loading test/props-basic/props-basic.disco...
 Running tests...
   foo: OK
   reverse: OK
-  x: OK
+  x:
+  - Test is false: ∀ x : ℤ6 + Void × Void. {? false when x is left _,
+                           false otherwise ?}
+    Counterexample:
+      x = foo
 Loaded.

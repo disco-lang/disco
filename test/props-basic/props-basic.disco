@@ -67,7 +67,7 @@ plusIsoR n =
 !!! ∀ x : Z1000. x * (1000 : Z1000) = (0 : Z1000)
 
 !!! ∀ x : Void + N. {? true when x is right _, false otherwise ?}
-!!! ∀ x : Z6 + Void * Void. {? true when x is left _, false otherwise ?}
+!!! ∀ x : Z6 + Void * Void. {? false when x is left _, false otherwise ?}
 
 x : N
 x = 0

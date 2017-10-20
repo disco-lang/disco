@@ -1,25 +1,26 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (use, (%=), (.=))
-import           Control.Monad                    (when, forM_, void, (>=>))
-import           Control.Monad.Except             (throwError)
-import           Control.Monad.IO.Class           (MonadIO(..))
-import           Control.Monad.Trans.Class        (MonadTrans(..))
-import           Data.Char                        (isSpace)
+import           Control.Arrow                           ((&&&))
+import           Control.Lens                            (use, (%=), (.=))
+import           Control.Monad                           (forM_, void, when,
+                                                          (>=>))
+import           Control.Monad.Except                    (throwError)
+import           Control.Monad.IO.Class                  (MonadIO (..))
+import           Control.Monad.Trans.Class               (MonadTrans (..))
+import           Data.Char                               (isSpace)
 import           Data.Coerce
-import           Data.List                        (find, isPrefixOf)
-import           Data.Map                         ((!))
-import qualified Data.Map                         as M
-import           Data.Maybe                       (isJust)
+import           Data.List                               (find, isPrefixOf)
+import           Data.Map                                ((!))
+import qualified Data.Map                                as M
+import           Data.Maybe                              (isJust)
 import           Data.Void
 
-import qualified Options.Applicative              as O
-import           System.Console.Haskeline         as H
+import qualified Options.Applicative                     as O
+import           System.Console.Haskeline                as H
 import           System.Exit
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec.Char             as C
+import           Text.Megaparsec                         hiding (runParser)
+import qualified Text.Megaparsec.Char                    as C
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -28,9 +29,9 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
-import           Disco.Messages
+import           Disco.Interpret.Core                    (loadDefs)
 import           Disco.MessageLog
-import           Disco.Interpret.Core             (loadDefs)
+import           Disco.Messages
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
@@ -196,12 +197,11 @@ handleDesugar t = do
     Left e   -> return.show $ e
     Right at -> return.show.runDSM.desugarTerm $ at
 
--- XXX change to use a message instead of printing
-loadFile :: FilePath -> Disco void (Maybe String)
-loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
+loadFile :: FilePath -> Disco Err (Maybe String)
+loadFile file = handle (\e -> fileNotFound file e >> return Nothing) (Just <$> io (readFile file))
 
-fileNotFound :: FilePath -> IOException -> IO ()
-fileNotFound file _ = putStrLn $ "File not found: " ++ file
+fileNotFound :: FilePath -> IOException -> Disco Err ()
+fileNotFound file _ = err $ "File not found: " ++ file
 
 -- XXX comment.  Return a Bool since if tests fail we don't want to
 -- throw an exception, loading the file should still succeed; but we
@@ -291,13 +291,15 @@ prettyTestFailure :: AProperty -> TestResult -> Disco IErr ()
 prettyTestFailure _ (TestOK {}) = return ()
 prettyTestFailure prop (TestFalse env) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  infoR (RSeq [RTxt "- Test is false: ", RTxt dp])
   let qTys = M.fromList . fst . unsafeUnbind $ prop
-  prettyCounterexample qTys env
+  cex <- counterexampleReport qTys env
+  infoR $ RList
+    [ RSeq [RTxt "- Test is false: ", RTxt dp]
+    , RSub cex
+    ]
 prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do
-  iputStr     "  - Test result mismatch for: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStrLn dp
+  infoR (RSeq [RTxt "- Test result mismatch for: ", RTxt dp])
   iputStr     "    - Expected: " >> prettyValue ty v2
   iputStr     "    - But got:  " >> prettyValue ty v1
   let qTys = M.fromList . fst . unsafeUnbind $ prop
@@ -308,7 +310,40 @@ prettyTestFailure prop (TestRuntimeFailure e) = do
   iputStrLn dp
   iputStr     "    " >> iprint e
 
--- XXX comment, move somewhere else
+counterexampleReport :: Ctx ATerm Type -> Env -> Disco void Report
+counterexampleReport ctx env
+  | M.null env = return REmpty
+  | otherwise = do
+      let maxNameLen = maximum . map (length . name2String) $ M.keys env
+      bindReports <- mapM (bindingReport maxNameLen) $ M.assocs env
+      return $ RList
+        [ RTxt "Counterexample:"
+        , RSub $ RList bindReports
+        ]
+
+  where
+    bindingReport maxNameLen (x,v) = do
+      -- XXX need to pretty-print the value here, but somehow call it
+      -- with prettyValueWith and save the output in a mutable cell in
+      -- the Disco monad??
+
+      -- No, the idea is to return some kind of "promise" that we can
+      -- stick in the Report.  When we go to print out the report we
+      -- force it.
+
+      -- Stick the value itself in the report, pretty-print it when we
+      -- go to format/output the report.  This might require some
+      -- recursive modules??
+
+--      pv <- undefined (ctx ! coerce x) v
+      let pv = "foo"
+
+      return $ RSeq
+        [ rName x
+        , RTxt " = "
+        , RTxt pv
+        ]
+
 prettyCounterexample :: Ctx ATerm Type -> Env -> Disco IErr ()
 prettyCounterexample ctx env
   | M.null env = return ()

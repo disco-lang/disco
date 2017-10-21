@@ -46,3 +46,6 @@ nsf/.diagrams_cache
 
 docs/_build
 explore/sub2/.sub2_history
+
+*.cut
+pubs/OBT18/*.pdf

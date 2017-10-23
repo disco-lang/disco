@@ -1,3 +1,5 @@
+% -*- compile-command: "pdflatex explanation-oriented-types.tex" -*-
+
 %% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
 %\documentclass[sigplan,review,anonymous]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
 %% For double-blind review submission, w/ CCS and ACM Reference
@@ -90,15 +92,8 @@
 % \email{first2.last2@inst2b.org}         %% \email is recommended
 
 
-%% Abstract
-%% Note: \begin{abstract}...\end{abstract} environment must come
-%% before \maketitle command
-\begin{abstract}
-Text of abstract \ldots.
-\end{abstract}
-
 % %% Keywords
-\keywords{keyword1, keyword2, keyword3}
+% \keywords{keyword1, keyword2, keyword3}
 
 
 %% \maketitle
@@ -107,10 +102,27 @@ Text of abstract \ldots.
 %% environment and commands, and keywords command.
 \maketitle
 
+Every beginning student of programming---at least those with the ill
+fortune of having a language with a static type system foisted upon
+them by a well-intentioned yet sadistic instructor---is
+well-acquainted with the Dreaded Type Error Message:
 
-\section{Introduction}
+\begin{verbatim}
+foo bar
+\end{verbatim}
 
-Text of paper \ldots
+Why do type error messages have to be so terrifying?  Can't we do a
+better job explaining type errors to programmers?
+
+\section{It's the Interactivity, Stupid}
+
+Much work in this space has focused on one of two things: rephrasing
+error messages to use less technical jargon, and/or including more
+potentially helpful information such as contextual information or
+suggested fixes.  Rephrasing error messages 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 %% Acknowledgments
 \begin{acks}                            %% acks environment is optional
@@ -133,11 +145,5 @@ Text of paper \ldots
 %% Bibliography
 %\bibliography{bibfile}
 
-
-%% Appendix
-\appendix
-\section{Appendix}
-
-Text of appendix \ldots
 
 \end{document}

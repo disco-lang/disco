@@ -121,6 +121,16 @@ error messages to use less technical jargon, and/or including more
 potentially helpful information such as contextual information or
 suggested fixes.  Rephrasing error messages 
 
+When there is a valid type for some program, how do we explain it?  We all know the answer to this: a typing derivation can be seen as a detailed explanation/justification of why some term has some type.  Make type checking/inference return an entire derivation rather than just a type.
+
+When a program *doesn't* type check, how do we explain it?  I propose the answer should be: with an untyping derivation!  That is, a constructive proof/evidence for untypability.  We can extract information from this to show to the user, or (ideally) let them interactively explore it.
+
+How do we know what the right definition of untyping derivations is?  Simple: we know we've "gotten it right" when we can prove a metatheorem showing that there is an untyping derivation if and only if there is not a typing derivation (or maybe we only want one direction if the type system is sufficiently undecidable??).  At this point I can pull out a simple example I've coded up in Agda, with typing and untyping derivations for the STLC, plus a formal metatheorem relating them.  (In practice, I didn't get the definition of untyping proofs right the first time: I had to adjust it when my proof didn't go though!  A triumph for machine-checked formalism.)
+
+Something about history and natural deduction blah blah, the natural-deduction style proofs we use for typing derivations just so happen to correspond very nicely to the way humans want to reason/think about things, and all the thinking can be done "locally".  Unfortunately this seems to go out the window when we bring in things like unification, because it is inherently nonlocal.
+
+I have a few thoughts about ways to design systems with unification to make them more explainable.  One of the main thoughts is that using a union-find data structure is not just for speed---it's also much more explainable!  Humans don't want to think in terms of transitive chains of equalities or in terms of (shudder) substitutions.  If the name of a thing keeps changing during the course of an explanation, a human is going to get very confused.  Instead we can keep the names of things the same and just accumulate sets of names which are all equal.  I also have some thoughts on using "extensional" names instead of/in addition to fresh ones (e.g. using a name like "the argument type of f" instead of "a0" or whatever).
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 

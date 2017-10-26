@@ -1,0 +1,35 @@
+* Notes from skype call with Brent & Richard
+  Thursday Oct 26.
+
+  Ideas/future directions:
+
+  - Explore the idea of building untyping derivations by plugging
+    "primitive" untyping proofs into holes in typing derivations.
+    I.e. every proof of untypability is composed of a partial typing
+    derivation (for the part of the term that does typecheck) plus
+    untypability evidence for the places that go wrong?
+
+    Note, however, that untyping derivations can again include typing
+    derivations---i.e. type errors don't only occur at "leaves".  For
+    example we might have an application (t1 t2) where t1 and t2 are
+    perfectly well-typed, but their application is not (e.g. because
+    t1 is not a function type, or because t2 doesn't have the right
+    type to be an argument to t1).
+
+  - Can we generically go from an ADT for typing derivations to an ADT
+    for untyping derivations?  Apply "not" and then push it down via
+    DeMorgan??
+  - Perhaps an untyping derivation should encode *every* possible
+    reason that something is not typable?  I.e. it should tell you
+    precisely which things are typable and which are not.  cf. ⊕ rule
+    in the Agda code Brent wrote for STLC, which "short-circuits" when
+    checking a term that looks like an ⊕ against a type that is not
+    Nat.  Instead, perhaps it should record that fact *and* continue
+    trying to recursively typecheck the arguments, and ultimately tell
+    you exactly which ones succeeded and which failed.
+
+  - On the practical side, something to try will be to write code to
+    turn untyping derivations into error message trees which can be
+    interactively explored (e.g. output the trees as HTML with a bit
+    of javascript to collapse/expand, or just output as XML and use an
+    XML viewer...?)

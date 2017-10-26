@@ -119,7 +119,30 @@ better job explaining type errors to programmers?
 Much work in this space has focused on one of two things: rephrasing
 error messages to use less technical jargon, and/or including more
 potentially helpful information such as contextual information or
-suggested fixes.  Rephrasing error messages 
+suggested fixes.  Rephrasing error messages is well and good, but
+doesn't go nearly far enough in and of itself.  When an error message
+is generated from somewhere deep inside a typechecking algorithm,
+beginning programmers are liable to have no idea where it comes from
+no matter how nicely it is phrased.  The solution, it would seem, is
+to include more contextual information, suggestions, and the like, to
+help the programmer understand where the error comes from and what
+their options are.  This is a natural impulse, but can sometimes be
+counterproductive: beginning programmers are likely to be intimidated
+by a twenty-line error message, even if the only reason it is twenty
+lines long is because it is stuffed full of helpful information.
+
+XXX could put example here of ``helpful'' GHC error message, though
+that might just take up too much space
+
+The real problem is that we are stuck thinking of type checking in a
+terminal-based, batch processing mode.  If the programmer is allowed
+to explore error messages interactively, we can have the best of both
+worlds: they can be initially presented with a concise, easy-to-read
+message, and then 
+
+
+
+
 
 When there is a valid type for some program, how do we explain it?  We all know the answer to this: a typing derivation can be seen as a detailed explanation/justification of why some term has some type.  Make type checking/inference return an entire derivation rather than just a type.
 

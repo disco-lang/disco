@@ -1,4 +1,4 @@
-% -*- compile-command: "pdflatex explanation-oriented-types.tex" -*-
+% -*- compile-command: "pdflatex explaining-errors.tex" -*-
 
 %% For double-blind review submission, w/o CCS and ACM Reference (max submission space)
 %\documentclass[sigplan,review,anonymous]{acmart}\settopmatter{printfolios=true,printccs=false,printacmref=false}
@@ -45,17 +45,6 @@
 
 \title{Explaining Type Errors}
 
-
-%% Author information
-%% Contents and number of authors suppressed with 'anonymous'.
-%% Each author should be introduced by \author, followed by
-%% \authornote (optional), \orcid (optional), \affiliation, and
-%% \email.
-%% An author may have multiple affiliations and/or emails; repeat the
-%% appropriate command.
-%% Many elements are not rendered, but should be provided for metadata
-%% extraction tools.
-
 %% Author with single affiliation.
 \author{Brent A. Yorgey}
 \affiliation{
@@ -85,9 +74,9 @@
 %% environment and commands, and keywords command.
 \maketitle
 
-Every beginning student of programming---at least those with the ill
-fortune of having a language with a static type system foisted upon
-them by a well-intentioned yet sadistic instructor---is
+Every beginning student of programming---that is, every student with
+the ill fortune of having a language with a static type system foisted
+upon them by a well-intentioned yet sadistic instructor---is
 well-acquainted with the Dreaded Type Error Message:
 
 \begin{verbatim}
@@ -101,6 +90,25 @@ well-acquainted with the Dreaded Type Error Message:
 
 Why do type error messages have to be so terrifying?  Can't we do a
 better job explaining type errors to programmers?
+
+We propose two interrelated theses:
+\begin{enumerate}
+\item We ought to move away from static error ``messages'' and towards
+  interactive \emph{error explanations}.
+\item We ought to consider the problem of generating error
+  explanations in a more systematic, disciplined, and formal way.
+  Explaining errors to users shouldn't just be relegated to the status
+  of an ``engineering issue'', but ought to have all the tools of
+  programming language theory and practice applied to it.
+\end{enumerate}
+
+\section{An example}
+
+Consider a standard version of the simply typed lambda calculus, with
+typing annotations on lambda-bound variables.
+
+XXX show heart of typical 
+
 
 \section{It's the Interactivity, Stupid}
 

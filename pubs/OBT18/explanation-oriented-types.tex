@@ -43,7 +43,7 @@
 
 \begin{document}
 
-\title{Explanation-Oriented Type Systems}
+\title{Explaining Type Errors}
 
 
 %% Author information
@@ -63,34 +63,17 @@
 }
 \email{yorgey@hendrix.edu}
 
-% %% Author with two affiliations and emails.
-% \author{First2 Last2}
-% \authornote{with author2 note}          %% \authornote is optional;
-%                                         %% can be repeated if necessary
-% \orcid{nnnn-nnnn-nnnn-nnnn}             %% \orcid is optional
-% \affiliation{
-%   \position{Position2a}
-%   \department{Department2a}             %% \department is recommended
-%   \institution{Institution2a}           %% \institution is required
-%   \streetaddress{Street2a Address2a}
-%   \city{City2a}
-%   \state{State2a}
-%   \postcode{Post-Code2a}
-%   \country{Country2a}                   %% \country is recommended
-% }
-% \email{first2.last2@inst2a.com}         %% \email is recommended
-% \affiliation{
-%   \position{Position2b}
-%   \department{Department2b}             %% \department is recommended
-%   \institution{Institution2b}           %% \institution is required
-%   \streetaddress{Street3b Address2b}
-%   \city{City2b}
-%   \state{State2b}
-%   \postcode{Post-Code2b}
-%   \country{Country2b}                   %% \country is recommended
-% }
-% \email{first2.last2@inst2b.org}         %% \email is recommended
+\author{Richard A. Eisenberg}
+\affiliation{
+  \institution{Bryn Mawr College}
+}
+\email{rae@cs.brynmawr.edu}
 
+\author{Harley D. Eades III}
+\affiliation{
+  \institution{Augusta University}
+}
+\email{heades@augusta.edu}
 
 % %% Keywords
 % \keywords{keyword1, keyword2, keyword3}
@@ -108,7 +91,12 @@ them by a well-intentioned yet sadistic instructor---is
 well-acquainted with the Dreaded Type Error Message:
 
 \begin{verbatim}
-foo bar
+<interactive>:1:33: error:
+  Couldn't match expected type (t, b0) with actual type Int
+  In the first argument of fst, namely p
+    In the expression: fst p
+    In the first argument of \ f -> f (3 :: Int), namely
+      (\ p -> fst p)
 \end{verbatim}
 
 Why do type error messages have to be so terrifying?  Can't we do a

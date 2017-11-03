@@ -40,6 +40,8 @@
 \usepackage{subcaption} %% For complex figures with subfigures/subcaptions
                         %% http://ctan.org/pkg/subcaption
 
+\usepackage{mathpartir}
+
 
 \begin{document}
 
@@ -78,7 +80,6 @@ Every beginning student of programming---that is, every student with
 the ill fortune of having a language with a static type system foisted
 upon them by a well-intentioned yet sadistic instructor---is
 well-acquainted with the Dreaded Type Error Message:
-
 \begin{verbatim}
 <interactive>:1:33: error:
   Couldn't match expected type (t, b0) with actual type Int
@@ -87,7 +88,6 @@ well-acquainted with the Dreaded Type Error Message:
     In the first argument of \ f -> f (3 :: Int), namely
       (\ p -> fst p)
 \end{verbatim}
-
 Why do type error messages have to be so terrifying?  Can't we do a
 better job explaining type errors to programmers?
 
@@ -102,33 +102,85 @@ We propose two interrelated theses:
   programming language theory and practice applied to it.
 \end{enumerate}
 
-\section{An example}
+\section{The curse of information}
 
 Consider a standard version of the simply typed lambda calculus, with
-typing annotations on lambda-bound variables.
+some arbitrary set of base types $B$ and typing annotations on
+lambda-bound variables.
 
-XXX show heart of typical 
+\newcommand{\lam}[3]{\lambda {#1}\!:\!{#2}.\; {#3}}
+\newcommand{\app}[2]{{#1}\; {#2}}
 
+\newcommand{\ty}[3]{{#1} \vdash {#2} : {#3}}
 
-\section{It's the Interactivity, Stupid}
+\begin{align*}
+  t &::= x \mid \lam x \tau t \mid \app{t_1}{t_2} \\
+  \tau &::= B \mid \tau_1 \to \tau_2 \\
+  \Gamma &::= \cdot \mid \Gamma,x:\tau
+\end{align*}
 
-Much work in this space has focused on one of two things: rephrasing
-error messages to use less technical jargon, and/or including more
-potentially helpful information such as contextual information or
-suggested fixes.  Rephrasing error messages is well and good, but
-doesn't go nearly far enough in and of itself.  When an error message
-is generated from somewhere deep inside a typechecking algorithm,
-beginning programmers are liable to have no idea where it comes from
-no matter how nicely it is phrased.  The solution, it would seem, is
-to include more contextual information, suggestions, and the like, to
-help the programmer understand where the error comes from and what
-their options are.  This is a natural impulse, but can sometimes be
-counterproductive: beginning programmers are likely to be intimidated
-by a twenty-line error message, even if the only reason it is twenty
-lines long is because it is stuffed full of helpful information.
+\begin{mathpar}
+  \inferrule{x : \tau \in \Gamma}{\ty \Gamma x \tau} \and
+  \inferrule{\ty {\Gamma, x:\tau_1} t {\tau_2}}{\ty \Gamma {\lam x
+      {\tau_1} t}{\tau_2}} \and
+  \inferrule{\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\ \ty \Gamma {t_2} {\tau_1}}
+            {\ty \Gamma {\app{t_1}{t_2}} {\tau_2}}
+\end{mathpar}
 
-XXX could put example here of ``helpful'' GHC error message, though
-that might just take up too much space
+A typical implementation of a type checker for this language recurses
+through the structure of a term, adding bindings to the context as it
+recurses through lambdas, and checking that the types match up
+appropriately at each application.  If the types don't match, some
+sort of error message is generated:
+
+XXX snippet of pseudocode: if tau1 /= tau2, throw error message
+like ``mismatch, expected: ... actual: ...''
+
+Of course, this error message lacks any sort of context.  One problem
+is that it may be difficult for the programmer to even figure out
+which part of their program the error corresponds to, especially if
+the mismatch happened deep inside a large term. This problem is not
+too hard to solve, by retaining information about the source code
+locations of terms and with appropriate editor support for
+highlighting the locations of reported error messages.
+
+However, a deeper problem is that even if the programmer knows
+\emph{where} in their program the error message came from, they may
+not understand \emph{why} the error is an error: for example, where
+did the two types in question come from, and why does the type checker
+think they ought to be equal?
+
+At this point, a natural reaction to this problem is to add more
+information to the error message: information about the context, XXX
+However, this is very likely to be unhelpful in the long run, for
+several reasons:
+
+\begin{itemize}
+\item There is a very large amount of information that could
+  conceivably be included in any given error message; how do we decide
+  which information should be included?  If we include all of it
+  (whatever that even means!), the error message will be impossibly
+  large; but if we omit some, there will inevitably be situations
+  where the information that would actually be most helpful has been
+  omitted.  To make things even worse, the information which would be
+  most helpful actually varies depending on the individual programmer
+  and their background.
+\item Even if we somehow figure out which information would be most
+  helpful to include, paradoxically, it may not actually be helpful to
+  include it!  Beginners, in particular, may actually be \emph{less}
+  likely to read large error messages because they are overwhelming or
+  intimidating, even when those error messages contain information
+  that would genuinely help them.  Experts also may prefer less
+  information to be presented, because in many cases they do not need
+  it, and they would rather be able to see more error messages on the
+  screen at once.
+\end{itemize}
+
+It seems we can't win: programmers will be confused if there is not enough
+information about what went wrong; but if we try to present more
+information, it is likely to be unhelpful, overwhelming, or both.
+
+\section{Interactivity to the rescue}
 
 The real problem is that we are stuck thinking of type checking in a
 terminal-based, batch processing mode.  If the programmer is allowed

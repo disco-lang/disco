@@ -81,12 +81,11 @@ the ill fortune of having a language with a static type system foisted
 upon them by a well-intentioned yet sadistic instructor---is
 well-acquainted with the Dreaded Type Error Message:
 \begin{verbatim}
-<interactive>:1:33: error:
-  Couldn't match expected type (t, b0) with actual type Int
-  In the first argument of fst, namely p
-    In the expression: fst p
-    In the first argument of \ f -> f (3 :: Int), namely
-      (\ p -> fst p)
+Couldn't match expected type (t, b0) with actual type Int
+In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f (3 :: Int), namely
+    (\ p -> fst p)
 \end{verbatim}
 Why do type error messages have to be so terrifying?  Can't we do a
 better job explaining type errors to programmers?
@@ -94,9 +93,9 @@ better job explaining type errors to programmers?
 We propose two interrelated theses:
 \begin{enumerate}
 \item We ought to move away from static error ``messages'' and towards
-  interactive \emph{error explanations}.
+  \emph{interactive error explanations}.
 \item We ought to consider the problem of generating error
-  explanations in a more systematic, disciplined, and formal way.
+  explanations in a more \emph{systematic, disciplined, and formal way.}
   Explaining errors to users shouldn't just be relegated to the status
   of an ``engineering issue'', but ought to have all the tools of
   programming language theory and practice applied to it.
@@ -141,19 +140,21 @@ is that it may be difficult for the programmer to even figure out
 which part of their program the error corresponds to, especially if
 the mismatch happened deep inside a large term. This problem is not
 too hard to solve, by retaining information about the source code
-locations of terms and with appropriate editor support for
+locations of terms, and by making use of appropriate editor support for
 highlighting the locations of reported error messages.
 
 However, a deeper problem is that even if the programmer knows
 \emph{where} in their program the error message came from, they may
-not understand \emph{why} the error is an error: for example, where
+not understand \emph{why} it is an error: for example, where
 did the two types in question come from, and why does the type checker
 think they ought to be equal?
 
-At this point, a natural reaction to this problem is to add more
-information to the error message: information about the context, XXX
-However, this is very likely to be unhelpful in the long run, for
-several reasons:
+A natural reaction to this problem is to add more information to the
+error message: for example, highlighting a larger portion of the term
+containing the problematic subterm, including the types of variables
+which are mentioned in the term, or even giving suggestions about
+potential fixes.  However, this is likely to be unhelpful in the long
+run, for several reasons:
 
 \begin{itemize}
 \item There is a very large amount of information that could
@@ -183,18 +184,46 @@ information, it is likely to be unhelpful, overwhelming, or both.
 \section{Interactivity to the rescue}
 
 The real problem is that we are stuck thinking of type checking in a
-terminal-based, batch processing mode.  If the programmer is allowed
-to explore error messages interactively, we can have the best of both
-worlds: they can be initially presented with a concise, easy-to-read
-message, and then 
+terminal-based, batch processing mode.  Suppose instead that the
+programmer is allowed to \emph{explore errors interactively}: they are
+be initially presented with a concise description of the error, and
+then they can incrementally explore additional information, for
+example, by expanding nodes in a tree corresponding to questions they
+might want to ask.  This solves both problems outlined above:
+\begin{itemize}
+\item We do not have to decide what information to include up front;
+  we can think of the error explanation as a lazy tree containing all
+  the information we could ever conceivably generate about the error
+  and its causes.  The programmer then gets to interactively select
+  exactly the information they want to see.
+\item The programmer is less likely to be overwhelmed, since the
+  initial message they are shown can be kept short and to the point.
+  Even if they end up looking at the same amount of information that a
+  static, batch error message might have included, processing and
+  assimilating the information will be easier when they explore the
+  information incrementally.
+\end{itemize}
 
+For example, XXX example for problematic term shown in the example,
+showing a few steps of expanding an explanation?
 
+\section{How to explain things}
 
+When a program has a valid type, how do we explain it?  The answer to
+this is well-known in the PL community: a \emph{typing derivation} is
+a (constructive) proof that a given term has a given type, and a
+constructive proof is nothing more or less than a detailed, logically
+rigorous explanation.  If we want a type inference algorithm to
+explain itself, we can have it return an entire typing derivation
+rather than just a type.   XXX cite some things
 
+When a program \emph{doesn't} type check, how should we explain it?
+Given the discussion in the previous paragraph, the answer ought to
+be: with an \emph{untyping derivation}, that is, a constructive proof
+of \emph{un}typability!  We can extract information from this to show to the
+programmer, or of course we can let them interactively explore it.
 
-When there is a valid type for some program, how do we explain it?  We all know the answer to this: a typing derivation can be seen as a detailed explanation/justification of why some term has some type.  Make type checking/inference return an entire derivation rather than just a type.
-
-When a program *doesn't* type check, how do we explain it?  I propose the answer should be: with an untyping derivation!  That is, a constructive proof/evidence for untypability.  We can extract information from this to show to the user, or (ideally) let them interactively explore it.
+Let's look at an example XXX Show untyping rules for basic STLC.
 
 How do we know what the right definition of untyping derivations is?  Simple: we know we've "gotten it right" when we can prove a metatheorem showing that there is an untyping derivation if and only if there is not a typing derivation (or maybe we only want one direction if the type system is sufficiently undecidable??).  At this point I can pull out a simple example I've coded up in Agda, with typing and untyping derivations for the STLC, plus a formal metatheorem relating them.  (In practice, I didn't get the definition of untyping proofs right the first time: I had to adjust it when my proof didn't go though!  A triumph for machine-checked formalism.)
 

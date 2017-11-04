@@ -41,7 +41,9 @@
                         %% http://ctan.org/pkg/subcaption
 
 \usepackage{mathpartir}
+\usepackage{acode}
 
+\usepackage{wasysym}  %% for \frownie
 
 \begin{document}
 
@@ -111,6 +113,7 @@ lambda-bound variables.
 \newcommand{\app}[2]{{#1}\; {#2}}
 
 \newcommand{\ty}[3]{{#1} \vdash {#2} : {#3}}
+\newcommand{\nty}[3]{{#1} \nvdash {#2} : {#3}}
 
 \begin{align*}
   t &::= x \mid \lam x \tau t \mid \app{t_1}{t_2} \\
@@ -130,10 +133,13 @@ A typical implementation of a type checker for this language recurses
 through the structure of a term, adding bindings to the context as it
 recurses through lambdas, and checking that the types match up
 appropriately at each application.  If the types don't match, some
-sort of error message is generated:
+sort of error message is generated: \medskip
 
-XXX snippet of pseudocode: if tau1 /= tau2, throw error message
-like ``mismatch, expected: ... actual: ...''
+\begin{acode}
+  \> !if ($\tau_1 \neq \tau_1'$) \\
+  \> \tb \> !then \> !throwError ``Mismatch: expected \{$\tau_1$\}, actual \{$\tau_1'$\}'' \\
+  \> !else \> ...
+\end{acode} \medskip
 
 Of course, this error message lacks any sort of context.  One problem
 is that it may be difficult for the programmer to even figure out
@@ -161,11 +167,11 @@ run, for several reasons:
   conceivably be included in any given error message; how do we decide
   which information should be included?  If we include all of it
   (whatever that even means!), the error message will be impossibly
-  large; but if we omit some, there will inevitably be situations
-  where the information that would actually be most helpful has been
-  omitted.  To make things even worse, the information which would be
-  most helpful actually varies depending on the individual programmer
-  and their background.
+  large. On the other hand, if we are more selective, there will
+  inevitably be situations where the information that would actually
+  be most helpful has been omitted---not to mention that which
+  information which would be most helpful actually varies depending on
+  the individual programmer and their background.
 \item Even if we somehow figure out which information would be most
   helpful to include, paradoxically, it may not actually be helpful to
   include it!  Beginners, in particular, may actually be \emph{less}
@@ -183,13 +189,19 @@ information, it is likely to be unhelpful, overwhelming, or both.
 
 \section{Interactivity to the rescue}
 
-The real problem is that we are stuck thinking of type checking in a
-terminal-based, batch processing mode.  Suppose instead that the
-programmer is allowed to \emph{explore errors interactively}: they are
-be initially presented with a concise description of the error, and
-then they can incrementally explore additional information, for
-example, by expanding nodes in a tree corresponding to questions they
-might want to ask.  This solves both problems outlined above:
+The problem of how much information to include in error messages is
+actually a red herring.  The real problem is that for reasons of
+history and technical convenience, we are stuck thinking in a
+framework that is terminal-based and oriented towards batch
+processing.  Even the term ``error \emph{message}'' itself seems to
+presuppose this mode of interaction.
+
+Suppose, instead, that the programmer is allowed to \emph{explore errors
+  interactively}: they are initially presented with a concise
+description of the error, and then they can incrementally explore
+additional information---for example, by expanding nodes in a tree
+corresponding to questions they might want to ask.  This solves both
+problems outlined above:
 \begin{itemize}
 \item We do not have to decide what information to include up front;
   we can think of the error explanation as a lazy tree containing all
@@ -198,16 +210,43 @@ might want to ask.  This solves both problems outlined above:
   exactly the information they want to see.
 \item The programmer is less likely to be overwhelmed, since the
   initial message they are shown can be kept short and to the point.
-  Even if they end up looking at the same amount of information that a
-  static, batch error message might have included, processing and
-  assimilating the information will be easier when they explore the
-  information incrementally.
+  Even if they end up looking at the same information that a static,
+  batch error message might have included, processing and assimilating
+  the information will still be psychologically easier when they
+  are able to explore the information incrementally.
 \end{itemize}
 
-For example, XXX example for problematic term shown in the example,
-showing a few steps of expanding an explanation?
+\newenvironment{discomsg}{\begin{quote}\sffamily}{\end{quote}}
+\newcommand{\discoq}{\item[$\blacktriangleright$]}
+\newcommand{\discoqa}{\item[$\blacktriangledown$]}
+
+For example, suppose \verb|f| is a function expecting a pair of
+natural numbers, but a programmer writes \verb|f b|, where \verb|b|
+has been inferred to have type \verb|Nat|.  They might be shown
+something like this:
+\begin{discomsg}
+  Type error: `\verb|b|' is a natural number, but it is used in a
+  place where there should be a pair of natural numbers.
+  \begin{enumerate}
+    \discoq Why is `\verb|b|' a natural number?
+    \discoq Why should there be a pair of natural numbers here instead?
+  \end{enumerate}
+\end{discomsg}
+The programmer can then expand either question to see an answer along
+with further questions for exploring more deeply.  For example,
+{\sffamily Why is `\verb|b|' a natural number?} might expand into an
+explanation of where \verb|b| is bound, along with further questions
+exploring how the binding site of \verb|b| affects its inferred type.
 
 \section{How to explain things}
+
+So, how do we go about generating error explanations?  It is here that
+we think the tools of programming language theory can be fruitfully
+applied. On the face of it, type errors do not seem like a very ``off
+the beaten track'' topic at all; but despite their close connection to
+programming languages and type systems, we are not actually aware of
+any work taking a principled approach to the problem of explaining
+type errors to programmers (but would be happy to learn otherwise!).
 
 When a program has a valid type, how do we explain it?  The answer to
 this is well-known in the PL community: a \emph{typing derivation} is
@@ -220,36 +259,106 @@ rather than just a type.   XXX cite some things
 When a program \emph{doesn't} type check, how should we explain it?
 Given the discussion in the previous paragraph, the answer ought to
 be: with an \emph{untyping derivation}, that is, a constructive proof
-of \emph{un}typability!  We can extract information from this to show to the
-programmer, or of course we can let them interactively explore it.
+of \emph{un}typability!  We can extract information from this to show
+to the programmer, or of course we can let them interactively explore
+it.
 
-Let's look at an example XXX Show untyping rules for basic STLC.
+Let's look at a very simple example.  Here are a few of the rules for
+untyping derivations for the simply typed lambda calculus.  $\nty
+\Gamma t \tau$ can be pronounced ``$t$ does not have type $\tau$ in
+context $\Gamma$''.
 
-How do we know what the right definition of untyping derivations is?  Simple: we know we've "gotten it right" when we can prove a metatheorem showing that there is an untyping derivation if and only if there is not a typing derivation (or maybe we only want one direction if the type system is sufficiently undecidable??).  At this point I can pull out a simple example I've coded up in Agda, with typing and untyping derivations for the STLC, plus a formal metatheorem relating them.  (In practice, I didn't get the definition of untyping proofs right the first time: I had to adjust it when my proof didn't go though!  A triumph for machine-checked formalism.)
+\begin{mathpar}
+  % -- ƛ-funty holds if τ is not a function type at all, or if it is a
+  % -- function type whose input type is not τ₁.
+  % ƛ-funty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
+  %            → (∀ {τ₂} → τ ≁ τ₁ ⇒ τ₂)
+  %            → Γ ⊬ ƛ τ₁ t ∶ τ
+  \inferrule*[right=AbsTy\frownie{}]
+    {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
+    {\nty \Gamma {\lam x {\tau_1} t} \tau}
+    \and
 
-Something about history and natural deduction blah blah, the natural-deduction style proofs we use for typing derivations just so happen to correspond very nicely to the way humans want to reason/think about things, and all the thinking can be done "locally".  Unfortunately this seems to go out the window when we bring in things like unification, because it is inherently nonlocal.
+  % -- Otherwise, τ is of the form (τ₁ ⇒ τ₂) but the body t does not
+  % -- have type τ₂.  Note this could be either because t is not typable
+  % -- at all, or because it has some type other than τ₂.
+  % ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
+  %            → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
+  %            → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+  \inferrule*[right=AbsBody\frownie{}]
+    {\nty{\Gamma, x:\tau_1} {t} {\tau_2}}
+    {\nty \Gamma {\lam x {\tau_1} t} {\tau_1 \to \tau_2}}
+    \and
 
-I have a few thoughts about ways to design systems with unification to make them more explainable.  One of the main thoughts is that using a union-find data structure is not just for speed---it's also much more explainable!  Humans don't want to think in terms of transitive chains of equalities or in terms of (shudder) substitutions.  If the name of a thing keeps changing during the course of an explanation, a human is going to get very confused.  Instead we can keep the names of things the same and just accumulate sets of names which are all equal.  I also have some thoughts on using "extensional" names instead of/in addition to fresh ones (e.g. using a name like "the argument type of f" instead of "a0" or whatever).
+  % ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
+  %            → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
+  %            → Γ ⊬ t₁ · t₂ ∶ τ₂
+  \inferrule*[right=LhsTy\frownie{}]
+    {\forall \tau_1.\; \nty \Gamma {t_1} {\tau_1 \to \tau_2}}
+    {\nty \Gamma {\app {t_1} {t_2}} {\tau_2}}
+    \and
+
+  % ·-arg    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₁ τ₂}
+  %            → Γ ⊢ t₁ ∶ τ₁ ⇒ τ₂
+  %            → Γ ⊬ t₂ ∶ τ₁
+  %            → Γ ⊬ t₁ · t₂ ∶ τ₂
+  \inferrule*[right=RhsTy\frownie{}]
+    {\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\
+      \nty \Gamma {t_2} {\tau_1}}
+    {\nty \Gamma {\app {t_1} {t_2}} {\tau_2}}
+\end{mathpar}
+Rules \textsc{AbsTy\frownie{}} and \textsc{AbsBody\frownie{}}
+enumerate the ways that a lambda term can fail to have a given type:
+the first says that if $\tau$ is not a function type, then a lambda
+term does not have type $\tau$; the second says that if the body of
+the lambda does not have type $\tau_1$ in a suitably extended context,
+then the whole lambda does not have type $\tau_1 \to \tau_2$.
+Likewise, rules \textsc{LhsTy\frownie{}} and \textsc{RhsTy\frownie{}}
+govern applications: $\app{t_1}{t_2}$ does not have type $\tau_2$ if
+either $t_1$ does not have an appropriate function type, or if $t_1$
+does have an appropriate type but $t_2$ does not have the right type
+to be its argument.
+
+This set of rules is not complete; for example, we would also want a
+rule saying that a variable does not have type $\tau$ if it is bound
+to a different type in the context $\Gamma$ (or if it is not bound at
+all---incidentally, the same approach can be used for explaining scope
+errors).
+
+XXX how do we know we got it right?  Metatheorems!
+
+XXX but even within this, there is a lot of room for variations.  For
+example, XXX encode just one error, or all possible errors?
+
+XXX in the talk:
+present this, with Agda code.  Thoughts on how to automatically derive untyping
+derivation definitions. Some preliminary thoughts on explaining unification errors.
+
+% How do we know what the right definition of untyping derivations is?  Simple: we know we've "gotten it right" when we can prove a metatheorem showing that there is an untyping derivation if and only if there is not a typing derivation (or maybe we only want one direction if the type system is sufficiently undecidable??).  At this point I can pull out a simple example I've coded up in Agda, with typing and untyping derivations for the STLC, plus a formal metatheorem relating them.  (In practice, I didn't get the definition of untyping proofs right the first time: I had to adjust it when my proof didn't go though!  A triumph for machine-checked formalism.)
+
+% Something about history and natural deduction blah blah, the natural-deduction style proofs we use for typing derivations just so happen to correspond very nicely to the way humans want to reason/think about things, and all the thinking can be done "locally".  Unfortunately this seems to go out the window when we bring in things like unification, because it is inherently nonlocal.
+
+% I have a few thoughts about ways to design systems with unification to make them more explainable.  One of the main thoughts is that using a union-find data structure is not just for speed---it's also much more explainable!  Humans don't want to think in terms of transitive chains of equalities or in terms of (shudder) substitutions.  If the name of a thing keeps changing during the course of an explanation, a human is going to get very confused.  Instead we can keep the names of things the same and just accumulate sets of names which are all equal.  I also have some thoughts on using "extensional" names instead of/in addition to fresh ones (e.g. using a name like "the argument type of f" instead of "a0" or whatever).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-%% Acknowledgments
-\begin{acks}                            %% acks environment is optional
-                                        %% contents suppressed with 'anonymous'
-  %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
-  %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
-  %% acknowledge financial support and will be used by metadata
-  %% extraction tools.
-  This material is based upon work supported by the
-  \grantsponsor{GS100000001}{National Science
-    Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
-  No.~\grantnum{GS100000001}{nnnnnnn} and Grant
-  No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
-  conclusions or recommendations expressed in this material are those
-  of the author and do not necessarily reflect the views of the
-  National Science Foundation.
-\end{acks}
+% %% Acknowledgments
+% \begin{acks}                            %% acks environment is optional
+%                                         %% contents suppressed with 'anonymous'
+%   %% Commands \grantsponsor{<sponsorID>}{<name>}{<url>} and
+%   %% \grantnum[<url>]{<sponsorID>}{<number>} should be used to
+%   %% acknowledge financial support and will be used by metadata
+%   %% extraction tools.
+%   This material is based upon work supported by the
+%   \grantsponsor{GS100000001}{National Science
+%     Foundation}{http://dx.doi.org/10.13039/100000001} under Grant
+%   No.~\grantnum{GS100000001}{nnnnnnn} and Grant
+%   No.~\grantnum{GS100000001}{mmmmmmm}.  Any opinions, findings, and
+%   conclusions or recommendations expressed in this material are those
+%   of the author and do not necessarily reflect the views of the
+%   National Science Foundation.
+% \end{acks}
 
 
 %% Bibliography

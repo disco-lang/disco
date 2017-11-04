@@ -1,0 +1,28 @@
+%%% aligned code
+
+\usepackage{polytable}
+
+% Taken from https://tex.stackexchange.com/questions/255280/reproduce-lhs2tex-s-code-indentation-in-latex/255303
+\begingroup
+\catcode`!=\active
+\gdef\activateexclamationmark{%    note the global \gdef
+  \catcode`!=\active%
+  \def!##1 {\kw{##1} }%
+}
+\endgroup
+
+\def\acode{%
+\begingroup%
+\activateexclamationmark%
+\sffamily%
+\ptboxed%
+\defaultcolumn{@{}l@{ }}%
+\ignorespaces%
+}
+\def\endacode{%
+\endptboxed%
+\endgroup%
+}
+
+\newcommand{\tb}{\mbox{\quad}}
+\newcommand{\kw}[1]{\textbf{#1}}

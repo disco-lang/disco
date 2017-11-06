@@ -105,7 +105,8 @@ We propose two interrelated theses:
 
 \section{The curse of information}
 
-Consider a standard version of the simply typed lambda calculus, with
+Consider a standard version of the simply typed lambda calculus shown
+in Figure~\ref{fig:STLC}, with
 some arbitrary set of base types $B$ and typing annotations on
 lambda-bound variables.
 
@@ -115,6 +116,7 @@ lambda-bound variables.
 \newcommand{\ty}[3]{{#1} \vdash {#2} : {#3}}
 \newcommand{\nty}[3]{{#1} \nvdash {#2} : {#3}}
 
+\begin{figure}[h!]
 \begin{align*}
   t &::= x \mid \lam x \tau t \mid \app{t_1}{t_2} \\
   \tau &::= B \mid \tau_1 \to \tau_2 \\
@@ -128,6 +130,8 @@ lambda-bound variables.
   \inferrule{\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\ \ty \Gamma {t_2} {\tau_1}}
             {\ty \Gamma {\app{t_1}{t_2}} {\tau_2}}
 \end{mathpar}
+\caption{The simply typed lambda calculus} \label{fig:STLC}
+\end{figure}
 
 A typical implementation of a type checker for this language recurses
 through the structure of a term, adding bindings to the context as it
@@ -146,8 +150,9 @@ is that it may be difficult for the programmer to even figure out
 which part of their program the error corresponds to, especially if
 the mismatch happened deep inside a large term. This problem is not
 too hard to solve, by retaining information about the source code
-locations of terms, and by making use of appropriate editor support for
-highlighting the locations of reported error messages.
+locations of terms, and possibly by making use of appropriate editor
+support for highlighting the locations of reported error messages; of
+course, most real-world language implementations actually do this.
 
 However, a deeper problem is that even if the programmer knows
 \emph{where} in their program the error message came from, they may
@@ -158,29 +163,26 @@ think they ought to be equal?
 A natural reaction to this problem is to add more information to the
 error message: for example, highlighting a larger portion of the term
 containing the problematic subterm, including the types of variables
-which are mentioned in the term, or even giving suggestions about
-potential fixes.  However, this is likely to be unhelpful in the long
-run, for several reasons:
+mentioned in the term, or even giving suggestions about potential
+fixes.  However, this is likely to be unhelpful in the long run:
 
 \begin{itemize}
-\item There is a very large amount of information that could
-  conceivably be included in any given error message; how do we decide
-  which information should be included?  If we include all of it
-  (whatever that even means!), the error message will be impossibly
-  large. On the other hand, if we are more selective, there will
-  inevitably be situations where the information that would actually
-  be most helpful has been omitted---not to mention that which
-  information which would be most helpful actually varies depending on
-  the individual programmer and their background.
+\item How do we decide which information to include in a given
+  message?  If we include all possible information (whatever that even
+  means!), the message will be impossibly large. On the other hand, if
+  we are more selective, we may end up omitting information which
+  would have been helpful---not to mention that the helpfulness of any
+  particular information varies depending on the individual programmer
+  and their background.
 \item Even if we somehow figure out which information would be most
-  helpful to include, paradoxically, it may not actually be helpful to
-  include it!  Beginners, in particular, may actually be \emph{less}
-  likely to read large error messages because they are overwhelming or
-  intimidating, even when those error messages contain information
-  that would genuinely help them.  Experts also may prefer less
-  information to be presented, because in many cases they do not need
-  it, and they would rather be able to see more error messages on the
-  screen at once.
+  helpful to include, paradoxically, it may not be helpful to include
+  it!  Beginners, in particular, may be \emph{less} likely to read
+  large error messages---even when those error messages contain
+  information that would genuinely help them---because they feel
+  overwhelming or intimidating. Experts also may prefer less
+  information, because in many cases they do not need it, and they
+  would rather be able to see more error messages on the screen at
+  once.
 \end{itemize}
 
 It seems we can't win: programmers will be confused if there is not enough
@@ -216,37 +218,37 @@ problems outlined above:
   are able to explore the information incrementally.
 \end{itemize}
 
-\newenvironment{discomsg}{\begin{quote}\sffamily}{\end{quote}}
-\newcommand{\discoq}{\item[$\blacktriangleright$]}
-\newcommand{\discoqa}{\item[$\blacktriangledown$]}
+% \newenvironment{discomsg}{\begin{quote}\sffamily}{\end{quote}}
+% \newcommand{\discoq}{\item[$\blacktriangleright$]}
+% \newcommand{\discoqa}{\item[$\blacktriangledown$]}
 
-For example, suppose \verb|f| is a function expecting a pair of
-natural numbers, but a programmer writes \verb|f b|, where \verb|b|
-has been inferred to have type \verb|Nat|.  They might be shown
-something like this:
-\begin{discomsg}
-  Type error: `\verb|b|' is a natural number, but it is used in a
-  place where there should be a pair of natural numbers.
-  \begin{enumerate}
-    \discoq Why is `\verb|b|' a natural number?
-    \discoq Why should there be a pair of natural numbers here instead?
-  \end{enumerate}
-\end{discomsg}
-The programmer can then expand either question to see an answer along
-with further questions for exploring more deeply.  For example,
-{\sffamily Why is `\verb|b|' a natural number?} might expand into an
-explanation of where \verb|b| is bound, along with further questions
-exploring how the binding site of \verb|b| affects its inferred type.
+% For example, suppose \verb|f| is a function expecting a pair of
+% natural numbers, but a programmer writes \verb|f b|, where \verb|b|
+% has been inferred to have type \verb|Nat|.  They might be shown
+% something like this:
+% \begin{discomsg}
+%   Type error: `\verb|b|' is a natural number, but it is used in a
+%   place where there should be a pair of natural numbers.
+%   \begin{enumerate}
+%     \discoq Why is `\verb|b|' a natural number?
+%     \discoq Why should there be a pair of natural numbers here instead?
+%   \end{enumerate}
+% \end{discomsg}
+% The programmer can then expand either question to see an answer along
+% with further questions for exploring more deeply.  For example,
+% {\sffamily Why is `\verb|b|' a natural number?} might expand into an
+% explanation of where \verb|b| is bound, along with further questions
+% exploring how the binding site of \verb|b| affects its inferred type.
 
 \section{How to explain things}
 
-So, how do we go about generating error explanations?  It is here that
-we think the tools of programming language theory can be fruitfully
-applied. On the face of it, type errors do not seem like a very ``off
-the beaten track'' topic at all; but despite their close connection to
-programming languages and type systems, we are not actually aware of
-any work taking a principled approach to the problem of explaining
-type errors to programmers (but would be happy to learn otherwise!).
+So, how do we go about generating such error explanations?  It is here
+that we think the tools of programming language theory can be
+fruitfully applied. On the face of it, type errors do not seem like a
+very ``off the beaten track'' topic at all; but despite their close
+connection to programming languages and type systems, we are not
+actually aware of any work taking a principled, PL-style approach to
+the problem of explaining type errors to programmers.
 
 When a program has a valid type, how do we explain it?  The answer to
 this is well-known in the PL community: a \emph{typing derivation} is
@@ -254,41 +256,46 @@ a (constructive) proof that a given term has a given type, and a
 constructive proof is nothing more or less than a detailed, logically
 rigorous explanation.  If we want a type inference algorithm to
 explain itself, we can have it return an entire typing derivation
-rather than just a type.   XXX cite some things
+rather than just a type.
 
-When a program \emph{doesn't} type check, how should we explain it?
-Given the discussion in the previous paragraph, the answer ought to
-be: with an \emph{untyping derivation}, that is, a constructive proof
-of \emph{un}typability!  We can extract information from this to show
-to the programmer, or of course we can let them interactively explore
-it.
+So, when a program \emph{doesn't} type check, how should we explain
+it?  Given the discussion in the previous paragraph, the answer ought
+to be clear: with an \emph{untyping derivation}, that is, a
+constructive proof of \emph{un}typability!  We can extract information
+from this to show to the programmer, or we can simply let them
+interactively explore it.  That is, to be clear, we propose that an
+untyping derivation itself should form the core of the tree structure
+making up an error explanation (though actually it should probably be
+more like a zipper onto the untyping derivation, since the explanation
+should start ``focused in'' on the specific location of an error,
+rather than on the top-level program).
 
-Let's look at a very simple example.  Here are a few of the rules for
-untyping derivations for the simply typed lambda calculus.  $\nty
-\Gamma t \tau$ can be pronounced ``$t$ does not have type $\tau$ in
-context $\Gamma$''.
-
+Let's look at a simple example.  Figure~\ref{fig:untyping-STLC}
+shows just two of the rules for untyping derivations for the simply typed
+lambda calculus; we pronounce $\nty \Gamma t \tau$ as ``$t$ does
+not have type $\tau$ in context $\Gamma$''.
+\begin{figure}
 \begin{mathpar}
-  % -- ƛ-funty holds if τ is not a function type at all, or if it is a
-  % -- function type whose input type is not τ₁.
-  % ƛ-funty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
-  %            → (∀ {τ₂} → τ ≁ τ₁ ⇒ τ₂)
-  %            → Γ ⊬ ƛ τ₁ t ∶ τ
-  \inferrule*[right=AbsTy\frownie{}]
-    {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
-    {\nty \Gamma {\lam x {\tau_1} t} \tau}
-    \and
+  % % -- ƛ-funty holds if τ is not a function type at all, or if it is a
+  % % -- function type whose input type is not τ₁.
+  % % ƛ-funty  : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ}
+  % %            → (∀ {τ₂} → τ ≁ τ₁ ⇒ τ₂)
+  % %            → Γ ⊬ ƛ τ₁ t ∶ τ
+  % \inferrule*[right=AbsTy\frownie{}]
+  %   {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
+  %   {\nty \Gamma {\lam x {\tau_1} t} \tau}
+  %   \and
 
-  % -- Otherwise, τ is of the form (τ₁ ⇒ τ₂) but the body t does not
-  % -- have type τ₂.  Note this could be either because t is not typable
-  % -- at all, or because it has some type other than τ₂.
-  % ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
-  %            → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
-  %            → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
-  \inferrule*[right=AbsBody\frownie{}]
-    {\nty{\Gamma, x:\tau_1} {t} {\tau_2}}
-    {\nty \Gamma {\lam x {\tau_1} t} {\tau_1 \to \tau_2}}
-    \and
+  % % -- Otherwise, τ is of the form (τ₁ ⇒ τ₂) but the body t does not
+  % % -- have type τ₂.  Note this could be either because t is not typable
+  % % -- at all, or because it has some type other than τ₂.
+  % % ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
+  % %            → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
+  % %            → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
+  % \inferrule*[right=AbsBody\frownie{}]
+  %   {\nty{\Gamma, x:\tau_1} {t} {\tau_2}}
+  %   {\nty \Gamma {\lam x {\tau_1} t} {\tau_1 \to \tau_2}}
+  %   \and
 
   % ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
   %            → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
@@ -306,33 +313,69 @@ context $\Gamma$''.
     {\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\
       \nty \Gamma {t_2} {\tau_1}}
     {\nty \Gamma {\app {t_1} {t_2}} {\tau_2}}
-\end{mathpar}
-Rules \textsc{AbsTy\frownie{}} and \textsc{AbsBody\frownie{}}
-enumerate the ways that a lambda term can fail to have a given type:
-the first says that if $\tau$ is not a function type, then a lambda
-term does not have type $\tau$; the second says that if the body of
-the lambda does not have type $\tau_1$ in a suitably extended context,
-then the whole lambda does not have type $\tau_1 \to \tau_2$.
-Likewise, rules \textsc{LhsTy\frownie{}} and \textsc{RhsTy\frownie{}}
-govern applications: $\app{t_1}{t_2}$ does not have type $\tau_2$ if
-either $t_1$ does not have an appropriate function type, or if $t_1$
-does have an appropriate type but $t_2$ does not have the right type
-to be its argument.
+  \end{mathpar}
+  \caption{Some untyping rules for the STLC} \label{fig:untyping-STLC}
+\end{figure}
+% Rules \textsc{AbsTy\frownie{}} and \textsc{AbsBody\frownie{}}
+% enumerate the ways that a lambda term can fail to have a given type:
+% the first says that if $\tau$ is not a function type, then a lambda
+% term does not have type $\tau$; the second says that if the body of
+% the lambda does not have type $\tau_1$ in a suitably extended context,
+% then the whole lambda does not have type $\tau_1 \to \tau_2$.
+Rules \textsc{LhsTy\frownie{}} and \textsc{RhsTy\frownie{}} enumerate
+the ways that an application can fail to have a given type:
+$\app{t_1}{t_2}$ does not have type $\tau_2$ if either $t_1$ does not
+have an appropriate function type, or if $t_1$ does have an
+appropriate type but $t_2$ does not have the right type to be its
+argument.
 
-This set of rules is not complete; for example, we would also want a
-rule saying that a variable does not have type $\tau$ if it is bound
-to a different type in the context $\Gamma$ (or if it is not bound at
-all---incidentally, the same approach can be used for explaining scope
-errors).
+How do we know when we have the definition of untyping derivations
+correct for a given type system?  We can justify a particular
+definition of untyping by proving some metatheorems relating it to
+typing.  For example, we certainly want a metatheorem of the form
+\[ \forall t \tau.\; (\nty \Gamma t {\tau}) \implies \neg(\ty \Gamma t
+  {\tau}). \] For some type systems we can prove the converse as well.
+If we want an untyping derivation to somehow encompass all possible
+errors in a term, rather than just picking one (corresponding to the
+difference between a type checking algorithm that stops as soon as an
+error is encountered and one which tries to continue and collect
+additional errors), we could try to prove a uniqueness theorem---for a
+given triple of $(\Gamma, t, \tau)$ there is at most one untyping
+derivation.
 
-XXX how do we know we got it right?  Metatheorems!
+There are many remaining questions:
+\begin{itemize}
+\item There is still a lot of latitude in designing the rules for
+  untyping derivations.  For example, one could imagine adding another
+  rule for the STLC:
+  \begin{mathpar}
+    \inferrule{\ty \Gamma {t_1} {\tau} \\ \textsc{NotArrow}(\tau)}{\nty
+      \Gamma {\app{t_1}{t_2}} {\tau_2}}
+  \end{mathpar}
+  This rule says that an application does not have a type if its LHS
+  \emph{does} have a type, but not an arrow type.  This rule is
+  actually subsumed by rule \textsc{LhsTy\frownie{}}, but might be
+  more comprehensible to programmers in cases when it applies.  Is
+  there a systematic way to approach the task of choosing rules for
+  building untyping derivations?
+\item Is there some way to \emph{mechanically} derive untyping
+  derivation rules from the rules of a type system?  De Morgan-type
+  laws may play a starring role, but there are likely to be
+  subtleties, given considerations such as the previous bullet point.
+\item Although building appropriate untyping rules seems straightforward
+  for natural-deduction-style systems, it becomes much trickier when
+  trying to explain unification failures; the precise algorithms used
+  to do unification seem to matter quite a bit.  What is the right way
+  to explain unification failures to programmers?
+\end{itemize}
 
-XXX but even within this, there is a lot of room for variations.  For
-example, XXX encode just one error, or all possible errors?
+\section{Proposal}
 
-XXX in the talk:
-present this, with Agda code.  Thoughts on how to automatically derive untyping
-derivation definitions. Some preliminary thoughts on explaining unification errors.
+In our talk, we will (a) motivate interactive error explanations and
+untyping derivations, (b) present several variant systems of untyping
+rules for the STLC, with appropriate metatheorems all formalized in
+Agda, (c) share some preliminary thoughts on how to explain
+unification errors.
 
 % How do we know what the right definition of untyping derivations is?  Simple: we know we've "gotten it right" when we can prove a metatheorem showing that there is an untyping derivation if and only if there is not a typing derivation (or maybe we only want one direction if the type system is sufficiently undecidable??).  At this point I can pull out a simple example I've coded up in Agda, with typing and untyping derivations for the STLC, plus a formal metatheorem relating them.  (In practice, I didn't get the definition of untyping proofs right the first time: I had to adjust it when my proof didn't go though!  A triumph for machine-checked formalism.)
 
@@ -361,8 +404,7 @@ derivation definitions. Some preliminary thoughts on explaining unification erro
 % \end{acks}
 
 
-%% Bibliography
-%\bibliography{bibfile}
+\bibliography{explaining-errors}
 
 
 \end{document}

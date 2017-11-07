@@ -33,3 +33,11 @@
     interactively explored (e.g. output the trees as HTML with a bit
     of javascript to collapse/expand, or just output as XML and use an
     XML viewer...?)
+* Annotated bibliography
+** Beaven & Stansifer (1995): Explaining type errors in polymorphic languages.
+   They build a tree of explanations just like we are proposing (with
+   interactive questions and everything!) but it's not clear whether
+   there is any deeper theory/principles behind it that would apply
+   more generally.
+** Chitil (ICFP 2001): Compositional Explanation of Types and Algorithmic Debugging of Type Errors
+** McAdam (???): Generalising Techniques for Type Debugging

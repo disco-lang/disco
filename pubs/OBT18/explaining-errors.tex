@@ -256,9 +256,13 @@ problems outlined above:
 So, how do we go about generating such error explanations?  It is here
 that we think the tools of programming language theory can be
 fruitfully applied. On the face of it, type errors do not seem like a
-very ``off the beaten track'' topic at all; but despite their close
-connection to programming languages and type systems, we are not
-actually aware of any work taking a principled, PL-style approach to
+very ``off the beaten track'' topic at all. There was a
+spate of work on explaining type errors in the 1990's and early 2000's
+(for example, \citet{beaven1993explaining, chitil:compositional, simon:typeview}), but
+this line of work seems to have mostly died out. Though there is
+ongoing work on tracking type and error \emph{provenance}
+(\citet{augustsson-provenance} is a representative example), we are not
+aware of more recent work taking a principled, PL-style approach to
 the problem of explaining type errors to programmers.
 
 When a program has a valid type, how do we explain it?  The answer to
@@ -266,8 +270,8 @@ this is well-known in the PL community: a \emph{typing derivation} is
 a (constructive) proof that a given term has a given type, and a
 constructive proof is simply a detailed, logically
 rigorous explanation.  If we want a type inference algorithm to
-explain itself, we can have it return an entire typing derivation
-rather than just a type.
+explain itself, we can have it return an entire typing derivation, not
+just a type.
 
 So, when a program \emph{doesn't} type check, how should we explain
 it?  Given the discussion in the previous paragraph, the answer ought

@@ -12,6 +12,13 @@
 \documentclass[sigplan, screen]{acmart}\settopmatter{printccs=false,printacmref=false}
 
 
+\newif\ifcomments\commentstrue
+\ifcomments
+\newcommand{\rae}[1]{\textcolor{magenta}{RAE: #1}}
+\else
+\newcommand{\rae}[1]{}
+\fi
+
 % https://tex.stackexchange.com/questions/346292/remove-conference-information-from-acm-2017-sigconf-template
 \settopmatter{printacmref=false} % Removes citation information below abstract
 \renewcommand\footnotetextcopyrightpermission[1]{} % removes footnote with conference information in first column
@@ -44,6 +51,8 @@
 \usepackage{acode}
 
 \usepackage{wasysym}  %% for \frownie
+
+\usepackage{xcolor}
 
 \begin{document}
 
@@ -82,6 +91,7 @@ Every beginning student of programming---that is, every student with
 the ill fortune of having a language with a static type system foisted
 upon them by a well-intentioned yet sadistic instructor---is
 well-acquainted with the Dreaded Type Error Message:
+{\small
 \begin{verbatim}
 Couldn't match expected type (t, b0) with actual type Int
 In the first argument of fst, namely p
@@ -89,6 +99,7 @@ In the first argument of fst, namely p
   In the first argument of \ f -> f (3 :: Int), namely
     (\ p -> fst p)
 \end{verbatim}
+}
 Why do type error messages have to be so terrifying?  Can't we do a
 better job explaining type errors to programmers?
 
@@ -126,16 +137,16 @@ lambda-bound variables.
 \begin{mathpar}
   \inferrule{x : \tau \in \Gamma}{\ty \Gamma x \tau} \and
   \inferrule{\ty {\Gamma, x:\tau_1} t {\tau_2}}{\ty \Gamma {\lam x
-      {\tau_1} t}{\tau_2}} \and
+      {\tau_1} t}{\tau_1 \to \tau_2}} \and
   \inferrule{\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\ \ty \Gamma {t_2} {\tau_1}}
             {\ty \Gamma {\app{t_1}{t_2}} {\tau_2}}
 \end{mathpar}
 \caption{The simply typed lambda calculus} \label{fig:STLC}
 \end{figure}
 
-A typical implementation of a type checker for this language recurses
+A typical implementation of a type checker for this language recurs
 through the structure of a term, adding bindings to the context as it
-recurses through lambdas, and checking that the types match up
+recurs through lambdas, and checking that the types match up
 appropriately at each application.  If the types don't match, some
 sort of error message is generated: \medskip
 
@@ -178,7 +189,7 @@ fixes.  However, this is likely to be unhelpful in the long run:
   helpful to include, paradoxically, it may not be helpful to include
   it!  Beginners, in particular, may be \emph{less} likely to read
   large error messages---even when those error messages contain
-  information that would genuinely help them---because they feel
+  information that would genuinely help them---because the messages seem
   overwhelming or intimidating. Experts also may prefer less
   information, because in many cases they do not need it, and they
   would rather be able to see more error messages on the screen at
@@ -253,7 +264,7 @@ the problem of explaining type errors to programmers.
 When a program has a valid type, how do we explain it?  The answer to
 this is well-known in the PL community: a \emph{typing derivation} is
 a (constructive) proof that a given term has a given type, and a
-constructive proof is nothing more or less than a detailed, logically
+constructive proof is simply a detailed, logically
 rigorous explanation.  If we want a type inference algorithm to
 explain itself, we can have it return an entire typing derivation
 rather than just a type.
@@ -327,7 +338,12 @@ the ways that an application can fail to have a given type:
 $\app{t_1}{t_2}$ does not have type $\tau_2$ if either $t_1$ does not
 have an appropriate function type, or if $t_1$ does have an
 appropriate type but $t_2$ does not have the right type to be its
-argument.
+argument. \rae{I'm a bit concerned by the fact that the lhs rule isn't
+actually inductive, having a $\forall$ in it. Note that it would take
+an infinite number of premises to prove LhsTy. As long as we're not
+doing metatheory proofs over untyping derivations, this might be OK.
+But at the least, if you agree with this concern, we should mention
+in the text that the $\forall$ is a soft spot in the theory.}
 
 How do we know when we have the definition of untyping derivations
 correct for a given type system?  We can justify a particular

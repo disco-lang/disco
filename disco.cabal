@@ -61,7 +61,7 @@ library
 
   build-depends:       base >=4.8 && <4.11,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 6.2,
+                       megaparsec >= 6.1.1 && < 6.3,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,
@@ -69,7 +69,7 @@ library
                        unbound-generics >= 0.3 && < 0.4,
                        lens >= 4.14 && < 4.16,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.5 && < 0.6,
+                       arithmoi >= 0.5 && < 0.7,
                        integer-logarithms >= 1.0 && < 1.1,
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.11
@@ -85,7 +85,7 @@ executable disco
                        haskeline >=0.7 && <0.8,
                        mtl >=2.2 && <2.3,
                        transformers >= 0.4 && < 0.6,
-                       megaparsec >= 6.1.1 && < 6.2,
+                       megaparsec >= 6.1.1 && < 6.3,
                        containers >= 0.5 && < 0.6,
                        unbound-generics >= 0.3 && < 0.4,
                        lens >= 4.14 && < 4.16,

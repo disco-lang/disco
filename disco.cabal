@@ -69,7 +69,12 @@ library
                        unbound-generics >= 0.3 && < 0.4,
                        lens >= 4.14 && < 4.16,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.5 && < 0.7,
+
+                       -- Upgrading arithmoi to 0.6:
+                       -- Math.NumberTheory.Moduli no longer exports
+                       -- powerModInteger, now called powMod or
+                       -- something like that
+                       arithmoi >= 0.5 && < 0.6,
                        integer-logarithms >= 1.0 && < 1.1,
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.11

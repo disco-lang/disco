@@ -1,0 +1,33 @@
+* Meta
+Aim for 20 minutes + questions?
+
+* To do
+
+  + Formalize some other variants of untyping rules in Agda to present
+  + Think more about how to explain unification errors
+  + Follow up related work pointed out by reviewers
+
+* Outline
+** Introduction
+
+   This should start similarly to the abstract:
+
+   + Horrendous error message
+   + Funny picture of sad/angry/confused programmer
+
+   + How can we make this better?
+   + Let's think first about what the problem is.
+   + Show lambda calculus and example of ill-typed term.
+   + Show example error message (no context).
+   + Show example error message with code location.
+   + Show example error message with code location and context
+     explaining why.
+   + Show example with all the above plus relevant bindings in scope,
+     potential fixes, ... (over the top).
+
+   + Explain why this is unhelpful (pictures of sad programmers)
+
+** Interactivity to the rescue
+
+
+** Related work / invitation

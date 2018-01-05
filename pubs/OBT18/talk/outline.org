@@ -4,7 +4,12 @@ Aim for 20 minutes + questions?
 * To do
 
   + Formalize some other variants of untyping rules in Agda to present
+    - Tried doing this with variant that encodes *all possible* errors
+      (i.e. for each premise you must say whether it or its negation
+      holds), but ran into problems with Agda positivity checker...
+
   + Think more about how to explain unification errors
+
   + Follow up related work pointed out by reviewers
 
 * Outline
@@ -29,5 +34,6 @@ Aim for 20 minutes + questions?
 
 ** Interactivity to the rescue
 
+   
 
 ** Related work / invitation

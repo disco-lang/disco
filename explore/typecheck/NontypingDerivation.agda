@@ -83,6 +83,14 @@ data _≁_ : Type → Type → Set where
 _∼?_ : (τ₁ τ₂ : Type) → (τ₁ ≡ τ₂) ⊎ (τ₁ ≁ τ₂)
 τ₁ ∼? τ₂ = Data.Sum.map id ≢-≁ (τ₁ ≡? τ₂)
 
+-- Evidence that a type is not an arrow type.
+data not⇒_ : Type → Set where
+  not⇒Nat : not⇒ Nat
+
+⇒? : (τ : Type) → (Σ[ τ₁ ∈ Type ] Σ[ τ₂ ∈ Type ] τ ≡ τ₁ ⇒ τ₂) ⊎ (not⇒ τ)
+⇒? Nat       = inj₂ not⇒Nat
+⇒? (τ₁ ⇒ τ₂) = inj₁ (τ₁ , τ₂ , refl)
+
 ------------------------------------------------------------
 -- Expressions
 ------------------------------------------------------------
@@ -300,6 +308,11 @@ check Γ (t₁ · t₂) τ | inj₁ (τ₁ ⇒ τ₂ , Γ⊢t₁∶τ₁) | inj�
 -- Take 2
 ------------------------------------------------------------
 
+-- XXX these need to be dependent somehow?  e.g. consider the ƛ case
+-- below.  If τ is not an arrow type the whole thing fails; but if it
+-- does, we need to know what τ₁ and τ₂ are in order to refer to them
+-- in the rest of the conditions.
+
 data many : List (Set × Set) → Set where
   empty : many []
   here  : ∀ {Tₗ Tᵣ Ts} → Tₗ → many Ts → many ((Tₗ , Tᵣ) ∷ Ts)
@@ -312,16 +325,28 @@ data some : List (Set × Set) → Set where
 -- Unique untypability; gives *every* possible reason that something
 -- is not typeable.  There is no 'mismatch' constructor.
 
+{-# NO_POSITIVITY_CHECK #-}
 data _⊬₂_∶_ : ∀ {n} → Ctx n → Expr n → Type → Set where
 
   lit : ∀ {n} {Γ : Ctx n} {m} {τ} → τ ≁ Nat → Γ ⊬₂ lit m ∶ τ
 
   -- For t₁ ⊕ t₂ to be untypeable, at least one of three things must be wrong:
-  ⊕ : ∀ {n} {Γ : Ctx n} {t₁ t₂ τ} →
-      some
+  ⊕   : ∀ {n} {Γ : Ctx n} {t₁ t₂ τ}
+      → some
         ( (Γ ⊬₂ t₁ ∶ Nat , Γ ⊢ t₁ ∶ Nat)     -- Either t₁ is well-typed or not
         ∷ (Γ ⊬₂ t₂ ∶ Nat , Γ ⊢ t₂ ∶ Nat)     -- Either t₂ is well-typed or not
-        ∷ ((τ ≁ Nat) , (τ ≡ Nat))                -- τ is Nat or not
+        ∷ ((τ ≁ Nat) , (τ ≡ Nat))            -- τ is Nat or not
         ∷ []
         )
       → Γ ⊬₂ t₁ ⊕ t₂ ∶ τ
+
+  var : ∀ {n} {Γ : Ctx n} {i τ}
+      → τ ≁ lookup i Γ
+      → Γ ⊬₂ var i ∶ τ
+
+  -- ƛ τ₁ t does not have type τ if
+  --   - τ is not an arrow type
+
+  -- ƛ   : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂ τ}
+  --     → some
+  --       ( (τ ≁ 

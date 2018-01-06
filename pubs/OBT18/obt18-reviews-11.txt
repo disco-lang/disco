@@ -1,0 +1,107 @@
+OBT '18 Paper #2 Reviews and Comments
+===========================================================================
+Paper #11 Explaining Type Errors
+
+
+Review #11A
+===========================================================================
+
+Overall merit
+-------------
+4. Accept
+
+Reviewer expertise
+------------------
+4. Expert
+
+Paper summary
+-------------
+The paper advocates explaining type errors by giving programmers the ability to traverse a derivation (witness) why a given program failed to type check. This is an interesting idea and should make for a fun talk.
+
+Comments for author
+-------------------
+- I don't quite understand why you can't give the "failed" attempt of building a typing derivation to explain where things went wrong but instead advocate a derivation tree for untyping. 
+
+- the question as to explain 'unification failures' seems quite crucial in explaining type errors
+
+- I am wondering if generating concrete counter examples would be helpful to illustrate where things go wrong. For example, the explanation in the example of your abstract could be:
+
+\f. f (3 :: Int)   will work for (\f. f (3::Int)) (\x. x + 1)  
+\f. f (3 :: Int)   does not work for (\f. f (3::Int)) (\p. fst p)
+
+
+
+Review #11B
+===========================================================================
+
+Overall merit
+-------------
+4. Accept
+
+Reviewer expertise
+------------------
+4. Expert
+
+Paper summary
+-------------
+The abstract suggest reforming our understanding of type errors from a
+message paradigm to an interactive, exploratory paradigm. Concretely,
+a notion of "untyping" derivation is proposed.
+
+Comments for author
+-------------------
+The idea is interesting and concrete. While type theory is one of the
+better-beaten paths, type theory *ergonomics* is definitely less well
+explored.
+
+A few pieces of related work may be relevant:
+
+  - Ulf Norrell gave a keynote at ICFP XXXX where wrote a dependently
+    typed type checker for STLC that either produced a well typed term
+    or a proof that the term was in some sense untypeable
+    (http://www.cse.chalmers.se/~ulfn/code/icfp2013/ICFP.html)
+
+  - Seidel et al. have done some very related work
+    (https://ranjitjhala.github.io/static/dynamic_witnesses_for_static_type_errors.pdf)
+
+  - Elm's type-error architecture and ergonomics are widely praised
+    and may have interesting ideas to contribute
+
+
+
+Review #11C
+===========================================================================
+
+Overall merit
+-------------
+3. Weak accept
+
+Reviewer expertise
+------------------
+3. Knowledgeable
+
+Paper summary
+-------------
+In this paper, the authors argue that too often, type errors are considered static error messages, and that instead, a shift to representing such type errors as dynamic, interactive error explanations is warranted.  The authors argue that simply providing more information about a type error is counterproductive, as  it could be overwhelming to most users. Thus, interactivity is the key to providing users with exactly the information they require. They argue that this could be achieved by providing interactive error explanations based on typing derivation trees. So, in order to get type inference to explain itself, return its type derivation, not just the type that was inferred. 
+
+The authors go on to propose so-called “untyping derivations” as a way to explain how a program doesn’t type check. While this notion of an untyping derivation seems interesting, it seems like going this route would likely be practically infeasible in a real compiler. I assume that for a real language, one would have to mechanically derive untyping derivations; but I imagine the potential space of such derivations would be large for a real language. As such, I’m left unsure of the feasibility of this approach.
+
+Comments for author
+-------------------
+I realize that the place of OBT isn’t to nitpick about prior work, but it might be useful to point out that there has been work done in the Scala community on interactively debugging type errors, visually. In fact, a tool that does exactly what this paper proposes (providing interactive type error explanations by way of typing derivations) was developed and presented at the Scala Symposium in 2013:
+
+Scalad: An Interactive Type-level Debugger
+Hubert Plociniczak
+
+I believe an earlier version was also presented at an ECOOP 2012 workshop:
+
+Implementing a type debugger for Scala
+Hubert Plociniczak Martin Odersky
+
+(In fact, this is the entire topic of Hubert Plociniczak’s PhD thesis. Perhaps more information can be found in the dissertation about what he tried and why it worked or didn’t work.)
+
+As for why these things haven’t taken off more broadly–I’m not sure! It could be that he only published in workshops, so his work remained largely unknown, or that it wasn’t understood by the community, or that that something was off in his execution (I’m not sure if the debugger was formally released, even.) 
+
+Further, the authors pointed out that an unknown/future work was how to explain unification failures to programmers. I believe in Hubert’s work, his focus was on showing users portions of the type derivation tree which disagreed with one another, thus leading to the typing error. Users were then able to interactively expand nodes to see where this mismatch might have come from. The trick was in deciding how to prune the full typing derivation trees down to something small and reasonable to show the programmer (as in the initial, collapsed, error explanation that users are presented before they expand and explore the tree interactively.)
+
+Type error explanations is indeed an important topic that is too often left by the wayside by mainline PL research. While I’m a bit concerned that a piece of related work has been published that seems to do the much same thing as proposed in this talk, this is nonetheless a space where too few researchers are working, and for which it would be nice to have more discussion. Thus, I think this talk would make for a nice addition to OBT!

@@ -1,0 +1,205 @@
+%% -*- mode: LaTeX; compile-command: "pdflatex explaining-errors.tex" -*-
+\documentclass[xcolor=svgnames,12pt,aspectratio=169]{beamer}
+
+%include polycode.fmt
+
+\usepackage[all]{xy}
+\usepackage{brent}
+\usepackage{xspace}
+% \usepackage[backend=pgf,extension=pgf,input,outputdir=diagrams]{diagrams-latex}
+\graphicspath{{images/}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Math typesetting
+
+%% a bit more space for matrices
+\setlength{\arraycolsep}{5pt}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\etc}{\textit{etc.}}
+\renewcommand{\eg}{\textit{e.g.}\xspace}
+\renewcommand{\ie}{\textit{i.e.}\xspace}
+
+\newcommand{\theschool}{Off the Beaten Track}
+% \newcommand{\thelocation}{Los Angeles}
+\newcommand{\thedate}{13 January 2018}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setbeamertemplate{items}[circle]
+
+\mode<presentation>
+{
+  \usetheme{default}                          % use a default (plain) theme
+
+  \setbeamertemplate{navigation symbols}{}    % don't show navigation
+                                              % buttons along the
+                                              % bottom
+  \setbeamerfont{normal text}{family=\sffamily}
+
+  % XX remove this before giving actual talk!
+  % \setbeamertemplate{footline}[frame number]
+  % {%
+  %   \begin{beamercolorbox}{section in head/foot}
+  %     \vskip2pt
+  %     \hfill \insertframenumber
+  %     \vskip2pt
+  %   \end{beamercolorbox}
+  % }
+
+  \AtBeginSection[]
+  {
+    \begin{frame}<beamer>
+      \frametitle{}
+
+      \begin{center}
+%        \includegraphics[width=2in]{\sectionimg}
+%        \bigskip
+
+        {\Huge \insertsectionhead}
+      \end{center}
+    \end{frame}
+  }
+}
+
+\defbeamertemplate*{title page}{customized}[1][]
+{
+  \vbox{}
+  \vfill
+  \begin{centering}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{title}
+      \usebeamerfont{title}\inserttitle\par%
+      \ifx\insertsubtitle\@@empty%
+      \else%
+        \vskip0.25em%
+        {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+      \fi%
+    \end{beamercolorbox}%
+    \vskip1em\par
+    {\usebeamercolor[fg]{titlegraphic}\inserttitlegraphic\par}
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=8pt,center,#1]{author}
+      \usebeamerfont{author}\insertauthor
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{institute}
+      \usebeamerfont{institute}\insertinstitute
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{date}
+      \usebeamerfont{date}\insertdate
+    \end{beamercolorbox}
+  \end{centering}
+  \vfill
+}
+
+\newenvironment{xframe}[1][]
+  {\begin{frame}[fragile,environment=xframe,#1]}
+  {\end{frame}}
+
+% uncomment me to get 4 slides per page for printing
+% \usepackage{pgfpages}
+% \pgfpagesuselayout{4 on 1}[uspaper, border shrink=5mm]
+
+% \setbeameroption{show only notes}
+
+\renewcommand{\emph}{\textbf}
+
+\title{Explaining Type Errors}
+\date{\theschool \\ \thedate}
+\author{\usebeamercolor[fg]{title}{Brent Yorgey} \and Richard
+  Eisenberg \and Harley Eades}
+% \titlegraphic{\includegraphics[width=1in]{deriv-tree}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\begin{xframe}{}
+   \titlepage
+\end{xframe}
+
+\begin{xframe}{The Dreaded Type Error Message}
+\footnotesize
+\begin{verbatim}
+Could not deduce (Num t0)
+from the context: (Num (t -> a), Num t, Num a)
+  bound by the inferred type for ‘it’:
+             forall a t. (Num (t -> a), Num t, Num a) => a
+  at <interactive>:4:1-19
+The type variable ‘t0’ is ambiguous
+In the ambiguity check for the inferred type for ‘it’
+To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+When checking the inferred type
+  it :: forall a t. (Num (t -> a), Num t, Num a) => a
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{}
+  \begin{center}
+    \includegraphics{what-the-function.jpg}
+  \end{center}
+\end{xframe}
+
+\begin{xframe}{Theses}
+  \begin{itemize}
+  \item Move away from static \emph{error messages} to dynamic,
+    interactive \emph{error explanations}. \medskip
+  \item Allow the user to explore \emph{constructive evidence for errors}.
+  \end{itemize}
+\end{xframe}
+
+\section{The Curse of Information}
+
+\begin{xframe}
+  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
+
+  \begin{verbatim}
+    Type mismatch between expected type (t, b0) and actual type Int
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}
+  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
+
+  \begin{verbatim}
+    Type mismatch between expected type (t, b0) and actual type Int
+      In the first argument of fst, namely p
+      In the expression: fst p
+      In the first argument of \ f -> f 3, namely
+        (\ p -> fst p)
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}
+  \footnotesize
+  \begin{verbatim}
+    Type mismatch between expected type (t, b0) and actual type Int
+      In the first argument of fst, namely p
+      In the expression: fst p
+      In the first argument of \ f -> f 3, namely
+        (\ p -> fst p)
+      Relevant bindings include
+        fst :: (a,b) -> a
+      Inferred types for subterms:
+        3             :: Int
+        (\f -> f 3)   :: forall a. (Int -> a) -> a
+        (\p -> fst p) :: (Int -> a0)
+        (\f -> f 3) (\p -> fst p) :: a0
+      Suggested fixes:
+        Change p to (p,y)
+        Change fst to a function expecting an Int
+        Change 3 to (x,y)
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}{}
+  \begin{center}
+    \includegraphics{what-the-function.jpg}
+  \end{center}
+\end{xframe}
+
+\end{document}

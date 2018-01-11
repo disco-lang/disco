@@ -6,6 +6,7 @@
 \usepackage[all]{xy}
 \usepackage{brent}
 \usepackage{xspace}
+\usepackage{fancyvrb}
 % \usepackage[backend=pgf,extension=pgf,input,outputdir=diagrams]{diagrams-latex}
 \graphicspath{{images/}}
 
@@ -16,6 +17,9 @@
 
 %% a bit more space for matrices
 \setlength{\arraycolsep}{5pt}
+
+\newcommand{\ty}[3]{{#1} \vdash {#2} : {#3}}
+\newcommand{\nty}[3]{{#1} \nvdash {#2} : {#3}}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -146,32 +150,53 @@ When checking the inferred type
 
 \begin{xframe}{Theses}
   \begin{itemize}
-  \item Move away from static \emph{error messages} to dynamic,
-    interactive \emph{error explanations}. \medskip
-  \item Allow the user to explore \emph{constructive evidence for errors}.
+  \item<+-> Interactive \emph{error explanations} instead of static
+    \emph{error messages}.
+  \item<+-> \emph{Error explanation} = \emph{constructive evidence} for
+    an error.
   \end{itemize}
 \end{xframe}
 
 \section{The Curse of Information}
 
-\begin{xframe}
-  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
+\begin{xframe}{}
+  \begin{center}
+\begin{BVerbatim}
+(\f -> f 3) (\p -> fst p)
+\end{BVerbatim}
+  \end{center}
+\end{xframe}
 
-  \begin{verbatim}
-    Type mismatch between expected type (t, b0) and actual type Int
-  \end{verbatim}
+\begin{xframe}{}
+%  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
+
+  \begin{center}
+    \begin{BVerbatim}
+(\f -> f 3) (\p -> fst p)
+    \end{BVerbatim}
+
+    \begin{verbatim}
+Type mismatch between expected type (t, b0) and actual type Int
+    \end{verbatim}
+  \end{center}
 \end{xframe}
 
 \begin{xframe}
-  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
+%  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
 
-  \begin{verbatim}
-    Type mismatch between expected type (t, b0) and actual type Int
-      In the first argument of fst, namely p
-      In the expression: fst p
-      In the first argument of \ f -> f 3, namely
-        (\ p -> fst p)
-  \end{verbatim}
+  \begin{center}
+    \begin{BVerbatim}
+(\f -> f 3) (\p -> fst p)
+    \end{BVerbatim}
+
+\begin{verbatim}
+Type mismatch between expected type (t, b0) and actual type Int
+  In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f 3, namely
+    (\ p -> fst p)
+\end{verbatim}
+  \end{center}
 \end{xframe}
 
 \begin{xframe}
@@ -182,7 +207,7 @@ When checking the inferred type
       In the expression: fst p
       In the first argument of \ f -> f 3, namely
         (\ p -> fst p)
-      Relevant bindings include
+      Relevant bindings include:
         fst :: (a,b) -> a
       Inferred types for subterms:
         3             :: Int
@@ -198,8 +223,61 @@ When checking the inferred type
 
 \begin{xframe}{}
   \begin{center}
-    \includegraphics{what-the-function.jpg}
+    \includegraphics[width=3in]{not-helping.jpg}
   \end{center}
 \end{xframe}
+
+\begin{xframe}
+  \footnotesize
+  \begin{verbatim}
+    Type mismatch between expected type (t, b0) and actual type Int
+      In the first argument of fst, namely p
+      In the expression: fst p
+      In the first argument of \ f -> f 3, namely
+        (\ p -> fst p)
+      Relevant bindings include:
+        fst :: (a,b) -> a
+      Inferred types for subterms:
+        3             :: Int
+        (\f -> f 3)   :: forall a. (Int -> a) -> a
+        (\p -> fst p) :: (Int -> a0)
+        (\f -> f 3) (\p -> fst p) :: a0
+      Suggested fixes:
+        Change p to (p,y)
+        Change fst to a function expecting an Int
+        Change 3 to (x,y)
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}{}
+  XXX real problem: we're stuck on static error MESSAGES.
+  Generate structured error EXPLANATIONS and give various ways of
+  exploring them.
+
+  (XXX include some references --- this is not a new idea, but it
+  ought to be better known.)
+\end{xframe}
+
+\section{Explaining errors}
+
+\begin{xframe}{}
+\begin{align*}
+  t &::= x \mid \abs x \tau t \mid \app{t_1}{t_2} \\
+  \tau &::= B \mid \tau_1 \to \tau_2 \\
+  \Gamma &::= \cdot \mid \Gamma,x:\tau
+\end{align*}
+\end{xframe}
+
+\begin{xframe}{}
+\begin{mathpar}
+  \inferrule{x : \tau \in \Gamma}{\ty \Gamma x \tau} \and
+  \inferrule{\ty {\Gamma, x:\tau_1} t {\tau_2}}{\ty \Gamma {\abs x
+      {\tau_1} t}{\tau_1 \to \tau_2}} \and
+  \inferrule{\ty \Gamma {t_1} {\tau_1 \to \tau_2} \\ \ty \Gamma {t_2} {\tau_1}}
+            {\ty \Gamma {\app{t_1}{t_2}} {\tau_2}}
+\end{mathpar}
+\end{xframe}
+
+
 
 \end{document}

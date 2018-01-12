@@ -7,6 +7,7 @@
 \usepackage{brent}
 \usepackage{xspace}
 \usepackage{fancyvrb}
+\usepackage{ulem}
 % \usepackage[backend=pgf,extension=pgf,input,outputdir=diagrams]{diagrams-latex}
 \graphicspath{{images/}}
 
@@ -150,9 +151,10 @@ When checking the inferred type
 
 \begin{xframe}{Theses}
   \begin{itemize}
-  \item<+-> Interactive \emph{error explanations} instead of static
+  \item ``Improving'' error messages doesn't fundamentally help.
+  \item Interactive \emph{error explanations} instead of static
     \emph{error messages}.
-  \item<+-> \emph{Error explanation} = \emph{constructive evidence} for
+  \item \emph{Error explanation} = \emph{constructive evidence} for
     an error.
   \end{itemize}
 \end{xframe}
@@ -250,14 +252,73 @@ Type mismatch between expected type (t, b0) and actual type Int
 \end{xframe}
 
 \begin{xframe}{}
-  XXX real problem: we're stuck on static error MESSAGES.
-  Generate structured error EXPLANATIONS and give various ways of
-  exploring them.
-
-  (XXX include some references --- this is not a new idea, but it
-  ought to be better known.)
+  \Large
+  \begin{center}
+    \sout{MESSAGES} \\
+    $\Downarrow$ \\
+    EXPLANATIONS
+  \end{center}
 \end{xframe}
 
+\begin{xframe}{}
+  \small
+\begin{verbatim}
+p is expected to have a pair type but was inferred to have type Int.
+  + Why is p expected to have a pair type?
+  + Why was p inferred to have type Int?
+
+
+
+
+
+
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{}
+  \small
+\begin{verbatim}
+p is expected to have a pair type but was inferred to have type Int.
+  + Why is p expected to have a pair type?
+  - Why was p inferred to have type Int?
+    => p is the parameter of the lambda expression \p -> fst p, which
+       must have type (Int -> a0).
+    + Why must (\p -> fst p) have type (Int -> a0)?
+
+
+
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{}
+  \small
+\begin{verbatim}
+p is expected to have a pair type but was inferred to have type Int.
+  + Why is p expected to have a pair type?
+  - Why was p inferred to have type Int?
+    => p is the parameter of the lambda expression \p -> fst p, which
+       must have type (Int -> a0).
+    - Why must (\p -> fst p) have type (Int -> a0)?
+      => It is an argument to (\f -> f 3), which was inferred to have
+         type (∀a. (Int -> a) -> a).
+      + Why was (\f -> f 3) inferred to have type (∀a. (Int -> a) -> a)?
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{Related work\dots}
+  \begin{itemize}
+  \item Plociniczak \& Odersky: Scalad (2012)
+  \item Stuckey, Sulzmann \& Wazny: Chameleon (2003)
+  \item Simon, Chitil, \& Huch (2000)
+  \item Beaven \& Stansifer (1993)
+  \end{itemize}
+
+  Also\dots
+  \begin{itemize}
+  \item Seidel, Jhala \& Weimer: dynamic witnesses for errors
+    (2016). A great idea, but not the focus of this talk.
+  \end{itemize}
+\end{xframe}
 \section{Explaining errors}
 
 \begin{xframe}{}
@@ -278,6 +339,38 @@ Type mismatch between expected type (t, b0) and actual type Int
 \end{mathpar}
 \end{xframe}
 
+\begin{xframe}{}
+  Type inference: Term -> Maybe Type
 
+  Better: Term -> Maybe TypingDerivation
+
+  Term -> Either UnTypingDerivation TypingDerivation
+
+  see Ulf Norell,
+  http://www.cse.chalmers.se/~ulfn/code/icfp2013/ICFP.html
+\end{xframe}
+
+\begin{xframe}
+  Let's do a concrete example.
+
+  Show rules for STLC, in Agda.  Show metatheorem.
+\end{xframe}
+
+\begin{xframe}
+  Existing tools just let you explore typing derivations, e.g. to
+  compare two of them that don't match, or with some place where they
+  went wrong marked.
+
+  Thinking in terms of untyping derivations gives us a lot more
+  freedom to design explanations in whatever way we want.
+
+  Options: untyping derivation is essentially a typing derivation with
+  a hole.  Or with many holes.  But could be other things as well, or
+  a combination.
+\end{xframe}
+
+\begin{xframe}
+  Unification??
+\end{xframe}
 
 \end{document}

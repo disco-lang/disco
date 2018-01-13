@@ -264,6 +264,38 @@
 \ReadOnlyOnce{agda.fmt}%
 
 
+\RequirePackage[T1]{fontenc}
+\RequirePackage[utf8x]{inputenc}
+\RequirePackage{ucs}
+\RequirePackage{amsfonts}
+
+\providecommand\mathbbm{\mathbb}
+
+% TODO: Define more of these ...
+\DeclareUnicodeCharacter{737}{\textsuperscript{l}}
+\DeclareUnicodeCharacter{8718}{\ensuremath{\blacksquare}}
+\DeclareUnicodeCharacter{8759}{::}
+\DeclareUnicodeCharacter{9669}{\ensuremath{\triangleleft}}
+\DeclareUnicodeCharacter{8799}{\ensuremath{\stackrel{\scriptscriptstyle ?}{=}}}
+\DeclareUnicodeCharacter{10214}{\ensuremath{\llbracket}}
+\DeclareUnicodeCharacter{10215}{\ensuremath{\rrbracket}}
+
+% TODO: This is in general not a good idea.
+\providecommand\textepsilon{$\epsilon$}
+\providecommand\textmu{$\mu$}
+
+
+%Actually, varsyms should not occur in Agda output.
+
+% TODO: Make this configurable. IMHO, italics doesn't work well
+% for Agda code.
+
+\renewcommand\Varid[1]{\mathord{\textsf{#1}}}
+\let\Conid\Varid
+\newcommand\Keyword[1]{\textsf{\textbf{#1}}}
+\EndFmtInput
+
+
 
 \usepackage[all]{xy}
 \usepackage{brent}
@@ -382,7 +414,7 @@
 
 \title{Explaining Type Errors}
 \date{\theschool \\ \thedate}
-\author{\usebeamercolor[fg]{title}{Brent Yorgey} \and Richard
+\author{{\usebeamercolor[fg]{title} Brent Yorgey} \and Richard
   Eisenberg \and Harley Eades}
 % \titlegraphic{\includegraphics[width=1in]{deriv-tree}}
 
@@ -433,31 +465,19 @@ When checking the inferred type
 \begin{BVerbatim}
 (\f -> f 3) (\p -> fst p)
 \end{BVerbatim}
-  \end{center}
-\end{xframe}
+\medskip
 
-\begin{xframe}{}
-%  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
-
-  \begin{center}
-    \begin{BVerbatim}
-(\f -> f 3) (\p -> fst p)
-    \end{BVerbatim}
-
+\begin{overprint}
+  \onslide<2>
     \begin{Verbatim}
 Type mismatch between expected type (t, b0) and actual type Int
+
+
+
+
     \end{Verbatim}
-  \end{center}
-\end{xframe}
 
-\begin{xframe}
-%  $\app{(\uabs{f}{\app{f}{3}})}{(\uabs{p}{\app{fst}{p}})}$
-
-  \begin{center}
-    \begin{BVerbatim}
-(\f -> f 3) (\p -> fst p)
-    \end{BVerbatim}
-
+  \onslide<3>
 \begin{Verbatim}
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -465,33 +485,83 @@ Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of \ f -> f 3, namely
     (\ p -> fst p)
 \end{Verbatim}
-  \end{center}
-\end{xframe}
 
-\begin{xframe}
-  \footnotesize
+\onslide<4>
 \begin{Verbatim}
-    Type mismatch between expected type (t, b0) and actual type Int
-      In the first argument of fst, namely p
-      In the expression: fst p
-      In the first argument of \ f -> f 3, namely
-        (\ p -> fst p)
-      Relevant bindings include:
-        fst :: (a,b) -> a
-      Inferred types for subterms:
-        3             :: Int
-        (\f -> f 3)   :: forall a. (Int -> a) -> a
-        (\p -> fst p) :: (Int -> a0)
-        (\f -> f 3) (\p -> fst p) :: a0
-      Suggested fixes:
-        Change p to (p,y)
-        Change fst to a function expecting an Int
-        Change 3 to (x,y)
+Type mismatch between expected type (t, b0) and actual type Int
+  In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f 3, namely
+    (\ p -> fst p)
+  Inferred types for subterms:
+    3             :: Int
+    (\f -> f 3)   :: forall a. (Int -> a) -> a
+    (\p -> fst p) :: (Int -> a0)
+    (\f -> f 3) (\p -> fst p) :: a0
 \end{Verbatim}
-\end{xframe}
 
-% XXX IF TIME: make one more slide, even more ridiculously small &
-% crowded with info
+\onslide<5>
+\begin{Verbatim}
+Type mismatch between expected type (t, b0) and actual type Int
+  In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f 3, namely
+    (\ p -> fst p)
+  Inferred types for subterms:
+    3             :: Int
+    (\f -> f 3)   :: forall a. (Int -> a) -> a
+    (\p -> fst p) :: (Int -> a0)
+    (\f -> f 3) (\p -> fst p) :: a0
+  Relevant bindings include:
+    fst :: (a,b) -> a
+\end{Verbatim}
+
+\onslide<6>
+\begin{Verbatim}[fontsize=\footnotesize]
+Type mismatch between expected type (t, b0) and actual type Int
+  In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f 3, namely
+    (\ p -> fst p)
+  Inferred types for subterms:
+    3             :: Int
+    (\f -> f 3)   :: forall a. (Int -> a) -> a
+    (\p -> fst p) :: (Int -> a0)
+    (\f -> f 3) (\p -> fst p) :: a0
+  Relevant bindings include:
+    fst :: (a,b) -> a
+  Suggested fixes:
+    Change p to (p,y)
+    Change fst to a function expecting an Int
+    Change 3 to (x,y)
+\end{Verbatim}
+
+\onslide<7>
+\begin{Verbatim}[fontsize=\scriptsize]
+Type mismatch between expected type (t, b0) and actual type Int
+  In the first argument of fst, namely p
+  In the expression: fst p
+  In the first argument of \ f -> f 3, namely
+    (\ p -> fst p)
+  Inferred types for subterms:
+    3             :: Int
+    (\f -> f 3)   :: forall a. (Int -> a) -> a
+    (\p -> fst p) :: (Int -> a0)
+    (\f -> f 3) (\p -> fst p) :: a0
+  Relevant bindings include:
+    fst :: (a,b) -> a
+  Suggested fixes:
+    Change p to (p,y)
+    Change fst to a function expecting an Int
+    Change 3 to (x,y)
+  Relevant documentation:
+    https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-260003.3
+    https://www.haskell.org/onlinereport/haskell2010/haskellch3.html#x8-360003.8
+    http://dev.stephendiehl.com/fun/006_hindley_milner.html
+\end{Verbatim}
+\end{overprint}
+\end{center}
+\end{xframe}
 
 \begin{xframe}{}
   \begin{center}
@@ -499,26 +569,12 @@ Type mismatch between expected type (t, b0) and actual type Int
   \end{center}
 \end{xframe}
 
-\begin{xframe}
-  \footnotesize
-  \begin{Verbatim}
-    Type mismatch between expected type (t, b0) and actual type Int
-      In the first argument of fst, namely p
-      In the expression: fst p
-      In the first argument of \ f -> f 3, namely
-        (\ p -> fst p)
-      Relevant bindings include:
-        fst :: (a,b) -> a
-      Inferred types for subterms:
-        3             :: Int
-        (\f -> f 3)   :: forall a. (Int -> a) -> a
-        (\p -> fst p) :: (Int -> a0)
-        (\f -> f 3) (\p -> fst p) :: a0
-      Suggested fixes:
-        Change p to (p,y)
-        Change fst to a function expecting an Int
-        Change 3 to (x,y)
-  \end{Verbatim}
+\begin{xframe}{The Curse of Information}
+  \begin{itemize}
+  \item<+-> Not enough information $\Rightarrow$ confusing
+  \item<+-> Too much information $\Rightarrow$ overwhelming
+  \item<+-> No middle ground!
+  \end{itemize}
 \end{xframe}
 
 \begin{xframe}{}
@@ -586,11 +642,13 @@ p is expected to have a pair type but was inferred to have type Int.
   \item Beaven \& Stansifer (1993)
   \end{itemize}
 
-  Also\dots
-  \begin{itemize}
-  \item Seidel, Jhala \& Weimer: dynamic witnesses for errors
-    (ICFP 2016). A great idea, but not the focus of this talk.
-  \end{itemize}
+  Not new! But not enough attention\dots
+
+  % Also\dots
+  % \begin{itemize}
+  % \item Seidel, Jhala \& Weimer: dynamic witnesses for errors
+  %   (ICFP 2016). A great idea, but not the focus of this talk.
+  % \end{itemize}
 \end{xframe}
 \section{Explaining errors}
 
@@ -601,7 +659,7 @@ p is expected to have a pair type but was inferred to have type Int.
 \begin{hscode}\SaveRestoreHook
 \column{B}{@{}>{\hspre}l<{\hspost}@{}}%
 \column{E}{@{}>{\hspre}l<{\hspost}@{}}%
-\>[B]{}\Varid{infer}\mathbin{:}\Conid{Context}\to \Conid{Term}\to \Conid{Maybe}\;\Conid{Type}{}\<[E]%
+\>[B]{}\Varid{infer}\;\mathbin{:}\;\Conid{Context}\;\to \;\Conid{Term}\;\to \;\Conid{Maybe}\;\Conid{Type}{}\<[E]%
 \ColumnHook
 \end{hscode}\resethooks
 
@@ -609,7 +667,7 @@ p is expected to have a pair type but was inferred to have type Int.
 \begin{hscode}\SaveRestoreHook
 \column{B}{@{}>{\hspre}l<{\hspost}@{}}%
 \column{E}{@{}>{\hspre}l<{\hspost}@{}}%
-\>[B]{}\Varid{infer}\mathbin{:}\Conid{Context}\to \Conid{Term}\to \Conid{Maybe}\;\Conid{TypingDerivation}{}\<[E]%
+\>[B]{}\Varid{infer}\;\mathbin{:}\;\Conid{Context}\;\to \;\Conid{Term}\;\to \;\Conid{Maybe}\;\Conid{TypingDerivation}{}\<[E]%
 \ColumnHook
 \end{hscode}\resethooks
 
@@ -617,44 +675,36 @@ p is expected to have a pair type but was inferred to have type Int.
 \begin{hscode}\SaveRestoreHook
 \column{B}{@{}>{\hspre}l<{\hspost}@{}}%
 \column{E}{@{}>{\hspre}l<{\hspost}@{}}%
-\>[B]{}\Varid{infer}\mathbin{:}\Conid{Context}\to \Conid{Term}\to (\Conid{Error}\mathbin{+}\Conid{TypingDerivation}){}\<[E]%
+\>[B]{}\Varid{infer}\;\mathbin{:}\;\Conid{Context}\;\to \;\Conid{Term}\;\to \;(\Conid{Error}\;\Varid{+}\;\Conid{TypingDerivation}){}\<[E]%
 \ColumnHook
 \end{hscode}\resethooks
 
-\onslide<4>
+\onslide<4->
 \begin{hscode}\SaveRestoreHook
 \column{B}{@{}>{\hspre}l<{\hspost}@{}}%
 \column{E}{@{}>{\hspre}l<{\hspost}@{}}%
-\>[B]{}\Varid{infer}\mathbin{:}\Conid{Context}\to \Conid{Term}\to (\neg\;\Conid{TypingDerivation}\mathbin{+}\Conid{TypingDerivation}){}\<[E]%
-\ColumnHook
-\end{hscode}\resethooks
-
-\onslide<5->
-\begin{hscode}\SaveRestoreHook
-\column{B}{@{}>{\hspre}l<{\hspost}@{}}%
-\column{E}{@{}>{\hspre}l<{\hspost}@{}}%
-\>[B]{}\Varid{infer}\mathbin{:}\Conid{Context}\to \Conid{Term}\to (\Conid{UntypingDerivation}\mathbin{+}\Conid{TypingDerivation}){}\<[E]%
+\>[B]{}\Varid{infer}\;\mathbin{:}\;\Conid{Context}\;\to \;\Conid{Term}\;\to \;(\Conid{UntypingDerivation}\;\Varid{+}\;\Conid{TypingDerivation}){}\<[E]%
 \ColumnHook
 \end{hscode}\resethooks
 
 \end{overprint}
 
 \begin{overprint}
-  \onslide<6>
-  See Ulf Norell invited talk @ ICFP 2013: \\
+  \onslide<5>
+  See Ulf Norell keynote @ ICFP 2013: \\
   \url{http://www.cse.chalmers.se/~ulfn/code/icfp2013/ICFP.html}
 
-  \onslide<7->
+  \onslide<6->
   \begin{center}
     To generate interactive error explanations, \\
     \emph{focus on designing untyping derivations}.
   \end{center}
 \end{overprint}
 
-\onslide<8>
-\begin{center}
-  (or unparsing derivations, or nontermination derivations, or \dots?)
-\end{center}
+% \onslide<7>
+% \begin{center}
+%   (or unparsing derivations, or nontermination derivations, or \dots?)
+% \end{center}
 \end{xframe}
 
 \begin{xframe}{Example: STLC + \N}
@@ -682,29 +732,29 @@ p is expected to have a pair type but was inferred to have type Int.
 \begin{xframe}{Untyping for STLC + $\N$}
   \framebox{$\nty \Gamma t {\tau}$}
   \begin{overprint}
-    \onslide<1>
+    \onslide<2>
     \begin{mathpar}
       \inferrule*[right=Mismatch\frownie{}]{\ty \Gamma t {\tau_1} \\ \tau_1 \neq \tau_2}{\nty
         \Gamma t {\tau_2}}
     \end{mathpar}
 
-    \onslide<2>
+    \onslide<3>
     \begin{mathpar}
       \inferrule{ }{\N \neq (\tau_1 \to \tau_2)} \and
       \inferrule{\tau_1 \neq \tau_2}{(\tau_1 \to \tau_3) \neq (\tau_2
         \to \tau_4)} \and \dots
     \end{mathpar}
 
-    \onslide<3>
+    \onslide<4>
     \begin{mathpar}
       \inferrule*[right=PlusL\frownie{}]{\nty \Gamma {t_1} {\N}}{\nty \Gamma {t_1 + t_2}
         {\tau}} \and
       \inferrule*[right=PlusR\frownie{}]{\nty \Gamma {t_2} {\N}}{\nty \Gamma {t_1 + t_2}
-        {\tau}} \and
+        {\tau}} \\
       \inferrule*[right=PlusTy\frownie{}]{\tau \neq \N}{\nty \Gamma {t_1 + t_2} {\tau}}
     \end{mathpar}
 
-    \onslide<4>
+    \onslide<5>
     \begin{mathpar}
       \inferrule*[right=AbsTy\frownie{}]
       {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
@@ -722,7 +772,7 @@ p is expected to have a pair type but was inferred to have type Int.
       {\nty \Gamma {\abs x {\tau_1} t} {\tau_1 \to \tau_2}}
     \end{mathpar}
 
-    \onslide<5>
+    \onslide<6>
     \begin{mathpar}
       % ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
       % → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
@@ -767,7 +817,6 @@ f+2 is expected to have type N->N, but an addition
   - Why is f+2 expected to have type N->N?
     => f+2 is the body of the lambda expression \f:N->N. f+2,
        which is expected to have type (N->N)->N->N.
-       - Why is ...
   \end{Verbatim}
 \end{xframe}
 
@@ -804,39 +853,44 @@ f is expected to have type N, but has type N->N.
 
 \begin{xframe}{Correctness?}
   Q: How do we know if our definition of untyping is correct?
+  \vspace{0.8in}
 \end{xframe}
 
 \begin{xframe}{Correctness}
   A: prove a metatheorem!
-  \[ \neg \ty \Gamma t \tau \iff \nty \Gamma t \tau \] \medskip
+  \[ \neg \ty \Gamma t \tau \iff \nty \Gamma t \tau \]
 
-  \onslide<2->
-  ($\Rightarrow$): follows from decidability of type
-  inference/checking. \medskip
+  % \onslide<2->
+  % ($\Rightarrow$): follows from decidability of type
+  % inference/checking. \medskip
 
-  \onslide<3-> ($\Leftarrow$): $\nty \Gamma t \tau$ adequately encodes
-  evidence that $t$ does not have type $\tau$. \medskip
+  % \onslide<3-> ($\Leftarrow$): $\nty \Gamma t \tau$ adequately encodes
+  % evidence that $t$ does not have type $\tau$. \medskip
 
-  \onslide<4> Still a lot of room for variation: round-tripping need
+  \onslide<2> Still a lot of room for variation: round-tripping need
   not be the identity!
 \end{xframe}
 
 \section{Challenges}
 
+\begin{xframe}{Structure}
+  How well do questions \& explorations really correspond to the
+  structure of untyping derivations?
+\end{xframe}
+
 \begin{xframe}{Derive untyping derivations?}
-  \begin{itemize}
-  \item<+-> Treat typing rules as a big sum-of-products
-  \item<+-> Negate
-  \item<+-> Use De Morgan laws to push negation down to the leaves
-  \end{itemize}
-  \onslide<4>How well does this work in practice?
+  Can we automatically derive untyping rules from typing rules?
+  \medskip
+
+  {\scriptsize \dots mumble mumble inversion lemma mumble De Morgan mumble\dots}
 \end{xframe}
 
 \begin{xframe}{Unification?}
+  \onslide<2->
   \small Does $\app{(\abs{f}{Int \to Int}{\app f
       {(3,4)}})}{(\uabs{x}{x+1})}$ have a type?
 
-  \onslide<2>
+  \onslide<3>
   \tiny
   \begin{Verbatim}
 Can't unify Int and <Int, Int>
@@ -920,6 +974,22 @@ Can't unify <Int, Int> and Int
                 - Checking that <u2, u3> -> u2 = u4 -> u5
                   because fst is applied to an argument (namely, p), so its type (<u2, u3> -> u2) must be a function type.
 \end{Verbatim}
+\end{xframe}
+
+\begin{xframe}{Unification?}
+  How to explain unification failures to the user?
+  \begin{itemize}
+  \item<2-> Implementation matters!
+  \item<3-> Union-find might work better than substitutions?
+  \item<4> Come up with good untyping derivations and then write an
+    algorithm to produce them, rather than the other way around!
+  \end{itemize}
+\end{xframe}
+
+\begin{xframe}{}
+  \begin{center}
+    Questions/comments/ideas/discussion?
+  \end{center}
 \end{xframe}
 
 \end{document}

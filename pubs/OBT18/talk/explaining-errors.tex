@@ -1,4 +1,4 @@
-%% -*- mode: LaTeX; compile-command: "lhs2TeX --poly explaining-errors.lhs -o explaining-errors.tex && pdflatex explaining-errors.tex" -*-
+%% -*- mode: LaTeX; compile-command: "lhs2TeX --agda explaining-errors.lhs -o explaining-errors.tex && pdflatex explaining-errors.tex" -*-
 \documentclass[xcolor=svgnames,12pt,aspectratio=169]{beamer}
 
 %% ODER: format ==         = "\mathrel{==}"
@@ -260,6 +260,9 @@
 \makeatother
 \EndFmtInput
 %
+%
+\ReadOnlyOnce{agda.fmt}%
+
 
 
 \usepackage[all]{xy}
@@ -742,51 +745,181 @@ p is expected to have a pair type but was inferred to have type Int.
 \end{xframe}
 
 \begin{xframe}{Example}
+  Does $\abs{f}{\N \to \N}{f+2}$ have type $(\N \to \N) \to \N \to \N$?
+
+  \onslide<2->
   \begin{mathpar}
     \inferrule*[right=AbsBody\frownie{}]
     {
       \inferrule*[right=PlusTy\frownie{}]
-      {\N \to \N \neq \N
+      {\inferrule{ }{(\N \to \N) \neq \N}
       }
       {\nty {f : \N \to \N}{f + 2}{\N \to \N}}
     }
     {\nty \varnothing {\abs{f}{\N \to \N}{f + 2}}{(\N \to \N) \to \N
         \to \N}}
   \end{mathpar}
+
+  \onslide<3>
+  \begin{Verbatim}
+f+2 is expected to have type N->N, but an addition
+  must have type N.
+  - Why is f+2 expected to have type N->N?
+    => f+2 is the body of the lambda expression \f:N->N. f+2,
+       which is expected to have type (N->N)->N->N.
+       - Why is ...
+  \end{Verbatim}
+\end{xframe}
+
+\begin{xframe}{Example, take 2}
+  Does $\abs{f}{\N \to \N}{f+2}$ have type $(\N \to \N) \to \N \to \N$?
+
+  \onslide<2->
+  \begin{mathpar}
+    \inferrule*
+    {
+      \inferrule*[right=PlusL\frownie{}]
+      {
+        \inferrule*[right=Mismatch\frownie{}]
+        { \inferrule{ }{\ty{f : \N \to \N}{f}{\N \to \N}} \\
+          \inferrule{ }{(\N \to \N) \neq \N}
+        }
+        {\nty {f : \N \to \N}{f}{\N}}
+      }
+      {\nty {f : \N \to \N}{f+2}{\N \to \N}}
+    }
+    {\nty \varnothing {\abs{f}{\N \to \N}{f + 2}}{(\N \to \N) \to \N
+        \to \N}}
+  \end{mathpar}
+
+  \onslide<3>
+  \begin{Verbatim}
+f is expected to have type N, but has type N->N.
+  - Why is f expected to have type N?
+    => f is used as an argument to the addition operator.
+  - Why does f have type N->N?
+    => f is the parameter of the lambda expression \f:N->N. f+2.
+  \end{Verbatim}
 \end{xframe}
 
 \begin{xframe}{Correctness?}
+  Q: How do we know if our definition of untyping is correct?
+\end{xframe}
+
+\begin{xframe}{Correctness}
+  A: prove a metatheorem!
   \[ \neg \ty \Gamma t \tau \iff \nty \Gamma t \tau \] \medskip
 
   \onslide<2->
   ($\Rightarrow$): follows from decidability of type
   inference/checking. \medskip
 
-  \onslide<3->
-  ($\Leftarrow$): more interesting; $\nty \Gamma t \tau$ adequately
-  encodes evidence that $t$ does not have type $\tau$. \medskip
+  \onslide<3-> ($\Leftarrow$): $\nty \Gamma t \tau$ adequately encodes
+  evidence that $t$ does not have type $\tau$. \medskip
 
-  \onslide<4>
-  Still a lot of room for variations: round-tripping need not
-  be the identity!
+  \onslide<4> Still a lot of room for variation: round-tripping need
+  not be the identity!
 \end{xframe}
 
-\begin{xframe}{Exploring explanations}
+\section{Challenges}
+
+\begin{xframe}{Derive untyping derivations?}
   \begin{itemize}
-  \item<+-> Untyping derivation = typing derivation with one negated
-    subterm?
-  \item<+-> Untyping derivation = typing derivation with many negated
-    subterms?
-  \item<+-> Untyping derivation = typing derivation with negated subterms
-    pushed as far to the leaves as possible?
-  \item<+-> \dots pulled as far toward the root as possible?
-  \item<+-> Treat typing rules as a big sum-of-products, negate, and
-    apply De Morgan laws?
+  \item<+-> Treat typing rules as a big sum-of-products
+  \item<+-> Negate
+  \item<+-> Use De Morgan laws to push negation down to the leaves
   \end{itemize}
+  \onslide<4>How well does this work in practice?
 \end{xframe}
 
-% \begin{xframe}{Unification?}
-  
-% \end{xframe}
+\begin{xframe}{Unification?}
+  \small Does $\app{(\abs{f}{Int \to Int}{\app f
+      {(3,4)}})}{(\uabs{x}{x+1})}$ have a type?
+
+  \onslide<2>
+  \tiny
+  \begin{Verbatim}
+Can't unify Int and <Int, Int>
+- Checking that Int = <Int, Int>
+  because the input types of Int -> Int and <Int, Int> -> u5 must match.
+    - Checking that Int -> Int = <Int, Int> -> u5
+      because it resulted from applying [u1 |-> <Int, Int>] to the constraint Int -> Int = u1 -> u5.
+        - Inferred that u1 = <Int, Int>
+          because <3, 4> is an argument to a function (namely, f), so its type <Int, Int> must be the same as the function's
+          input type u1.
+        - Checking that Int -> Int = u1 -> u5
+          because it resulted from applying [u2 |-> u5] to the constraint Int -> Int = u1 -> u2.
+            - Inferred that u2 = u5
+              because the output types of (Int -> Int) -> u2 and (u3 -> Int) -> u5 must match.
+                - Inferred that (Int -> Int) -> u2 = (u3 -> Int) -> u5
+                  because it resulted from applying [u4 |-> u3 -> Int] to the constraint (Int -> Int) -> u2 = u4 -> u5.
+                    - Inferred that u4 = u3 -> Int
+                      because ^x. x + 1 is an argument to a function (namely, ^f : Int -> Int. f <3, 4>), so its type
+                      u3 -> Int must be the same as the function's input type u4.
+                    - Inferred that (Int -> Int) -> u2 = u4 -> u5
+                      because ^f : Int -> Int. f <3, 4> is applied to an argument (namely, ^x. x + 1), so its type
+                      ((Int -> Int) -> u2) must be a function type.
+            - Checking that Int -> Int = u1 -> u2
+              because f is applied to an argument (namely, <3, 4>), so its type (Int -> Int) must be a function type.
+  \end{Verbatim}
+\end{xframe}
+
+\begin{xframe}{Unification?}
+\small Does $\app{(\uabs{p}{\app{fst}{p} + 3})}{((2,5), 6)}$ have a
+type?
+
+\onslide<2>
+\begin{Verbatim}[fontsize=\TINY]
+Can't unify <Int, Int> and Int
+- Checking that <Int, Int> = Int
+  because it resulted from applying [u2 |-> <Int, Int>] to the constraint u2 = Int.
+    - Inferred that u2 = <Int, Int>
+      because the first components of <u2, u3> and <<Int, Int>, Int> must match.
+        - Inferred that <u2, u3> = <<Int, Int>, Int>
+          because the input types of <u2, u3> -> u2 and <<Int, Int>, Int> -> Int must match.
+            - Inferred that <u2, u3> -> u2 = <<Int, Int>, Int> -> Int
+              because it resulted from applying [u4 |-> <<Int, Int>, Int>] to the constraint <u2, u3> -> u2 = u4 -> Int.
+                - Inferred that u4 = <<Int, Int>, Int>
+                  because it resulted from applying [u1 |-> <<Int, Int>, Int>] to the constraint u1 = u4.
+                    - Inferred that u1 = <<Int, Int>, Int>
+                      because the input types of u1 -> Int and <<Int, Int>, Int> -> u7 must match.
+                        - Inferred that u1 -> Int = <<Int, Int>, Int> -> u7
+                          because it resulted from applying [u6 |-> <<Int, Int>, Int>] to the constraint u1 -> Int = u6 -> u7.
+                            - Inferred that u6 = <<Int, Int>, Int>
+                              because <<2, 5>, 6> is an argument to a function (namely, ^p. fst p + 3), so its type <<Int, Int>, Int> must be the same as the function's input type u6.
+                            - Inferred that u1 -> Int = u6 -> u7
+                              because ^p. fst p + 3 is applied to an argument (namely, <<2, 5>, 6>), so its type (u1 -> Int) must be a function type.
+                    - Inferred that u1 = u4
+                      because p is an argument to a function (namely, fst), so its type u1 must be the same as the function's input type u4.
+                - Inferred that <u2, u3> -> u2 = u4 -> Int
+                  because it resulted from applying [u5 |-> Int] to the constraint <u2, u3> -> u2 = u4 -> u5.
+                    - Inferred that u5 = Int
+                      because fst p, which was inferred to have type u5, must also have type Int.
+                    - Inferred that <u2, u3> -> u2 = u4 -> u5
+                      because fst is applied to an argument (namely, p), so its type (<u2, u3> -> u2) must be a function type.
+    - Checking that u2 = Int
+      because the output types of <u2, u3> -> u2 and <<Int, Int>, Int> -> Int must match.
+        - Checking that <u2, u3> -> u2 = <<Int, Int>, Int> -> Int
+          because it resulted from applying [u4 |-> <<Int, Int>, Int>] to the constraint <u2, u3> -> u2 = u4 -> Int.
+            - Inferred that u4 = <<Int, Int>, Int>
+              because it resulted from applying [u1 |-> <<Int, Int>, Int>] to the constraint u1 = u4.
+                - Inferred that u1 = <<Int, Int>, Int>
+                  because the input types of u1 -> Int and <<Int, Int>, Int> -> u7 must match.
+                    - Inferred that u1 -> Int = <<Int, Int>, Int> -> u7
+                      because it resulted from applying [u6 |-> <<Int, Int>, Int>] to the constraint u1 -> Int = u6 -> u7.
+                        - Inferred that u6 = <<Int, Int>, Int>
+                          because <<2, 5>, 6> is an argument to a function (namely, ^p. fst p + 3), so its type <<Int, Int>, Int> must be the same as the function's input type u6.
+                        - Inferred that u1 -> Int = u6 -> u7
+                          because ^p. fst p + 3 is applied to an argument (namely, <<2, 5>, 6>), so its type (u1 -> Int) must be a function type.
+                - Inferred that u1 = u4
+                  because p is an argument to a function (namely, fst), so its type u1 must be the same as the function's input type u4.
+            - Checking that <u2, u3> -> u2 = u4 -> Int
+              because it resulted from applying [u5 |-> Int] to the constraint <u2, u3> -> u2 = u4 -> u5.
+                - Inferred that u5 = Int
+                  because fst p, which was inferred to have type u5, must also have type Int.
+                - Checking that <u2, u3> -> u2 = u4 -> u5
+                  because fst is applied to an argument (namely, p), so its type (<u2, u3> -> u2) must be a function type.
+\end{Verbatim}
+\end{xframe}
 
 \end{document}

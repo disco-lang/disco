@@ -135,6 +135,8 @@
    \titlepage
 \end{xframe}
 
+% \note{Foo bar}
+
 \begin{xframe}{The Dreaded Type Error Message}
 \footnotesize
 \begin{Verbatim}

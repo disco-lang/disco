@@ -1,5 +1,5 @@
 %% -*- mode: LaTeX; compile-command: "lhs2TeX --agda explaining-errors.lhs -o explaining-errors.tex && pdflatex explaining-errors.tex" -*-
-\documentclass[xcolor=svgnames,12pt,aspectratio=169]{beamer}
+\documentclass[xcolor=svgnames,12pt,aspectratio=169,notes]{beamer}
 
 %include agda.fmt
 
@@ -135,7 +135,8 @@
    \titlepage
 \end{xframe}
 
-% \note{Foo bar}
+\note{Every beginning programmer using a statically typed language is
+  all too familiar with\dots}
 
 \begin{xframe}{The Dreaded Type Error Message}
 \footnotesize
@@ -153,11 +154,15 @@ When checking the inferred type
 \end{Verbatim}
 \end{xframe}
 
+\note{the Dreaded Type Error Message!}
+
 \begin{xframe}{}
   \begin{center}
     \includegraphics{what-the-function.jpg}
   \end{center}
 \end{xframe}
+
+\note{What can we do to make this better?}
 
 \begin{xframe}{Theses}
   \begin{itemize}
@@ -168,6 +173,17 @@ When checking the inferred type
     an error.
   \end{itemize}
 \end{xframe}
+
+\note{I'm going to propose three interrelated theses: first, although
+  improving error messages is certainly worthwhile, it doesn't really
+  fix the fundamental problem.  Second, we should think about moving
+  towards interactive error explanations rather than static error
+  messages; finally, I will propose a framework for thinking about how
+  to construct such explanations, in terms of constructive evidence
+  for errors.
+
+  First, let's understand what the fundamental problem is, which is
+  something I call ``the curse of information''.}
 
 \section{The Curse of Information}
 
@@ -187,8 +203,33 @@ Type mismatch between expected type (t, b0) and actual type Int
 
 
     \end{Verbatim}
+\end{overprint}
+  \end{center}
+\end{xframe}
 
-  \onslide<3>
+\note{Suppose a hypothetical beginning programmer has written this
+  expression.  (This looks Haskell-ish but what I'm going to say isn't
+  specific to any particular programming language.)
+
+  As it turns out, this is not type correct, so they might get an
+  error message like this: apparently the type checker was expecting
+  some kind of pair type but got an Int.
+
+  Now, for an experienced programmer, this might be enough to find and
+  fix the error.  But it's certainly not enough for our beginning
+  programmer; the error message doesn't even say \emph{where} the
+  problem is.
+  }
+
+\begin{xframe}{}
+  \begin{center}
+\begin{BVerbatim}
+(\f -> f 3) (\p -> fst p)
+\end{BVerbatim}
+\medskip
+
+\begin{overprint}
+\onslide<1>
 \begin{Verbatim}
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -197,7 +238,7 @@ Type mismatch between expected type (t, b0) and actual type Int
     (\ p -> fst p)
 \end{Verbatim}
 
-\onslide<4>
+\onslide<2>
 \begin{Verbatim}
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -211,7 +252,7 @@ Type mismatch between expected type (t, b0) and actual type Int
     (\f -> f 3) (\p -> fst p) :: a0
 \end{Verbatim}
 
-\onslide<5>
+\onslide<3>
 \begin{Verbatim}
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -227,7 +268,7 @@ Type mismatch between expected type (t, b0) and actual type Int
     fst :: (a,b) -> a
 \end{Verbatim}
 
-\onslide<6>
+\onslide<4>
 \begin{Verbatim}[fontsize=\footnotesize]
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -247,7 +288,7 @@ Type mismatch between expected type (t, b0) and actual type Int
     Change 3 to (x,y)
 \end{Verbatim}
 
-\onslide<7>
+\onslide<5>
 \begin{Verbatim}[fontsize=\scriptsize]
 Type mismatch between expected type (t, b0) and actual type Int
   In the first argument of fst, namely p
@@ -274,11 +315,26 @@ Type mismatch between expected type (t, b0) and actual type Int
 \end{center}
 \end{xframe}
 
+\note{OK, so let's add more information!  Now the error message says
+  where the problem is.
+
+  But the beginning programmer still might not understand \emph{why}
+  there is an error.  So let's add information about types of inferred
+  subterms, so they can see where different types are coming from.
+
+  But they might forget what \texttt{fst} is, so we could add
+  information about it.  Maybe they still have no idea what to do so
+  we could add some suggested fixes\dots and links to relevant
+  documentation\dots
+  }
+
 \begin{xframe}{}
   \begin{center}
     \includegraphics[width=3in]{not-helping.jpg}
   \end{center}
 \end{xframe}
+
+\note{This actually doesn't help!  Why not?}
 
 \begin{xframe}{The Curse of Information}
   \begin{itemize}
@@ -288,6 +344,20 @@ Type mismatch between expected type (t, b0) and actual type Int
   \end{itemize}
 \end{xframe}
 
+\note{This is what I am calling the Curse of Information.  If there's
+  not enough information, the programmer will obviously be confused
+  and have no idea what is going on.  On the other hand, if there is
+  too \emph{much} information, it will be overwhelming: both because
+  much of the information may turn out to be irrelevant, so it's hard
+  to pick out the information that is really needed; and simply
+  because psychologically it is overwhelming to see a giant wall of
+  text.
+
+  To make things worse, though, there \emph{is no} middle ground! The
+  problem is that the right amount of information, and which
+  information is relevant, will vary from programmer to programmer and
+  even from error to error with the same programmer.}
+
 \begin{xframe}{}
   \Large
   \begin{center}
@@ -296,6 +366,11 @@ Type mismatch between expected type (t, b0) and actual type Int
     EXPLANATIONS
   \end{center}
 \end{xframe}
+
+\note{The real problem is that we are fixated on static \emph{error
+    messages}.  We ought to instead think about dynamic \emph{error
+    explanations} where the programmer gets to interactively pick
+  exactly the information that is relevant to them.}
 
 \begin{xframe}{}
   \small
@@ -313,6 +388,18 @@ p is expected to have a pair type but was inferred to have type Int.
 \end{Verbatim}
 \end{xframe}
 
+\note{Let's look at a simple, completely made-up example of what this
+  might look like for our running example.  The programmer would
+  initially be presented with a basic type mismatch message, together
+  with several \emph{questions} they can expand if they wish to see
+  the answer.
+
+  In this case, perhaps the programmer thinks, ``I definitely know why
+  p is expected to have a pair type, because it is an argument to
+  \texttt{fst}; what I don't understand is why it was inferred to have
+  type \texttt{Int}.'' So they expand that question.
+  }
+
 \begin{xframe}{}
   \small
 \begin{Verbatim}
@@ -328,6 +415,11 @@ p is expected to have a pair type but was inferred to have type Int.
 
 \end{Verbatim}
 \end{xframe}
+
+\note{It might then explain to them that this is because p is the
+  parameter of a lambda expression which must have a type whose domain
+  is Int.  Perhaps they don't understand that either, so they can
+  expand another question.}
 
 \begin{xframe}{}
   \small
@@ -345,6 +437,20 @@ p is expected to have a pair type but was inferred to have type Int.
 \end{Verbatim}
 \end{xframe}
 
+\note{This step is then explained in turn: because this lambda
+  expression is an argument to \verb|(\f -> f 3)|, which was
+  inferred to have a certain type.  Perhaps, hypothetically, at this
+  point the light bulb turns on and they don't need to expand any
+  further.
+
+  [Something to point out, which I didn't say in the talk but fielded a
+  question about later: I am not advocating for a textual
+  question-answer format like this in particular.  This is just one
+  particular example of a possible manifestation of interactive error
+  explanations. One could also imagine things involving graph
+  visualizations, tooltips, or some mixture of all these things.]
+  }
+
 \begin{xframe}{Related work\dots}
   \begin{itemize}
   \item Plociniczak \& Odersky: Scalad (2012)
@@ -361,6 +467,24 @@ p is expected to have a pair type but was inferred to have type Int.
   %   (ICFP 2016). A great idea, but not the focus of this talk.
   % \end{itemize}
 \end{xframe}
+
+\note{This idea is not new.  There has been work on related things
+  over many years.  Most recently, an interactive type debugger for
+  Scala; in early 2000s there was a similar system for Haskell;  in
+  the 1990's there was some more foundational work.  But in my opinion
+  this area is not receiving enough attention.
+
+  [I did not mention this in my talk for time reasons, but some
+  reviewers mentioned Seidel, Jhala \& Weimer on generating dynamic
+  witnesses for type errors (ICFP 2016). This is a really cool idea,
+  but orthogonal to my proposal; we should do both.]
+
+  As far as I understand, all of these work by allowing the user to
+  interactively explore typing derivations; if there is anything novel
+  in my talk, it is my proposal of an alternative framework for
+  thinking about how to construct error explanations.
+  }
+
 \section{Explaining errors}
 
 \begin{xframe}{The type of type inference?}
@@ -375,36 +499,79 @@ infer : Context -> Term -> Maybe Type
 \begin{spec}
 infer : Context -> Term -> Maybe TypingDerivation
 \end{spec}
+  \end{overprint}
+\end{xframe}
 
-\onslide<3>
+\note{Let's start by thinking about the type of a type inference
+  algorithm.  (One could tell a similar story for type checking but
+  inference will be simpler for my purpose.)  We could start with a
+  simplistic version that takes as input a context and a term, and
+  either outputs a type for the term or fails.
+
+  Of course, this is unsatisfactory: how do we know that the output
+  type has anything to do with the input term?  And we'd like to know
+  \emph{why} the given term has this type.  The solution to this is
+  well-known: instead of outputting just a type, we output a
+  \emph{typing derivation} which is a (constructive) proof that the
+  given term has some type in the given context.
+  }
+
+\begin{xframe}{The type of type inference?}
+  \begin{overprint}
+
+\onslide<1>
 \begin{spec}
 infer : Context -> Term -> (Error + TypingDerivation)
 \end{spec}
 
-\onslide<4->
+\onslide<2->
 \begin{spec}
 infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
 \end{spec}
 
 \end{overprint}
+\end{xframe}
+
+\note{Of course, we don't just want to fail---we should return some
+  kind of error if the term does not have a type.  This is how lots of
+  existing typecheckers actually look.
+
+  But simply generating an error is unsatisfactory for similar reasons
+  that simply generating a type was unsatisfactory---how do we know
+  the error has anything to do with the term?  \emph{Why} was a
+  particular error generated?
+
+  The solution is also parallel: instead of an error we should return
+  \emph{constructive evidence} that the term does \emph{not} have a
+  type, which I call an \emph{untyping derivation}.
+  }
+
+\begin{xframe}{The type of type inference?}
+\begin{spec}
+infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
+\end{spec}
 
 \begin{overprint}
-  \onslide<5>
+  \onslide<1>
   See Ulf Norell keynote @@ ICFP 2013: \\
   \url{http://www.cse.chalmers.se/~ulfn/code/icfp2013/ICFP.html}
 
-  \onslide<6->
+  \onslide<2->
   \begin{center}
     To generate interactive error explanations, \\
     \emph{focus on designing untyping derivations}.
   \end{center}
 \end{overprint}
-
-% \onslide<7>
-% \begin{center}
-%   (or unparsing derivations, or nontermination derivations, or \dots?)
-% \end{center}
 \end{xframe}
+
+\note{
+  This is not really new either: Ulf Norell actually gave a nice
+  keynote at ICFP in Boston where he essentially livecoded a type
+  inference algorithm very much like this for the STLC in Agda.
+
+  I propose that a principled way to think about generating error
+  explanations is to focus on designing untyping derivations.
+}
 
 \begin{xframe}{Example: STLC + \N}
 \begin{align*}
@@ -413,6 +580,13 @@ infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
   \Gamma &::= \varnothing \mid \Gamma,x:\tau
 \end{align*}
 \end{xframe}
+
+\note{
+  Let's look at a simple example.  We'll consider the STLC with
+  natural number literals and addition expressions. Notice that
+  lambdas have type annotations which will make things a lot simpler.
+  There is a primitive type of natural numbers and arrow types.
+  }
 
 \begin{xframe}{Example: STLC + \N}
 \framebox{$\ty \Gamma t {\tau}$}
@@ -427,6 +601,10 @@ infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
     {t_1 + t_2}{\N}}
 \end{mathpar}
 \end{xframe}
+
+\note{
+  And here is the type system; this is entirely standard.
+  }
 
 \begin{xframe}{Untyping for STLC + $\N$}
   \framebox{$\nty \Gamma t {\tau}$}

@@ -608,35 +608,79 @@ infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
 
 \begin{xframe}{Untyping for STLC + $\N$}
   \framebox{$\nty \Gamma t {\tau}$}
+  \onslide<2>
+  \begin{mathpar}
+    \inferrule*[right=Mismatch\frownie{}]{\ty \Gamma t {\tau_1} \\ \tau_1 \neq \tau_2}{\nty
+      \Gamma t {\tau_2}}
+  \end{mathpar}
+\end{xframe}
+
+\note{
+  So, let's think about how to design \emph{untyping} derivations for
+  this language.  There are actually a lot of ways to do this, I'm
+  just going to show one example.
+
+  Here's the first rule I will propose, which is fairly simple: if $t$
+  has some type $\tau_1$, then it does not have some different type
+  $\tau_2$.  Of course, this only works because the STLC has unique
+  types; if you had a system without unique types then you wouldn't
+  have this rule.
+
+  There are a few things to point out. One is that of course this rule
+  references the typing judgment, which is probably typical.
+
+  Another thing to point out is about the other premise, $\tau_1 \neq
+  \tau_2$: this is another negative, but we don't just want it to be
+  the negation of equality; we want positive evidence that $\tau_1$
+  and $\tau_2$ are different, which we can use to explain \emph{why}
+  they are different.
+}
+
+\begin{xframe}{Untyping for STLC + $\N$}
+  \framebox{$\tau_1 \neq \tau_2$}
+  \begin{mathpar}
+    \inferrule{ }{\N \neq (\tau_1 \to \tau_2)} \and
+    \inferrule{\tau_1 \neq \tau_2}{(\tau_1 \to \tau_3) \neq (\tau_2
+      \to \tau_4)} \and \dots
+  \end{mathpar}
+\end{xframe}
+
+\note{
+  For example, we'd probably have some rules like this: Nat is not an
+  arrow type; some congruence rules; and so on.
+}
+
+\begin{xframe}{Untyping for STLC + $\N$}
+  \framebox{$\nty \Gamma t {\tau}$}
+  \begin{mathpar}
+    \inferrule*[right=PlusL\frownie{}]{\nty \Gamma {t_1} {\N}}{\nty \Gamma {t_1 + t_2}
+      {\tau}} \and
+    \inferrule*[right=PlusR\frownie{}]{\nty \Gamma {t_2} {\N}}{\nty \Gamma {t_1 + t_2}
+      {\tau}} \\
+    \inferrule*[right=PlusTy\frownie{}]{\tau \neq \N}{\nty \Gamma {t_1 + t_2} {\tau}}
+  \end{mathpar}
+\end{xframe}
+
+\note{
+  Now for some rules about addition.  There are basically two ways an
+  addition expression could fail to have a particular type.  One is if
+  the type is not $\N$.  The other is if one of the two subterms does
+  not have type $\N$.
+
+  Again, there are other ways we could encode this.  Part of the point
+  is that we have some freedom in choosing rules that will result in
+  the sort of explanations we want.
+}
+
+\begin{xframe}{Untyping for STLC + $\N$}
+  \framebox{$\nty \Gamma t {\tau}$}
   \begin{overprint}
-    \onslide<2>
-    \begin{mathpar}
-      \inferrule*[right=Mismatch\frownie{}]{\ty \Gamma t {\tau_1} \\ \tau_1 \neq \tau_2}{\nty
-        \Gamma t {\tau_2}}
-    \end{mathpar}
-
-    \onslide<3>
-    \begin{mathpar}
-      \inferrule{ }{\N \neq (\tau_1 \to \tau_2)} \and
-      \inferrule{\tau_1 \neq \tau_2}{(\tau_1 \to \tau_3) \neq (\tau_2
-        \to \tau_4)} \and \dots
-    \end{mathpar}
-
-    \onslide<4>
-    \begin{mathpar}
-      \inferrule*[right=PlusL\frownie{}]{\nty \Gamma {t_1} {\N}}{\nty \Gamma {t_1 + t_2}
-        {\tau}} \and
-      \inferrule*[right=PlusR\frownie{}]{\nty \Gamma {t_2} {\N}}{\nty \Gamma {t_1 + t_2}
-        {\tau}} \\
-      \inferrule*[right=PlusTy\frownie{}]{\tau \neq \N}{\nty \Gamma {t_1 + t_2} {\tau}}
-    \end{mathpar}
-
-    \onslide<5>
-    \begin{mathpar}
-      \inferrule*[right=AbsTy\frownie{}]
-      {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
-      {\nty \Gamma {\abs x {\tau_1} t} \tau}
-      \and
+    \onslide<1>
+  \begin{mathpar}
+    \inferrule*[right=AbsTy\frownie{}]
+    {\forall \tau_2.\; \tau \neq (\tau_1 \to \tau_2)}
+    {\nty \Gamma {\abs x {\tau_1} t} \tau}
+    \and
 
   % -- Otherwise, τ is of the form (τ₁ ⇒ τ₂) but the body t does not
   % -- have type τ₂.  Note this could be either because t is not typable
@@ -644,12 +688,12 @@ infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
   % ƛ        : ∀ {n} {Γ : Ctx n} {t} {τ₁ τ₂}
   %            → (τ₁ ∷ Γ) ⊬ t ∶ τ₂
   %            → Γ ⊬ ƛ τ₁ t ∶ (τ₁ ⇒ τ₂)
-      \inferrule*[right=AbsBody\frownie{}]
-      {\nty{\Gamma, x:\tau_1} {t} {\tau_2}}
-      {\nty \Gamma {\abs x {\tau_1} t} {\tau_1 \to \tau_2}}
-    \end{mathpar}
+    \inferrule*[right=AbsBody\frownie{}]
+    {\nty{\Gamma, x:\tau_1} {t} {\tau_2}}
+    {\nty \Gamma {\abs x {\tau_1} t} {\tau_1 \to \tau_2}}
+  \end{mathpar}
 
-    \onslide<6>
+    \onslide<2>
     \begin{mathpar}
       % ·-fun    : ∀ {n} {Γ : Ctx n} {t₁ t₂} {τ₂}
       % → (∀ {τ₁} → Γ ⊬ t₁ ∶ τ₁ ⇒ τ₂)
@@ -670,6 +714,17 @@ infer : Context -> Term -> (UntypingDerivation + TypingDerivation)
     \end{mathpar}
   \end{overprint}
 \end{xframe}
+
+\note{
+  Then we have some rules about lambdas.  There are two ways a lambda
+  expression can fail to have type $\tau$.  The first is if $\tau$ is
+  not an arrow type with the correct domain.  Otherwise, if $\tau$ is
+  an arrow type with a matching domain, the body could fail to have
+  the type of the codomain.
+
+  I'll skip over the rules for function application since I won't use
+  them in my examples.
+}
 
 \begin{xframe}{Example}
   Does $\abs{f}{\N \to \N}{f+2}$ have type $(\N \to \N) \to \N \to \N$?
@@ -696,6 +751,17 @@ f+2 is expected to have type N->N, but an addition
        which is expected to have type (N->N)->N->N.
   \end{Verbatim}
 \end{xframe}
+
+\note{
+  Let's look at an example.  Consider asking whether this lambda
+  expression has this particular type.  If you think about it for a
+  bit you can see that it does not, but how do we formally show it?
+
+  Here's one untyping derivation we could give.  The type \emph{is} in
+  fact an arrow type with the correct domain, so the final rule has to
+  be AbsBody.  At that point we note that an addition expression
+  cannot have type $\N \to \N$ since it is not equal to $\N$.
+}
 
 \begin{xframe}{Example, take 2}
   Does $\abs{f}{\N \to \N}{f+2}$ have type $(\N \to \N) \to \N \to \N$?

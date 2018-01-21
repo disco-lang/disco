@@ -761,6 +761,10 @@ f+2 is expected to have type N->N, but an addition
   fact an arrow type with the correct domain, so the final rule has to
   be AbsBody.  At that point we note that an addition expression
   cannot have type $\N \to \N$ since it is not equal to $\N$.
+
+  And here is a possible explanation that could be generated from this
+  derivation.  Note how each statement corresponds to a rule in the
+  derivation.
 }
 
 \begin{xframe}{Example, take 2}
@@ -794,10 +798,30 @@ f is expected to have type N, but has type N->N.
   \end{Verbatim}
 \end{xframe}
 
+\note{
+  There is actually a different derivation that could be given.  It
+  starts in the same way as before, but there is another reason that
+  $f+2$ is not well-typed, namely, that $f$ does not have type $\N$.
+
+  And here is the explanation that might correspond to this.  Notice
+  that when the user expands the question as to why $f$ has type $\N
+  \to \N$, we must jump down in the derivation to the rule that put
+  $f$ into the context.  So explanations do not necessarily simply
+  step through the tree to adjacent nodes.  One could imagine storing
+  in the context alongside $f$ a pointer to the node in the derivation
+  which put $f$ into the context.
+}
+
 \begin{xframe}{Correctness?}
   Q: How do we know if our definition of untyping is correct?
   \vspace{0.8in}
 \end{xframe}
+
+\note{
+  So I have just finished showing you a bunch of rules for untyping
+  derivations for the STLC.  How can we have any confidence that these
+  rules are the right ones, or I haven't left out any cases?
+}
 
 \begin{xframe}{Correctness}
   A: prove a metatheorem!
@@ -814,6 +838,22 @@ f is expected to have type N, but has type N->N.
   not be the identity!
 \end{xframe}
 
+\note{Well, untyping derivations are supposed to prove that a term
+  does not have a certain type, so we should just prove a metatheorem
+  showing that untyping is logically equivalent to the negation of
+  typing.
+
+  I have in fact formalized the system I just showed you in Agda, and
+  proved this metatheorem---in fact, through the process of proving it
+  I fixed a few bugs in my rules!
+
+  Notice that this metatheorem does not constrain untyping to a single
+  unique solution; in general there may be many different definitions
+  of untyping which all satisfy this theorem.  Intuitively, this is
+  because round-tripping through this logical equivalence need not get
+  us back to where we started.
+}
+
 \section{Challenges}
 
 \begin{xframe}{Structure}
@@ -821,12 +861,33 @@ f is expected to have type N, but has type N->N.
   structure of untyping derivations?
 \end{xframe}
 
+\note{
+  There are many remaining challenges; I have really only sketched an
+  idea.
+
+  One challenge is simply to see how well this correspondence between
+  untyping derivations and the kind of error explanations we want to
+  generate scales up.  I have only tried it for small toy languages so
+  far.
+}
+
 \begin{xframe}{Derive untyping derivations?}
   Can we automatically derive untyping rules from typing rules?
   \medskip
 
   {\scriptsize \dots mumble mumble inversion lemma mumble De Morgan mumble\dots}
 \end{xframe}
+
+\note{
+  Another challenge: can we automatically derive an untyping judgment
+  from a typing judgment?  Of course we do want the freedom to design
+  untyping judgments in order to get the error explanations we want,
+  but especially for larger systems it would be tedious to have to
+  design all the rules by hand.
+
+  I have some very vague ideas about how to do this but could really
+  only mumble about it at this point.
+}
 
 \begin{xframe}{Unification?}
   \onslide<2->
@@ -860,6 +921,19 @@ Can't unify Int and <Int, Int>
               because f is applied to an argument (namely, <3, 4>), so its type (Int -> Int) must be a function type.
   \end{Verbatim}
 \end{xframe}
+
+\note{ Finally, what about systems where typing involves unification?
+  I tried implementing full type reconstruction for a version of the
+  STLC with no type annotations on lambdas via unification, which
+  kept track of what it was doing so it could generate explanations
+  when something went wrong.
+
+  Consider this simple example.  It is not well-typed, and we would
+  like an explanation that says something about $f$ expecting an Int
+  but being given a tuple.  Unfortunately, this is the explanation
+  that was generated!  As you can see, most of it has to do with
+  unification variables and substitutions and so on, and is very
+  difficult to follow unless you already know how unification works.}
 
 \begin{xframe}{Unification?}
 \small Does $\app{(\uabs{p}{\app{fst}{p} + 3})}{((2,5), 6)}$ have a
@@ -919,6 +993,12 @@ Can't unify <Int, Int> and Int
 \end{Verbatim}
 \end{xframe}
 
+\note{
+  In fact, it gets much worse: this term is not much more complicated,
+  and the error explanation does not even fit on the slide.  Again,
+  most of it has to do with unification variables and such.
+}
+
 \begin{xframe}{Unification?}
   How to explain unification failures to the user?
   \begin{itemize}
@@ -928,6 +1008,24 @@ Can't unify <Int, Int> and Int
     algorithm to produce them, rather than the other way around!
   \end{itemize}
 \end{xframe}
+
+\note{
+  I think there are a few lessons I learned from this.  One is that
+  the implementation matters!  We are used to thinking of the
+  implementation as being unimportant, except perhaps for efficiency.
+  But actually it can make a big difference in terms of what sorts of
+  explanations are easy to generate.
+
+  The fastest implementations of unification actually use a union-find
+  structure rather than composing lots of substitutions; in this case,
+  I have a vague intuition that a union-find structure might actually
+  make things easier to explain.
+
+  More importantly, I think I did things sort of backwards: what I
+  should have done was first design an untyping judgment that
+  corresponds to the sort of explanations I would like to see, and
+  then figure out how to produce them, rather than the other way around.
+}
 
 \begin{xframe}{}
   \begin{center}

@@ -11,20 +11,18 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
+tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.2
 
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      -- The custom build script also adds all the test files
 
 cabal-version:       >= 1.10
 
--- eventually we want this to be able to specify custom-setup section below
--- cabal-version:    >= 1.23
+cabal-version:       >= 1.23
 build-type:          Custom
 
--- eventually we'll want to specify this
--- custom-setup
---   setup-depends: base, Cabal, process
+custom-setup
+  setup-depends: base, Cabal, process
 
 source-repository head
   type:     git

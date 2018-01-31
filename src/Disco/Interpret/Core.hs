@@ -58,7 +58,7 @@ import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Math.NumberTheory.Logarithms       (integerLog2)
-import           Math.NumberTheory.Moduli           (invertMod, powerModInteger)
+import           Math.NumberTheory.Moduli.Class     (invertSomeMod, powSomeMod, modulo, getVal, SomeMod(..))
 
 import           Disco.AST.Core
 import           Disco.AST.Surface                  (Ellipsis (..),
@@ -528,8 +528,8 @@ modDiv :: Integer -> [Core] -> Disco IErr Value
 modDiv n [c1,c2] = do
   VNum _ a <- whnf c1
   VNum _ b <- whnf c2
-  case invertMod (numerator b) n of
-    Just b' -> modOp (a * (b' % 1)) (n % 1)
+  case invertSomeMod (numerator b `modulo` fromInteger n) of
+    Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
     Nothing -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 
@@ -540,7 +540,9 @@ modExp n [c1,c2] = do
   VNum _ r2 <- whnf c2
   let a = numerator r1
   let b = numerator r2
-  return $ vnum ((powerModInteger a b n) % 1)
+  let v = powSomeMod (a `modulo` fromInteger n) b
+  case v of
+    SomeMod v' -> return $ vnum (getVal v' % 1)
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.

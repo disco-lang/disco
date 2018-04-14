@@ -28,20 +28,26 @@ at the ``Disco>`` prompt:
 * ``5 * (-2)``
 * ``(1 + 2)(3 + 4)``
 * ``2 ^ 5``
-* ``3/7 + 2/5``
-* ``2 ^ (-5)``
+* ``2 ^ 5000``
 
 Notice that it is not always necessary to write ``*`` for
 multiplication: as is standard mathematical notation, we may often
 omit it, as in ``(1 + 2)(3 + 4)``, which means the same as ``(1 + 2) *
 (3 + 4)``. (For precise details on when the asterisk may be omitted,
-see XXX.)  The last two expressions may also come as a bit of a
-surprise if you are already used to other languages such as Java or
-Python, which would yield a floating-point (*i.e.* real) number.  In
-fact, being a language for *discrete* mathematics, disco does not have
-real numbers at all, only integers and rational numbers.  However,
-rational numbers can still be entered using decimal notation.  Try
-these expressions as well:
+see XXX.)  Notice also that integers in disco may be arbitrarily
+large.
+
+Now try these:
+
+* ``3/7 + 2/5``
+* ``2 ^ (-5)``
+
+The results may come as a bit of a surprise if you are already used to
+other languages such as Java or Python, which would yield a
+floating-point (*i.e.* real) number.  In fact, being a language for
+*discrete* mathematics, disco does not have real numbers at all, only
+integers and rationals.  However, rational numbers can still be
+entered using decimal notation.  Try these expressions as well:
 
 * ``2.3 + 1.6``
 * ``1/5.``
@@ -62,14 +68,76 @@ The standard ``floor`` and ``ceiling`` operations are built-in:
     Disco> ceiling (17/3)
     6
 
-* integer division
-* mod
-* abs
+Just for fun, disco also supports standard mathematical notation for
+these operations via Unicode characters:
 
-XXX some more text
+::
+   Disco> ⌊ 17/3 ⌋
+   5
+   Disco> ⌈ 17/3 ⌉
+   6
 
-* divides
-* choose
+Integer division, which rounds down to the nearest integer, can be
+expressed using ``//``:
+
+::
+   Disco> 5 // 2
+   2
+   Disco> (-5) // 2
+   -3
+
+``x // y`` is always equivalent to ``floor (x/y)``, but is provided as
+a separate operator for convenience.
+
+The counterpart to integer division is ``mod``, which gives the
+remainder when the first number is divided by the second:
+
+::
+   Disco> 5 mod 2
+   2
+   Disco> (2^32) mod 7
+   4
+
+Finally, the ``abs`` function is provided for computing absolute
+value:
+
+::
+   Disco> abs 5
+   5
+   Disco> abs (-5)
+   5
+
+
+Advanced arithmetic
+===================
+
+Disco also provides a few more advanced arithmetic operators which you
+might not find built in to other languages:
+
+* The ``divides`` operator can be used to test whether one number
+  evenly divides another.  Try evaluating these expressions:
+
+    * ``2 divides 20``
+    * ``2 divides 21``
+    * ``(-2) divides 20``
+    * ``2 divides (-20)``
+    * ``7 divides (2^32 - 4)``
+    * ``(1/2) divides (3/2)``
+    * ``(1/5) divides (3/2)``
+    * ``1 divides 10``
+    * ``0 divides 10``
+    * ``10 divides 0``
+    * ``0 divides 0``
+
+    The last three expressions may be surprising, but follow directly
+    from the definition: ``a divides b`` is true if there is an
+    integer ``k`` such that ``a*k = b``.  For example, there is no
+    ``k`` such that ``0*k = 10``, so ``0 divides 10`` is false.
+
+* The ``choose`` operator can be used to compute binomial
+  coefficients.  For example, ``5 choose 2`` is the number of ways to
+  select two things out of five.
+
 * factorial
 * sqrt
 * lg

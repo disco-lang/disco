@@ -72,6 +72,7 @@ Just for fun, disco also supports standard mathematical notation for
 these operations via Unicode characters:
 
 ::
+
     Disco> ⌊ 17/3 ⌋
     5
     Disco> ⌈ 17/3 ⌉
@@ -81,6 +82,7 @@ Integer division, which rounds down to the nearest integer, can be
 expressed using ``//``:
 
 ::
+
     Disco> 5 // 2
     2
     Disco> (-5) // 2
@@ -93,6 +95,7 @@ The counterpart to integer division is ``mod``, which gives the
 remainder when the first number is divided by the second:
 
 ::
+
     Disco> 5 mod 2
     2
     Disco> (2^32) mod 7
@@ -102,6 +105,7 @@ Finally, the ``abs`` function is provided for computing absolute
 value:
 
 ::
+
     Disco> abs 5
     5
     Disco> abs (-5)
@@ -142,6 +146,7 @@ might not find built in to other languages.
   notation:
 
     ::
+
         Disco> 20!
         2432902008176640000
 
@@ -150,6 +155,7 @@ might not find built in to other languages.
   (remember that disco does not support arbitrary real numbers).
 
     ::
+
         Disco> sqrt (299^2 + 1)
         299
         Disco> sqrt (299^2 - 1)

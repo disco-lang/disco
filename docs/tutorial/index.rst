@@ -72,19 +72,19 @@ Just for fun, disco also supports standard mathematical notation for
 these operations via Unicode characters:
 
 ::
-   Disco> ⌊ 17/3 ⌋
-   5
-   Disco> ⌈ 17/3 ⌉
-   6
+    Disco> ⌊ 17/3 ⌋
+    5
+    Disco> ⌈ 17/3 ⌉
+    6
 
 Integer division, which rounds down to the nearest integer, can be
 expressed using ``//``:
 
 ::
-   Disco> 5 // 2
-   2
-   Disco> (-5) // 2
-   -3
+    Disco> 5 // 2
+    2
+    Disco> (-5) // 2
+    -3
 
 ``x // y`` is always equivalent to ``floor (x/y)``, but is provided as
 a separate operator for convenience.
@@ -93,26 +93,26 @@ The counterpart to integer division is ``mod``, which gives the
 remainder when the first number is divided by the second:
 
 ::
-   Disco> 5 mod 2
-   2
-   Disco> (2^32) mod 7
-   4
+    Disco> 5 mod 2
+    2
+    Disco> (2^32) mod 7
+    4
 
 Finally, the ``abs`` function is provided for computing absolute
 value:
 
 ::
-   Disco> abs 5
-   5
-   Disco> abs (-5)
-   5
+    Disco> abs 5
+    5
+    Disco> abs (-5)
+    5
 
 
 Advanced arithmetic
 ===================
 
 Disco also provides a few more advanced arithmetic operators which you
-might not find built in to other languages:
+might not find built in to other languages.
 
 * The ``divides`` operator can be used to test whether one number
   evenly divides another.  Try evaluating these expressions:

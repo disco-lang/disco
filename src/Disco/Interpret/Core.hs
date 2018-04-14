@@ -472,7 +472,7 @@ whnfOp OMod     = numOp' modOp
 whnfOp ODivides = numOp' (\m n -> return (mkEnum $ divides m n))
 whnfOp OBinom   = numOp binom
 whnfOp OMultinom = multinomOp
-whnfOp OFact    = uNumOp fact
+whnfOp OFact    = uNumOp' fact
 whnfOp (OEq ty) = eqOp ty
 whnfOp (OLt ty) = ltOp ty
 whnfOp ONot     = notOp
@@ -503,10 +503,15 @@ numOp' (#) cs = do
 
 -- | Perform a numeric unary operation.
 uNumOp :: (Rational -> Rational) -> [Core] -> Disco IErr Value
-uNumOp f [c] = do
+uNumOp f = uNumOp' (return . f)
+
+-- | Perform a numeric unary operation, with the ability to /e.g./
+--   throw an error (used for factorial, which can overflow).
+uNumOp' :: (Rational -> Disco IErr Rational) -> [Core] -> Disco IErr Value
+uNumOp' f [c] = do
   VNum d m <- whnf c
-  return $ VNum d (f m)
-uNumOp _ _ = error "Impossible! Second argument to uNumOp has length /= 1"
+  VNum d <$> f m
+uNumOp' _ _ = error "Impossible! Second argument to uNumOp' has length /= 1"
 
 -- | For performing a modular unary operation within a finite type
 modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> Disco IErr Value
@@ -656,8 +661,10 @@ multinomOp [c1, c2] = do
 multinomOp cs = error $ "Impossible! multinomOp " ++ show cs
 
 -- | Factorial.  The argument will always be a natural number.
-fact :: Rational -> Rational
-fact (numerator -> n) = factorial (fromIntegral n) % 1
+fact :: Rational -> Disco IErr Rational
+fact (numerator -> n)
+  | n > fromIntegral (maxBound :: Int) = throwError Overflow
+  | otherwise = return $ factorial (fromIntegral n) % 1
 
 -- | Perform boolean negation.
 notOp :: [Core] -> Disco IErr Value

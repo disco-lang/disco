@@ -185,6 +185,9 @@ data IErr where
   -- | Underflow, e.g. (2 - 3 : Nat)
   Underflow     ::              IErr
 
+  -- | Overflow, e.g. (2^66)!
+  Overflow      ::              IErr
+
   -- | Taking the base-2 logarithm of zero.
   LgOfZero      ::              IErr
 

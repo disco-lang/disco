@@ -3,7 +3,10 @@
 Arithmetic
 **********
 
-XXX introduction
+As a computational platform for learning discrete mathematics, at the
+core of disco is of course the ability to compute with numbers.
+However, unlike many other languages, disco does not support
+real (*aka* floating-point) numbers.
 
 Basic arithmetic
 ================
@@ -33,9 +36,7 @@ Now try these:
 
 The results may come as a bit of a surprise if you are already used to
 other languages such as Java or Python, which would yield a
-floating-point (*i.e.* real) number.  In fact, being a language for
-*discrete* mathematics, disco does not have real numbers at all, only
-integers and rationals.  However, rational numbers can still be
+floating-point (*i.e.* real) number.  XXX  However, rational numbers can still be
 entered using decimal notation.  Try these expressions as well:
 
 * ``2.3 + 1.6``
@@ -100,6 +101,11 @@ value:
     Disco> abs (-5)
     5
 
+Let expressions
+===============
+
+XXX put this here?  Not really about arithmetic per se, but it needs
+to go somewhere and it's fairly basic.
 
 Advanced arithmetic
 ===================
@@ -153,3 +159,4 @@ might not find built in to other languages.
         35
         Disco> lg (2^35 - 1)
         34
+

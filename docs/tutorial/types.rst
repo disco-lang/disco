@@ -37,6 +37,9 @@ The above example shows that normally, disco infers the type of ``3 +
 an ``Integer``, which in turn forces the whole expression to be inferred
 as an integer.
 
+XXX defining things in a ``.disco`` file: you can give them a type
+signature or not.  Show examples.
+
 Primitive numeric types
 =======================
 
@@ -66,7 +69,17 @@ picture like this:
 That is, the natural numbers are a subset of the integers as well as a
 subset of the positive rationals; the integers are a subset of the
 rationals; and the positive rationals are a subset of the rationals.
-Going up and to the left (:math:`\mathbb{N} \to \mathbb{Z}` or
-:math:`\mathbb{Q}^+ \to \mathbb{Q}`) adds negatives; going up and to
-the right (:math:`mathbb{N} \to \mathbb{Q}^+` or :math:`\mathbb{Z} \to
-\mathbb{Q}`) adds reciprocals.
+Natural numbers, and hence all numeric types, can be added and
+multiplied.  Going up and to the left (:math:`\mathbb{N} \to
+\mathbb{Z}` or :math:`\mathbb{Q}^+ \to \mathbb{Q}`) adds negatives,
+that is, the ability to perform subtraction; going up and to the right
+(:math:`\mathbb{N} \to \mathbb{Q}^+` or :math:`\mathbb{Z} \to
+\mathbb{Q}`) adds reciprocals, that is, the ability to perform
+division.
+
+XXX examples.
+
+Finite types
+============
+
+XXX to do

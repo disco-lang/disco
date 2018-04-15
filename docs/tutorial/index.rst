@@ -13,5 +13,11 @@ uses.
 
    starting
    arithmetic
+   files
    types
-
+   logic
+   functions
+   structure
+   lists
+   laziness
+   properties

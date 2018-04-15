@@ -12,3 +12,6 @@ You should see a disco prompt that looks like this:
 ::
 
     Disco>
+
+XXX you can also put stuff in a .disco file and then ``:load`` it at the
+disco prompt.

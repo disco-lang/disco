@@ -32,13 +32,13 @@ than what disco would infer.  For example:
     Disco> :type (3 : Integer) + 5
     (3 : ℤ) + 5 : ℤ
 
-The above example shows that normally, disco infers the type of `3 +
-5` to be a natural number, but we can force the `3` to be treated as
-an `Integer`, which in turn forces the whole expression to be inferred
+The above example shows that normally, disco infers the type of ``3 +
+5`` to be a natural number, but we can force the ``3`` to be treated as
+an ``Integer``, which in turn forces the whole expression to be inferred
 as an integer.
 
-Numeric types
-=============
+Primitive numeric types
+=======================
 
 Disco has four primitive numeric types which XXX
 
@@ -52,7 +52,8 @@ Disco has four primitive numeric types which XXX
 * The type of rational numbers, written ``Rational``, ``Q`` or ``ℚ``,
   includes all ratios of integers.
 
-These four types are related to each other in a diamond shape:
+If we consider which types are subsets of other types, we get a
+picture like this:
 
 ::
 

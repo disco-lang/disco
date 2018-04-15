@@ -32,17 +32,38 @@ than what disco would infer.  For example:
     Disco> :type (3 : Integer) + 5
     (3 : ℤ) + 5 : ℤ
 
+The above example shows that normally, disco infers the type of `3 +
+5` to be a natural number, but we can force the `3` to be treated as
+an `Integer`, which in turn forces the whole expression to be inferred
+as an integer.
+
 Numeric types
 =============
 
 Disco has four primitive numeric types which XXX
 
 * The type of natural numbers, written ``Natural``, ``Nat``, ``N``, or ``ℕ``,
-  includes the counting numbers ``0, 1, 2, ...``.
+  includes the counting numbers :math:`0, 1, 2, \dots`.
 * The type of integers, written ``Integer``, ``Int``, ``Z``, or ``ℤ``,
   includes the natural numbers as well as their negatives.
 * The type of positive rationals, written ``QP`` or ``ℚ⁺``, includes
   all ratios of the form :math:`a/b` where :math:`a` and :math:`b` are
-  natural numbers with :math:`b \neq 0`.
+  natural numbers, with :math:`b \neq 0`.
+* The type of rational numbers, written ``Rational``, ``Q`` or ``ℚ``,
+  includes all ratios of integers.
 
+These four types are related to each other in a diamond shape:
 
+::
+
+      Q
+     / \
+    Z   Q+
+     \ /
+      N
+
+That is, the natural numbers are a subset of the integers
+as well as a subset of the positive rationals; the integers are a
+subset of the rationals; and the positive rationals are a subset of
+the rationals.  Going up and to the left adds negatives; going up and
+to the right adds reciprocals.

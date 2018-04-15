@@ -63,8 +63,10 @@ picture like this:
      \ /
       N
 
-That is, the natural numbers are a subset of the integers
-as well as a subset of the positive rationals; the integers are a
-subset of the rationals; and the positive rationals are a subset of
-the rationals.  Going up and to the left adds negatives; going up and
-to the right adds reciprocals.
+That is, the natural numbers are a subset of the integers as well as a
+subset of the positive rationals; the integers are a subset of the
+rationals; and the positive rationals are a subset of the rationals.
+Going up and to the left (:math:`\mathbb{N} \to \mathbb{Z}` or
+:math:`\mathbb{Q}^+ \to \mathbb{Q}`) adds negatives; going up and to
+the right (:math:`mathbb{N} \to \mathbb{Q}^+` or :math:`\mathbb{Z} \to
+\mathbb{Q}`) adds reciprocals.

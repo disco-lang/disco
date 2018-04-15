@@ -20,7 +20,7 @@ type disco has inferred for a given expression, you can use the
     Disco> :type [1,2,5]
     [1, 2, 5] : List ℕ
 
-The colon in `3 : ℕ` can be read "has type" or "is a", as in "three is
+The colon in ``3 : ℕ`` can be read "has type" or "is a", as in "three is
 a natural number".  A colon can also be used to give an explicit type
 to an expression, for example, when you want to specify a type other
 than what disco would infer.  For example:

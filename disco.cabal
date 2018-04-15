@@ -93,7 +93,7 @@ test-suite disco-tests
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   hs-source-dirs: test
-  build-depends:    base >= 4.7 && < 4.11,
+  build-depends:    base >= 4.7 && < 4.12,
                     tasty >= 0.10 && < 1.1,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
@@ -107,7 +107,7 @@ test-suite disco-examples
   type: exitcode-stdio-1.0
   main-is: TestExamples.hs
   hs-source-dirs: example
-  build-depends:    base >= 4.7 && < 4.11,
+  build-depends:    base >= 4.7 && < 4.12,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

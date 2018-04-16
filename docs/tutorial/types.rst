@@ -150,8 +150,8 @@ In addition, division can be performed as long as :math:`n` is prime:
 Other types
 ===========
 
-There are many other types built into disco as well---`Bool`, `Void`,
-`Unit`, `List`, product, and sum types, to name a few.  These will be
+There are many other types built into disco as well---``Bool``, ``Void``,
+``Unit``, ``List``, product, and sum types, to name a few.  These will be
 covered throughout the rest of the tutorial and appropriate places.
 For now, try executing these commands and see if you can guess what is
 going on:

@@ -1,0 +1,14 @@
+||| A reasonable approximation of pi.
+approx_pi : Rational
+approx_pi = 22/7   -- an OK approximation
+
+||| Take a natural number as input, and return the natural
+||| number which is one greater.
+|||
+||| Should not be used while operating heavy machinery.
+-- This comment will be ignored.
+increment : N -> N
+increment n {- the input -} = n + 1 {- one more than the input -}
+
+fizz : N
+fizz = 1

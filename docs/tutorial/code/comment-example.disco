@@ -1,0 +1,10 @@
+-- This is a comment
+approx_pi : Rational
+approx_pi = 22/7   -- an OK approximation
+
+{- The following function is very complicated
+   and took about three weeks to write.
+   Don't laugh.
+-}
+increment : N -> N
+increment n {- the input -} = n + 1 {- one more than the input -}

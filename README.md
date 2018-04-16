@@ -22,6 +22,12 @@ some code if you like---collaborators are most welcome.  However, note
 that no guarantees are made about anything in particular at the
 moment.
 
+Documentation
+-------------
+
+Documentation (such as it is) is [hosted on
+readthedocs.io](http://disco-lang.readthedocs.io/en/latest/).
+
 Building
 --------
 

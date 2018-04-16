@@ -63,7 +63,8 @@ to support division yields the rationals.  However, what if we do
 these extensions in the opposite order?  Extending the natural numbers
 to support division results in the positive rational numbers; then
 extending these with subtraction again yields the rationals.  All
-told, the relationship between these four types forms a diamond shape:
+told, the relationship between these four types forms a diamond-shaped
+lattice:
 
 ::
 
@@ -80,10 +81,40 @@ that is, subtraction; going northeast (:math:`\mathbb{N} \to
 \mathbb{Q}^+` or :math:`\mathbb{Z} \to \mathbb{Q}`) corresponds to
 adding reciprocals, that is, division.
 
-XXX examples.  Show subtyping.  Show how types of different operations
-works.
+Try evaluating each of the following expressions at the disco prompt,
+and also request their inferred type with the ``:type`` command.  What
+type does disco infer for each? Why?
 
-Finite types
-============
+* ``1 + 2``
+* ``3 * 7``
+* ``1 - 2``
+* ``1 / 2``
+* ``(1 - 2) / 3``
 
-XXX to do
+Going southeast in the lattice (getting rid of negatives) is
+accomplished with the absolute value function ``abs``.  Going
+southwest (getting rid of fractions) is accomplished with ``floor``
+and ``ceiling``.
+
+Note that disco supports *subtyping*, that is, values of type ``S`` can
+be automatically "upgraded" to another type ``T`` as long as ``S`` is
+a "subtype" (think: subset) of ``T``.  For example, a natural number
+can be automatically upgraded to an integer.
+
+::
+
+    Disco> (-1 : Z) + (3 : N)
+    2
+    Disco> :type (-1 : Z) + (3: N)
+    (-1 : ℤ) + (3 : ℕ) : ℤ
+
+In the above example, the natural number ``3`` is automatically
+upgraded to an integer so that it can be added to ``-1``.  When we
+discuss functions later, we will see that this principle extends to
+function arguments as well: if a function is expecting an integer as
+input, it is acceptable to give it a natural number, since the natural
+number can be upgraded to an integer.
+
+Modular types
+=============
+

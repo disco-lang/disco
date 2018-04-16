@@ -3,8 +3,6 @@
 Logic
 *****
 
-XXX
-
 Booleans
 ========
 

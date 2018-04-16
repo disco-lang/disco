@@ -9,3 +9,4 @@ Coming soon!
 * Definition by cases
 * Anonymous functions
 * Function comparison
+* Let expressions ?

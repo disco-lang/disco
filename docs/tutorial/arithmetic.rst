@@ -29,8 +29,8 @@ Notice that it is not always necessary to write ``*`` for
 multiplication: as is standard mathematical notation, we may often
 omit it, as in ``(1 + 2)(3 + 4)``, which means the same as ``(1 + 2) *
 (3 + 4)``. (For precise details on when the asterisk may be omitted,
-see XXX.)  Notice also that integers in disco may be arbitrarily
-large.
+see the disco language reference.)  Notice also that integers in disco may
+be arbitrarily large.
 
 Now try these:
 
@@ -39,8 +39,10 @@ Now try these:
 
 The results may come as a bit of a surprise if you are already used to
 other languages such as Java or Python, which would yield a
-floating-point (*i.e.* real) number.  XXX  However, rational numbers can still be
-entered using decimal notation.  Try these expressions as well:
+floating-point (*i.e.* real) number; as mentioned before, disco does
+not support floating-point numbers. However, rational numbers can
+still be entered using decimal notation.  Try these expressions as
+well:
 
 * ``2.3 + 1.6``
 * ``1/5.``
@@ -103,12 +105,6 @@ value:
     5
     Disco> abs (-5)
     5
-
-Let expressions
-===============
-
-XXX put this here?  Not really about arithmetic per se, but it needs
-to go somewhere and it's fairly basic.
 
 Advanced arithmetic
 ===================

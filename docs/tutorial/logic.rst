@@ -64,9 +64,9 @@ or greater, using operators ``<``, ``<=``, ``>``, or ``>=``.
 (The last example is ``false`` because ``(9 : Z7)`` is equivalent to
 ``(2 : Z7)``.)
 
-Comparisons can also be chained; the result is obtained by taking the
-logical AND of all results of a comparison to its two neighbors.  For
-example:
+Comparisons can also be chained; the result is obtained by comparing
+each pair of values according to the comparison between them, and
+taking the logical AND of all the results. For example:
 
 ::
 

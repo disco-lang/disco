@@ -189,13 +189,15 @@ uPrec = opPrec . (uopMap !)
 bPrec :: BOp -> Int
 bPrec = opPrec . (bopMap !)
 
+-- | Look up the \"fixity\" (/i.e./ associativity) of a binary operator.
 assoc :: BOp -> BFixity
 assoc op =
   case M.lookup op bopMap of
     Just (OpInfo (BOpF fx _) _ _) -> fx
     _                             -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
--- | The precedence level of function application.
+-- | The precedence level of function application (higher than any
+--   other precedence level).
 funPrec :: Int
 funPrec = length opTable
 

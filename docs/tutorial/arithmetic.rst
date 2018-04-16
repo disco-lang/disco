@@ -137,10 +137,10 @@ might not find built in to other languages.
     ``k`` such that ``0*k = 10``, so ``0 divides 10`` is false.
 
     Note that a vertical line is often used to denote divisibility, as
-    in :math:`3 | 21`, but disco does not support this notation, since
+    in :math:`3 \mid 21`, but disco does not support this notation, since
     the vertical line is used for other things (and besides, it is
     typically not a good idea to use a visually symmetric operator for
-    a nonsymmetric relation anyway).
+    a nonsymmetric relation).
 
 * The ``choose`` operator can be used to compute binomial
   coefficients.  For example, ``5 choose 2`` is the number of ways to

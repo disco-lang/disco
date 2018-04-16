@@ -118,3 +118,28 @@ number can be upgraded to an integer.
 Modular types
 =============
 
+In addition to the four primitive numeric types discussed above, disco
+also supports an infinite family of "modular" or finite types of the
+form :math:`\mathbb{Z}_n`.  For a given natural number :math:`n`, the
+type :math:`\mathbb{Z}_n` consists of the :math:`n` values :math:`\{0,
+1, 2, \dots, n-1\}`.  Addition, subtraction, multiplication, and
+exponentiation are performed :math:`\pmod{n}`.
+
+::
+
+    Disco> (3 + 5) : Z6
+    2
+    Disco> (3 - 5) : Z6
+    4
+    Disco> 2^20 : Z7
+    4
+
+In addition, division can be performed as long as :math:`n` is prime:
+
+::
+
+    Disco> 1 / 5 : Z7   -- compute the inverse of 5 mod 7
+    3
+    Disco> 3 * 5 : Z7   -- sure enough, 3 * 5 is 1 mod 7
+    1
+

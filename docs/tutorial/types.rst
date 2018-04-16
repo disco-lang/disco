@@ -37,13 +37,11 @@ The above example shows that normally, disco infers the type of ``3 +
 an ``Integer``, which in turn forces the whole expression to be inferred
 as an integer.
 
-XXX defining things in a ``.disco`` file: you can give them a type
-signature or not.  Show examples.
-
 Primitive numeric types
 =======================
 
-Disco has four primitive numeric types which XXX
+Disco has four built-in primitive numeric types: natural numbers,
+integers, positive rationals, and rationals.
 
 * The type of natural numbers, written ``Natural``, ``Nat``, ``N``, or ``ℕ``,
   includes the counting numbers :math:`0, 1, 2, \dots`.
@@ -55,8 +53,17 @@ Disco has four primitive numeric types which XXX
 * The type of rational numbers, written ``Rational``, ``Q`` or ``ℚ``,
   includes all ratios of integers.
 
-If we consider which types are subsets of other types, we get a
-picture like this:
+In mathematics, it is typically not so common to think of the positive
+rationals :math:`\mathbb{Q}^+` as a separate set by themselves; but
+this is mostly for historical reasons and because of the way the
+development of rational numbers is usually presented.  The natural
+numbers support addition and multiplication.  Extending them to
+support subtraction yields the integers; then, extending these again
+to support division yields the rationals.  However, what if we do
+these extensions in the opposite order?  Extending the natural numbers
+to support division results in the positive rational numbers; then
+extending these with subtraction again yields the rationals.  All
+told, the relationship between these four types forms a diamond shape:
 
 ::
 
@@ -66,18 +73,15 @@ picture like this:
      \ /
       N
 
-That is, the natural numbers are a subset of the integers as well as a
-subset of the positive rationals; the integers are a subset of the
-rationals; and the positive rationals are a subset of the rationals.
-Natural numbers, and hence all numeric types, can be added and
-multiplied.  Going up and to the left (:math:`\mathbb{N} \to
-\mathbb{Z}` or :math:`\mathbb{Q}^+ \to \mathbb{Q}`) adds negatives,
-that is, the ability to perform subtraction; going up and to the right
-(:math:`\mathbb{N} \to \mathbb{Q}^+` or :math:`\mathbb{Z} \to
-\mathbb{Q}`) adds reciprocals, that is, the ability to perform
-division.
+Each type is a subset of the type or types above it.  Going northwest
+in this diagram (:math:`\mathbb{N} \to \mathbb{Z}` or
+:math:`\mathbb{Q}^+ \to \mathbb{Q}`) corresponds to adding negatives,
+that is, subtraction; going northeast (:math:`\mathbb{N} \to
+\mathbb{Q}^+` or :math:`\mathbb{Z} \to \mathbb{Q}`) corresponds to
+adding reciprocals, that is, division.
 
-XXX examples.
+XXX examples.  Show subtyping.  Show how types of different operations
+works.
 
 Finite types
 ============

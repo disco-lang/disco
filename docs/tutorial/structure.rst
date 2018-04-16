@@ -5,4 +5,8 @@ Structural types
 
 Coming soon!
 
-XXX structural types.  Pattern-matching.  Finite types (enumerate, count).
+* Product (pair) types.
+* Pattern-matching, case expressions.
+* Sum types.
+* Unit and void types.
+* Finite types (enumerate, count).

@@ -13,8 +13,8 @@ uses.
 
    starting
    arithmetic
-   files
    types
+   files
    logic
    functions
    structure

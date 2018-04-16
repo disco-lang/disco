@@ -86,8 +86,9 @@ script:
 
   # Manually add disco executable to the path, needed by the test suite
   # BAY  6 Dec 2016, added after discussion with hvr.  Re-added 15 April 2018.
+  # Actually this doesn't work anymore.  Need to figure out a better way.
   # Eventually once cabal new-test is finished this will be unnecessary??
-  - EXELOC=`ls -d dist-newstyle/*/*/*/$SRC_BASENAME/build/$PKGNAME`
+  - EXELOC=`ls -d /tmp/dist-test*/dist-newstyle/*/*/*/*/*/*/build/disco`
   - PATH=$EXELOC:$PATH
 
   # Build with installed constraints for packages in global-db

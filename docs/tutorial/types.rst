@@ -4,8 +4,12 @@ Types
 *****
 
 Every value in disco has a *type*.  Types play a central role in the
-language and help XXX.  However, the type system has for the most part
-been designed to correspond to common mathematical practice, so XXX.
+language, and help guide and constrain programs.  All the types in a
+program must match correctly (*i.e.* the program must *typecheck*)
+before it can be run.  The type system has for the most part been
+designed to correspond to common mathematical practice, so if you are
+used to type systems in other programming languages (even other
+functional languages) you may be in for a surprise or two.  
 
 Disco can often infer the type of an expression.  To find out what
 type disco has inferred for a given expression, you can use the
@@ -143,3 +147,19 @@ In addition, division can be performed as long as :math:`n` is prime:
     Disco> 3 * 5 : Z7   -- sure enough, 3 * 5 is 1 mod 7
     1
 
+Other types
+===========
+
+There are many other types built into disco as well---`Bool`, `Void`,
+`Unit`, `List`, product, and sum types, to name a few.  These will be
+covered throughout the rest of the tutorial and appropriate places.
+For now, try executing these commands and see if you can guess what is
+going on:
+
+* ``:type false``
+* ``:type ()``
+* ``:type [1, 2, 3]``
+* ``:type [1, 2, -3]``
+* ``:type [1, 2, -3, 4/5]``
+* ``:type [[1,2], [3,4,5]]``
+* ``:type (1, true)``

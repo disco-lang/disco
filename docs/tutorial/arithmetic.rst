@@ -6,7 +6,10 @@ Arithmetic
 As a computational platform for learning discrete mathematics, at the
 core of disco is of course the ability to compute with numbers.
 However, unlike many other languages, disco does not support
-real (*aka* floating-point) numbers.
+real (*aka* floating-point) numbers at all---they are not typically
+needed for discrete mathematics, and omitting them simplifies the
+language quite a bit.   To compensate, however, disco has
+sophisticated built-in support for rational numbers.
 
 Basic arithmetic
 ================

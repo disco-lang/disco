@@ -17,8 +17,9 @@ knowledge of functional programming.
    types
    files
    logic
-   functions
    structure
+   functions
+   case
    lists
    laziness
    properties

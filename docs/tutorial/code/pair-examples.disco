@@ -1,0 +1,11 @@
+pair1 : N * Q
+pair1 = (3, -5/6)
+
+pair2 : Z5 × Bool
+pair2 = (17 + 22, (3,5) < (4,2))
+
+pair3 : Bool * (Bool * Bool)
+pair3 = (true, (false, true))
+
+pair4 : Bool * Bool * Bool
+pair4 = (true, false, true)

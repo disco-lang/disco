@@ -50,13 +50,40 @@ example:
    :caption:
 
 All of these examples are in fact *pattern-matching* on their
-arguments, although this is most noticeable with the last example.
+arguments, although this is most noticeable with the last example,
+which decomposes its input into a pair of pairs and gives a name to
+each component.
 
 Anonymous functions
 ===================
 
 Comparing functions
 ===================
+
+In certain cases, functions can be compared for equality, or even
+compared to see which is less or greater.
+
+::
+
+    Disco> ((x:Bool) -> x) = ((x:Bool) -> not (not x))
+    true
+    Disco> ((x:Bool) -> x) = ((x:Bool) -> not x)
+    false
+
+There is no magic involved, and it does not work by looking at the
+definitions of the functions. Simply put, two functions are equal if
+they give the same output for every input.  So disco can only test two
+functions for equality if they have a finite input type, in which case
+it simply enumerates all possible values of the input type, and tests
+that the two functions give equal outputs for every input.
+
+Functions are ordered by conceptually listing all their outputs
+ordered by inputs (that is, list the values of the input type in order
+from smallest to largest and apply the function to each) and then
+comparing these lists of outputs lexicographically.  That is, if ``i``
+is the smallest possible input value and ``f i < g i``, then ``f <
+g``.  If ``f i = g i``, then we move on to consider the second
+smallest input value, and so on.
 
 Let expressions
 ===============

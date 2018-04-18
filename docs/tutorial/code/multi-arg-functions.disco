@@ -1,0 +1,9 @@
+gcd : N * N -> N
+gcd(a,0) = a
+gcd(a,b) = gcd(b, a mod b)
+
+discrim : Q * Q * Q -> Q
+discrim(a,b,c) = b^2 - 4*a*c
+
+manhattan : (Q*Q) * (Q*Q) -> Q
+manhattan ((x1,y1), (x2,y2)) = abs (x1-x2) + abs (y1-y2)

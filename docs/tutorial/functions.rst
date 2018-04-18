@@ -28,6 +28,17 @@ The type of functions with input ``X`` and output ``Y`` is written ``X
   recursive.  Notice also that ``factorial`` is defined by two cases,
   which are matched in order from top to bottom, just as in Haskell.
 
+Functions can be given inputs using the same syntax:
+
+::
+
+    Disco> f(2^5)
+    39
+    Disco> g(-5)
+    false
+    Disco> factorial(5 + 6)
+    39916800
+
 "Multi-argument functions" can be written as functions which take a
 product type as input. (This is again a stylistic choice: disco
 certainly supports curried functions as well.  But in either case,
@@ -41,7 +52,11 @@ example:
 All of these examples are in fact *pattern-matching* on their
 arguments, although this is most noticeable with the last example.
 
-* Pattern-matching
-* Anonymous functions
-* Function comparison
-* Let expressions ?
+Anonymous functions
+===================
+
+Comparing functions
+===================
+
+Let expressions
+===============

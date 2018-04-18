@@ -58,7 +58,9 @@ import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Math.NumberTheory.Logarithms       (integerLog2)
-import           Math.NumberTheory.Moduli.Class     (invertSomeMod, powSomeMod, modulo, getVal, SomeMod(..))
+import           Math.NumberTheory.Moduli.Class     (SomeMod (..), getVal,
+                                                     invertSomeMod, modulo,
+                                                     powSomeMod)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface                  (Ellipsis (..),
@@ -869,7 +871,7 @@ decideEqForClosures ty2 clos1 clos2 = go
         True  -> go vs
 
 -- | Decide whether two values of a primitive type (Void, Unit, Bool,
---   N, Z, Q) are equal.
+--   N, Z, Q, Zn) are equal.
 primValEq :: Value -> Value -> Bool
 primValEq (VCons i []) (VCons j []) = i == j
 primValEq (VNum _ n1)  (VNum _ n2)  = n1 == n2

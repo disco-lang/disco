@@ -68,12 +68,14 @@ Anonymous functions
 ===================
 
 The syntax for an anonymous function in disco consists of three parts:
-a *binding*, followed by a *mapsto* symbol, followed by an arbitrary
+one or more *bindings*, followed by a *mapsto* symbol, followed by an arbitrary
 disco expression.
 
-* The *binding* specifies the name of the function input.  It can be
-  either a simple variable name, or a parenthesized variable name with
-  a type annotation (*e.g.* ``(x:Nat)``).
+* Each *binding* specifies the name of an input to the function.  A binding
+  can be either a simple variable name, or a parenthesized variable
+  name with a type annotation (*e.g.* ``(x:Nat)``).  There can be
+  multiple bindings separated by whitespace, which creates a (curried)
+  "multi-argument" function.
 * disco will accept any one of several syntaxes for the *mapsto*
   symbol: either ``->``, ``|->``, or ``↦``.
 
@@ -91,8 +93,11 @@ disco expression.
    that notation anyway, in which case we might as well introduce them
    to the lambda calculus.
 
-   Here are a few examples of using anonymous functions as arguments
-   to ``thrice``:
+   Currently, bindings cannot contain patterns, but in general we
+   might want to allow this, for example, ``((x,y) |-> x + y) : N*N -> N``.
+
+Here are a few examples of using anonymous functions as arguments
+to ``thrice``:
 
 ::
 
@@ -100,6 +105,8 @@ disco expression.
     8
     Disco> thrice((z:Nat) ↦ z^2 + 2z + 1)(7)
     17859076
+
+TODO example of using multi-argument anonymous function
 
 Comparing functions
 ===================

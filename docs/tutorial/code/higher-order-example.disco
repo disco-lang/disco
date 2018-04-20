@@ -1,0 +1,2 @@
+thrice : (N -> N) -> (N -> N)
+thrice(f)(n) = f(f(f(n)))

@@ -54,8 +54,52 @@ arguments, although this is most noticeable with the last example,
 which decomposes its input into a pair of pairs and gives a name to
 each component.
 
+Functions in disco are first-class, and can be provided as input to
+another function or output from a function, stored in data structures,
+*etc*.  For example, here is how one could write a higher-order
+function to take a function on natural numbers and produce a new
+function which iterates the original function three times:
+
+.. literalinclude:: code/higher-order-example.disco
+   :language: idris
+   :caption:
+
 Anonymous functions
 ===================
+
+The syntax for an anonymous function in disco consists of three parts:
+a *binding*, followed by a *mapsto* symbol, followed by an arbitrary
+disco expression.
+
+* The *binding* specifies the name of the function input.  It can be
+  either a simple variable name, or a parenthesized variable name with
+  a type annotation (*e.g.* ``(x:Nat)``).
+* disco will accept any one of several syntaxes for the *mapsto*
+  symbol: either ``->``, ``|->``, or ``↦``.
+
+.. note::
+
+   It's quite possible this syntax might change.  For example, we
+   might want to disallow ``->`` as a mapsto symbol, since that may
+   cause confusion with the same symbol used as part of a type.  Also, we
+   might want to require "lambda" syntax before the binding (*e.g.*
+   either a backslash or an actual lambda).
+
+   The current syntax was designed to mirror the syntax in most common
+   mathematical practice (*e.g.* :math:`x \mapsto x^2 + 3`), but it's
+   quite possible discrete math students will not be familiar with
+   that notation anyway, in which case we might as well introduce them
+   to the lambda calculus.
+
+   Here are a few examples of using anonymous functions as arguments
+   to ``thrice``:
+
+::
+
+    Disco> thrice(x |-> x*2)(1)
+    8
+    Disco> thrice((z:Nat) ↦ z^2 + 2z + 1)(7)
+    17859076
 
 Comparing functions
 ===================
@@ -87,3 +131,5 @@ smallest input value, and so on.
 
 Let expressions
 ===============
+
+TODO

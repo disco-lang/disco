@@ -20,7 +20,7 @@ such as
             5 - x         & \text{otherwise}
           \end{cases}
 
-Here is the disco syntax corresponding to the above definition:
+Here is how one would write a corresponding definition in disco:
 
 .. literalinclude:: code/case-example.disco
    :language: idris

@@ -29,8 +29,8 @@ Notice that it is not always necessary to write ``*`` for
 multiplication: as is standard mathematical notation, we may often
 omit it, as in ``(1 + 2)(3 + 4)``, which means the same as ``(1 + 2) *
 (3 + 4)``. (For precise details on when the asterisk may be omitted,
-see the disco language reference.)  Notice also that integers in disco may
-be arbitrarily large.
+see the discussion in the section on functions.)  Notice also that
+integers in disco may be arbitrarily large.
 
 Now try these:
 

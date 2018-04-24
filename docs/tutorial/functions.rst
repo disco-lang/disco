@@ -136,6 +136,54 @@ is the smallest possible input value and ``f i < g i``, then ``f <
 g``.  If ``f i = g i``, then we move on to consider the second
 smallest input value, and so on.
 
+Disambiguating function application and multiplication
+======================================================
+
+As previously mentioned, the fundamental syntax for applying a
+function to an argument is *juxtaposition*, that is, simply putting
+the function next to its argument (with a space in between if
+necessary).
+
+However, disco also allows multiplication to be written in this way.
+How can it tell the difference? Given an expression of the form ``X
+Y`` (where ``X`` and ``Y`` may themselves be complex expressions),
+disco uses simple *syntactic* rules to distinguish between
+multiplication and function application.  In particular, note that the
+*types* of ``X`` and ``Y`` do not enter into it at all (it would
+greatly complicate matters if parsing and typechecking had to be
+interleaved---even though this is what human mathematicians do in
+their heads; see the discussion below).
+
+To decide whether ``X Y`` is function application or multiplication,
+disco looks only at the syntax of ``X``; ``X Y`` is multiplication if
+and only if ``X`` is a *multiplicative term*, and function application
+otherwise.  A multiplicative term is one that looks like either a
+natural number literal, or a unary or binary operation (possibly in
+parentheses).  For example, ``3``, ``(-2)``, and ``(x + 5)`` are all
+multiplicative terms, so ``3x``, ``(-2)x``, and ``(x + 5)x`` all get parsed as
+multiplication.  On the other hand, an expression like ``(x y)`` is always parsed as
+function application, even if x and y both turn out to have numeric types
+types; a bare variable like x does not count as a multiplicative term.
+Likewise, ``(x y) z`` is parsed as function application, since ``(x y)`` is
+not a multiplicative term.
+
+.. note::
+
+   You may enjoy reflecting on how a *human* mathematician does this
+   disambiguation.  In fact, they are doing something much more
+   sophisticated than disco, implicitly using information about types
+   and social conventions regarding variable names in addition to
+   syntactic cues.  For example, consider :math:`x(y + 3)` versus :math:`f(y +
+   3)`. Most mathematicians would unconsciously interpret the first
+   as multiplication and the second as function application, due to
+   standard conventions about the use of variable names :math:`x` and
+   :math:`f`.  On the other hand, in the sentence "Let :math:`x` be the function
+   which doubles an integer, and consider :math:`v = x(y+3)`", any
+   mathematician would have no trouble identifying this use of
+   :math:`x(y+3)` as function application, although they might also
+   rightly complain that :math:`x` is a strange choice for the name of
+   a function.
+
 Let expressions
 ===============
 

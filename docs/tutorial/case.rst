@@ -25,3 +25,12 @@ Here is how one would write a corresponding definition in disco:
 .. literalinclude:: code/case-example.disco
    :language: idris
    :caption:
+
+The entire expression is surrounded by ``{? ... ?}``; the curly braces
+are reminiscent of the big brace following :math:`f(x) = \dots` in the
+standard mathematical notation, but we don't want to use plain curly
+braces (since those will be used for sets), so question marks are
+added (which remind us that case expressions are really all about
+asking questions).
+
+More formally, the syntax of a case expression consists of one or more 

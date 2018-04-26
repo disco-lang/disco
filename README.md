@@ -33,7 +33,8 @@ Building
 
 First, make sure you have
 [the `stack` tool](https://docs.haskellstack.org/en/stable/README/).
-Then at a command prompt, execute
+Then open a command prompt, navigate to the root directory of this
+repository, and execute
 
 ```
 stack build

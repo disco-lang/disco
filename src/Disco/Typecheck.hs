@@ -1100,5 +1100,5 @@ eraseQual (AQBind x (unembed -> at)) = QBind (coerce x) (embed (erase at))
 eraseQual (AQGuard (unembed -> at))  = QGuard (embed (erase at))
 
 eraseProperty :: AProperty -> Property
-eraseProperty b = bind ((map . first) coerce xs) (erase at)
+eraseProperty b = bind (coerce xs) (erase at)
   where (xs, at) = unsafeUnbind b

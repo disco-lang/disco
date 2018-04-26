@@ -218,7 +218,7 @@ check (TAbs lam) ty = do
     -- types for all the arguments.
     extends ctx $ do
     at <- check t resTy
-    return $ ATAbs ty (bind ((map . first) coerce args) at)
+    return $ ATAbs ty (bind (coerce args) at)
 
 -- To check an injection has a sum type, recursively check the
 -- relevant type.

@@ -1,0 +1,5 @@
+g : Z*Z -> Z
+g(p) = {? 0      when p is (3,_),
+          x + y  when p is (x,y) if x > 5 or y > 20,
+          -100   otherwise
+       ?}

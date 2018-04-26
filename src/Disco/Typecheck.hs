@@ -164,7 +164,7 @@ execTCM :: TCM a -> Either TCError DefnCtx
 execTCM = fmap snd . runTCM
 
 -- | Add a definition to the set of current definitions.
-addDefn :: Name Term -> [Bind [Pattern] ATerm] -> TCM ()
+addDefn :: Name Term -> Defn -> TCM ()
 addDefn x b = modify (M.insert (coerce x) b)
 
 -- | Look up the type of a variable in the context.  Throw an "unbound

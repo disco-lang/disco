@@ -5,4 +5,8 @@ Laziness
 
 Coming soon!
 
-What should go in here?  Do we need a separate section for it?
+* Numeric types are strict (to avoid bad behavior of e.g. lazy sum in Haskell)
+* Tuples, lists, etc. are lazy
+
+Infinite lists.
+

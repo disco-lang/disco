@@ -1,0 +1,10 @@
+comp1 : List N -> List N -> List N
+comp1 xs ys = [ x + y | x in xs, 2 divides x, y in ys, 2 divides y, x + y >= 50 ]
+
+pythagTriples : List (N*N*N)
+pythagTriples = [ (a,b,c)
+  | a in [1 .. 100]
+  , b in [1 .. 100]
+  , c in [1 .. 100]
+  , a^2 + b^2 = c^2
+  ]

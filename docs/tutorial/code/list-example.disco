@@ -1,0 +1,17 @@
+emptyList : List Bool
+emptyList = []
+
+nums : List N
+nums = [1, 3, 4, 6]
+
+nums2 : List N
+nums2 = 1 :: 3 :: 4 :: 6 :: []
+
+  -- nums and nums2 are equal
+
+nested : List List Q
+nested = [1, 5/2, -8] :: [[2, 4], [], [1/2]]
+
+sum : List N -> N
+sum []        = 0
+sum (n :: ns) = n + sum ns

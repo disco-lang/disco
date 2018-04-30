@@ -95,6 +95,9 @@ remainder when the first number is divided by the second:
     2
     Disco> (2^32) mod 7
     4
+    Disco> (2^32) % 7
+
+The ``%`` operator may also be used as a synonym for ``mod``.
 
 Finally, the ``abs`` function is provided for computing absolute
 value:

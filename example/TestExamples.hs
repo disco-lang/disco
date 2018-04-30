@@ -7,13 +7,19 @@ import System.Process
 
 import Control.Monad
 
+exampleDirs :: [FilePath]
+exampleDirs = ["example", "docs/tutorial/code"]
+
 main :: IO ()
-main = do
-  examples <- filter ((== ".disco") . takeExtension) <$> getDirectoryContents "example"
-  res <- and <$> mapM checkExample examples
+main = mapM_ checkDir exampleDirs
+
+checkDir :: FilePath -> IO ()
+checkDir dir = do
+  examples <- filter ((== ".disco") . takeExtension) <$> getDirectoryContents dir
+  res <- and <$> mapM (checkExample . (dir </>)) examples
   when (not res) $ exitFailure
 
 checkExample :: FilePath -> IO Bool
 checkExample exampleFile = do
-  ex <- system ("disco --check " ++ ("example" </> exampleFile))
+  ex <- system ("disco --check " ++ exampleFile)
   return (ex == ExitSuccess)

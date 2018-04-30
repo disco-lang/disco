@@ -1,6 +1,6 @@
 
 **************
-Disco Tutorial
+Quick Tutorial
 **************
 
 Disco is a small yet expressive, pure functional programming language

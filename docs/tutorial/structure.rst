@@ -66,12 +66,12 @@ Bool``, and has values such as ``((false, true), true)``.
 Sum types
 =========
 
-If ``X`` and ``Y`` are types, their *sum*, written ``X + Y``, is the
-disjoint union of ``X`` and ``Y``.  That is, values of type ``X + Y``
-are either values of ``X`` or values of ``Y``, along with a "tag" so
-that we know which it is.  The possible tags are ``left`` and
-``right`` (to indicate the type on the left or right of the ``+``).
-For example:
+If ``X`` and ``Y`` are types, their *sum*, written ``X + Y`` (or ``X ⊎
+Y``), is the disjoint union of ``X`` and ``Y``.  That is, values of
+type ``X + Y`` are either values of ``X`` or values of ``Y``, along
+with a "tag" so that we know which it is.  The possible tags are
+``left`` and ``right`` (to indicate the type on the left or right of
+the ``+``).  For example:
 
 .. literalinclude:: example/sum.disco
    :language: idris

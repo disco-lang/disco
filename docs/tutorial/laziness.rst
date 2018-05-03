@@ -3,10 +3,11 @@
 Laziness
 ********
 
-Coming soon!
+Disco takes a hybrid approach to laziness.
 
-* Numeric types are strict (to avoid bad behavior of e.g. lazy sum in Haskell)
-* Tuples, lists, etc. are lazy
+* To facilitate compositionality and allow for things such as infinite
+  lists, structured types (lists, pairs, etc.) in disco are lazy.
+* To avoid surprising performance issues, numeric types in disco are
+  strict.
 
-Infinite lists.
-
+Examples coming soon.

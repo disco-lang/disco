@@ -17,7 +17,7 @@ which essentially functions as a unit test.  When loading a file,
 disco will check that all such properties evaluate to ``true``, and
 present an error message if any do not.
 
-.. literalinclude:: code/unit-test-example.disco
+.. literalinclude:: example/unit-test.disco
    :language: idris
    :caption:
 
@@ -26,8 +26,8 @@ tests associated with ``gcd``:
 
 ::
 
-    Disco> :load code/unit-test-example.disco
-    Loading code/unit-test-example.disco...
+    Disco> :load example/unit-test.disco
+    Loading example/unit-test.disco...
     Running tests...
       gcd: OK
     Loaded.
@@ -37,8 +37,8 @@ On the other hand, if we change the first property to ``!!! gcd(7,6) =
 
 ::
 
-    Disco> :load code/unit-test-example.disco
-    Loading code/unit-test-example.disco...
+    Disco> :load example/unit-test.disco
+    Loading example/unit-test.disco...
     Running tests...
       gcd:
       - Test result mismatch for: gcd (7, 6) = 2

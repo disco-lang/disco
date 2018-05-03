@@ -13,7 +13,7 @@ Disco files
 Disco files typically end in ``.disco``.
 Here is a simple example:
 
-.. literalinclude:: code/example.disco
+.. literalinclude:: example/basics.disco
    :language: idris
    :caption:
 
@@ -35,8 +35,8 @@ defined in the file are available for use.  For example:
 
 ::
 
-    Disco> :load code/example.disco
-    Loading code/example.disco...
+    Disco> :load example/basics.disco
+    Loading example/basics.disco...
     Loaded.
     Disco> approx_pi
     22/7
@@ -56,7 +56,7 @@ everything until the next newline character; ``{- ... -}`` creates a
 multi-line comment causing disco to ignore everything in between
 ``{-`` and ``-}``.
 
-.. literalinclude:: code/comment-example.disco
+.. literalinclude:: example/comment.disco
    :language: idris
    :caption:
 
@@ -67,7 +67,7 @@ syntax for *documentation*, which must be placed before the type
 signature of a definition.  Each line of documentation must begin with
 ``|||`` (three vertical bars).
 
-.. literalinclude:: code/doc-example.disco
+.. literalinclude:: example/doc.disco
    :language: idris
    :caption:
 
@@ -76,8 +76,8 @@ command to see the documentation associated with each name.
 
 ::
 
-    Disco> :load code/doc-example.disco
-    Loading code/doc-example.disco...
+    Disco> :load example/doc.disco
+    Loading example/doc.disco...
     Loaded.
     Disco> :doc approx_pi
     approx_pi : ℚ

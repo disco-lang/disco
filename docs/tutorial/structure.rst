@@ -15,7 +15,7 @@ times symbol ``×``, is a type whose values are ordered pairs of values
 of the component types.  Pairs are written using standard ordered pair
 notation.
 
-.. literalinclude:: code/pair-examples.disco
+.. literalinclude:: example/pair.disco
    :language: idris
 
 ``pair1`` in the example above has type ``N * Q``, that is, the type
@@ -73,7 +73,7 @@ that we know which it is.  The possible tags are ``left`` and
 ``right`` (to indicate the type on the left or right of the ``+``).
 For example:
 
-.. literalinclude:: code/sum-examples.disco
+.. literalinclude:: example/sum.disco
    :language: idris
 
 ``sum1`` and ``sum2`` have the same type, namely, ``N + Bool``; values

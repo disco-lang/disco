@@ -6,7 +6,7 @@ Functions
 The type of functions with input ``X`` and output ``Y`` is written ``X
 -> Y``.  Some basic examples of function definitions are shown below.
 
-.. literalinclude:: code/function-examples.disco
+.. literalinclude:: example/function.disco
    :language: idris
    :caption:
 
@@ -45,7 +45,7 @@ certainly supports curried functions as well.  But in either case,
 disco fundamentally supports only one-argument functions.)  For
 example:
 
-.. literalinclude:: code/multi-arg-functions.disco
+.. literalinclude:: example/multi-arg-functions.disco
    :language: idris
    :caption:
 
@@ -60,7 +60,7 @@ another function or output from a function, stored in data structures,
 function to take a function on natural numbers and produce a new
 function which iterates the original function three times:
 
-.. literalinclude:: code/higher-order-example.disco
+.. literalinclude:: example/higher-order.disco
    :language: idris
    :caption:
 

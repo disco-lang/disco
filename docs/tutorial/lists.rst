@@ -19,7 +19,7 @@ almost exactly the same as in Haskell, with the one difference that
 the single colon (type of) and double colon (cons) have been switched
 from Haskell.
 
-.. literalinclude:: code/list-example.disco
+.. literalinclude:: example/list.disco
    :language: idris
    :caption:
 
@@ -48,7 +48,7 @@ of all Pythagoren triples with all three components at
 most 100. (There are much more efficient ways to compute Pythagorean
 triples, but never mind.)
 
-.. literalinclude:: code/comprehension-example.disco
+.. literalinclude:: example/comprehension.disco
    :language: idris
    :caption:
 
@@ -71,7 +71,7 @@ differences.  One minor syntactic difference is that (just for fun)
 disco accepts two *or more* dots as an ellipsis; the number of dots
 makes no difference.
 
-.. literalinclude:: code/basic-ellipsis-example.disco
+.. literalinclude:: example/basic-ellipsis.disco
     :language: idris
     :caption:
 
@@ -108,7 +108,7 @@ additional terms of the list. (In practice, the disco interpreter does
 not actually find a polynomial, but uses the *method of finite
 differences*, just like Charles Babbage's Difference Engine.)
 
-.. literalinclude:: code/general-ellipsis-example.disco
+.. literalinclude:: example/general-ellipsis.disco
     :language: idris
     :caption:
 

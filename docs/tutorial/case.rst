@@ -22,7 +22,7 @@ such as
 
 Here is how one would write a corresponding definition in disco:
 
-.. literalinclude:: code/case-example.disco
+.. literalinclude:: example/case.disco
    :language: idris
    :caption:
 
@@ -61,7 +61,7 @@ are interchangeable).  There are three types of guards:
 
 Here is an example using both boolean and pattern guards:
 
-.. literalinclude:: code/case-pattern-example.disco
+.. literalinclude:: example/case-pattern.disco
    :language: idris
    :caption:
 
@@ -112,6 +112,6 @@ clauses and pattern-matching.  In fact, any such definition simply
 desugars to one big case expression.  For example, the ``gcd`` function
 shown below actually desugars to something like ``gcd2``:
 
-.. literalinclude:: code/function-desugar.disco
+.. literalinclude:: example/function-desugar.disco
    :language: idris
    :caption:

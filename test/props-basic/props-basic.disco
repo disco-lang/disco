@@ -54,7 +54,7 @@ plusIsoR n =
   ?}
 
 !!! ∀ v:Void. 2 = 3    -- this is true!
-!!! ∀ u:Unit. u = u    -- there is only one Unit type
+!!! ∀ u:Unit. u = u    -- there is only one Unit value
 !!! ∀ l:List Void. l = l
 !!! ∀ l:List Unit. l = reverseU l
 !!! ∀ bs : List Bool. toBin (fromBin bs) = bs

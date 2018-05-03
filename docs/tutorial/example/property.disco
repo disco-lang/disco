@@ -1,0 +1,21 @@
+!!! ∀ x:B. neg (neg x) = x
+neg : B -> B
+neg x = not x
+
+!!! ∀p: N + N. plusIsoR (plusIso p) = p
+plusIso : N + N -> N
+plusIso (left n) = 2n
+plusIso (right n) = 2n + 1
+
+!!! ∀n:N. plusIso (plusIsoR n) = n
+plusIsoR : N -> N + N
+plusIsoR n =
+  {? left  (n // 2)   if 2 divides n
+   , right (n // 2)   otherwise
+  ?}
+
+!!! forall x:N, y:N, z:N.
+      f(f(x,y), z) = f(x, f(y,z))
+
+f : N*N -> N
+f (x,y) = x + x*y + y

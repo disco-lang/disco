@@ -14,7 +14,7 @@ category:            Language
 tested-with:         GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.1
 
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
-                     docs/tutorial/code/*.disco
+                     docs/tutorial/example/*.disco
                      --- TEST FILES BEGIN (updated automatically by add-test-files.hs) ---
                      test/README.md
                      test/Tests.hs

@@ -8,7 +8,7 @@ import System.Process
 import Control.Monad
 
 exampleDirs :: [FilePath]
-exampleDirs = ["example", "docs/tutorial/code"]
+exampleDirs = ["example", "docs/tutorial/example"]
 
 main :: IO ()
 main = mapM_ checkDir exampleDirs

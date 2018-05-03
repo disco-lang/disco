@@ -29,6 +29,9 @@ outputs one more than its natural number input. (Functions and the
 syntax for defining them will be covered in much more detail in an
 upcoming section of the tutorial.)
 
+The order of definitions in a ``.disco`` file does not matter;
+each definition may refer to any other definition in the whole file.
+
 To load the definitions in a file into the disco REPL, you can use the
 ``:load`` command.  After successfully loading a file, all the names
 defined in the file are available for use.  For example:

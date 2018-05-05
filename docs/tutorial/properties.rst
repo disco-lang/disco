@@ -88,3 +88,28 @@ inputs (*a la* ``QuickCheck``) and checks that the property is
 satisfied for each.  If a counterexample is found, the property
 certainly does not hold, and the counterexample can be printed.  If no
 counterexample is found, the property "probably" holds.
+
+For example, consider this function with a property claiming it is
+associative:
+
+.. literalinclude:: example/failing/property.disco
+   :language: idris
+   :caption:
+
+The function is not associative, however, and if we try to load this
+file disco quickly finds a counterexample:
+
+::
+
+    Disco> :load example/failing/property.disco
+    Loading example/failing/property.disco...
+    Running tests...
+      f:
+      - Test result mismatch for: ∀ x : ℕ, y : ℕ, z : ℕ. f (f (x, y), z) = f (x, f (y, z))
+        - Expected: 5
+        - But got:  3
+        Counterexample:
+          x = 1
+          y = 0
+          z = 1
+    Loaded.

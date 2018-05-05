@@ -1,0 +1,5 @@
+!!! forall x:N, y:N, z:N.
+      f(f(x,y), z) = f(x, f(y,z))
+
+f : N*N -> N
+f (x,y) = x + 2*y

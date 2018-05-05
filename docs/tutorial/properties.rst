@@ -3,7 +3,7 @@
 Properties
 **********
 
-Each disco definition may have any number of associated *properties*.,
+Each disco definition may have any number of associated *properties*,
 mathematical claims about the behavior of the definition which can be
 automatically verified by disco.  Properties begin with ``!!!``, must
 occur just before their associated definition, and may be arbitrarily

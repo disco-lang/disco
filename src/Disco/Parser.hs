@@ -217,7 +217,7 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool"
+  , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
   , "forall"
@@ -675,7 +675,7 @@ parseAtomicType :: Parser Type
 parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
-  <|> TyBool <$ (reserved "Bool" <|> reserved "B")
+  <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")

@@ -347,8 +347,10 @@ prettyWHNF out _ (VNum d r)
 
 prettyWHNF out _ (VFun _) = out "<function>"
 
+prettyWHNF out _ (VClos _ _) = out "<function>"
+
 prettyWHNF _ ty v = error $
-  "Impossible! No matching case in prettyValue for " ++ show v ++ ": " ++ show ty
+  "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()

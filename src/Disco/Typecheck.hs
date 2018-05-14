@@ -704,14 +704,11 @@ infer (TBin op t1 t2)
 
   -- &&, ||, and not always have type Bool, and the subterms must have type
   -- Bool as well.
-infer (TBin And t1 t2) = do
+infer (TBin op t1 t2) | op `elem` [And, Or, Impl] = do
   at1 <- check t1 TyBool
   at2 <- check t2 TyBool
-  return $ ATBin TyBool And at1 at2
-infer (TBin Or t1 t2) = do
-  at1 <- check t1 TyBool
-  at2 <- check t2 TyBool
-  return $ ATBin TyBool Or at1 at2
+  return $ ATBin TyBool op at1 at2
+
 infer (TUn Not t) = do
   at <- check t TyBool
   return $ ATUn TyBool Not at

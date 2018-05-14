@@ -14,3 +14,7 @@ false or false
 true || false
 not true
 not false
+true ==> true 
+true ==> false 
+false ==> true 
+false ==> false 

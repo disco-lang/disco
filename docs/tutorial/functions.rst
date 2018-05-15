@@ -183,13 +183,3 @@ not a multiplicative term.
    :math:`x(y+3)` as function application, although they might also
    rightly complain that :math:`x` is a strange choice for the name of
    a function.
-
-Let expressions
-===============
-
-TODO
-
-* Optional type annotations
-* Multiple bindings separated by commas
-* Each binding scopes over later bindings
-* No recursion

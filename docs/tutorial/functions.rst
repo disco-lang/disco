@@ -188,3 +188,8 @@ Let expressions
 ===============
 
 TODO
+
+* Optional type annotations
+* Multiple bindings separated by commas
+* Each binding scopes over later bindings
+* No recursion

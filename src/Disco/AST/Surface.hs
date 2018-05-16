@@ -9,7 +9,9 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
-
+{-# LANGUAGE TypeOperators, PatternSynonyms #-}
+{-# LANGUAGE EmptyCase, StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface
@@ -55,7 +57,7 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-
+import           GHC.Exts (Constraint)
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
 data Module = Module [Decl] (Ctx Term Docs)
@@ -148,6 +150,111 @@ fromTelescope = foldTelescope (:) []
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
+
+data Term_ e where
+
+  -- | A variable.
+  TVar_   :: T_var e -> Name (Term_ e) -> Term_ e
+
+  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
+  TLet_   :: T_let e -> Bind (Telescope Binding) (Term_ e) -> Term_ e
+
+  -- | Explicit parentheses.  We need to keep track of these in order
+  --   to syntactically distinguish multiplication and function
+  --   application.
+  TParens_ :: T_parens e -> Term_ e -> Term_ e
+
+  -- | The unit value, (), of type Unit.
+  TUnit_  :: T_unit e -> Term_ e
+
+  -- | True or false.
+  TBool_  :: T_bool e -> Bool -> Term_ e
+
+  -- | A natural number.
+  TNat_   :: T_nat e -> Integer -> Term_ e
+
+  -- | A nonnegative rational number, parsed as a decimal.
+  TRat_   :: T_rat e -> Rational -> Term_ e
+
+  -- | An anonymous function.
+  TAbs_   :: T_abs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
+
+  -- | Function application.
+  TApp_  :: T_app e -> Term_ e -> Term_ e -> Term_ e
+
+  -- | An n-tuple, @(t1, ..., tn)@.
+  TTup_   :: T_tup e -> [Term_ e] -> Term_ e
+
+  -- | An injection into a sum type.
+  TInj_   :: T_inj e -> Side -> Term_ e -> Term_ e
+
+  -- | A case expression.
+  TCase_  :: T_case e -> [Branch] -> Term_ e
+
+  -- | An application of a unary operator.
+  TUn_    :: T_un e -> UOp -> Term_ e -> Term_ e
+
+  -- | An application of a binary operator.
+  TBin_   :: T_bin e -> BOp -> Term_ e -> Term_ e -> Term_ e
+
+  -- | A chained comparison.  Should contain only comparison
+  --   operators.
+  TChain_ :: T_chain e -> Term_ e -> [Link] -> Term_ e
+
+  -- | An application of a type operator.
+  TTyOp_  :: T_tyop e -> TyOp -> Type -> Term_ e
+
+  -- | A literal list.
+  TList_ :: T_list e -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
+
+  -- | List comprehension.
+  TListComp_ :: T_listcomp e -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
+
+  -- | Type ascription, @(Term_ e : type)@.
+  TAscr_  :: T_ascr e -> Term_ e -> Type -> Term_ e
+
+  Term_   :: T_term e -> Term_ e 
+  deriving (Generic)
+
+
+-- type Forall_t (a :: * -> Constraint) e 
+--       = (a (T_var e), a (T_let e),  
+--          a (T_parens e), a (T_unit e), 
+--          a (T_bool e), a (T_nat e), 
+--          a (T_rat e), a (T_abs e), 
+--          a (T_app e), a (T_inj e),
+--          a (T_case e), a (T_un e),
+--          a (T_bin e), a (T_chain e),
+--          a (T_tyop e), a (T_list e),
+--          a (T_listcomp e), a (T_ascr e),
+--          a (T_term e), a (T_tup e))
+
+-- deriving instance Forall_t Show e => Show (Term_ e)
+
+
+type family T_var e 
+type family T_let e 
+type family T_parens e 
+type family T_unit e 
+type family T_bool e 
+type family T_nat e 
+type family T_rat e 
+type family T_abs e 
+type family T_app e 
+type family T_inj e 
+type family T_case e 
+type family T_un e 
+type family T_bin e 
+type family T_chain e 
+type family T_tyop e 
+type family T_list e 
+type family T_listcomp e 
+type family T_ascr e
+type family T_term e 
+type family T_tup e 
+
+  
+
 -- | Terms.
 data Term where
 
@@ -212,6 +319,14 @@ data Term where
   TAscr  :: Term -> Type -> Term
   deriving (Show, Generic)
 
+data Link_ e where
+  TLink_ :: T_link e -> BOp -> Term_ e -> Link_ e
+  deriving Generic
+
+deriving instance (Show (T_link e), Show (Term_ e)) => Show (Link_ e)
+
+type family T_link e
+
 data Link where
   TLink :: BOp -> Term -> Link
   deriving (Show, Generic)
@@ -225,6 +340,21 @@ data Ellipsis t where
 
 -- Note: very similar to guards-
 --  maybe some generalization in the future?
+
+data Qual_ e where
+
+  -- | A binding qualifier (i.e. @x <- t@)
+  QBind_   :: Q_bind e -> Name (Term_ e) -> Embed (Term_ e) -> Qual_ e
+
+  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  QGuard_  :: Q_guard e -> Embed (Term_ e) -> Qual_ e
+
+  deriving Generic
+
+deriving instance (Show (Q_bind e), Show (Q_guard e), Show (Term_ e)) => Show (Qual_ e)
+
+type family Q_bind e
+type family Q_guard e
 
 -- | A single qualifier in a list comprehension.
 data Qual where
@@ -244,7 +374,25 @@ data Binding = Binding (Maybe Type) (Name Term) (Embed Term)
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
 --   over subsequent guards.
+
+type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
+
 type Branch = Bind (Telescope Guard) Term
+
+data Guard_ e where
+
+  -- | Boolean guard (@if <test>@)
+  GBool_ :: G_bool e -> Embed (Term_ e) -> Guard_ e
+
+  -- | Pattern guard (@when term = pat@)
+  GPat_  :: G_pat e -> Embed (Term_ e) -> Pattern -> Guard_ e
+
+  deriving Generic
+
+deriving instance (Show (G_bool e), Show (G_pat e), Show (Term_ e)) => Show (Guard_ e)
+
+type family G_bool e
+type family G_pat e
 
 -- | A single guard in a branch: either an @if@ or a @when@.
 data Guard where

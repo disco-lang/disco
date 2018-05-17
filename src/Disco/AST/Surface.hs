@@ -61,12 +61,12 @@ import           GHC.Exts (Constraint)
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
 data Module = Module [Decl] (Ctx Term Docs)
-  deriving Show
+deriving instance Forall_t Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl
-  deriving Show
+deriving instance Forall_t Show  UD => Show TopLevel
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]
@@ -77,7 +77,7 @@ data DocThing
                             --   of @||| text@ items
   | DocProperty Property    -- ^ An example/doctest/property of the
                             --   form @!!! forall (x1:ty1) ... . property@
-  deriving Show
+deriving instance Forall_t Show  UD => Show DocThing
 
 -- | A property is a universally quantified term of the form
 --   @forall v1 : T1, v2 : T2. term@.
@@ -93,7 +93,8 @@ data Decl where
   --   patterns bind variables in the term. For example, @f n (x,y) =
   --   n*x + y@.
   DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
-  deriving Show
+
+deriving instance Forall_t Show  UD => Show Decl
 
 -- | Get the name that a declaration is about.
 declName :: Decl -> Name Term
@@ -254,71 +255,75 @@ type family X_TAscr e
 type family X_Term e 
 type family X_TTup e 
 
+
+type Term = Term_ UD 
+data UD 
+
   
 
--- | Terms.
-data Term where
+-- -- | Terms.
+-- data Term where
 
-  -- | A variable.
-  TVar   :: Name Term -> Term
+--   -- | A variable.
+--   TVar   :: Name Term -> Term
 
-  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
-  TLet   :: Bind (Telescope Binding) Term -> Term
+--   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
+--   TLet   :: Bind (Telescope Binding) Term -> Term
 
-  -- | Explicit parentheses.  We need to keep track of these in order
-  --   to syntactically distinguish multiplication and function
-  --   application.
-  TParens :: Term -> Term
+--   -- | Explicit parentheses.  We need to keep track of these in order
+--   --   to syntactically distinguish multiplication and function
+--   --   application.
+--   TParens :: Term -> Term
 
-  -- | The unit value, (), of type Unit.
-  TUnit  :: Term
+--   -- | The unit value, (), of type Unit.
+--   TUnit  :: Term
 
-  -- | True or false.
-  TBool  :: Bool -> Term
+--   -- | True or false.
+--   TBool  :: Bool -> Term
 
-  -- | A natural number.
-  TNat   :: Integer -> Term
+--   -- | A natural number.
+--   TNat   :: Integer -> Term
 
-  -- | A nonnegative rational number, parsed as a decimal.
-  TRat   :: Rational -> Term
+--   -- | A nonnegative rational number, parsed as a decimal.
+--   TRat   :: Rational -> Term
 
-  -- | An anonymous function.
-  TAbs   :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
+--   -- | An anonymous function.
+--   TAbs   :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 
-  -- | Function application.
-  TApp  :: Term -> Term -> Term
+--   -- | Function application.
+--   TApp  :: Term -> Term -> Term
 
-  -- | An n-tuple, @(t1, ..., tn)@.
-  TTup   :: [Term] -> Term
+--   -- | An n-tuple, @(t1, ..., tn)@.
+--   TTup   :: [Term] -> Term
 
-  -- | An injection into a sum type.
-  TInj   :: Side -> Term -> Term
+--   -- | An injection into a sum type.
+--   TInj   :: Side -> Term -> Term
 
-  -- | A case expression.
-  TCase  :: [Branch] -> Term
+--   -- | A case expression.
+--   TCase  :: [Branch] -> Term
 
-  -- | An application of a unary operator.
-  TUn    :: UOp -> Term -> Term
+--   -- | An application of a unary operator.
+--   TUn    :: UOp -> Term -> Term
 
-  -- | An application of a binary operator.
-  TBin   :: BOp -> Term -> Term -> Term
+--   -- | An application of a binary operator.
+--   TBin   :: BOp -> Term -> Term -> Term
 
-  -- | A chained comparison.  Should contain only comparison
-  --   operators.
-  TChain :: Term -> [Link] -> Term
+--   -- | A chained comparison.  Should contain only comparison
+--   --   operators.
+--   TChain :: Term -> [Link] -> Term
 
-  -- | An application of a type operator.
-  TTyOp  :: TyOp -> Type -> Term
+--   -- | An application of a type operator.
+--   TTyOp  :: TyOp -> Type -> Term
 
-  -- | A literal list.
-  TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+--   -- | A literal list.
+--   TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 
-  -- | List comprehension.
-  TListComp :: Bind (Telescope Qual) Term -> Term
+--   -- | List comprehension.
+--   TListComp :: Bind (Telescope Qual) Term -> Term
 
-  -- | Type ascription, @(term : type)@.
-  TAscr  :: Term -> Type -> Term
-  deriving (Show, Generic)
+--   -- | Type ascription, @(term : type)@.
+--   TAscr  :: Term -> Type -> Term
+--   deriving (Show, Generic)
 
 data Link_ e where
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
@@ -328,9 +333,13 @@ type family X_TLink e
 
 deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 
-data Link where
-  TLink :: BOp -> Term -> Link
-  deriving (Show, Generic)
+-- data Link where
+--   TLink :: BOp -> Term -> Link
+--   deriving (Generic)
+type Link = Link_ UD 
+
+
+deriving instance Forall_t Show  UD => Show Link 
 
 -- | An ellipsis is an "omitted" part of a literal list, of the form
 --   @..@ or @.. t@.
@@ -358,19 +367,24 @@ type family X_QBind e
 type family X_QGuard e
 
 -- | A single qualifier in a list comprehension.
-data Qual where
+-- data Qual where
 
-  -- | A binding qualifier (i.e. @x <- t@)
-  QBind   :: Name Term -> Embed Term -> Qual
+--   -- | A binding qualifier (i.e. @x <- t@)
+--   QBind   :: Name Term -> Embed Term -> Qual
 
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  QGuard  :: Embed Term -> Qual
+--   -- | A boolean guard qualfier (i.e. @x + y > 4@)
+--   QGuard  :: Embed Term -> Qual
 
-  deriving (Show, Generic)
+--   deriving (Generic)
+type Qual = Qual_ UD 
+
+deriving instance Forall_t Show  UD => Show Qual 
 
 -- | A binding is a name along with its definition.
 data Binding = Binding (Maybe Type) (Name Term) (Embed Term)
-  deriving (Show, Generic)
+  deriving (Generic)
+
+deriving instance Forall_t Show  UD => Show Binding 
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
@@ -396,15 +410,18 @@ type family X_GBool e
 type family X_GPat e
 
 -- | A single guard in a branch: either an @if@ or a @when@.
-data Guard where
+-- data Guard where
 
-  -- | Boolean guard (@if <test>@)
-  GBool :: Embed Term -> Guard
+--   -- | Boolean guard (@if <test>@)
+--   GBool :: Embed Term -> Guard
 
-  -- | Pattern guard (@when term = pat@)
-  GPat  :: Embed Term -> Pattern -> Guard
+--   -- | Pattern guard (@when term = pat@)
+--   GPat  :: Embed Term -> Pattern -> Guard
 
-  deriving (Show, Generic)
+--   deriving (Generic)
+type Guard = Guard_ UD 
+
+deriving instance Forall_t Show  UD => Show Guard
 
 -- | Patterns.
 data Pattern where

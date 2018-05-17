@@ -37,7 +37,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc
+       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, lastFile
 
          -- * Disco monad
 
@@ -237,6 +237,8 @@ data DiscoState e = DiscoState
     -- ^ The next available (unused) memory location.
 
   , _messageLog :: MessageLog e
+
+  , _lastFile :: Maybe FilePath
   }
 
 -- | The initial state for the @Disco@ monad.
@@ -249,6 +251,7 @@ initDiscoState = DiscoState
   , _memory     = IntMap.empty
   , _nextLoc    = 0
   , _messageLog = emptyMessageLog
+  , _lastFile   = Nothing
   }
 
 ------------------------------------------------------------
@@ -375,4 +378,3 @@ withTopEnv :: Disco e a -> Disco e a
 withTopEnv m = do
   env <- use topEnv
   withEnv env m
-

@@ -29,7 +29,7 @@ take on the value of ``<expression1>``.
 More generally:
 
 * A ``let`` may have multiple variables defined before ``in``,
-  separated by commas;
+  separated by commas.
 * Each variable may optionally have a type annotation.
 * The definitions of later variables may refer to previously defined
   variables.

@@ -597,6 +597,36 @@ instance Pretty Constraint where
     let (as, c) = unsafeUnbind b in "forall " ++ intercalate " " (map show as) ++ ". " ++ pretty c
 
 ------------------------------------------------------------
+-- Constraint solving
+------------------------------------------------------------
+
+-- Step 1. Open foralls (instantiating with skolem variables) and
+-- collect qualifier givens and wanteds.  Should result in just a list
+-- of equational and subtyping constraints.
+
+-- Step 2. Check for weak unification to ensure termination. (a la
+-- Traytel et al).
+
+-- Step 3. Simplify constraints, resulting in a set of atomic
+-- subtyping constraints.  Also simplify/update qualifier given &
+-- wanted sets accordingly.
+
+-- Step 4. Turn the atomic constraints into a directed constraint
+-- graph.
+
+-- Step 5. Check for any weakly connected components containing more
+-- than one skolem, or a skolem and a base type; such components are
+-- not allowed.
+
+-- Step 6. Eliminate cycles.
+
+-- Step 7. Solve the graph.
+
+-- Step 8. Unify any remaining variables in weakly connected
+-- components.
+
+
+------------------------------------------------------------
 -- main
 ------------------------------------------------------------
 

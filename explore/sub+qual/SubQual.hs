@@ -454,7 +454,17 @@ checkName nm tau = do
 checkSubsumption :: Sigma -> Type -> TC Constraint
 checkSubsumption (Forall sig) tau2 = do
   (as, (delta, tau1)) <- unbind sig
-  return $ cAnd [CSub tau1 tau2, deltaToConstraint delta]
+  return $ cAnd [cSub tau1 tau2, deltaToConstraint delta]
+
+-- Opportunity to get rid of trivial constraints
+cSub :: Type -> Type -> Constraint
+cSub tau1 tau2
+  | isKnownSub tau1 tau2 = CTrue
+  | otherwise            = CSub tau1 tau2
+
+isKnownSub tau1 tau2 | tau1 == tau2 = True
+isKnownSub TyNat TyInt              = True
+isKnownSub _ _ = False
 
 ------------------------------------------------------------
 -- Interpreter

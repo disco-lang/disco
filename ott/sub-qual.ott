@@ -1,0 +1,652 @@
+% -*- compile-command: "ott -tex_show_meta false -i sub-qual.ott -o sub-qual.tex && pdflatex sub-qual.tex" -*-
+
+embed
+  {{ tex-preamble
+\DeclareMathAlphabet{\mathbbold}{U}{bbold}{m}{n}
+\usepackage{stmaryrd}
+  }}
+
+metavar termvar, x ::=
+  {{ tex \mathit{[[termvar]]} }} {{ com  term variable  }}
+
+metavar const, c {{ tex \mathsf{c} }}   ::=
+  {{ com  constant }}
+
+metavar typevar, a {{ tex \alpha }} ::=
+  {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
+
+metavar natural, n ::=
+  {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
+
+indexvar k ::=
+  {{ com  index }}
+
+grammar
+
+  term, t :: 't_' ::=                                   {{ com term }}
+    | n                    ::   :: nat                     {{ com natural literal }}
+    | x                    ::   :: var                     {{ com variable }}
+    | c                    ::   :: const                   {{ com constant }}
+    | \ x . t              ::   :: lam  (+ bind x in t +)  {{ com abstraction }}
+    | \ x : T . t          ::   :: tlam (+ bind x in t +)  {{ com typed abstraction }}
+    | t1 t2                ::   :: app                     {{ com application }}
+    | let x = t1 in t2     ::   :: let  (+ bind x in t2 +) {{ com let }}
+    | let x : S = t1 in t2 ::   :: tlet (+ bind x in t2 +) {{ com typed let }}
+    | t : S                ::   :: ascribe                 {{ com type ascription }}
+    | ( t )                :: S :: paren
+
+  value, v :: 'v_' ::=                                  {{ com value }}
+    | n                   ::   :: nat                     {{ com natural number literal }}
+    | \ x . t             ::   :: lam                     {{ com abstraction }}
+    | \ x : T . t         ::   :: tlam                    {{ com typed abstraction }}
+
+  tycon, K {{ tex \mathsf{K} }} :: 'K_' ::=             {{ com type constructor }}
+    | N                   ::   :: nat                     {{ com natural numbers }}
+    | Z                   ::   :: int                     {{ com integers }}
+    | Prod                ::   :: prod                    {{ com product type }}
+
+  type, T {{ tex \tau }} :: 'T_' ::=                    {{ com monotype }}
+    | a                   ::   :: var                     {{ com variable }}
+    | K T1 .. Tk          ::   :: const                   {{ com type constructor }}
+    | T1 -> T2            ::   :: arrow                   {{ com function type }}
+    | ( T )               :: S :: paren
+    | { T / a } T'        :: M :: tysub
+
+  qualifier, Q :: 'Q_' ::=                              {{ com qualifier }}
+    | add                 ::   :: num                     {{ com additive }}
+    | sub                 ::   :: sub                     {{ com subtractive }}
+
+  D {{ tex \Delta }} :: D_ ::=                          {{ com qualifier context }}
+    | empty               ::   :: em                      {{ com empty context }}
+    | D , Q T             ::   :: cons                    {{ com cons }}
+    | D , D'              :: M :: append                  {{ com append }}
+
+  polytype, S {{ tex \sigma }} :: 'S_' ::=              {{ com polytype }}
+    | T                          ::   :: mono              {{ com monotype }}
+    | forall a1 .. ak [ D ] . T  ::   :: forall            {{ com forall }}
+
+  G {{ tex \Gamma }} :: G_ ::=                          {{ com type context }}
+    | empty               ::   :: em                      {{ com empty context }}
+    | G , x : S           ::   :: vn                      {{ com cons }}
+    | G , G'              :: M :: append                  {{ com append }}
+
+  constraint, C :: C_ ::=                               {{ com constraint }}
+    | T1 == T2            ::   :: u                       {{ com unification }}
+    | T1 <= T2            ::   :: sub                     {{ com subtype }}
+    | Q T                 ::   :: qual                    {{ com qualifier }}
+    | true                ::   :: true                    {{ com trivial }}
+    | C1 /\ C2            ::   :: conj                    {{ com conjunction }}
+    | [[ D ]]             ::   :: delta                   {{ com qualifiers }}
+    | D ==> C             ::   :: impl                    {{ com entailment }}
+    | forall a1 .. ak . C ::   :: forall  (+ bind a1 .. ak in C +)
+                                                          {{ com universal }}
+
+  % subst, theta {{ tex \theta }} :: 'subst_' ::=
+  %   | empty               ::   :: empty
+  %   | { t / x } subst     ::   :: cons
+  %   | { t / x }           :: M :: singleton
+  %   | subst1 subst2       :: M :: compose
+
+  terminals :: 'terminals_' ::=
+    | \                   ::   :: lambda     {{ tex \lambda }}
+    | elem                ::   :: elem       {{ tex \in }}
+    | fresh               ::   :: fresh      {{ tex \mathrm{fresh} }}
+    | N                   ::   :: nat        {{ tex \mathbb{N} }}
+    | Z                   ::   :: int        {{ tex \mathbb{Z} }}
+    | Prod                ::   :: prod       {{ tex \mathsf{Prod} }}
+    | ->                  ::   :: arrow      {{ tex \rightarrow }}
+    | empty               ::   :: em         {{ tex \varnothing }}
+    | forall              ::   :: forall     {{ tex \forall }}
+    | add                 ::   :: add        {{ tex \mathsf{add} }}
+    | sub                 ::   :: sub        {{ tex \mathsf{sub} }}
+    | ==                  ::   :: unify      {{ tex \equiv }}
+    | <=                  ::   :: subtype    {{ tex \leq }}
+    | ==>                 ::   :: impl       {{ tex \Longrightarrow }}
+    | /\                  ::   :: and        {{ tex \land }}
+    | |-                  ::   :: vdash      {{ tex \vdash }}
+    | |-p                 ::   :: vdashp     {{ tex \vdash^{\mathrm{poly} } }}
+    | |>                  ::   :: synth      {{ tex \triangleright }}
+    | <|                  ::   :: check      {{ tex \triangleleft }}
+    | ~>                  ::   :: gen        {{ tex \rightsquigarrow }}
+    | <<=>                ::   :: subsumeI   {{ tex \sqsubseteq^{\triangleright} }}
+    | <<=<                ::   :: subsumeC   {{ tex \sqsubseteq^{\triangleleft} }}
+    | [[                  ::   :: lbrack     {{ tex \llbracket }}
+    | ]]                  ::   :: rbrack     {{ tex \rrbracket }}
+
+  formula :: 'formula_' ::=
+    | judgement           ::   :: judgement
+    | x : S elem G        ::   :: xTelemG
+    | formula1 .. formulak ::  :: dots
+    | not formula         ::   :: not
+    | a fresh             ::   :: fresh
+    | a1 .. ak fresh      ::   :: nfresh
+    | ( formula )         :: S :: parens
+
+funs
+  DtoC ::=
+fun
+  [[ D ]] :: C :: dtoc  {{ com A function to convert qualifier contexts to constraints }}
+by
+  [[ empty   ]] === true
+  [[ D , Q T ]] === [[ D ]] /\ Q T
+
+% parsing
+%   uop_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
+%   formula_dots left formula_not
+
+subrules
+  v <:: t
+
+% freevars
+%   t x :: fv
+
+% substitutions
+%   single t x :: tsubst
+
+defns
+  Jtype :: '' ::=
+
+  defn
+    G |- t |> T ~> C :: :: inftype :: inf_    {{ com [[t]] has inferred type [[T]] in context [[G]], generating constraints [[C]] }} by
+
+    --------------- :: nat
+    G |- n |> N ~> true
+
+    x : S elem G      S <<=> T ~> C
+    ---------------------------- :: var
+    G |- x |> T ~> C
+
+    G, x : T1 |- t |> T2 ~> C
+    -------------------------- :: tabs
+    G |- \x:T1.t |> T1 -> T2 ~> C
+
+    a1 fresh     a2 fresh
+    G |- t1 |> T ~> C1      G |- t2 <| a1 ~> C2
+    ------------------------------------------- :: app
+    G |- t1 t2 |> a2 ~> C1 /\ C2 /\ T == a1 -> a2
+
+    G |- t1 |> T1 ~> C1
+    G, x : T1 |- t2 |> T2 ~> C2
+    ------------------------------------------ :: let
+    G |- let x = t1 in t2 |> T2 ~> C1 /\ C2
+
+    G |-p t1 <| S ~> C1
+    G, x : S |- t2 |> T ~> C2
+    ------------------------------------------ :: tlet
+    G |- let x : S = t1 in t2 |> T ~> C1 /\ C2
+
+    G |-p t <| S ~> C1          S <<=> T ~> C2
+    ----------------------------------------- :: ascribe
+    G |- t : S |> T ~> C1 /\ C2
+
+  defn
+    G |-p t <| S ~> C :: :: chkpoly :: chkp_   {{ com [[t]] has checked polytype [[S]] in context [[G]], generating constraints [[C]] }} by
+
+    a1 .. ak fresh     G |- t <| T ~> C
+    ------------------------------------------ :: open
+    G |-p t <| forall a1 .. ak [ D ]. T ~> forall a1 .. ak. D ==> C
+
+  defn
+    G |- t <| T ~> C :: :: chktype :: chk_    {{ com [[t]] has checked type [[T]] in context [[G]], generating constraints [[C]] }} by
+
+    x : S elem G        S <<=< T ~> C
+    --------------------------------- :: var
+    G |- x <| T ~> C
+
+    a1 fresh    a2 fresh
+    G, x : a1 |- t <| a2 ~> C
+    ------------------------------------ :: abs
+    G |- \x.t <| T ~> C /\ T == a1 -> a2
+
+    G |- t1 |> T1 ~> C1
+    G, x : T1 |- t2 <| T2 ~> C2
+    ------------------------------------------ :: let
+    G |- let x = t1 in t2 <| T2 ~> C1 /\ C2
+
+    G |-p t1 <| S ~> C1
+    G, x : S |- t2 <| T ~> C2
+    ------------------------------------------ :: tlet
+    G |- let x : S = t1 in t2 <| T ~> C1 /\ C2
+
+    G |-p t <| S ~> C1          S <<=< T ~> C2
+    ----------------------------------------- :: ascribe
+    G |- t : S <| T ~> C1 /\ C2
+
+    G |- t |> T1 ~> C
+    ----------------------------- :: infer
+    G |- t <| T2 ~> C /\ T1 <= T2
+
+  defn
+    S <<=> T ~> C :: :: subsumption_synth :: ss_   {{ com [[T]] is more specific than [[S]] (inference mode), generating constraints [[C]] }} by
+
+    a1 .. ak fresh
+    --------------------------------------- :: inst
+    forall a1 .. ak [D]. T <<=> T ~> [[ D ]]
+
+  defn
+    S <<=< T ~> C :: :: subsumption_check :: sc_   {{ com [[T]] is more specific than [[S]] (checking mode), generating constraints [[C]] }} by
+
+    a1 .. ak fresh
+    ------------------------------------------------------ :: inst
+    forall a1 .. ak [D]. T1 <<=< T2 ~> [[ D ]] /\ T1 <= T2
+
+
+%     x : T elem G
+%     ------------ :: var
+%     G |- x : T
+
+%     -------------- :: unit
+%     G |- () : Unit
+
+%     ---------------- :: true
+%     G |- true : Bool
+
+%     ----------------- :: false
+%     G |- false : Bool
+
+%     G,x1: T1 |- t : T
+%     ------------------ :: abs
+%     G |- x1 |-> t : T1->T
+
+%     G |- t : T1->T2    G |- t' : T1
+%     ------------------------------- :: apply
+%     G |- t t' : T2
+
+%     G |- t1 : T1     G |- t2 : T2
+%     ----------------------------- :: pair
+%     G |- ( t1 , t2 ) : T1 ** T2
+
+%     G |- t : T1
+%     --------------------- :: inl
+%     G |- inl t : T1 ++ T2
+
+%     G |- t : T2
+%     --------------------- :: inr
+%     G |- inr t : T1 ++ T2
+
+%     ---------- :: nat
+%     G |- n : N
+
+%     G |- t1 : num     G |- t2 : num
+%     -------------------------------- :: add
+%     G |- t1 + t2 : num
+
+%     G |- t1 : num    G |- t2 : num
+%     ------------------------------- :: mul
+%     G |- t1 * t2 : num
+
+%     G |- t1 : num     G |- t2 : num         Z <: num
+%     ------------------------------------------------- :: sub
+%     G |- t1 - t2 : num
+
+%     G |- t : num       Z <: num
+%     ---------------------------- :: neg
+%     G |- - t : num
+
+%     G |- t1 : num      G |- t2 : num       Q <: num
+%     ----------------------------------------------- :: div
+%     G |- t1 / t2 : num
+
+%     G |- t : num    G |- t' : num
+%     ----------------------------- :: mul_num
+%     G |- t t' : num
+
+%     G |- t1 : T    G |- t2 : T   Decidable T
+%     ---------------------------------------- :: eq
+%     G |- t1 == t2 : Bool
+
+%     G |- t1 : T    G |- t2 : T   Ordered T
+%     -------------------------------------- :: lt
+%     G |- t1 < t2 : Bool
+
+%     G |- t1 : Bool    G |- t2 : Bool
+%     -------------------------------- :: and
+%     G |- t1 && t2 : Bool
+
+%     G |- t1 : Bool    G |- t2 : Bool
+%     -------------------------------- :: or
+%     G |- t1 || t2 : Bool
+
+%     G |- t1 : T1     G , x : T1 |- t2 : T2
+%     -------------------------------------- :: let
+%     G |- let x = t1 in t2 : T2
+
+%     G |-b b : T
+%     --------------- :: case
+%     G |- case b : T
+
+%     G |- t : T
+%     ---------------- :: ascribe
+%     G |- (t : T) : T
+
+% defn
+%     G |-b b : T :: :: branches_type :: bty_       {{ com branches [[b]] have type [[T]] in context [[G]] }} by
+
+%     --------------- :: empty
+%     G |-b empty : T
+
+%     G |-b branches : T
+%     -------------------- :: skip
+%     G |-b { branches : T
+
+%     G |-g t , guard : T   G |-b branches : T
+%     ---------------------------------------- :: cons
+%     G |-b { t guard branches : T
+
+% defn
+%     G |-g t , g : T :: :: guarded_type :: gty_    {{ com [[t]] guarded by [[g]] has type [[T]] in context [[G]] }} by
+
+%     G |- t : T
+%     ------------------ :: top
+%     G |-g t , top : T
+
+%     G |- t2 : Bool
+%     G |-g t1 , g : T
+%     -------------------- :: if
+%     G |-g t1 , if t2 g : T
+
+%     G |-p p : T2 ---> G2      G |- t2 : T2
+%     G , G2 |-g t1 , g : T
+%     ----------------------------- :: when
+%     G |-g t1 , when t2 = p g : T
+
+% defn
+%     G |-p p : T ---> G' :: :: pattern :: 'p_'  {{ com [[p]] has type [[T]] in context [[G]], and produces bindings [[G']] }} by
+
+%     ----------------------------- :: var
+%     G |-p x : T ---> empty, x : T
+
+%     -------------------------- :: wild
+%     G |-p _ : T ---> empty
+
+%     ------------------------------ :: unit
+%     G |-p () : Unit ---> empty
+
+%     -------------------------------- :: true
+%     G |-p true : Bool ---> empty
+
+%     --------------------------------- :: false
+%     G |-p false : Bool ---> empty
+
+%     G |-p p1 : T1 ---> G1    G |-p p2 : T2 ---> G2
+%     ---------------------------------------------- :: pair
+%     G |-p (p1,p2) : T1 ** T2 ---> G1,G2
+
+%     G |-p p : T1 ---> G1
+%     ------------------------------ :: inl
+%     G |-p inl p : T1 ++ T2 ---> G1
+
+%     G |-p p : T2 ---> G2
+%     ------------------------------ :: inr
+%     G |-p inr p : T1 ++ T2 ---> G2
+
+%     ------------------------ :: nat
+%     G |-p n : N ---> empty
+
+%     G |-p p : N ---> G'
+%     ----------------------- :: succ
+%     G |-p S p : N ---> G'
+
+% defns
+%   Jop :: '' ::=
+
+%     defn
+%     t1 --> t2 ::  :: reduce :: ''       {{ com [[t1]] reduces to [[t2]] }} by
+
+%     empty |- v2 : num
+%     --------------------------  :: beta_num
+%     (x |-> t12) v2 -->  {v2/x}t12
+
+%     not (empty |- t2 : num)
+%     ---------------------------- :: beta
+%     (x |-> t12) t2 --> {t2/x}t12
+
+%     t1 --> t1'
+%     -------------- :: cong_app_fun
+%     t1 t --> t1' t
+
+%     empty |- t1 : num   t1 --> t1'
+%     ------------------------------ :: cong_app_num
+%     v t1 --> v t1'
+
+%     t1 --> t1'
+%     -------------------- :: cong_fst
+%     (t1,t2) --> (t1',t2)
+
+%     t2 --> t2'
+%     -------------------- :: cong_snd
+%     (t1,t2) --> (t1,t2')
+
+%     t --> t'
+%     ---------------- :: cong_inl
+%     inl t --> inl t'
+
+%     t --> t'
+%     ---------------- :: cong_inr
+%     inr t --> inr t'
+
+%     t1 --> t1'
+%     ------------------ :: cong_uop
+%     uop t1 --> uop t1'
+
+%     --------------------- :: uop
+%     uop v --> [[ uop v ]]
+
+%     t1 --> t1'
+%     ------------------------ :: cong_bop_l
+%     t1 bop t2 --> t1' bop t2
+
+%     t2 --> t2'
+%     ------------------------ :: cong_bop_r
+%     t1 bop t2 --> t1 bop t2'
+
+%     ----------------------------- :: bop
+%     v1 bop v2 --> [[ v1 bop v2 ]]
+
+%     empty |- t1 : num     t1 --> t1'
+%     -------------------------------------- :: cong_let_num
+%     let x = t1 in t2 --> let x = t1' in t2
+
+%     empty |- v1 : num
+%     ------------------------------ :: let_num
+%     let x = v1 in t2 --> {v1/x} t2
+
+%     not (empty |- t1 : num)
+%     ------------------------------ :: let
+%     let x = t1 in t2 --> {t1/x} t2
+
+%     --------------------------------- :: case_skip
+%     case { branches --> case branches
+
+%     g --> g'
+%     -------------------------------------------- :: cong_case
+%     case { t g branches --> case { t g' branches
+
+%     g ---> theta
+%     ------------------------------- :: case_success
+%     case { t g branches --> theta t
+
+%     g !
+%     ------------------------------------- :: case_failure
+%     case { t g branches --> case branches
+
+%     defn
+%     g --> g' ::  :: greduce :: 'gred_'  {{ com guard [[g]] reduces to [[g']] }} by
+
+%     t --> t'
+%     ------------------ :: if
+%     if t g --> if t' g
+
+%     t --> t'
+%     -------------------------------- :: when
+%     when t = p g --> when t' = p g
+
+%     defn
+%     guard ---> theta ::  :: success :: 'success_'   {{ com [[guard]] succeeds, producing substitution [[theta]] }} by
+
+%     -------------- :: top
+%     top ---> empty
+
+%     g ---> theta
+%     --------------------- :: true
+%     if true g ---> theta
+
+%     t ~ p ---> theta1
+%     g ---> theta2
+%     -------------------------------- :: match
+%     when t = p g ---> theta2 theta1
+
+%     defn
+%     guard ! ::  :: failure :: 'fail_'   {{ com [[guard]] fails }} by
+
+%     ------------ :: false
+%     if false g !
+
+%     not (t ~ p ---> theta)
+%     ---------------------- :: match
+%     when t = p g !
+
+%     g !
+%     ---------- :: rest
+%     aguard g !
+
+%     defn
+%     t ~ p ---> theta ::  :: match :: 'match_'    {{ com term [[t]] matches pattern [[p]], producing substitution [[theta]] }} by
+
+%     -------------------- :: var
+%     t ~ x ---> { t / x }
+
+%     -------------------- :: wild
+%     t ~ _ ---> empty
+
+%     ----------------- :: unit
+%     t ~ () ---> empty
+
+%     ---------------------- :: true
+%     true ~ true ---> empty
+
+%     ------------------------ :: false
+%     false ~ false ---> empty
+
+%     t1 ~ p1 ---> theta1     t2 ~ p2 ---> theta2
+%     ------------------------------------------- :: pair
+%     (t1, t2) ~ (p1, p2) ---> theta1 theta2
+
+%     t ~ p ---> theta
+%     ------------------------ :: inl
+%     inl t ~ inl p ---> theta
+
+%     t ~ p ---> theta
+%     ------------------------ :: inr
+%     inr t ~ inr p ---> theta
+
+%     ---------------- :: nat
+%     n ~ n ---> empty
+
+%     n >= 1     (n - 1) ~ p ---> theta
+%     --------------------------------- :: succ
+%     n ~ S p ---> theta
+
+
+% defns
+%   Jalgtype :: '' ::=
+
+%   defn
+%     G |- t => T :: :: infer :: inf_    {{ com [[t]] synthesizes type [[T]] in context [[G]] }} by
+
+%     x : T elem G
+%     ------------ :: var
+%     G |- x => T
+
+%     --------------- :: unit
+%     G |- () => Unit
+
+%     ----------------- :: true
+%     G |- true => Bool
+
+%     ----------------- :: false
+%     G |- false => Bool
+
+%     G |- t => T1 -> T2    G |- t' <= T1
+%     ----------------------------------- :: apply
+%     G |- t t' => T2
+
+%     G |- t => num1    G |- t' => num2
+%     num3 = num1 \/ num2
+%     ----------------------------------- :: mul_num
+%     G |- t t' => num3
+
+%     G |- t1 => T1    G |- t2 => T2
+%     ------------------------------- :: pair
+%     G |- (t1, t2) => T1 ** T2
+
+%     ----------- :: nat
+%     G |- n => N
+
+%     G |- t1 => num1    G |- t2 => num2
+%     num3 = num1 \/ num2
+%     ---------------------------------- :: add
+%     G |- t1 + t2 => num3
+
+%     G |- t1 => num1    G |- t2 => num2
+%     num3 = num1 \/ num2
+%     ---------------------------------- :: mul
+%     G |- t1 * t2 => num3
+
+%     G |- t1 => num1    G |- t2 => num2
+%     num3 = num1 \/ num2    num4 = num3 \/ Z
+%     ---------------------------------- :: sub
+%     G |- t1 - t2 => num3
+
+%     G |- t => num      num2 = num \/ Z
+%     ----------------------------------- :: neg
+%     G |- - t => num2
+
+%     G |- t1 <= Q   G |- t2 <= Q
+%     --------------------------------- :: div
+%     G |- t1 / t2 => Q
+
+%     G |- t1 => T1     G |- t2 => T2
+%     T3 = T1 \/ T2     Decidable T3
+%     ---------------------------------- :: eq
+%     G |- t1 == t2 => Bool
+
+%     G |- t1 => T1     G |- t2 => T2
+%     T3 = T1 \/ T2     Ordered T2
+%     --------------------------------- :: lt
+%     G |- t1 < t2 => Bool
+
+%     G |- t1 <= Bool    G |- t2 <= Bool
+%     ---------------------------------- :: and
+%     G |- t1 && t2 => Bool
+
+%     G |- t1 <= Bool    G |- t2 <= Bool
+%     ---------------------------------- :: or
+%     G |- t1 || t2 => Bool
+
+%     G |- t1 => T1   G, x : T1 |- t2 => T2
+%     ----------------------------------------- :: let
+%     G |- let x = t1 in t2 => T1
+
+%     G |- t <= T
+%     ----------------- :: ascribe
+%     G |- (t : T) => T
+
+%   defn
+%     G |- t <= T :: :: check :: chk_    {{ com [[t]] checks at type [[T]] in context [[G]] }} by
+
+%     G, x1 : T1 |- t <= T
+%     ------------------------- :: abs
+%     G |- x1 |-> t <= T1 -> T
+
+%     G |- t <= T1
+%     ----------------------- :: inl
+%     G |- inl t <= T1 ++ T2
+
+%     G |- t <= T2
+%     ----------------------- :: inr
+%     G |- inr t <= T1 ++ T2
+
+%     G |- t => T'    T' <: T
+%     ----------------------- :: flip
+%     G |- t <= T

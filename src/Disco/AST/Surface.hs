@@ -34,19 +34,53 @@ module Disco.AST.Surface
 
          -- * Terms
 
-       , Term(..)
+       , Term
+       , pattern TVar 
+       , pattern TUn
+       , pattern TLet
+       , pattern TParens
+       , pattern TUnit
+       , pattern TBool
+       , pattern TNat
+       , pattern TRat
+       , pattern TAbs
+       , pattern TApp
+       , pattern TTup
+       , pattern TInj
+       , pattern TCase
+       , pattern TBin
+       , pattern TChain
+       , pattern TTyOp
+       , pattern TList
+       , pattern TListComp
+       , pattern TAscr
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
 
          -- ** Expressions
-       , Side(..), Link(..), Binding(..)
+       , Side(..)
+
+       , Link
+       , pattern TLink
+
+       , Binding(..)
 
          -- ** Lists
-       , Qual(..), Ellipsis(..)
+       , Qual
+       , pattern QBind
+       , pattern QGuard
+       
+       , Ellipsis(..)
 
          -- ** Case expressions and patterns
-       , Branch, Guard(..), Pattern(..)
+       , Branch
+
+       , Guard
+       , pattern GBool
+       , pattern GPat
+       
+       , Pattern(..)
        )
        where
 
@@ -214,8 +248,87 @@ data Term_ e where
   -- | Type ascription, @(Term_ e : type)@.
   TAscr_  :: X_TAscr e -> Term_ e -> Type -> Term_ e
 
-  Term_   :: X_Term e -> Term_ e 
+  XTerm_   :: X_Term e -> Term_ e 
   deriving (Generic)
+
+pattern TVar :: Name Term -> Term
+pattern TVar name = TVar_ () name
+
+pattern TUn :: UOp -> Term -> Term
+pattern TUn uop term = TUn_ () uop term
+
+pattern TLet :: Bind (Telescope Binding) Term -> Term
+pattern TLet bind = TLet_ () bind 
+
+pattern TParens :: Term -> Term
+pattern TParens term  = TParens_ () term 
+
+pattern TUnit :: Term
+pattern TUnit = TUnit_ ()
+
+pattern TBool :: Bool -> Term
+pattern TBool bool = TBool_ () bool
+
+pattern TNat  :: Integer -> Term
+pattern TNat int = TNat_ () int
+
+pattern TRat :: Rational -> Term
+pattern TRat rat = TRat_ () rat
+
+pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
+pattern TAbs bind = TAbs_ () bind
+
+pattern TApp  :: Term -> Term -> Term
+pattern TApp term1 term2 = TApp_ () term1 term2 
+
+pattern TTup :: [Term] -> Term
+pattern TTup termlist = TTup_ () termlist 
+
+pattern TInj :: Side -> Term -> Term
+pattern TInj side term = TInj_ () side term
+
+pattern TCase :: [Branch] -> Term
+pattern TCase branch = TCase_ () branch
+
+pattern TBin :: BOp -> Term -> Term -> Term
+pattern TBin bop term1 term2 = TBin_ () bop term1 term2
+
+pattern TChain :: Term -> [Link] -> Term
+pattern TChain term linklist = TChain_ () term linklist
+
+pattern TTyOp :: TyOp -> Type -> Term
+pattern TTyOp tyop ty = TTyOp_ () tyop ty
+
+pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TList termlist mellipses = TList_ () termlist mellipses
+
+pattern TListComp :: Bind (Telescope Qual) Term -> Term
+pattern TListComp bind = TListComp_ () bind
+
+pattern TAscr :: Term -> Type -> Term
+pattern TAscr term ty = TAscr_ () term ty
+
+{-# COMPLETE   TVar 
+       , TUn
+       , TLet
+       , TParens
+       , TUnit
+       , TBool
+       , TNat
+       , TRat
+       , TAbs
+       , TApp
+       , TTup
+       , TInj
+       , TCase
+       , TBin
+       , TChain
+       , TTyOp
+       , TList
+       , TListComp
+       , TAscr
+       #-}
+ 
 
 
 type Forall_t (a :: * -> Constraint) e 
@@ -258,6 +371,30 @@ type family X_TTup e
 
 type Term = Term_ UD 
 data UD 
+
+type instance X_TVar UD = ()
+type instance X_TLet UD = ()
+type instance X_TParens UD = () 
+type instance X_TUnit UD = ()
+type instance X_TBool UD = () 
+type instance X_TNat UD = ()
+type instance X_TRat UD = ()
+type instance X_TAbs UD = () 
+type instance X_TApp UD = ()
+type instance X_TInj UD = () 
+type instance X_TCase UD = () 
+type instance X_TUn UD = ()
+type instance X_TBin UD = () 
+type instance X_TChain UD = () 
+type instance X_TTyop UD = () 
+type instance X_TList UD = () 
+type instance X_TListComp UD = () 
+type instance X_TAscr UD = ()
+type instance X_Term UD = () 
+type instance X_TTup UD = () 
+
+
+
 
   
 
@@ -329,7 +466,14 @@ data Link_ e where
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
   deriving Generic
 
+pattern TLink :: BOp -> Term -> Link
+pattern TLink bop term = TLink_ () bop term
+
+{-# COMPLETE TLink #-}
+
+
 type family X_TLink e
+type instance X_TLink UD = ()
 
 deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 
@@ -338,8 +482,6 @@ deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 --   deriving (Generic)
 type Link = Link_ UD 
 
-
-deriving instance Forall_t Show  UD => Show Link 
 
 -- | An ellipsis is an "omitted" part of a literal list, of the form
 --   @..@ or @.. t@.
@@ -361,10 +503,22 @@ data Qual_ e where
 
   deriving Generic
 
+pattern QBind :: Name Term -> Embed Term -> Qual
+pattern QBind namet embedt = QBind_ () namet embedt
+
+pattern QGuard :: Embed Term -> Qual
+pattern QGuard embedt = QGuard_ () embedt
+
+{-# COMPLETE QBind, QGuard #-}
+
+
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
 
 type family X_QBind e
 type family X_QGuard e
+
+type instance X_QBind UD = ()
+type instance X_QGuard UD = ()
 
 -- | A single qualifier in a list comprehension.
 -- data Qual where
@@ -378,7 +532,6 @@ type family X_QGuard e
 --   deriving (Generic)
 type Qual = Qual_ UD 
 
-deriving instance Forall_t Show  UD => Show Qual 
 
 -- | A binding is a name along with its definition.
 data Binding = Binding (Maybe Type) (Name Term) (Embed Term)
@@ -392,7 +545,9 @@ deriving instance Forall_t Show  UD => Show Binding
 
 type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
 
-type Branch = Bind (Telescope Guard) Term
+
+-- type Branch = Bind (Telescope Guard) Term 
+type Branch = Branch_ UD 
 
 data Guard_ e where
 
@@ -404,10 +559,21 @@ data Guard_ e where
 
   deriving Generic
 
+pattern GBool :: Embed Term -> Guard
+pattern GBool embedt = GBool_ () embedt
+
+pattern GPat :: Embed Term -> Pattern -> Guard
+pattern GPat embedt pat = GPat_ () embedt pat
+
+{-# COMPLETE GBool, GPat #-}
+
 deriving instance (Show (X_GBool e), Show (X_GPat e), Show (Term_ e)) => Show (Guard_ e)
 
 type family X_GBool e
 type family X_GPat e
+
+type instance X_GBool UD = ()
+type instance X_GPat UD = ()
 
 -- | A single guard in a branch: either an @if@ or a @when@.
 -- data Guard where
@@ -420,8 +586,6 @@ type family X_GPat e
 
 --   deriving (Generic)
 type Guard = Guard_ UD 
-
-deriving instance Forall_t Show  UD => Show Guard
 
 -- | Patterns.
 data Pattern where

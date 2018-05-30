@@ -185,7 +185,7 @@ data Expr where
   EBin   :: BOp -> Expr -> Expr -> Expr
   ELam   :: Bind (Name Expr) Expr -> Expr
   EApp   :: Expr -> Expr -> Expr
-  EAnnot :: Expr -> Sigma -> Expr
+  EAscribe :: Expr -> Sigma -> Expr
   ELet   :: Expr -> Sigma -> Bind (Name Expr) Expr -> Expr
 
   deriving (Show, Generic)
@@ -260,7 +260,7 @@ parseExpr :: Parser Expr
 parseExpr = ascribe <$> parseExpr' <*> optionMaybe (symbol ":" *> parseSigma)
   where
     ascribe t Nothing   = t
-    ascribe t (Just ty) = EAnnot t ty
+    ascribe t (Just ty) = EAscribe t ty
 
 
 parseExpr' :: Parser Expr
@@ -360,7 +360,7 @@ infer (EApp t1 t2) = do
   (tau1, tau2, c2) <- ensureArrow tau
   c3 <- check t2 tau1
   return (tau2, cAnd [c1, c2, c3])
-infer (EAnnot e sig) = do
+infer (EAscribe e sig) = do
   c1 <- checkSigma e sig
   tau <- inferSubsumption sig
   return (tau, c1)
@@ -412,7 +412,7 @@ check (ELam lam) tau = do
   (x, body) <- unbind lam
   c2 <- extend x (toSigma tau1) $ check body tau2
   return $ cAnd [c1, c2]
-check (EAnnot e sig) tau = do
+check (EAscribe e sig) tau = do
   c1 <- checkSigma e sig
   c2 <- checkSubsumption sig tau
   return $ cAnd [c1, c2]
@@ -474,7 +474,7 @@ interp' (EApp fun arg)  = do
         interp' body
     VFun f -> return (f va)
     _ -> error $ printf "Impossible! interp' EApp with (%s) (%s)" (show fun) (show arg)
-interp' (EAnnot e _) = interp' e
+interp' (EAscribe e _) = interp' e
 interp' (ELet e1 _ b) = do
   ve1 <- interp' e1
   lunbind b $ \(x,body) ->

@@ -1,4 +1,4 @@
-% -*- compile-command: "ott -tex_show_meta false -i quantified.ott -o quantified.tex && pdflatex quantified.tex" -*-
+% -*- compile-command: "ott -tex_show_meta false -i disco.ott -o disco.tex && pdflatex disco.tex" -*-
 
 embed
   {{ tex-preamble
@@ -6,10 +6,10 @@ embed
 \usepackage{stmaryrd}
   }}
 
-metavar termvar, x ::=
+metavar termvar, x, f ::=
   {{ tex \mathit{[[termvar]]} }} {{ com  term variable  }}
 
-metavar typevar, X ::=
+metavar typevar, a {{ tex \alpha }} ::=
   {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
 
 metavar natural, n ::=
@@ -23,8 +23,8 @@ grammar
     | decl1 .. declk      ::   :: decllist
 
   decl, D :: 'D_' ::=                                   {{ com declaration }}
-    | x : T ;             ::   :: type                    {{ com type }}
-    | x = t ;             ::   :: definition              {{ com definition }}
+    | x : T               ::   :: type                    {{ com type }}
+    | f p1 .. pk = t      ::   :: definition              {{ com definition }}
 
   uop :: 'uop_' ::=                                     {{ com unary operator }}
     | -                   ::   :: neg                     {{ com negation }}
@@ -56,7 +56,7 @@ grammar
     | t1 bop t2           ::   :: bop                     {{ com binary operator }}
     | let x = t1 in t2    ::   :: let (+ bind x in t2 +)  {{ com let }}
     | case branches       ::   :: case                    {{ com case analysis }}
-    | t : T               ::   :: ascribe                 {{ com type ascription }}
+    | t : S               ::   :: ascribe                 {{ com type ascription }}
     | ( t )               :: S :: paren
     | theta t'            :: M :: tsub
     | 1                   :: M :: One
@@ -70,56 +70,51 @@ grammar
     | inl v               ::   :: inl                     {{ com left introduction }}
     | inr v               ::   :: inr                     {{ com right introduction }}
 
-  stype, S :: 'S_' ::=                                  {{ com simple type }}
-    | X                   ::   :: var                     {{ com variable }}
-    | Void                ::   :: void                    {{ com void type }}
-    | Unit                ::   :: unit                    {{ com unit type }}
-    | Bool                ::   :: bool                    {{ com boolean type }}
+  basety, B :: 'B_' ::=                                 {{ com base type }}
+    | Void                ::   :: void                    {{ com void }}
+    | Unit                ::   :: unit                    {{ com unit }}
+    | Bool                ::   :: bool                    {{ com booleans }}
+    | N                   ::   :: nat                     {{ com naturals }}
+    | Z                   ::   :: int                     {{ com integers }}
+    | Rat+                ::   :: posrat                  {{ com nonnegative rationals }}
+    | Rat                 ::   :: rat                     {{ com rationals }}
+    | Z_ n                ::   :: Zn                      {{ com integers modulo n }}
+
+  type, T {{ tex \tau }} :: 'T_' ::=                    {{ com monotype }}
+    | a                   ::   :: var                     {{ com variable }}
+    | B                   ::   :: base                    {{ com base type }}
     | T1 -> T2            ::   :: arrow                   {{ com function type }}
     | T1 ** T2            ::   :: product                 {{ com product type }}
     | T1 ++ T2            ::   :: sum                     {{ com sum type }}
-    | N                   ::   :: nat                     {{ com natural type }}
-    | Z                   ::   :: int                     {{ com integer type }}
-    | Q                   ::   :: rat                     {{ com rational type }}
-%    | t1 = t2             ::   :: eq                      {{ com identity }}
     | ( T )               :: S :: paren
     | { T / X } T'        :: M :: tysub
 
-  qual :: 'Qual_' ::=                                   {{ com qualifier }}
-    | forall X            ::   :: forall                  {{ com universal }}
-    | S1 <: S2            ::   :: sub                     {{ com subtype }}
-    | finite S            ::   :: fin                     {{ com finite }}
-    | decidable S         ::   :: dec                     {{ com decidable }}
-    | ordered S           ::   :: ord                     {{ com ordered }}
-    | numeric S           ::   :: num                     {{ com numeric }}
-
-  constraint, C :: 'C_' ::=                             {{ com constraint }}
-    | top                 ::   :: top                     {{ com trivial }}
-    | bot                 ::   :: bot                     {{ com impossible }}
-    | C1 /\ C2            ::   :: and                     {{ com conjunction }}
-    | C1 \/ C2            ::   :: or                      {{ com disjunction }}
-    | S1 <: S2            ::   :: sub                     {{ com subtype }}
-    | S1 = S2 |_| S3      ::   :: lub                     {{ com lub }}
-    | T1 <<: S2           ::   :: inst                    {{ com instantiation + subtype }}
-    | finite S            ::   :: fin                     {{ com finite }}
-    | decidable S         ::   :: dec                     {{ com decidable }}
-    | ordered S           ::   :: ord                     {{ com ordered }}
-    | numeric S           ::   :: num                     {{ com numeric }}
-    | ( C )               :: S :: paren
-
-  type, T :: 'T_' ::=                                   {{ com type }}
-    | S                   ::   :: stype                   {{ com simple type }}
-    | qual , T            ::   :: qual                    {{ com qualified type }}
-
-  num {{ tex \nu }} :: 'num_' ::=                       {{ com numeric type }}
-    | N                   ::   :: nat                     {{ com natural type }}
-    | Z                   ::   :: int                     {{ com integer type }}
-    | Q                   ::   :: rat                     {{ com rational type }}
+  polytype, S {{ tex \sigma }} :: 'S_' ::=              {{ com polytype }}
+    | T                   ::   :: mono                    {{ com monotype }}
+    | forall a1 .. ak . T ::   :: poly                    {{ com forall }}
 
   G {{ tex \Gamma }} :: G_ ::=                          {{ com type context }}
     | empty               ::   :: em                      {{ com empty context }}
     | G , x : T           ::   :: vn                      {{ com cons }}
     | G , G'              :: M :: append                  {{ com append }}
+
+  qualifier, Q :: 'Q_' ::=                              {{ com qualifier }}
+    | add                 ::   :: num                     {{ com additive }}
+    | sub                 ::   :: sub                     {{ com subtractive }}
+    | mul                 ::   :: mul                     {{ com multiplicative }}
+    | div                 ::   :: div                     {{ com divisible }}
+    | fin                 ::   :: fin                     {{ com finite }}
+    | eq                  ::   :: dec                     {{ com decidable equality }}
+    | ord                 ::   :: ord                     {{ com decidable ordering }}
+
+  constraint, C :: 'C_' ::=                             {{ com constraint }}
+    | T1 == T2            ::   :: u                       {{ com unification }}
+    | T1 <= T2            ::   :: sub                     {{ com subtype }}
+    | Q T                 ::   :: qual                    {{ com qualifier }}
+    | top                 ::   :: true                    {{ com trivial }}
+    | C1 /\ C2            ::   :: conj                    {{ com conjunction }}
+    | forall a1 .. ak . C ::   :: forall  (+ bind a1 .. ak in C +)
+                                                          {{ com universal }}
 
   pattern, p :: 'pat_' ::=                              {{ com pattern }}
     | x                   ::   :: var   (+ binders = x +)     {{ com variable }}
@@ -134,8 +129,6 @@ grammar
     | inr p               ::   :: inr   (+ binders = binders(p) +)
                                                               {{ com right }}
     | n                   ::   :: lit   (+ binders = {} +)    {{ com natural }}
-    | S p                 ::   :: succ  (+ binders = binders(p) +)
-                                                              {{ com successor }}
     | ( p )               :: S :: paren
 
   branches, b :: 'branches_' ::=
@@ -145,10 +138,10 @@ grammar
 
   aguard, ag :: 'aguard_' ::=                           {{ com atomic guard }}
     | if t                ::   :: bool  (+ binders = {} +)          {{ com boolean guard }}
-    | when t = p          ::   :: pat   (+ binders = binders(p) +)  {{ com pattern guard }}
+    | when t is p         ::   :: pat   (+ binders = binders(p) +)  {{ com pattern guard }}
 
   guard, g :: 'guard_' ::=                              {{ com guard }}
-    | top                 ::   :: top   (+ binders = {} +)    {{ com trivial guard }}
+    | otherwise           ::   :: other (+ binders = {} +)    {{ com trivial guard }}
     | ag g                ::   :: cons  (+ binders = binders(ag) union binders(g) +)
                                                               {{ com cons atomic }}
 
@@ -164,8 +157,10 @@ grammar
     | -->                 ::   :: red        {{ tex \longrightarrow }}
     | --->                ::   :: yields     {{ tex \rightsquigarrow }}
     |  ->                 ::   :: arrow      {{ tex \rightarrow }}
-    | =>                  ::   :: infers     {{ tex \Rightarrow }}
-    | <=                  ::   :: checks     {{ tex \Leftarrow }}
+    | <=                  ::   :: subty      {{ tex \leq }}
+    | top                 ::   :: top        {{ tex \top }}
+    | |>                  ::   :: infers     {{ tex \triangleright }}
+    | <|                  ::   :: checks     {{ tex \triangleleft }}
     | |-                  ::   :: turnstile  {{ tex \vdash }}
     | |-b                 ::   :: bturnstile {{ tex \vdash_b }}
     | |-g                 ::   :: gturnstile {{ tex \vdash_g }}
@@ -179,10 +174,17 @@ grammar
     | ++                  ::   :: sum        {{ tex \uplus }}
     | N                   ::   :: nat        {{ tex \mathbb{N} }}
     | Z                   ::   :: int        {{ tex \mathbb{Z} }}
-    | Q                   ::   :: rat        {{ tex \mathbb{Q} }}
+    | Rat                 ::   :: rat        {{ tex \mathbb{Q} }}
+    | Rat+                ::   :: posrat     {{ tex \mathbb{Q}^{+} }}
+    | Z_                  ::   :: intmod     {{ tex \mathbb{Z}_ }}
+    | add                 ::   :: add        {{ tex \mathsf{add} }}
+    | sub                 ::   :: sub        {{ tex \mathsf{sub} }}
+    | mul                 ::   :: mul        {{ tex \mathsf{mul} }}
+    | div                 ::   :: div        {{ tex \mathsf{div} }}
+    | fin                 ::   :: fin        {{ tex \mathsf{fin} }}
+    | eq                  ::   :: deq        {{ tex \mathsf{eq}  }}
+    | ord                 ::   :: ord        {{ tex \mathsf{ord} }}
     | empty               ::   :: em         {{ tex \varnothing }}
-    | top                 ::   :: top        {{ tex \top }}
-    | bot                 ::   :: bot        {{ tex \bot }}
     | forall              ::   :: forall     {{ tex \forall }}
     | !                   ::   :: fail
     | not                 ::   :: not        {{ tex \lnot }}
@@ -211,9 +213,9 @@ parsing
   uop_neg left t_app    % t1 - t2  should parse as  minus(t1, t2), not app(t1,neg(t2))
   formula_dots left formula_not
 
-subrules
-  v <:: t
-  num <:: S
+% subrules
+%   v <:: t
+%   num <:: S
 
 freevars
   t x :: fv

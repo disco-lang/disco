@@ -9,8 +9,8 @@
 
 -- 29 May 2018.  Study for disco type system.
 
--- STLC extended with arithmetic and subtyping; a bidirectional
--- checker with constraint generation.
+-- Hindley-Milner extended with arithmetic and subtyping; a
+-- bidirectional checker with constraint generation.
 --
 -- Like sub+qual but without type qualifiers in the concrete syntax;
 -- they still have to show up as constraints for the constraint

@@ -9,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -32,13 +33,12 @@ module Disco.AST.Surface
 
          -- * Terms
 
-       , Term(..)
+       , Term(..), pattern TList, pattern TListComp
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
-
          -- ** Expressions
-       , Side(..), Link(..), Binding(..)
+       , Side(..), Container(..), Link(..), Binding(..)
 
          -- ** Lists
        , Qual(..), Ellipsis(..)
@@ -148,6 +148,12 @@ fromTelescope = foldTelescope (:) []
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
+
+data Container where
+  CList :: Container
+  CSet :: Container
+  deriving (Show, Eq, Enum, Generic)
+
 -- | Terms.
 data Term where
 
@@ -203,14 +209,17 @@ data Term where
   TTyOp  :: TyOp -> Type -> Term
 
   -- | A literal list.
-  TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+  TContainer :: Container -> [Term] -> Maybe (Ellipsis Term) -> Term
 
   -- | List comprehension.
-  TListComp :: Bind (Telescope Qual) Term -> Term
+  TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
 
   -- | Type ascription, @(term : type)@.
   TAscr  :: Term -> Type -> Term
   deriving (Show, Generic)
+
+pattern TList ts e = TContainer CList ts e
+pattern TListComp x = TContainerComp CList x
 
 data Link where
   TLink :: BOp -> Term -> Link
@@ -294,6 +303,7 @@ data Pattern where
   -- TODO: figure out how to match on Z or Q!
 
 instance Alpha Side
+instance Alpha Container
 instance Alpha Link
 instance Alpha Term
 instance Alpha Binding

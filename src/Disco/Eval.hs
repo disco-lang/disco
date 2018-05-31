@@ -121,6 +121,7 @@ data Value where
   -- | A delayed value, containing a @Disco Value@ computation which can
   --   be run later.
   VDelay  :: ValDelay -> Value
+  VSet :: [Value] -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a

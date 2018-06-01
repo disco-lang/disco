@@ -166,6 +166,7 @@ library
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.AST.Core
+                       Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
                        Disco.Context

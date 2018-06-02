@@ -79,8 +79,8 @@ module Disco.AST.Surface
        , Guard
        , pattern GBool
        , pattern GPat
-       
-       , Pattern(..)
+
+       , Pattern
        , pattern PVar
        , pattern PWild
        , pattern PUnit 
@@ -95,14 +95,10 @@ module Disco.AST.Surface
        )
        where
 
-import           GHC.Generics                     (Generic)
-
 import           Unbound.Generics.LocallyNameless
-
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-import           GHC.Exts (Constraint)
 import           Disco.AST.Generic
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
@@ -155,6 +151,29 @@ isDefn _       = False
 ------------------------------------------------------------
 -- Terms
 ------------------------------------------------------------
+data UD
+type Term = Term_ UD 
+
+type instance X_TVar UD = ()
+type instance X_TLet UD = ()
+type instance X_TParens UD = () 
+type instance X_TUnit UD = ()
+type instance X_TBool UD = () 
+type instance X_TNat UD = ()
+type instance X_TRat UD = ()
+type instance X_TAbs UD = () 
+type instance X_TApp UD = ()
+type instance X_TInj UD = () 
+type instance X_TCase UD = () 
+type instance X_TUn UD = ()
+type instance X_TBin UD = () 
+type instance X_TChain UD = () 
+type instance X_TTyop UD = () 
+type instance X_TList UD = () 
+type instance X_TListComp UD = () 
+type instance X_TAscr UD = ()
+type instance X_Term UD = () 
+type instance X_TTup UD = () 
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -233,41 +252,21 @@ pattern TAscr term ty = TAscr_ () term ty
        , TListComp
        , TAscr
        #-}
- 
 
-type Term = Term_ UD 
-data UD 
 
-type instance X_TVar UD = ()
-type instance X_TLet UD = ()
-type instance X_TParens UD = () 
-type instance X_TUnit UD = ()
-type instance X_TBool UD = () 
-type instance X_TNat UD = ()
-type instance X_TRat UD = ()
-type instance X_TAbs UD = () 
-type instance X_TApp UD = ()
-type instance X_TInj UD = () 
-type instance X_TCase UD = () 
-type instance X_TUn UD = ()
-type instance X_TBin UD = () 
-type instance X_TChain UD = () 
-type instance X_TTyop UD = () 
-type instance X_TList UD = () 
-type instance X_TListComp UD = () 
-type instance X_TAscr UD = ()
-type instance X_Term UD = () 
-type instance X_TTup UD = () 
+type Link = Link_ UD 
 
+type instance X_TLink UD = ()
 
 pattern TLink :: BOp -> Term -> Link
 pattern TLink bop term = TLink_ () bop term
 
 {-# COMPLETE TLink #-}
 
-type instance X_TLink UD = ()
+type Qual = Qual_ UD
 
-type Link = Link_ UD 
+type instance X_QBind UD = ()
+type instance X_QGuard UD = () 
 
 pattern QBind :: Name Term -> Embed Term -> Qual
 pattern QBind namet embedt = QBind_ () namet embedt
@@ -278,20 +277,20 @@ pattern QGuard embedt = QGuard_ () embedt
 {-# COMPLETE QBind, QGuard #-}
 
 
-type instance X_QBind UD = ()
-type instance X_QGuard UD = ()
-
-type Qual = Qual_ UD 
-
-deriving instance Forall_t Show  UD => Show Binding
-
 type Binding = Binding_ UD 
 
 pattern Binding :: (Maybe Type) -> Name Term -> Embed Term -> Binding 
 pattern Binding m b n = Binding_ m b n 
 
+deriving instance Forall_t Show  UD => Show Binding
+
 type Branch = Branch_ UD 
 
+
+type Guard = Guard_ UD
+
+type instance X_GBool UD = ()
+type instance X_GPat UD = () 
 
 pattern GBool :: Embed Term -> Guard
 pattern GBool embedt = GBool_ () embedt
@@ -301,10 +300,7 @@ pattern GPat embedt pat = GPat_ () embedt pat
 
 {-# COMPLETE GBool, GPat #-}
 
-type instance X_GBool UD = ()
-type instance X_GPat UD = ()
 
-type Guard = Guard_ UD 
 
 type Pattern = Pattern_ UD 
 
@@ -344,6 +340,7 @@ pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ lp 
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat, PSucc, PCons, PList #-}
+
 
 instance Alpha Side
 instance Alpha Link

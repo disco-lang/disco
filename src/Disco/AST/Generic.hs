@@ -121,6 +121,26 @@ fromTelescope = foldTelescope (:) []
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
+type family X_TVar e 
+type family X_TLet e 
+type family X_TParens e 
+type family X_TUnit e 
+type family X_TBool e 
+type family X_TNat e 
+type family X_TRat e 
+type family X_TAbs e 
+type family X_TApp e 
+type family X_TInj e 
+type family X_TCase e 
+type family X_TUn e 
+type family X_TBin e 
+type family X_TChain e 
+type family X_TTyop e 
+type family X_TList e 
+type family X_TListComp e 
+type family X_TAscr e
+type family X_Term e 
+type family X_TTup e
 
 data Term_ e where
 
@@ -203,35 +223,13 @@ type Forall_t (a :: * -> Constraint) e
          a (X_GBool e), a (X_GPat e),
          a (X_TLink e), a (Binding_ e))
 
-deriving instance Forall_t Show e => Show (Term_ e)
+deriving instance Forall_t Show e => Show (Term_ e) 
 
-
-type family X_TVar e 
-type family X_TLet e 
-type family X_TParens e 
-type family X_TUnit e 
-type family X_TBool e 
-type family X_TNat e 
-type family X_TRat e 
-type family X_TAbs e 
-type family X_TApp e 
-type family X_TInj e 
-type family X_TCase e 
-type family X_TUn e 
-type family X_TBin e 
-type family X_TChain e 
-type family X_TTyop e 
-type family X_TList e 
-type family X_TListComp e 
-type family X_TAscr e
-type family X_Term e 
-type family X_TTup e 
+type family X_TLink e
 
 data Link_ e where
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
   deriving Generic
-
-type family X_TLink e
 
 deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 
@@ -246,6 +244,9 @@ data Ellipsis t where
 -- Note: very similar to guards-
 --  maybe some generalization in the future?
 
+type family X_QBind e
+type family X_QGuard e
+
 data Qual_ e where
 
   -- | A binding qualifier (i.e. @x <- t@)
@@ -256,12 +257,7 @@ data Qual_ e where
 
   deriving Generic
 
-
-
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
-
-type family X_QBind e
-type family X_QGuard e
 
 
 
@@ -278,6 +274,9 @@ data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
 type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
 
 
+type family X_GBool e
+type family X_GPat e
+
 data Guard_ e where
 
   -- | Boolean guard (@if <test>@)
@@ -291,9 +290,6 @@ data Guard_ e where
 -- {-# COMPLETE GBool, GPat #-}
 
 deriving instance (Show (X_GBool e), Show (X_GPat e), Show (Term_ e)) => Show (Guard_ e)
-
-type family X_GBool e
-type family X_GPat e
 
 -- | Patterns.
 data Pattern_ e where

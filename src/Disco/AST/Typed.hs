@@ -1,10 +1,17 @@
+{-# LANGUAGE DeriveFoldable        #-}
+{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveTraversable     #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE TypeOperators, PatternSynonyms #-}
+{-# LANGUAGE EmptyCase, StandaloneDeriving #-}
+{-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,110 +44,261 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
+import           Disco.AST.Generic
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever
 
 -- | An @ATerm@ is a typechecked term where every node in the tree has
 --   been annotated with the type of the subterm rooted at that node.
-data ATerm where
 
-  -- | A variable together with its type.
-  ATVar   :: Type -> Name ATerm -> ATerm
+data TY
+type ATerm = Term_ TY
 
-  -- | A (non-recursive) let expression.
-  ATLet   :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
+type instance X_TVar TY = Type
+type instance X_TLet TY = Type
+type instance X_TUnit TY = ()
+type instance X_TBool TY = () 
+type instance X_TNat TY = Type
+type instance X_TRat TY = ()
+type instance X_TAbs TY = Type 
+type instance X_TApp TY = Type
+type instance X_TInj TY = Type
+type instance X_TCase TY = Type
+type instance X_TUn TY = Type
+type instance X_TBin TY = Type 
+type instance X_TChain TY = Type 
+type instance X_TTyop TY = Type
+type instance X_TList TY = Type 
+type instance X_TListComp TY = Type 
+type instance X_TAscr TY = ()
+type instance X_Term TY = () 
+type instance X_TTup TY = Type
 
-  -- | The unit value.  We don't bother explicitly storing @TyUnit@
-  --   here.
-  ATUnit  :: ATerm
+pattern ATVar :: Type -> Name ATerm -> ATerm
+pattern ATVar ty name = TVar_ ty name
 
-  -- | A boolean value. Again, we don't bother explicitly storing
-  --   the type.
-  ATBool  :: Bool -> ATerm
+pattern ATUn :: Type -> UOp -> ATerm -> ATerm
+pattern ATUn ty uop term = TUn_ ty uop term
 
-  -- | A natural number.
-  ATNat   :: Type -> Integer -> ATerm
+pattern ATLet :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
+pattern ATLet ty bind = TLet_ ty bind 
 
-  -- | A nonnegative rational number (parsed and displayed as a
-  --   decimal).
-  ATRat   :: Rational -> ATerm
+pattern ATUnit :: ATerm
+pattern ATUnit = TUnit_ ()
 
-  -- | Anonymous function, with its type.
-  ATAbs   :: Type -> Bind [(Name ATerm, Embed (Maybe Type))] ATerm -> ATerm
+pattern ATBool :: Bool -> ATerm
+pattern ATBool bool = TBool_ () bool
 
-  -- | A function application, with its type.
-  ATApp   :: Type -> ATerm -> ATerm -> ATerm
+pattern ATNat  :: Type -> Integer -> ATerm
+pattern ATNat ty int = TNat_ ty int
 
-  -- | An n-tuple.
-  ATTup   :: Type -> [ATerm] -> ATerm
+pattern ATRat :: Rational -> ATerm
+pattern ATRat rat = TRat_ () rat
 
-  -- | A sum type injection.
-  ATInj   :: Type -> Side -> ATerm -> ATerm
+pattern ATAbs :: Type -> Bind [(Name ATerm, Embed (Maybe Type))] ATerm -> ATerm
+pattern ATAbs ty bind = TAbs_ ty bind
 
-  -- | A case expression.
-  ATCase  :: Type -> [ABranch] -> ATerm
+pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
+pattern ATApp ty term1 term2 = TApp_ ty term1 term2 
 
-  -- | A unary operator application.
-  ATUn    :: Type -> UOp -> ATerm -> ATerm
+pattern ATTup :: Type -> [ATerm] -> ATerm
+pattern ATTup ty termlist = TTup_ ty termlist 
 
-  -- | A binary operator application.
-  ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
+pattern ATInj :: Type -> Side -> ATerm -> ATerm
+pattern ATInj ty side term = TInj_ ty side term
 
-  -- | A chained comparison.
-  ATChain :: Type -> ATerm -> [ALink] -> ATerm
+pattern ATCase :: Type -> [ABranch] -> ATerm
+pattern ATCase ty branch = TCase_ ty branch
 
-  -- | A type operator application.
-  ATTyOp  :: Type -> TyOp -> Type -> ATerm
+pattern ATBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
+pattern ATBin ty bop term1 term2 = TBin_ ty bop term1 term2
 
-  -- | A literal list.  The type would be ambiguous if the list was
-  --   empty.
-  ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+pattern ATChain :: Type -> ATerm -> [ALink] -> ATerm
+pattern ATChain ty term linklist = TChain_ ty term linklist
 
-  -- | A list comprehension.
-  ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
+pattern ATTyOp :: Type -> TyOp -> Type -> ATerm
+pattern ATTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
-  -- | Type ascription.
-  ATAscr  :: ATerm -> Type -> ATerm
+pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+pattern ATList ty termlist mellipses = TList_ ty termlist mellipses
 
-  deriving (Show, Generic)
+pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
+pattern ATListComp ty bind = TListComp_ ty bind
 
-data ALink where
-  ATLink :: BOp -> ATerm -> ALink
-  deriving (Show, Generic)
+pattern ATAscr :: ATerm -> Type -> ATerm
+pattern ATAscr term ty = TAscr_ () term ty
 
-data ABinding = ABinding (Maybe Type) (Name ATerm) (Embed ATerm)
-  deriving (Show, Generic)
+-- data ATerm where
+
+--   -- | A variable together with its type.
+--   ATVar   :: Type -> Name ATerm -> ATerm
+
+--   -- | A (non-recursive) let expression.
+--   ATLet   :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
+
+--   -- | The unit value.  We don't bother explicitly storing @TyUnit@
+--   --   here.
+--   ATUnit  :: ATerm
+
+--   -- | A boolean value. Again, we don't bother explicitly storing
+--   --   the type.
+--   ATBool  :: Bool -> ATerm
+
+--   -- | A natural number.
+--   ATNat   :: Type -> Integer -> ATerm
+
+--   -- | A nonnegative rational number (parsed and displayed as a
+--   --   decimal).
+--   ATRat   :: Rational -> ATerm
+
+--   -- | Anonymous function, with its type.
+--   ATAbs   :: Type -> Bind [(Name ATerm, Embed (Maybe Type))] ATerm -> ATerm
+
+--   -- | A function application, with its type.
+--   ATApp   :: Type -> ATerm -> ATerm -> ATerm
+
+--   -- | An n-tuple.
+--   ATTup   :: Type -> [ATerm] -> ATerm
+
+--   -- | A sum type injection.
+--   ATInj   :: Type -> Side -> ATerm -> ATerm
+
+--   -- | A case expression.
+--   ATCase  :: Type -> [ABranch] -> ATerm
+
+--   -- | A unary operator application.
+--   ATUn    :: Type -> UOp -> ATerm -> ATerm
+
+--   -- | A binary operator application.
+--   ATBin   :: Type -> BOp -> ATerm -> ATerm -> ATerm
+
+--   -- | A chained comparison.
+--   ATChain :: Type -> ATerm -> [ALink] -> ATerm
+
+--   -- | A type operator application.
+--   ATTyOp  :: Type -> TyOp -> Type -> ATerm
+
+--   -- | A literal list.  The type would be ambiguous if the list was
+--   --   empty.
+--   ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+
+--   -- | A list comprehension.
+--   ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
+
+--   -- | Type ascription.
+--   ATAscr  :: ATerm -> Type -> ATerm
+
+--   deriving (Show, Generic)
+
+type ALink = Link_ TY
+
+type instance X_TLink TY = ()
+
+pattern ALink :: BOp -> ATerm -> ALink
+pattern ALink bop term = TLink_ () bop term
+
+-- data ALink where
+--   ATLink :: BOp -> ATerm -> ALink
+--   deriving (Show, Generic)
+
+type ABinding = Binding_ TY
+
+pattern ABinding :: (Maybe Type) -> Name ATerm -> Embed ATerm -> ABinding 
+pattern ABinding m b n = Binding_ m b n 
+
+-- data ABinding = ABinding (Maybe Type) (Name ATerm) (Embed ATerm)
+--   deriving (Show, Generic)
 
 -- | A branch of a case, consisting of a list of guards and a type-annotated term.
 type ABranch = Bind (Telescope AGuard) ATerm
 
--- | A single guard (@if@ or @when@) containing a type-annotated term.
-data AGuard where
 
-  -- | Boolean guard (@when <test>@)
-  AGBool :: Embed ATerm -> AGuard
+type AGuard = Guard_ TY
 
-  -- | Pattern guard (@when term = pat@)
-  AGPat  :: Embed ATerm -> Pattern -> AGuard
+type instance X_GBool TY = ()
+type instance X_GPat TY = () 
 
-  deriving (Show, Generic)
+pattern AGBool :: Embed ATerm -> AGuard
+pattern AGBool embedt = GBool_ () embedt
 
--- Note: very similar to guards
---  maybe some generalization in the future?
+pattern AGPat :: Embed ATerm -> Pattern -> AGuard
+pattern AGPat embedt pat = GPat_ () embedt pat
 
--- | A single qualifier in a list comprehension.
-data AQual where
+-- -- | A single guard (@if@ or @when@) containing a type-annotated term.
+-- data AGuard where
 
-  -- | A binding qualifier (i.e. @x <- t@)
-  AQBind   :: Name ATerm -> Embed ATerm -> AQual
+--   -- | Boolean guard (@when <test>@)
+--   AGBool :: Embed ATerm -> AGuard
 
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  AQGuard  :: Embed ATerm -> AQual
+--   -- | Pattern guard (@when term = pat@)
+--   AGPat  :: Embed ATerm -> Pattern -> AGuard
 
-  deriving (Show, Generic)
+--   deriving (Show, Generic)
 
-type AProperty = Bind [(Name ATerm, Type)] ATerm
+-- -- Note: very similar to guards
+-- --  maybe some generalization in the future?
+
+type AQual = Qual_ TY
+
+type instance X_QBind TY = ()
+type instance X_QGuard TY = ()
+
+pattern AQBind :: Name ATerm -> Embed ATerm -> AQual
+pattern AQBind namet embedt = QBind_ () namet embedt
+
+pattern AQGuard :: Embed ATerm -> AQual
+pattern AQGuard embedt = QGuard_ () embedt
+
+-- -- | A single qualifier in a list comprehension.
+-- data AQual where
+
+--   -- | A binding qualifier (i.e. @x <- t@)
+--   AQBind   :: Name ATerm -> Embed ATerm -> AQual
+
+--   -- | A boolean guard qualfier (i.e. @x + y > 4@)
+--   AQGuard  :: Embed ATerm -> AQual
+
+--   deriving (Show, Generic)
+
+-- type AProperty = Bind [(Name ATerm, Type)] ATerm
+
+-- type APattern = Pattern_ TY
+
+-- pattern AVar :: Name ATerm -> APattern
+-- pattern AVar name = PVar_ name 
+
+-- pattern PWild :: APattern
+-- pattern PWild = PWild_ 
+
+-- pattern PUnit :: APattern
+-- pattern PUnit = PUnit_
+
+-- pattern PBool :: Bool -> APattern
+-- pattern PBool  b = PBool_ b 
+
+-- pattern PTup  :: [APattern] -> APattern
+-- pattern PTup lp = PTup_ lp 
+
+-- -- | Injection pattern (@inl pat@ or @inr pat@).
+-- pattern PInj  :: Side -> APattern -> APattern
+-- pattern PInj s p = PInj_ s p 
+
+-- -- | Literal natural number pattern.
+-- pattern PNat  :: Integer -> APattern
+-- pattern PNat n = PNat_ n 
+
+-- -- | Successor pattern, @S p@.
+-- pattern PSucc :: APattern -> APattern
+-- pattern PSucc p = PSucc_ p 
+
+-- -- | Cons pattern @p1 :: p2@.
+-- pattern PCons :: APattern -> APattern -> APattern
+-- pattern PCons  p1 p2 = PCons_ p1 p2 
+
+-- -- | List pattern @[p1, .., pn]@.
+-- pattern PList :: [APattern] -> APattern
+-- pattern PList lp = PList_ lp 
 
 instance Alpha ATerm
 instance Alpha ABinding
@@ -169,7 +327,7 @@ getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
 getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
-getType (ATLet ty _)      = ty
+-- getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 getType (ATAscr _ ty)     = ty
 

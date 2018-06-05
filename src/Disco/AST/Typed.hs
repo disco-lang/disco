@@ -28,17 +28,58 @@
 
 module Disco.AST.Typed
        ( -- * Type-annotated terms
-         ATerm(..), ALink(..), ABinding(..), AProperty
+       ATerm
+       , pattern ATVar 
+       , pattern ATUn
+       , pattern ATLet
+       , pattern ATUnit
+       , pattern ATBool
+       , pattern ATNat
+       , pattern ATRat
+       , pattern ATAbs
+       , pattern ATApp
+       , pattern ATTup
+       , pattern ATInj
+       , pattern ATCase
+       , pattern ATBin
+       , pattern ATChain
+       , pattern ATTyOp
+       , pattern ATList
+       , pattern ATListComp
+       , pattern ATAscr
 
+       , ALink
+       , pattern ATLink
+
+       , ABinding
          -- * Branches and guards
-       , ABranch, AGuard(..), AQual(..)
+       , ABranch
 
+       , AGuard
+       , pattern AGBool
+       , pattern AGPat
+
+       , AQual
+       , pattern AQBind
+       , pattern AQGuard
+
+       , APattern
+       , pattern APVar
+       , pattern APWild
+       , pattern APUnit 
+       , pattern APBool 
+       , pattern APTup 
+       , pattern APInj
+       , pattern APNat 
+       , pattern APSucc
+       , pattern APCons
+       , pattern APList 
+       , pattern ABinding
          -- * Utilities
        , getType
        )
        where
 
-import           GHC.Generics (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
@@ -53,6 +94,10 @@ import           Disco.AST.Generic
 --   been annotated with the type of the subterm rooted at that node.
 
 data TY
+
+type AProperty = Property_ TY
+pattern AProperty b = Property_ b
+
 type ATerm = Term_ TY
 
 type instance X_TVar TY = Type
@@ -74,6 +119,7 @@ type instance X_TListComp TY = Type
 type instance X_TAscr TY = ()
 type instance X_Term TY = () 
 type instance X_TTup TY = Type
+type instance X_TParens TY = ()
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -195,8 +241,8 @@ type ALink = Link_ TY
 
 type instance X_TLink TY = ()
 
-pattern ALink :: BOp -> ATerm -> ALink
-pattern ALink bop term = TLink_ () bop term
+pattern ATLink :: BOp -> ATerm -> ALink
+pattern ATLink bop term = TLink_ () bop term
 
 -- data ALink where
 --   ATLink :: BOp -> ATerm -> ALink
@@ -222,7 +268,7 @@ type instance X_GPat TY = ()
 pattern AGBool :: Embed ATerm -> AGuard
 pattern AGBool embedt = GBool_ () embedt
 
-pattern AGPat :: Embed ATerm -> Pattern -> AGuard
+pattern AGPat :: Embed ATerm -> APattern -> AGuard
 pattern AGPat embedt pat = GPat_ () embedt pat
 
 -- -- | A single guard (@if@ or @when@) containing a type-annotated term.
@@ -263,48 +309,60 @@ pattern AQGuard embedt = QGuard_ () embedt
 
 -- type AProperty = Bind [(Name ATerm, Type)] ATerm
 
--- type APattern = Pattern_ TY
+type APattern = Pattern_ TY
 
--- pattern AVar :: Name ATerm -> APattern
--- pattern AVar name = PVar_ name 
+type instance X_PVar TY = ()
+type instance X_PWild TY = ()
+type instance X_PUnit TY = ()
+type instance X_PBool TY = ()
+type instance X_PTup TY = ()
+type instance X_PInj TY = ()
+type instance X_PNat TY = ()
+type instance X_PSucc TY = ()
+type instance X_PCons TY = ()
+type instance X_PList TY = ()
 
--- pattern PWild :: APattern
--- pattern PWild = PWild_ 
+pattern APVar :: Name ATerm -> APattern
+pattern APVar name = PVar_ () name 
 
--- pattern PUnit :: APattern
--- pattern PUnit = PUnit_
+pattern APWild :: APattern
+pattern APWild = PWild_ () 
 
--- pattern PBool :: Bool -> APattern
--- pattern PBool  b = PBool_ b 
+pattern APUnit :: APattern
+pattern APUnit = PUnit_ ()
 
--- pattern PTup  :: [APattern] -> APattern
--- pattern PTup lp = PTup_ lp 
+pattern APBool :: Bool -> APattern
+pattern APBool  b = PBool_ () b 
 
--- -- | Injection pattern (@inl pat@ or @inr pat@).
--- pattern PInj  :: Side -> APattern -> APattern
--- pattern PInj s p = PInj_ s p 
+pattern APTup  :: [APattern] -> APattern
+pattern APTup lp = PTup_ () lp 
 
--- -- | Literal natural number pattern.
--- pattern PNat  :: Integer -> APattern
--- pattern PNat n = PNat_ n 
+-- | Injection pattern (@inl pat@ or @inr pat@).
+pattern APInj  :: Side -> APattern -> APattern
+pattern APInj s p = PInj_ () s p 
 
--- -- | Successor pattern, @S p@.
--- pattern PSucc :: APattern -> APattern
--- pattern PSucc p = PSucc_ p 
+-- | Literal natural number pattern.
+pattern APNat  :: Integer -> APattern
+pattern APNat n = PNat_ () n 
 
--- -- | Cons pattern @p1 :: p2@.
--- pattern PCons :: APattern -> APattern -> APattern
--- pattern PCons  p1 p2 = PCons_ p1 p2 
+-- | Successor pattern, @S p@.
+pattern APSucc :: APattern -> APattern
+pattern APSucc p = PSucc_ () p 
 
--- -- | List pattern @[p1, .., pn]@.
--- pattern PList :: [APattern] -> APattern
--- pattern PList lp = PList_ lp 
+-- | Cons pattern @p1 :: p2@.
+pattern APCons :: APattern -> APattern -> APattern
+pattern APCons  p1 p2 = PCons_ () p1 p2 
+
+-- | List pattern @[p1, .., pn]@.
+pattern APList :: [APattern] -> APattern
+pattern APList lp = PList_ () lp 
 
 instance Alpha ATerm
 instance Alpha ABinding
 instance Alpha ALink
 instance Alpha AGuard
 instance Alpha AQual
+instance Alpha APattern
 
 ------------------------------------------------------------
 -- getType
@@ -327,7 +385,10 @@ getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
 getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
--- getType (ATLet ty _)      = ty
+getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 getType (ATAscr _ ty)     = ty
 
+{-# COMPLETE ATVar, ATUnit, ATBool, ATNat, ATRat, ATAbs,
+    ATApp, ATTup, ATInj, ATUn, ATBin, ATTyOp, ATChain, ATList,
+    ATListComp, ATLet, ATCase, ATAscr #-}

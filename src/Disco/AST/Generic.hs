@@ -57,15 +57,26 @@ module Disco.AST.Generic
       , Guard_ (..)
       , X_GBool
       , X_GPat
-      , Pattern_ (..)
       , Forall_t
       , Telescope (..)
       , Side (..)
       , Ellipsis (..)
+      , Pattern_ (..)
+      , X_PVar
+      , X_PWild
+      , X_PUnit
+      , X_PBool
+      , X_PTup
+      , X_PInj
+      , X_PNat
+      , X_PSucc
+      , X_PCons
+      , X_PList
       , foldTelescope 
       , mapTelescope
       , toTelescope
       , fromTelescope
+      , Property_ (..)
        )
        where
 
@@ -112,6 +123,8 @@ toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
 -- | Convert a telescope to a list.
 fromTelescope :: Alpha b => Telescope b -> [b]
 fromTelescope = foldTelescope (:) []
+
+data Property_ e = Property_ (Bind [(Name (Term_ e), Type)] (Term_ e))
 
 ------------------------------------------------------------
 -- Terms
@@ -221,7 +234,11 @@ type Forall_t (a :: * -> Constraint) e
          a (X_Term e), a (X_TTup e),
          a (X_QBind e), a (X_QGuard e),
          a (X_GBool e), a (X_GPat e),
-         a (X_TLink e), a (Binding_ e))
+         a (X_TLink e), a (Binding_ e),
+         a (X_PVar e), a (X_PWild e), a (X_PUnit e),
+         a (X_PBool e), a (X_PTup e), a (X_PInj e),
+         a (X_PNat e), a (X_PSucc e), a (X_PCons e),
+         a (X_PList e))
 
 deriving instance Forall_t Show e => Show (Term_ e) 
 
@@ -265,6 +282,8 @@ deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show 
 data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
+deriving instance (Show (Term_ e)) => Show (Binding_ e)
+
 -- deriving instance Forall_t Show  UD => Show Binding 
 
 -- | A branch of a case is a list of guards with an accompanying term.
@@ -287,41 +306,58 @@ data Guard_ e where
 
   deriving Generic
 
+  
+deriving instance (Show (X_GBool e), Show (X_GPat e), Show (Term_ e), Show (Pattern_ e)) => Show (Guard_ e)
+
 -- {-# COMPLETE GBool, GPat #-}
 
-deriving instance (Show (X_GBool e), Show (X_GPat e), Show (Term_ e)) => Show (Guard_ e)
+type family X_PVar e
+type family X_PWild e
+type family X_PUnit e
+type family X_PBool e
+type family X_PTup e
+type family X_PInj e
+type family X_PNat e
+type family X_PSucc e
+type family X_PCons e
+type family X_PList e
 
--- | Patterns.
-data Pattern_ e where
+data Pattern_  e where
 
   -- | Variable pattern: matches anything and binds the variable.
-  PVar_  :: Name (Term_ e) -> Pattern_ e
+  PVar_  :: X_PVar e -> Name (Term_ e) -> Pattern_ e
 
   -- | Wildcard pattern @_@: matches anything.
-  PWild_ :: Pattern_ e
+  PWild_ :: X_PWild e -> Pattern_ e
 
   -- | Unit pattern @()@: matches @()@.
-  PUnit_ :: Pattern_ e
+  PUnit_ :: X_PUnit e -> Pattern_ e
 
   -- | Literal boolean pattern.
-  PBool_ :: Bool -> Pattern_ e
+  PBool_ :: X_PBool e -> Bool -> Pattern_ e
 
   -- | Tuple pattern @(pat1, .. , patn)@.
-  PTup_  :: [Pattern_ e] -> Pattern_ e
+  PTup_  :: X_PTup e -> [Pattern_ e] -> Pattern_ e
 
   -- | Injection pattern (@inl pat@ or @inr pat@).
-  PInj_  :: Side -> Pattern_ e -> Pattern_ e
+  PInj_  :: X_PInj e -> Side -> Pattern_ e -> Pattern_ e
 
   -- | Literal natural number pattern.
-  PNat_  :: Integer -> Pattern_ e
+  PNat_  :: X_PNat e -> Integer -> Pattern_ e
 
   -- | Successor pattern, @S p@.
-  PSucc_ :: Pattern_ e -> Pattern_ e
+  PSucc_ :: X_PSucc e -> Pattern_ e -> Pattern_ e
 
   -- | Cons pattern @p1 :: p2@.
-  PCons_ :: Pattern_ e -> Pattern_ e -> Pattern_ e
+  PCons_ :: X_PCons e -> Pattern_ e -> Pattern_ e -> Pattern_ e
 
   -- | List pattern @[p1, .., pn]@.
-  PList_ :: [Pattern_ e] -> Pattern_ e
+  PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
 
-  deriving (Show, Generic)
+  deriving (Generic)
+
+deriving instance (Show (X_PVar e), Show (X_PWild e), Show (X_PUnit e),
+                   Show (X_PTup e), Show (X_PInj e), Show (X_PNat e),
+                   Show (X_PSucc e), Show (X_PCons e), Show (X_PList e),
+                   Show (X_PBool e), Show (Term_ e)) => Show (Pattern_ e)
+

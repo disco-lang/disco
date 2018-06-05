@@ -282,9 +282,7 @@ deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show 
 data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
-deriving instance (Show (Term_ e)) => Show (Binding_ e)
-
--- deriving instance Forall_t Show  UD => Show Binding 
+deriving instance Forall_t Show  e => Show (Binding_ e)
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
@@ -302,27 +300,39 @@ data Guard_ e where
   GBool_ :: X_GBool e -> Embed (Term_ e) -> Guard_ e
 
   -- | Pattern guard (@when term = pat@)
+  {-I am thinking about changing Pattern_ e here to Pattern_ b 
+    but you wouldn't be able to derive Generic if you do that. -}
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
 
   deriving Generic
-
-  
-deriving instance (Show (X_GBool e), Show (X_GPat e), Show (Term_ e), Show (Pattern_ e)) => Show (Guard_ e)
+-- deriving instance Generic (Guard_ e)
 
 -- {-# COMPLETE GBool, GPat #-}
 
-type family X_PVar e
-type family X_PWild e
-type family X_PUnit e
-type family X_PBool e
-type family X_PTup e
-type family X_PInj e
-type family X_PNat e
-type family X_PSucc e
-type family X_PCons e
-type family X_PList e
+deriving instance Forall_t Show  e => Show (Guard_ e)
 
-data Pattern_  e where
+-- | Patterns.
+
+type family X_PVar e 
+type family X_PWild e 
+type family X_PUnit e 
+type family X_PBool e 
+type family X_PTup e 
+type family X_PInj e 
+type family X_PNat e 
+type family X_PSucc e 
+type family X_PCons e 
+type family X_PList e 
+
+-- type Forall_p (a :: * -> Constraint) e 
+--       = (a (X_PVar e), a (X_PWild e),  
+--          a (X_PUnit e), a (X_PBool e), 
+--          a (X_PTup e), a (X_PInj e), 
+--          a (X_PNat e), a (X_PSucc e), 
+--          a (X_PCons e), a (X_PList e))
+
+
+data Pattern_ e where
 
   -- | Variable pattern: matches anything and binds the variable.
   PVar_  :: X_PVar e -> Name (Term_ e) -> Pattern_ e

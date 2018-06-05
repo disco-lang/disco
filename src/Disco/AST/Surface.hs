@@ -282,7 +282,7 @@ type Binding = Binding_ UD
 pattern Binding :: (Maybe Type) -> Name Term -> Embed Term -> Binding 
 pattern Binding m b n = Binding_ m b n 
 
-deriving instance Forall_t Show  UD => Show Binding
+-- deriving instance Forall_t Show  UD => Show Binding
 
 type Branch = Branch_ UD 
 
@@ -303,6 +303,17 @@ pattern GPat embedt pat = GPat_ () embedt pat
 
 
 type Pattern = Pattern_ UD 
+
+type instance X_PVar UD = () 
+type instance X_PWild UD = ()
+type instance X_PUnit UD = ()
+type instance X_PBool UD = ()
+type instance X_PTup UD = ()
+type instance X_PInj UD = ()
+type instance X_PNat UD = ()
+type instance X_PSucc UD = ()
+type instance X_PCons UD = ()
+type instance X_PList UD = ()
 
 pattern PVar :: Name Term -> Pattern
 pattern PVar name = PVar_ name 

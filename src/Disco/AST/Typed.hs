@@ -35,6 +35,34 @@ module Disco.AST.Typed
 
          -- * Utilities
        , getType
+       , pattern ATVar 
+       , pattern ATUn 
+       , pattern ATLet 
+       , pattern ATUnit 
+       , pattern ATBool 
+       , pattern ATNat 
+       , pattern ATRat 
+       , pattern ATAbs 
+       , pattern ATApp 
+       , pattern ATTup 
+       , pattern ATInj
+       , pattern ATCase 
+       , pattern ATBin 
+       , pattern ATChain 
+       , pattern ATTyOp
+       , pattern ATList 
+       , pattern ATListComp
+       , pattern ATAscr
+
+       , pattern ATLink 
+
+       , pattern ABinding
+
+       , pattern AGBool
+       , pattern AGPat
+
+       , pattern AQBind
+       , pattern AQGuard
        )
        where
 
@@ -74,6 +102,7 @@ type instance X_TListComp TY = Type
 type instance X_TAscr TY = ()
 type instance X_Term TY = () 
 type instance X_TTup TY = Type
+type instance X_TParens TY = ()
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -195,8 +224,8 @@ type ALink = Link_ TY
 
 type instance X_TLink TY = ()
 
-pattern ALink :: BOp -> ATerm -> ALink
-pattern ALink bop term = TLink_ () bop term
+pattern ATLink :: BOp -> ATerm -> ALink
+pattern ATLink bop term = TLink_ () bop term
 
 -- data ALink where
 --   ATLink :: BOp -> ATerm -> ALink
@@ -222,8 +251,9 @@ type instance X_GPat TY = ()
 pattern AGBool :: Embed ATerm -> AGuard
 pattern AGBool embedt = GBool_ () embedt
 
-pattern AGPat :: Embed ATerm -> Pattern -> AGuard
+pattern AGPat :: Embed ATerm -> APattern -> AGuard
 pattern AGPat embedt pat = GPat_ () embedt pat
+
 
 -- -- | A single guard (@if@ or @when@) containing a type-annotated term.
 -- data AGuard where
@@ -261,48 +291,60 @@ pattern AQGuard embedt = QGuard_ () embedt
 
 --   deriving (Show, Generic)
 
--- type AProperty = Bind [(Name ATerm, Type)] ATerm
+type AProperty = Bind [(Name ATerm, Type)] ATerm
 
--- type APattern = Pattern_ TY
+type APattern = Pattern_ TY
 
--- pattern AVar :: Name ATerm -> APattern
--- pattern AVar name = PVar_ name 
+type instance X_PVar TY = () 
+type instance X_PWild TY = ()
+type instance X_PUnit TY = ()
+type instance X_PBool TY = ()
+type instance X_PTup TY = ()   -- Type?
+type instance X_PInj TY = ()
+type instance X_PNat TY = ()
+type instance X_PSucc TY = ()  -- Type?
+type instance X_PCons TY = ()  -- Type?
+type instance X_PList TY = ()  -- Type?
 
--- pattern PWild :: APattern
--- pattern PWild = PWild_ 
+pattern AVar :: Name ATerm -> APattern
+pattern AVar name = PVar_ name 
 
--- pattern PUnit :: APattern
--- pattern PUnit = PUnit_
+pattern PWild :: APattern
+pattern PWild = PWild_ 
 
--- pattern PBool :: Bool -> APattern
--- pattern PBool  b = PBool_ b 
+pattern PUnit :: APattern
+pattern PUnit = PUnit_
 
--- pattern PTup  :: [APattern] -> APattern
--- pattern PTup lp = PTup_ lp 
+pattern PBool :: Bool -> APattern
+pattern PBool  b = PBool_ b 
 
--- -- | Injection pattern (@inl pat@ or @inr pat@).
--- pattern PInj  :: Side -> APattern -> APattern
--- pattern PInj s p = PInj_ s p 
+pattern PTup  :: [APattern] -> APattern
+pattern PTup lp = PTup_ lp 
 
--- -- | Literal natural number pattern.
--- pattern PNat  :: Integer -> APattern
--- pattern PNat n = PNat_ n 
+-- | Injection pattern (@inl pat@ or @inr pat@).
+pattern PInj  :: Side -> APattern -> APattern
+pattern PInj s p = PInj_ s p 
 
--- -- | Successor pattern, @S p@.
--- pattern PSucc :: APattern -> APattern
--- pattern PSucc p = PSucc_ p 
+-- | Literal natural number pattern.
+pattern PNat  :: Integer -> APattern
+pattern PNat n = PNat_ n 
 
--- -- | Cons pattern @p1 :: p2@.
--- pattern PCons :: APattern -> APattern -> APattern
--- pattern PCons  p1 p2 = PCons_ p1 p2 
+-- | Successor pattern, @S p@.
+pattern PSucc :: APattern -> APattern
+pattern PSucc p = PSucc_ p 
 
--- -- | List pattern @[p1, .., pn]@.
--- pattern PList :: [APattern] -> APattern
--- pattern PList lp = PList_ lp 
+-- | Cons pattern @p1 :: p2@.
+pattern PCons :: APattern -> APattern -> APattern
+pattern PCons  p1 p2 = PCons_ p1 p2 
+
+-- | List pattern @[p1, .., pn]@.
+pattern PList :: [APattern] -> APattern
+pattern PList lp = PList_ lp 
 
 instance Alpha ATerm
 instance Alpha ABinding
 instance Alpha ALink
+instance Alpha APattern
 instance Alpha AGuard
 instance Alpha AQual
 

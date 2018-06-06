@@ -76,7 +76,7 @@ module Disco.AST.Generic
       , mapTelescope
       , toTelescope
       , fromTelescope
-      , Property_ (..)
+      , Property_ 
        )
        where
 
@@ -124,7 +124,7 @@ toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
 fromTelescope :: Alpha b => Telescope b -> [b]
 fromTelescope = foldTelescope (:) []
 
-data Property_ e = Property_ (Bind [(Name (Term_ e), Type)] (Term_ e))
+type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
 
 ------------------------------------------------------------
 -- Terms

@@ -92,6 +92,8 @@ module Disco.AST.Surface
        , pattern PCons
        , pattern PList 
        , pattern Binding 
+
+       , Property
        )
        where
 
@@ -129,7 +131,7 @@ deriving instance Forall_t Show  UD => Show DocThing
 --   @forall v1 : T1, v2 : T2. term@.
 type Property = Property_ UD
 
-pattern Property b = Property_ b
+-- pattern Property b = Property_ b
 
 -- | A declaration is either a type declaration or a definition.
 data Decl where

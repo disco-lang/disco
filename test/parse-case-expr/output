@@ -1,1 +1,7 @@
-[false, false]
+1:15:
+  |
+1 | let n = 3 in {? true if 2 divides n, false otherwise ?} :: false :: []
+  |               ^
+unexpected '?'
+expecting '}' or expression
+

@@ -6,6 +6,24 @@
 ((1, 2), 3, 4, 5)
 (1, 2, -3, 4., -5.) : ℕ × ℕ × ℤ × ℚ⁺ × ℚ
 ((1 / 2, 1), 2) : (ℚ⁺ × ℕ) × ℕ
-3
-29
--50
+1:2:
+  |
+1 | {? x when (3,4,5) is (x,y,z) ?}
+  |  ^
+unexpected '?'
+expecting '}' or expression
+
+1:2:
+  |
+1 | {? x+y when (7,22,45) is (x,y,z) ?}
+  |  ^
+unexpected '?'
+expecting '}' or expression
+
+1:2:
+  |
+1 | {? a*f when (10,15,-23,7,3,-5) is (a,b,c,d,e,f) ?}
+  |  ^
+unexpected '?'
+expecting '}' or expression
+

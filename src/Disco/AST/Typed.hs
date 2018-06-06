@@ -5,6 +5,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,7 +23,7 @@
 module Disco.AST.Typed
        ( -- * Type-annotated terms
          ATerm(..), ALink(..), ABinding(..), AProperty
-
+         ,pattern ATList, pattern ATListComp
          -- * Branches and guards
        , ABranch, AGuard(..), AQual(..)
 
@@ -95,15 +96,18 @@ data ATerm where
 
   -- | A literal list.  The type would be ambiguous if the list was
   --   empty.
-  ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+  ATContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 
   -- | A list comprehension.
-  ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
+  ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 
   -- | Type ascription.
   ATAscr  :: ATerm -> Type -> ATerm
 
   deriving (Show, Generic)
+
+pattern ATList t xs e = ATContainer t CList xs e
+pattern ATListComp t e = ATContainerComp t CList e
 
 data ALink where
   ATLink :: BOp -> ATerm -> ALink
@@ -167,9 +171,8 @@ getType (ATUn ty _ _)     = ty
 getType (ATBin ty _ _ _)  = ty
 getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
-getType (ATList ty _ _)   = ty
-getType (ATListComp ty _) = ty
+getType (ATContainer ty _ _ _)   = ty
+getType (ATContainerComp ty _ _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 getType (ATAscr _ ty)     = ty
-

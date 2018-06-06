@@ -688,6 +688,7 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
+  <|> TySet <$> (reserved "Set" *> parseAtomicType)
   <|> parens parseType
 
 parseTyFin :: Parser Type

@@ -50,6 +50,9 @@ parens   = fmap PP.parens
 brackets :: Functor f => f PP.Doc -> f PP.Doc
 brackets = fmap PP.brackets
 
+braces :: Functor f => f PP.Doc -> f PP.Doc
+braces = fmap PP.braces
+
 text :: Monad m => String -> m PP.Doc
 text     = return . PP.text
 
@@ -128,6 +131,8 @@ prettyTy TyQP             = text "ℚ⁺"
 prettyTy (TyFin n)        = text "ℤ" <> (integer n)
 prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
+prettyTy (TySet ty)      = mparens (PA 9 InR) $
+  text "Set" <+> prettyTy' 9 InR ty
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -159,16 +164,16 @@ prettyTerm (TApp t1 t2)  = mparens funPA $
 prettyTerm (TTup ts)     = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   parens (hsep ds)
-prettyTerm (TList ts e)  = do
+prettyTerm (TContainer c ts e)  = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   let pe = case e of
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  brackets (hsep (ds ++ pe))
-prettyTerm (TListComp bqst) =
+  (case c of {CList -> brackets; CSet -> braces}) (hsep (ds ++ pe))
+prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
-  brackets (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
+  (case c of {CList -> brackets; CSet -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n

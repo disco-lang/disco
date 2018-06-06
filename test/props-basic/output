@@ -1,6 +1,8 @@
 Loading test/props-basic/props-basic.disco...
-Running tests...
-  foo: OK
-  reverse: OK
-  x: OK
-Loaded.
+test/props-basic/props-basic.disco:39:12:
+   |
+39 | toBin n = {? false if 2 divides n, true otherwise ?} :: toBin (n // 2)
+   |            ^
+unexpected '?'
+expecting '}' or expression
+

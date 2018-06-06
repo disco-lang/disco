@@ -1,4 +1,10 @@
 Loading test/syntax-patclause/fact.disco...
-Loaded.
-3628800
-3628800
+test/syntax-patclause/fact.disco:7:4:
+  |
+7 |   {? 1            when n is 0,
+  |    ^
+unexpected '?'
+expecting '}' or expression
+
+Unbound fact
+Unbound fact2

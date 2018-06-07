@@ -80,7 +80,7 @@ desugarDefn def = do
     lunbinds :: (Alpha a, Alpha b) => [Bind a b] -> ([(a,b)] -> DSM r) -> DSM r
     lunbinds bs k = mapM (flip lunbind return) bs >>= k
 
-    mkBranch :: [Name Core] -> ATerm -> [Pattern] -> DSM CBranch
+    mkBranch :: [Name Core] -> ATerm -> [APattern] -> DSM CBranch
     mkBranch xs b ps = do
       b'  <- desugarTerm b
       let ps' = map desugarPattern ps
@@ -301,21 +301,21 @@ desugarQual (AQGuard (unembed -> t))  = do
   return $ CQGuard (embed dt)
 
 -- | Desugar a pattern.
-desugarPattern :: Pattern -> CPattern
-desugarPattern (PVar x)      = CPVar (coerce x)
-desugarPattern PWild         = CPWild
-desugarPattern PUnit         = CPCons 0 []
-desugarPattern (PBool b)     = CPCons (fromEnum b) []
-desugarPattern (PTup p)      = desugarTuplePats p
-desugarPattern (PInj s p)    = CPCons (fromEnum s) [desugarPattern p]
-desugarPattern (PNat n)      = CPNat n
-desugarPattern (PSucc p)     = CPSucc (desugarPattern p)
-desugarPattern (PCons p1 p2) = CPCons 1 [desugarPattern p1, desugarPattern p2]
-desugarPattern (PList ps)    = foldr (\p cp -> CPCons 1 [desugarPattern p, cp])
-                                     (CPCons 0 [])
-                                     ps
+desugarPattern :: APattern -> CPattern
+desugarPattern (APVar x)      = CPVar (coerce x)
+desugarPattern APWild         = CPWild
+desugarPattern APUnit         = CPCons 0 []
+desugarPattern (APBool b)     = CPCons (fromEnum b) []
+desugarPattern (APTup p)      = desugarTuplePats p
+desugarPattern (APInj s p)    = CPCons (fromEnum s) [desugarPattern p]
+desugarPattern (APNat n)      = CPNat n
+desugarPattern (APSucc p)     = CPSucc (desugarPattern p)
+desugarPattern (APCons p1 p2) = CPCons 1 [desugarPattern p1, desugarPattern p2]
+desugarPattern (APList ps)    = foldr (\p cp -> CPCons 1 [desugarPattern p, cp])
+                                      (CPCons 0 [])
+                                      ps
 
-desugarTuplePats :: [Pattern] -> CPattern
+desugarTuplePats :: [APattern] -> CPattern
 desugarTuplePats []      = error "Impossible! desugarTuplePats []"
 desugarTuplePats [p]     = desugarPattern p
 desugarTuplePats (p:ps)  = CPCons 0 [desugarPattern p, desugarTuplePats ps]

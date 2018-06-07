@@ -77,34 +77,6 @@ module Disco.AST.Typed
        , pattern ABinding
          -- * Utilities
        , getType
-       , pattern ATVar 
-       , pattern ATUn 
-       , pattern ATLet 
-       , pattern ATUnit 
-       , pattern ATBool 
-       , pattern ATNat 
-       , pattern ATRat 
-       , pattern ATAbs 
-       , pattern ATApp 
-       , pattern ATTup 
-       , pattern ATInj
-       , pattern ATCase 
-       , pattern ATBin 
-       , pattern ATChain 
-       , pattern ATTyOp
-       , pattern ATList 
-       , pattern ATListComp
-       , pattern ATAscr
-
-       , pattern ATLink 
-
-       , pattern ABinding
-
-       , pattern AGBool
-       , pattern AGPat
-
-       , pattern AQBind
-       , pattern AQGuard
 
        , AProperty
        )

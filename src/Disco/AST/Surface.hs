@@ -33,7 +33,7 @@ module Disco.AST.Surface
        , Decl(..), declName, isDefn
 
          -- * Terms
-
+       , UD
        , Term
        , pattern TVar 
        , pattern TUn
@@ -92,8 +92,6 @@ module Disco.AST.Surface
        , pattern PCons
        , pattern PList 
        , pattern Binding 
-
-       , Property
        )
        where
 

@@ -101,7 +101,8 @@ import           Disco.Syntax.Operators
 import           Disco.Types
 import           Disco.AST.Generic
 
--- The extension descriptor for Surface specific AST types.
+-- | The extension descriptor for Surface specific AST types.
+
 data UD
 
 -- | A module is a list of declarations together with a collection of
@@ -128,8 +129,6 @@ deriving instance Forall_t Show  UD => Show DocThing
 -- | A property is a universally quantified term of the form
 --   @forall v1 : T1, v2 : T2. term@.
 type Property = Property_ UD
-
--- pattern Property b = Property_ b
 
 -- | A declaration is either a type declaration or a definition.
 data Decl where
@@ -237,26 +236,9 @@ pattern TListComp bind = TListComp_ () bind
 pattern TAscr :: Term -> Type -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
-{-# COMPLETE   TVar 
-       , TUn
-       , TLet
-       , TParens
-       , TUnit
-       , TBool
-       , TNat
-       , TRat
-       , TAbs
-       , TApp
-       , TTup
-       , TInj
-       , TCase
-       , TBin
-       , TChain
-       , TTyOp
-       , TList
-       , TListComp
-       , TAscr
-       #-}
+{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
+             TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp, 
+             TList, TListComp, TAscr #-}
 
 
 type Link = Link_ UD 
@@ -287,10 +269,9 @@ type Binding = Binding_ UD
 pattern Binding :: (Maybe Type) -> Name Term -> Embed Term -> Binding 
 pattern Binding m b n = Binding_ m b n 
 
--- deriving instance Forall_t Show  UD => Show Binding
+{-# COMPLETE Binding #-}
 
 type Branch = Branch_ UD 
-
 
 type Guard = Guard_ UD
 
@@ -353,7 +334,8 @@ pattern PCons  p1 p2 = PCons_ () p1 p2
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp 
 
-{-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat, PSucc, PCons, PList #-}
+{-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
+             PSucc, PCons, PList #-}
 
 
 instance Alpha Side

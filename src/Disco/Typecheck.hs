@@ -82,7 +82,7 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-
+--
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
 --   function being defined.  For example, given the concrete syntax
@@ -930,11 +930,11 @@ checkPattern (PTup ps) ty                   = do
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APTup aps)
 checkPattern (PInj L p) (TySum ty1 _)       = do
-  (ctx, ap) <- checkPattern p ty1
-  return (ctx, APInj L ap)
+  (ctx, apt) <- checkPattern p ty1
+  return (ctx, APInj L apt)
 checkPattern (PInj R p) (TySum _ ty2)       = do
-  (ctx, ap) <- checkPattern p ty2
-  return (ctx, APInj R ap)
+  (ctx, apt) <- checkPattern p ty2
+  return (ctx, APInj R apt)
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.
@@ -942,8 +942,8 @@ checkPattern (PNat n) ty | isSub TyN ty = return (emptyCtx, APNat n)
 checkPattern (PNat n) (TyFin _)         = return (emptyCtx, APNat n)
 
 checkPattern (PSucc p)  TyN                 = do
-  (ctx, ap) <- checkPattern p TyN
-  return (ctx, APSucc ap)
+  (ctx, apt) <- checkPattern p TyN
+  return (ctx, APSucc apt)
 checkPattern (PCons p1 p2) (TyList ty)      = do
   (ctx1, ap1) <- checkPattern p1 ty
   (ctx2, ap2) <- checkPattern p2 (TyList ty)
@@ -965,11 +965,6 @@ checkTuplePat (p:ps) (TyPair ty1 ty2) = do
   rest <- checkTuplePat ps ty2
   return ((ctx, apt):rest)
 checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
-
--- | Successfully return the empty context.  A convenience method for
---   checking patterns that bind no variables.
--- ok :: TCM TyCtx
--- ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.

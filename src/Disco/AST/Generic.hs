@@ -14,14 +14,13 @@
 {-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Disco.AST.Surface
+-- Module      :  Disco.AST.Generic
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  byorgey@gmail.com
 --
--- Abstract syntax trees representing the surface syntax of the Disco
--- language.
---
+-- Abstract syntax trees representing the generic syntax of the Disco
+-- language. Concrete AST instances may use this module as a template.
 -----------------------------------------------------------------------------
 
 module Disco.AST.Generic
@@ -276,8 +275,6 @@ data Qual_ e where
 
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
 
-
-
 -- | A binding is a name along with its definition.
 data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
@@ -305,9 +302,6 @@ data Guard_ e where
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
 
   deriving Generic
--- deriving instance Generic (Guard_ e)
-
--- {-# COMPLETE GBool, GPat #-}
 
 deriving instance Forall_t Show  e => Show (Guard_ e)
 
@@ -323,14 +317,6 @@ type family X_PNat e
 type family X_PSucc e 
 type family X_PCons e 
 type family X_PList e 
-
--- type Forall_p (a :: * -> Constraint) e 
---       = (a (X_PVar e), a (X_PWild e),  
---          a (X_PUnit e), a (X_PBool e), 
---          a (X_PTup e), a (X_PInj e), 
---          a (X_PNat e), a (X_PSucc e), 
---          a (X_PCons e), a (X_PList e))
-
 
 data Pattern_ e where
 

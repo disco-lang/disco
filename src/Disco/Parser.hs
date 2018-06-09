@@ -637,8 +637,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     isMultiplicativeTerm (TNat _)            = True
     isMultiplicativeTerm (TUn {})            = True
     isMultiplicativeTerm (TBin {})           = True
-    isMultiplicativeTerm (TParens (TUn  {})) = True
-    isMultiplicativeTerm (TParens (TBin {})) = True
+    isMultiplicativeTerm (TParens t)         = isMultiplicativeTerm t
     isMultiplicativeTerm _                   = False
 
     -- Fix precedence by bubbling up any new TBin terms whose

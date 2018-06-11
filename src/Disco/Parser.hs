@@ -370,9 +370,7 @@ parseTerm' = label "expression" $
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = label "expression" $
-      brackets (parseList CList)
-  <|> braces (parseList CSet)
-  <|> TBool True  <$ (reserved "true" <|> reserved "True")
+       TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
   <|> TRat <$> try decimal
@@ -382,6 +380,8 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
+  <|> brackets (parseList CList)
+  <|> braces (parseList CSet)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
 -- | Parse a list-ish thing, like a literal list or a list

@@ -2,13 +2,7 @@
 let f = (x : ℕ) ↦ x + 1 in f : ℕ → ℕ
 4
 let f = (x ↦ x + 1 : ℕ → ℕ) in f : ℕ → ℕ
-1:24:
-  |
-1 | let g = (x:N) -> (b:B) -> {? x*x if b, x+2 otherwise ?} in (g 3 true, g 6 false)
-  |                        ^
-unexpected "->"
-expecting "in", ',', operator, the rest of expression, or type annotation
-
+(9, 8)
 5
 (x : ℤ) (y : ℕ) ↦ x * y : ℤ → ℕ → ℤ
 [false, true, true]

@@ -1,28 +1,4 @@
-1:2:
-  |
-1 | {? x when (0, 0/0) is (S x, 3) ?}
-  |  ^
-unexpected '?'
-expecting '}' or expression
-
-1:2:
-  |
-1 | {? x when (0, 0/0) is (S x, 3), 2 otherwise ?}
-  |  ^
-unexpected '?'
-expecting '}' or expression
-
-1:2:
-  |
-1 | {? x when [1,2,3/0] is [x,3,5], 2 otherwise ?}
-  |  ^
-unexpected '?'
-expecting '}' or expression
-
-1:2:
-  |
-1 | {? x when [1,2,3/0] is [x,2,5], 2 otherwise ?}
-  |  ^
-unexpected '?'
-expecting '}' or expression
-
+NonExhaustive
+2
+2
+DivByZero

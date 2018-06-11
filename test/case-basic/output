@@ -1,13 +1,7 @@
 Loading test/case-basic/case-basic.disco...
-test/case-basic/case-basic.disco:3:3:
-  |
-3 |  {? n     when x is left (n :: _),
-  |   ^
-unexpected '?'
-expecting '}' or expression
-
-Unbound foo
-Unbound foo
-Unbound foo
-Unbound foo
-Unbound foo
+Loaded.
+0
+1
+2
+3
+4

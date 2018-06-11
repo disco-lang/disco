@@ -353,9 +353,18 @@ prettyWHNF out _ (VNum d r)
 prettyWHNF out _ (VFun _) = out "<function>"
 
 prettyWHNF out _ (VClos _ _) = out "<function>"
+prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
+
+
+--prettyIteration handles the pretty-printing of lists of values,
+--such as those found in sets.
+prettyIteration :: (String -> Disco IErr()) -> Type -> [Value] -> Disco IErr ()
+prettyIteration out _ []     = out ""
+prettyIteration out t [x]    = prettyValueWith out t x
+prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
 
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()

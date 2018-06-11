@@ -233,8 +233,24 @@ whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CCase bs)     = whnfCase bs
 whnf (COp op cs)    = whnfOp op cs
 
+whnf (CoreSet t es) = do
+  res <- mapM mkThunk es
+  dres <- deduplicateSet t res
+  return $ VSet dres
 
 whnf (CType _)      = error "Called whnf on CType"
+
+deduplicateSet :: Type -> [Value] -> Disco IErr [Value]
+deduplicateSet _ [] = return []
+deduplicateSet t (x:xs) = do
+  xInXs <- elemOf t x xs
+  result <- if xInXs then deduplicateSet t xs else (x:) <$> (deduplicateSet t xs)
+  return result
+
+elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
+elemOf _ _ [] = return False
+elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF

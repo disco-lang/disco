@@ -169,7 +169,7 @@ desugarTerm (ATContainer t c es mell) = case c of
     des <- mapM desugarTerm es
     case mell of
       Nothing -> return $ CoreSet t des
-      Just ell -> error "Set's cannot have ellipses yet"
+      Just ell -> error "Sets cannot have ellipses yet"
 -- desugarTerm (ATList _ es mell) = do
 --   des <- mapM desugarTerm es
 --   case mell of

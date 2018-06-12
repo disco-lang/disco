@@ -95,6 +95,8 @@ data Type where
   -- | Lists
   TyList   :: Type -> Type
 
+  TySet :: Type -> Type
+
   deriving (Show, Eq, Generic)
 
 instance Alpha Type

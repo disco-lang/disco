@@ -96,6 +96,11 @@ data Core where
   -- | A type.
   CType :: Type -> Core
 
+  -- | A Set
+  --   Named so because CSet conflicts with the type Container type
+  --   defined in Disco.AST.Surace
+  CoreSet :: Type -> [Core] -> Core
+
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not

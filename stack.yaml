@@ -11,7 +11,6 @@ packages:
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
 - parser-combinators-0.4.0
-- megaparsec-6.2.0
 - http://ozark.hendrix.edu/~yorgey/hosted/exact-combinatorics-0.2.0.8-r1.tgz
 
 # Override default flag values for local packages and extra-deps

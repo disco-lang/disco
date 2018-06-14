@@ -194,7 +194,7 @@ library
 
   build-depends:       base >=4.8 && <4.12,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 6.3,
+                       megaparsec >= 6.1.1 && < 6.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,

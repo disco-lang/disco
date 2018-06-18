@@ -1,11 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE PatternSynonyms       #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE TupleSections              #-}
 
 -- 29 May 2018.  Study for disco type system.
 
@@ -16,43 +17,63 @@
 -- they still have to show up as constraints for the constraint
 -- solver.
 
-import           Prelude hiding (lookup)
+import           Prelude                                 hiding (lookup)
 
 import           Data.Coerce
-import           Data.List (intercalate)
-import           GHC.Generics (Generic)
+import           GHC.Generics                            (Generic)
+import           System.IO
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-import           System.IO
 
-import           Control.Monad.Reader
 import           Control.Monad.Except
+import           Control.Monad.Reader
 
-import           Data.Char    (toLower)
-import           Data.Maybe   (fromJust)
-import           Data.Map     (Map, (!))
-import qualified Data.Map     as M
-import           Data.Set     (Set)
-import qualified Data.Set     as S
+import           Control.Arrow                           ((&&&))
+import           Data.Bifunctor                          (first, second)
+import           Data.Char                               (toLower)
+import           Data.List                               (intercalate)
+import           Data.Map                                (Map, (!))
+import qualified Data.Map                                as M
+import           Data.Maybe                              (fromJust)
+import           Data.Semigroup
+import           Data.Set                                (Set)
+import qualified Data.Set                                as S
 import           Text.Printf
 
-import Parsing2
+import           Parsing2
 
 ------------------------------------------------------------
 -- Atomic types
 ------------------------------------------------------------
 
+data BaseTy where
+  Nat :: BaseTy
+  Int :: BaseTy
+  deriving (Show, Eq, Ord, Generic)
+
+instance Alpha BaseTy
+
+data Var where
+  U :: Name Type -> Var   -- unification variable
+  S :: Name Type -> Var   -- skolem variable
+  deriving (Show, Eq, Ord, Generic)
+
+instance Alpha Var
+
 data Atom where
-  AVar :: Name Type -> Atom
-  ANat :: Atom
-  AInt :: Atom
+  AVar  :: Var -> Atom
+  ABase :: BaseTy -> Atom
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Atom
 
+instance Subst Atom Var
+instance Subst Atom BaseTy
+
+-- don't substitute for skolem vars
 instance Subst Atom Atom where
-  isvar (AVar x) = Just (SubstName (coerce x))
-  isvar _        = Nothing
+  isvar (AVar (U x)) = Just (SubstName (coerce x))
+  isvar _            = Nothing
 
 isVar :: Atom -> Bool
 isVar (AVar _) = True
@@ -60,11 +81,6 @@ isVar _        = False
 
 isBase :: Atom -> Bool
 isBase = not . isVar
-
-isSub :: Atom -> Atom -> Bool
-isSub a1 a2 | a1 == a2 = True
-isSub ANat AInt = True
-isSub _ _ = False
 
 ------------------------------------------------------------
 -- Type structure
@@ -94,11 +110,14 @@ data Type where
 
 instance Alpha Type
 
+instance Subst Type Var
+instance Subst Type BaseTy
 instance Subst Type Atom
 instance Subst Type Cons
+instance Subst Type Qual
 instance Subst Type Type where
-  isvar (TyAtom (AVar x)) = Just (SubstName x)
-  isvar _                 = Nothing
+  isvar (TyAtom (AVar (U x))) = Just (SubstName x)
+  isvar _                     = Nothing
 
 -- orphans
 instance (Ord a, Subst t a) => Subst t (Set a) where
@@ -117,13 +136,16 @@ var :: String -> Type
 var x = TyVar (string2Name x)
 
 pattern TyVar :: Name Type -> Type
-pattern TyVar v = TyAtom (AVar v)
+pattern TyVar v = TyAtom (AVar (U v))
+
+pattern Skolem :: Name Type -> Type
+pattern Skolem v = TyAtom (AVar (S v))
 
 pattern TyNat :: Type
-pattern TyNat   = TyAtom ANat
+pattern TyNat   = TyAtom (ABase Nat)
 
 pattern TyInt :: Type
-pattern TyInt   = TyAtom AInt
+pattern TyInt   = TyAtom (ABase Int)
 
 pattern TyFun :: Type -> Type -> Type
 pattern TyFun ty1 ty2 = TyCons CArr [ty1, ty2]
@@ -151,14 +173,36 @@ data Constraint where
 instance Alpha Qual
 instance Alpha Constraint
 
+instance Subst Type Constraint
+
 cAnd :: [Constraint] -> Constraint
 cAnd cs = case filter nontrivial cs of
-  []   -> CTrue
-  [c]  -> c
-  cs'  -> CAnd cs'
+  []  -> CTrue
+  [c] -> c
+  cs' -> CAnd cs'
   where
     nontrivial CTrue = False
     nontrivial _     = True
+
+------------------------------------------------------------
+-- Subtyping and qualifier rules
+------------------------------------------------------------
+
+isSubA :: Atom -> Atom -> Bool
+isSubA a1 a2                 | a1 == a2 = True
+isSubA (ABase t1) (ABase t2) = isSubB t1 t2
+isSubA _ _                   = False
+
+isSubB :: BaseTy -> BaseTy -> Bool
+isSubB Nat Int = True
+isSubB _ _     = False
+
+qualifications :: Map Qual (Set BaseTy)
+qualifications = M.fromList $
+  [ (QAdd, S.fromList [Nat, Int])
+  , (QMul, S.fromList [Nat, Int])
+  , (QSub, S.fromList [Int])
+  ]
 
 ------------------------------------------------------------
 -- Polytypes
@@ -341,6 +385,9 @@ lookup x = do
 freshTy :: TC Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
+freshSkolem :: TC Var
+freshSkolem = S <$> fresh (string2Name "s")
+
 --------------------------------------------------
 -- Inference mode
 
@@ -431,9 +478,9 @@ cSub tau1 tau2
   | isKnownSub tau1 tau2 = CTrue
   | otherwise            = CSub tau1 tau2
 
-isKnownSub tau1 tau2 | tau1 == tau2 = True
-isKnownSub TyNat TyInt              = True
-isKnownSub _ _ = False
+isKnownSub tau1 tau2   | tau1 == tau2 = True
+isKnownSub TyNat TyInt = True
+isKnownSub _ _         = False
 
 ------------------------------------------------------------
 -- Interpreter
@@ -537,9 +584,9 @@ instance Pretty Expr where
       (prettyPrec 3 L e1 ++ " " ++ prettyPrec 3 R e2)
 
 instance Pretty Type where
-  pretty (TyVar x) = show x
-  pretty TyNat     = "N"
-  pretty TyInt     = "Z"
+  pretty (TyVar x)       = show x
+  pretty TyNat           = "N"
+  pretty TyInt           = "Z"
   pretty (TyFun ty1 ty2) = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
 
 instance Pretty Env where
@@ -566,16 +613,91 @@ instance Pretty Constraint where
 -- Constraint solving
 ------------------------------------------------------------
 
--- Step 1. Open foralls (instantiating with skolem variables) and
--- collect qualifier givens and wanteds.  Should result in just a list
--- of equational and subtyping constraints.
+--------------------------------------------------
+-- Substitutions
+
+-- This is an inefficient representation of substitutions; and ideally
+-- we would implement constraint solving without using explicit
+-- substitutions at all.  But this will do for now.
+
+type S' a = [(Name a, a)]
+
+idS :: S' a
+idS = []
+
+-- Construct a singleton substitution
+(|->) :: Name a -> a -> S' a
+x |-> t = [(x,t)]
+
+-- Substitution composition
+(@@) :: Subst a a => S' a -> S' a -> S' a
+s1 @@ s2 = (map . second) (substs s1) s2 ++ s1
+
+-- Compose a whole bunch of substitutions
+compose :: (Subst a a, Foldable t) => t (S' a) -> S' a
+compose = foldr (@@) idS
+
+type S = S' Type
+
+--------------------------------------------------
+-- Solver errors
+
+-- | Type of errors which can be generated by the constraint solving
+--   process.
+data SolveError where
+  NoWeakUnifier :: SolveError
+  NoUnify       :: SolveError
+  UnqualBase    :: Qual -> BaseTy    -> SolveError
+  Unqual        :: Qual -> Type      -> SolveError
+  QualSkolem    :: Qual -> Name Type -> SolveError
+  deriving Show
+
+-- | Convert 'Nothing' into the given error.
+maybeError :: e -> Maybe a -> Except e a
+maybeError e Nothing  = throwError e
+maybeError _ (Just a) = return a
+
+--------------------------------------------------
+-- Solver monad
+
+type SolveM a = ExceptT SolveError FreshM a
+
+--------------------------------------------------
+-- Simple constraints and qualifier maps
+
+data SimpleConstraint where
+  (:<:) :: Type -> Type -> SimpleConstraint
+  (:=:) :: Type -> Type -> SimpleConstraint
+
+newtype QualMap = QM { unQM :: Map (Name Type) (Set Qual) }
+
+instance Semigroup QualMap where
+  QM qm1 <> QM qm2 = QM (M.unionWith (<>) qm1 qm2)
+
+instance Monoid QualMap where
+  mempty  = QM M.empty
+  mappend = (<>)
+
+--------------------------------------------------
+-- Top-level solver algorithm
+
+solveConstraint :: Constraint -> SolveM S
+solveConstraint c = do
+
+  -- Step 1. Open foralls (instantiating with skolem variables) and
+  -- collect wanted qualifiers.  Should result in just a list of
+  -- equational and subtyping constraints in addition to qualifiers.
+
+  (quals, cs) <- decomposeConstraint c
+
+  return undefined
 
 -- Step 2. Check for weak unification to ensure termination. (a la
 -- Traytel et al).
 
 -- Step 3. Simplify constraints, resulting in a set of atomic
--- subtyping constraints.  Also simplify/update qualifier given &
--- wanted sets accordingly.
+-- subtyping constraints.  Also simplify/update qualifier set
+-- accordingly.
 
 -- Step 4. Turn the atomic constraints into a directed constraint
 -- graph.
@@ -591,6 +713,41 @@ instance Pretty Constraint where
 -- Step 8. Unify any remaining variables in weakly connected
 -- components.
 
+--------------------------------------------------
+-- Step 1. Constraint decomposition.
+
+decomposeConstraint :: Constraint -> SolveM (QualMap, [SimpleConstraint])
+decomposeConstraint (CSub t1 t2) = return (mempty, [t1 :<: t2])
+decomposeConstraint (CEq  t1 t2) = return (mempty, [t1 :=: t2])
+decomposeConstraint (CQual q ty) = (, []) <$> decomposeQual q ty
+decomposeConstraint (CAnd cs)    = mconcat <$> mapM decomposeConstraint cs
+decomposeConstraint CTrue        = return mempty
+decomposeConstraint (CAll ty)    = do
+  (vars, c) <- unbind ty
+  let c' = substs (mkSkolems vars) c
+  decomposeConstraint c'
+
+  where
+    mkSkolems :: [Name Type] -> [(Name Type, Type)]
+    mkSkolems = map (id &&& Skolem)
+
+decomposeQual :: Qual -> Type -> SolveM QualMap
+decomposeQual q (TyAtom a)        = checkQual q a
+decomposeQual q ty@(TyCons c tys) = throwError $ Unqual q ty
+  -- Right now, no structured type (functions) can satisfy a
+  -- qualifier.  In a bigger system this would be different: this
+  -- function would decompose a qualifier on a structured type into
+  -- appropriate qualifiers on its component types.  Once the rest is
+  -- working we could e.g. add product types and specify that numeric
+  -- operations lift over pairs componentwise.
+
+checkQual :: Qual -> Atom -> SolveM QualMap
+checkQual q (AVar (U v)) = return . QM $ M.singleton v (S.singleton q)
+checkQual q (AVar (S v)) = throwError $ QualSkolem q v
+checkQual q (ABase bty)  =
+  case bty `S.member` (qualifications ! q) of
+    True  -> return mempty
+    False -> throwError $ UnqualBase q bty
 
 ------------------------------------------------------------
 -- main
@@ -613,5 +770,3 @@ repl = forever $ do
         putStrLn (pretty ty)
         putStrLn (pretty c)
         putStrLn (pretty (interp e))
-
-

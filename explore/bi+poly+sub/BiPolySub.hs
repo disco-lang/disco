@@ -25,10 +25,13 @@ import           System.IO
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           System.Console.Haskeline                as H
+
 import           Control.Monad.Except
 import           Control.Monad.Reader
 
 import           Control.Arrow                           ((&&&))
+import           Control.Lens                            (anyOf)
 import           Data.Bifunctor                          (first, second)
 import           Data.Char                               (toLower)
 import           Data.List                               (intercalate)
@@ -41,6 +44,8 @@ import qualified Data.Set                                as S
 import           Text.Printf
 
 import           Parsing2
+
+import           Debug.Trace
 
 ------------------------------------------------------------
 -- Atomic types
@@ -126,8 +131,6 @@ instance (Ord a, Subst t a) => Subst t (Set a) where
 instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
-
--- type S = S' Type
 
 -- atomToTypeSubst :: S' Atom -> S' Type
 -- atomToTypeSubst = map (coerce *** TyAtom)
@@ -230,7 +233,7 @@ data Expr where
   ELam   :: Bind (Name Expr) Expr -> Expr
   EApp   :: Expr -> Expr -> Expr
   EAscribe :: Expr -> Sigma -> Expr
-  ELet   :: Expr -> Sigma -> Bind (Name Expr) Expr -> Expr
+  ELet   :: Expr -> Maybe Sigma -> Bind (Name Expr) Expr -> Expr
 
   deriving (Show, Generic)
 
@@ -292,7 +295,7 @@ parseAtom
   <|> eLam  <$> (symbol "\\" *> identifier)
             <*> (symbol "." *> parseExpr)
   <|> eLet  <$> (reserved "let" *> identifier)
-            <*> (symbol ":" *> parseSigma)
+            <*> optionMaybe (symbol ":" *> parseSigma)
             <*> (symbol "=" *> parseExpr)
             <*> (reserved "in" *> parseExpr)
   <|> parens parseExpr
@@ -411,11 +414,18 @@ infer (EAscribe e sig) = do
   c1 <- checkSigma e sig
   tau <- inferSubsumption sig
   return (tau, c1)
-infer (ELet e1 sig b) = do
-  c1 <- checkSigma e1 sig
-  (x,body) <- unbind b
-  (tau, c2) <- extend x sig $ infer body
-  return (tau, cAnd [c1, c2])
+infer (ELet e1 msig b) = do
+  case msig of
+    Nothing -> do
+      (tau1, c1) <- infer e1
+      (x, body)  <- unbind b
+      (tau, c2)  <- extend x (toSigma tau1) $ infer body
+      return (tau, cAnd [c1, c2])
+    Just sig -> do
+      c1 <- checkSigma e1 sig
+      (x,body) <- unbind b
+      (tau, c2) <- extend x sig $ infer body
+      return (tau, cAnd [c1, c2])
 infer e = throwError (CantInfer e)
 
 opQual :: BOp -> Qual
@@ -585,6 +595,7 @@ instance Pretty Expr where
 
 instance Pretty Type where
   pretty (TyVar x)       = show x
+  pretty (Skolem s)      = "%" ++ show s
   pretty TyNat           = "N"
   pretty TyInt           = "Z"
   pretty (TyFun ty1 ty2) = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
@@ -608,6 +619,28 @@ instance Pretty Constraint where
   pretty CTrue = "true"
   pretty (CAll b) =
     let (as, c) = unsafeUnbind b in "forall " ++ intercalate " " (map show as) ++ ". " ++ pretty c
+
+instance Pretty QualMap where
+  pretty (QM quals) = "QM " ++ pretty (M.assocs quals)
+
+-- instance Pretty a => Pretty (S' a) where
+--   pretty =
+
+instance Pretty (Name a) where
+  pretty = show
+
+instance Pretty SimpleConstraint where
+  pretty (t1 :<: t2) = pretty t1 ++ " < " ++ pretty t2
+  pretty (t1 :=: t2) = pretty t1 ++ " = " ++ pretty t2
+
+instance Pretty a => Pretty [a] where
+  pretty = prettyList . map pretty
+
+instance (Pretty a, Pretty b) => Pretty (a,b) where
+  pretty (x,y) = "(" ++ pretty x ++ ", " ++ pretty y ++ ")"
+
+instance Pretty a => Pretty (Set a) where
+  pretty = ("{"++) . (++"}") . intercalate ", " . map pretty . S.toList
 
 ------------------------------------------------------------
 -- Constraint solving
@@ -640,6 +673,77 @@ compose = foldr (@@) idS
 type S = S' Type
 
 --------------------------------------------------
+-- Unification
+
+-- | Given a list of equations between types, return a substitution
+--   which makes all the equations satisfied (or fail if it is not
+--   possible).
+--
+--   This is not the most efficient way to implement unification but
+--   it is simple.
+unify :: [(Type, Type)] -> Maybe S
+unify = unify' (==)
+
+-- | Given a list of equations between types, return a substitution
+--   which makes all the equations equal *up to* identifying all base
+--   types.  So, for example, Int = Nat weakly unifies but Int = (Int
+--   -> Int) does not.  This is used to check whether subtyping
+--   constraints are structurally sound before doing constraint
+--   simplification/solving.
+weakUnify :: [(Type, Type)] -> Maybe S
+weakUnify = unify' (\_ _ -> True)
+
+-- | Given a list of equations between types, return a substitution
+--   which makes all the equations satisfied (or fail if it is not
+--   possible), up to the given comparison on base types.
+unify' :: (BaseTy -> BaseTy -> Bool) -> [(Type, Type)] -> Maybe S
+unify' _ [] = Just idS
+unify' baseEq (e:es) = do
+  u <- unifyOne baseEq e
+  case u of
+    Left sub    -> (@@ sub) <$> unify' baseEq (substs sub es)
+    Right newEs -> unify' baseEq (newEs ++ es)
+
+equate :: [Type] -> Maybe S
+equate tys = unify eqns
+  where
+    eqns = zipWith (,) tys (tail tys)
+
+occurs :: Name Type -> Type -> Bool
+occurs x = anyOf fv (==x)
+
+unifyOne :: (BaseTy -> BaseTy -> Bool) -> (Type, Type) -> Maybe (Either S [(Type, Type)])
+
+unifyOne _ (ty1, ty2)
+  | ty1 == ty2 = return $ Left idS
+
+unifyOne _ (TyVar x, ty2)
+  | occurs x ty2 = Nothing
+  | otherwise    = Just $ Left (x |-> ty2)
+unifyOne baseEq (ty1, x@(TyVar _))
+  = unifyOne baseEq (x, ty1)
+
+-- At this point we know ty2 isn't the same skolem nor a unification variable.
+unifyOne _ (Skolem _, _) = Nothing
+unifyOne _ (_, Skolem _) = Nothing
+
+unifyOne _ (TyCons c1 tys1, TyCons c2 tys2)
+  | c1 == c2  = return $ Right (zipWith (,) tys1 tys2)
+  | otherwise = Nothing
+unifyOne baseEq (TyAtom (ABase b1), TyAtom (ABase b2))
+  | baseEq b1 b2 = return $ Left idS
+  | otherwise    = Nothing
+unifyOne _ _ = Nothing  -- Atom = Cons
+
+-- unifyAtoms :: [Atom] -> Maybe (S' Atom)
+-- unifyAtoms = fmap convert . equate . map TyAtom
+--   where
+--     -- Guaranteed that this will get everything in the list, since we
+--     -- started with all atoms.
+--     convert s = [(coerce x, a) | (x, TyAtom a) <- s]
+
+
+--------------------------------------------------
 -- Solver errors
 
 -- | Type of errors which can be generated by the constraint solving
@@ -653,7 +757,7 @@ data SolveError where
   deriving Show
 
 -- | Convert 'Nothing' into the given error.
-maybeError :: e -> Maybe a -> Except e a
+maybeError :: Monad m => e -> Maybe a -> ExceptT e m a
 maybeError e Nothing  = throwError e
 maybeError _ (Just a) = return a
 
@@ -662,14 +766,19 @@ maybeError _ (Just a) = return a
 
 type SolveM a = ExceptT SolveError FreshM a
 
+runSolveM :: SolveM a -> Either SolveError a
+runSolveM = runFreshM . runExceptT
+
 --------------------------------------------------
 -- Simple constraints and qualifier maps
 
 data SimpleConstraint where
   (:<:) :: Type -> Type -> SimpleConstraint
   (:=:) :: Type -> Type -> SimpleConstraint
+  deriving (Show)
 
 newtype QualMap = QM { unQM :: Map (Name Type) (Set Qual) }
+  deriving (Show)
 
 instance Semigroup QualMap where
   QM qm1 <> QM qm2 = QM (M.unionWith (<>) qm1 qm2)
@@ -690,14 +799,21 @@ solveConstraint c = do
 
   (quals, cs) <- decomposeConstraint c
 
-  return undefined
+  traceM (pretty quals)
+  traceM (pretty cs)
 
--- Step 2. Check for weak unification to ensure termination. (a la
--- Traytel et al).
+  -- Step 2. Check for weak unification to ensure termination. (a la
+  -- Traytel et al).
 
--- Step 3. Simplify constraints, resulting in a set of atomic
--- subtyping constraints.  Also simplify/update qualifier set
--- accordingly.
+  let toEqn (t1 :<: t2) = (t1,t2)
+      toEqn (t1 :=: t2) = (t1,t2)
+  maybeError NoWeakUnifier $ weakUnify (map toEqn cs)
+
+  -- Step 3. Simplify constraints, resulting in a set of atomic
+  -- subtyping constraints.  Also simplify/update qualifier set
+  -- accordingly.
+
+
 
 -- Step 4. Turn the atomic constraints into a directed constraint
 -- graph.
@@ -712,6 +828,9 @@ solveConstraint c = do
 
 -- Step 8. Unify any remaining variables in weakly connected
 -- components.
+
+  return idS
+
 
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
@@ -756,17 +875,30 @@ checkQual q (ABase bty)  =
 main :: IO ()
 main = do
   hSetBuffering stdout NoBuffering
-  repl
+  let settings = defaultSettings
+        { historyFile = Just ".bipolysub_history" }
+  runInputT settings repl
 
-repl :: IO ()
+repl :: InputT IO ()
 repl = forever $ do
-  putStr "> "
-  inp <- getLine
-  case parse expr inp of
-    Left err -> print err
+  inp <- getInputLine "> "
+  case parse expr (fromJust inp) of
+    Left err -> iprint err
     Right e  -> case runTC (infer e) of
-      Left err -> print err
+      Left err -> iprint err
       Right (ty, c) -> do
-        putStrLn (pretty ty)
-        putStrLn (pretty c)
-        putStrLn (pretty (interp e))
+        ipretty ty
+        ipretty c
+        case runSolveM $ solveConstraint c of
+          Left err -> iprint err
+          Right s  -> do
+            ipretty s
+            iputStrLn (pretty (interp e))
+  where
+    iprint :: Show a => a -> InputT IO ()
+    iprint    = liftIO . print
+
+    iputStrLn = liftIO . putStrLn
+
+    ipretty :: Pretty a => a -> InputT IO ()
+    ipretty = iputStrLn . pretty

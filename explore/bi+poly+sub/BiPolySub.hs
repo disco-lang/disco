@@ -26,6 +26,7 @@ import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           System.Console.Haskeline                as H
+import           System.Exit
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
@@ -91,18 +92,18 @@ isBase = not . isVar
 -- Type structure
 ------------------------------------------------------------
 
-data Cons where
-  CArr  :: Cons
---  CPair :: Cons
+data Con where
+  CArr  :: Con
+  CPair :: Con
   deriving (Show, Eq, Ord, Generic)
 
-instance Alpha Cons
+instance Alpha Con
 
 data Variance = Co | Contra  -- could add 'In' as well
 
-arity :: Cons -> [Variance]
+arity :: Con -> [Variance]
 arity CArr  = [Contra, Co]
--- arity CPair = [Co, Co]
+arity CPair = [Co, Co]
 
 ------------------------------------------------------------
 -- Monotypes
@@ -110,7 +111,7 @@ arity CArr  = [Contra, Co]
 
 data Type where
   TyAtom :: Atom -> Type
-  TyCons :: Cons -> [Type] -> Type
+  TyCon  :: Con -> [Type] -> Type
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Type
@@ -118,7 +119,7 @@ instance Alpha Type
 instance Subst Type Var
 instance Subst Type BaseTy
 instance Subst Type Atom
-instance Subst Type Cons
+instance Subst Type Con
 instance Subst Type Qual
 instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
@@ -151,10 +152,10 @@ pattern TyInt :: Type
 pattern TyInt   = TyAtom (ABase Int)
 
 pattern TyFun :: Type -> Type -> Type
-pattern TyFun ty1 ty2 = TyCons CArr [ty1, ty2]
+pattern TyFun ty1 ty2 = TyCon CArr [ty1, ty2]
 
--- pattern TyPair :: Type -> Type -> Type
--- pattern TyPair ty1 ty2 = TyCons CPair [ty1, ty2]
+pattern TyPair :: Type -> Type -> Type
+pattern TyPair ty1 ty2 = TyCon CPair [ty1, ty2]
 
 ------------------------------------------------------------
 -- Constraints
@@ -207,6 +208,19 @@ qualifications = M.fromList $
   , (QSub, S.fromList [Int])
   ]
 
+(==>) :: a -> b -> (a,b)
+(==>) = (,)
+
+-- (c, (q, qs)) means that  TyCon c t1 t2 ... tn  is logically equivalent to
+-- q1 t1 /\ q2 t2 /\ ... /\ qn tn.
+qualRules :: Map Con (Map Qual [Maybe Qual])
+qualRules = M.fromList
+  [ CPair ==> M.fromList [ QAdd ==> [Just QAdd, Just QAdd]
+                         , QMul ==> [Just QMul, Just QMul]
+                         , QSub ==> [Just QSub, Just QSub]
+                         ]
+  ]
+
 ------------------------------------------------------------
 -- Polytypes
 ------------------------------------------------------------
@@ -232,6 +246,7 @@ data Expr where
   EBin   :: BOp -> Expr -> Expr -> Expr
   ELam   :: Bind (Name Expr) Expr -> Expr
   EApp   :: Expr -> Expr -> Expr
+  EPair  :: Expr -> Expr -> Expr
   EAscribe :: Expr -> Sigma -> Expr
   ELet   :: Expr -> Maybe Sigma -> Bind (Name Expr) Expr -> Expr
 
@@ -294,6 +309,8 @@ parseAtom
   <|> ENat  <$> natural
   <|> eLam  <$> (symbol "\\" *> identifier)
             <*> (symbol "." *> parseExpr)
+  <|> EPair <$> (symbol "<" *> parseExpr)
+            <*> (symbol "," *> parseExpr <* symbol ">")
   <|> eLet  <$> (reserved "let" *> identifier)
             <*> optionMaybe (symbol ":" *> parseSigma)
             <*> (symbol "=" *> parseExpr)
@@ -313,7 +330,8 @@ parseExpr = ascribe <$> parseExpr' <*> optionMaybe (symbol ":" *> parseSigma)
 parseExpr' :: Parser Expr
 parseExpr' = buildExpressionParser table parseAtom
   where
-    table = [ [ Infix  (EApp <$ reservedOp "")   AssocLeft ]
+    table = [ [ Infix  (EApp <$ reservedOp "")   AssocLeft
+              ]
             , [ Infix  (EBin Times <$ reservedOp "*") AssocLeft ]
             , [ Infix  (EBin Plus  <$ reservedOp "+") AssocLeft
               , Infix  (EBin Minus <$ reservedOp "-") AssocLeft
@@ -330,7 +348,9 @@ parseTypeAtom =
 parseType :: Parser Type
 parseType = buildExpressionParser table parseTypeAtom
   where
-    table = [ [ Infix (TyFun <$ reservedOp "->") AssocRight ] ]
+    table = [ [ Infix (TyPair <$ reservedOp "*")  AssocRight ]
+            , [ Infix (TyFun  <$ reservedOp "->") AssocRight ]
+            ]
 
 parseSigma :: Parser Sigma
 parseSigma = Forall <$> (reserved "forall"
@@ -366,14 +386,21 @@ type Ctx = Map (Name Expr) Sigma
 data TypeError where
   Unbound   :: Name Expr -> TypeError
   CantInfer :: Expr -> TypeError
+  Mismatch  :: Con -> Type -> TypeError
   Unknown   :: TypeError
   deriving (Show, Generic)
 
 newtype TC a = TC { unTC :: ReaderT Ctx (ExceptT TypeError FreshM) a }
   deriving (Functor, Applicative, Monad, MonadReader Ctx, MonadError TypeError, Fresh)
 
+gamma0 :: Ctx
+gamma0 = M.fromList
+  [ (string2Name "fst", ty "forall a b. a*b -> a")
+  , (string2Name "snd", ty "forall a b. a*b -> b")
+  ]
+
 runTC :: TC a -> Either TypeError a
-runTC (TC t) = runFreshM . runExceptT . flip runReaderT M.empty $ t
+runTC (TC t) = runFreshM . runExceptT . flip runReaderT gamma0 $ t
 
 extend :: Name Expr -> Sigma -> TC a -> TC a
 extend x s = local (M.insert x s)
@@ -407,9 +434,14 @@ infer (EBin bop t1 t2) = do
   return (tau3, cAnd [c1, c2, cSub tau1 tau3, cSub tau2 tau3, CQual (opQual bop) tau3])
 infer (EApp t1 t2) = do
   (tau, c1) <- infer t1
-  (tau1, tau2, c2) <- ensureArrow tau
+  ([tau1, tau2], c2) <- ensure CArr tau
   c3 <- check t2 tau1
   return (tau2, cAnd [c1, c2, c3])
+infer (EPair t1 t2) = do
+  (tau1, c1) <- infer t1
+  (tau2, c2) <- infer t2
+  return (TyPair tau1 tau2, cAnd [c1, c2])
+
 infer (EAscribe e sig) = do
   c1 <- checkSigma e sig
   tau <- inferSubsumption sig
@@ -433,12 +465,13 @@ opQual Plus  = QAdd
 opQual Minus = QSub
 opQual Times = QMul
 
-ensureArrow :: Type -> TC (Type, Type, Constraint)
-ensureArrow (TyFun tau1 tau2) = return (tau1, tau2, CTrue)
-ensureArrow tau               = do
-  tau1 <- freshTy
-  tau2 <- freshTy
-  return (tau1, tau2, CEq tau (TyFun tau1 tau2))
+ensure :: Con -> Type -> TC ([Type], Constraint)
+ensure c ty@(TyCon d args)
+  | c == d    = return (args, CTrue)
+  | otherwise = throwError $ Mismatch c ty
+ensure c tau = do
+  vars <- mapM (const freshTy) (arity c)
+  return (vars, CEq tau (TyCon c vars))
 
 inferSubsumption :: Sigma -> TC Type
 inferSubsumption (Forall sig) = do
@@ -465,10 +498,15 @@ check (EBin op t1 t2) tau = do
   c2 <- check t2 tau
   return $ cAnd [c1, c2, CQual (opQual op) tau]
 check (ELam lam) tau = do
-  (tau1, tau2, c1) <- ensureArrow tau
+  ([tau1, tau2], c1) <- ensure CArr tau
   (x, body) <- unbind lam
   c2 <- extend x (toSigma tau1) $ check body tau2
   return $ cAnd [c1, c2]
+check (EPair t1 t2) tau = do
+  ([tau1, tau2], c) <- ensure CPair tau
+  c1 <- check t1 tau1
+  c2 <- check t2 tau2
+  return $ cAnd [c, c1, c2]
 check (EAscribe e sig) tau = do
   c1 <- checkSigma e sig
   c2 <- checkSubsumption sig tau
@@ -500,6 +538,7 @@ type Env = Map (Name Expr) Value
 
 data Value where
   VInt     :: Integer -> Value
+  VPair    :: Value -> Value -> Value
   VClosure :: Bind (Name Expr) Expr -> Env -> Value
   VFun     :: (Value -> Value) -> Value
 
@@ -509,8 +548,14 @@ extendV x v = local (M.insert x v)
 withEnv :: MonadReader Env m => Env -> m a -> m a
 withEnv e = local (const e)
 
+rho0 :: Env
+rho0 = M.fromList
+  [ (string2Name "fst", VFun $ \(VPair v1 _) -> v1)
+  , (string2Name "snd", VFun $ \(VPair _ v2) -> v2)
+  ]
+
 interp :: Expr -> Value
-interp = runLFreshM . flip runReaderT M.empty . interp'
+interp = runLFreshM . flip runReaderT rho0 . interp'
 
 interp' :: Expr -> ReaderT Env LFreshM Value
 interp' (EVar x)        = (fromJust . M.lookup x) <$> ask
@@ -531,6 +576,8 @@ interp' (EApp fun arg)  = do
         interp' body
     VFun f -> return (f va)
     _ -> error $ printf "Impossible! interp' EApp with (%s) (%s)" (show fun) (show arg)
+interp' (EPair e1 e2)  = VPair <$> interp' e1 <*> interp' e2
+
 interp' (EAscribe e _) = interp' e
 interp' (ELet e1 _ b) = do
   ve1 <- interp' e1
@@ -564,6 +611,7 @@ class Pretty p where
 
 instance Pretty Value where
   pretty (VInt n) = show n
+  pretty (VPair v1 v2) = printf "<%s, %s>" (pretty v1) (pretty v2)
   pretty (VClosure b env)
     = printf "<%s: %s %s>"
       (show x) (pretty body) (pretty env)
@@ -593,12 +641,16 @@ instance Pretty Expr where
     mparens (p>3 || (p==3 && a == R)) $
       (prettyPrec 3 L e1 ++ " " ++ prettyPrec 3 R e2)
 
+  prettyPrec _ _ (EPair e1 e2) =
+    "<" ++ prettyPrec 0 L e1 ++ ", " ++ prettyPrec 0 L e2 ++ ">"
+
 instance Pretty Type where
-  pretty (TyVar x)       = show x
-  pretty (Skolem s)      = "%" ++ show s
-  pretty TyNat           = "N"
-  pretty TyInt           = "Z"
-  pretty (TyFun ty1 ty2) = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
+  pretty (TyVar x)        = show x
+  pretty (Skolem s)       = "%" ++ show s
+  pretty TyNat            = "N"
+  pretty TyInt            = "Z"
+  pretty (TyFun ty1 ty2)  = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
+  pretty (TyPair ty1 ty2) = pretty ty1 ++ " * " ++ pretty ty2
 
 instance Pretty Env where
   pretty env = prettyList bindings
@@ -727,7 +779,7 @@ unifyOne baseEq (ty1, x@(TyVar _))
 unifyOne _ (Skolem _, _) = Nothing
 unifyOne _ (_, Skolem _) = Nothing
 
-unifyOne _ (TyCons c1 tys1, TyCons c2 tys2)
+unifyOne _ (TyCon c1 tys1, TyCon c2 tys2)
   | c1 == c2  = return $ Right (zipWith (,) tys1 tys2)
   | otherwise = Nothing
 unifyOne baseEq (TyAtom (ABase b1), TyAtom (ABase b2))
@@ -815,19 +867,19 @@ solveConstraint c = do
 
 
 
--- Step 4. Turn the atomic constraints into a directed constraint
--- graph.
+  -- Step 4. Turn the atomic constraints into a directed constraint
+  -- graph.
 
--- Step 5. Check for any weakly connected components containing more
--- than one skolem, or a skolem and a base type; such components are
--- not allowed.
+  -- Step 5. Check for any weakly connected components containing more
+  -- than one skolem, or a skolem and a base type; such components are
+  -- not allowed.
 
--- Step 6. Eliminate cycles.
+  -- Step 6. Eliminate cycles.
 
--- Step 7. Solve the graph.
+  -- Step 7. Solve the graph.
 
--- Step 8. Unify any remaining variables in weakly connected
--- components.
+  -- Step 8. Unify any remaining variables in weakly connected
+  -- components.
 
   return idS
 
@@ -851,8 +903,8 @@ decomposeConstraint (CAll ty)    = do
     mkSkolems = map (id &&& Skolem)
 
 decomposeQual :: Qual -> Type -> SolveM QualMap
-decomposeQual q (TyAtom a)        = checkQual q a
-decomposeQual q ty@(TyCons c tys) = throwError $ Unqual q ty
+decomposeQual q (TyAtom a)       = checkQual q a
+decomposeQual q ty@(TyCon c tys) = throwError $ Unqual q ty  -- XXX TODO
   -- Right now, no structured type (functions) can satisfy a
   -- qualifier.  In a bigger system this would be different: this
   -- function would decompose a qualifier on a structured type into
@@ -881,19 +933,21 @@ main = do
 
 repl :: InputT IO ()
 repl = forever $ do
-  inp <- getInputLine "> "
-  case parse expr (fromJust inp) of
-    Left err -> iprint err
-    Right e  -> case runTC (infer e) of
+  minp <- getInputLine "> "
+  case minp of
+    Just inp -> case parse expr inp of
       Left err -> iprint err
-      Right (ty, c) -> do
-        ipretty ty
-        ipretty c
-        case runSolveM $ solveConstraint c of
-          Left err -> iprint err
-          Right s  -> do
-            ipretty s
-            iputStrLn (pretty (interp e))
+      Right e  -> case runTC (infer e) of
+        Left err -> iprint err
+        Right (ty, c) -> do
+          ipretty ty
+          ipretty c
+          case runSolveM $ solveConstraint c of
+            Left err -> iprint err
+            Right s  -> do
+              ipretty s
+              iputStrLn (pretty (interp e))
+    Nothing -> liftIO exitSuccess
   where
     iprint :: Show a => a -> InputT IO ()
     iprint    = liftIO . print

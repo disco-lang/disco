@@ -61,8 +61,9 @@ import           Debug.Trace
 ------------------------------------------------------------
 
 data BaseTy where
-  Nat :: BaseTy
-  Int :: BaseTy
+  Nat  :: BaseTy
+  Int  :: BaseTy
+  Bool :: BaseTy
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha BaseTy
@@ -160,6 +161,9 @@ pattern TyNat   = TyAtom (ABase Nat)
 pattern TyInt :: Type
 pattern TyInt   = TyAtom (ABase Int)
 
+pattern TyBool :: Type
+pattern TyBool  = TyAtom (ABase Bool)
+
 pattern TyFun :: Type -> Type -> Type
 pattern TyFun ty1 ty2 = TyCon CArr [ty1, ty2]
 
@@ -252,6 +256,7 @@ data BOp = Plus | Times | Minus
 data Expr where
   EVar   :: Name Expr -> Expr
   ENat   :: Integer -> Expr
+  EBool  :: Bool -> Expr
   EBin   :: BOp -> Expr -> Expr -> Expr
   ELam   :: Bind (Name Expr) Expr -> Expr
   EApp   :: Expr -> Expr -> Expr
@@ -283,7 +288,9 @@ instance Subst Expr Sigma where
 
 lexer :: TokenParser u
 lexer = makeTokenParser emptyDef
-  { reservedNames = ["let", "in", "N", "Nat", "Z", "Int", "forall"]
+  { reservedNames = [ "let", "in", "N", "Nat", "Z", "Int", "forall"
+                    , "true", "false"
+                    ]
   , opStart       = oneOf "+-"
   , opLetter      = oneOf "+-"
   }
@@ -316,6 +323,7 @@ parseAtom :: Parser Expr
 parseAtom
   =   EVar  <$> identifier
   <|> ENat  <$> natural
+  <|> EBool <$> (True <$ reserved "true" <|> False <$ reserved "false")
   <|> eLam  <$> (symbol "\\" *> identifier)
             <*> (symbol "." *> parseExpr)
   <|> EPair <$> (symbol "<" *> parseExpr)
@@ -432,6 +440,7 @@ freshSkolem = S <$> fresh (string2Name "s")
 
 infer :: Expr -> TC (Type, Constraint)
 infer (ENat _)     = return (TyNat, CTrue)
+infer (EBool _)    = return (TyBool, CTrue)
 infer (EVar x)     = do
   sig <- lookup x
   tau <- inferSubsumption sig
@@ -547,6 +556,7 @@ type Env = Map (Name Expr) Value
 
 data Value where
   VInt     :: Integer -> Value
+  VBool    :: Bool -> Value
   VPair    :: Value -> Value -> Value
   VClosure :: Bind (Name Expr) Expr -> Env -> Value
   VFun     :: (Value -> Value) -> Value
@@ -569,6 +579,7 @@ interp = runLFreshM . flip runReaderT rho0 . interp'
 interp' :: Expr -> ReaderT Env LFreshM Value
 interp' (EVar x)        = (fromJust . M.lookup x) <$> ask
 interp' (ENat n)        = return $ VInt n
+interp' (EBool b)       = return $ VBool b
 interp' (EBin op e1 e2) = do
   v1 <- interp' e1
   v2 <- interp' e2
@@ -622,6 +633,7 @@ class Pretty p where
 
 instance Pretty Value where
   pretty (VInt n) = show n
+  pretty (VBool b) = map toLower (show b)
   pretty (VPair v1 v2) = printf "<%s, %s>" (pretty v1) (pretty v2)
   pretty (VClosure b env)
     = printf "<%s: %s %s>"
@@ -633,7 +645,8 @@ instance Pretty Value where
 instance Pretty Expr where
   prettyPrec _ _ (EVar x) = show x
 
-  prettyPrec _ _ (ENat i) = show i
+  prettyPrec _ _ (ENat i)  = show i
+  prettyPrec _ _ (EBool b) = map toLower (show b)
   prettyPrec p a (EBin Times e1 e2) =
     mparens (p>1 || (p==1 && a == R)) $
       (prettyPrec 1 L e1 ++ " * " ++ prettyPrec 1 R e2)
@@ -669,8 +682,9 @@ instance Pretty Var where
   pretty (S v) = "%" ++ show v
 
 instance Pretty BaseTy where
-  pretty Nat = "N"
-  pretty Int = "Z"
+  pretty Nat  = "N"
+  pretty Int  = "Z"
+  pretty Bool = "B"
 
 instance Pretty Env where
   pretty env = prettyList bindings

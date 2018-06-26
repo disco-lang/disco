@@ -174,8 +174,19 @@ pattern TyPair ty1 ty2 = TyCon CPair [ty1, ty2]
 -- Constraints
 ------------------------------------------------------------
 
+-- | A 'Qual' is a type qualifier.  It represents a particular set of
+--   types which have some property or support some operation.
 data Qual = QAdd | QSub | QMul
   deriving (Show, Eq, Ord, Generic)
+
+-- | A 'Sort' represents a set of qualifiers, and also represents a
+--   set of types (in general, the intersection of the sets
+--   corresponding to the qualifiers).
+type Sort = Set Qual
+
+-- | The special sort "top" which includes all types.
+topSort :: Sort
+topSort = S.empty
 
 data Constraint where
   CSub  :: Type -> Type -> Constraint
@@ -202,7 +213,7 @@ cAnd cs = case filter nontrivial cs of
     nontrivial _     = True
 
 ------------------------------------------------------------
--- Subtyping and qualifier rules
+-- Subtyping and qualifier/sort rules
 ------------------------------------------------------------
 
 isSubA :: Atom -> Atom -> Bool
@@ -226,13 +237,43 @@ qualifications = M.fromList $
 
 -- (c, (q, qs)) means that  TyCon c t1 t2 ... tn  is logically equivalent to
 -- q1 t1 /\ q2 t2 /\ ... /\ qn tn.
+--
+-- Note in Disco I think we can get away with any given qualifier
+-- requiring *at most one* qualifier on each type argument.  Then we
+-- can derive the sortRules by combining qualRules.  In general,
+-- however, you could imagine some particular qualifier requiring a
+-- set of qualifiers (i.e. a sort) on a type argument.  Then we would
+-- just have to encode sortRules directly.
 qualRules :: Map Con (Map Qual [Maybe Qual])
 qualRules = M.fromList
   [ CPair ==> M.fromList [ QAdd ==> [Just QAdd, Just QAdd]
-                         , QMul ==> [Just QMul, Just QMul]
                          , QSub ==> [Just QSub, Just QSub]
+                         , QMul ==> [Just QMul, Nothing]   -- Just to make things interesting,
+                                                           -- <x,y> * <u,v> = <x*u, y>
                          ]
   ]
+
+-- sortRules T s = [s1, ..., sn] means that sort s holds of
+-- type (T t1 ... tn) if and only if  s1 t1 /\ ... /\ sn tn.
+-- For now this is just derived directly from qualRules.
+--
+-- This is the 'arity' function described in section 4.1 of Traytel et
+-- al.
+sortRules :: Con -> Sort -> Maybe [Sort]
+sortRules c s = do
+  -- If tycon c is not in the qualRules map, there's no way to make it
+  -- an instance of any sort, so fail
+  qualMap   <- M.lookup c qualRules
+
+  -- If any of the quals q in sort s are not in the map corresponding
+  -- to tycon c, there's no way to make c an instance of q, so fail
+  -- (the mapM will succeed only if all lookups succeed)
+  needQuals <- mapM (flip M.lookup qualMap) (S.toList s)
+
+  -- Otherwise we are left with a list (corresponding to all the quals
+  -- in sort s) of lists (each one corresponds to the type args of c).
+  -- We zip them together to produce a list of sorts.
+  return $ foldl' (zipWith (\srt -> maybe srt (`S.insert` srt))) (repeat topSort) needQuals
 
 ------------------------------------------------------------
 -- Polytypes
@@ -605,6 +646,8 @@ interp' (ELet e1 _ b) = do
     extendV x ve1 $ interp' body
 
 interpOp op (VInt i) (VInt j) = VInt (interpVOp op i j)
+interpOp Times (VPair v11 v12) (VPair v21 _)
+  = VPair (interpOp Times v11 v21) v12
 interpOp op (VPair v11 v12) (VPair v21 v22)
   = VPair (interpOp op v11 v21) (interpOp op v12 v22)
 
@@ -706,8 +749,8 @@ instance Pretty Constraint where
   pretty (CAll b) =
     let (as, c) = unsafeUnbind b in "forall " ++ intercalate " " (map show as) ++ ". " ++ pretty c
 
-instance Pretty QualMap where
-  pretty (QM quals) = "QM " ++ pretty (M.assocs quals)
+instance Pretty SortMap where
+  pretty (SM quals) = "SM " ++ pretty (M.assocs quals)
 
 -- instance Pretty a => Pretty (S' a) where
 --   pretty =
@@ -868,14 +911,14 @@ data SimpleConstraint where
 
 instance Alpha SimpleConstraint
 
-newtype QualMap = QM { unQM :: Map (Name Type) (Set Qual) }
+newtype SortMap = SM { unSM :: Map (Name Type) Sort }
   deriving (Show)
 
-instance Semigroup QualMap where
-  QM qm1 <> QM qm2 = QM (M.unionWith (<>) qm1 qm2)
+instance Semigroup SortMap where
+  SM qm1 <> SM qm2 = SM (M.unionWith (<>) qm1 qm2)
 
-instance Monoid QualMap where
-  mempty  = QM M.empty
+instance Monoid SortMap where
+  mempty  = SM M.empty
   mappend = (<>)
 
 --------------------------------------------------
@@ -887,7 +930,7 @@ instance Monoid QualMap where
 -- the current qualifier map (containing wanted qualifiers for type variables),
 -- the list of remaining SimpleConstraints, and the current substitution.
 data SimplifyState = SS
-  { _ssQualMap     :: QualMap
+  { _ssSortMap     :: SortMap
   , _ssConstraints :: [SimpleConstraint]
   , _ssSubst       :: S
   }
@@ -955,7 +998,7 @@ solveConstraint c = do
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
 
-decomposeConstraint :: Constraint -> SolveM (QualMap, [SimpleConstraint])
+decomposeConstraint :: Constraint -> SolveM (SortMap, [SimpleConstraint])
 decomposeConstraint (CSub t1 t2) = return (mempty, [t1 :<: t2])
 decomposeConstraint (CEq  t1 t2) = return (mempty, [t1 :=: t2])
 decomposeConstraint (CQual q ty) = (, []) <$> decomposeQual ty q
@@ -970,15 +1013,15 @@ decomposeConstraint (CAll ty)    = do
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& Skolem)
 
-decomposeQual :: Type -> Qual -> SolveM QualMap
+decomposeQual :: Type -> Qual -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
 decomposeQual ty@(TyCon c tys) q
   = case (M.lookup c >=> M.lookup q) qualRules of
       Nothing -> throwError $ Unqual q ty
       Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual) tys qs
 
-checkQual :: Qual -> Atom -> SolveM QualMap
-checkQual q (AVar (U v)) = return . QM $ M.singleton v (S.singleton q)
+checkQual :: Qual -> Atom -> SolveM SortMap
+checkQual q (AVar (U v)) = return . SM $ M.singleton v (S.singleton q)
 checkQual q (AVar (S v)) = throwError $ QualSkolem q v
 checkQual q (ABase bty)  =
   case bty `S.member` (qualifications ! q) of
@@ -1006,13 +1049,13 @@ type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
 
-simplify :: QualMap -> [SimpleConstraint] -> Except SolveError (QualMap, [(Atom, Atom)], S)
+simplify :: SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
 simplify qm cs
   = (\(SS qm' cs' s') -> (qm', map extractAtoms cs', s'))
   <$> contFreshMT (execStateT simplify' (SS qm cs idS)) n
   where
 
-    -- XXX do we need to look at QualMap to avoid name clashes too?
+    -- XXX do we need to look at SortMap to avoid name clashes too?
     n = succ . maximum0 . map (name2Integer :: Name Type -> _) . toListOf fv $ cs
 
     maximum0 [] = 0
@@ -1129,11 +1172,11 @@ simplify qm cs
     extendSubst s' = do
       ssSubst %= (s'@@)
       ssConstraints %= substs s'
-      substQualMap s'
+      substSortMap s'
 
-    substQualMap :: S -> SimplifyM ()
-    substQualMap s' = do
-      QM qm <- use ssQualMap
+    substSortMap :: S -> SimplifyM ()
+    substSortMap s' = do
+      SM qm <- use ssSortMap
 
       -- XXX does this work for *combining* quals?  e.g. suppose we have
       --   add a
@@ -1143,19 +1186,19 @@ simplify qm cs
       -- 1. Get quals for each var in domain of s' and match them with
       -- the types being substituted for those vars.
 
-      let tyQuals :: [(Type, Set Qual)]
-          tyQuals = catMaybes . map (traverse (flip M.lookup qm) . swap) $ s'
+      let tySorts :: [(Type, Sort)]
+          tySorts = catMaybes . map (traverse (flip M.lookup qm) . swap) $ s'
 
           tyQualList :: [(Type, Qual)]
-          tyQualList = concatMap (sequenceA . second S.toList) $ tyQuals
+          tyQualList = concatMap (sequenceA . second S.toList) $ tySorts
 
       -- 2. Decompose the resulting qualifier constraints
 
-      QM qm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
+      SM qm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
 
       -- 3. delete domain of s' from qm and merge in decomposed quals.
 
-      ssQualMap .= QM (qm' `M.union` foldl' (flip M.delete) qm (map fst s'))
+      ssSortMap .= SM (qm' `M.union` foldl' (flip M.delete) qm (map fst s'))
 
       return ()
 

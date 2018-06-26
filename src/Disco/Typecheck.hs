@@ -1030,6 +1030,7 @@ checkModule (Module m docs) = do
     ctx <- ask
     return (docs, aprops, ctx, cst)
 
+-- Refactor this to one function that takes a constructor as an argument
 ensureSum :: Type -> TCM (Type, Type, Constraint)
 ensureSum (TyPair ty1 ty2) = return (ty1, ty2, CTrue) 
 ensureSum tyv@(TyVar _) = do

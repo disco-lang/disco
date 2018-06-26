@@ -25,7 +25,8 @@ import           Data.Maybe                       (fromJust)
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind,
+import           Unbound.Generics.LocallyNameless (Name, 
+                                                   lunbind,
                                                    unembed)
 
 import           Disco.Interpret.Core             (whnfV)
@@ -132,6 +133,12 @@ prettyTy (TyList ty)      = mparens (PA 9 InR) $
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
+prettySigma :: Sigma -> Doc
+prettySigma (Forall bnd) = lunbind bnd $
+  \(tyvars, body) -> case tyvars of
+                      [] -> prettyTy body
+                      _  -> text "forany" <+> prettyTyVars tyvars <> text "." <+> prettyTy body
+                      where prettyTyVars tyvars = hsep (map prettyName tyvars)
 --------------------------------------------------
 
 mparens :: PA -> Doc -> Doc
@@ -139,7 +146,7 @@ mparens pa doc = do
   parentPA <- ask
   (if (pa < parentPA) then parens else id) doc
 
-prettyName :: Name Term -> Doc
+prettyName :: (Show a) => Name a -> Doc
 prettyName = text . show
 
 prettyTerm :: Term -> Doc
@@ -203,11 +210,11 @@ prettyTerm (TLet bnd) = mparens initPA $
     prettyBinding (Binding Nothing x (unembed -> t))
       = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
     prettyBinding (Binding (Just ty) x (unembed -> t))
-      = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InL t]
+      = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
-prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
+prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettySigma ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
     prettyTyOp op <+> prettyTy' funPrec InR ty
@@ -287,7 +294,7 @@ prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
-prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
+prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettySigma ty
 prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
   where
     prettyClause b

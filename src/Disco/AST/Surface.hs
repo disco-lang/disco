@@ -134,7 +134,7 @@ type Property = Property_ UD
 data Decl where
 
   -- | A type declaration, @name : type@.
-  DType :: Name Term -> Type -> Decl
+  DType :: Name Term -> Sigma -> Decl
 
   -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
   --   patterns bind variables in the term. For example, @f n (x,y) =
@@ -233,7 +233,7 @@ pattern TList termlist mellipses = TList_ () termlist mellipses
 pattern TListComp :: Bind (Telescope Qual) Term -> Term
 pattern TListComp bind = TListComp_ () bind
 
-pattern TAscr :: Term -> Type -> Term
+pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
@@ -266,7 +266,7 @@ pattern QGuard embedt = QGuard_ () embedt
 
 type Binding = Binding_ UD 
 
-pattern Binding :: (Maybe Type) -> Name Term -> Embed Term -> Binding 
+pattern Binding :: (Maybe Sigma) -> Name Term -> Embed Term -> Binding 
 pattern Binding m b n = Binding_ m b n 
 
 {-# COMPLETE Binding #-}

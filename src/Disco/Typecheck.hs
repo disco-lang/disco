@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE GADTs                    #-}
@@ -68,12 +69,13 @@ import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Bifunctor                          (first)
+import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
 import qualified Data.Map                                as M
 
+import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -94,7 +96,7 @@ type Defn  = [Bind [APattern] ATerm]
 type DefnCtx = Ctx ATerm Defn
 
 -- | A typing context is a mapping from term names to types.
-type TyCtx = Ctx Term Type
+type TyCtx = Ctx Term Sigma
 
 -- | Potential typechecking errors.
 data TCError
@@ -170,39 +172,93 @@ addDefn x b = modify (M.insert (coerce x) b)
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
-lookupTy :: Name Term -> TCM Type
+lookupTy :: Name Term -> TCM Sigma
 lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
+
+-- | Generates a type variable with a fresh name.
+freshTy :: TCM Type
+freshTy = TyVar <$> fresh (string2Name "a")
+
+-- | Constraints are generated as a result of type inference and checking.
+--   These constraints are accumulated during the inference and checking phase
+--   and are subsequently solved by the constraint solver.
+data Constraint where
+  CExp :: Type -> Type -> Constraint
+  CPos :: Type -> Type -> Constraint
+  CInt :: Type -> Type -> Constraint 
+  CSub  :: Type -> Type -> Constraint
+  CEq   :: Type -> Type -> Constraint
+  CQual :: Qualifier -> Type -> Constraint
+  CAnd  :: [Constraint] -> Constraint
+  CTrue :: Constraint
+  CAll  :: Bind [Name Type] Constraint -> Constraint
+
+  deriving (Show, Generic)
+
+instance Alpha Constraint
+
+-- A helper function for creating a single constraint from a list of constraints.
+cAnd cs = case filter nontrivial cs of
+  []   -> CTrue
+  [c]  -> c
+  cs'  -> CAnd cs'
+  where
+    nontrivial CTrue = False
+    nontrivial _     = True
+
+-- | Qualifiers that may appear in the CQual constraint.
+data Qualifier = QAdd | QSub | QMul | QDiv | QNum | QFin
+  deriving (Show, Eq, Ord, Generic)
+
+instance Alpha Qualifier
+
+-- | A helper function that returns the appropriate qualifier for a binary operation.
+bopQual :: BOp -> Qualifier
+bopQual Add  = QAdd
+bopQual Mul = QMul
+bopQual Div = QDiv
+bopQual Sub = QSub
+
+-- | Check that a term has the given sigma type.
+checkSigma :: Term -> Sigma -> TCM (ATerm, Constraint)
+checkSigma t (Forall sig) = do
+  (as, tau) <- unbind sig
+  (at, cst) <- check t tau
+  return $ case as of
+    [] -> (at, cst)
+    _  -> (at, CAll (bind as cst))
 
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
-check :: Term -> Type -> TCM ATerm
+check :: Term -> Type -> TCM (ATerm, Constraint)
 
 check (TParens t) ty = check t ty
 
 check (TTup ts) ty = do
-  ats <- checkTuple ts ty
-  return $ ATTup ty ats
+  (ats, csts) <- checkTuple ts ty
+  return $ (ATTup ty ats, cAnd csts)
 
 check (TList xs ell) ty@(TyList eltTy) = do
-  axs  <- mapM (flip check eltTy) xs
-  aell <- checkEllipsis ell eltTy
-  return $ ATList ty axs aell
+  aclist <- mapM (flip check eltTy) xs
+  let (axs, csts) = unzip aclist
+  (aell, cst) <- checkEllipsis ell eltTy
+  return $ (ATList ty axs aell, cAnd (cst:csts))
 
 check l@(TList _ _) ty            = throwError (NotList l ty)
 
 check (TBin Cons x xs) ty@(TyList eltTy) = do
-  ax  <- check x  eltTy
-  axs <- check xs ty
-  return $ ATBin ty Cons ax axs
+  (ax, cst1) <- check x  eltTy
+  (axs, cst2) <- check xs ty
+  return $ (ATBin ty Cons ax axs, cAnd [cst1, cst2])
 
 check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
 check (TListComp bqt) ty@(TyList eltTy) = do
   lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferTelescope inferQual qs
+  (aqs, cx, cst1) <- inferTelescope inferQual qs
   extends cx $ do
-  at <- check t eltTy
-  return $ ATListComp ty (bind aqs at)
+  (at, cst2) <- check t eltTy
+  return $ (ATListComp ty (bind aqs at), cAnd [cst1, cst2])
 
 check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
 
@@ -213,22 +269,18 @@ check (TAbs lam) ty = do
     -- ... -> resTy, where the types ty1, ty2 ... match up with any
     -- types declared for the arguments to the lambda (e.g.  (x:tyA)
     -- (y:tyB) -> ...).
-    (ctx, resTy) <- checkArgs args ty
+    (ctx, resTy, cst1) <- checkArgs args ty
 
     -- Then check the type of the body under a context extended with
     -- types for all the arguments.
     extends ctx $ do
-    at <- check t resTy
-    return $ ATAbs ty (bind (coerce args) at)
+    (at, cst2) <- check t resTy
+    return (ATAbs ty (bind (coerce args) at), cAnd [cst1, cst2])
 
 -- To check an injection has a sum type, recursively check the
 -- relevant type.
-check (TInj L t) ty@(TySum ty1 _) = do
-  at <- check t ty1
-  return $ ATInj ty L at
-check (TInj R t) ty@(TySum _ ty2) = do
-  at <- check t ty2
-  return $ ATInj ty R at
+check (TInj L t) ty@(TySum ty1 _) = check t ty1
+check (TInj R t) ty@(TySum _ ty2) = check t ty2
 
 -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
@@ -238,16 +290,17 @@ check (TLet l) ty =
   lunbind l $ \(bs, t2) -> do
 
     -- Infer the types of all the variables bound by the let...
-    (as, ctx) <- inferTelescope inferBinding bs
+    (as, ctx, cst1) <- inferTelescope inferBinding bs
 
     -- ...then check the body under an extended context.
     extends ctx $ do
-      at2 <- check t2 ty
-      return $ ATLet ty (bind as at2)
+      (at2, cst2) <- check t2 ty
+      return $ (ATLet ty (bind as at2), cAnd [cst1, cst2])
 
 check (TCase bs) ty = do
-  bs' <- mapM (checkBranch ty) bs
-  return (ATCase ty bs')
+  aclist <- mapM (checkBranch ty) bs
+  let (bs', clist) = unzip aclist
+  return (ATCase ty bs', cAnd clist)
 
 -- Once upon a time, when we only had types N, Z, Q+, and Q, we could
 -- always infer the type of anything numeric, so we didn't need
@@ -255,47 +308,45 @@ check (TCase bs) ty = do
 -- b) : Z13, in which case we need to push the checking type (in the
 -- example, Z13) through the operator to check the arguments.
 
--- Checking addition and multiplication is the same.
-check (TBin op t1 t2) ty | op `elem` [Add, Mul] =
-  if (isNumTy ty)
-    then do
-      at1 <- check t1 ty
-      at2 <- check t2 ty
-      return $ ATBin ty op at1 at2
-    else throwError (NotNumTy ty)
+-- Checking arithmetic binary operations involves checking both operands 
+-- and then adding a constraint qualifier over binary operation and the desired type.
+check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub] = do
+  (at1, cst1) <- check t1 ty
+  (at2, cst2) <- check t2 ty
+  return (ATBin ty op at1 at2, cAnd [cst1, cst2, CQual (bopQual op) ty])
 
-check (TBin Div t1 t2) ty = do
-  _ <- checkFractional ty
-  at1 <- check t1 ty
-  at2 <- check t2 ty
-  return $ ATBin ty Div at1 at2
+-- check (TBin Div t1 t2) ty = do
+--   _ <- checkFractional ty
+--   at1 <- check t1 ty
+--   at2 <- check t2 ty
+--   return $ ATBin ty Div at1 at2
 
-check (TBin IDiv t1 t2) ty = do
-  if (isNumTy ty)
-    then do
-      -- We are trying to check that (x // y) has type @ty@. Checking
-      -- that x and y in turn have type @ty@ would be too restrictive:
-      -- For example, for (x // y) to have type Nat it need not be the
-      -- case that x and y also have type Nat.  It is enough in this
-      -- case for them to have type Q+.  On the other hand, if (x //
-      -- y) : Z5 then x and y must also have type Z5.  So we check at
-      -- the lub of ty and Q+ if it exists, or ty otherwise.
-      ty' <- lub ty TyQP <|> return ty
+-- Take this case out for now
+-- check (TBin IDiv t1 t2) ty = do
+--   if (isNumTy ty)
+--     then do
+--       -- We are trying to check that (x // y) has type @ty@. Checking
+--       -- that x and y in turn have type @ty@ would be too restrictive:
+--       -- For example, for (x // y) to have type Nat it need not be the
+--       -- case that x and y also have type Nat.  It is enough in this
+--       -- case for them to have type Q+.  On the other hand, if (x //
+--       -- y) : Z5 then x and y must also have type Z5.  So we check at
+--       -- the lub of ty and Q+ if it exists, or ty otherwise.
+--       ty' <- lub ty TyQP <|> return ty
 
-      at1 <- check t1 ty'
-      at2 <- check t2 ty'
-      return $ ATBin ty IDiv at1 at2
-    else throwError (NotNumTy ty)
+--       at1 <- check t1 ty'
+--       at2 <- check t2 ty'
+--       return $ ATBin ty IDiv at1 at2
+--     else throwError (NotNumTy ty)
 
-check (TBin Exp t1 t2) ty =
-  if (isNumTy ty)
-    then do
-      -- if a^b :: fractional t, then a :: t, b :: Z
-      -- else if a^b :: non-fractional t, then a :: t, b :: N
-      at1 <- check t1 ty
-      at2 <- check t2 (if isFractional ty then TyZ else TyN)
-      return $ ATBin ty Exp at1 at2
-    else throwError (NotNumTy ty)
+check (TBin Exp t1 t2) ty = do
+  -- if a^b :: fractional t, then a :: t, b :: Z
+  -- else if a^b :: non-fractional t, then a :: t, b :: N
+  (at1, cst1) <- check t1 ty
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  return $ (ATBin ty Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1, CExp ty2 ty1])
 
 -- Notice here we only check that ty is numeric, *not* that it is
 -- subtractive.  As a special case, we allow subtraction to typecheck
@@ -303,35 +354,35 @@ check (TBin Exp t1 t2) ty =
 -- Q+, it incurs a runtime check that the result is positive.
 
 -- XXX should make this an opt-in feature rather than on by default.
-check (TBin Sub t1 t2) ty = do
-  when (not (isNumTy ty)) $ throwError (NotNumTy ty)
+-- check (TBin Sub t1 t2) ty = do
+--   when (not (isNumTy ty)) $ throwError (NotNumTy ty)
 
-  -- when (not (isSubtractive ty)) $ do
-  --   traceM $ "Warning: checking subtraction at type " ++ show ty
-  --   traceShowM $ (TBin Sub t1 t2)
-    -- XXX emit a proper warning re: subtraction on N or Q+
-  at1 <- check t1 ty
-  at2 <- check t2 ty
-  return $ ATBin ty Sub at1 at2
+--   -- when (not (isSubtractive ty)) $ do
+--   --   traceM $ "Warning: checking subtraction at type " ++ show ty
+--   --   traceShowM $ (TBin Sub t1 t2)
+--     -- XXX emit a proper warning re: subtraction on N or Q+
+--   at1 <- check t1 ty
+--   at2 <- check t2 ty
+--   return $ ATBin ty Sub at1 at2
 
 -- Note, we don't have the same special case for Neg as for Sub, since
 -- unlike subtraction, which can sometimes make sense on N or QP, it
 -- never makes sense to negate a value of type N or QP.
 check (TUn Neg t) ty = do
-  _ <- checkSubtractive ty
-  at <- check t ty
-  return $ ATUn ty Neg at
+  (at, cst) <- check t ty
+  return $ (ATUn ty Neg at, cAnd [cst, CQual (QSub) ty])
 
 check (TNat x) (TyFin n) =
-  return $ ATNat (TyFin n) x
+  return $ (ATNat (TyFin n) x, CTrue)
 
 
 -- Finally, to check anything else, we can fall back to inferring its
 -- type and then check that the inferred type is a *subtype* of the
 -- given type.
 check t ty = do
-  at <- infer t
-  checkSub at ty
+  (at, ct1) <- infer t
+  let aty = getType at
+  return $ (at, cAnd [ct1, CSub aty ty])
 
 
 -- | Given the variables and their optional type annotations in the
@@ -346,36 +397,33 @@ check t ty = do
 --   (taken either from their annotation or from the type to be
 --   checked, as appropriate) which we can use to extend when checking
 --   the body, along with the result type of the function.
-checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> TCM (TyCtx, Type)
+checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> TCM (TyCtx, Type, Constraint)
 
 -- If we're all out of arguments, the remaining checking type is the
 -- result, and there are no variables to bind in the context.
-checkArgs [] ty = return (emptyCtx, ty)
+checkArgs [] ty = return (emptyCtx, ty, CTrue)
 
 -- Take the next variable and its annotation; the checking type must
 -- be a function type ty1 -> ty2.
 checkArgs ((x, unembed -> mty) : args) (TyArr ty1 ty2) = do
 
   -- Figure out the type of x:
-  xTy <- case mty of
+  (xTy, cst1) <- case mty of
 
     -- If it has no annotation, just take the input type ty1.
-    Nothing    -> return ty1
+    Nothing    -> return (ty1, CTrue)
 
     -- If it does have an annotation, make sure the input type is a
     -- subtype of it.
-    Just annTy ->
-      case isSub ty1 annTy of
-        False -> throwError $ Mismatch ty1 (ATVar annTy (coerce x))
-        True  -> return annTy
+    Just annTy -> return (ty1, CSub ty1 annTy)
 
   -- Check the rest of the arguments under the type ty2, returning a
   -- context with the rest of the arguments and the final result type.
-  (ctx, resTy) <- checkArgs args ty2
+  (ctx, resTy, cst2) <- checkArgs args ty2
 
   -- Pass the result type through, and add x with its type to the
   -- generated context.
-  return (singleCtx x xTy `joinCtx` ctx, resTy)
+  return (singleCtx x (toSigma xTy) `joinCtx` ctx, resTy, cAnd [cst1, cst2])
 
 -- Otherwise, we are trying to check some lambda arguments under a
 -- non-arrow type.
@@ -384,30 +432,32 @@ checkArgs _args _ty = error $ "checkArgs --- Make a better error here!"
 
 -- | Check the types of terms in a tuple against a nested
 --   pair type.
-checkTuple :: [Term] -> Type -> TCM [ATerm]
+checkTuple :: [Term] -> Type -> TCM ([ATerm], [Constraint])
 checkTuple [] _   = error "Impossible! checkTuple []"
 checkTuple [t] ty = do     -- (:[]) <$> check t ty
-  at <- check t ty
-  return [at]
+  (at, cst) <- check t ty
+  return ([at], [cst])
 checkTuple (t:ts) (TyPair ty1 ty2) = do
-  at  <- check t ty1
-  ats <- checkTuple ts ty2
-  return (at:ats)
+  (at, ct1) <- check t ty1
+  (ats, ct2) <- checkTuple ts ty2
+  return $ (at : ats, ct1 : ct2)
 checkTuple ts ty = throwError $ NotTuple (TTup ts) ty
 
-checkEllipsis :: Maybe (Ellipsis Term) -> Type -> TCM (Maybe (Ellipsis ATerm))
-checkEllipsis Nothing          _  = return Nothing
-checkEllipsis (Just Forever)   _  = return (Just Forever)
-checkEllipsis (Just (Until t)) ty = (Just . Until) <$> check t ty
+checkEllipsis :: Maybe (Ellipsis Term) -> Type -> TCM (Maybe (Ellipsis ATerm), Constraint)
+checkEllipsis Nothing          _  = return (Nothing, CTrue)
+checkEllipsis (Just Forever)   _  = return (Just Forever, CTrue)
+checkEllipsis (Just (Until t)) ty = do
+  (at, ct) <- check t ty
+  return $ ((Just . Until) at, ct)
 
 -- | Check the type of a branch, returning a type-annotated branch.
-checkBranch :: Type -> Branch -> TCM ABranch
+checkBranch :: Type -> Branch -> TCM (ABranch, Constraint)
 checkBranch ty b =
   lunbind b $ \(gs, t) -> do
-  (ags, ctx) <- inferTelescope inferGuard gs
+  (ags, ctx, cst1) <- inferTelescope inferGuard gs
   extends ctx $ do
-  at <- check t ty
-  return $ bind ags at
+  (at, cst2) <- check t ty
+  return $ (bind ags at, cAnd [cst1, cst2])
 
 -- | Check that the given annotated term has a type which is a subtype
 --   of the given type.  The returned annotated term may be the same
@@ -554,20 +604,21 @@ positivizeTy t    = t
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
-infer :: Term -> TCM ATerm
+infer :: Term -> TCM (ATerm, Constraint)
 
 infer (TParens t)   = infer t
 
   -- To infer the type of a variable, just look it up in the context.
 infer (TVar x)      = do
-  ty <- lookupTy x
-  return $ ATVar ty (coerce x)
+  sig <- lookupTy x
+  ty <- inferSubsumption sig
+  return $ (ATVar ty (coerce x), CTrue)
 
   -- A few trivial cases.
-infer TUnit         = return ATUnit
-infer (TBool b)     = return $ ATBool b
-infer (TNat n)      = return $ ATNat TyN n
-infer (TRat r)      = return $ ATRat r
+infer TUnit         = return (ATUnit, CTrue)
+infer (TBool b)     = return $ (ATBool b, CTrue)
+infer (TNat n)      = return $ (ATNat TyN n, CTrue)
+infer (TRat r)      = return $ (ATRat r, CTrue)
 
   -- We can infer the type of a lambda if the variable is annotated
   -- with a type.
@@ -576,10 +627,10 @@ infer (TAbs lam)    =
     let (xs, mtys) = unzip args
     case sequence (map unembed mtys) of
       Nothing  -> throwError (CantInfer (TAbs lam))
-      Just tys -> extends (M.fromList $ zip xs tys) $ do
-        at <- infer t
-        return $ ATAbs (mkFunTy tys (getType at))
-                       (bind (zip (map coerce xs) (map (embed . Just) tys)) at)
+      Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
+        (at, cst) <- infer t
+        return (ATAbs (mkFunTy tys (getType at))
+                       (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
   where
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
@@ -588,117 +639,75 @@ infer (TAbs lam)    =
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.
 infer (TApp t t')   = do
-  at <- infer t
+  (at, cst1) <- infer t
   (ty1, ty2) <- getFunTy at
-  at' <- check t' ty1
-  return $ ATApp ty2 at at'
+  (at', cst2) <- check t' ty1
+  return $ (ATApp ty2 at at', cAnd [cst1, cst2])
 
   -- To infer the type of a pair, just infer the types of both components.
 infer (TTup ts) = do
-  (ty, ats) <- inferTuple ts
-  return $ ATTup ty ats
+  (ty, ats, csts) <- inferTuple ts
+  return (ATTup ty ats, cAnd csts)
 
   -- To infer the type of addition or multiplication, infer the types
   -- of the subterms, check that they are numeric, and return their
   -- lub.
-infer (TBin Add t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  num3 <- numLub at1 at2
-  return $ ATBin num3 Add at1 at2
-infer (TBin Mul t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  num3 <- numLub at1 at2
-  return $ ATBin num3 Mul at1 at2
+infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div] = do
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv <- freshTy
+  return (ATBin tyv Add at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CQual (bopQual op) tyv])
 
-  -- Subtraction is similar, except that we must also lub with Z (a
-  -- Nat minus a Nat is not a Nat, it is an Int).
-infer (TBin Sub t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  num3 <- numLub at1 at2
-  num4 <- lub num3 TyZ <|> checkSubtractive num3
-  return $ ATBin num4 Sub at1 at2
-
-  -- Negation is similar to subtraction.
+  -- Ask about this!
 infer (TUn Neg t) = do
-  at <- infer t
-  checkNumTy at
+  (at, cst) <- infer t
   let ty = getType at
-  num2 <- lub ty TyZ <|> checkSubtractive ty
-  return $ ATUn num2 Neg at
+  tyv <- freshTy
+  return $ (ATUn tyv Neg at, cAnd [cst, CSub ty tyv, CQual QSub tyv]) 
 
-infer (TUn Sqrt t) = do
-  at <- check t TyN
-  return $ ATUn TyN Sqrt at
+infer (TUn op t) | op `elem` [Sqrt, Lg] = do
+  (at, cst) <- check t TyN
+  return (ATUn TyN op at, cst)
 
-infer (TUn Lg t)  = do
-  at <- check t TyN
-  return $ ATUn TyN Lg at
-
-infer (TUn Floor t) = do
-  at <- infer t
-  checkNumTy at
-  let num2 = getType at
-  return $ ATUn (integralizeTy num2) Floor at
-
-infer (TUn Ceil t) = do
-  at <- infer t
-  checkNumTy at
-  let num2 = getType at
-  return $ ATUn (integralizeTy num2) Ceil at
+infer (TUn op t) | op `elem` [Floor, Ceil] = do
+  (at, cst) <- infer t
+  let ty = getType at
+  tyv <- freshTy
+  return (ATUn tyv op at, cAnd [cst, CPos ty tyv])
 
 infer (TUn Abs t) = do
-  at <- infer t
-  checkNumTy at
-  return $ ATUn (positivizeTy (getType at)) Abs at
-
-  -- Division is similar to subtraction; we must take the lub with Q+.
-infer (TBin Div t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  num3 <- numLub at1 at2
-  num4 <- lub num3 TyQP <|> checkFractional num3
-  return $ ATBin num4 Div at1 at2
+  (at, cst) <- infer t
+  let ty = getType at
+  tyv <- freshTy
+  return (ATUn tyv Abs at, cAnd [cst, CInt ty tyv])
 
  -- Very similar to division
 infer (TBin IDiv t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  num3 <- numLub at1 at2
-  let num4 = integralizeTy num3
-  return $ ATBin num4 IDiv at1 at2
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv1 <- freshTy
+  tyv2 <- freshTy
+  return (ATBin tyv2 IDiv at1 at2, cAnd [cst1, cst2, CSub ty1 tyv1, CSub ty2 tyv1, CQual QDiv tyv1, CInt tyv1 tyv2])
 
 infer (TBin Exp t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  checkNumTy at1
-  checkNumTy at2
-  case getType at2 of
-
-    -- t1^n has the same type as t1 when n : Nat.
-    TyN -> return $ ATBin (getType at1) Exp at1 at2
-
-    -- t1^z has type (lub ty1 Q+) when t1 : ty1 and z : Z.
-    -- For example, (-3)^(-5) has type Q (= lub Z Q+)
-    -- but 3^(-5) has type Q+.
-    TyZ -> do
-      res <- lub (getType at1) TyQP <|> checkFractional (getType at1)
-      return $ ATBin res Exp at1 at2
-    TyQ -> throwError ExpQ
-    _   -> error "Impossible! getType at2 is not num type after checkNumTy"
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  return (ATBin ty1 Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1, CExp ty2 ty1])
 
   -- An equality or inequality test always has type Bool, but we need
   -- to check a few things first. We infer the types of both subterms
   -- and check that (1) they have a common supertype which (2) has
   -- decidable equality.
 infer (TBin eqOp t1 t2) | eqOp `elem` [Eq, Neq] = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty3 <- lub (getType at1) (getType at2)
-  checkDecidable ty3
-  return $ ATBin TyBool eqOp at1 at2
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  return (ATBin TyBool eqOp at1 at2, cAnd [cst1, cst2])
 
 infer (TBin op t1 t2)
   | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2
@@ -706,110 +715,118 @@ infer (TBin op t1 t2)
   -- &&, ||, and not always have type Bool, and the subterms must have type
   -- Bool as well.
 infer (TBin op t1 t2) | op `elem` [And, Or, Impl] = do
-  at1 <- check t1 TyBool
-  at2 <- check t2 TyBool
-  return $ ATBin TyBool op at1 at2
+  (at1, cst1) <- check t1 TyBool
+  (at2, cst2) <- check t2 TyBool
+  return (ATBin TyBool op at1 at2, cAnd [cst1, cst2])
 
 infer (TUn Not t) = do
-  at <- check t TyBool
-  return $ ATUn TyBool Not at
+  (at, cst) <- check t TyBool
+  return (ATUn TyBool Not at, cst)
 
 infer (TBin Mod t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty <- numLub at1 at2
-  if (isSub ty TyZ)
-    then return (ATBin ty Mod at1 at2)
-    else throwError ModQ
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv <- freshTy
+  return (ATBin tyv Mod at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CSub tyv TyZ])
+  
 
 infer (TBin Divides t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  _ <- numLub at1 at2
-  return (ATBin TyBool Divides at1 at2)
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv <- freshTy
+  return (ATBin TyBool Divides at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CQual QNum tyv])
 
 -- For now, a simple typing rule for multinomial coefficients that
 -- requires everything to be Nat.  However, they can be extended to
 -- handle negative or fractional arguments.
 infer (TBin Choose t1 t2) = do
-  at1 <- check t1 TyN
+  (at1, cst1) <- check t1 TyN
 
   -- t2 can be either a Nat (a binomial coefficient)
   -- or a list of Nat (a multinomial coefficient).
-  at2 <- check t2 TyN <|> check t2 (TyList TyN)
-  return $ ATBin TyN Choose at1 at2
+  (at2, cst2) <- check t2 TyN <|> check t2 (TyList TyN)
+  return (ATBin TyN Choose at1 at2, cAnd [cst1, cst2])
 
 -- To infer the type of a cons:
 infer (TBin Cons t1 t2) = do
 
   -- First, infer the type of the first argument (a list element).
-  at1 <- infer t1
+  (at1, cst1) <- infer t1
 
   case t2 of
     -- If the second argument is the empty list, just assign it the
     -- type inferred from the first element.
     TList [] Nothing -> do
       let ty1 = getType at1
-      return $ ATBin (TyList ty1) Cons at1 (ATList (TyList ty1) [] Nothing)
+      return (ATBin (TyList ty1) Cons at1 (ATList (TyList ty1) [] Nothing), cst1)
 
     -- Otherwise, infer the type of the second argument...
     _ -> do
-      at2 <- infer t2
+      (at2, cst2) <- infer t2
       case (getType at2) of
 
         -- ...make sure it is a list, and find the lub of the element types.
         TyList ty2 -> do
-          elTy <- lub (getType at1) ty2
-          return $ ATBin (TyList elTy) Cons at1 at2
+          let ty1 = getType at1
+          tyv <- freshTy
+          return (ATBin tyv Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
         ty -> throwError (NotList t2 ty)
 
 infer (TUn Fact t) = do
-  at <- check t TyN
-  return $ ATUn TyN Fact at
+  (at, cst) <- check t TyN
+  return (ATUn TyN Fact at, cst)
 
 infer (TChain t1 links) = do
-  at1 <- infer t1
-  alinks <- inferChain t1 links
-  return $ ATChain TyBool at1 alinks
+  (at1, cst1) <- infer t1
+  (alinks, cst2) <- inferChain t1 links
+  return (ATChain TyBool at1 alinks, cAnd [cst1, cAnd cst2])
 
 infer (TList es@(_:_) ell)  = do
-  ates <- mapM infer es
-  aell <- inferEllipsis ell
+  list1 <- mapM infer es
+  let (ates, cstes) = unzip list1
+  (aell, cstell) <- inferEllipsis ell
   let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
-  ty  <- lubs tys
-  return $ ATList (TyList ty) ates aell
+  tyv  <- freshTy
+  return (ATList (TyList tyv) ates aell, cAnd [cAnd cstes, cstell, cAnd (subs tys tyv)])
+    where subs tylist ty = map (flip CSub ty) tylist
 
 infer (TListComp bqt) = do
   lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferTelescope inferQual qs
+  (aqs, cx, cst1) <- inferTelescope inferQual qs
   extends cx $ do
-  at <- infer t
+  (at, cst2) <- infer t
   let ty = getType at
-  return $ ATListComp (TyList ty) (bind aqs at)
+  return (ATListComp (TyList ty) (bind aqs at), cAnd [cst1, cst2])
 
+-- Should enumerate and count genereate any constraints?
+-- Need to add a finite Q
 infer (TTyOp Enumerate t) = do
-  checkFinite t
-  return $ ATTyOp (TyList t) Enumerate t
+  return (ATTyOp (TyList t) Enumerate t, CQual QFin t)
+
 
 infer (TTyOp Count t) = do
-  checkFinite t
-  return $ ATTyOp TyN Count t
+  return (ATTyOp TyN Count t, CQual QFin t)
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.
 infer (TLet l) = do
   lunbind l $ \(bs, t2) -> do
-  (as, ctx) <- inferTelescope inferBinding bs
+  (as, ctx, cst1) <- inferTelescope inferBinding bs
   extends ctx $ do
-  at2 <- infer t2
-  return $ ATLet (getType at2) (bind as at2)
+  (at2, cst2) <- infer t2
+  return (ATLet (getType at2) (bind as at2), cAnd [cst1, cst2])
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.
+  -- XXX: WHAT should I do since there will no longer be an ATAsrc
 infer (TAscr t ty) = do
-  at <- check t ty
-  return $ ATAscr at ty
+  (at, cst) <- checkSigma t ty
+  return (at, cst)
 
 infer (TCase []) = throwError EmptyCase
 infer (TCase bs) = inferCase bs
@@ -817,69 +834,80 @@ infer (TCase bs) = inferCase bs
   -- Catch-all case at the end: if we made it here, we can't infer it.
 infer t = throwError (CantInfer t)
 
+-- | Recover a Type type from a Sigma type by pulling out the type within
+--   the Forall constructor
+inferSubsumption :: Sigma -> TCM Type
+inferSubsumption (Forall sig) = do
+  (_, tau) <- unbind sig
+  return tau
+
 -- | Infer the type of a binding (@x [: ty] = t@), returning a
 --   type-annotated binding along with a (singleton) context for the
 --   bound variable.  The optional type annotation on the variable
 --   determines whether we use inference or checking mode for the
 --   body.
-inferBinding :: Binding -> TCM (ABinding, TyCtx)
+inferBinding :: Binding -> TCM (ABinding, TyCtx, Constraint)
 inferBinding (Binding mty x (unembed -> t)) = do
-  at <- case mty of
-    Just ty -> check t ty
+  (at, cst) <- case mty of
+    Just ty -> checkSigma t ty
     Nothing -> infer t
-  return $ (ABinding mty (coerce x) (embed at), singleCtx x (getType at))
+  return $ (ABinding mty (coerce x) (embed at), singleCtx x (toSigma $ getType at), cst)
 
 -- | Infer the type of a comparison. A comparison always has type
 --   Bool, but we have to make sure the subterms are OK. We must check
 --   that their types are compatible and have a total order.
-inferComp :: BOp -> Term -> Term -> TCM ATerm
+inferComp :: BOp -> Term -> Term -> TCM (ATerm, Constraint)
 inferComp comp t1 t2 = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty3 <- lub (getType at1) (getType at2)
-  checkOrdered ty3
-  return $ ATBin TyBool comp at1 at2
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  return (ATBin TyBool comp at1 at2, cAnd [cst1, cst2])
 
-inferChain :: Term -> [Link] -> TCM [ALink]
-inferChain _  [] = return []
+inferChain :: Term -> [Link] -> TCM ([ALink], [Constraint])
+inferChain _  [] = return ([], [CTrue])
 inferChain t1 (TLink op t2 : links) = do
-  at2 <- infer t2
-  _   <- check (TBin op t1 t2) TyBool
-  (ATLink op at2 :) <$> inferChain t2 links
+  (at2, cst1) <- infer t2
+  (_, cst2)   <- check (TBin op t1 t2) TyBool
+  (atl, cst3) <- inferChain t2 links
+  return (ATLink op at2 : atl, cst1 : cst2 : cst3)
 
-inferEllipsis :: Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm))
-inferEllipsis (Just (Until t)) = (Just . Until) <$> infer t
-inferEllipsis (Just Forever)   = return $ Just Forever
-inferEllipsis Nothing          = return Nothing
+inferEllipsis :: Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm), Constraint)
+inferEllipsis (Just (Until t)) = do 
+  (at, cst) <- infer t
+  return ((Just . Until) at, cst)
 
-inferTuple :: [Term] -> TCM (Type, [ATerm])
+inferEllipsis (Just Forever)   = return (Just Forever, CTrue)
+inferEllipsis Nothing          = return (Nothing, CTrue)
+
+inferTuple :: [Term] -> TCM (Type, [ATerm], [Constraint])
 inferTuple []     = error "Impossible! inferTuple []"
 inferTuple [t]    = do
-  at <- infer t
-  return (getType at, [at])
+  (at, cst) <- infer t
+  return (getType at, [at], [cst])
 inferTuple (t:ts) = do
-  at <- infer t
-  (ty, ats) <- inferTuple ts
-  return (TyPair (getType at) ty, at:ats)
+  (at, cst) <- infer t
+  (ty, ats, csts) <- inferTuple ts
+  return (TyPair (getType at) ty, at : ats, cst : csts)
 
+-- THIS IS WHERE I LEFT OFF
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.
-inferCase :: [Branch] -> TCM ATerm
+inferCase :: [Branch] -> TCM (ATerm, Constraint)
 inferCase bs = do
   bs' <- mapM inferBranch bs
-  let (branchTys, abs') = unzip bs'
-  resTy <- foldM lub TyVoid branchTys
-  return $ ATCase resTy abs'
+  let (branchTys, abs', csts) = unzip3 bs'
+  resTy <- freshTy
+  return (ATCase resTy abs', cAnd [cAnd csts, cAnd $ sub branchTys resTy])
+    where sub tylist ty = map (flip CSub ty) tylist
 
 -- | Infer the type of a case branch, returning the type along with a
 --   type-annotated branch.
-inferBranch :: Branch -> TCM (Type, ABranch)
+inferBranch :: Branch -> TCM (Type, ABranch, Constraint)
 inferBranch b =
   lunbind b $ \(gs, t) -> do
-  (ags, ctx) <- inferTelescope inferGuard gs
+  (ags, ctx, cst1) <- inferTelescope inferGuard gs
   extends ctx $ do
-  at <- infer t
-  return $ (getType at, bind ags at)
+  (at, cst2) <- infer t
+  return $ (getType at, bind ags at, cAnd [cst1, cst2])
 
 -- | Infer the type of a telescope, given a way to infer the type of
 --   each item along with a context of variables it binds; each such
@@ -887,94 +915,112 @@ inferBranch b =
 --   subsequent items in the telescope.
 inferTelescope
   :: (Alpha b, Alpha tyb)
-  => (b -> TCM (tyb, TyCtx)) -> Telescope b -> TCM (Telescope tyb, TyCtx)
-inferTelescope inferOne tel = first toTelescope <$> go (fromTelescope tel)
+  => (b -> TCM (tyb, TyCtx, Constraint)) -> Telescope b -> TCM (Telescope tyb, TyCtx, Constraint)
+inferTelescope inferOne tel = do
+  (tel, ctx, cst) <- go (fromTelescope tel)
+  return $ (toTelescope tel, ctx, cst)
   where
-    go []     = return ([], emptyCtx)
+    go []     = return ([], emptyCtx, CTrue)
     go (b:bs) = do
-      (tyb, ctx) <- inferOne b
+      (tyb, ctx, cst1) <- inferOne b
       extends ctx $ do
-      (tybs, ctx') <- go bs
-      return (tyb:tybs, ctx `joinCtx` ctx')
+      (tybs, ctx', cst2) <- go bs
+      return (tyb:tybs, ctx `joinCtx` ctx', cAnd [cst1, cst2])
 
 -- | Infer the type of a guard, returning the type-annotated guard
 --   along with a context of types for any variables bound by the guard.
-inferGuard :: Guard -> TCM (AGuard, TyCtx)
+inferGuard :: Guard -> TCM (AGuard, TyCtx, Constraint)
 inferGuard (GBool (unembed -> t)) = do
-  at <- check t TyBool
-  return (AGBool (embed at), emptyCtx)
+  (at, cst) <- check t TyBool
+  return (AGBool (embed at), emptyCtx, cst)
 inferGuard (GPat (unembed -> t) p) = do
-  at <- infer t
-  (ctx, apt) <- checkPattern p (getType at)
-  return (AGPat (embed at) apt, ctx)
+  (at, cst1) <- infer t
+  (ctx, apt, cst2) <- checkPattern p (getType at)
+  return (AGPat (embed at) apt, ctx, cAnd [cst1, cst2])
 
-inferQual :: Qual -> TCM (AQual, TyCtx)
+inferQual :: Qual -> TCM (AQual, TyCtx, Constraint)
 inferQual (QBind x (unembed -> t))  = do
-  at <- infer t
+  (at, cst) <- infer t
   case getType at of
-    TyList ty -> return (AQBind (coerce x) (embed at), singleCtx x ty)
+    TyList ty -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
     wrongTy   -> throwError $ NotList t wrongTy
 inferQual (QGuard (unembed -> t))   = do
-  at <- check t TyBool
-  return (AQGuard (embed at), emptyCtx)
+  (at, cst) <- check t TyBool
+  return (AQGuard (embed at), emptyCtx, cst)
 
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
-checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern)
-checkPattern (PVar x) ty                    = return $ (singleCtx x ty, APVar (coerce x))
-checkPattern PWild    _                     = return (emptyCtx, APWild)
-checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit)
-checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b)
+checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern, Constraint)
+checkPattern (PVar x) ty                    = return (singleCtx x (toSigma ty), APVar (coerce x), CTrue)
+
+checkPattern PWild    _                     = return (emptyCtx, APWild, CTrue)
+
+checkPattern PUnit tyv@(TyVar _)            = return (emptyCtx, APUnit, CEq tyv TyUnit)
+checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit, CTrue)
+
+checkPattern PUnit tyv@(TyVar _)            = return (emptyCtx, APUnit, CEq tyv TyBool)
+checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b, CTrue)
+
 checkPattern (PTup ps) ty                   = do
   listCtxtAps <- checkTuplePat ps ty
-  let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APTup aps)
+  let (ctxs, aps, csts) = unzip3 listCtxtAps
+  return (joinCtxs ctxs, APTup aps, cAnd csts)
 checkPattern (PInj L p) (TySum ty1 _)       = do
-  (ctx, apt) <- checkPattern p ty1
-  return (ctx, APInj L apt)
+  (ctx, apt, cst) <- checkPattern p ty1
+  return (ctx, APInj L apt, cst)
 checkPattern (PInj R p) (TySum _ ty2)       = do
-  (ctx, apt) <- checkPattern p ty2
-  return (ctx, APInj R apt)
+  (ctx, apt, cst) <- checkPattern p ty2
+  return (ctx, APInj R apt, cst)
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.
-checkPattern (PNat n) ty | isSub TyN ty = return (emptyCtx, APNat n)
-checkPattern (PNat n) (TyFin _)         = return (emptyCtx, APNat n)
+checkPattern (PNat n) ty = return (emptyCtx, APNat n, CSub TyN ty)
 
-checkPattern (PSucc p)  TyN                 = do
-  (ctx, apt) <- checkPattern p TyN
-  return (ctx, APSucc apt)
+checkPattern (PNat n) tyv@(TyVar _)     = return (emptyCtx, APNat n, CSub tyv (TyFin n))
+checkPattern (PNat n) (TyFin _)         = return (emptyCtx, APNat n, CTrue)
+
+
+checkPattern (PSucc p) tyv@(TyVar _)               = do
+  (ctx, apt, cst) <- checkPattern p TyN
+  return (ctx, APSucc apt, cAnd [cst, CEq tyv TyN])
+
+checkPattern (PSucc p) TyN                 = do
+  (ctx, apt, cst) <- checkPattern p TyN
+  return (ctx, APSucc apt, cst)
+
 checkPattern (PCons p1 p2) (TyList ty)      = do
-  (ctx1, ap1) <- checkPattern p1 ty
-  (ctx2, ap2) <- checkPattern p2 (TyList ty)
-  return (joinCtx ctx1 ctx2, APCons ap1 ap2)
+  (ctx1, ap1, cst1) <- checkPattern p1 ty
+  (ctx2, ap2, cst2) <- checkPattern p2 (TyList ty)
+  return (joinCtx ctx1 ctx2, APCons ap1 ap2, cAnd [cst1, cst2])
+
 checkPattern (PList ps) (TyList ty)         = do
   listCtxtAps <- mapM (flip checkPattern ty) ps
-  let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APList aps)
+  let (ctxs, aps, csts) = unzip3 listCtxtAps
+  return (joinCtxs ctxs, APList aps, cAnd csts)
 
 checkPattern p ty = throwError (PatternType p ty)
 
-checkTuplePat :: [Pattern] -> Type -> TCM ([(TyCtx, APattern)])
+checkTuplePat :: [Pattern] -> Type -> TCM ([(TyCtx, APattern, Constraint)])
 checkTuplePat [] _   = error "Impossible! checkTuplePat []"
 checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
-  (ctx, apt) <- checkPattern p ty
-  return [(ctx, apt)]
+  (ctx, apt, cst) <- checkPattern p ty
+  return [(ctx, apt, cst)]
 checkTuplePat (p:ps) (TyPair ty1 ty2) = do
-  (ctx, apt)  <- checkPattern p ty1
+  (ctx, apt, cst)  <- checkPattern p ty1
   rest <- checkTuplePat ps ty2
-  return ((ctx, apt):rest)
+  return ((ctx, apt, cst) : rest)
 checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
+checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx, Constraint)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
-    aprops <- checkProperties docs
-    (docs,aprops,) <$> ask
+    (aprops, cst) <- checkProperties docs
+    ctx <- ask
+    return (docs, aprops, ctx, cst)
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type
@@ -997,16 +1043,20 @@ withTypeDecls decls k = do
 
 -- | Type check a top-level definition. Precondition: only called on
 --   'DDefn's.
-checkDefn :: Decl -> TCM ()
+checkDefn :: Decl -> TCM (Constraint)
 checkDefn (DDefn x clauses) = do
-  ty <- lookupTy x
+  Forall sig <- lookupTy x
   prevDefn <- gets (M.lookup (coerce x))
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do
       checkNumPats clauses
-      aclauses <- mapM (checkClause ty) clauses
+      (names, ty) <- unbind sig
+      aclist <- mapM (checkClause ty) clauses
+      let (aclauses, csts) = unzip aclist
+      let cst = cAnd csts
       addDefn x aclauses
+      return $ CAll (bind names cst)
   where
     numPats = length . fst . unsafeUnbind
 
@@ -1019,46 +1069,56 @@ checkDefn (DDefn x clauses) = do
                -- patterns don't match across different clauses
       | otherwise = return ()
 
-    checkClause :: Type -> Bind [Pattern] Term -> TCM (Bind [APattern] ATerm)
+    checkClause :: Type -> Bind [Pattern] Term -> TCM (Bind [APattern] ATerm, Constraint)
     checkClause ty clause =
       lunbind clause $ \(pats, body) -> do
-      (aps, at) <- go pats ty body
-      return $ bind aps at
+      (aps, at, cst) <- go pats ty body
+      return (bind aps at, cst)
 
-    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm)  
-    go [] ty body =  ([],) <$> check body ty
+    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm, Constraint)  
+    go [] ty body = do
+     (at, cst) <- check body ty
+     return ([], at, cst)
     go (p:ps) (TyArr ty1 ty2) body = do
-      (ctx, apt) <- checkPattern p ty1
-      (first (apt :)) <$> (extends ctx $ go ps ty2 body)
+      (ctx, apt, cst1) <- checkPattern p ty1
+      (apts, at, cst2) <- extends ctx $ go ps ty2 body
+      return (apt:apts, at, cAnd [cst1, cst2])
     go _ _ _ = throwError NumPatterns   -- XXX include more info
 
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
-checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
-checkProperties docs =
-  (M.mapKeys coerce . M.filter (not.null))
-    <$> (traverse . traverse) checkProperty properties
+checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty], Constraint)
+checkProperties docs = do
+  ctx <- (traverse . traverse) checkProperty properties
+  let (names, aclistlist) = unzip (M.toList ctx)
+  let (apropll, cstl) = unpack aclistlist
+  let newctx = (M.mapKeys coerce . M.filter (not.null)) $ M.fromList (zip names apropll) 
+  return (newctx, cAnd cstl) 
   where
     properties :: Ctx Term [Property]
     properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
 
+    unpack :: [[(a,c)]] -> ([[a]],[c])
+    unpack l = foldr (\acc (apll,cstl) -> 
+      let (aps, csts) = unzip acc in (aps : apll, csts ++ cstl)) ([],[]) l
+
 -- | Check the types of the terms embedded in a property.
-checkProperty :: Property -> TCM AProperty
+checkProperty :: Property -> TCM (AProperty, Constraint)
 checkProperty prop = do
 
   -- A property looks like  forall (x1:ty1) ... (xn:tyn). term.
   lunbind prop $ \(binds, t) -> do
 
   -- Extend the context with (x1:ty1) ... (xn:tyn) ...
-  extends (M.fromList binds) $ do
+  extends (M.fromList $ map (second toSigma) binds) $ do
 
   -- ... and check that the term has type Bool.
-  at <- check t TyBool
+  (at, cst) <- check t TyBool
 
   -- We just have to fix up the types of the variables.
-  return $ bind (binds & traverse . _1 %~ coerce) at
+  return (bind (binds & traverse . _1 %~ coerce) at, cst)
 
 ------------------------------------------------------------
 -- Erasure

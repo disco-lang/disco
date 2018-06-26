@@ -175,7 +175,7 @@ pattern ATList ty termlist mellipses = TList_ ty termlist mellipses
 pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATListComp ty bind = TListComp_ ty bind
 
-pattern ATAscr :: ATerm -> Type -> ATerm
+pattern ATAscr :: ATerm -> Sigma -> ATerm
 pattern ATAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
@@ -206,7 +206,7 @@ pattern AQGuard embedt = QGuard_ () embedt
 
 type ABinding = Binding_ TY
 
-pattern ABinding :: (Maybe Type) -> Name ATerm -> Embed ATerm -> ABinding 
+pattern ABinding :: (Maybe Sigma) -> Name ATerm -> Embed ATerm -> ABinding 
 pattern ABinding m b n = Binding_ m b n 
 
 {-# COMPLETE ABinding #-}
@@ -307,7 +307,7 @@ getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
-getType (ATAscr _ ty)     = ty
+getType (ATAscr _ ty)     = error "There shouldn't be an ATAscr constructor "
 
 {-# COMPLETE ATVar, ATUnit, ATBool, ATNat, ATRat, ATAbs,
     ATApp, ATTup, ATInj, ATUn, ATBin, ATTyOp, ATChain, ATList,

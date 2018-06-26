@@ -48,6 +48,7 @@ module Disco.Parser
 
          -- ** Types
        , parseType, parseAtomicType
+       , parseSigma
        )
        where
 
@@ -220,7 +221,7 @@ reservedWords =
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
   , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
-  , "forall"
+  , "forall", "forany"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -333,10 +334,11 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
 
+-- ADDSIGMA
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
-  DType <$> ident <*> (indented $ colon *> parseType)
+  DType <$> ident <*> (indented $ colon *> parseSigma)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser Decl
@@ -350,11 +352,12 @@ parseDefn = label "definition" $
 term :: Parser Term
 term = between sc eof parseTerm
 
+-- ADDIGMA
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseType))
+  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseSigma))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -485,11 +488,12 @@ parseLet =
         <$> (toTelescope <$> (parseBinding `sepBy` comma))
         <*> (reserved "in" *> parseTerm)))
 
+-- ADDSIGMA
 -- | Parse a single binding (@x [ : ty ] = t@).
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parseType)
+  mty <- optionMaybe (colon *> parseSigma)
   t   <- symbol "=" *> (embed <$> parseTerm)
   return $ Binding mty x t
 
@@ -688,11 +692,26 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
+  <|> TyVar <$> parseTyVar
   <|> parens parseType
 
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
+
+parseTyVar :: Parser (Name Type)
+parseTyVar = string2Name <$> identifier
+
+parseSigma :: Parser Sigma
+parseSigma = Forall <$> (reserved "forany"
+                     *> (bind
+                           <$> (some parseTyVar)
+                           <*> (symbol "." *> parseType)
+                        )
+                    )
+         <|> toSigma <$> parseType
+
+
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

@@ -214,7 +214,7 @@ data Term_ e where
   TListComp_ :: X_TListComp e -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
 
   -- | Type ascription, @(Term_ e : type)@.
-  TAscr_  :: X_TAscr e -> Term_ e -> Type -> Term_ e
+  TAscr_  :: X_TAscr e -> Term_ e -> Sigma -> Term_ e
 
   XTerm_   :: X_Term e -> Term_ e 
   deriving (Generic)
@@ -276,7 +276,7 @@ data Qual_ e where
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
 
 -- | A binding is a name along with its definition.
-data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
+data Binding_ e = Binding_ (Maybe Sigma) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
 deriving instance Forall_t Show  e => Show (Binding_ e)

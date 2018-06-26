@@ -20,8 +20,8 @@
 module Disco.Types
        (
        -- * Disco language types
-         Type(..)
-
+         Sigma(..)
+       , Type(..)
        -- * Type predicates
 
        , isNumTy, isEmptyTy, isFinite
@@ -32,6 +32,7 @@ module Disco.Types
        , Strictness(..), strictness
 
        -- * Utilities
+       , toSigma
        , countType
        , unpair
 
@@ -47,6 +48,14 @@ import           Math.NumberTheory.Primes.Testing (isPrime)
 --------------------------------------------------
 -- Disco types
 --------------------------------------------------
+
+newtype Sigma = Forall (Bind [Name Type] Type)
+  deriving (Show, Generic)
+
+instance Alpha Sigma
+
+toSigma :: Type -> Sigma
+toSigma ty = Forall (bind [] ty)
 
 -- | Types.
 data Type where

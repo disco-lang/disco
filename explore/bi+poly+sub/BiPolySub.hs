@@ -5,8 +5,12 @@
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TupleSections              #-}
+
+{-# OPTIONS_GHC -fno-warn-partial-type-signatures #-}
 
 -- 29 May 2018.  Study for disco type system.
 
@@ -30,18 +34,22 @@ import           System.Exit
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import           Control.Monad.State
 
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (anyOf)
+import           Control.Arrow                           ((&&&), (***))
+import           Control.Lens                            (anyOf, makeLenses,
+                                                          toListOf, use, (%=),
+                                                          (.=))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char                               (toLower)
-import           Data.List                               (intercalate)
+import           Data.List                               (foldl', intercalate)
 import           Data.Map                                (Map, (!))
 import qualified Data.Map                                as M
-import           Data.Maybe                              (fromJust)
+import           Data.Maybe                              (catMaybes, fromJust)
 import           Data.Semigroup
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
+import           Data.Tuple                              (swap)
 import           Text.Printf
 
 import           Parsing2
@@ -121,6 +129,7 @@ instance Subst Type BaseTy
 instance Subst Type Atom
 instance Subst Type Con
 instance Subst Type Qual
+instance Subst Type SimpleConstraint
 instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
   isvar _                     = Nothing
@@ -585,6 +594,8 @@ interp' (ELet e1 _ b) = do
     extendV x ve1 $ interp' body
 
 interpOp op (VInt i) (VInt j) = VInt (interpVOp op i j)
+interpOp op (VPair v11 v12) (VPair v21 v22)
+  = VPair (interpOp op v11 v21) (interpOp op v12 v22)
 
 interpVOp Plus  = (+)
 interpVOp Minus = (-)
@@ -645,12 +656,21 @@ instance Pretty Expr where
     "<" ++ prettyPrec 0 L e1 ++ ", " ++ prettyPrec 0 L e2 ++ ">"
 
 instance Pretty Type where
-  pretty (TyVar x)        = show x
-  pretty (Skolem s)       = "%" ++ show s
-  pretty TyNat            = "N"
-  pretty TyInt            = "Z"
+  pretty (TyAtom a)       = pretty a
   pretty (TyFun ty1 ty2)  = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
   pretty (TyPair ty1 ty2) = pretty ty1 ++ " * " ++ pretty ty2
+
+instance Pretty Atom where
+  pretty (AVar v)  = pretty v
+  pretty (ABase b) = pretty b
+
+instance Pretty Var where
+  pretty (U v) = show v
+  pretty (S v) = "%" ++ show v
+
+instance Pretty BaseTy where
+  pretty Nat = "N"
+  pretty Int = "Z"
 
 instance Pretty Env where
   pretty env = prettyList bindings
@@ -709,6 +729,9 @@ type S' a = [(Name a, a)]
 
 idS :: S' a
 idS = []
+
+dom :: S' a -> [Name a]
+dom = map fst
 
 -- Construct a singleton substitution
 (|->) :: Name a -> a -> S' a
@@ -809,17 +832,17 @@ data SolveError where
   deriving Show
 
 -- | Convert 'Nothing' into the given error.
-maybeError :: Monad m => e -> Maybe a -> ExceptT e m a
+maybeError :: MonadError e m => e -> Maybe a -> m a
 maybeError e Nothing  = throwError e
 maybeError _ (Just a) = return a
 
 --------------------------------------------------
 -- Solver monad
 
-type SolveM a = ExceptT SolveError FreshM a
+type SolveM a = FreshMT (Except SolveError) a
 
 runSolveM :: SolveM a -> Either SolveError a
-runSolveM = runFreshM . runExceptT
+runSolveM = runExcept . runFreshMT
 
 --------------------------------------------------
 -- Simple constraints and qualifier maps
@@ -827,7 +850,9 @@ runSolveM = runFreshM . runExceptT
 data SimpleConstraint where
   (:<:) :: Type -> Type -> SimpleConstraint
   (:=:) :: Type -> Type -> SimpleConstraint
-  deriving (Show)
+  deriving (Show, Generic)
+
+instance Alpha SimpleConstraint
 
 newtype QualMap = QM { unQM :: Map (Name Type) (Set Qual) }
   deriving (Show)
@@ -840,6 +865,22 @@ instance Monoid QualMap where
   mappend = (<>)
 
 --------------------------------------------------
+-- Simplifier types
+
+-- Uses TH to generate lenses so it has to go here before other stuff.
+
+-- The simplification stage maintains a mutable state consisting of
+-- the current qualifier map (containing wanted qualifiers for type variables),
+-- the list of remaining SimpleConstraints, and the current substitution.
+data SimplifyState = SS
+  { _ssQualMap     :: QualMap
+  , _ssConstraints :: [SimpleConstraint]
+  , _ssSubst       :: S
+  }
+
+makeLenses ''SimplifyState
+
+--------------------------------------------------
 -- Top-level solver algorithm
 
 solveConstraint :: Constraint -> SolveM S
@@ -848,6 +889,9 @@ solveConstraint c = do
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers.  Should result in just a list of
   -- equational and subtyping constraints in addition to qualifiers.
+
+  traceM "------------------------------"
+  traceM "Decomposing constraints..."
 
   (quals, cs) <- decomposeConstraint c
 
@@ -865,16 +909,26 @@ solveConstraint c = do
   -- subtyping constraints.  Also simplify/update qualifier set
   -- accordingly.
 
+  traceM "------------------------------"
+  traceM "Running simplifier..."
 
+  case runExcept (simplify quals cs) of
+    Left err -> throwError err
+    Right (qm, atoms, theta) -> do
+      traceM (pretty qm)
+      traceM (pretty atoms)
+      traceM (pretty theta)
 
   -- Step 4. Turn the atomic constraints into a directed constraint
   -- graph.
 
   -- Step 5. Check for any weakly connected components containing more
   -- than one skolem, or a skolem and a base type; such components are
-  -- not allowed.
+  -- not allowed.  Other WCCs with a single skolem simply unify to
+  -- that skolem.
 
-  -- Step 6. Eliminate cycles.
+  -- Step 6. Any remaining WCCs have no skolems.  First, eliminate
+  -- cycles by unifying them.
 
   -- Step 7. Solve the graph.
 
@@ -890,7 +944,7 @@ solveConstraint c = do
 decomposeConstraint :: Constraint -> SolveM (QualMap, [SimpleConstraint])
 decomposeConstraint (CSub t1 t2) = return (mempty, [t1 :<: t2])
 decomposeConstraint (CEq  t1 t2) = return (mempty, [t1 :=: t2])
-decomposeConstraint (CQual q ty) = (, []) <$> decomposeQual q ty
+decomposeConstraint (CQual q ty) = (, []) <$> decomposeQual ty q
 decomposeConstraint (CAnd cs)    = mconcat <$> mapM decomposeConstraint cs
 decomposeConstraint CTrue        = return mempty
 decomposeConstraint (CAll ty)    = do
@@ -902,15 +956,12 @@ decomposeConstraint (CAll ty)    = do
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& Skolem)
 
-decomposeQual :: Qual -> Type -> SolveM QualMap
-decomposeQual q (TyAtom a)       = checkQual q a
-decomposeQual q ty@(TyCon c tys) = throwError $ Unqual q ty  -- XXX TODO
-  -- Right now, no structured type (functions) can satisfy a
-  -- qualifier.  In a bigger system this would be different: this
-  -- function would decompose a qualifier on a structured type into
-  -- appropriate qualifiers on its component types.  Once the rest is
-  -- working we could e.g. add product types and specify that numeric
-  -- operations lift over pairs componentwise.
+decomposeQual :: Type -> Qual -> SolveM QualMap
+decomposeQual (TyAtom a) q       = checkQual q a
+decomposeQual ty@(TyCon c tys) q
+  = case (M.lookup c >=> M.lookup q) qualRules of
+      Nothing -> throwError $ Unqual q ty
+      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual) tys qs
 
 checkQual :: Qual -> Atom -> SolveM QualMap
 checkQual q (AVar (U v)) = return . QM $ M.singleton v (S.singleton q)
@@ -919,6 +970,186 @@ checkQual q (ABase bty)  =
   case bty `S.member` (qualifications ! q) of
     True  -> return mempty
     False -> throwError $ UnqualBase q bty
+
+--------------------------------------------------
+-- Step 3. Constraint simplification.
+
+-- SimplifyM a = StateT SimplifyState SolveM a
+--
+--   (we can't literally write that as the definition since SolveM is
+--   a type synonym and hence must be fully applied)
+
+type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
+
+-- | This step does unification of equality constraints, as well as
+--   structural decomposition of subtyping constraints.  For example,
+--   if we have a constraint (x -> y) <: (z -> Int), then we can
+--   decompose it into two constraints, (z <: x) and (y <: Int); if we
+--   have a constraint v <: (a,b), then we substitute v ↦ (x,y) (where
+--   x and y are fresh type variables) and continue; and so on.
+--
+--   After this step, the remaining constraints will all be atomic
+--   constraints, that is, only of the form (v1 <: v2), (v <: b), or
+--   (b <: v), where v is a type variable and b is a base type.
+
+simplify :: QualMap -> [SimpleConstraint] -> Except SolveError (QualMap, [(Atom, Atom)], S)
+simplify qm cs
+  = (\(SS qm' cs' s') -> (qm', map extractAtoms cs', s'))
+  <$> contFreshMT (execStateT simplify' (SS qm cs idS)) n
+  where
+
+    -- XXX do we need to look at QualMap to avoid name clashes too?
+    n = succ . maximum0 . map (name2Integer :: Name Type -> _) . toListOf fv $ cs
+
+    maximum0 [] = 0
+    maximum0 xs = maximum xs
+
+    -- Extract the type atoms from an atomic constraint.
+    extractAtoms :: SimpleConstraint -> (Atom, Atom)
+    extractAtoms (TyAtom a1 :<: TyAtom a2) = (a1, a2)
+    extractAtoms c = error $ "Impossible: simplify left non-atomic or non-subtype constraint " ++ show c
+
+    -- Iterate picking one simplifiable constraint and simplifying it
+    -- until none are left.
+    simplify' :: SimplifyM ()
+    simplify' = do
+      -- q <- gets fst
+      -- traceM (pretty q)
+      -- traceM ""
+
+      mc <- pickSimplifiable
+      case mc of
+        Nothing -> return ()
+        Just s  -> do
+
+          -- traceM (pretty s)
+          -- traceM "---------------------------------------"
+
+          simplifyOne s
+          simplify'
+
+    -- Pick out one simplifiable constraint, removing it from the list
+    -- of constraints in the state.  Return Nothing if no more
+    -- constraints can be simplified.
+    pickSimplifiable :: SimplifyM (Maybe SimpleConstraint)
+    pickSimplifiable = do
+      cs <- use ssConstraints
+      case pick simplifiable cs of
+        Nothing     -> return Nothing
+        Just (a,as) -> do
+          ssConstraints .= as
+          return (Just a)
+
+    -- Pick the first element from a list satisfying the given
+    -- predicate, returning the element and the list with the element
+    -- removed.
+    pick :: (a -> Bool) -> [a] -> Maybe (a,[a])
+    pick _ [] = Nothing
+    pick p (a:as)
+      | p a       = Just (a,as)
+      | otherwise = second (a:) <$> pick p as
+
+    -- Check if a constraint can be simplified.  An equality
+    -- constraint can always be "simplified" via unification.  A
+    -- subtyping constraint can be simplified if either it involves a
+    -- type constructor (in which case we can decompose it), or if it
+    -- involves two base types (in which case it can be removed if the
+    -- relationship holds).
+    simplifiable :: SimpleConstraint -> Bool
+    simplifiable (_ :=: _)                               = True
+    simplifiable (TyCon {} :<: TyCon {})                 = True
+    simplifiable (TyVar {} :<: TyCon {})                 = True
+    simplifiable (TyCon {} :<: TyVar  {})                = True
+    simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
+
+    simplifiable _                                       = False
+
+    -- Simplify the given simplifiable constraint.
+    simplifyOne :: SimpleConstraint -> SimplifyM ()
+
+    -- If we have an equality constraint, run unification on it.  The
+    -- resulting substitution is applied to the remaining constraints
+    -- as well as prepended to the current substitution.
+    simplifyOne eqn@(ty1 :=: ty2) =
+      case unify [(ty1, ty2)] of
+        Nothing -> throwError NoUnify
+        Just s' -> extendSubst s'
+
+    -- Given a subtyping constraint between two type constructors,
+    -- decompose it if the constructors are the same (or fail if they
+    -- aren't), taking into account the variance of each argument to
+    -- the constructor.
+    simplifyOne (TyCon c1 tys1 :<: TyCon c2 tys2)
+      | c1 /= c2  = throwError NoUnify
+      | otherwise =
+          ssConstraints %= (zipWith3 variance (arity c1) tys1 tys2 ++)
+
+    -- Given a subtyping constraint between a variable and a type
+    -- constructor, expand the variable into the same constructor
+    -- applied to fresh type variables.
+    simplifyOne con@(TyVar a   :<: TyCon c _) = expandStruct a c con
+    simplifyOne con@(TyCon c _ :<: TyVar a  ) = expandStruct a c con
+
+    -- Given a subtyping constraint between two base types, just check
+    -- whether the first is indeed a subtype of the second.  (Note
+    -- that we only pattern match here on type atoms, which could
+    -- include variables, but this will only ever get called if
+    -- 'simplifiable' was true, which checks that both are base
+    -- types.)
+    simplifyOne (TyAtom (ABase b1) :<: TyAtom (ABase b2)) = do
+      case isSubB b1 b2 of
+        True  -> return ()
+        False -> throwError NoUnify
+
+    expandStruct :: Name Type -> Con -> SimpleConstraint -> SimplifyM ()
+    expandStruct a c con = do
+      as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
+      let s' = a |-> TyCon c as
+      ssConstraints %= (con:)
+      extendSubst s'
+
+    -- 1. compose s' with current subst
+    -- 2. apply s' to constraints
+    -- 3. apply s' to qualifier map and decompose
+    extendSubst :: S -> SimplifyM ()
+    extendSubst s' = do
+      ssSubst %= (s'@@)
+      ssConstraints %= substs s'
+      substQualMap s'
+
+    substQualMap :: S -> SimplifyM ()
+    substQualMap s' = do
+      QM qm <- use ssQualMap
+
+      -- XXX does this work for *combining* quals?  e.g. suppose we have
+      --   add a
+      --   sub b
+      -- and we decide to unify a,b?
+
+      -- 1. Get quals for each var in domain of s' and match them with
+      -- the types being substituted for those vars.
+
+      let tyQuals :: [(Type, Set Qual)]
+          tyQuals = catMaybes . map (traverse (flip M.lookup qm) . swap) $ s'
+
+          tyQualList :: [(Type, Qual)]
+          tyQualList = concatMap (sequenceA . second S.toList) $ tyQuals
+
+      -- 2. Decompose the resulting qualifier constraints
+
+      QM qm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
+
+      -- 3. delete domain of s' from qm and merge in decomposed quals.
+
+      ssQualMap .= QM (qm' `M.union` foldl' (flip M.delete) qm (map fst s'))
+
+      return ()
+
+    -- Create a subtyping constraint based on the variance of a type
+    -- constructor argument position: in the usual order for
+    -- covariant, and reversed for contravariant.
+    variance Co     ty1 ty2 = ty1 :<: ty2
+    variance Contra ty1 ty2 = ty2 :<: ty1
 
 ------------------------------------------------------------
 -- main

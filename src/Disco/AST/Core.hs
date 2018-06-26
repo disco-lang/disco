@@ -99,6 +99,7 @@ data Core where
   -- | A Set
   --   Named so because CSet conflicts with the type Container type
   --   defined in Disco.AST.Surace
+  -- Type stores the type of the elements.
   CoreSet :: Type -> [Core] -> Core
 
   deriving (Show, Generic)
@@ -142,6 +143,13 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMNeg Integer
         | OMDiv Integer
         | OMExp Integer
+    -- Set Operations
+        | OSize    -- ^ Size of two sets (@size@)
+        | OSubset Type -- ^ Subset test for two sets (@⊆@)
+        | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
+        | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)
+        | ODifference Type   -- ^ Difference of two sets (@\@)
+
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

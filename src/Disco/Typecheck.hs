@@ -133,6 +133,7 @@ data TCError
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
+  | NotSet Term Type       -- ^ Should have a set type, but expected to have some other type
   | NotSubtractive Type
   | NotFractional Type
   | NoError                -- ^ Not an error.  The identity of the
@@ -186,7 +187,7 @@ check l@(TContainer c xs ell) ty = case checkContainer c ty of
   Just eltTy -> do
     axs  <- mapM (flip check eltTy) xs
     aell <- checkEllipsis ell eltTy
-    return $ ATContainer ty c axs aell
+    return $ ATContainer ty axs aell
   Nothing -> throwError (NotList l ty)
 
 check (TBin Cons x xs) ty@(TyList eltTy) = do
@@ -196,13 +197,29 @@ check (TBin Cons x xs) ty@(TyList eltTy) = do
 
 check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
+check t@(TBin setOp t1 t2) ty | setOp `elem` [Union, Intersection, Difference, Subset] =
+  case ty of
+    (TySet elty) -> do
+      at1 <- check t1 ty
+      at2 <- check t2 ty
+      return $ ATBin ty setOp at1 at2
+    _ -> throwError (NotSet t ty)
+
+-- check t@(TBin Subset t1 t2) ty =
+--   case ty of
+--     (TySet elty) -> do
+--       at1 <- check t1 ty
+--       at2 <- check t2 ty
+--       return $ ATBin TyBool Subset at1 at2
+--     _ -> throwError (NotSet t ty)
+
 check l@(TContainerComp c bqt) ty = case checkContainer c ty of
   Just eltTy -> do
     lunbind bqt $ \(qs,t) -> do
     (aqs, cx) <- inferTelescope (inferQual c) qs
     extends cx $ do
     at <- check t eltTy
-    return $ ATContainerComp ty c (bind aqs at)
+    return $ ATContainerComp ty (bind aqs at)
   Nothing -> throwError (NotList l ty)
 
 -- To check an abstraction:
@@ -770,6 +787,32 @@ infer (TBin Cons t1 t2) = do
           return $ ATBin (TyList elTy) Cons at1 at2
         ty -> throwError (NotList t2 ty)
 
+--To infer the type of the size of a list:
+infer (TUn Size t) = do
+  --First, infer the type of the argument.
+  at <- infer t
+  case getType at of
+    --If the type of the argument is a set,
+    --we return a natural number.
+    (TySet _) -> return $ ATUn TyN Size at
+    --Otherwise, we throw an error.
+    ty                    -> throwError $ NotSet t ty
+
+infer (TBin setOp t1 t2) | setOp `elem` [Union, Intersection, Difference, Subset] = do
+  at1 <- infer t1
+  at2 <- infer t2
+  case (getType at1, getType at2) of
+    (TySet ty1, TySet ty2) -> do
+      ty <- case setOp of {Subset -> return TyBool; _ -> TySet <$> lub ty1 ty2}
+      return $ ATBin ty setOp at1 at2
+    (TySet _, ty2)                          -> throwError $ NotSet t2 ty2
+    (ty1, _)                                -> throwError $ NotSet t1 ty1
+
+-- infer (TBin Subset t1 t2) = do
+--   at1 <- infer t1
+--   at2 <- infer t2
+--   case (getType at1, getType at2)
+
 infer (TUn Fact t) = do
   at <- check t TyN
   return $ ATUn TyN Fact at
@@ -784,7 +827,7 @@ infer (TContainer c es@(_:_) ell)  = do
   aell <- inferEllipsis ell
   let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
   ty  <- lubs tys
-  return $ ATContainer ((case c of {CList -> TyList; CSet -> TySet}) ty) c ates aell
+  return $ ATContainer ((case c of {CList -> TyList; CSet -> TySet}) ty) ates aell
 
 infer (TContainerComp c bqt) = do
   lunbind bqt $ \(qs,t) -> do
@@ -792,7 +835,7 @@ infer (TContainerComp c bqt) = do
   extends cx $ do
   at <- infer t
   let ty = getType at
-  return $ ATContainerComp ((case c of {CList -> TyList; CSet -> TySet}) ty) c (bind aqs at)
+  return $ ATContainerComp ((case c of {CList -> TyList; CSet -> TySet}) ty) (bind aqs at)
 
 infer (TTyOp Enumerate t) = do
   checkFinite t

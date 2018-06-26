@@ -159,16 +159,16 @@ desugarTerm (ATBin ty op t1 t2) =
   desugarBOp (getType t1) (getType t2) ty op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
-desugarTerm (ATContainer t c es mell) = case c of
-  CList -> do
+desugarTerm (ATContainer t es mell) = case t of
+  TyList _ -> do
     des <- mapM desugarTerm es
     case mell of
       Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
       Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
-  CSet -> do
+  TySet ty -> do
     des <- mapM desugarTerm es
     case mell of
-      Nothing -> return $ CoreSet t des
+      Nothing -> return $ CoreSet ty des
       Just ell -> error "Sets cannot have ellipses yet"
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
@@ -225,6 +225,7 @@ desugarUOp _ Lg     c = COp OLg     [c]
 desugarUOp _ Floor  c = COp OFloor  [c]
 desugarUOp _ Ceil   c = COp OCeil   [c]
 desugarUOp _ Abs    c = COp OAbs    [c]
+desugarUOp _ Size   c = COp OSize   [c]
 
 -- | Desugar a binary operator application.
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
@@ -240,27 +241,33 @@ desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ ty Sub     c1 c2
   | isSubtractive ty = COp OAdd [c1, COp ONeg [c2]]
   | otherwise        = COp OPosSub [c1, c2]
-desugarBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
-desugarBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
-desugarBOp _  _ _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]
-desugarBOp _  _ _ Exp     c1 c2 = COp OExp [c1, c2]
-desugarBOp ty _ _ Eq      c1 c2 = COp (OEq ty) [c1, c2]
-desugarBOp ty _ _ Neq     c1 c2 = COp ONot [COp (OEq ty) [c1, c2]]
-desugarBOp ty _ _ Lt      c1 c2 = COp (OLt ty) [c1, c2]
-desugarBOp ty _ _ Gt      c1 c2 = COp (OLt ty) [c2, c1]
-desugarBOp ty _ _ Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
-desugarBOp ty _ _ Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
-desugarBOp _  _ _ And     c1 c2 = COp OAnd [c1, c2]
-desugarBOp _  _ _ Or      c1 c2 = COp OOr  [c1, c2]
-desugarBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
-desugarBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
-desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
+desugarBOp _  _ _ Mul      c1 c2 = COp OMul [c1, c2]
+desugarBOp _  _ _ Div      c1 c2 = COp ODiv [c1, c2]
+desugarBOp _  _ _ IDiv     c1 c2 = COp OFloor [COp ODiv [c1, c2]]
+desugarBOp _  _ _ Exp      c1 c2 = COp OExp [c1, c2]
+desugarBOp ty _ _ Eq       c1 c2 = COp (OEq ty) [c1, c2]
+desugarBOp ty _ _ Neq      c1 c2 = COp ONot [COp (OEq ty) [c1, c2]]
+desugarBOp ty _ _ Lt       c1 c2 = COp (OLt ty) [c1, c2]
+desugarBOp ty _ _ Gt       c1 c2 = COp (OLt ty) [c2, c1]
+desugarBOp ty _ _ Leq      c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
+desugarBOp ty _ _ Geq      c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
+desugarBOp _  _ _ And      c1 c2 = COp OAnd [c1, c2]
+desugarBOp _  _ _ Or       c1 c2 = COp OOr  [c1, c2]
+desugarBOp _  _ _ Mod      c1 c2 = COp OMod [c1, c2]
+desugarBOp _  _ _ Divides  c1 c2 = COp ODivides [c1, c2]
+desugarBOp _  _ _ Cons     c1 c2 = CCons 1 [c1, c2]
 
-desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
-desugarBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
+desugarBOp _ TyN _ Choose  c1 c2 = COp OBinom [c1, c2]
+desugarBOp _ _   _ Choose  c1 c2 = COp OMultinom [c1, c2]
+
+desugarBOp (TySet ty) _ _ Union c1 c2        = COp (OUnion ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Intersection c1 c2 = COp (OIntersection ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Difference c1 c2   = COp (ODifference ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Subset c1 c2           = COp (OSubset ty) [c1, c2]
 
 desugarBOp _  _ _ op _ _ = error $ "Impossible! " ++
   "desugarBOp " ++ show op
+
 
 -- | Desugar a type operator application.
 desugarTyOp :: TyOp -> Type -> Core

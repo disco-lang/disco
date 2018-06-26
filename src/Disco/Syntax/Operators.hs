@@ -44,6 +44,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Floor -- ^ Floor of fractional type (@floor@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
          | Abs   -- ^ Absolute value (@abs@)
+         | Size  -- ^ The size of a set.
   deriving (Show, Eq, Ord, Generic)
 
 -- | Binary operators.
@@ -66,6 +67,10 @@ data BOp = Add     -- ^ Addition (@+@)
          | Divides -- ^ Divisibility test (@|@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
+         | Union   -- ^ Union of two sets (@union@ / @∪@)
+         | Intersection -- ^ Intersection of two sets (@intersect@ / @∩@)
+         | Difference  -- ^ Difference between two sets (@\@)
+         | Subset      -- ^ Subset test (@⊆@)
   deriving (Show, Eq, Ord, Generic)
 
 -- | Type operators.
@@ -138,7 +143,15 @@ opTable =
     , uopInfo Pre  Ceil    ["ceiling"]
     , uopInfo Pre  Abs     ["abs"]
     ]
+  , [ uopInfo Pre Size     ["size"]
+    ]
+
   , [ bopInfo In   Choose   ["choose"]
+    ]
+  , [ bopInfo InL  Union    ["union", "∪", "U"]
+    , bopInfo InL  Intersection ["intersect", "∩"]
+    , bopInfo InL  Difference ["\\"]
+    , bopInfo InL Subset ["⊆"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]
@@ -203,4 +216,3 @@ assoc op =
 --   other precedence level).
 funPrec :: Int
 funPrec = length opTable
-

@@ -173,6 +173,7 @@ isDecidable TyZ               = True
 isDecidable TyQP              = True
 isDecidable TyQ               = True
 isDecidable (TyFin _)         = True
+isDecidable (TySet ty)        = isDecidable ty
 isDecidable (TySum  ty1 ty2)  = isDecidable ty1 && isDecidable ty2
 isDecidable (TyPair ty1 ty2)  = isDecidable ty1 && isDecidable ty2
 isDecidable (TyList ty)       = isDecidable ty

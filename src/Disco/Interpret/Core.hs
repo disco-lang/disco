@@ -503,6 +503,65 @@ whnfOp (OMSub n) = modArithBin (-) n
 whnfOp (OMNeg n) = modArithUn negate n
 whnfOp (OMDiv n) = modDiv n
 whnfOp (OMExp n) = modExp n
+whnfOp (OSize)   = setSize
+whnfOp (OUnion ty)        = setUnion ty
+whnfOp (OIntersection ty) = setIntersection ty
+whnfOp (ODifference ty)   = setDifference ty
+whnfOp (OSubset ty)       = subsetTest ty
+
+setSize :: [Core] -> Disco IErr Value
+setSize [x] = do
+  (VSet xs) <- whnf x
+  return $ vnum (fromIntegral $ length xs)
+
+setUnion :: Type -> [Core] -> Disco IErr Value
+setUnion ty [c1, c2] = do
+  (VSet xs) <- whnf c1
+  (VSet ys) <- whnf c2
+  zs <- deduplicateSet ty (xs ++ ys)
+  return $ VSet zs
+
+setIntersection :: Type -> [Core] -> Disco IErr Value
+setIntersection ty [c1, c2] = do
+  (VSet xs) <- whnf c1
+  (VSet ys) <- whnf c2
+  zs <- intersection ty xs ys
+  return $ VSet zs
+
+intersection :: Type -> [Value] -> [Value] -> Disco IErr [Value]
+intersection _ [] _      = return []
+intersection _ _ []      = return []
+intersection t (x:xs) ys = do
+  xInYs <- elemOf t x ys
+  result <- if xInYs then (x:) <$> (intersection t xs ys) else intersection t xs ys
+  return result
+
+setDifference :: Type -> [Core] -> Disco IErr Value
+setDifference ty [c1, c2] = do
+  (VSet xs) <- whnf c1
+  (VSet ys) <- whnf c2
+  zs <- difference ty xs ys
+  return $ VSet zs
+
+difference :: Type -> [Value] -> [Value] -> Disco IErr [Value]
+difference _ [] _       = return []
+difference _ xs []      = return xs
+difference ty (x:xs) ys = do
+  xInYs <- elemOf ty x ys
+  result <- if xInYs then difference ty xs ys else (x:) <$> (difference ty xs ys)
+  return result
+
+subsetTest :: Type -> [Core] -> Disco IErr Value
+subsetTest ty [c1, c2] = do
+  (VSet xs) <- whnf c1
+  (VSet ys) <- whnf c2
+  mkEnum <$> subset ty xs ys
+
+subset :: Type -> [Value] -> [Value] -> Disco IErr Bool
+subset ty xs ys = do
+  foldr (\x acc -> (&&) <$> elemOf ty x ys <*> acc) (return True) xs
+
+
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value
@@ -755,7 +814,6 @@ decideEqFor (TyArr ty1 ty2) v1 v2 = do
 
 -- To decide equality at a list type, [elTy]:
 decideEqFor (TyList elTy) v1 v2 = do
-
   -- Reduce both values to WHNF; will be either nil with no arguments
   -- or cons with two.
   VCons c1 l1 <- whnfV v1
@@ -776,6 +834,12 @@ decideEqFor (TyList elTy) v1 v2 = do
 
     -- Different constructors => unequal.
     _     -> return False
+
+decideEqFor (TySet ty) v1 v2 = do
+  (VSet xs) <- whnfV v1
+  (VSet ys) <- whnfV v2
+  (&&) <$> subset ty xs ys <*> subset ty ys xs
+
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
@@ -891,7 +955,7 @@ decideEqForClosures ty2 clos1 clos2 = go
 primValEq :: Value -> Value -> Bool
 primValEq (VCons i []) (VCons j []) = i == j
 primValEq (VNum _ n1)  (VNum _ n2)  = n1 == n2
-primValEq _ _                       = False
+primValEq v1 v2                     = error $ "primValEq on non-primitive values " ++ show v1 ++ " and " ++ show v2
 
 ------------------------------------------------------------
 -- Comparison testing

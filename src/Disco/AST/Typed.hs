@@ -94,20 +94,20 @@ data ATerm where
   -- | A type operator application.
   ATTyOp  :: Type -> TyOp -> Type -> ATerm
 
-  -- | A literal list.  The type would be ambiguous if the list was
+  -- | A literal container such as a list or set.  The type would be ambiguous if the list was
   --   empty.
-  ATContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+  ATContainer :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 
-  -- | A list comprehension.
-  ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
+  -- | A container comprehension.
+  ATContainerComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 
   -- | Type ascription.
   ATAscr  :: ATerm -> Type -> ATerm
 
   deriving (Show, Generic)
 
-pattern ATList t xs e = ATContainer t CList xs e
-pattern ATListComp t e = ATContainerComp t CList e
+pattern ATList t xs e = ATContainer t xs e
+pattern ATListComp t e = ATContainerComp t e
 
 data ALink where
   ATLink :: BOp -> ATerm -> ALink
@@ -171,8 +171,8 @@ getType (ATUn ty _ _)     = ty
 getType (ATBin ty _ _ _)  = ty
 getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
-getType (ATContainer ty _ _ _)   = ty
-getType (ATContainerComp ty _ _) = ty
+getType (ATContainer ty _ _)   = ty
+getType (ATContainerComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 getType (ATAscr _ ty)     = ty

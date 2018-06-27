@@ -36,10 +36,12 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
 
+import qualified Graph as G
+import           Graph (Graph)
 import           Control.Arrow                           ((&&&), (***))
 import           Control.Lens                            (anyOf, makeLenses,
                                                           toListOf, use, (%=),
-                                                          (.=))
+                                                          (.=), (^..), each)
 import           Data.Bifunctor                          (first, second)
 import           Data.Char                               (toLower)
 import           Data.List                               (foldl', intercalate)
@@ -143,8 +145,8 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
 
--- atomToTypeSubst :: S' Atom -> S' Type
--- atomToTypeSubst = map (coerce *** TyAtom)
+atomToTypeSubst :: S' Atom -> S' Type
+atomToTypeSubst = map (coerce *** TyAtom)
 
 var :: String -> Type
 var x = TyVar (string2Name x)
@@ -224,6 +226,32 @@ isSubA _ _                   = False
 isSubB :: BaseTy -> BaseTy -> Bool
 isSubB Nat Int = True
 isSubB _ _     = False
+
+glb2 :: BaseTy -> BaseTy -> Maybe BaseTy
+glb2 a1 a2 | a1 == a2 = Just a1
+glb2 Int Nat = Just Nat
+glb2 Nat Int = Just Int
+glb2 _ _     = Nothing
+
+glb :: [BaseTy] -> Maybe BaseTy
+glb [] = Nothing
+glb [a] = Just a
+glb (a:as) = do
+  g <- glb as
+  glb2 a g
+
+lub2 :: BaseTy -> BaseTy -> Maybe BaseTy
+lub2 a1 a2 | a1 == a2 = Just a1
+lub2 Int Nat = Just Int
+lub2 Nat Int = Just Int
+lub2 _ _     = Nothing
+
+lub :: [BaseTy] -> Maybe BaseTy
+lub []  = Nothing
+lub [a] = Just a
+lub (a:as) = do
+  g <- lub as
+  lub2 a g
 
 qualifications :: Map Qual (Set BaseTy)
 qualifications = M.fromList $
@@ -807,6 +835,13 @@ type S = S' Type
 --------------------------------------------------
 -- Unification
 
+-- XXX todo: might be better if unification took sorts into account
+-- directly.  As it is, however, I think it works properly;
+-- e.g. suppose we have a with sort {sub} and we unify it with Bool.
+-- unify will just return a substitution [a |-> Bool].  But then when
+-- we call extendSubst, and in particular substSortMap, the sort {sub}
+-- will be applied to Bool and decomposed which will throw an error.
+
 -- | Given a list of equations between types, return a substitution
 --   which makes all the equations satisfied (or fail if it is not
 --   possible).
@@ -856,6 +891,7 @@ unifyOne baseEq (ty1, x@(TyVar _))
   = unifyOne baseEq (x, ty1)
 
 -- At this point we know ty2 isn't the same skolem nor a unification variable.
+-- Skolems don't unify with anything.
 unifyOne _ (Skolem _, _) = Nothing
 unifyOne _ (_, Skolem _) = Nothing
 
@@ -867,13 +903,12 @@ unifyOne baseEq (TyAtom (ABase b1), TyAtom (ABase b2))
   | otherwise    = Nothing
 unifyOne _ _ = Nothing  -- Atom = Cons
 
--- unifyAtoms :: [Atom] -> Maybe (S' Atom)
--- unifyAtoms = fmap convert . equate . map TyAtom
---   where
---     -- Guaranteed that this will get everything in the list, since we
---     -- started with all atoms.
---     convert s = [(coerce x, a) | (x, TyAtom a) <- s]
-
+unifyAtoms :: [Atom] -> Maybe (S' Atom)
+unifyAtoms = fmap convert . equate . map TyAtom
+  where
+    -- Guaranteed that this will get everything in the list, since we
+    -- started with all atoms.
+    convert s = [(coerce x, a) | (x, TyAtom a) <- s]
 
 --------------------------------------------------
 -- Solver errors
@@ -900,6 +935,9 @@ type SolveM a = FreshMT (Except SolveError) a
 
 runSolveM :: SolveM a -> Either SolveError a
 runSolveM = runExcept . runFreshMT
+
+liftExcept :: MonadError e m => Except e a -> m a
+liftExcept = either throwError return . runExcept
 
 --------------------------------------------------
 -- Simple constraints and qualifier maps
@@ -969,30 +1007,54 @@ solveConstraint c = do
   traceM "------------------------------"
   traceM "Running simplifier..."
 
-  case runExcept (simplify quals cs) of
-    Left err -> throwError err
-    Right (qm, atoms, theta) -> do
-      traceM (pretty qm)
-      traceM (pretty atoms)
-      traceM (pretty theta)
+  (qm, atoms, theta_simp) <- liftExcept (simplify quals cs)
+
+  traceM (pretty qm)
+  traceM (pretty atoms)
+  traceM (pretty theta_simp)
 
   -- Step 4. Turn the atomic constraints into a directed constraint
   -- graph.
 
-  -- Step 5. Check for any weakly connected components containing more
+  traceM "------------------------------"
+  traceM "Generating constraint graph..."
+  let g = mkConstraintGraph atoms
+
+  traceShowM g
+
+  -- I used to have this as the next step:
+  --
+  -- Check for any weakly connected components containing more
   -- than one skolem, or a skolem and a base type; such components are
   -- not allowed.  Other WCCs with a single skolem simply unify to
   -- that skolem.
+  --
+  -- Doing this as a preprocessing step might lead to better error
+  -- messages perhaps; but for now, I think this will be taken care of
+  -- by attempted unifications that happen later on.
 
-  -- Step 6. Any remaining WCCs have no skolems.  First, eliminate
-  -- cycles by unifying them.
+  -- Step 5. Eliminate cycles from the graph, turning each strongly
+  -- connected component into a single node, unifying all the atoms in
+  -- each component. (Note, unification will naturally fail if any
+  -- cycle has more than one skolem, or a skolem and at least one base
+  -- type.)
 
-  -- Step 7. Solve the graph.
+  traceM "------------------------------"
+  traceM "Collapsing SCCs..."
 
-  -- Step 8. Unify any remaining variables in weakly connected
-  -- components.
+  (g', theta_cyc) <- liftExcept (elimCycles g)
 
-  return idS
+  traceShowM g'
+
+  -- Steps 6 & 7: solve the graph, iteratively finding satisfying
+  -- assignments for each type variable based on its successor and
+  -- predecessor base types in the graph; then unify all the type
+  -- variables in any remaining weakly connected components.
+  theta_sol       <- solveGraph g'
+
+  let theta_final = (theta_sol @@ theta_cyc @@ theta_simp)
+
+  return theta_final
 
 
 --------------------------------------------------
@@ -1055,8 +1117,14 @@ simplify qm cs
   <$> contFreshMT (execStateT simplify' (SS qm cs idS)) n
   where
 
-    -- XXX do we need to look at SortMap to avoid name clashes too?
-    n = succ . maximum0 . map (name2Integer :: Name Type -> _) . toListOf fv $ cs
+    fvNums :: Alpha a => [a] -> [Integer]
+    fvNums = map (name2Integer :: Name Type -> _) . toListOf fv
+
+    -- Find first unused integer in constraint free vars and sort map
+    -- domain, and use it to start the fresh var generation, so we don't
+    -- generate any "fresh" names that interfere with existing names
+    n1 = maximum0 . fvNums $ cs
+    n = succ . maximum . (n1:) . fvNums . M.keys . unSM $ qm
 
     maximum0 [] = 0
     maximum0 xs = maximum xs
@@ -1178,11 +1246,6 @@ simplify qm cs
     substSortMap s' = do
       SM qm <- use ssSortMap
 
-      -- XXX does this work for *combining* quals?  e.g. suppose we have
-      --   add a
-      --   sub b
-      -- and we decide to unify a,b?
-
       -- 1. Get quals for each var in domain of s' and match them with
       -- the types being substituted for those vars.
 
@@ -1197,16 +1260,196 @@ simplify qm cs
       SM qm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
 
       -- 3. delete domain of s' from qm and merge in decomposed quals.
+      --    Be sure to keep quals from before, via 'unionWith'!
 
-      ssSortMap .= SM (qm' `M.union` foldl' (flip M.delete) qm (map fst s'))
+      ssSortMap .= SM (M.unionWith S.union qm' (foldl' (flip M.delete) qm (map fst s')))
 
-      return ()
+      -- The above works even when unifying two variables.  Say we have
+      -- the SortMap
+      --
+      --   a |-> {add}
+      --   b |-> {sub}
+      --
+      -- and we get back theta = [a |-> b].  The domain of theta
+      -- consists solely of a, so we look up a in the SortMap and get
+      -- {add}.  We therefore generate the constraint 'add (theta a)'
+      -- = 'add b' which can't be decomposed at all, and hence yields
+      -- the SortMap {b |-> {add}}.  We then delete a from the
+      -- original SortMap and merge the result with the new SortMap,
+      -- yielding {b |-> {sub,add}}.
+
 
     -- Create a subtyping constraint based on the variance of a type
     -- constructor argument position: in the usual order for
     -- covariant, and reversed for contravariant.
     variance Co     ty1 ty2 = ty1 :<: ty2
     variance Contra ty1 ty2 = ty2 :<: ty1
+
+--------------------------------------------------
+-- Step 4: Build constraint graph
+
+-- | Given a list of atomic subtype constraints (each pair @(a1,a2)@
+--   corresponds to the constraint @a1 <: a2@) build the corresponding
+--   constraint graph.
+mkConstraintGraph :: [(Atom, Atom)] -> Graph Atom
+mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
+  where
+    nodes = S.fromList $ cs ^.. traverse . each
+
+--------------------------------------------------
+-- Step 5: Eliminate cycles
+
+-- | Eliminate cycles in the constraint set by collapsing each
+--   strongly connected component to a single node, (unifying all the
+--   types in the SCC). A strongly connected component is a maximal
+--   set of nodes where every node is reachable from every other by a
+--   directed path; since we are using directed edges to indicate a
+--   subtyping constraint, this means every node must be a subtype of
+--   every other, and the only way this can happen is if all are in
+--   fact equal.
+--
+--   Of course, this step can fail if the types in a SCC are not
+--   unifiable.  If it succeeds, it returns the collapsed graph (which
+--   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
+elimCycles :: Graph Atom -> Except SolveError (Graph Atom, S)
+elimCycles g
+  = maybeError NoUnify
+  $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
+  where
+
+    g' :: Maybe (Graph (Atom, S' Atom))
+    g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
+
+    unifySCC :: Set Atom -> Maybe (Atom, S' Atom)
+    unifySCC atoms
+      | S.null atoms = error "Impossible! unifySCC on the empty set"
+      | otherwise    = (flip substs a &&& id) <$> unifyAtoms as
+      where
+        as@(a:_) = S.toList atoms
+
+------------------------------------------------------------
+-- Steps 5 and 6: Constraint resolution
+------------------------------------------------------------
+
+-- | Build the set of successor and predecessor base types of each
+--   type variable in the constraint graph.  For each type variable,
+--   make sure the sup of its predecessors is <: the inf of its
+--   successors, and assign it one of the two: if it has only
+--   successors, assign it their inf; otherwise, assign it the sup of
+--   its predecessors.  If it has both predecessors and successors, we
+--   have a choice of whether to assign it the sup of predecessors or
+--   inf of successors; both lead to a sound & complete algorithm.  We
+--   choose to assign it the sup of its predecessors in this case,
+--   since it seems nice to default to "simpler" types lower down in
+--   the subtyping chain.
+--
+--   After picking concrete base types for all the type variables we
+--   can, the only thing possibly remaining in the graph are
+--   components containing only type variables and no base types.  It
+--   is sound, and simplifies the generated types considerably, to
+--   simply unify any type variables which are related by subtyping
+--   constraints.  That is, we collect all the type variables in each
+--   weakly connected component and unify them.
+--
+--   As an example where this final step makes a difference, consider
+--   a term like @\x. (\y.y) x@.  A fresh type variable is generated
+--   for the type of @x@, and another for the type of @y@; the
+--   application of @(\y.y)@ to @x@ induces a subtyping constraint
+--   between the two type variables.  The most general type would be
+--   something like @forall a b. (a <: b) => a -> b@, but we want to
+--   avoid generating unnecessary subtyping constraints (the type
+--   system might not even support subtyping qualifiers like this).
+--   Instead, we unify the two type variables and the resulting type
+--   is @forall a. a -> a@.
+solveGraph :: Graph Atom -> SolveM S
+solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
+  where
+    unifyWCC :: S' Atom -> S' Atom
+    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
+      where
+        wccVarGroups  = filter (all isVar) . substs s $ G.wcc g
+        mkEquateSubst = (\(a:as) -> map (\(AVar v) -> (coerce v, a)) as) . S.toList
+
+    -- Get the successor and predecessor sets for all the type variables.
+    (ss, ps) = (onlyVars *** onlyVars) $ G.cessors g
+    onlyVars = M.filterWithKey (\a _ -> isVar a)
+
+    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> SolveM (S' Atom)
+    go succs preds = case as of
+
+      -- No variables left that have base type constraints.
+      []    -> return idS
+
+      -- Solve one variable at a time.  See below.
+      (a:_) ->
+
+        case solveVar a of
+          Nothing       -> throwError NoUnify
+
+          -- If we solved for a, delete it from the maps, apply the
+          -- resulting substitution to the remainder, and recurse.
+          -- The substitution we want will be the composition of the
+          -- substitution for a with the substitution generated by the
+          -- recursive call.
+          Just s ->
+            (@@ s) <$> go (substs s (M.delete a succs)) (substs s (M.delete a preds))
+
+      where
+        -- NOTE we can't solve a bunch in parallel!  Might end up
+        -- assigning them conflicting solutions if some depend on
+        -- others.  For example, consider the situation
+        --
+        --            Z
+        --            |
+        --            a3
+        --           /  \
+        --          a1   N
+        --
+        -- If we try to solve in parallel we will end up assigning a1
+        -- -> Z (since it only has base types as an upper bound) and
+        -- a3 -> N (since it has both upper and lower bounds, and by
+        -- default we pick the lower bound), but this is wrong since
+        -- we should have a1 < a3.
+        --
+        -- If instead we solve them one at a time, we could e.g. first
+        -- solve a1 -> Z, and then we would find a3 -> Z as well.
+        -- Alternately, if we first solve a3 -> N then we will have a1
+        -- -> N as well.  Both are acceptable.
+        --
+        -- In fact, this exact graph comes from (^x.x+1) which was
+        -- erroneously being inferred to have type Z -> N when I first
+        -- wrote the code.
+
+        -- Get only the variables we can solve on this pass, which
+        -- have base types in their predecessor or successor set.
+        as = filter (\a -> any isBase (succs ! a) || any isBase (preds ! a)) (M.keys succs)
+
+        -- Solve for a variable, failing if it has no solution, otherwise returning
+        -- a substitution for it.
+        solveVar :: Atom -> Maybe (S' Atom)
+        solveVar a@(AVar v) =
+          case (filter isBase (S.toList $ succs ! a), filter isBase (S.toList $ preds ! a)) of
+            ([], []) ->
+              error $ "Impossible! solveGraph.solveVar called on variable "
+                      ++ show a ++ " with no base type successors or predecessors"
+
+            -- Only successors.  Just assign a to their inf, if one exists.
+            (bsuccs, []) -> (coerce v |->) <$> glb bsuccs
+
+            -- Only predecessors.  Just assign a to their sup.
+            ([], bpreds) -> (coerce v |->) <$> lub bpreds
+
+            -- Both successors and predecessors.  Both must have a
+            -- valid bound, and the bounds must not overlap.  Assign a
+            -- to the sup of its predecessors.
+            (bsuccs, bpreds) -> do
+              ub <- glb bsuccs
+              lb <- lub bpreds
+              case isSub lb ub of
+                True  -> Just (coerce v |-> lb)
+                False -> Nothing
+
+        solveVar a = error $ "Impossible! solveGraph.solveVar called on non-variable " ++ show a
 
 ------------------------------------------------------------
 -- main

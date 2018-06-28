@@ -62,8 +62,6 @@ import           Math.NumberTheory.Moduli.Class     (SomeMod (..), getVal,
                                                      invertSomeMod, modulo,
                                                      powSomeMod)
 
-import           Math.NumberTheory.GCD              (binaryGCD)
-
 import           Disco.AST.Core
 import           Disco.AST.Surface                  (Ellipsis (..),
                                                      fromTelescope)
@@ -563,7 +561,7 @@ modDivides :: Integer -> [Core] -> Disco IErr Value
 modDivides n [c1,c2] = do
   VNum _ a <- whnf c1
   VNum _ b <- whnf c2
-  return $ mkEnum $ divides (toRational (binaryGCD (numerator a) n)) b
+  return $ mkEnum $ divides (toRational (gcd (numerator a) n)) b
 
 modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
 

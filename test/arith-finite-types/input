@@ -9,3 +9,7 @@
 (11231234 + 123412341435356) : Z3
 (2 : Z7) divides (5 : Z7)
 (6 : Z21) divides (4 : Z21)
+(0 : Z4) divides (0 : Z4)
+(0 : Z3) divides (3 : Z3)
+(0 : Z4) divides (3 : Z4)
+(6 : Z2) divides (0 :Z2)

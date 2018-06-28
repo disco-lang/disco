@@ -241,7 +241,7 @@ pattern TAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
              TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp, 
-             TList, TListComp, TAscr #-}
+             TContainer, TContainerComp, TAscr #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 pattern TList ts e = TContainer_ () CList ts e
@@ -345,12 +345,9 @@ pattern PList lp = PList_ () lp
              PSucc, PCons, PList #-}
 
 
-instance Alpha Side
-instance Alpha Container
 instance Alpha Link
 instance Alpha Term
 instance Alpha Binding
-instance Alpha t => Alpha (Ellipsis t)
 instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Qual

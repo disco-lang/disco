@@ -134,6 +134,8 @@ type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
+instance Alpha Side
+
 type family X_TVar e 
 type family X_TLet e 
 type family X_TParens e 
@@ -256,12 +258,16 @@ data Container where
   CSet :: Container
   deriving (Show, Eq, Enum, Generic)
 
+instance Alpha Container
+
 -- | An ellipsis is an "omitted" part of a literal list, of the form
 --   @..@ or @.. t@.
 data Ellipsis t where
   Forever ::      Ellipsis t   -- @..@
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)
+
+instance Alpha t => Alpha (Ellipsis t)
 
 -- Note: very similar to guards-
 --  maybe some generalization in the future?

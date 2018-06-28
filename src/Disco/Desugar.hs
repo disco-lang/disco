@@ -38,7 +38,6 @@ import           Data.Ratio
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
-import           Disco.AST.Generic
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators

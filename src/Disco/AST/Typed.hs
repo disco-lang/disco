@@ -183,7 +183,7 @@ pattern ATAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
              ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp, 
-             ATAscr #-}
+             ATContainer, ATContainerComp, ATAscr #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 pattern ATList t xs e = ATContainer t CList xs e

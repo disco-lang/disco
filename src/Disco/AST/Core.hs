@@ -142,6 +142,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMNeg Integer
         | OMDiv Integer
         | OMExp Integer
+        | OMDivides Integer
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

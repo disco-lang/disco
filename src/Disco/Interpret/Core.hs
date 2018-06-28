@@ -62,6 +62,8 @@ import           Math.NumberTheory.Moduli.Class     (SomeMod (..), getVal,
                                                      invertSomeMod, modulo,
                                                      powSomeMod)
 
+import           Math.NumberTheory.GCD              (binaryGCD)
+
 import           Disco.AST.Core
 import           Disco.AST.Surface                  (Ellipsis (..),
                                                      fromTelescope)
@@ -503,6 +505,7 @@ whnfOp (OMSub n) = modArithBin (-) n
 whnfOp (OMNeg n) = modArithUn negate n
 whnfOp (OMDiv n) = modDiv n
 whnfOp (OMExp n) = modExp n
+whnfOp (OMDivides n) = modDivides n
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value
@@ -555,6 +558,15 @@ modDiv n [c1,c2] = do
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
     Nothing -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
+
+modDivides :: Integer -> [Core] -> Disco IErr Value
+modDivides n [c1,c2] = do
+  VNum _ a <- whnf c1
+  VNum _ b <- whnf c2
+  return $ mkEnum $ divides (toRational (binaryGCD (numerator a) n)) b
+
+modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
+
 
 -- | For performing modular exponentiation within a finite type.
 modExp :: Integer -> [Core] -> Disco IErr Value

@@ -96,6 +96,11 @@ data Core where
   -- | A type.
   CType :: Type -> Core
 
+  -- | A Set
+  --   Named so because CSet conflicts with the type Container type
+  --   defined in Disco.AST.Surace
+  CoreSet :: Type -> [Core] -> Core
+
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
@@ -137,6 +142,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMNeg Integer
         | OMDiv Integer
         | OMExp Integer
+        | OMDivides Integer
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

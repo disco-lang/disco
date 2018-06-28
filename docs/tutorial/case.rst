@@ -90,19 +90,22 @@ expression becomes the value of ``x + y``; for example, ``g(16,15) =
 .. warning::
 
    Be careful not to get a Boolean guard using ``=`` confused with a
-   pattern guard using ``is`` (this is probably something that will
+   pattern guard using ``is``. (This is probably something that will
    confuse students learning the language; ideas on how to make it
-   less confusing are welcome).  The difference is in how variables
-   are handled: boolean guards can only use existing variables;
-   pattern guards create new variables.  For example, ``... when p is
-   (x,y)`` matches a tuple ``p`` and gives the names ``x`` and ``y``
-   to the components.  On the other hand, ``... if p = (x,y)`` will
-   probably complain that ``x`` and ``y`` are undefined---unless ``x``
-   and ``y`` are already defined elsewhere, in which case this will
-   simply check that ``p`` is exactly equal to the value ``(x,y)``.
-   Use a boolean guard when you want to check some condition; use a
-   pattern guard when you want to take a value apart or see what it
-   looks like.
+   less confusing are welcome.  As I am writing this, I realize that
+   it might be a good idea to require ``when`` with pattern guards and
+   ``if`` with boolean guards, rather than allowing them to be mixed
+   and matched.)  The difference is in how variables are handled:
+   boolean guards can only use existing variables; pattern guards
+   create new variables.  For example, ``... when p is (x,y)`` matches
+   a tuple ``p`` and gives the names ``x`` and ``y`` to the
+   components.  On the other hand, ``... if p = (x,y)`` will probably
+   complain that ``x`` and ``y`` are undefined---unless ``x`` and
+   ``y`` are already defined elsewhere, in which case this will simply
+   check that ``p`` is exactly equal to the value ``(x,y)``.  Use a
+   boolean guard when you want to check some condition; use a pattern
+   guard when you want to take a value apart or see what it looks
+   like.
 
 Function pattern-matching
 =========================

@@ -40,12 +40,13 @@ module Disco.AST.Generic
       , X_TUn
       , X_TBin 
       , X_TChain 
-      , X_TTyop 
-      , X_TList 
-      , X_TListComp 
+      , X_TTyop
+      , X_TContainer
+      , X_TContainerComp
       , X_TAscr
       , X_Term
       , X_TTup
+      , Container (..)
       , Link_ (..)
       , X_TLink
       , Qual_ (..)
@@ -147,9 +148,9 @@ type family X_TCase e
 type family X_TUn e 
 type family X_TBin e 
 type family X_TChain e 
-type family X_TTyop e 
-type family X_TList e 
-type family X_TListComp e 
+type family X_TTyop e
+type family X_TContainer e 
+type family X_TContainerComp e
 type family X_TAscr e
 type family X_Term e 
 type family X_TTup e
@@ -207,11 +208,11 @@ data Term_ e where
   -- | An application of a type operator.
   TTyOp_  :: X_TTyop e -> TyOp -> Type -> Term_ e
 
-  -- | A literal list.
-  TList_ :: X_TList e -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
+  -- | A containter for sets and lsits.
+  TContainer_ :: X_TContainer e -> Container -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
 
-  -- | List comprehension.
-  TListComp_ :: X_TListComp e -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
+  -- | A container for set and list comprehensions
+  TContainerComp_ :: X_TContainerComp e -> Container -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
 
   -- | Type ascription, @(Term_ e : type)@.
   TAscr_  :: X_TAscr e -> Term_ e -> Type -> Term_ e
@@ -228,8 +229,8 @@ type Forall_t (a :: * -> Constraint) e
          a (X_TApp e), a (X_TInj e),
          a (X_TCase e), a (X_TUn e),
          a (X_TBin e), a (X_TChain e),
-         a (X_TTyop e), a (X_TList e),
-         a (X_TListComp e), a (X_TAscr e),
+         a (X_TTyop e), a (X_TContainer e),
+         a (X_TContainerComp e), a (X_TAscr e),
          a (X_Term e), a (X_TTup e),
          a (X_QBind e), a (X_QGuard e),
          a (X_GBool e), a (X_GPat e),
@@ -249,6 +250,11 @@ data Link_ e where
 
 deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 
+-- | A container is a wrapper for sets and lists.
+data Container where
+  CList :: Container
+  CSet :: Container
+  deriving (Show, Eq, Enum, Generic)
 
 -- | An ellipsis is an "omitted" part of a literal list, of the form
 --   @..@ or @.. t@.

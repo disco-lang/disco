@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
--- |
+--
 -- Module      :  Disco.Parser
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
@@ -370,8 +370,7 @@ parseTerm' = label "expression" $
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = label "expression" $
-      brackets parseList
-  <|> TBool True  <$ (reserved "true" <|> reserved "True")
+       TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
   <|> TRat <$> try decimal
@@ -381,6 +380,8 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
+  <|> brackets (parseList CList)
+  <|> braces (parseList CSet)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
 -- | Parse a list-ish thing, like a literal list or a list
@@ -395,8 +396,8 @@ parseAtom = label "expression" $
 --   > ell           ::= '..' [t]
 --   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
 
-parseList :: Parser Term
-parseList = nonEmptyList <|> return (TList [] Nothing)
+parseList :: Container -> Parser Term
+parseList c = nonEmptyList <|> return (TContainer c [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
@@ -410,20 +411,20 @@ parseList = nonEmptyList <|> return (TList [] Nothing)
       t <- parseTerm
       (listRemainder t <|> singletonList t)
 
-    singletonList t = TList [t] <$> optionMaybe parseEllipsis
+    singletonList t = TContainer c [t] <$> optionMaybe parseEllipsis
 
     -- The remainder of a list after the first term starts with either
     -- a pipe (for a comprehension) or a comma (for a literal list).
     listRemainder t = do
       s <- pipe <|> comma
       case s of
-        "|" -> parseListComp t
+        "|" -> parseListComp c t
         "," -> do
           -- Parse the rest of the terms in a literal list after the
           -- first, then an optional ellipsis, and return everything together.
           ts <- parseTerm `sepBy` comma
           e  <- optionMaybe parseEllipsis
-          return $ TList (t:ts) e
+          return $ TContainer c (t:ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
@@ -437,10 +438,10 @@ parseEllipsis = do
 --   square brackets), i.e. a list of qualifiers.
 --
 --   @q [,q]*@
-parseListComp :: Term -> Parser Term
-parseListComp t = do
+parseListComp :: Container -> Term -> Parser Term
+parseListComp c t = do
   qs <- toTelescope <$> (parseQual `sepBy` comma)
-  return (TListComp $ bind qs t)
+  return (TContainerComp c $ bind qs t)
 
 -- | Parse a qualifier in a comprehension: either a binder @x in t@ or
 --   a guard @t@.
@@ -509,13 +510,12 @@ parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parse
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
-parseGuard =
-  mkGuard <$> (embed <$> (guardWord *> parseTerm))
-          <*> optionMaybe (reserved "is" *> parsePattern)
+parseGuard = parseGBool <|> parseGPat
   where
-    guardWord = reserved "when" <|> reserved "if"
-    mkGuard t Nothing  = GBool t
-    mkGuard t (Just p) = GPat  t p
+    parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
+    parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
+                      <*> (reserved "is" *> parsePattern)
+
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern
@@ -638,8 +638,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     isMultiplicativeTerm (TNat _)            = True
     isMultiplicativeTerm (TUn {})            = True
     isMultiplicativeTerm (TBin {})           = True
-    isMultiplicativeTerm (TParens (TUn  {})) = True
-    isMultiplicativeTerm (TParens (TBin {})) = True
+    isMultiplicativeTerm (TParens t)         = isMultiplicativeTerm t
     isMultiplicativeTerm _                   = False
 
     -- Fix precedence by bubbling up any new TBin terms whose
@@ -688,6 +687,7 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
+  <|> TySet <$> (reserved "Set" *> parseAtomicType)
   <|> parens parseType
 
 parseTyFin :: Parser Type

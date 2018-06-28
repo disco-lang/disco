@@ -37,7 +37,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc
+       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, lastFile
 
          -- * Disco monad
 
@@ -121,6 +121,7 @@ data Value where
   -- | A delayed value, containing a @Disco Value@ computation which can
   --   be run later.
   VDelay  :: ValDelay -> Value
+  VSet :: [Value] -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
@@ -237,6 +238,8 @@ data DiscoState e = DiscoState
     -- ^ The next available (unused) memory location.
 
   , _messageLog :: MessageLog e
+
+  , _lastFile :: Maybe FilePath
   }
 
 -- | The initial state for the @Disco@ monad.
@@ -249,6 +252,7 @@ initDiscoState = DiscoState
   , _memory     = IntMap.empty
   , _nextLoc    = 0
   , _messageLog = emptyMessageLog
+  , _lastFile   = Nothing
   }
 
 ------------------------------------------------------------
@@ -375,4 +379,3 @@ withTopEnv :: Disco e a -> Disco e a
 withTopEnv m = do
   env <- use topEnv
   withEnv env m
-

@@ -79,6 +79,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -183,12 +184,12 @@ check (TTup ts) ty = do
   ats <- checkTuple ts ty
   return $ ATTup ty ats
 
-check (TList xs ell) ty@(TyList eltTy) = do
-  axs  <- mapM (flip check eltTy) xs
-  aell <- checkEllipsis ell eltTy
-  return $ ATList ty axs aell
-
-check l@(TList _ _) ty            = throwError (NotList l ty)
+check l@(TContainer c xs ell) ty = case checkContainer c ty of
+  Just eltTy -> do
+    axs  <- mapM (flip check eltTy) xs
+    aell <- checkEllipsis ell eltTy
+    return $ ATContainer ty c axs aell
+  Nothing -> throwError (NotList l ty)
 
 check (TBin Cons x xs) ty@(TyList eltTy) = do
   ax  <- check x  eltTy
@@ -197,14 +198,14 @@ check (TBin Cons x xs) ty@(TyList eltTy) = do
 
 check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
-check (TListComp bqt) ty@(TyList eltTy) = do
-  lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferTelescope inferQual qs
-  extends cx $ do
-  at <- check t eltTy
-  return $ ATListComp ty (bind aqs at)
-
-check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
+check l@(TContainerComp c bqt) ty = case checkContainer c ty of
+  Just eltTy -> do
+    lunbind bqt $ \(qs,t) -> do
+    (aqs, cx) <- inferTelescope (inferQual c) qs
+    extends cx $ do
+    at <- check t eltTy
+    return $ ATContainerComp ty c (bind aqs at)
+  Nothing -> throwError (NotList l ty)
 
 -- To check an abstraction:
 check (TAbs lam) ty = do
@@ -334,6 +335,11 @@ check t ty = do
   checkSub at ty
 
 
+checkContainer :: Container -> Type -> Maybe Type
+checkContainer CList (TyList eltTy) = Just eltTy
+checkContainer CSet (TySet eltTy) = Just eltTy
+checkContainer _ _ = Nothing
+
 -- | Given the variables and their optional type annotations in the
 --   head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
 --   type at which we are checking the lambda, ensure that the type is
@@ -457,6 +463,9 @@ lub (TySum t1 t2) (TySum t1' t2') = do
 lub (TyList t1) (TyList t2) = do
   t' <- lub t1 t2
   return $ TyList t'
+lub (TySet t1) (TySet t2) = do
+  t' <-lub t1 t2
+  return $ TySet t'
 lub ty1 ty2 = throwError $ NoLub ty1 ty2
 
 -- | Recursively computes the least upper bound of a list of Types.
@@ -772,20 +781,20 @@ infer (TChain t1 links) = do
   alinks <- inferChain t1 links
   return $ ATChain TyBool at1 alinks
 
-infer (TList es@(_:_) ell)  = do
+infer (TContainer c es@(_:_) ell)  = do
   ates <- mapM infer es
   aell <- inferEllipsis ell
   let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
   ty  <- lubs tys
-  return $ ATList (TyList ty) ates aell
+  return $ ATContainer ((case c of {CList -> TyList; CSet -> TySet}) ty) c ates aell
 
-infer (TListComp bqt) = do
+infer (TContainerComp c bqt) = do
   lunbind bqt $ \(qs,t) -> do
-  (aqs, cx) <- inferTelescope inferQual qs
+  (aqs, cx) <- inferTelescope (inferQual c) qs
   extends cx $ do
   at <- infer t
   let ty = getType at
-  return $ ATListComp (TyList ty) (bind aqs at)
+  return $ ATContainerComp ((case c of {CList -> TyList; CSet -> TySet}) ty) c (bind aqs at)
 
 infer (TTyOp Enumerate t) = do
   checkFinite t
@@ -908,13 +917,14 @@ inferGuard (GPat (unembed -> t) p) = do
   (ctx, apt) <- checkPattern p (getType at)
   return (AGPat (embed at) apt, ctx)
 
-inferQual :: Qual -> TCM (AQual, TyCtx)
-inferQual (QBind x (unembed -> t))  = do
+inferQual :: Container -> Qual -> TCM (AQual, TyCtx)
+inferQual c (QBind x (unembed -> t))  = do
   at <- infer t
-  case getType at of
-    TyList ty -> return (AQBind (coerce x) (embed at), singleCtx x ty)
-    wrongTy   -> throwError $ NotList t wrongTy
-inferQual (QGuard (unembed -> t))   = do
+  case (c, getType at) of
+    (_, TyList ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
+    (CSet, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
+    (_, wrongTy)   -> throwError $ NotList t wrongTy
+inferQual _ (QGuard (unembed -> t))   = do
   at <- check t TyBool
   return (AQGuard (embed at), emptyCtx)
 

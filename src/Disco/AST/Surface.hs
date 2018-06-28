@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeOperators, PatternSynonyms #-}
 {-# LANGUAGE EmptyCase, StandaloneDeriving #-}
 {-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface
@@ -51,13 +52,14 @@ module Disco.AST.Surface
        , pattern TBin
        , pattern TChain
        , pattern TTyOp
+       , pattern TContainerComp
+       , pattern TContainer
+       , pattern TAscr
        , pattern TList
        , pattern TListComp
-       , pattern TAscr
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
-
          -- ** Expressions
        , Side(..)
 
@@ -71,6 +73,7 @@ module Disco.AST.Surface
        , pattern QBind
        , pattern QGuard
        
+       , Container(..)
        , Ellipsis(..)
 
          -- ** Case expressions and patterns
@@ -162,7 +165,7 @@ type instance X_TVar UD = ()
 type instance X_TLet UD = ()
 type instance X_TParens UD = () 
 type instance X_TUnit UD = ()
-type instance X_TBool UD = () 
+type instance X_TBool UD = ()
 type instance X_TNat UD = ()
 type instance X_TRat UD = ()
 type instance X_TAbs UD = () 
@@ -173,8 +176,8 @@ type instance X_TUn UD = ()
 type instance X_TBin UD = () 
 type instance X_TChain UD = () 
 type instance X_TTyop UD = () 
-type instance X_TList UD = () 
-type instance X_TListComp UD = () 
+type instance X_TContainer UD = () 
+type instance X_TContainerComp UD = () 
 type instance X_TAscr UD = ()
 type instance X_Term UD = () 
 type instance X_TTup UD = () 
@@ -227,11 +230,11 @@ pattern TChain term linklist = TChain_ () term linklist
 pattern TTyOp :: TyOp -> Type -> Term
 pattern TTyOp tyop ty = TTyOp_ () tyop ty
 
-pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
-pattern TList termlist mellipses = TList_ () termlist mellipses
+pattern TContainer :: Container -> [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TContainer c tl mets = TContainer_ () c tl mets
 
-pattern TListComp :: Bind (Telescope Qual) Term -> Term
-pattern TListComp bind = TListComp_ () bind
+pattern TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
+pattern TContainerComp c b = TContainerComp_ () c b
 
 pattern TAscr :: Term -> Type -> Term
 pattern TAscr term ty = TAscr_ () term ty
@@ -240,6 +243,11 @@ pattern TAscr term ty = TAscr_ () term ty
              TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp, 
              TList, TListComp, TAscr #-}
 
+pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TList ts e = TContainer_ () CList ts e
+
+pattern TListComp :: Bind (Telescope Qual) Term -> Term
+pattern TListComp x = TContainerComp_ () CList x
 
 type Link = Link_ UD 
 
@@ -262,7 +270,6 @@ pattern QGuard :: Embed Term -> Qual
 pattern QGuard embedt = QGuard_ () embedt
 
 {-# COMPLETE QBind, QGuard #-}
-
 
 type Binding = Binding_ UD 
 
@@ -339,6 +346,7 @@ pattern PList lp = PList_ () lp
 
 
 instance Alpha Side
+instance Alpha Container
 instance Alpha Link
 instance Alpha Term
 instance Alpha Binding

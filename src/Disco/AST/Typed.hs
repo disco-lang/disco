@@ -44,6 +44,8 @@ module Disco.AST.Typed
        , pattern ATBin
        , pattern ATChain
        , pattern ATTyOp
+       , pattern ATContainer
+       , pattern ATContainerComp
        , pattern ATList
        , pattern ATListComp
        , pattern ATAscr
@@ -51,6 +53,7 @@ module Disco.AST.Typed
        , ALink
        , pattern ATLink
 
+       , Container(..)
        , ABinding
          -- * Branches and guards
        , ABranch
@@ -117,8 +120,8 @@ type instance X_TUn TY = Type
 type instance X_TBin TY = Type 
 type instance X_TChain TY = Type 
 type instance X_TTyop TY = Type
-type instance X_TList TY = Type 
-type instance X_TListComp TY = Type 
+type instance X_TContainer TY = Type 
+type instance X_TContainerComp TY = Type 
 type instance X_TAscr TY = ()
 type instance X_Term TY = () 
 type instance X_TTup TY = Type
@@ -169,18 +172,24 @@ pattern ATChain ty term linklist = TChain_ ty term linklist
 pattern ATTyOp :: Type -> TyOp -> Type -> ATerm
 pattern ATTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
-pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
-pattern ATList ty termlist mellipses = TList_ ty termlist mellipses
+pattern ATContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 
-pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
-pattern ATListComp ty bind = TListComp_ ty bind
+pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
+pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 pattern ATAscr :: ATerm -> Type -> ATerm
 pattern ATAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
              ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp, 
-             ATList, ATListComp, ATAscr #-}
+             ATAscr #-}
+
+pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+pattern ATList t xs e = ATContainer t CList xs e
+
+pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
+pattern ATListComp t b = ATContainerComp t CList b
 
 type ALink = Link_ TY
 
@@ -191,10 +200,12 @@ pattern ATLink bop term = TLink_ () bop term
 
 {-# COMPLETE ATLink #-}
 
+
 type AQual = Qual_ TY
 
 type instance X_QBind TY = ()
 type instance X_QGuard TY = ()
+
 
 pattern AQBind :: Name ATerm -> Embed ATerm -> AQual
 pattern AQBind namet embedt = QBind_ () namet embedt
@@ -290,25 +301,21 @@ instance Alpha AQual
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
-getType (ATVar ty _)      = ty
-getType ATUnit            = TyUnit
-getType (ATBool _)        = TyBool
-getType (ATNat ty _)      = ty
-getType (ATRat _)         = TyQP
-getType (ATAbs ty _)      = ty
-getType (ATApp ty _ _)    = ty
-getType (ATTup ty _)      = ty
-getType (ATInj ty _ _)    = ty
-getType (ATUn ty _ _)     = ty
-getType (ATBin ty _ _ _)  = ty
-getType (ATTyOp ty _ _)   = ty
-getType (ATChain ty _ _)  = ty
-getType (ATList ty _ _)   = ty
-getType (ATListComp ty _) = ty
-getType (ATLet ty _)      = ty
-getType (ATCase ty _)     = ty
-getType (ATAscr _ ty)     = ty
-
-{-# COMPLETE ATVar, ATUnit, ATBool, ATNat, ATRat, ATAbs,
-    ATApp, ATTup, ATInj, ATUn, ATBin, ATTyOp, ATChain, ATList,
-    ATListComp, ATLet, ATCase, ATAscr #-}
+getType (ATVar ty _)             = ty
+getType ATUnit                   = TyUnit
+getType (ATBool _)               = TyBool
+getType (ATNat ty _)             = ty
+getType (ATRat _)                = TyQP
+getType (ATAbs ty _)             = ty
+getType (ATApp ty _ _)           = ty
+getType (ATTup ty _)             = ty
+getType (ATInj ty _ _)           = ty
+getType (ATUn ty _ _)            = ty
+getType (ATBin ty _ _ _)         = ty
+getType (ATTyOp ty _ _)          = ty
+getType (ATChain ty _ _)         = ty
+getType (ATContainer ty _ _ _)   = ty
+getType (ATContainerComp ty _ _) = ty 
+getType (ATLet ty _)             = ty
+getType (ATCase ty _)            = ty
+getType (ATAscr _ ty)            = ty

@@ -18,6 +18,9 @@ sqIso (x,y) =
   ?}
 
 ||| Inverse direction of the square isomorphism.
+
+!!! ∀ p : Nat*Nat. sqIso' (sqIso p) = p
+
 sqIso' : ℕ → ℕ×ℕ
 sqIso' n =
   let r = sqrt n
@@ -57,10 +60,10 @@ diagIso' n =
 
 !!! forall n:Nat. powerIso (powerIso' (n+1)) = (n+1)
 
--- Alternatively, since 'or' is lazy (i.e. "short-circuiting"), we can
--- write
+-- Alternatively, since 'implies' is lazy (i.e. "short-circuiting"),
+-- we can write
 
-!!! ∀ n : Nat. n = 0 or powerIso (powerIso' n) = n
+!!! ∀ n : Nat. (n > 0) ==> powerIso (powerIso' n) = n
 
 powerIso : ℕ×ℕ → ℕ
 powerIso (x,y) = 2^x * (2y + 1)

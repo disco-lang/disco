@@ -1,0 +1,213 @@
+% -*- compile-command: "ott -tex_show_meta false -i bi-poly-sub.ott -o bi-poly-sub.tex && pdflatex bi-poly-sub.tex" -*-
+
+embed
+  {{ tex-preamble
+\DeclareMathAlphabet{\mathbbold}{U}{bbold}{m}{n}
+\usepackage{stmaryrd}
+  }}
+
+metavar termvar, x ::=
+  {{ tex \mathit{[[termvar]]} }} {{ com  term variable  }}
+
+metavar typevar, a {{ tex \alpha }} ::=
+  {{ tex \mathit{[[typevar]]} }} {{ com  type variable  }}
+
+metavar natural, n ::=
+  {{ tex \mathit{[[natural]]} }} {{ com  natural number }}
+
+indexvar k ::=
+  {{ com  index }}
+
+grammar
+
+  term, t :: 't_' ::=                                   {{ com term }}
+    | x                    ::   :: var                     {{ com variable }}
+    | n                    ::   :: nat                     {{ com natural literal }}
+    | t1 + t2              ::   :: add                     {{ com addition }}
+    | t1 - t2              ::   :: sub                     {{ com subtraction }}
+    | \ x . t              ::   :: lam  (+ bind x in t +)  {{ com abstraction }}
+    | \ x : T . t          ::   :: tlam (+ bind x in t +)  {{ com typed abstraction }}
+    | t1 t2                ::   :: app                     {{ com application }}
+    | let x = t1 in t2     ::   :: let  (+ bind x in t2 +) {{ com let }}
+    | let x : S = t1 in t2 ::   :: tlet (+ bind x in t2 +) {{ com typed let }}
+    | t : S                ::   :: ascribe                 {{ com type ascription }}
+    | ( t )                :: S :: paren
+
+  basety, B :: 'BT_' ::=                                {{ com base type }}
+    | N                   ::   :: nat                     {{ com natural numbers }}
+    | Z                   ::   :: int                     {{ com integers }}
+
+  tycon, K {{ tex \mathsf{K} }} :: 'K_' ::=             {{ com type constructor }}
+    | Sum                 ::   :: sum                     {{ com sum type }}
+    | Prod                ::   :: prod                    {{ com product type }}
+
+  type, T {{ tex \tau }} :: 'T_' ::=                    {{ com monotype }}
+    | a                   ::   :: var                     {{ com variable }}
+    | B                   ::   :: base                    {{ com base type }}
+    | K T1 .. Tk          ::   :: const                   {{ com type constructor }}
+    | T1 -> T2            ::   :: arrow                   {{ com function type }}
+    | ( T )               :: S :: paren
+    | { T / a } T'        :: M :: tysub
+
+  qualifier, Q :: 'Q_' ::=                              {{ com qualifier }}
+    | add                 ::   :: num                     {{ com additive }}
+    | sub                 ::   :: sub                     {{ com subtractive }}
+
+  polytype, S {{ tex \sigma }} :: 'S_' ::=              {{ com polytype }}
+    | T                   ::   :: mono                    {{ com monotype }}
+    | forall a1 .. ak . T ::   :: forall                  {{ com forall }}
+
+  G {{ tex \Gamma }} :: G_ ::=                          {{ com type context }}
+    | empty               ::   :: em                      {{ com empty context }}
+    | G , x : S           ::   :: vn                      {{ com cons }}
+    | G , G'              :: M :: append                  {{ com append }}
+
+  constraint, C :: C_ ::=                               {{ com constraint }}
+    | T1 == T2            ::   :: u                       {{ com unification }}
+    | T1 <= T2            ::   :: sub                     {{ com subtype }}
+    | Q T                 ::   :: qual                    {{ com qualifier }}
+    | true                ::   :: true                    {{ com trivial }}
+    | C1 /\ C2            ::   :: conj                    {{ com conjunction }}
+    | forall a1 .. ak . C ::   :: forall  (+ bind a1 .. ak in C +)
+                                                          {{ com universal }}
+
+  terminals :: 'terminals_' ::=
+    | \                   ::   :: lambda     {{ tex \lambda }}
+    | elem                ::   :: elem       {{ tex \in }}
+    | fresh               ::   :: fresh      {{ tex \mathrm{fresh} }}
+    | N                   ::   :: nat        {{ tex \mathbb{N} }}
+    | Z                   ::   :: int        {{ tex \mathbb{Z} }}
+    | Sum                 ::   :: sum        {{ tex \mathsf{Sum} }}
+    | Prod                ::   :: prod       {{ tex \mathsf{Prod} }}
+    | ->                  ::   :: arrow      {{ tex \rightarrow }}
+    | empty               ::   :: em         {{ tex \varnothing }}
+    | forall              ::   :: forall     {{ tex \forall }}
+    | add                 ::   :: add        {{ tex \mathsf{add} }}
+    | sub                 ::   :: sub        {{ tex \mathsf{sub} }}
+    | ==                  ::   :: unify      {{ tex \equiv }}
+    | <=                  ::   :: subtype    {{ tex \leq }}
+    | ==>                 ::   :: impl       {{ tex \Longrightarrow }}
+    | /\                  ::   :: and        {{ tex \land }}
+    | |-                  ::   :: vdash      {{ tex \vdash }}
+    | |-p                 ::   :: vdashp     {{ tex \vdash^{\mathrm{poly} } }}
+    | |>                  ::   :: synth      {{ tex \triangleright }}
+    | <|                  ::   :: check      {{ tex \triangleleft }}
+    | ~>                  ::   :: gen        {{ tex \rightsquigarrow }}
+    | <<=>                ::   :: subsumeI   {{ tex \sqsubseteq^{\triangleright} }}
+    | <<=<                ::   :: subsumeC   {{ tex \sqsubseteq^{\triangleleft} }}
+    | [[                  ::   :: lbrack     {{ tex \llbracket }}
+    | ]]                  ::   :: rbrack     {{ tex \rrbracket }}
+
+  formula :: 'formula_' ::=
+    | judgement           ::   :: judgement
+    | x : S elem G        ::   :: xTelemG
+    | formula1 .. formulak ::  :: dots
+    | not formula         ::   :: not
+    | a fresh             ::   :: fresh
+    | a1 .. ak fresh      ::   :: nfresh
+    | ( formula )         :: S :: parens
+
+defns
+  Jtype :: '' ::=
+
+  defn
+    G |- t |> T ~> C :: :: inftype :: inf_    {{ com [[t]] has inferred type [[T]] in context [[G]], generating constraints [[C]] }} by
+
+    --------------- :: nat
+    G |- n |> N ~> true
+
+    x : S elem G      S <<=> T ~> C
+    ---------------------------- :: var
+    G |- x |> T ~> C
+
+    a fresh
+    G |- t1 |> T1 ~> C1     G |- t2 |> T2 ~> C2
+    ------------------------------------------------------------ :: add
+    G |- t1 + t2 |> a ~> C1 /\ C2 /\ T1 <= a /\ T2 <= a /\ add a
+
+    a fresh
+    G |- t1 |> T1 ~> C1     G |- t2 |> T2 ~> C2
+    ------------------------------------------------------------ :: sub
+    G |- t1 - t2 |> a ~> C1 /\ C2 /\ T1 <= a /\ T2 <= a /\ sub a
+
+    G, x : T1 |- t |> T2 ~> C
+    -------------------------- :: tabs
+    G |- \x:T1.t |> T1 -> T2 ~> C
+
+    a1 fresh     a2 fresh
+    G |- t1 |> T ~> C1      G |- t2 <| a1 ~> C2
+    ------------------------------------------- :: app
+    G |- t1 t2 |> a2 ~> C1 /\ C2 /\ T == a1 -> a2
+
+    G |- t1 |> T1 ~> C1
+    G, x : T1 |- t2 |> T2 ~> C2
+    ------------------------------------------ :: let
+    G |- let x = t1 in t2 |> T2 ~> C1 /\ C2
+
+    G |-p t1 <| S ~> C1
+    G, x : S |- t2 |> T ~> C2
+    ------------------------------------------ :: tlet
+    G |- let x : S = t1 in t2 |> T ~> C1 /\ C2
+
+    G |-p t <| S ~> C1          S <<=> T ~> C2
+    ----------------------------------------- :: ascribe
+    G |- t : S |> T ~> C1 /\ C2
+
+  defn
+    G |-p t <| S ~> C :: :: chkpoly :: chkp_   {{ com [[t]] has checked polytype [[S]] in context [[G]], generating constraints [[C]] }} by
+
+    a1 .. ak fresh     G |- t <| T ~> C
+    ------------------------------------------ :: open
+    G |-p t <| forall a1 .. ak. T ~> forall a1 .. ak. C
+
+  defn
+    G |- t <| T ~> C :: :: chktype :: chk_    {{ com [[t]] has checked type [[T]] in context [[G]], generating constraints [[C]] }} by
+
+    x : S elem G        S <<=< T ~> C
+    --------------------------------- :: var
+    G |- x <| T ~> C
+
+    G |- t1 <| T ~> C1    G |- t2 <| T ~> C2
+    ---------------------------------------- :: add
+    G |- t1 + t2 <| T ~> C1 /\ C2 /\ add T
+
+    G |- t1 <| T ~> C1    G |- t2 <| T ~> C2
+    ---------------------------------------- :: sub
+    G |- t1 - t2 <| T ~> C1 /\ C2 /\ sub T
+
+    a1 fresh    a2 fresh
+    G, x : a1 |- t <| a2 ~> C
+    ------------------------------------ :: abs
+    G |- \x.t <| T ~> C /\ T == a1 -> a2
+
+    G |- t1 |> T1 ~> C1
+    G, x : T1 |- t2 <| T2 ~> C2
+    ------------------------------------------ :: let
+    G |- let x = t1 in t2 <| T2 ~> C1 /\ C2
+
+    G |-p t1 <| S ~> C1
+    G, x : S |- t2 <| T ~> C2
+    ------------------------------------------ :: tlet
+    G |- let x : S = t1 in t2 <| T ~> C1 /\ C2
+
+    G |-p t <| S ~> C1          S <<=< T ~> C2
+    ----------------------------------------- :: ascribe
+    G |- t : S <| T ~> C1 /\ C2
+
+    G |- t |> T1 ~> C
+    ----------------------------- :: infer
+    G |- t <| T2 ~> C /\ T1 <= T2
+
+  defn
+    S <<=> T ~> C :: :: subsumption_synth :: ss_   {{ com [[T]] is more specific than [[S]] (inference mode), generating constraints [[C]] }} by
+
+    a1 .. ak fresh
+    --------------------------------------- :: inst
+    forall a1 .. ak. T <<=> T ~> true
+
+  defn
+    S <<=< T ~> C :: :: subsumption_check :: sc_   {{ com [[T]] is more specific than [[S]] (checking mode), generating constraints [[C]] }} by
+
+    a1 .. ak fresh
+    ------------------------------------------------------ :: inst
+    forall a1 .. ak. T1 <<=< T2 ~> T1 <= T2

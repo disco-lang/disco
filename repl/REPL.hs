@@ -47,6 +47,7 @@ data REPLExpr =
  | Pretty Term                  -- Pretty-print a term
  | Desugar Term                 -- Show a desugared term
  | Load FilePath                -- Load a file.
+ | Reload                       -- Reloads the most recently loaded file.
  | Doc (Name Term)              -- Show documentation.
  | Nop                          -- No-op, e.g. if the user just enters a comment
  | Help
@@ -71,6 +72,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       , ("pretty",  Pretty    <$> term)
       , ("desugar", Desugar   <$> term)
       , ("load",    Load      <$> fileParser)
+      , ("reload",  return Reload)
       , ("doc",     Doc       <$> (sc *> ident))
       , ("help",    return Help)
       ]
@@ -110,7 +112,12 @@ handleCMD s =
     handleLine (Parse t)     = iprint $ t
     handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
     handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
-    handleLine (Load file)   = handleLoad file >> return ()
+    handleLine (Load file)   = handleLoad file >> lastFile .= Just file >>return ()
+    handleLine (Reload)      = do
+      file <- use lastFile
+      case file of
+        Nothing -> iputStrLn "No file to reload."
+        Just f -> handleLoad f >> return()
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"

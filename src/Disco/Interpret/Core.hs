@@ -233,8 +233,24 @@ whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CCase bs)     = whnfCase bs
 whnf (COp op cs)    = whnfOp op cs
 
+whnf (CoreSet t es) = do
+  res <- mapM mkThunk es
+  dres <- deduplicateSet t res
+  return $ VSet dres
 
 whnf (CType _)      = error "Called whnf on CType"
+
+deduplicateSet :: Type -> [Value] -> Disco IErr [Value]
+deduplicateSet _ [] = return []
+deduplicateSet t (x:xs) = do
+  xInXs <- elemOf t x xs
+  result <- if xInXs then deduplicateSet t xs else (x:) <$> (deduplicateSet t xs)
+  return result
+
+elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
+elemOf _ _ [] = return False
+elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
@@ -487,6 +503,7 @@ whnfOp (OMSub n) = modArithBin (-) n
 whnfOp (OMNeg n) = modArithUn negate n
 whnfOp (OMDiv n) = modDiv n
 whnfOp (OMExp n) = modExp n
+whnfOp (OMDivides n) = modDivides n
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value
@@ -539,6 +556,15 @@ modDiv n [c1,c2] = do
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
     Nothing -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
+
+modDivides :: Integer -> [Core] -> Disco IErr Value
+modDivides n [c1,c2] = do
+  VNum _ a <- whnf c1
+  VNum _ b <- whnf c2
+  return $ mkEnum $ divides (toRational (gcd (numerator a) n)) b
+
+modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
+
 
 -- | For performing modular exponentiation within a finite type.
 modExp :: Integer -> [Core] -> Disco IErr Value

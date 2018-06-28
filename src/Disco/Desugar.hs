@@ -38,6 +38,7 @@ import           Data.Ratio
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Core
+import           Disco.AST.Generic
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators
@@ -109,6 +110,8 @@ desugarTerm (ATNat ty n)  = desugarNat ty n
 desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn ty op t) =
   desugarUOp ty op <$> desugarTerm t
+desugarTerm (ATBin _ Impl t1 t2) =
+  desugarTerm (ATBin TyBool Or (ATUn TyBool Not t1) t2)
 desugarTerm (ATBin _ And t1 t2) = do
   x <- lfresh (string2Name "b")
   y <- lfresh (string2Name "c")
@@ -157,11 +160,17 @@ desugarTerm (ATBin ty op t1 t2) =
   desugarBOp (getType t1) (getType t2) ty op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
-desugarTerm (ATList _ es mell) = do
-  des <- mapM desugarTerm es
-  case mell of
-    Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
-    Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
+desugarTerm (ATContainer t c es mell) = case c of
+  CList -> do
+    des <- mapM desugarTerm es
+    case mell of
+      Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
+      Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
+  CSet -> do
+    des <- mapM desugarTerm es
+    case mell of
+      Nothing -> return $ CoreSet t des
+      Just ell -> error "Sets cannot have ellipses yet"
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
   dt <- desugarTerm t
@@ -222,11 +231,12 @@ desugarUOp _ Abs    c = COp OAbs    [c]
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
 desugarBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
 -- Special ops for modular arithmetic in finite types
-desugarBOp _ _ (TyFin n) Add c1 c2 = COp (OMAdd n) [c1, c2]
-desugarBOp _ _ (TyFin n) Mul c1 c2 = COp (OMMul n) [c1, c2]
-desugarBOp _ _ (TyFin n) Sub c1 c2 = COp (OMSub n) [c1, c2]
-desugarBOp _ _ (TyFin n) Div c1 c2 = COp (OMDiv n) [c1, c2]
-desugarBOp _ _ (TyFin n) Exp c1 c2 = COp (OMExp n) [c1, c2]
+desugarBOp _ _ (TyFin n) Add     c1 c2 = COp (OMAdd n) [c1, c2]
+desugarBOp _ _ (TyFin n) Mul     c1 c2 = COp (OMMul n) [c1, c2]
+desugarBOp _ _ (TyFin n) Sub     c1 c2 = COp (OMSub n) [c1, c2]
+desugarBOp _ _ (TyFin n) Div     c1 c2 = COp (OMDiv n) [c1, c2]
+desugarBOp _ _ (TyFin n) Exp     c1 c2 = COp (OMExp n) [c1, c2]
+desugarBOp (TyFin n) _ _ Divides c1 c2 = COp (OMDivides n) [c1, c2]
 
 desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
 desugarBOp _  _ ty Sub     c1 c2
@@ -244,13 +254,15 @@ desugarBOp ty _ _ Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
 desugarBOp ty _ _ Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
 desugarBOp _  _ _ And     c1 c2 = COp OAnd [c1, c2]
 desugarBOp _  _ _ Or      c1 c2 = COp OOr  [c1, c2]
-desugarBOp _  _ _ Impl    c1 c2 = COp OOr  [COp ONot [c1], c2]
 desugarBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
 desugarBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
 
 desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
 desugarBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
+
+desugarBOp _  _ _ op _ _ = error $ "Impossible! " ++
+  "desugarBOp " ++ show op
 
 -- | Desugar a type operator application.
 desugarTyOp :: TyOp -> Type -> Core

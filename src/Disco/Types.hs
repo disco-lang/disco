@@ -1,10 +1,10 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE DeriveGeneric         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -151,10 +151,10 @@ isFinite ty = isJust (countType ty)
 
 -- | Decide whether a type supports division.
 isFractional :: Type -> Bool
-isFractional TyQ        = True
-isFractional TyQP       = True
-isFractional (TyFin n)  = isPrime n
-isFractional _          = False
+isFractional TyQ       = True
+isFractional TyQP      = True
+isFractional (TyFin n) = isPrime n
+isFractional _         = False
 
 -- | Decide whether a type supports subtraction.
 isSubtractive :: Type -> Bool
@@ -165,37 +165,37 @@ isSubtractive _         = False
 
 -- | Decide whether a type has decidable equality.
 isDecidable :: Type -> Bool
-isDecidable TyVoid            = True
-isDecidable TyUnit            = True
-isDecidable TyBool            = True
-isDecidable TyN               = True
-isDecidable TyZ               = True
-isDecidable TyQP              = True
-isDecidable TyQ               = True
-isDecidable (TyFin _)         = True
-isDecidable (TySum  ty1 ty2)  = isDecidable ty1 && isDecidable ty2
-isDecidable (TyPair ty1 ty2)  = isDecidable ty1 && isDecidable ty2
-isDecidable (TyList ty)       = isDecidable ty
-isDecidable (TyArr  ty1 ty2)  = isFinite    ty1 && isDecidable ty2
+isDecidable TyVoid           = True
+isDecidable TyUnit           = True
+isDecidable TyBool           = True
+isDecidable TyN              = True
+isDecidable TyZ              = True
+isDecidable TyQP             = True
+isDecidable TyQ              = True
+isDecidable (TyFin _)        = True
+isDecidable (TySum  ty1 ty2) = isDecidable ty1 && isDecidable ty2
+isDecidable (TyPair ty1 ty2) = isDecidable ty1 && isDecidable ty2
+isDecidable (TyList ty)      = isDecidable ty
+isDecidable (TyArr  ty1 ty2) = isFinite    ty1 && isDecidable ty2
 
-isDecidable (TyVar _)         = error "isDecidable TyVar"
+isDecidable (TyVar _)        = error "isDecidable TyVar"
 
 -- | Check whether the given type has a decidable total order.
 isOrdered :: Type -> Bool
-isOrdered TyVoid            = True
-isOrdered TyUnit            = True
-isOrdered TyBool            = True
-isOrdered TyN               = True
-isOrdered TyZ               = True
-isOrdered TyQP              = True
-isOrdered TyQ               = True
-isOrdered (TyFin _)         = True
-isOrdered (TySum  ty1 ty2)  = isOrdered ty1 && isOrdered ty2
-isOrdered (TyPair ty1 ty2)  = isOrdered ty1 && isOrdered ty2
-isOrdered (TyList ty)       = isOrdered ty
-isOrdered (TyArr  ty1 ty2)  = isFinite ty1 && isOrdered ty1 && isOrdered ty2
+isOrdered TyVoid           = True
+isOrdered TyUnit           = True
+isOrdered TyBool           = True
+isOrdered TyN              = True
+isOrdered TyZ              = True
+isOrdered TyQP             = True
+isOrdered TyQ              = True
+isOrdered (TyFin _)        = True
+isOrdered (TySum  ty1 ty2) = isOrdered ty1 && isOrdered ty2
+isOrdered (TyPair ty1 ty2) = isOrdered ty1 && isOrdered ty2
+isOrdered (TyList ty)      = isOrdered ty
+isOrdered (TyArr  ty1 ty2) = isFinite ty1 && isOrdered ty1 && isOrdered ty2
 
-isOrdered (TyVar _)         = error "isOrdered TyVar"
+isOrdered (TyVar _)        = error "isOrdered TyVar"
 
 --------------------------------------------------
 -- Strictness

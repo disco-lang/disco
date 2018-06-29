@@ -1,5 +1,5 @@
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -54,24 +54,25 @@ module Disco.Eval
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), (<>=), makeLenses, use)
-import           Control.Monad.Trans.Except
-import           Control.Monad.Except               (catchError)
+import           Control.Lens                            (makeLenses, use, (%=),
+                                                          (<+=), (<>=))
+import           Control.Monad.Except                    (catchError)
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
-import           Data.IntMap.Lazy                   (IntMap)
-import qualified Data.IntMap.Lazy                   as IntMap
-import qualified Data.Sequence as Seq
+import           Data.IntMap.Lazy                        (IntMap)
+import qualified Data.IntMap.Lazy                        as IntMap
+import qualified Data.Sequence                           as Seq
 
 import           Unbound.Generics.LocallyNameless
 
 import           System.Console.Haskeline.MonadException
 
+import           Disco.AST.Core
+import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
 import           Disco.Types
-import           Disco.AST.Core
-import           Disco.AST.Surface
 
 ------------------------------------------------------------
 -- Values
@@ -239,7 +240,7 @@ data DiscoState e = DiscoState
 
   , _messageLog :: MessageLog e
 
-  , _lastFile :: Maybe FilePath
+  , _lastFile   :: Maybe FilePath
   }
 
 -- | The initial state for the @Disco@ monad.

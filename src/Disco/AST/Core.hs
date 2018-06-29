@@ -32,7 +32,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Surface (Ellipsis, Telescope)
+import           Disco.AST.Surface                (Ellipsis, Telescope)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number

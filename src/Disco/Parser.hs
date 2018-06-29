@@ -273,7 +273,7 @@ parseModule = do
       where
         (grp, rest) = span matchDefn $ ds
         matchDefn (DDefn x' _) = x == x'
-        matchDefn _ = False
+        matchDefn _            = False
         getClauses (DDefn _ cs) = cs
         getClauses _ = error "Impossible! parseModule.defnGroups.getClauses on non-DDefn"
           -- Impossible since we only call getClauses on things that
@@ -570,9 +570,9 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
 
-    bfxParser InL  = InfixL
-    bfxParser InR  = InfixR
-    bfxParser In   = InfixN
+    bfxParser InL = InfixL
+    bfxParser InR = InfixR
+    bfxParser In  = InfixN
 
     isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides]
 
@@ -635,11 +635,11 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- application, since (x y) is not a multiplicative term: it is
     -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
-    isMultiplicativeTerm (TNat _)            = True
-    isMultiplicativeTerm (TUn {})            = True
-    isMultiplicativeTerm (TBin {})           = True
-    isMultiplicativeTerm (TParens t)         = isMultiplicativeTerm t
-    isMultiplicativeTerm _                   = False
+    isMultiplicativeTerm (TNat _)    = True
+    isMultiplicativeTerm (TUn {})    = True
+    isMultiplicativeTerm (TBin {})   = True
+    isMultiplicativeTerm (TParens t) = isMultiplicativeTerm t
+    isMultiplicativeTerm _           = False
 
     -- Fix precedence by bubbling up any new TBin terms whose
     -- precedence is less than that of the operator above them.  We

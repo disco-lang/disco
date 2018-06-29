@@ -168,7 +168,7 @@ desugarTerm (ATContainer t c es mell) = case c of
   CSet -> do
     des <- mapM desugarTerm es
     case mell of
-      Nothing -> return $ CoreSet t des
+      Nothing  -> return $ CoreSet t des
       Just ell -> error "Sets cannot have ellipses yet"
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
@@ -203,28 +203,28 @@ desugarLambda args c = go args
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
 desugarNat :: Type -> Integer -> DSM Core
-desugarNat (TyFin n) x  = return $ CNum Fraction ((x `mod` n) % 1)
-desugarNat _ x          = return $ CNum Fraction (x % 1)
+desugarNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
+desugarNat _ x         = return $ CNum Fraction (x % 1)
 
 -- | Desugar a tuple to nested pairs.
 desugarTuples :: [ATerm] -> DSM Core
-desugarTuples []      = error "Impossible! desugarTuples []"
-desugarTuples [t]     = desugarTerm t
-desugarTuples (t:ts)  = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
+desugarTuples []     = error "Impossible! desugarTuples []"
+desugarTuples [t]    = desugarTerm t
+desugarTuples (t:ts) = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
 
 -- | Desugar a unary operator application.
 desugarUOp :: Type -> UOp -> Core -> Core
 -- Special ops for modular arithmetic in finite types
 desugarUOp (TyFin n) Neg c = COp (OMNeg n) [c]
 
-desugarUOp _ Neg    c = COp ONeg    [c]
-desugarUOp _ Not    c = COp ONot    [c]
-desugarUOp _ Fact   c = COp OFact   [c]
-desugarUOp _ Sqrt   c = COp OSqrt   [c]
-desugarUOp _ Lg     c = COp OLg     [c]
-desugarUOp _ Floor  c = COp OFloor  [c]
-desugarUOp _ Ceil   c = COp OCeil   [c]
-desugarUOp _ Abs    c = COp OAbs    [c]
+desugarUOp _ Neg    c      = COp ONeg    [c]
+desugarUOp _ Not    c      = COp ONot    [c]
+desugarUOp _ Fact   c      = COp OFact   [c]
+desugarUOp _ Sqrt   c      = COp OSqrt   [c]
+desugarUOp _ Lg     c      = COp OLg     [c]
+desugarUOp _ Floor  c      = COp OFloor  [c]
+desugarUOp _ Ceil   c      = COp OCeil   [c]
+desugarUOp _ Abs    c      = COp OAbs    [c]
 
 -- | Desugar a binary operator application.
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
@@ -327,6 +327,6 @@ desugarPattern (APList ps)    = foldr (\p cp -> CPCons 1 [desugarPattern p, cp])
                                       ps
 
 desugarTuplePats :: [APattern] -> CPattern
-desugarTuplePats []      = error "Impossible! desugarTuplePats []"
-desugarTuplePats [p]     = desugarPattern p
-desugarTuplePats (p:ps)  = CPCons 0 [desugarPattern p, desugarTuplePats ps]
+desugarTuplePats []     = error "Impossible! desugarTuplePats []"
+desugarTuplePats [p]    = desugarPattern p
+desugarTuplePats (p:ps) = CPCons 0 [desugarPattern p, desugarTuplePats ps]

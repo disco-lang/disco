@@ -337,8 +337,8 @@ check t ty = do
 
 checkContainer :: Container -> Type -> Maybe Type
 checkContainer CList (TyList eltTy) = Just eltTy
-checkContainer CSet (TySet eltTy) = Just eltTy
-checkContainer _ _ = Nothing
+checkContainer CSet (TySet eltTy)   = Just eltTy
+checkContainer _ _                  = Nothing
 
 -- | Given the variables and their optional type annotations in the
 --   head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
@@ -428,17 +428,17 @@ checkSub at ty =
 -- | Check whether one type is a subtype of another (we have decidable
 --   subtyping).
 isSub :: Type -> Type -> Bool
-isSub ty1 ty2 | ty1 == ty2 = True
-isSub TyVoid _ = True
-isSub TyN TyZ  = True
-isSub TyN TyQP = True
-isSub TyN TyQ  = True
-isSub TyZ TyQ  = True
-isSub TyQP TyQ = True
+isSub ty1 ty2                         | ty1 == ty2 = True
+isSub TyVoid _                        = True
+isSub TyN TyZ                         = True
+isSub TyN TyQP                        = True
+isSub TyN TyQ                         = True
+isSub TyZ TyQ                         = True
+isSub TyQP TyQ                        = True
 isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
-isSub _ _ = False
+isSub _ _                             = False
 
 -- | Compute the least upper bound (least common supertype) of two
 --   types.  Return the LUB, or throw an error if there isn't one.
@@ -535,7 +535,7 @@ requireSameTy ty1 ty2
 --   type if it does, throwing an error if not.
 getFunTy :: ATerm -> TCM (Type, Type)
 getFunTy (getType -> TyArr ty1 ty2) = return (ty1, ty2)
-getFunTy at = throwError (NotFun at)
+getFunTy at                         = throwError (NotFun at)
 
 -- | Check that an annotated term has a numeric type.  Throw an error
 --   if not.
@@ -549,17 +549,17 @@ checkNumTy at =
 --   support division.  In particular this is used for the typing rule
 --   of the floor and ceiling functions.
 integralizeTy :: Type -> Type
-integralizeTy TyQ   = TyZ
-integralizeTy TyQP  = TyN
-integralizeTy t     = t
+integralizeTy TyQ  = TyZ
+integralizeTy TyQP = TyN
+integralizeTy t    = t
 
 -- | Convert a numeric type to its greatest subtype that does not
 --   support subtraction.  In particular this is used for the typing
 --   rule of the absolute value function.
 positivizeTy :: Type -> Type
-positivizeTy TyZ  = TyN
-positivizeTy TyQ  = TyQP
-positivizeTy t    = t
+positivizeTy TyZ = TyN
+positivizeTy TyQ = TyQP
+positivizeTy t   = t
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
@@ -921,9 +921,9 @@ inferQual :: Container -> Qual -> TCM (AQual, TyCtx)
 inferQual c (QBind x (unembed -> t))  = do
   at <- infer t
   case (c, getType at) of
-    (_, TyList ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
+    (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x ty)
     (CSet, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
-    (_, wrongTy)   -> throwError $ NotList t wrongTy
+    (_, wrongTy)     -> throwError $ NotList t wrongTy
 inferQual _ (QGuard (unembed -> t))   = do
   at <- check t TyBool
   return (AQGuard (embed at), emptyCtx)
@@ -1035,7 +1035,7 @@ checkDefn (DDefn x clauses) = do
       (aps, at) <- go pats ty body
       return $ bind aps at
 
-    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm)  
+    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm)
     go [] ty body =  ([],) <$> check body ty
     go (p:ps) (TyArr ty1 ty2) body = do
       (ctx, apt) <- checkPattern p ty1
@@ -1102,16 +1102,16 @@ eraseBinding :: ABinding -> Binding
 eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))
 
 erasePattern :: APattern -> Pattern
-erasePattern (APVar n) = PVar (coerce n)
-erasePattern APWild = PWild
-erasePattern APUnit = PUnit
-erasePattern (APBool b) = PBool b
-erasePattern (APTup alp) = PTup $ map erasePattern alp
-erasePattern (APInj s apt) = PInj s (erasePattern apt)
-erasePattern (APNat n) = PNat n
-erasePattern (APSucc apt) = PSucc $ erasePattern apt
+erasePattern (APVar n)        = PVar (coerce n)
+erasePattern APWild           = PWild
+erasePattern APUnit           = PUnit
+erasePattern (APBool b)       = PBool b
+erasePattern (APTup alp)      = PTup $ map erasePattern alp
+erasePattern (APInj s apt)    = PInj s (erasePattern apt)
+erasePattern (APNat n)        = PNat n
+erasePattern (APSucc apt)     = PSucc $ erasePattern apt
 erasePattern (APCons ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
-erasePattern (APList alp) = PList $ map erasePattern alp
+erasePattern (APList alp)     = PList $ map erasePattern alp
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)

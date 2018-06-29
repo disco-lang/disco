@@ -25,14 +25,14 @@ import           Data.Maybe                       (fromJust)
 import           Data.Ratio
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind,
-                                                   unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
 
-import           Disco.Interpret.Core             (whnfV)
 import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.Eval                       (Disco, IErr, Value (..), io,
+                                                   iputStr, iputStrLn)
+import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
-import           Disco.Eval                       (Value(..), Disco, iputStr, iputStrLn, io, IErr)
 import           Disco.Types
 
 --------------------------------------------------
@@ -225,8 +225,8 @@ prettySide L = text "left"
 prettySide R = text "right"
 
 prettyTyOp :: TyOp -> Doc
-prettyTyOp Enumerate  = text "enumerate"
-prettyTyOp Count      = text "count"
+prettyTyOp Enumerate = text "enumerate"
+prettyTyOp Count     = text "count"
 
 prettyUOp :: UOp -> Doc
 prettyUOp op =

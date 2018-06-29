@@ -15,15 +15,14 @@
 
 module Disco.Messages where
 
-import Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless
 
-import           Control.Monad.Writer
-import           Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import           Data.Sequence                    (Seq)
+import qualified Data.Sequence                    as Seq
 
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.AST.Core
+import           Disco.AST.Core
+import           Disco.AST.Surface
+import           Disco.AST.Typed
 
 data MessageLevel
   = Info

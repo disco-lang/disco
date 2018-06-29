@@ -31,7 +31,7 @@ module Disco.Typecheck
        , TCError(..)
 
          -- * Type checking
-       , check, checkPattern, ok, checkDefn
+       , check, checkPattern, checkDefn
        , checkProperties, checkProperty
 
          -- ** Whole modules
@@ -56,6 +56,7 @@ module Disco.Typecheck
        , erase
        , eraseBinding, eraseBranch, eraseGuard
        , eraseLink, eraseQual, eraseProperty
+       , erasePattern
        )
        where
 
@@ -78,16 +79,17 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-
+--
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
 --   function being defined.  For example, given the concrete syntax
 --   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
 --   something like @[n, (x,y)] (n*x + y)@.
-type Defn  = [Bind [Pattern] ATerm]
+type Defn  = [Bind [APattern] ATerm]
 
 -- | A map from names to definitions.
 type DefnCtx = Ctx ATerm Defn
@@ -335,8 +337,8 @@ check t ty = do
 
 checkContainer :: Container -> Type -> Maybe Type
 checkContainer CList (TyList eltTy) = Just eltTy
-checkContainer CSet (TySet eltTy) = Just eltTy
-checkContainer _ _ = Nothing
+checkContainer CSet (TySet eltTy)   = Just eltTy
+checkContainer _ _                  = Nothing
 
 -- | Given the variables and their optional type annotations in the
 --   head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
@@ -426,17 +428,17 @@ checkSub at ty =
 -- | Check whether one type is a subtype of another (we have decidable
 --   subtyping).
 isSub :: Type -> Type -> Bool
-isSub ty1 ty2 | ty1 == ty2 = True
-isSub TyVoid _ = True
-isSub TyN TyZ  = True
-isSub TyN TyQP = True
-isSub TyN TyQ  = True
-isSub TyZ TyQ  = True
-isSub TyQP TyQ = True
+isSub ty1 ty2                         | ty1 == ty2 = True
+isSub TyVoid _                        = True
+isSub TyN TyZ                         = True
+isSub TyN TyQP                        = True
+isSub TyN TyQ                         = True
+isSub TyZ TyQ                         = True
+isSub TyQP TyQ                        = True
 isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
 isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
 isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
-isSub _ _ = False
+isSub _ _                             = False
 
 -- | Compute the least upper bound (least common supertype) of two
 --   types.  Return the LUB, or throw an error if there isn't one.
@@ -533,7 +535,7 @@ requireSameTy ty1 ty2
 --   type if it does, throwing an error if not.
 getFunTy :: ATerm -> TCM (Type, Type)
 getFunTy (getType -> TyArr ty1 ty2) = return (ty1, ty2)
-getFunTy at = throwError (NotFun at)
+getFunTy at                         = throwError (NotFun at)
 
 -- | Check that an annotated term has a numeric type.  Throw an error
 --   if not.
@@ -547,17 +549,17 @@ checkNumTy at =
 --   support division.  In particular this is used for the typing rule
 --   of the floor and ceiling functions.
 integralizeTy :: Type -> Type
-integralizeTy TyQ   = TyZ
-integralizeTy TyQP  = TyN
-integralizeTy t     = t
+integralizeTy TyQ  = TyZ
+integralizeTy TyQP = TyN
+integralizeTy t    = t
 
 -- | Convert a numeric type to its greatest subtype that does not
 --   support subtraction.  In particular this is used for the typing
 --   rule of the absolute value function.
 positivizeTy :: Type -> Type
-positivizeTy TyZ  = TyN
-positivizeTy TyQ  = TyQP
-positivizeTy t    = t
+positivizeTy TyZ = TyN
+positivizeTy TyQ = TyQP
+positivizeTy t   = t
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
@@ -912,60 +914,67 @@ inferGuard (GBool (unembed -> t)) = do
   return (AGBool (embed at), emptyCtx)
 inferGuard (GPat (unembed -> t) p) = do
   at <- infer t
-  ctx <- checkPattern p (getType at)
-  return (AGPat (embed at) p, ctx)
+  (ctx, apt) <- checkPattern p (getType at)
+  return (AGPat (embed at) apt, ctx)
 
 inferQual :: Container -> Qual -> TCM (AQual, TyCtx)
 inferQual c (QBind x (unembed -> t))  = do
   at <- infer t
   case (c, getType at) of
-    (_, TyList ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
+    (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x ty)
     (CSet, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x ty)
-    (_, wrongTy)   -> throwError $ NotList t wrongTy
+    (_, wrongTy)     -> throwError $ NotList t wrongTy
 inferQual _ (QGuard (unembed -> t))   = do
   at <- check t TyBool
   return (AQGuard (embed at), emptyCtx)
 
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
-checkPattern :: Pattern -> Type -> TCM TyCtx
-checkPattern (PVar x) ty                    = return $ singleCtx x ty
-checkPattern PWild    _                     = ok
-checkPattern PUnit TyUnit                   = ok
-checkPattern (PBool _) TyBool               = ok
-checkPattern (PTup ps) ty                   =
-  joinCtxs <$> checkTuplePat ps ty
-checkPattern (PInj L p) (TySum ty1 _)       = checkPattern p ty1
-checkPattern (PInj R p) (TySum _ ty2)       = checkPattern p ty2
+checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern)
+checkPattern (PVar x) ty                    = return $ (singleCtx x ty, APVar (coerce x))
+checkPattern PWild    _                     = return (emptyCtx, APWild)
+checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit)
+checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b)
+checkPattern (PTup ps) ty                   = do
+  listCtxtAps <- checkTuplePat ps ty
+  let (ctxs, aps) = unzip listCtxtAps
+  return (joinCtxs ctxs, APTup aps)
+checkPattern (PInj L p) (TySum ty1 _)       = do
+  (ctx, apt) <- checkPattern p ty1
+  return (ctx, APInj L apt)
+checkPattern (PInj R p) (TySum _ ty2)       = do
+  (ctx, apt) <- checkPattern p ty2
+  return (ctx, APInj R apt)
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.
-checkPattern (PNat _) ty | isSub TyN ty = ok
-checkPattern (PNat _) (TyFin _)         = ok
+checkPattern (PNat n) ty | isSub TyN ty = return (emptyCtx, APNat n)
+checkPattern (PNat n) (TyFin _)         = return (emptyCtx, APNat n)
 
-checkPattern (PSucc p)  TyN                 = checkPattern p TyN
-checkPattern (PCons p1 p2) (TyList ty)      =
-  joinCtx <$> checkPattern p1 ty <*> checkPattern p2 (TyList ty)
-checkPattern (PList ps) (TyList ty) =
-  joinCtxs <$> mapM (flip checkPattern ty) ps
+checkPattern (PSucc p)  TyN                 = do
+  (ctx, apt) <- checkPattern p TyN
+  return (ctx, APSucc apt)
+checkPattern (PCons p1 p2) (TyList ty)      = do
+  (ctx1, ap1) <- checkPattern p1 ty
+  (ctx2, ap2) <- checkPattern p2 (TyList ty)
+  return (joinCtx ctx1 ctx2, APCons ap1 ap2)
+checkPattern (PList ps) (TyList ty)         = do
+  listCtxtAps <- mapM (flip checkPattern ty) ps
+  let (ctxs, aps) = unzip listCtxtAps
+  return (joinCtxs ctxs, APList aps)
 
 checkPattern p ty = throwError (PatternType p ty)
 
-checkTuplePat :: [Pattern] -> Type -> TCM [TyCtx]
+checkTuplePat :: [Pattern] -> Type -> TCM ([(TyCtx, APattern)])
 checkTuplePat [] _   = error "Impossible! checkTuplePat []"
 checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
-  ctx <- checkPattern p ty
-  return [ctx]
+  (ctx, apt) <- checkPattern p ty
+  return [(ctx, apt)]
 checkTuplePat (p:ps) (TyPair ty1 ty2) = do
-  ctx  <- checkPattern p ty1
-  ctxs <- checkTuplePat ps ty2
-  return (ctx:ctxs)
+  (ctx, apt)  <- checkPattern p ty1
+  rest <- checkTuplePat ps ty2
+  return ((ctx, apt):rest)
 checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
-
--- | Successfully return the empty context.  A convenience method for
---   checking patterns that bind no variables.
-ok :: TCM TyCtx
-ok = return emptyCtx
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
@@ -1020,15 +1029,17 @@ checkDefn (DDefn x clauses) = do
                -- patterns don't match across different clauses
       | otherwise = return ()
 
+    checkClause :: Type -> Bind [Pattern] Term -> TCM (Bind [APattern] ATerm)
     checkClause ty clause =
       lunbind clause $ \(pats, body) -> do
-      at <- go pats ty body
-      return $ bind pats at
+      (aps, at) <- go pats ty body
+      return $ bind aps at
 
-    go [] ty body = check body ty
+    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm)
+    go [] ty body =  ([],) <$> check body ty
     go (p:ps) (TyArr ty1 ty2) body = do
-      ctx <- checkPattern p ty1
-      extends ctx $ go ps ty2 body
+      (ctx, apt) <- checkPattern p ty1
+      (first (apt :)) <$> (extends ctx $ go ps ty2 body)
     go _ _ _ = throwError NumPatterns   -- XXX include more info
 
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
@@ -1090,13 +1101,25 @@ erase (ATAscr at ty)        = TAscr (erase at) ty
 eraseBinding :: ABinding -> Binding
 eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))
 
+erasePattern :: APattern -> Pattern
+erasePattern (APVar n)        = PVar (coerce n)
+erasePattern APWild           = PWild
+erasePattern APUnit           = PUnit
+erasePattern (APBool b)       = PBool b
+erasePattern (APTup alp)      = PTup $ map erasePattern alp
+erasePattern (APInj s apt)    = PInj s (erasePattern apt)
+erasePattern (APNat n)        = PNat n
+erasePattern (APSucc apt)     = PSucc $ erasePattern apt
+erasePattern (APCons ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
+erasePattern (APList alp)     = PList $ map erasePattern alp
+
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)
   where (tel,at) = unsafeUnbind b
 
 eraseGuard :: AGuard -> Guard
 eraseGuard (AGBool (unembed -> at))  = GBool (embed (erase at))
-eraseGuard (AGPat (unembed -> at) p) = GPat (embed (erase at)) p
+eraseGuard (AGPat (unembed -> at) p) = GPat (embed (erase at)) (erasePattern p)
 
 eraseLink :: ALink -> Link
 eraseLink (ATLink bop at) = TLink bop (erase at)

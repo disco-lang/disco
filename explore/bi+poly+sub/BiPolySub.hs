@@ -1623,7 +1623,9 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
               trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
               trace ("sortmap: " ++ show sm) $
               trace ("relmap: " ++ show relMap) $
-              trace ("sort for " ++ show v ++ ": " ++ show (unSM sm ! v)) $
+                -- XXX blerg is failing: need to make a sort lookup function that returns
+                -- the empty sort if the key is not in the sort map
+              trace ("sort for " ++ show v ++ ": " ++ show (lkup "blerg" (unSM sm) v)) $
               trace ("relvars: " ++ show (varRels (relMap ! (v,Sub)))) $
               (coerce v |->) <$> lubBySort sm relMap bsubs   (lkup "solveVar bsubs, sort" (unSM sm) v)
                 (varRels (lkup "solveVar bsubs, rels" relMap (v,Sub)))

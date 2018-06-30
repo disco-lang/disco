@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
--- |
+--
 -- Module      :  Disco.Parser
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
@@ -513,13 +513,12 @@ parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parse
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
-parseGuard =
-  mkGuard <$> (embed <$> (guardWord *> parseTerm))
-          <*> optionMaybe (reserved "is" *> parsePattern)
+parseGuard = parseGBool <|> parseGPat
   where
-    guardWord = reserved "when" <|> reserved "if"
-    mkGuard t Nothing  = GBool t
-    mkGuard t (Just p) = GPat  t p
+    parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
+    parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
+                      <*> (reserved "is" *> parsePattern)
+
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern

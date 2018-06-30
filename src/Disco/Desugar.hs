@@ -109,6 +109,8 @@ desugarTerm (ATNat ty n)  = desugarNat ty n
 desugarTerm (ATRat r) = return $ CNum Decimal r
 desugarTerm (ATUn ty op t) =
   desugarUOp ty op <$> desugarTerm t
+desugarTerm (ATBin _ Impl t1 t2) =
+  desugarTerm (ATBin TyBool Or (ATUn TyBool Not t1) t2)
 desugarTerm (ATBin _ And t1 t2) = do
   x <- lfresh (string2Name "b")
   y <- lfresh (string2Name "c")
@@ -244,13 +246,15 @@ desugarBOp ty _ _ Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
 desugarBOp ty _ _ Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
 desugarBOp _  _ _ And     c1 c2 = COp OAnd [c1, c2]
 desugarBOp _  _ _ Or      c1 c2 = COp OOr  [c1, c2]
-desugarBOp _  _ _ Impl    c1 c2 = COp OOr  [COp ONot [c1], c2]
 desugarBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
 desugarBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
 desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
 
 desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
 desugarBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
+
+desugarBOp _  _ _ op _ _ = error $ "Impossible! " ++
+  "desugarBOp " ++ show op
 
 -- | Desugar a type operator application.
 desugarTyOp :: TyOp -> Type -> Core

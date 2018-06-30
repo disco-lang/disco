@@ -3,19 +3,21 @@
 --   @Node@ values.
 module Graph where
 
-import Prelude hiding (map)
-import qualified Prelude as P
+import           Prelude                           hiding (map)
+import qualified Prelude                           as P
 
-import           Data.Map    (Map, (!))
-import qualified Data.Map    as M
-import           Data.Maybe  (fromJust, isJust)
-import           Data.Set    (Set)
-import qualified Data.Set    as S
-import           Data.Tuple  (swap)
+import           Control.Arrow                     ((&&&))
+import           Data.Map                          (Map, (!))
+import qualified Data.Map                          as M
+import           Data.Maybe                        (fromJust, isJust)
+import           Data.Set                          (Set)
+import qualified Data.Set                          as S
+import           Data.Tuple                        (swap)
 
-import qualified Data.Graph.Inductive.Graph     as G
+import qualified Data.Graph.Inductive.Graph        as G
 import           Data.Graph.Inductive.PatriciaTree (Gr)
-import qualified Data.Graph.Inductive.Query.DFS as G (condensation, topsort', components)
+import qualified Data.Graph.Inductive.Query.DFS    as G (components,
+                                                         condensation, topsort')
 
 -- | Directed graphs, with vertices labelled by @a@ and unlabelled
 --   edges.
@@ -45,6 +47,12 @@ edges (G g _ m) = S.fromList $ P.map (\(n1,n2,()) -> (m ! n1, m ! n2)) (G.labEdg
 map :: Ord b => (a -> b) -> Graph a -> Graph b
 map f (G g m1 m2) = G (G.nmap f g) (M.mapKeys f m1) (M.map f m2)
 
+-- | Delete a vertex.
+delete :: Ord a => a -> Graph a -> Graph a
+delete a (G g a2n n2a) = G (G.delNode n g) (M.delete a a2n) (M.delete n n2a)
+  where
+    n = a2n ! a
+
 -- | The @condensation@ of a graph is the graph of its strongly
 --   connected components, /i.e./ each strongly connected component is
 --   compressed to a single node, labelled by the set of vertices in
@@ -64,7 +72,10 @@ condensation (G g _ n2a) = G g' as2n n2as
 --   strongly connected components of the graph when considered as an
 --   undirected graph.
 wcc :: Ord a => Graph a -> [Set a]
-wcc (G g a2n n2a) = P.map S.fromList $ (P.map . P.map) (n2a!) (G.components g)
+wcc = P.map (S.map snd) . wccIDs
+
+wccIDs :: Ord a => Graph a -> [Set (G.Node, a)]
+wccIDs (G g a2n n2a) = P.map S.fromList $ (P.map . P.map) (id &&& (n2a!)) (G.components g)
 
 -- | A miscellaneous utility function to turn a @Graph Maybe@ into a
 --   @Maybe Graph@: the result is @Just@ iff all the vertices in the

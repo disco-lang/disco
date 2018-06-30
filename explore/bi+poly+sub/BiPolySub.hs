@@ -4,6 +4,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE PartialTypeSignatures      #-}
 {-# LANGUAGE PatternSynonyms            #-}
@@ -36,15 +37,19 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
 
-import qualified Graph as G
-import           Graph (Graph)
 import           Control.Arrow                           ((&&&), (***))
-import           Control.Lens                            (anyOf, makeLenses,
+import           Control.Lens                            (anyOf, both, each,
+                                                          makeLenses, over,
                                                           toListOf, use, (%=),
-                                                          (.=), (^..), each)
+                                                          (.=), (^..))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char                               (toLower)
-import           Data.List                               (foldl', intercalate)
+import           Data.Either                             (isRight,
+                                                          partitionEithers)
+import           Data.Function                           ((&))
+import           Data.List                               (find, foldl',
+                                                          intercalate,
+                                                          intersect, partition)
 import           Data.Map                                (Map, (!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (catMaybes, fromJust)
@@ -52,6 +57,8 @@ import           Data.Semigroup
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 import           Data.Tuple                              (swap)
+import           Graph                                   (Graph)
+import qualified Graph                                   as G
 import           Text.Printf
 
 import           Parsing2
@@ -69,6 +76,8 @@ data BaseTy where
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha BaseTy
+
+instance Subst BaseTy BaseTy
 
 data Var where
   U :: Name Type -> Var   -- unification variable
@@ -92,12 +101,22 @@ instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
   isvar _            = Nothing
 
+type UAtom = Either BaseTy (Name Type)  -- unifiable atoms, i.e. no skolems
+
+uatomToAtom :: UAtom -> Atom
+uatomToAtom (Left b)  = ABase b
+uatomToAtom (Right x) = AVar (U x)
+
 isVar :: Atom -> Bool
 isVar (AVar _) = True
 isVar _        = False
 
 isBase :: Atom -> Bool
 isBase = not . isVar
+
+isSkolem :: Atom -> Bool
+isSkolem (AVar (S _)) = True
+isSkolem _            = False
 
 ------------------------------------------------------------
 -- Type structure
@@ -145,8 +164,14 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
 
+nameToTypeSubst :: S' (Name Type) -> S' Type
+nameToTypeSubst = map (coerce *** TyVar)
+
 atomToTypeSubst :: S' Atom -> S' Type
 atomToTypeSubst = map (coerce *** TyAtom)
+
+uatomToTypeSubst :: S' UAtom -> S' Type
+uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)
 
 var :: String -> Type
 var x = TyVar (string2Name x)
@@ -224,34 +249,13 @@ isSubA (ABase t1) (ABase t2) = isSubB t1 t2
 isSubA _ _                   = False
 
 isSubB :: BaseTy -> BaseTy -> Bool
+isSubB b1 b2   | b1 == b2 = True
 isSubB Nat Int = True
 isSubB _ _     = False
 
-glb2 :: BaseTy -> BaseTy -> Maybe BaseTy
-glb2 a1 a2 | a1 == a2 = Just a1
-glb2 Int Nat = Just Nat
-glb2 Nat Int = Just Int
-glb2 _ _     = Nothing
-
-glb :: [BaseTy] -> Maybe BaseTy
-glb [] = Nothing
-glb [a] = Just a
-glb (a:as) = do
-  g <- glb as
-  glb2 a g
-
-lub2 :: BaseTy -> BaseTy -> Maybe BaseTy
-lub2 a1 a2 | a1 == a2 = Just a1
-lub2 Int Nat = Just Int
-lub2 Nat Int = Just Int
-lub2 _ _     = Nothing
-
-lub :: [BaseTy] -> Maybe BaseTy
-lub []  = Nothing
-lub [a] = Just a
-lub (a:as) = do
-  g <- lub as
-  lub2 a g
+isDirB :: Dir -> BaseTy -> BaseTy -> Bool
+isDirB Sub   b1 b2 = isSubB b1 b2
+isDirB Super b1 b2 = isSubB b2 b1
 
 qualifications :: Map Qual (Set BaseTy)
 qualifications = M.fromList $
@@ -259,6 +263,12 @@ qualifications = M.fromList $
   , (QMul, S.fromList [Nat, Int])
   , (QSub, S.fromList [Int])
   ]
+
+hasQual :: BaseTy -> Qual -> Bool
+hasQual b q = maybe False (S.member b) (M.lookup q qualifications)
+
+hasSort :: BaseTy -> Sort -> Bool
+hasSort = all . hasQual
 
 (==>) :: a -> b -> (a,b)
 (==>) = (,)
@@ -302,6 +312,25 @@ sortRules c s = do
   -- in sort s) of lists (each one corresponds to the type args of c).
   -- We zip them together to produce a list of sorts.
   return $ foldl' (zipWith (\srt -> maybe srt (`S.insert` srt))) (repeat topSort) needQuals
+
+data Dir = Sub | Super
+  deriving (Eq, Ord, Read, Show)
+
+other :: Dir -> Dir
+other Sub   = Super
+other Super = Sub
+
+supertypes :: BaseTy -> [BaseTy]
+supertypes Nat = [Nat, Int]
+supertypes b   = [b]
+
+subtypes :: BaseTy -> [BaseTy]
+subtypes Int = [Nat, Int]
+subtypes b   = [b]
+
+dirtypes :: Dir -> BaseTy -> [BaseTy]
+dirtypes Sub   = subtypes
+dirtypes Super = supertypes
 
 ------------------------------------------------------------
 -- Polytypes
@@ -953,7 +982,7 @@ newtype SortMap = SM { unSM :: Map (Name Type) Sort }
   deriving (Show)
 
 instance Semigroup SortMap where
-  SM qm1 <> SM qm2 = SM (M.unionWith (<>) qm1 qm2)
+  SM sm1 <> SM sm2 = SM (M.unionWith (<>) sm1 sm2)
 
 instance Monoid SortMap where
   mempty  = SM M.empty
@@ -1007,9 +1036,9 @@ solveConstraint c = do
   traceM "------------------------------"
   traceM "Running simplifier..."
 
-  (qm, atoms, theta_simp) <- liftExcept (simplify quals cs)
+  (sm, atoms, theta_simp) <- liftExcept (simplify quals cs)
 
-  traceM (pretty qm)
+  traceM (pretty sm)
   traceM (pretty atoms)
   traceM (pretty theta_simp)
 
@@ -1022,37 +1051,42 @@ solveConstraint c = do
 
   traceShowM g
 
-  -- I used to have this as the next step:
-  --
+  -- Step 5.
   -- Check for any weakly connected components containing more
   -- than one skolem, or a skolem and a base type; such components are
   -- not allowed.  Other WCCs with a single skolem simply unify to
   -- that skolem.
-  --
-  -- Doing this as a preprocessing step might lead to better error
-  -- messages perhaps; but for now, I think this will be taken care of
-  -- by attempted unifications that happen later on.
 
-  -- Step 5. Eliminate cycles from the graph, turning each strongly
+  traceM "------------------------------"
+  traceM "Checking WCCs for skolems..."
+
+  (g', theta_skolem) <- liftExcept (checkSkolems sm g)
+
+  -- Step 6. Eliminate cycles from the graph, turning each strongly
   -- connected component into a single node, unifying all the atoms in
-  -- each component. (Note, unification will naturally fail if any
-  -- cycle has more than one skolem, or a skolem and at least one base
-  -- type.)
+  -- each component.
 
   traceM "------------------------------"
   traceM "Collapsing SCCs..."
 
-  (g', theta_cyc) <- liftExcept (elimCycles g)
+  (g'', theta_cyc) <- liftExcept (elimCycles g')
 
-  traceShowM g'
+  traceShowM g''
 
-  -- Steps 6 & 7: solve the graph, iteratively finding satisfying
+  -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
   -- predecessor base types in the graph; then unify all the type
   -- variables in any remaining weakly connected components.
-  theta_sol       <- solveGraph g'
 
-  let theta_final = (theta_sol @@ theta_cyc @@ theta_simp)
+  traceM "------------------------------"
+  traceM "Solving for type variables..."
+
+  theta_sol       <- solveGraph sm g''
+
+  traceM "------------------------------"
+  traceM "Composing final substitution..."
+
+  let theta_final = (theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp)
 
   return theta_final
 
@@ -1112,9 +1146,9 @@ type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
 --   (b <: v), where v is a type variable and b is a base type.
 
 simplify :: SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
-simplify qm cs
-  = (\(SS qm' cs' s') -> (qm', map extractAtoms cs', s'))
-  <$> contFreshMT (execStateT simplify' (SS qm cs idS)) n
+simplify sm cs
+  = (\(SS sm' cs' s') -> (sm', map extractAtoms cs', s'))
+  <$> contFreshMT (execStateT simplify' (SS sm cs idS)) n
   where
 
     fvNums :: Alpha a => [a] -> [Integer]
@@ -1124,7 +1158,7 @@ simplify qm cs
     -- domain, and use it to start the fresh var generation, so we don't
     -- generate any "fresh" names that interfere with existing names
     n1 = maximum0 . fvNums $ cs
-    n = succ . maximum . (n1:) . fvNums . M.keys . unSM $ qm
+    n = succ . maximum . (n1:) . fvNums . M.keys . unSM $ sm
 
     maximum0 [] = 0
     maximum0 xs = maximum xs
@@ -1244,25 +1278,25 @@ simplify qm cs
 
     substSortMap :: S -> SimplifyM ()
     substSortMap s' = do
-      SM qm <- use ssSortMap
+      SM sm <- use ssSortMap
 
       -- 1. Get quals for each var in domain of s' and match them with
       -- the types being substituted for those vars.
 
       let tySorts :: [(Type, Sort)]
-          tySorts = catMaybes . map (traverse (flip M.lookup qm) . swap) $ s'
+          tySorts = catMaybes . map (traverse (flip M.lookup sm) . swap) $ s'
 
           tyQualList :: [(Type, Qual)]
           tyQualList = concatMap (sequenceA . second S.toList) $ tySorts
 
       -- 2. Decompose the resulting qualifier constraints
 
-      SM qm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
+      SM sm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
 
-      -- 3. delete domain of s' from qm and merge in decomposed quals.
+      -- 3. delete domain of s' from sm and merge in decomposed quals.
       --    Be sure to keep quals from before, via 'unionWith'!
 
-      ssSortMap .= SM (M.unionWith S.union qm' (foldl' (flip M.delete) qm (map fst s')))
+      ssSortMap .= SM (M.unionWith S.union sm' (foldl' (flip M.delete) sm (map fst s')))
 
       -- The above works even when unifying two variables.  Say we have
       -- the SortMap
@@ -1297,7 +1331,50 @@ mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
     nodes = S.fromList $ cs ^.. traverse . each
 
 --------------------------------------------------
--- Step 5: Eliminate cycles
+-- Step 5: Check skolems
+
+-- | Check for any weakly connected components containing more than
+--   one skolem, or a skolem and a base type, or a skolem and any
+--   variables with nontrivial sorts; such components are not allowed.
+--   If there are any WCCs with a single skolem, no base types, and
+--   only unsorted variables, just unify them all with the skolem and
+--   remove those components.
+checkSkolems :: SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
+checkSkolems (SM sm) g = do
+  let skolemWCCs :: [Set Atom]
+      skolemWCCs = filter (any isSkolem) $ G.wcc g
+
+      ok wcc =  S.size (S.filter isSkolem wcc) <= 1
+             && all (\case { ABase _ -> False
+                           ; AVar (S _) -> True
+                           ; AVar (U v) -> maybe True S.null (M.lookup v sm) })
+                wcc
+
+      (good, bad) = partition ok skolemWCCs
+
+  when (not . null $ bad) $ throwError NoUnify
+
+  -- take all good sets and
+  --   (1) delete them from the graph
+  --   (2) unify them all with the skolem
+  unifyWCCs g idS good
+
+  where
+    noSkolems (ABase b)    = Left b
+    noSkolems (AVar (U v)) = Right v
+    noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
+
+    unifyWCCs g s []     = return (G.map noSkolems g, s)
+    unifyWCCs g s (u:us) = do
+      let g' = foldl' (flip G.delete) g u
+
+          ms' = unifyAtoms (S.toList u)
+      case ms' of
+        Nothing -> throwError NoUnify
+        Just s' -> unifyWCCs g' (atomToTypeSubst s' @@ s) us
+
+--------------------------------------------------
+-- Step 6: Eliminate cycles
 
 -- | Eliminate cycles in the constraint set by collapsing each
 --   strongly connected component to a single node, (unifying all the
@@ -1311,28 +1388,93 @@ mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
 --   Of course, this step can fail if the types in a SCC are not
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
-elimCycles :: Graph Atom -> Except SolveError (Graph Atom, S)
+elimCycles :: Graph UAtom -> Except SolveError (Graph UAtom, S)
 elimCycles g
   = maybeError NoUnify
   $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (Atom, S' Atom))
+    g' :: Maybe (Graph (UAtom, S' Atom))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set Atom -> Maybe (Atom, S' Atom)
-    unifySCC atoms
-      | S.null atoms = error "Impossible! unifySCC on the empty set"
-      | otherwise    = (flip substs a &&& id) <$> unifyAtoms as
+    unifySCC :: Set UAtom -> Maybe (UAtom, S' Atom)
+    unifySCC uatoms
+      | S.null uatoms = error "Impossible! unifySCC on the empty set"
+      | otherwise     = (flip substs a &&& id) <$> unifyAtoms (map uatomToAtom as)
       where
-        as@(a:_) = S.toList atoms
+        as@(a:_) = S.toList uatoms
 
 ------------------------------------------------------------
--- Steps 5 and 6: Constraint resolution
+-- Steps 7 and 8: Constraint resolution
 ------------------------------------------------------------
 
--- | Build the set of successor and predecessor base types of each
---   type variable in the constraint graph.  For each type variable,
+-- | Rels stores the set of base types and variables related to a
+--   given variable in the constraint graph (either predecessors or
+--   successors, but not both).
+data Rels = Rels
+  { baseRels :: Set BaseTy
+  , varRels  :: Set (Name Type)
+  }
+  deriving (Show, Eq)
+
+-- | A RelMap associates each variable to its sets of base type and
+--   variable predecessors and successors in the constraint graph.
+type RelMap = Map (Name Type, Dir) Rels
+
+-- | Essentially dirtypesBySort sm rm dir t s x finds all the
+--   dir-types (sub- or super-) of t which have sort s, relative to
+--   the variables in x.  This is \overbar{T}_S^X (resp. \underbar...)
+--   from Traytel et al.
+dirtypesBySort :: SortMap -> RelMap -> Dir -> BaseTy -> Sort -> Set (Name Type) -> [BaseTy]
+dirtypesBySort (SM sm) relMap dir t s x
+
+    -- Keep only those supertypes t' of t
+  = keep (dirtypes dir t) $ \t' ->
+      -- which have the right sort, and such that
+      hasSort t' s &&
+
+      -- for all variables beta \in x,
+      (forAll x $ \beta ->
+
+       -- there is at least one type t'' which is a subtype of t'
+       -- which would be a valid solution for beta, that is,
+       exists (dirtypes (other dir) t') $ \t'' ->
+
+          -- t'' has the sort beta is supposed to have, and
+         (hasSort t'' (sm ! beta)) &&
+
+          -- t'' is a supertype of every base type predecessor of beta.
+         (forAll (baseRels (relMap ! (beta, other dir))) $ \u ->
+            isDirB dir t'' u
+         )
+      )
+
+    -- The above comments are written assuming dir = Super; of course,
+    -- if dir = Sub then just swap "super" and "sub" everywhere.
+
+  where
+    forAll, exists :: Foldable t => t a -> (a -> Bool) -> Bool
+    forAll = flip all
+    exists = flip any
+    keep   = flip filter
+
+-- | Sort-aware infimum or supremum.
+limBySort :: SortMap -> RelMap -> Dir -> [BaseTy] -> Sort -> Set (Name Type) -> Maybe BaseTy
+limBySort sm rm dir ts s x
+  = (\is -> find (\lim -> all (\u -> isDirB dir u lim) is) is)
+  . isects
+  . map (\t -> dirtypesBySort sm rm dir t s x)
+  $ ts
+  where
+    isects = foldr1 intersect
+
+lubBySort, glbBySort :: SortMap -> RelMap -> [BaseTy] -> Sort -> Set (Name Type) -> Maybe BaseTy
+lubBySort sm rm = limBySort sm rm Super
+glbBySort sm rm = limBySort sm rm Sub
+
+-- | From the constraint graph, build the sets of successor and
+--   predecessor base types of each type variable, as well as the sets
+--   of successor and predecessor variables.  For each type variable,
 --   make sure the sup of its predecessors is <: the inf of its
 --   successors, and assign it one of the two: if it has only
 --   successors, assign it their inf; otherwise, assign it the sup of
@@ -1361,21 +1503,35 @@ elimCycles g
 --   system might not even support subtyping qualifiers like this).
 --   Instead, we unify the two type variables and the resulting type
 --   is @forall a. a -> a@.
-solveGraph :: Graph Atom -> SolveM S
-solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
+solveGraph :: SortMap -> Graph UAtom -> SolveM S
+solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
   where
-    unifyWCC :: S' Atom -> S' Atom
-    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ s
+    unifyWCC :: S' BaseTy -> S' Atom
+    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ (map (coerce *** ABase) s)
       where
-        wccVarGroups  = filter (all isVar) . substs s $ G.wcc g
-        mkEquateSubst = (\(a:as) -> map (\(AVar v) -> (coerce v, a)) as) . S.toList
+        wccVarGroups :: [Set UAtom]
+        wccVarGroups  = filter (all isRight) . substs s $ G.wcc g
+        mkEquateSubst :: Set UAtom -> S' Atom
+        mkEquateSubst _ = idS
+            -- XXX TODO
+            -- (\(a:as) -> map (\v -> (coerce v, a)) as) . map fromRight . S.toList
+
+        fromRight (Right r) = r
 
     -- Get the successor and predecessor sets for all the type variables.
-    (ss, ps) = (onlyVars *** onlyVars) $ G.cessors g
-    onlyVars = M.filterWithKey (\a _ -> isVar a)
+    topRelMap :: RelMap
+    topRelMap
+      = M.map (uncurry Rels . (S.fromAscList *** S.fromAscList) . partitionEithers . S.toList)
+      $ M.mapKeys (,Super) subMap `M.union` M.mapKeys (,Sub) superMap
 
-    go :: Map Atom (Set Atom) -> Map Atom (Set Atom) -> SolveM (S' Atom)
-    go succs preds = case as of
+    subMap, superMap :: Map (Name Type) (Set UAtom)
+    (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
+
+    onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
+    onlyVars = M.mapKeys (\(Right n) -> n) . M.filterWithKey (\a _ -> isRight a)
+
+    go :: RelMap -> SolveM (S' BaseTy)
+    go relMap = case as of
 
       -- No variables left that have base type constraints.
       []    -> return idS
@@ -1384,7 +1540,9 @@ solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
       (a:_) ->
 
         case solveVar a of
-          Nothing       -> throwError NoUnify
+          Nothing       -> do
+            traceM $ "Couldn't solve for " ++ show a
+            throwError NoUnify
 
           -- If we solved for a, delete it from the maps, apply the
           -- resulting substitution to the remainder, and recurse.
@@ -1392,7 +1550,10 @@ solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
           -- substitution for a with the substitution generated by the
           -- recursive call.
           Just s ->
-            (@@ s) <$> go (substs s (M.delete a succs)) (substs s (M.delete a preds))
+            (@@ s) <$> go (M.delete (a,Sub) . M.delete (a,Super) $ relMap)
+              -- XXX do we also need to update the SortMap?  Maybe it
+              -- really would be better to just modify variables to
+              -- carry around their sort with them!
 
       where
         -- NOTE we can't solve a bunch in parallel!  Might end up
@@ -1422,34 +1583,44 @@ solveGraph g = (atomToTypeSubst . unifyWCC) <$> go ss ps
 
         -- Get only the variables we can solve on this pass, which
         -- have base types in their predecessor or successor set.
-        as = filter (\a -> any isBase (succs ! a) || any isBase (preds ! a)) (M.keys succs)
+        as = map fst . filter (\k -> not . S.null . baseRels $ (relMap ! k)) $ M.keys relMap
 
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.
-        solveVar :: Atom -> Maybe (S' Atom)
-        solveVar a@(AVar v) =
-          case (filter isBase (S.toList $ succs ! a), filter isBase (S.toList $ preds ! a)) of
+        solveVar :: Name Type -> Maybe (S' BaseTy)
+        solveVar v =
+          case ((v,Super), (v,Sub)) & over both (S.toList . baseRels . (relMap!)) of
             ([], []) ->
               error $ "Impossible! solveGraph.solveVar called on variable "
-                      ++ show a ++ " with no base type successors or predecessors"
+                      ++ show v ++ " with no base type successors or predecessors"
 
-            -- Only successors.  Just assign a to their inf, if one exists.
-            (bsuccs, []) -> (coerce v |->) <$> glb bsuccs
+            -- Only supertypes.  Just assign a to their inf, if one exists.
+            (bsupers, []) ->
+              trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
+              (coerce v |->) <$> glbBySort sm relMap bsupers (unSM sm ! v)
+                (varRels (relMap ! (v,Super)))
 
-            -- Only predecessors.  Just assign a to their sup.
-            ([], bpreds) -> (coerce v |->) <$> lub bpreds
+            -- Only subtypes.  Just assign a to their sup.
+            ([], bsubs)   ->
+              trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
+              trace ("sortmap: " ++ show sm) $
+              trace ("relmap: " ++ show relMap) $
+              trace ("sort for " ++ show v ++ ": " ++ show (unSM sm ! v)) $
+              trace ("relvars: " ++ show (varRels (relMap ! (v,Sub)))) $
+              (coerce v |->) <$> lubBySort sm relMap bsubs   (unSM sm ! v)
+                (varRels (relMap ! (v,Sub)))
 
             -- Both successors and predecessors.  Both must have a
             -- valid bound, and the bounds must not overlap.  Assign a
             -- to the sup of its predecessors.
-            (bsuccs, bpreds) -> do
-              ub <- glb bsuccs
-              lb <- lub bpreds
-              case isSub lb ub of
+            (bsupers, bsubs) -> do
+              ub <- glbBySort sm relMap bsupers (unSM sm ! v)
+                      (varRels (relMap ! (v,Super)))
+              lb <- lubBySort sm relMap bsubs   (unSM sm ! v)
+                      (varRels (relMap ! (v,Sub)))
+              case isSubB lb ub of
                 True  -> Just (coerce v |-> lb)
                 False -> Nothing
-
-        solveVar a = error $ "Impossible! solveGraph.solveVar called on non-variable " ++ show a
 
 ------------------------------------------------------------
 -- main

@@ -770,10 +770,16 @@ instance Pretty Expr where
   prettyPrec _ _ (EPair e1 e2) =
     "<" ++ prettyPrec 0 L e1 ++ ", " ++ prettyPrec 0 L e2 ++ ">"
 
+-- infixr -> 1
+-- infixr *  3
 instance Pretty Type where
-  pretty (TyAtom a)       = pretty a
-  pretty (TyFun ty1 ty2)  = "(" ++ pretty ty1 ++ " -> " ++ pretty ty2 ++ ")"
-  pretty (TyPair ty1 ty2) = pretty ty1 ++ " * " ++ pretty ty2
+  prettyPrec _ _ (TyAtom a)      = pretty a
+  prettyPrec p a (TyFun ty1 ty2) =
+    mparens (p > 1 || p==1 && a == L) $
+      prettyPrec 1 L ty1 ++ " -> " ++ prettyPrec 1 R ty2
+  prettyPrec p a (TyPair ty1 ty2) =
+    mparens (p > 3 || p==3 && a == L) $
+      prettyPrec 3 L ty1 ++ " * " ++ prettyPrec 3 R ty2
 
 instance Pretty Atom where
   pretty (AVar v)  = pretty v
@@ -1679,7 +1685,7 @@ repl = forever $ do
             Left err -> iprint err
             Right s  -> do
               ipretty s
-              iputStrLn (pretty (interp e))
+              iputStrLn (pretty (interp e) ++ " : " ++ pretty (substs s ty))
     Nothing -> liftIO exitSuccess
   where
     iprint :: Show a => a -> InputT IO ()

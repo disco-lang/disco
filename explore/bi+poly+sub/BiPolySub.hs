@@ -1387,6 +1387,8 @@ checkSkolems (SM sm) g = do
 
     unifyWCCs g s []     = return (G.map noSkolems g, s)
     unifyWCCs g s (u:us) = do
+      traceM $ "Unifying " ++ pretty (u:us) ++ "..."
+
       let g' = foldl' (flip G.delete) g u
 
           ms' = unifyAtoms (S.toList u)
@@ -1499,37 +1501,19 @@ lubBySort, glbBySort :: SortMap -> RelMap -> [BaseTy] -> Sort -> Set (Name Type)
 lubBySort sm rm = limBySort sm rm Super
 glbBySort sm rm = limBySort sm rm Sub
 
--- | From the constraint graph, build the sets of successor and
---   predecessor base types of each type variable, as well as the sets
---   of successor and predecessor variables.  For each type variable,
---   make sure the sup of its predecessors is <: the inf of its
---   successors, and assign it one of the two: if it has only
---   successors, assign it their inf; otherwise, assign it the sup of
---   its predecessors.  If it has both predecessors and successors, we
---   have a choice of whether to assign it the sup of predecessors or
---   inf of successors; both lead to a sound & complete algorithm.  We
---   choose to assign it the sup of its predecessors in this case,
---   since it seems nice to default to "simpler" types lower down in
---   the subtyping chain.
---
---   After picking concrete base types for all the type variables we
---   can, the only thing possibly remaining in the graph are
---   components containing only type variables and no base types.  It
---   is sound, and simplifies the generated types considerably, to
---   simply unify any type variables which are related by subtyping
---   constraints.  That is, we collect all the type variables in each
---   weakly connected component and unify them.
---
---   As an example where this final step makes a difference, consider
---   a term like @\x. (\y.y) x@.  A fresh type variable is generated
---   for the type of @x@, and another for the type of @y@; the
---   application of @(\y.y)@ to @x@ induces a subtyping constraint
---   between the two type variables.  The most general type would be
---   something like @forall a b. (a <: b) => a -> b@, but we want to
---   avoid generating unnecessary subtyping constraints (the type
---   system might not even support subtyping qualifiers like this).
---   Instead, we unify the two type variables and the resulting type
---   is @forall a. a -> a@.
+-- | From the constraint graph, build the sets of sub- and super- base
+--   types of each type variable, as well as the sets of sub- and
+--   supertype variables.  For each type variable x in turn, try to
+--   find a common supertype of its base subtypes which is consistent
+--   with the sort of x and with the sorts of all its sub-variables,
+--   as well as symmetrically a common subtype of its supertypes, etc.
+--   Assign x one of the two: if it has only successors, assign it
+--   their inf; otherwise, assign it the sup of its predecessors.  If
+--   it has both, we have a choice of whether to assign it the sup of
+--   predecessors or inf of successors; both lead to a sound &
+--   complete algorithm.  We choose to assign it the sup of its
+--   predecessors in this case, since it seems nice to default to
+--   "simpler" types lower down in the subtyping chain.
 solveGraph :: SortMap -> Graph UAtom -> SolveM S
 solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
   where
@@ -1546,9 +1530,30 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
 
             -- However, since disco will never infer a polymorphic
             -- type (for now), it doesn't really matter.  I'll leave
-            -- mkEquateSubst here as idS for now just as a reminder of
-            -- where to put this code if we ever want it again in the
-            -- future.
+            -- mkEquateSubst here as idS (+ the below comments) for
+            -- now just as a reminder of where to put this code if we
+            -- ever want it again in the future.
+
+            -- After picking concrete base types for all the type
+            -- variables we can, the only thing possibly remaining in
+            -- the graph are components containing only type variables
+            -- and no base types.  It is sound, and simplifies the
+            -- generated types considerably, to simply unify any type
+            -- variables which are related by subtyping constraints.
+            -- That is, we collect all the type variables in each
+            -- weakly connected component and unify them.
+            --
+            -- As an example where this final step makes a difference,
+            -- consider a term like @\x. (\y.y) x@.  A fresh type
+            -- variable is generated for the type of @x@, and another
+            -- for the type of @y@; the application of @(\y.y)@ to @x@
+            -- induces a subtyping constraint between the two type
+            -- variables.  The most general type would be something
+            -- like @forall a b. (a <: b) => a -> b@, but we want to
+            -- avoid generating unnecessary subtyping constraints (the
+            -- type system might not even support subtyping qualifiers
+            -- like this).  Instead, we unify the two type variables
+            -- and the resulting type is @forall a. a -> a@.
 
         fromRight (Right r) = r
 
@@ -1579,10 +1584,10 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
             throwError NoUnify
 
           -- If we solved for a, delete it from the maps, apply the
-          -- resulting substitution to the remainder, and recurse.
-          -- The substitution we want will be the composition of the
-          -- substitution for a with the substitution generated by the
-          -- recursive call.
+          -- resulting substitution to the remainder (updating the
+          -- relMap appropriately), and recurse.  The substitution we
+          -- want will be the composition of the substitution for a
+          -- with the substitution generated by the recursive call.
           --
           -- Note we don't need to delete a from the SortMap; we never
           -- use the set of keys from the SortMap for anything

@@ -1,17 +1,20 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveTraversable     #-}
+{-# LANGUAGE EmptyCase             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
-{-# LANGUAGE TypeOperators, PatternSynonyms #-}
-{-# LANGUAGE EmptyCase, StandaloneDeriving #-}
-{-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface
@@ -35,7 +38,7 @@ module Disco.AST.Surface
          -- * Terms
        , UD
        , Term
-       , pattern TVar 
+       , pattern TVar
        , pattern TUn
        , pattern TLet
        , pattern TParens
@@ -70,7 +73,7 @@ module Disco.AST.Surface
        , Qual
        , pattern QBind
        , pattern QGuard
-       
+
        , Ellipsis(..)
 
          -- ** Case expressions and patterns
@@ -83,23 +86,23 @@ module Disco.AST.Surface
        , Pattern
        , pattern PVar
        , pattern PWild
-       , pattern PUnit 
-       , pattern PBool 
-       , pattern PTup 
+       , pattern PUnit
+       , pattern PBool
+       , pattern PTup
        , pattern PInj
-       , pattern PNat 
+       , pattern PNat
        , pattern PSucc
        , pattern PCons
-       , pattern PList 
-       , pattern Binding 
+       , pattern PList
+       , pattern Binding
        )
        where
 
-import           Unbound.Generics.LocallyNameless
+import           Disco.AST.Generic
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
-import           Disco.AST.Generic
+import           Unbound.Generics.LocallyNameless
 
 -- | The extension descriptor for Surface specific AST types.
 
@@ -156,28 +159,28 @@ isDefn _       = False
 ------------------------------------------------------------
 -- Terms
 ------------------------------------------------------------
-type Term = Term_ UD 
+type Term = Term_ UD
 
 type instance X_TVar UD = ()
 type instance X_TLet UD = ()
-type instance X_TParens UD = () 
+type instance X_TParens UD = ()
 type instance X_TUnit UD = ()
-type instance X_TBool UD = () 
+type instance X_TBool UD = ()
 type instance X_TNat UD = ()
 type instance X_TRat UD = ()
-type instance X_TAbs UD = () 
+type instance X_TAbs UD = ()
 type instance X_TApp UD = ()
-type instance X_TInj UD = () 
-type instance X_TCase UD = () 
+type instance X_TInj UD = ()
+type instance X_TCase UD = ()
 type instance X_TUn UD = ()
-type instance X_TBin UD = () 
-type instance X_TChain UD = () 
-type instance X_TTyop UD = () 
-type instance X_TList UD = () 
-type instance X_TListComp UD = () 
+type instance X_TBin UD = ()
+type instance X_TChain UD = ()
+type instance X_TTyop UD = ()
+type instance X_TList UD = ()
+type instance X_TListComp UD = ()
 type instance X_TAscr UD = ()
-type instance X_Term UD = () 
-type instance X_TTup UD = () 
+type instance X_Term UD = ()
+type instance X_TTup UD = ()
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -186,10 +189,10 @@ pattern TUn :: UOp -> Term -> Term
 pattern TUn uop term = TUn_ () uop term
 
 pattern TLet :: Bind (Telescope Binding) Term -> Term
-pattern TLet bind = TLet_ () bind 
+pattern TLet bind = TLet_ () bind
 
 pattern TParens :: Term -> Term
-pattern TParens term  = TParens_ () term 
+pattern TParens term  = TParens_ () term
 
 pattern TUnit :: Term
 pattern TUnit = TUnit_ ()
@@ -207,10 +210,10 @@ pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 pattern TAbs bind = TAbs_ () bind
 
 pattern TApp  :: Term -> Term -> Term
-pattern TApp term1 term2 = TApp_ () term1 term2 
+pattern TApp term1 term2 = TApp_ () term1 term2
 
 pattern TTup :: [Term] -> Term
-pattern TTup termlist = TTup_ () termlist 
+pattern TTup termlist = TTup_ () termlist
 
 pattern TInj :: Side -> Term -> Term
 pattern TInj side term = TInj_ () side term
@@ -237,11 +240,11 @@ pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
-             TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp, 
+             TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TList, TListComp, TAscr #-}
 
 
-type Link = Link_ UD 
+type Link = Link_ UD
 
 type instance X_TLink UD = ()
 
@@ -253,7 +256,7 @@ pattern TLink bop term = TLink_ () bop term
 type Qual = Qual_ UD
 
 type instance X_QBind UD = ()
-type instance X_QGuard UD = () 
+type instance X_QGuard UD = ()
 
 pattern QBind :: Name Term -> Embed Term -> Qual
 pattern QBind namet embedt = QBind_ () namet embedt
@@ -264,19 +267,19 @@ pattern QGuard embedt = QGuard_ () embedt
 {-# COMPLETE QBind, QGuard #-}
 
 
-type Binding = Binding_ UD 
+type Binding = Binding_ UD
 
-pattern Binding :: (Maybe Sigma) -> Name Term -> Embed Term -> Binding 
-pattern Binding m b n = Binding_ m b n 
+pattern Binding :: Maybe (Embed Sigma) -> Name Term -> Embed Term -> Binding
+pattern Binding m b n = Binding_ m b n
 
 {-# COMPLETE Binding #-}
 
-type Branch = Branch_ UD 
+type Branch = Branch_ UD
 
 type Guard = Guard_ UD
 
 type instance X_GBool UD = ()
-type instance X_GPat UD = () 
+type instance X_GPat UD = ()
 
 pattern GBool :: Embed Term -> Guard
 pattern GBool embedt = GBool_ () embedt
@@ -286,7 +289,7 @@ pattern GPat embedt pat = GPat_ () embedt pat
 
 {-# COMPLETE GBool, GPat #-}
 
-type Pattern = Pattern_ UD 
+type Pattern = Pattern_ UD
 
 type instance X_PVar UD = ()
 type instance X_PWild UD = ()
@@ -300,7 +303,7 @@ type instance X_PCons UD = ()
 type instance X_PList UD = ()
 
 pattern PVar :: Name Term -> Pattern
-pattern PVar name = PVar_ () name 
+pattern PVar name = PVar_ () name
 
 pattern PWild :: Pattern
 pattern PWild = PWild_ ()
@@ -309,30 +312,30 @@ pattern PUnit :: Pattern
 pattern PUnit = PUnit_ ()
 
 pattern PBool :: Bool -> Pattern
-pattern PBool  b = PBool_ () b 
+pattern PBool  b = PBool_ () b
 
 pattern PTup  :: [Pattern] -> Pattern
-pattern PTup lp = PTup_ () lp 
+pattern PTup lp = PTup_ () lp
 
 -- | Injection pattern (@inl pat@ or @inr pat@).
 pattern PInj  :: Side -> Pattern -> Pattern
-pattern PInj s p = PInj_ () s p 
+pattern PInj s p = PInj_ () s p
 
 -- | Literal natural number pattern.
 pattern PNat  :: Integer -> Pattern
-pattern PNat n = PNat_ () n 
+pattern PNat n = PNat_ () n
 
 -- | Successor pattern, @S p@.
 pattern PSucc :: Pattern -> Pattern
-pattern PSucc p = PSucc_ () p 
+pattern PSucc p = PSucc_ () p
 
 -- | Cons pattern @p1 :: p2@.
 pattern PCons :: Pattern -> Pattern -> Pattern
-pattern PCons  p1 p2 = PCons_ () p1 p2 
+pattern PCons  p1 p2 = PCons_ () p1 p2
 
 -- | List pattern @[p1, .., pn]@.
 pattern PList :: [Pattern] -> Pattern
-pattern PList lp = PList_ () lp 
+pattern PList lp = PList_ () lp
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
              PSucc, PCons, PList #-}

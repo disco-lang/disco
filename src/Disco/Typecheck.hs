@@ -77,6 +77,7 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Typecheck.Constraints
+import           Disco.Typecheck.Solve
 import           Disco.Types
 import           Disco.Types.Rules
 
@@ -133,6 +134,7 @@ data TCError
   | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
   | NotSubtractive Type
   | NotFractional Type
+  | Unsolvable SolveError
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -426,9 +428,11 @@ checkBranch ty b =
 -- | Infer the type of a term.  The resulting annotations on the term
 --   are guaranteed to be free of type variables.
 inferTop :: Term -> TCM ATerm
-inferTop t = fst <$> infer t
-  -- XXX FIX ME!!!  Run the constraint solver and use the resulting
-  -- substitution.
+inferTop t = do
+  (at, constr) <- infer t
+  case runSolveM (solveConstraint constr) of
+    Left solveErr -> throwError $ Unsolvable solveErr
+    Right theta   -> return $ substs theta at
 
 -- | Infer the type of a term, along with some constraints.  If it
 --   succeeds, it returns the term with all subterms annotated.
@@ -494,7 +498,7 @@ infer (TUn Neg t) = do
   (at, cst) <- infer t
   let ty = getType at
   tyv <- freshTy
-  return $ (ATUn tyv Neg at, cAnd [cst, CSub ty tyv, CQual QSub tyv]) 
+  return $ (ATUn tyv Neg at, cAnd [cst, CSub ty tyv, CQual QSub tyv])
 
 infer (TUn op t) | op `elem` [Sqrt, Lg] = do
   (at, cst) <- check t TyN
@@ -559,7 +563,7 @@ infer (TBin Mod t1 t2) = do
   let ty2 = getType at2
   tyv <- freshTy
   return (ATBin tyv Mod at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CSub tyv TyZ])
-  
+
 
 infer (TBin Divides t1 t2) = do
   (at1, cst1) <- infer t1
@@ -678,8 +682,8 @@ inferSubsumption (Forall sig) = do
 inferBinding :: Binding -> TCM (ABinding, TyCtx, Constraint)
 inferBinding (Binding mty x (unembed -> t)) = do
   (at, cst) <- case mty of
-    Just ty -> checkSigma t ty
-    Nothing -> infer t
+    Just (unembed -> ty) -> checkSigma t ty
+    Nothing              -> infer t
   return $ (ABinding mty (coerce x) (embed at), singleCtx x (toSigma $ getType at), cst)
 
 -- | Infer the type of a comparison. A comparison always has type
@@ -700,7 +704,7 @@ inferChain t1 (TLink op t2 : links) = do
   return (ATLink op at2 : atl, cst1 : cst2 : cst3)
 
 inferEllipsis :: Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm), Constraint)
-inferEllipsis (Just (Until t)) = do 
+inferEllipsis (Just (Until t)) = do
   (at, cst) <- infer t
   return ((Just . Until) at, cst)
 
@@ -860,7 +864,7 @@ checkModule (Module m docs) = do
 
 -- Refactor this to one function that takes a constructor as an argument
 ensureSum :: Type -> TCM (Type, Type, Constraint)
-ensureSum (TyPair ty1 ty2) = return (ty1, ty2, CTrue) 
+ensureSum (TyPair ty1 ty2) = return (ty1, ty2, CTrue)
 ensureSum tyv@(TyVar _) = do
   ty1 <- freshTy
   ty2 <- freshTy
@@ -949,7 +953,7 @@ checkDefn (DDefn x clauses) = do
       (aps, at, cst) <- go pats ty body
       return (bind aps at, cst)
 
-    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm, Constraint)  
+    go :: [Pattern] -> Type -> Term -> TCM ([APattern], ATerm, Constraint)
     go [] ty body = do
      (at, cst) <- check body ty
      return ([], at, cst)
@@ -968,14 +972,14 @@ checkProperties docs = do
   ctx <- (traverse . traverse) checkProperty properties
   let (nms, aclistlist) = unzip (M.toList ctx)
   let (apropll, cstl) = unpack aclistlist
-  let newctx = (M.mapKeys coerce . M.filter (not.null)) $ M.fromList (zip nms apropll) 
-  return (newctx, cAnd cstl) 
+  let newctx = (M.mapKeys coerce . M.filter (not.null)) $ M.fromList (zip nms apropll)
+  return (newctx, cAnd cstl)
   where
     properties :: Ctx Term [Property]
     properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
 
     unpack :: [[(a,c)]] -> ([[a]],[c])
-    unpack l = foldr (\acc (apll,cstl) -> 
+    unpack l = foldr (\acc (apll,cstl) ->
       let (aps, csts) = unzip acc in (aps : apll, csts ++ cstl)) ([],[]) l
 
 -- | Check the types of the terms embedded in a property.
@@ -1026,16 +1030,16 @@ eraseBinding :: ABinding -> Binding
 eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))
 
 erasePattern :: APattern -> Pattern
-erasePattern (APVar n) = PVar (coerce n)
-erasePattern APWild = PWild
-erasePattern APUnit = PUnit
-erasePattern (APBool b) = PBool b
-erasePattern (APTup alp) = PTup $ map erasePattern alp
-erasePattern (APInj s apt) = PInj s (erasePattern apt)
-erasePattern (APNat n) = PNat n
-erasePattern (APSucc apt) = PSucc $ erasePattern apt
+erasePattern (APVar n)        = PVar (coerce n)
+erasePattern APWild           = PWild
+erasePattern APUnit           = PUnit
+erasePattern (APBool b)       = PBool b
+erasePattern (APTup alp)      = PTup $ map erasePattern alp
+erasePattern (APInj s apt)    = PInj s (erasePattern apt)
+erasePattern (APNat n)        = PNat n
+erasePattern (APSucc apt)     = PSucc $ erasePattern apt
 erasePattern (APCons ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
-erasePattern (APList alp) = PList $ map erasePattern alp
+erasePattern (APList alp)     = PList $ map erasePattern alp
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)

@@ -274,7 +274,7 @@ parseModule = do
       where
         (grp, rest) = span matchDefn $ ds
         matchDefn (DDefn x' _) = x == x'
-        matchDefn _ = False
+        matchDefn _            = False
         getClauses (DDefn _ cs) = cs
         getClauses _ = error "Impossible! parseModule.defnGroups.getClauses on non-DDefn"
           -- Impossible since we only call getClauses on things that
@@ -495,7 +495,7 @@ parseBinding = do
   x   <- ident
   mty <- optionMaybe (colon *> parseSigma)
   t   <- symbol "=" *> (embed <$> parseTerm)
-  return $ Binding mty x t
+  return $ Binding (embed <$> mty) x t
 
 -- | Parse a case expression.
 parseCase :: Parser Term
@@ -573,9 +573,9 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
 
-    bfxParser InL  = InfixL
-    bfxParser InR  = InfixR
-    bfxParser In   = InfixN
+    bfxParser InL = InfixL
+    bfxParser InR = InfixR
+    bfxParser In  = InfixN
 
     isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides]
 

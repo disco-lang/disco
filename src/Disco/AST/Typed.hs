@@ -1,17 +1,20 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveTraversable     #-}
+{-# LANGUAGE EmptyCase             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
-{-# LANGUAGE TypeOperators, PatternSynonyms #-}
-{-# LANGUAGE EmptyCase, StandaloneDeriving #-}
-{-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -29,7 +32,7 @@
 module Disco.AST.Typed
        ( -- * Type-annotated terms
        ATerm
-       , pattern ATVar 
+       , pattern ATVar
        , pattern ATUn
        , pattern ATLet
        , pattern ATUnit
@@ -66,14 +69,14 @@ module Disco.AST.Typed
        , APattern
        , pattern APVar
        , pattern APWild
-       , pattern APUnit 
-       , pattern APBool 
-       , pattern APTup 
+       , pattern APUnit
+       , pattern APBool
+       , pattern APTup
        , pattern APInj
-       , pattern APNat 
+       , pattern APNat
        , pattern APSucc
        , pattern APCons
-       , pattern APList 
+       , pattern APList
        , pattern ABinding
          -- * Utilities
        , getType
@@ -84,10 +87,10 @@ module Disco.AST.Typed
 
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Generic
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
-import           Disco.AST.Generic
 
 -- | The extension descriptor for Typed specific AST types.
 
@@ -103,24 +106,36 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
+instance Subst Type Rational where
+  subst _ _ = id
+  substs _  = id
+
+instance Subst Type APattern
+instance Subst Type AQual
+instance Subst Type AGuard
+instance Subst Type Sigma
+instance Subst Type ABinding
+instance Subst Type ALink
+instance Subst Type ATerm
+
 type instance X_TVar TY = Type
 type instance X_TLet TY = Type
 type instance X_TUnit TY = ()
-type instance X_TBool TY = () 
+type instance X_TBool TY = ()
 type instance X_TNat TY = Type
 type instance X_TRat TY = ()
-type instance X_TAbs TY = Type 
+type instance X_TAbs TY = Type
 type instance X_TApp TY = Type
 type instance X_TInj TY = Type
 type instance X_TCase TY = Type
 type instance X_TUn TY = Type
-type instance X_TBin TY = Type 
-type instance X_TChain TY = Type 
+type instance X_TBin TY = Type
+type instance X_TChain TY = Type
 type instance X_TTyop TY = Type
-type instance X_TList TY = Type 
-type instance X_TListComp TY = Type 
+type instance X_TList TY = Type
+type instance X_TListComp TY = Type
 type instance X_TAscr TY = ()
-type instance X_Term TY = () 
+type instance X_Term TY = ()
 type instance X_TTup TY = Type
 type instance X_TParens TY = ()
 
@@ -131,7 +146,7 @@ pattern ATUn :: Type -> UOp -> ATerm -> ATerm
 pattern ATUn ty uop term = TUn_ ty uop term
 
 pattern ATLet :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
-pattern ATLet ty bind = TLet_ ty bind 
+pattern ATLet ty bind = TLet_ ty bind
 
 pattern ATUnit :: ATerm
 pattern ATUnit = TUnit_ ()
@@ -149,10 +164,10 @@ pattern ATAbs :: Type -> Bind [(Name ATerm, Embed (Maybe Type))] ATerm -> ATerm
 pattern ATAbs ty bind = TAbs_ ty bind
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
-pattern ATApp ty term1 term2 = TApp_ ty term1 term2 
+pattern ATApp ty term1 term2 = TApp_ ty term1 term2
 
 pattern ATTup :: Type -> [ATerm] -> ATerm
-pattern ATTup ty termlist = TTup_ ty termlist 
+pattern ATTup ty termlist = TTup_ ty termlist
 
 pattern ATInj :: Type -> Side -> ATerm -> ATerm
 pattern ATInj ty side term = TInj_ ty side term
@@ -179,7 +194,7 @@ pattern ATAscr :: ATerm -> Sigma -> ATerm
 pattern ATAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
-             ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp, 
+             ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATList, ATListComp, ATAscr #-}
 
 type ALink = Link_ TY
@@ -206,8 +221,8 @@ pattern AQGuard embedt = QGuard_ () embedt
 
 type ABinding = Binding_ TY
 
-pattern ABinding :: (Maybe Sigma) -> Name ATerm -> Embed ATerm -> ABinding 
-pattern ABinding m b n = Binding_ m b n 
+pattern ABinding :: Maybe (Embed Sigma) -> Name ATerm -> Embed ATerm -> ABinding
+pattern ABinding m b n = Binding_ m b n
 
 {-# COMPLETE ABinding #-}
 
@@ -216,7 +231,7 @@ type ABranch = Bind (Telescope AGuard) ATerm
 type AGuard = Guard_ TY
 
 type instance X_GBool TY = ()
-type instance X_GPat TY = () 
+type instance X_GPat TY = ()
 
 pattern AGBool :: Embed ATerm -> AGuard
 pattern AGBool embedt = GBool_ () embedt
@@ -240,39 +255,39 @@ type instance X_PCons TY = ()
 type instance X_PList TY = ()
 
 pattern APVar :: Name ATerm -> APattern
-pattern APVar name = PVar_ () name 
+pattern APVar name = PVar_ () name
 
 pattern APWild :: APattern
-pattern APWild = PWild_ () 
+pattern APWild = PWild_ ()
 
 pattern APUnit :: APattern
 pattern APUnit = PUnit_ ()
 
 pattern APBool :: Bool -> APattern
-pattern APBool  b = PBool_ () b 
+pattern APBool  b = PBool_ () b
 
 pattern APTup  :: [APattern] -> APattern
-pattern APTup lp = PTup_ () lp 
+pattern APTup lp = PTup_ () lp
 
 -- | Injection pattern (@inl pat@ or @inr pat@).
 pattern APInj  :: Side -> APattern -> APattern
-pattern APInj s p = PInj_ () s p 
+pattern APInj s p = PInj_ () s p
 
 -- | Literal natural number pattern.
 pattern APNat  :: Integer -> APattern
-pattern APNat n = PNat_ () n 
+pattern APNat n = PNat_ () n
 
 -- | Successor pattern, @S p@.
 pattern APSucc :: APattern -> APattern
-pattern APSucc p = PSucc_ () p 
+pattern APSucc p = PSucc_ () p
 
 -- | Cons pattern @p1 :: p2@.
 pattern APCons :: APattern -> APattern -> APattern
-pattern APCons  p1 p2 = PCons_ () p1 p2 
+pattern APCons  p1 p2 = PCons_ () p1 p2
 
 -- | List pattern @[p1, .., pn]@.
 pattern APList :: [APattern] -> APattern
-pattern APList lp = PList_ () lp 
+pattern APList lp = PList_ () lp
 
 {-# COMPLETE APVar, APWild, APUnit, APBool, APTup, APInj, APNat,
     APSucc, APCons, APList #-}

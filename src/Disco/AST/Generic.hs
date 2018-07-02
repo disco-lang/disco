@@ -1,17 +1,22 @@
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveTraversable     #-}
+{-# LANGUAGE EmptyCase             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
-{-# LANGUAGE TypeOperators, PatternSynonyms #-}
-{-# LANGUAGE EmptyCase, StandaloneDeriving #-}
-{-# LANGUAGE TypeFamilies, DataKinds, ConstraintKinds #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Generic
@@ -24,25 +29,25 @@
 -----------------------------------------------------------------------------
 
 module Disco.AST.Generic
-       ( 
+       (
        Term_ (..)
-      , X_TVar 
-      , X_TLet 
-      , X_TParens 
-      , X_TUnit 
-      , X_TBool 
-      , X_TNat 
-      , X_TRat 
-      , X_TAbs 
-      , X_TApp 
-      , X_TInj 
-      , X_TCase 
+      , X_TVar
+      , X_TLet
+      , X_TParens
+      , X_TUnit
+      , X_TBool
+      , X_TNat
+      , X_TRat
+      , X_TAbs
+      , X_TApp
+      , X_TInj
+      , X_TCase
       , X_TUn
-      , X_TBin 
-      , X_TChain 
-      , X_TTyop 
-      , X_TList 
-      , X_TListComp 
+      , X_TBin
+      , X_TChain
+      , X_TTyop
+      , X_TList
+      , X_TListComp
       , X_TAscr
       , X_Term
       , X_TTup
@@ -71,11 +76,11 @@ module Disco.AST.Generic
       , X_PSucc
       , X_PCons
       , X_PList
-      , foldTelescope 
+      , foldTelescope
       , mapTelescope
       , toTelescope
       , fromTelescope
-      , Property_ 
+      , Property_
        )
        where
 
@@ -85,7 +90,7 @@ import           Unbound.Generics.LocallyNameless
 
 import           Disco.Syntax.Operators
 import           Disco.Types
-import           GHC.Exts (Constraint)
+import           GHC.Exts                         (Constraint)
 ------------------------------------------------------------
 -- Telescopes
 ------------------------------------------------------------
@@ -104,10 +109,12 @@ data Telescope b where
 
 instance Alpha b => Alpha (Telescope b)
 
+instance Subst t b => Subst t (Telescope b)
+
 -- | Fold a telescope given a combining function and a value for the
 --   empty telescope.
 foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
-foldTelescope _ z TelEmpty = z
+foldTelescope _ z TelEmpty                       = z
 foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
 
 -- | Map over a telescope.
@@ -133,25 +140,27 @@ type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
-type family X_TVar e 
-type family X_TLet e 
-type family X_TParens e 
-type family X_TUnit e 
-type family X_TBool e 
-type family X_TNat e 
-type family X_TRat e 
-type family X_TAbs e 
-type family X_TApp e 
-type family X_TInj e 
-type family X_TCase e 
-type family X_TUn e 
-type family X_TBin e 
-type family X_TChain e 
-type family X_TTyop e 
-type family X_TList e 
-type family X_TListComp e 
+instance Subst t Side
+
+type family X_TVar e
+type family X_TLet e
+type family X_TParens e
+type family X_TUnit e
+type family X_TBool e
+type family X_TNat e
+type family X_TRat e
+type family X_TAbs e
+type family X_TApp e
+type family X_TInj e
+type family X_TCase e
+type family X_TUn e
+type family X_TBin e
+type family X_TChain e
+type family X_TTyop e
+type family X_TList e
+type family X_TListComp e
 type family X_TAscr e
-type family X_Term e 
+type family X_Term e
 type family X_TTup e
 
 data Term_ e where
@@ -216,15 +225,14 @@ data Term_ e where
   -- | Type ascription, @(Term_ e : type)@.
   TAscr_  :: X_TAscr e -> Term_ e -> Sigma -> Term_ e
 
-  XTerm_   :: X_Term e -> Term_ e 
+  XTerm_   :: X_Term e -> Term_ e
   deriving (Generic)
 
- 
-type Forall_t (a :: * -> Constraint) e 
-      = (a (X_TVar e), a (X_TLet e),  
-         a (X_TParens e), a (X_TUnit e), 
-         a (X_TBool e), a (X_TNat e), 
-         a (X_TRat e), a (X_TAbs e), 
+type Forall_t (a :: * -> Constraint) e
+      = (a (X_TVar e), a (X_TLet e),
+         a (X_TParens e), a (X_TUnit e),
+         a (X_TBool e), a (X_TNat e),
+         a (X_TRat e), a (X_TAbs e),
          a (X_TApp e), a (X_TInj e),
          a (X_TCase e), a (X_TUn e),
          a (X_TBin e), a (X_TChain e),
@@ -239,7 +247,7 @@ type Forall_t (a :: * -> Constraint) e
          a (X_PNat e), a (X_PSucc e), a (X_PCons e),
          a (X_PList e))
 
-deriving instance Forall_t Show e => Show (Term_ e) 
+deriving instance Forall_t Show e => Show (Term_ e)
 
 type family X_TLink e
 
@@ -256,6 +264,8 @@ data Ellipsis t where
   Forever ::      Ellipsis t   -- @..@
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)
+
+instance Subst a t => Subst a (Ellipsis t)
 
 -- Note: very similar to guards-
 --  maybe some generalization in the future?
@@ -276,7 +286,7 @@ data Qual_ e where
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
 
 -- | A binding is a name along with its definition.
-data Binding_ e = Binding_ (Maybe Sigma) (Name (Term_ e)) (Embed (Term_ e))
+data Binding_ e = Binding_ (Maybe (Embed Sigma)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
 deriving instance Forall_t Show  e => Show (Binding_ e)
@@ -297,7 +307,7 @@ data Guard_ e where
   GBool_ :: X_GBool e -> Embed (Term_ e) -> Guard_ e
 
   -- | Pattern guard (@when term = pat@)
-  {-I am thinking about changing Pattern_ e here to Pattern_ b 
+  {-I am thinking about changing Pattern_ e here to Pattern_ b
     but you wouldn't be able to derive Generic if you do that. -}
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
 
@@ -307,16 +317,16 @@ deriving instance Forall_t Show  e => Show (Guard_ e)
 
 -- | Patterns.
 
-type family X_PVar e 
-type family X_PWild e 
-type family X_PUnit e 
-type family X_PBool e 
-type family X_PTup e 
-type family X_PInj e 
-type family X_PNat e 
-type family X_PSucc e 
-type family X_PCons e 
-type family X_PList e 
+type family X_PVar e
+type family X_PWild e
+type family X_PUnit e
+type family X_PBool e
+type family X_PTup e
+type family X_PInj e
+type family X_PNat e
+type family X_PSucc e
+type family X_PCons e
+type family X_PList e
 
 data Pattern_ e where
 

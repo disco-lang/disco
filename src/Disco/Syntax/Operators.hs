@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -76,6 +78,10 @@ data TyOp = Enumerate -- ^ List all values of a type
 instance Alpha UOp
 instance Alpha BOp
 instance Alpha TyOp
+
+instance Subst t UOp
+instance Subst t BOp
+instance Subst t TyOp
 
 ------------------------------------------------------------
 -- Operator info

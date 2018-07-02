@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GADTs         #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -41,6 +42,8 @@ data Constraint where
   deriving (Show, Generic)
 
 instance Alpha Constraint
+
+instance Subst Type Constraint
 
 -- A helper function for creating a single constraint from a list of constraints.
 cAnd :: [Constraint] -> Constraint

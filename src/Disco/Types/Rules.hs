@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types.Rules
@@ -75,6 +76,8 @@ data Qualifier = QNum | QSub | QDiv | QFin
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier
+
+instance Subst Type Qualifier
 
 -- | A helper function that returns the appropriate qualifier for a binary operation.
 bopQual :: BOp -> Qualifier

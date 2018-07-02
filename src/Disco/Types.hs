@@ -58,6 +58,10 @@ module Disco.Types
 
        , isNumTy, isSubtractive, isEmptyTy
 
+       -- * Type substitutions
+
+       , S', atomToTypeSubst, uatomToTypeSubst
+
        -- * Strictness
        , Strictness(..), strictness
 
@@ -75,6 +79,13 @@ import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Math.NumberTheory.Primes.Testing (isPrime)
+
+import           Control.Arrow                    ((***))
+import           Data.Coerce
+import           Data.Map                         (Map, (!))
+import qualified Data.Map                         as M
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 
 import           Disco.Subst                      (S')
 
@@ -244,6 +255,14 @@ instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
   isvar _                     = Nothing
 
+-- orphans
+instance (Ord a, Subst t a) => Subst t (Set a) where
+  subst x t = S.map (subst x t)
+  substs s  = S.map (substs s)
+instance (Ord k, Subst t a) => Subst t (Map k a) where
+  subst x t = M.map (subst x t)
+  substs s  = M.map (substs s)
+
 ----------------------------------------
 -- Sigma types (i.e. quanitified types)
 
@@ -337,3 +356,9 @@ unpair ty               = [ty]
 -- | Define @S@ as a substitution on types (the most common kind)
 --   for convenience.
 type S = S' Type
+
+atomToTypeSubst :: S' Atom -> S' Type
+atomToTypeSubst = map (coerce *** TyAtom)
+
+uatomToTypeSubst :: S' UAtom -> S' Type
+uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)

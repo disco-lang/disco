@@ -1,24 +1,24 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (use, (%=), (.=))
-import           Control.Monad                    (when, forM_)
-import           Control.Monad.Except             (catchError)
-import           Control.Monad.IO.Class           (MonadIO(..))
-import           Control.Monad.Trans.Class        (MonadTrans(..))
-import           Data.Char                        (isSpace)
+import           Control.Arrow                           ((&&&))
+import           Control.Lens                            (use, (%=), (.=))
+import           Control.Monad                           (forM_, when)
+import           Control.Monad.Except                    (catchError)
+import           Control.Monad.IO.Class                  (MonadIO (..))
+import           Control.Monad.Trans.Class               (MonadTrans (..))
+import           Data.Char                               (isSpace)
 import           Data.Coerce
-import           Data.List                        (find, isPrefixOf)
-import           Data.Map                         ((!))
-import qualified Data.Map                         as M
-import           Data.Maybe                       (isJust)
+import           Data.List                               (find, isPrefixOf)
+import           Data.Map                                ((!))
+import qualified Data.Map                                as M
+import           Data.Maybe                              (isJust)
 
-import qualified Options.Applicative              as O
-import           System.Console.Haskeline         as H
+import qualified Options.Applicative                     as O
+import           System.Console.Haskeline                as H
 import           System.Exit
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec.Char             as C
+import           Text.Megaparsec                         hiding (runParser)
+import qualified Text.Megaparsec.Char                    as C
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -27,7 +27,7 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
-import           Disco.Interpret.Core             (loadDefs)
+import           Disco.Interpret.Core                    (loadDefs)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
@@ -90,8 +90,8 @@ lineParser
 parseLine :: String -> Either String REPLExpr
 parseLine s =
   case (runParser lineParser "" s) of
-    Left  e  -> Left $ parseErrorPretty' s e
-    Right l  -> Right l
+    Left  e -> Left $ parseErrorPretty' s e
+    Right l -> Right l
 
 -- XXX eventually this should switch from using IErr specifically to
 -- an umbrella error type in which IErr can be embedded, along with
@@ -117,7 +117,7 @@ handleCMD s =
       file <- use lastFile
       case file of
         Nothing -> iputStrLn "No file to reload."
-        Just f -> handleLoad f >> return()
+        Just f  -> handleLoad f >> return()
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
@@ -125,11 +125,11 @@ handleCMD s =
 handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
-  let mat = runTCM (extends ctx $ infer t)
+  let mat = runTCM (extends ctx $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, _) -> do
-      topCtx   %= M.insert x (getType at)
+      topCtx   %= M.insert x (toSigma (getType at))
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
 handleShowDefn :: Name Term -> Disco IErr String
@@ -141,7 +141,7 @@ handleShowDefn x = do
 
 handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
-  case evalTCM (infer t) of
+  case evalTCM (inferTop t) of
     Left e   -> return.show $ e
     Right at -> return.show.runDSM.desugarTerm $ at
 
@@ -159,7 +159,7 @@ handleLoad file = do
   case mp of
     Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
     Right p  ->
-      case runTCM (checkModule p) of
+      case runTCM (checkModuleTop p) of
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
@@ -233,7 +233,7 @@ prettyCounterexample ctx env
   where
     prettyBinding maxNameLen (x,v) = do
       iputStr "      "
-      iputStr =<< (renderDoc . prettyName $ coerce x)
+      iputStr =<< (renderDoc . prettyName $ x)
       iputStr (replicate (maxNameLen - length (name2String x)) ' ')
       iputStr " = "
       prettyValue (ctx ! coerce x) v
@@ -245,16 +245,16 @@ handleDocs x = do
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
-      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyTy ty]
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettySigma ty]
       io . putStrLn $ p
       case M.lookup x docs of
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
-        _ -> return ()
+        _                       -> return ()
 
 evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
-  case evalTCM (extends ctx $ infer t) of
+  case evalTCM (extends ctx $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right at ->
       let ty = getType at
@@ -264,7 +264,7 @@ evalTerm t = do
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
-  case (evalTCM $ extends ctx (infer t)) of
+  case (evalTCM $ extends ctx (inferTop t)) of
     Left e   -> return.show $ e    -- XXX pretty-print
     Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
 
@@ -328,7 +328,7 @@ main = do
       Just file -> do
         mcmds <- loadFile file
         case mcmds of
-          Nothing -> return ()
+          Nothing   -> return ()
           Just cmds -> mapM_ handleCMD (lines cmds)
       Nothing   -> return ()
     case evaluate opts of

@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE FlexibleInstances        #-}
 {-# LANGUAGE GADTs                    #-}
@@ -36,11 +36,11 @@ module Disco.Typecheck
        , checkProperties, checkProperty
 
          -- ** Whole modules
+       , checkModuleTop
        , checkModule, withTypeDecls
-         -- ** Subtyping
-       , checkSub
 
          -- * Type inference
+       , inferTop
        , infer
        , inferComp
          -- ** Case analysis
@@ -68,7 +68,7 @@ import           Data.List                               (group, partition,
                                                           sort)
 import qualified Data.Map                                as M
 
-import           GHC.Generics                     (Generic)
+import           GHC.Generics                            (Generic)
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -76,8 +76,10 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
+import           Disco.Typecheck.Constraints
 import           Disco.Types
---
+import           Disco.Types.Rules
+
 -- | A definition is a group of clauses, each having a list of
 --   patterns that bind names in a term, without the name of the
 --   function being defined.  For example, given the concrete syntax
@@ -171,48 +173,6 @@ lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 -- | Generates a type variable with a fresh name.
 freshTy :: TCM Type
 freshTy = TyVar <$> lfresh (string2Name "a")
-
--- | Constraints are generated as a result of type inference and checking.
---   These constraints are accumulated during the inference and checking phase
---   and are subsequently solved by the constraint solver.
-data Constraint where
-  CExp :: Type -> Type -> Constraint
-  CPos :: Type -> Type -> Constraint
-  CInt :: Type -> Type -> Constraint 
-  CSub  :: Type -> Type -> Constraint
-  CEq   :: Type -> Type -> Constraint
-  CQual :: Qualifier -> Type -> Constraint
-  CAnd  :: [Constraint] -> Constraint
-  CTrue :: Constraint
-  CAll  :: Bind [Name Type] Constraint -> Constraint
-
-  deriving (Show, Generic)
-
-instance Alpha Constraint
-
--- A helper function for creating a single constraint from a list of constraints.
-cAnd :: [Constraint] -> Constraint
-cAnd cs = case filter nontrivial cs of
-  []   -> CTrue
-  [c]  -> c
-  cs'  -> CAnd cs'
-  where
-    nontrivial CTrue = False
-    nontrivial _     = True
-
--- | Qualifiers that may appear in the CQual constraint.
-data Qualifier = QAdd | QSub | QMul | QDiv | QNum | QFin
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha Qualifier
-
--- | A helper function that returns the appropriate qualifier for a binary operation.
-bopQual :: BOp -> Qualifier
-bopQual Add  = QAdd
-bopQual Mul = QMul
-bopQual Div = QDiv
-bopQual Sub = QSub
-bopQual _   = error "No qualifier for binary operation"
 
 -- | Check that a term has the given sigma type.
 checkSigma :: Term -> Sigma -> TCM (ATerm, Constraint)
@@ -313,7 +273,7 @@ check (TCase bs) ty = do
 -- b) : Z13, in which case we need to push the checking type (in the
 -- example, Z13) through the operator to check the arguments.
 
--- Checking arithmetic binary operations involves checking both operands 
+-- Checking arithmetic binary operations involves checking both operands
 -- and then adding a constraint qualifier over binary operation and the desired type.
 check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub] = do
   (at1, cst1) <- check t1 ty
@@ -433,10 +393,6 @@ checkArgs ((x, unembed -> mty) : args) ty = do
   -- generated context.
   return (singleCtx x (toSigma xTy) `joinCtx` ctx, resTy, cAnd [cst1, cst2, cst3])
 
--- Otherwise, we are trying to check some lambda arguments under a
--- non-arrow type.
-checkArgs _args _ty = error $ "checkArgs --- Make a better error here!"
-
 
 -- | Check the types of terms in a tuple against a nested
 --   pair type.
@@ -450,7 +406,6 @@ checkTuple (t:ts) ty = do
   (at, cst2) <- check t ty1
   (ats, csts) <- checkTuple ts ty2
   return $ (at : ats, cst1 : cst2 : csts)
-checkTuple ts ty = throwError $ NotTuple (TTup ts) ty
 
 checkEllipsis :: Maybe (Ellipsis Term) -> Type -> TCM (Maybe (Ellipsis ATerm), Constraint)
 checkEllipsis Nothing          _  = return (Nothing, CTrue)
@@ -468,145 +423,15 @@ checkBranch ty b =
   (at, cst2) <- check t ty
   return $ (bind ags at, cAnd [cst1, cst2])
 
--- | Check that the given annotated term has a type which is a subtype
---   of the given type.  The returned annotated term may be the same
---   as the input, or it may be wrapped in 'ATSub' if we made a
---   nontrivial use of subtyping.
-checkSub :: ATerm -> Type -> TCM ATerm
-checkSub at ty =
-  case isSub (getType at) ty of
-    True  -> return at
-    False -> throwError (Mismatch ty at)
+-- | Infer the type of a term.  The resulting annotations on the term
+--   are guaranteed to be free of type variables.
+inferTop :: Term -> TCM ATerm
+inferTop t = fst <$> infer t
+  -- XXX FIX ME!!!  Run the constraint solver and use the resulting
+  -- substitution.
 
--- | Check whether one type is a subtype of another (we have decidable
---   subtyping).
-isSub :: Type -> Type -> Bool
-isSub ty1 ty2 | ty1 == ty2 = True
-isSub TyVoid _ = True
-isSub TyN TyZ  = True
-isSub TyN TyQP = True
-isSub TyN TyQ  = True
-isSub TyZ TyQ  = True
-isSub TyQP TyQ = True
-isSub (TyArr t1 t2) (TyArr t1' t2')   = isSub t1' t1 && isSub t2 t2'
-isSub (TyPair t1 t2) (TyPair t1' t2') = isSub t1 t1' && isSub t2 t2'
-isSub (TySum  t1 t2) (TySum  t1' t2') = isSub t1 t1' && isSub t2 t2'
-isSub _ _ = False
-
--- -- | Compute the least upper bound (least common supertype) of two
--- --   types.  Return the LUB, or throw an error if there isn't one.
--- lub :: Type -> Type -> TCM Type
--- lub ty1 ty2
---   | isSub ty1 ty2 = return ty2
---   | isSub ty2 ty1 = return ty1
--- lub TyQP TyZ = return TyQ
--- lub TyZ TyQP = return TyQ
--- lub (TyArr t1 t2) (TyArr t1' t2') = do
---   requireSameTy t1 t1'
---   t2'' <- lub t2 t2'
---   return $ TyArr t1 t2''
--- lub (TyPair t1 t2) (TyPair t1' t2') = do
---   t1'' <- lub t1 t1'
---   t2'' <- lub t2 t2'
---   return $ TyPair t1'' t2''
--- lub (TySum t1 t2) (TySum t1' t2') = do
---   t1'' <- lub t1 t1'
---   t2'' <- lub t2 t2'
---   return $ TySum t1'' t2''
--- lub (TyList t1) (TyList t2) = do
---   t' <- lub t1 t2
---   return $ TyList t'
--- lub ty1 ty2 = throwError $ NoLub ty1 ty2
-
--- -- | Recursively computes the least upper bound of a list of Types.
--- lubs :: [Type] -> TCM Type
--- lubs [ty]     = return $ ty
--- lubs (ty:tys) = do
---   lubstys  <- lubs tys
---   lubty    <- lub ty lubstys
---   return $ lubty
--- lubs []       = error "Impossible! Called lubs on an empty list"
-
--- -- | Convenience function that ensures the given annotated terms have
--- --   numeric types, AND computes their LUB.
--- numLub :: ATerm -> ATerm -> TCM Type
--- numLub at1 at2 = do
---   checkNumTy at1
---   checkNumTy at2
---   lub (getType at1) (getType at2)
-
--- -- | Check whether the given type supports division, and throw an
--- --   error if not.
--- checkFractional :: Type -> TCM Type
--- checkFractional ty =
---   if (isNumTy ty)
---     then case isFractional ty of
---       True  -> return ty
---       False -> throwError $ NotFractional ty
---     else throwError $ NotNumTy ty
-
--- -- | Check whether the given type supports subtraction, and throw an
--- --   error if not.
--- checkSubtractive :: Type -> TCM Type
--- checkSubtractive ty =
---   if (isNumTy ty)
---     then case isSubtractive ty of
---       True  -> return ty
---       False -> throwError $ NotSubtractive ty
---   else throwError $ NotNumTy ty
-
--- -- | Check whether the given type is finite, and throw an error if not.
--- checkFinite :: Type -> TCM ()
--- checkFinite ty
---   | isFinite ty = return ()
---   | otherwise   = throwError $ Infinite ty
-
--- -- | Check whether the given type has decidable equality, and throw an
--- --   error if not.
--- checkDecidable :: Type -> TCM ()
--- checkDecidable ty
---   | isDecidable ty = return ()
---   | otherwise      = throwError $ Undecidable ty
-
--- -- | Check whether the given type has a total order, and throw an
--- --   error if not.
--- checkOrdered :: Type -> TCM ()
--- checkOrdered ty
---   | isOrdered ty = return ()
---   | otherwise    = throwError $ Unordered ty
-
--- -- | Require two types to be equal.
--- requireSameTy :: Type -> Type -> TCM ()
--- requireSameTy ty1 ty2
---   | ty1 == ty2 = return ()
---   | otherwise  = throwError $ IncompatibleTypes ty1 ty2
-
--- -- | Check that an annotated term has a numeric type.  Throw an error
--- --   if not.
--- checkNumTy :: ATerm -> TCM ()
--- checkNumTy at =
---   if (isNumTy $ getType at)
---      then return ()
---      else throwError (NotNum at)
-
--- -- | Convert a numeric type to its greatest subtype that does not
--- --   support division.  In particular this is used for the typing rule
--- --   of the floor and ceiling functions.
--- integralizeTy :: Type -> Type
--- integralizeTy TyQ   = TyZ
--- integralizeTy TyQP  = TyN
--- integralizeTy t     = t
-
--- -- | Convert a numeric type to its greatest subtype that does not
--- --   support subtraction.  In particular this is used for the typing
--- --   rule of the absolute value function.
--- positivizeTy :: Type -> Type
--- positivizeTy TyZ  = TyN
--- positivizeTy TyQ  = TyQP
--- positivizeTy t    = t
-
--- | Infer the type of a term.  If it succeeds, it returns the term
---   with all subterms annotated.
+-- | Infer the type of a term, along with some constraints.  If it
+--   succeeds, it returns the term with all subterms annotated.
 infer :: Term -> TCM (ATerm, Constraint)
 
 infer (TParens t)   = infer t
@@ -1017,7 +842,10 @@ checkTuplePat (p:ps) ty = do
   (ctx, apt, cst2)  <- checkPattern p ty1
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
-checkTuplePat ps ty = throwError $ NotTuplePattern (PTup ps) ty
+
+checkModuleTop :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
+checkModuleTop m = (\(a,b,c,_) -> (a,b,c)) <$> checkModule m
+  -- XXX FIX ME!! Run constraint solver etc.
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.

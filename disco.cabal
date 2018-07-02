@@ -177,8 +177,12 @@ library
                        Disco.Desugar
                        Disco.Eval
                        Disco.Interpret.Core
+                       Disco.Subst
                        Disco.Typecheck
+                       Disco.Typecheck.Constraints
+                       Disco.Typecheck.Unify
                        Disco.Types
+                       Disco.Types.Rules
 
   other-extensions:
                        GADTs

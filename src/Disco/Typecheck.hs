@@ -491,7 +491,7 @@ infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div] = do
   let ty1 = getType at1
   let ty2 = getType at2
   tyv <- freshTy
-  return (ATBin tyv Add at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CQual (bopQual op) tyv])
+  return (ATBin tyv op at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CQual (bopQual op) tyv])
 
   -- Ask about this!
 infer (TUn Neg t) = do

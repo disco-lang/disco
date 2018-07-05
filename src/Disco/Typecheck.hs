@@ -605,7 +605,7 @@ infer (TBin Cons t1 t2) = do
         TyList ty2 -> do
           let ty1 = getType at1
           tyv <- freshTy
-          return (ATBin tyv Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
+          return (ATBin (TyList tyv) Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
         ty -> throwError (NotList t2 ty)
 
 infer (TUn Fact t) = do

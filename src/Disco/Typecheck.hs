@@ -146,11 +146,11 @@ instance Monoid TCError where
 -- | Type checking monad. Maintains a context of variable types and a
 --   set of definitions, and can throw @TCError@s and generate fresh
 --   names.
-type TCM = StateT DefnCtx (ReaderT TyCtx (ExceptT TCError LFreshM))
+type TCM = StateT DefnCtx (ReaderT TyCtx (ExceptT TCError FreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError (a, DefnCtx)
-runTCM = runLFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
+runTCM = runFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
 
 -- | Run a 'TCM' computation starting in the empty context, returning
 --   only the result of the computation.
@@ -173,12 +173,12 @@ lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 
 -- | Generates a type variable with a fresh name.
 freshTy :: TCM Type
-freshTy = TyVar <$> lfresh (string2Name "a")
+freshTy = TyVar <$> fresh (string2Name "a")
 
 -- | Check that a term has the given sigma type.
 checkSigma :: Term -> Sigma -> TCM (ATerm, Constraint)
 checkSigma t (Forall sig) = do
-  lunbind sig $ \(as, tau) -> do
+  (as, tau) <- unbind sig
   (at, cst) <- check t tau
   return $ case as of
     [] -> (at, cst)
@@ -213,7 +213,7 @@ check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
 check (TListComp bqt) ty = do
   (eltTy, cst1) <- ensureList ty
-  lunbind bqt $ \(qs,t) -> do
+  (qs, t) <- unbind bqt
   (aqs, cx, cst2) <- inferTelescope inferQual qs
   extends cx $ do
   (at, cst3) <- check t eltTy
@@ -223,18 +223,19 @@ check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
 
 -- To check an abstraction:
 check (TAbs lam) ty = do
-  lunbind lam $ \(args, t) -> do
-    -- First check that the given type is of the form ty1 -> ty2 ->
-    -- ... -> resTy, where the types ty1, ty2 ... match up with any
-    -- types declared for the arguments to the lambda (e.g.  (x:tyA)
-    -- (y:tyB) -> ...).
-    (ctx, resTy, cst1) <- checkArgs args ty
+  (args, t) <- unbind lam
 
-    -- Then check the type of the body under a context extended with
-    -- types for all the arguments.
-    extends ctx $ do
-    (at, cst2) <- check t resTy
-    return (ATAbs ty (bind (coerce args) at), cAnd [cst1, cst2])
+  -- First check that the given type is of the form ty1 -> ty2 ->
+  -- ... -> resTy, where the types ty1, ty2 ... match up with any
+  -- types declared for the arguments to the lambda (e.g.  (x:tyA)
+  -- (y:tyB) -> ...).
+  (ctx, resTy, cst1) <- checkArgs args ty
+
+  -- Then check the type of the body under a context extended with
+  -- types for all the arguments.
+  extends ctx $ do
+  (at, cst2) <- check t resTy
+  return (ATAbs ty (bind (coerce args) at), cAnd [cst1, cst2])
 
 -- To check an injection has a sum type, recursively check the
 -- relevant type.
@@ -252,16 +253,16 @@ check (TInj R t) ty = do
 check t@(TInj _ _) ty = throwError (NotSum t ty)
 
 -- To check a let expression:
-check (TLet l) ty =
-  lunbind l $ \(bs, t2) -> do
+check (TLet l) ty = do
+  (bs, t2) <- unbind l
 
-    -- Infer the types of all the variables bound by the let...
-    (as, ctx, cst1) <- inferTelescope inferBinding bs
+  -- Infer the types of all the variables bound by the let...
+  (as, ctx, cst1) <- inferTelescope inferBinding bs
 
-    -- ...then check the body under an extended context.
-    extends ctx $ do
-      (at2, cst2) <- check t2 ty
-      return $ (ATLet ty (bind as at2), cAnd [cst1, cst2])
+  -- ...then check the body under an extended context.
+  extends ctx $ do
+    (at2, cst2) <- check t2 ty
+    return $ (ATLet ty (bind as at2), cAnd [cst1, cst2])
 
 check (TCase bs) ty = do
   aclist <- mapM (checkBranch ty) bs
@@ -417,8 +418,8 @@ checkEllipsis (Just (Until t)) ty = do
 
 -- | Check the type of a branch, returning a type-annotated branch.
 checkBranch :: Type -> Branch -> TCM (ABranch, Constraint)
-checkBranch ty b =
-  lunbind b $ \(gs, t) -> do
+checkBranch ty b = do
+  (gs, t) <- unbind b
   (ags, ctx, cst1) <- inferTelescope inferGuard gs
   extends ctx $ do
   (at, cst2) <- check t ty
@@ -453,15 +454,15 @@ infer (TRat r)      = return $ (ATRat r, CTrue)
 
   -- We can infer the type of a lambda if the variable is annotated
   -- with a type.
-infer (TAbs lam)    =
-  lunbind lam $ \(args, t) -> do
-    let (xs, mtys) = unzip args
-    case sequence (map unembed mtys) of
-      Nothing  -> throwError (CantInfer (TAbs lam))
-      Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
-        (at, cst) <- infer t
-        return (ATAbs (mkFunTy tys (getType at))
-                       (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
+infer (TAbs lam)    = do
+  (args, t) <- unbind lam
+  let (xs, mtys) = unzip args
+  case sequence (map unembed mtys) of
+    Nothing  -> throwError (CantInfer (TAbs lam))
+    Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
+      (at, cst) <- infer t
+      return (ATAbs (mkFunTy tys (getType at))
+                     (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
   where
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
@@ -627,7 +628,7 @@ infer (TList es@(_:_) ell)  = do
     where subs tylist ty = map (flip CSub ty) tylist
 
 infer (TListComp bqt) = do
-  lunbind bqt $ \(qs,t) -> do
+  (qs, t) <- unbind bqt
   (aqs, cx, cst1) <- inferTelescope inferQual qs
   extends cx $ do
   (at, cst2) <- infer t
@@ -647,7 +648,7 @@ infer (TTyOp Count t) = do
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of
   -- t2 in an extended context.
 infer (TLet l) = do
-  lunbind l $ \(bs, t2) -> do
+  (bs, t2) <- unbind l
   (as, ctx, cst1) <- inferTelescope inferBinding bs
   extends ctx $ do
   (at2, cst2) <- infer t2
@@ -669,9 +670,7 @@ infer t = throwError (CantInfer t)
 -- | Recover a Type type from a Sigma type by pulling out the type within
 --   the Forall constructor
 inferSubsumption :: Sigma -> TCM Type
-inferSubsumption (Forall sig) = do
-  lunbind sig $ \(_, tau) -> do
-  return tau
+inferSubsumption (Forall sig) = snd <$> unbind sig
 
 -- | Infer the type of a binding (@x [: ty] = t@), returning a
 --   type-annotated binding along with a (singleton) context for the
@@ -734,8 +733,8 @@ inferCase bs = do
 -- | Infer the type of a case branch, returning the type along with a
 --   type-annotated branch.
 inferBranch :: Branch -> TCM (Type, ABranch, Constraint)
-inferBranch b =
-  lunbind b $ \(gs, t) -> do
+inferBranch b = do
+  (gs, t) <- unbind b
   (ags, ctx, cst1) <- inferTelescope inferGuard gs
   extends ctx $ do
   (at, cst2) <- infer t
@@ -928,7 +927,7 @@ checkDefn (DDefn x clauses) = do
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do
       checkNumPats clauses
-      lunbind sig $ \(nms, ty) -> do
+      (nms, ty) <- unbind sig
       aclist <- mapM (checkClause ty) clauses
       let (aclauses, csts) = unzip aclist
       let cst = cAnd csts
@@ -947,8 +946,8 @@ checkDefn (DDefn x clauses) = do
       | otherwise = return ()
 
     checkClause :: Type -> Bind [Pattern] Term -> TCM (Bind [APattern] ATerm, Constraint)
-    checkClause ty clause =
-      lunbind clause $ \(pats, body) -> do
+    checkClause ty clause = do
+      (pats, body) <- unbind clause
       (aps, at, cst) <- go pats ty body
       return (bind aps at, cst)
 
@@ -986,7 +985,7 @@ checkProperty :: Property -> TCM (AProperty, Constraint)
 checkProperty prop = do
 
   -- A property looks like  forall (x1:ty1) ... (xn:tyn). term.
-  lunbind prop $ \(binds, t) -> do
+  (binds, t) <- unbind prop
 
   -- Extend the context with (x1:ty1) ... (xn:tyn) ...
   extends (M.fromList $ map (second toSigma) binds) $ do

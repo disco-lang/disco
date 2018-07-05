@@ -31,7 +31,7 @@ import           GHC.Generics                     (Generic)
 
 import           Control.Arrow                    ((&&&), (***))
 import           Control.Lens
-import           Data.Bifunctor                   (first, second)
+import           Data.Bifunctor                   (second)
 import           Data.Either                      (isRight, partitionEithers)
 import           Data.List                        (find, foldl', intersect,
                                                    partition)
@@ -155,7 +155,7 @@ solveConstraint c = do
 
   let toEqn (t1 :<: t2) = (t1,t2)
       toEqn (t1 :=: t2) = (t1,t2)
-  maybeError NoWeakUnifier $ weakUnify (map toEqn cs)
+  _ <- maybeError NoWeakUnifier $ weakUnify (map toEqn cs)
 
   -- Step 3. Simplify constraints, resulting in a set of atomic
   -- subtyping constraints.  Also simplify/update qualifier set
@@ -237,6 +237,10 @@ decomposeConstraint (CAll ty)    = do
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& Skolem)
 
+decomposeConstraint (CExp _ _) = error "decomposeConstraint CExp unimplemented"
+decomposeConstraint (CPos _ _) = error "decomposeConstraint CExp unimplemented"
+decomposeConstraint (CInt _ _) = error "decomposeConstraint CExp unimplemented"
+
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
 decomposeQual ty@(TyCon c tys) q
@@ -274,9 +278,9 @@ type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
 --   (b <: v), where v is a type variable and b is a base type.
 
 simplify :: SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
-simplify sm cs
+simplify origSM cs
   = (\(SS sm' cs' s') -> (sm', map extractAtoms cs', s'))
-  <$> contFreshMT (execStateT simplify' (SS sm cs idS)) n
+  <$> contFreshMT (execStateT simplify' (SS origSM cs idS)) n
   where
 
     fvNums :: Alpha a => [a] -> [Integer]
@@ -286,7 +290,7 @@ simplify sm cs
     -- domain, and use it to start the fresh var generation, so we don't
     -- generate any "fresh" names that interfere with existing names
     n1 = maximum0 . fvNums $ cs
-    n = succ . maximum . (n1:) . fvNums . M.keys . unSM $ sm
+    n = succ . maximum . (n1:) . fvNums . M.keys . unSM $ origSM
 
     maximum0 [] = 0
     maximum0 xs = maximum xs
@@ -320,8 +324,8 @@ simplify sm cs
     -- constraints can be simplified.
     pickSimplifiable :: SimplifyM (Maybe SimpleConstraint)
     pickSimplifiable = do
-      cs <- use ssConstraints
-      case pick simplifiable cs of
+      curCs <- use ssConstraints
+      case pick simplifiable curCs of
         Nothing     -> return Nothing
         Just (a,as) -> do
           ssConstraints .= as
@@ -357,7 +361,7 @@ simplify sm cs
     -- If we have an equality constraint, run unification on it.  The
     -- resulting substitution is applied to the remaining constraints
     -- as well as prepended to the current substitution.
-    simplifyOne eqn@(ty1 :=: ty2) =
+    simplifyOne (ty1 :=: ty2) =
       case unify [(ty1, ty2)] of
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
@@ -468,9 +472,9 @@ mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
 checkSkolems :: SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
-checkSkolems (SM sm) g = do
+checkSkolems (SM sm) graph = do
   let skolemWCCs :: [Set Atom]
-      skolemWCCs = filter (any isSkolem) $ G.wcc g
+      skolemWCCs = filter (any isSkolem) $ G.wcc graph
 
       ok wcc =  S.size (S.filter isSkolem wcc) <= 1
              && all (\case { ABase _ -> False
@@ -485,7 +489,7 @@ checkSkolems (SM sm) g = do
   -- take all good sets and
   --   (1) delete them from the graph
   --   (2) unify them all with the skolem
-  unifyWCCs g idS good
+  unifyWCCs graph idS good
 
   where
     noSkolems (ABase b)    = Left b
@@ -528,11 +532,9 @@ elimCycles g
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
     unifySCC :: Set UAtom -> Maybe (UAtom, S' Atom)
-    unifySCC uatoms
-      | S.null uatoms = error "Impossible! unifySCC on the empty set"
-      | otherwise     = (flip substs a &&& id) <$> unifyAtoms (map uatomToAtom as)
-      where
-        as@(a:_) = S.toList uatoms
+    unifySCC uatoms = case S.toList uatoms of
+      []       -> error "Impossible! unifySCC on the empty set"
+      as@(a:_) -> (flip substs a &&& id) <$> unifyAtoms (map uatomToAtom as)
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution
@@ -661,8 +663,6 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
             -- type system might not even support subtyping qualifiers
             -- like this).  Instead, we unify the two type variables
             -- and the resulting type is @forall a. a -> a@.
-
-        fromRight (Right r) = r
 
     -- Get the successor and predecessor sets for all the type variables.
     topRelMap :: RelMap

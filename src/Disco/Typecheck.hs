@@ -68,7 +68,6 @@ import           Data.List                               (group, partition,
                                                           sort)
 import qualified Data.Map                                as M
 
-import           GHC.Generics                            (Generic)
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 

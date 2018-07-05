@@ -7,6 +7,8 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types
@@ -74,15 +76,11 @@ module Disco.Types
        where
 
 import           Data.Coerce
-import           Data.Maybe                       (isJust)
 import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
-import           Math.NumberTheory.Primes.Testing (isPrime)
-
 import           Control.Arrow                    ((***))
-import           Data.Coerce
-import           Data.Map                         (Map, (!))
+import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
@@ -204,6 +202,9 @@ data Type where
   deriving (Show, Eq, Generic)
 
 instance Alpha Type
+instance Subst Type Rational where
+  subst _ _ = id
+  substs _  = id
 
 pattern TyVar  :: Name Type -> Type
 pattern TyVar v = TyAtom (AVar (U v))
@@ -247,6 +248,8 @@ pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
 
+{-# COMPLETE TyUnit, TyBool, TyN, TyZ, TyQP, TyQ, TyFin, TyArr, TyPair, TySum, TyList #-}
+
 instance Subst Type Var
 instance Subst Type BaseTy
 instance Subst Type Atom
@@ -272,6 +275,7 @@ newtype Sigma = Forall (Bind [Name Type] Type)
   deriving (Show, Generic)
 
 instance Alpha Sigma
+instance Subst Type Sigma
 
 -- | Convert a monotype into a (trivially) quantified type.
 toSigma :: Type -> Sigma

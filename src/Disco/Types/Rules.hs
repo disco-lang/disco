@@ -133,6 +133,7 @@ isSubB N QP  = True
 isSubB N Q   = True
 isSubB Z Q   = True
 isSubB QP Q  = True
+isSubB _ _   = False
 
 -- | Check whether one base type is a sub- or supertype of another.
 isDirB :: Dir -> BaseTy -> BaseTy -> Bool
@@ -164,11 +165,12 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual (Fin n) q    | q `elem` [QNum, QSub, QFin] = True
+hasQual (Fin _) q    | q `elem` [QNum, QSub, QFin] = True
 hasQual (Fin n) QDiv = isPrime n
 hasQual b       QNum = b `elem` [N, Z, QP, Q]
 hasQual b       QSub = b `elem` [Z, Q]
 hasQual b       QDiv = b `elem` [QP, Q]
+hasQual _ _          = False
 
 -- | Check whether a base type has a certain sort.
 hasSort :: BaseTy -> Sort -> Bool

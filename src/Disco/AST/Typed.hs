@@ -88,7 +88,6 @@ module Disco.AST.Typed
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic
-import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
 
@@ -106,14 +105,9 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
-instance Subst Type Rational where
-  subst _ _ = id
-  substs _  = id
-
 instance Subst Type APattern
 instance Subst Type AQual
 instance Subst Type AGuard
-instance Subst Type Sigma
 instance Subst Type ABinding
 instance Subst Type ALink
 instance Subst Type ATerm
@@ -322,7 +316,7 @@ getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
-getType (ATAscr _ ty)     = error "There shouldn't be an ATAscr constructor "
+getType (ATAscr _ _ty)    = error "There shouldn't be an ATAscr constructor"
 
 {-# COMPLETE ATVar, ATUnit, ATBool, ATNat, ATRat, ATAbs,
     ATApp, ATTup, ATInj, ATUn, ATBin, ATTyOp, ATChain, ATList,

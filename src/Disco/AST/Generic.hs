@@ -140,6 +140,7 @@ type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
 data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
+instance Alpha Side
 instance Subst t Side
 
 type family X_TVar e
@@ -265,6 +266,7 @@ data Ellipsis t where
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
+instance Alpha t => Alpha (Ellipsis t)
 instance Subst a t => Subst a (Ellipsis t)
 
 -- Note: very similar to guards-

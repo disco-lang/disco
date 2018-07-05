@@ -341,11 +341,9 @@ pattern PList lp = PList_ () lp
              PSucc, PCons, PList #-}
 
 
-instance Alpha Side
 instance Alpha Link
 instance Alpha Term
 instance Alpha Binding
-instance Alpha t => Alpha (Ellipsis t)
 instance Alpha Guard
 instance Alpha Pattern
 instance Alpha Qual

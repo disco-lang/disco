@@ -84,7 +84,7 @@ wcc :: Ord a => Graph a -> [Set a]
 wcc = P.map (S.map snd) . wccIDs
 
 wccIDs :: Ord a => Graph a -> [Set (G.Node, a)]
-wccIDs (G g a2n n2a) = P.map S.fromList $ (P.map . P.map) (id &&& (n2a!)) (G.components g)
+wccIDs (G g _a2n n2a) = P.map S.fromList $ (P.map . P.map) (id &&& (n2a!)) (G.components g)
 
 -- | A miscellaneous utility function to turn a @Graph Maybe@ into a
 --   @Maybe Graph@: the result is @Just@ iff all the vertices in the
@@ -115,7 +115,7 @@ pre (G g a2n n2a) = P.map (n2a !) . G.pre g . (a2n !)
 --
 --   but much more efficient.
 cessors :: Ord a => Graph a -> (Map a (Set a), Map a (Set a))
-cessors g@(G gg a2n n2a) = (succs, preds)
+cessors g@(G gg _ _) = (succs, preds)
   where
     as = G.topsort' gg
     succs = foldr collectSuccs M.empty as  -- build successors map

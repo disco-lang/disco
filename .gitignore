@@ -55,3 +55,5 @@ explore/sub2/.sub2_history
 pubs/OBT18/*.pdf
 pubs/OBT18/talk/*.pdf
 pubs/OBT18/talk/*.tex
+
+test/*/output

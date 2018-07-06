@@ -642,7 +642,7 @@ infer (TTyOp Enumerate t) = do
 
 
 infer (TTyOp Count t) = do
-  return (ATTyOp TyN Count t, CTrue)
+  return (ATTyOp (TySum TyUnit TyN) Count t, CTrue)
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of

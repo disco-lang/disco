@@ -194,8 +194,8 @@ check (TTup ts) ty = do
   (ats, csts) <- checkTuple ts ty
   return $ (ATTup ty ats, cAnd csts)
 
-check (TList xs ell) ty = do
-  (eltTy, cst1) <- ensureList ty
+check t@(TList xs ell) ty = do
+  (eltTy, cst1) <- ensureList ty (Left t) 
   aclist <- mapM (flip check eltTy) xs
   let (axs, csts) = unzip aclist
   (aell, cst2) <- checkEllipsis ell eltTy
@@ -203,20 +203,20 @@ check (TList xs ell) ty = do
 
 check l@(TList _ _) ty            = throwError (NotList l ty)
 
-check (TBin Cons x xs) ty = do
-  (eltTy, cst1) <- ensureList ty
+check t@(TBin Cons x xs) ty = do
+  (eltTy, cst1) <- ensureList ty (Left t)
   (ax, cst2) <- check x  eltTy
   (axs, cst3) <- check xs ty
   return $ (ATBin ty Cons ax axs, cAnd [cst1, cst2, cst3])
 
 check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
-check (TListComp bqt) ty = do
-  (eltTy, cst1) <- ensureList ty
-  (qs, t) <- unbind bqt
+check t@(TListComp bqt) ty = do
+  (eltTy, cst1) <- ensureList ty (Left t)
+  (qs, term) <- unbind bqt
   (aqs, cx, cst2) <- inferTelescope inferQual qs
   extends cx $ do
-  (at, cst3) <- check t eltTy
+  (at, cst3) <- check term eltTy
   return $ (ATListComp ty (bind aqs at), cAnd [cst1, cst2, cst3])
 
 check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
@@ -229,7 +229,7 @@ check (TAbs lam) ty = do
   -- ... -> resTy, where the types ty1, ty2 ... match up with any
   -- types declared for the arguments to the lambda (e.g.  (x:tyA)
   -- (y:tyB) -> ...).
-  (ctx, resTy, cst1) <- checkArgs args ty
+  (ctx, resTy, cst1) <- checkArgs args ty (TAbs lam)
 
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
@@ -239,15 +239,15 @@ check (TAbs lam) ty = do
 
 -- To check an injection has a sum type, recursively check the
 -- relevant type.
-check (TInj L t) ty = do
-  (ty1, _, cst1) <- ensureSum ty
+check lt@(TInj L t) ty = do
+  (ty1, _, cst1) <- ensureSum ty (Left lt)
   (at, cst2) <- check t ty1
-  return (at, cAnd [cst1, cst2])
+  return (ATInj ty L at, cAnd [cst1, cst2])
 
-check (TInj R t) ty = do
-  (_, ty2, cst1) <- ensureSum ty
+check rt@(TInj R t) ty = do
+  (_, ty2, cst1) <- ensureSum ty (Left rt)
   (at, cst2) <- check t ty2
-  return (at, cAnd [cst1, cst2])
+  return (ATInj ty R at, cAnd [cst1, cst2])
 
 -- Trying to check an injection under a non-sum type: error.
 check t@(TInj _ _) ty = throwError (NotSum t ty)
@@ -364,18 +364,18 @@ check t ty = do
 --   (taken either from their annotation or from the type to be
 --   checked, as appropriate) which we can use to extend when checking
 --   the body, along with the result type of the function.
-checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> TCM (TyCtx, Type, Constraint)
+checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> Term ->  TCM (TyCtx, Type, Constraint)
 
 -- If we're all out of arguments, the remaining checking type is the
 -- result, and there are no variables to bind in the context.
-checkArgs [] ty = return (emptyCtx, ty, CTrue)
+checkArgs [] ty _ = return (emptyCtx, ty, CTrue)
 
 -- Take the next variable and its annotation; the checking type must
 -- be a function type ty1 -> ty2.
-checkArgs ((x, unembed -> mty) : args) ty = do
+checkArgs ((x, unembed -> mty) : args) ty term = do
 
   -- Ensure that ty is a function type
-  (ty1, ty2, cst1) <- ensureArrow ty
+  (ty1, ty2, cst1) <- ensureArrow ty (Left term)
 
   -- Figure out the type of x:
   (xTy, cst2) <- case mty of
@@ -389,7 +389,7 @@ checkArgs ((x, unembed -> mty) : args) ty = do
 
   -- Check the rest of the arguments under the type ty2, returning a
   -- context with the rest of the arguments and the final result type.
-  (ctx, resTy, cst3) <- checkArgs args ty2
+  (ctx, resTy, cst3) <- checkArgs args ty2 term
 
   -- Pass the result type through, and add x with its type to the
   -- generated context.
@@ -404,7 +404,7 @@ checkTuple [t] ty = do     -- (:[]) <$> check t ty
   (at, cst) <- check t ty
   return ([at], [cst])
 checkTuple (t:ts) ty = do
-  (ty1, ty2, cst1) <- ensurePair ty
+  (ty1, ty2, cst1) <- ensurePair ty (Left $ TTup  (t:ts))
   (at, cst2) <- check t ty1
   (ats, csts) <- checkTuple ts ty2
   return $ (at : ats, cst1 : cst2 : csts)
@@ -473,7 +473,7 @@ infer (TAbs lam)    = do
 infer (TApp t t')   = do
   (at, cst1) <- infer t
   let ty = getType at
-  (ty1, ty2, cst2) <- ensureArrow ty
+  (ty1, ty2, cst2) <- ensureArrow ty (Left t)
   (at', cst3) <- check t' ty1
   return (ATApp ty2 at at', cAnd [cst1, cst2, cst3])
 
@@ -691,7 +691,10 @@ inferComp :: BOp -> Term -> Term -> TCM (ATerm, Constraint)
 inferComp comp t1 t2 = do
   (at1, cst1) <- infer t1
   (at2, cst2) <- infer t2
-  return (ATBin TyBool comp at1 at2, cAnd [cst1, cst2])
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv <- freshTy
+  return (ATBin TyBool comp at1 at2, cAnd [CSub ty1 tyv, CSub ty2 tyv, cst1, cst2])
 
 inferChain :: Term -> [Link] -> TCM ([ALink], [Constraint])
 inferChain _  [] = return ([], [CTrue])
@@ -796,13 +799,13 @@ checkPattern (PTup ps) ty                   = do
   listCtxtAps <- checkTuplePat ps ty
   let (ctxs, aps, csts) = unzip3 listCtxtAps
   return (joinCtxs ctxs, APTup aps, cAnd csts)
-checkPattern (PInj L p) ty       = do
-  (ty1, _, cst1) <- ensurePair ty
-  (ctx, apt, cst2) <- checkPattern p ty1
+checkPattern p@(PInj L pat) ty       = do
+  (ty1, _, cst1) <- ensureSum ty (Right p)
+  (ctx, apt, cst2) <- checkPattern pat ty1
   return (ctx, APInj L apt, cAnd [cst1, cst2])
-checkPattern (PInj R p) ty    = do
-  (_, ty2, cst1) <- ensurePair ty
-  (ctx, apt, cst2) <- checkPattern p ty2
+checkPattern p@(PInj R pat) ty    = do
+  (_, ty2, cst1) <- ensureSum ty (Right p)
+  (ctx, apt, cst2) <- checkPattern pat ty2
   return (ctx, APInj R apt, cAnd [cst1, cst2])
 
 -- we can match any supertype of TyN against a Nat pattern, OR
@@ -820,14 +823,14 @@ checkPattern (PSucc p) TyN                 = do
   (ctx, apt, cst) <- checkPattern p TyN
   return (ctx, APSucc apt, cst)
 
-checkPattern (PCons p1 p2) ty      = do
-  (tyl, cst1) <- ensureList ty
+checkPattern p@(PCons p1 p2) ty      = do
+  (tyl, cst1) <- ensureList ty (Right p)
   (ctx1, ap1, cst2) <- checkPattern p1 tyl
   (ctx2, ap2, cst3) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons ap1 ap2, cAnd [cst1, cst2, cst3])
 
-checkPattern (PList ps) ty         = do
-  (tyl, cst) <- ensureList ty
+checkPattern p@(PList ps) ty         = do
+  (tyl, cst) <- ensureList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps, csts) = unzip3 listCtxtAps
   return (joinCtxs ctxs, APList aps, cAnd (cst:csts))
@@ -840,7 +843,7 @@ checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
   (ctx, apt, cst) <- checkPattern p ty
   return [(ctx, apt, cst)]
 checkTuplePat (p:ps) ty = do
-  (ty1, ty2, cst1)  <- ensurePair ty
+  (ty1, ty2, cst1)  <- ensurePair ty (Right $ PTup (p:ps))
   (ctx, apt, cst2)  <- checkPattern p ty1
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
@@ -861,40 +864,48 @@ checkModule (Module m docs) = do
     return (docs, aprops, ctx, cst)
 
 -- Refactor this to one function that takes a constructor as an argument
-ensureSum :: Type -> TCM (Type, Type, Constraint)
-ensureSum (TyPair ty1 ty2) = return (ty1, ty2, CTrue)
-ensureSum tyv@(TyVar _) = do
+ensureSum :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
+ensureSum (TySum ty1 ty2) _ = return (ty1, ty2, CTrue)
+ensureSum tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
   return (ty1, ty2, CEq tyv (TyPair ty1 ty2))
 
-ensureSum _ = error "Type is not a sum type"
+ensureSum ty tyarg = case tyarg of
+                      Left term -> throwError (NotSum term ty)
+                      Right pat -> throwError (PatternType pat ty)
 
-ensureList :: Type -> TCM (Type, Constraint)
-ensureList (TyList ty) = return (ty, CTrue)
-ensureList tyv@(TyVar _) = do
+ensureList :: Type -> Either Term Pattern -> TCM (Type, Constraint)
+ensureList (TyList ty) _ = return (ty, CTrue)
+ensureList tyv@(TyVar _) _ = do
   ty <- freshTy
   return (ty, CEq tyv (TyList ty))
 
-ensureList _ = error "Type is not a list type"
+ensureList ty tyarg = case tyarg of
+                      Left term -> throwError (NotList term ty)
+                      Right pat -> throwError (PatternType pat ty)
 
-ensurePair :: Type -> TCM (Type, Type, Constraint)
-ensurePair (TyPair ty1 ty2) = return (ty1, ty2, CTrue)
-ensurePair tyv@(TyVar _) = do
+ensurePair :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
+ensurePair (TyPair ty1 ty2) _ = return (ty1, ty2, CTrue)
+ensurePair tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
   return (ty1, ty2, CEq tyv (TyPair ty1 ty2))
 
-ensurePair _ = error "Type is not a pair type"
+ensurePair ty tyarg = case tyarg of
+                      Left term -> throwError (NotTuple term ty)
+                      Right pat -> throwError (PatternType pat ty)
 
-ensureArrow :: Type -> TCM (Type, Type, Constraint)
-ensureArrow (TyArr ty1 ty2) = return (ty1, ty2, CTrue)
-ensureArrow tyv@(TyVar _) = do
+ensureArrow :: Type -> Either Term Pattern ->  TCM (Type, Type, Constraint)
+ensureArrow (TyArr ty1 ty2) _ = return (ty1, ty2, CTrue)
+ensureArrow tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
   return (ty1, ty2, CEq tyv (TyArr ty1 ty2))
 
-ensureArrow _ = error "Type is not an function type"
+ensureArrow ty tyarg = case tyarg of
+                      Left term -> throwError (NotArrow term ty)
+                      Right pat -> throwError (PatternType pat ty)
 
 -- ensurePair
 

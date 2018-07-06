@@ -1062,7 +1062,6 @@ erase (ATTyOp _ op ty)      = TTyOp op ty
 erase (ATList _ ats aell)   = TList (map erase ats) ((fmap . fmap) erase aell)
 erase (ATListComp _ b)      = TListComp $ bind (mapTelescope eraseQual tel) (erase at)
   where (tel,at) = unsafeUnbind b
-erase (ATAscr at ty)        = TAscr (erase at) ty
 
 eraseBinding :: ABinding -> Binding
 eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))

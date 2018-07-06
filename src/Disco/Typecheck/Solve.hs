@@ -96,6 +96,16 @@ runSolveM = runExcept . runFreshMT
 liftExcept :: MonadError e m => Except e a -> m a
 liftExcept = either throwError return . runExcept
 
+reifyExcept :: MonadError e m => m a -> m (Either e a)
+reifyExcept m = (Right <$> m) `catchError` (return . Left)
+
+filterExcept :: MonadError e m => [m a] -> m [a]
+filterExcept ms = do
+  es <- sequence . map reifyExcept $ ms
+  case partitionEithers es of
+    ((e:_), []) -> throwError e
+    (_, as)     -> return as
+
 --------------------------------------------------
 -- Simple constraints and qualifier maps
 
@@ -258,7 +268,7 @@ decomposeConstraint (CAll ty)    = do
   where
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& Skolem)
-decomposeConstraint (COr cs)     = concat <$> mapM decomposeConstraint cs
+decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstraint cs)
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a

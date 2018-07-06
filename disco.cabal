@@ -33,9 +33,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-numthry/expected
                      test/arith-numthry/input
                      test/arith-numthry/output
-                     test/arith-pos-sub/expected
-                     test/arith-pos-sub/input
-                     test/arith-pos-sub/output
                      test/arith-round/expected
                      test/arith-round/input
                      test/arith-round/output

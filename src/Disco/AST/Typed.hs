@@ -49,7 +49,6 @@ module Disco.AST.Typed
        , pattern ATTyOp
        , pattern ATList
        , pattern ATListComp
-       , pattern ATAscr
 
        , ALink
        , pattern ATLink
@@ -184,12 +183,9 @@ pattern ATList ty termlist mellipses = TList_ ty termlist mellipses
 pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATListComp ty bind = TListComp_ ty bind
 
-pattern ATAscr :: ATerm -> Sigma -> ATerm
-pattern ATAscr term ty = TAscr_ () term ty
-
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
              ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
-             ATList, ATListComp, ATAscr #-}
+             ATList, ATListComp #-}
 
 type ALink = Link_ TY
 
@@ -316,8 +312,4 @@ getType (ATList ty _ _)   = ty
 getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
-getType (ATAscr _ _ty)    = error "There shouldn't be an ATAscr constructor"
 
-{-# COMPLETE ATVar, ATUnit, ATBool, ATNat, ATRat, ATAbs,
-    ATApp, ATTup, ATInj, ATUn, ATBin, ATTyOp, ATChain, ATList,
-    ATListComp, ATLet, ATCase, ATAscr #-}

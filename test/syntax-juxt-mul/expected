@@ -2,7 +2,7 @@ Loading test/syntax-juxt-mul/juxt-mul.disco...
 Loaded.
 200
 200
-NotFun (TVar_ TyN x)
+NotArrow (TVar_ () x) (TyAtom (ABase N))
 24
 14
 600

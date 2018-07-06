@@ -29,14 +29,12 @@ import           Unbound.Generics.LocallyNameless
 --   These constraints are accumulated during the inference and checking phase
 --   and are subsequently solved by the constraint solver.
 data Constraint where
-  CExp :: Type -> Type -> Constraint
-  CPos :: Type -> Type -> Constraint
-  CInt :: Type -> Type -> Constraint
-  CSub  :: Type -> Type -> Constraint
-  CEq   :: Type -> Type -> Constraint
-  CQual :: Qualifier -> Type -> Constraint
-  CAnd  :: [Constraint] -> Constraint
-  CTrue :: Constraint
+  CSub   :: Type -> Type -> Constraint
+  CEq    :: Type -> Type -> Constraint
+  CQual  :: Qualifier -> Type -> Constraint
+  CAnd   :: [Constraint] -> Constraint
+  CTrue  :: Constraint
+  COr    :: [Constraint] -> Constraint
   CAll  :: Bind [Name Type] Constraint -> Constraint
 
   deriving (Show, Generic)

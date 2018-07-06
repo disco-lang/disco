@@ -313,7 +313,7 @@ check (TBin Exp t1 t2) ty = do
   (at2, cst2) <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  return $ (ATBin ty Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1, CExp ty2 ty1])
+  return $ (ATBin ty Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1]) -- , CExp ty2 ty1])
 
 -- Notice here we only check that ty is numeric, *not* that it is
 -- subtractive.  As a special case, we allow subtraction to typecheck
@@ -425,11 +425,40 @@ checkBranch ty b = do
   (at, cst2) <- check t ty
   return $ (bind ags at, cAnd [cst1, cst2])
 
+cPos :: Type -> TCM (Type, Constraint)
+cPos (TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CTrue)  -- Has to be QNum!!
+  where
+    pos Z = N
+    pos Q = QP
+    pos b = b
+
+cPos ty                 = do
+  res <- freshTy
+  return (res, COr [ cAnd [CSub ty TyZ, CSub TyN res ]
+                   , cAnd [CSub ty TyQ, CSub TyQP res]
+                   , CEq ty res
+                   ])
+
+cInt :: Type -> TCM (Type, Constraint)
+cInt (TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CTrue)
+  where
+    int QP = N
+    int Q  = Z
+    int b  = b
+
+cInt ty                 = do
+  res <- freshTy
+  return (res, COr [ cAnd [CSub ty TyQP, CSub TyN res]
+                   , cAnd [CSub ty TyQ,  CSub TyZ res]
+                   , CEq ty res
+                   ])
+
 -- | Infer the type of a term.  The resulting annotations on the term
 --   are guaranteed to be free of type variables.
 inferTop :: Term -> TCM ATerm
 inferTop t = do
   (at, constr) <- infer t
+  traceShowM at
   case runSolveM (solveConstraint constr) of
     Left solveErr -> throwError $ Unsolvable solveErr
     Right theta   -> return $ substs theta at
@@ -507,14 +536,14 @@ infer (TUn op t) | op `elem` [Sqrt, Lg] = do
 infer (TUn op t) | op `elem` [Floor, Ceil] = do
   (at, cst) <- infer t
   let ty = getType at
-  tyv <- freshTy
-  return (ATUn tyv op at, cAnd [cst, CPos ty tyv])
+  (resTy, cst2) <- cInt ty
+  return (ATUn resTy op at, cAnd [cst, cst2])
 
 infer (TUn Abs t) = do
   (at, cst) <- infer t
   let ty = getType at
-  tyv <- freshTy
-  return (ATUn tyv Abs at, cAnd [cst, CInt ty tyv])
+  (resTy, cst2) <- cPos ty
+  return (ATUn resTy Abs at, cAnd [cst, cst2])
 
  -- Very similar to division
 infer (TBin IDiv t1 t2) = do
@@ -524,14 +553,14 @@ infer (TBin IDiv t1 t2) = do
   let ty2 = getType at2
   tyv1 <- freshTy
   tyv2 <- freshTy
-  return (ATBin tyv2 IDiv at1 at2, cAnd [cst1, cst2, CSub ty1 tyv1, CSub ty2 tyv1, CQual QDiv tyv1, CInt tyv1 tyv2])
+  return (ATBin tyv2 IDiv at1 at2, cAnd [cst1, cst2, CSub ty1 tyv1, CSub ty2 tyv1, CQual QDiv tyv1]) -- , CInt tyv1 tyv2])
 
 infer (TBin Exp t1 t2) = do
   (at1, cst1) <- infer t1
   (at2, cst2) <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  return (ATBin ty1 Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1, CExp ty2 ty1])
+  return (ATBin ty1 Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1]) -- , CExp ty2 ty1])
 
   -- An equality or inequality test always has type Bool, but we need
   -- to check a few things first. We infer the types of both subterms

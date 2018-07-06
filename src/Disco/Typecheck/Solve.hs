@@ -52,6 +52,16 @@ import           Disco.Typecheck.Unify
 import           Disco.Types
 import           Disco.Types.Rules
 
+import qualified Debug.Trace                      as Debug
+
+traceM :: Applicative f => String -> f ()
+traceM _ = pure ()
+-- traceM = Debug.traceM
+
+traceShowM :: (Show a, Applicative f) => a -> f ()
+traceShowM _ = pure ()
+-- traceShowM = Debug.traceShowM
+
 --------------------------------------------------
 -- Solver errors
 
@@ -63,7 +73,12 @@ data SolveError where
   UnqualBase    :: Qualifier -> BaseTy    -> SolveError
   Unqual        :: Qualifier -> Type      -> SolveError
   QualSkolem    :: Qualifier -> Name Type -> SolveError
+  Unknown       :: SolveError
   deriving Show
+
+instance Monoid SolveError where
+  mempty = Unknown
+  e `mappend` _ = e
 
 -- | Convert 'Nothing' into the given error.
 maybeError :: MonadError e m => e -> Maybe a -> m a
@@ -142,13 +157,20 @@ solveConstraint c = do
   -- collect wanted qualifiers.  Should result in just a list of
   -- equational and subtyping constraints in addition to qualifiers.
 
-  -- traceM "------------------------------"
-  -- traceM "Decomposing constraints..."
+  traceShowM c
 
-  (quals, cs) <- decomposeConstraint c
+  traceM "------------------------------"
+  traceM "Decomposing constraints..."
 
-  -- traceM (pretty quals)
-  -- traceM (pretty cs)
+  qcList <- decomposeConstraint c
+
+  msum (map (uncurry solveConstraintChoice) qcList)
+
+solveConstraintChoice :: SortMap -> [SimpleConstraint] -> SolveM S
+solveConstraintChoice quals cs = do
+
+  traceM (show quals)
+  traceM (show cs)
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
@@ -161,23 +183,23 @@ solveConstraint c = do
   -- subtyping constraints.  Also simplify/update qualifier set
   -- accordingly.
 
-  -- traceM "------------------------------"
-  -- traceM "Running simplifier..."
+  traceM "------------------------------"
+  traceM "Running simplifier..."
 
   (sm, atoms, theta_simp) <- liftExcept (simplify quals cs)
 
-  -- traceM (pretty sm)
-  -- traceM (pretty atoms)
-  -- traceM (pretty theta_simp)
+  traceM (show sm)
+  traceM (show atoms)
+  traceM (show theta_simp)
 
   -- Step 4. Turn the atomic constraints into a directed constraint
   -- graph.
 
-  -- traceM "------------------------------"
-  -- traceM "Generating constraint graph..."
+  traceM "------------------------------"
+  traceM "Generating constraint graph..."
   let g = mkConstraintGraph atoms
 
-  -- traceShowM g
+  traceShowM g
 
   -- Step 5.
   -- Check for any weakly connected components containing more
@@ -185,8 +207,8 @@ solveConstraint c = do
   -- not allowed.  Other WCCs with a single skolem simply unify to
   -- that skolem.
 
-  -- traceM "------------------------------"
-  -- traceM "Checking WCCs for skolems..."
+  traceM "------------------------------"
+  traceM "Checking WCCs for skolems..."
 
   (g', theta_skolem) <- liftExcept (checkSkolems sm g)
 
@@ -194,25 +216,25 @@ solveConstraint c = do
   -- connected component into a single node, unifying all the atoms in
   -- each component.
 
-  -- traceM "------------------------------"
-  -- traceM "Collapsing SCCs..."
+  traceM "------------------------------"
+  traceM "Collapsing SCCs..."
 
   (g'', theta_cyc) <- liftExcept (elimCycles g')
 
-  -- traceShowM g''
+  traceShowM g''
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
   -- predecessor base types in the graph; then unify all the type
   -- variables in any remaining weakly connected components.
 
-  -- traceM "------------------------------"
-  -- traceM "Solving for type variables..."
+  traceM "------------------------------"
+  traceM "Solving for type variables..."
 
   theta_sol       <- solveGraph sm g''
 
-  -- traceM "------------------------------"
-  -- traceM "Composing final substitution..."
+  traceM "------------------------------"
+  traceM "Composing final substitution..."
 
   let theta_final = (theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp)
 
@@ -222,12 +244,12 @@ solveConstraint c = do
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
 
-decomposeConstraint :: Constraint -> SolveM (SortMap, [SimpleConstraint])
-decomposeConstraint (CSub t1 t2) = return (mempty, [t1 :<: t2])
-decomposeConstraint (CEq  t1 t2) = return (mempty, [t1 :=: t2])
-decomposeConstraint (CQual q ty) = (, []) <$> decomposeQual ty q
-decomposeConstraint (CAnd cs)    = mconcat <$> mapM decomposeConstraint cs
-decomposeConstraint CTrue        = return mempty
+decomposeConstraint :: Constraint -> SolveM [(SortMap, [SimpleConstraint])]
+decomposeConstraint (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
+decomposeConstraint (CEq  t1 t2) = return [(mempty, [t1 :=: t2])]
+decomposeConstraint (CQual q ty) = ((:[]) . (, [])) <$> decomposeQual ty q
+decomposeConstraint (CAnd cs)    = (map mconcat . sequence) <$> mapM decomposeConstraint cs
+decomposeConstraint CTrue        = return [mempty]
 decomposeConstraint (CAll ty)    = do
   (vars, c) <- unbind ty
   let c' = substs (mkSkolems vars) c
@@ -236,10 +258,7 @@ decomposeConstraint (CAll ty)    = do
   where
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& Skolem)
-
-decomposeConstraint (CExp _ _) = error "decomposeConstraint CExp unimplemented"
-decomposeConstraint (CPos _ _) = error "decomposeConstraint CPos unimplemented"
-decomposeConstraint (CInt _ _) = error "decomposeConstraint CInt unimplemented"
+decomposeConstraint (COr cs)     = concat <$> mapM decomposeConstraint cs
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
@@ -313,8 +332,8 @@ simplify origSM cs
         Nothing -> return ()
         Just s  -> do
 
-          -- traceM (pretty s)
-          -- traceM "---------------------------------------"
+          traceM (show s)
+          traceM "---------------------------------------"
 
           simplifyOne s
           simplify'
@@ -498,7 +517,7 @@ checkSkolems (SM sm) graph = do
 
     unifyWCCs g s []     = return (G.map noSkolems g, s)
     unifyWCCs g s (u:us) = do
-      -- traceM $ "Unifying " ++ pretty (u:us) ++ "..."
+      traceM $ "Unifying " ++ show (u:us) ++ "..."
 
       let g' = foldl' (flip G.delete) g u
 
@@ -687,7 +706,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
 
         case solveVar a of
           Nothing       -> do
-            -- traceM $ "Couldn't solve for " ++ show a
+            traceM $ "Couldn't solve for " ++ show a
             throwError NoUnify
 
           -- If we solved for a, delete it from the maps, apply the

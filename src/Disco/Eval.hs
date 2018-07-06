@@ -197,6 +197,9 @@ data IErr where
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              IErr
 
+  -- | Trying to count an infinite type.
+  InfiniteTy    :: Type      -> IErr
+
   -- | Internal error for features not yet implemented.
   Unimplemented :: String    -> IErr
 

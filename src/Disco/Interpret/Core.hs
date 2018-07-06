@@ -553,13 +553,17 @@ modExp n [c1,c2] = do
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
-countOp :: [Core] -> Disco e Value
-countOp [CType ty]  = return $ vnum ((fromJust $ countType ty) % 1)
+countOp :: [Core] -> Disco IErr Value
+countOp [CType ty]  = case countType ty of
+                        Right num -> return $ vnum (num % 1)
+                        Left ()   -> throwError $ InfiniteTy ty 
 countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 
 -- | Perform an enumeration of the values of a given type.
-enumOp :: [Core] -> Disco e Value
-enumOp [CType ty] = return $ (toDiscoList (enumerate ty))
+enumOp :: [Core] -> Disco IErr Value
+enumOp [CType ty] = case countType ty of
+                    Right _ -> return $ (toDiscoList (enumerate ty))
+                    Left  _ -> throwError $ InfiniteTy ty
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
 -- | Perform a square root operation. If the program typechecks,

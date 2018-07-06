@@ -638,11 +638,11 @@ infer (TListComp bqt) = do
 -- Should enumerate and count genereate any constraints?
 -- Need to add a finite Q
 infer (TTyOp Enumerate t) = do
-  return (ATTyOp (TyList t) Enumerate t, CQual QFin t)
+  return (ATTyOp (TyList t) Enumerate t, CTrue)
 
 
 infer (TTyOp Count t) = do
-  return (ATTyOp TyN Count t, CQual QFin t)
+  return (ATTyOp TyN Count t, CTrue)
 
   -- To infer the type of (let x = t1 in t2), assuming it is
   -- NON-RECURSIVE, infer the type of t1, and then infer the type of

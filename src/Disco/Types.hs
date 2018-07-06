@@ -287,26 +287,26 @@ toSigma ty = Forall (bind [] ty)
 
 -- | Compute the number of inhabitants of a type.  @Nothing@ means the
 --   type is countably infinite.
-countType :: Type -> Maybe Integer
-countType TyVoid            = Just 0
-countType TyUnit            = Just 1
-countType TyBool            = Just 2
-countType (TyFin n)         = Just n
+countType :: Type -> Either () Integer
+countType TyVoid            = Right 0
+countType TyUnit            = Right 1
+countType TyBool            = Right 2
+countType (TyFin n)         = Right n
 countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
 countType (TyPair ty1 ty2)
-  | isEmptyTy ty1 = Just 0
-  | isEmptyTy ty2 = Just 0
+  | isEmptyTy ty1 = Right 0
+  | isEmptyTy ty2 = Right 0
   | otherwise     = (*) <$> countType ty1 <*> countType ty2
 countType (TyArr  ty1 ty2)
-  | isEmptyTy ty1 = Just 1
-  | isEmptyTy ty2 = Just 0
+  | isEmptyTy ty1 = Right 1
+  | isEmptyTy ty2 = Right 0
   | otherwise     = (^) <$> countType ty2 <*> countType ty1
 countType (TyList ty)
-  | isEmptyTy ty            = Just 1
-  | otherwise               = Nothing
+  | isEmptyTy ty            = Right 1
+  | otherwise               = Left ()
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyQP)
-countType _                 = Nothing
+countType _                 = Left () 
 
 --------------------------------------------------
 -- Type predicates

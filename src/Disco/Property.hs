@@ -132,7 +132,7 @@ getEquatands _                    = Nothing
 testCases :: Int -> [(Name ATerm, Type)] -> Disco e (Bool, [Env])
 testCases _ []    = return (True, [M.empty])
 testCases n binds
-  | Just m <- fmap product . sequence . map countType $ tys
+  | Right m <- fmap product . sequence . map countType $ tys
   , m <= (fromIntegral n)
   = return $ (True, map (M.fromList . zip ys) $ mapM enumerate tys)
     -- The above mapM is in the list monad!

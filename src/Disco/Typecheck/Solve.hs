@@ -238,8 +238,8 @@ decomposeConstraint (CAll ty)    = do
     mkSkolems = map (id &&& Skolem)
 
 decomposeConstraint (CExp _ _) = error "decomposeConstraint CExp unimplemented"
-decomposeConstraint (CPos _ _) = error "decomposeConstraint CExp unimplemented"
-decomposeConstraint (CInt _ _) = error "decomposeConstraint CExp unimplemented"
+decomposeConstraint (CPos _ _) = error "decomposeConstraint CPos unimplemented"
+decomposeConstraint (CInt _ _) = error "decomposeConstraint CInt unimplemented"
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a

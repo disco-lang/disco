@@ -320,7 +320,8 @@ check (TBin Exp t1 t2) ty = do
   (at2, cst2) <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  return $ (ATBin ty Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1]) -- , CExp ty2 ty1])
+  (resTy, cst3) <- cExp ty1 ty2
+  return $ (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3])
 
 -- Notice here we only check that ty is numeric, *not* that it is
 -- subtractive.  As a special case, we allow subtraction to typecheck
@@ -434,32 +435,51 @@ checkBranch ty b = do
   return $ (bind ags at, cAnd [cst1, cst2])
 
 cPos :: Type -> TCM (Type, Constraint)
-cPos (TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CTrue)  -- Has to be QNum!!
+cPos ty@(TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CQual QNum ty)  -- Has to be QNum!!
   where
     pos Z = N
     pos Q = QP
-    pos b = b
+    pos _ = b
 
 cPos ty                 = do
   res <- freshTy
-  return (res, COr [ cAnd [CSub ty TyZ, CSub TyN res ]
-                   , cAnd [CSub ty TyQ, CSub TyQP res]
-                   , CEq ty res
-                   ])
+  return (res, CAnd 
+               [ CQual QNum ty 
+               , COr 
+                 [ cAnd [CSub ty TyZ, CSub TyN res ]
+                 , cAnd [CSub ty TyQ, CSub TyQP res]
+                 , CEq ty res
+                 ] 
+               ])
 
 cInt :: Type -> TCM (Type, Constraint)
-cInt (TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CTrue)
+cInt ty@(TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CQual QNum ty)
   where
     int QP = N
     int Q  = Z
-    int b  = b
+    int _  = b
 
 cInt ty                 = do
   res <- freshTy
-  return (res, COr [ cAnd [CSub ty TyQP, CSub TyN res]
-                   , cAnd [CSub ty TyQ,  CSub TyZ res]
-                   , CEq ty res
-                   ])
+  return (res, CAnd 
+               [ CQual QNum ty
+               , COr 
+                 [ cAnd [CSub ty TyQP, CSub TyN res]
+                 , cAnd [CSub ty TyQ,  CSub TyZ res]
+                 , CEq ty res
+                 ]
+               ])
+
+
+-- cExp ty1@(TyAtom (ABase b1)) ty2@(TyAtom (ABase b2)) =
+--   return (TyAtom (ABase (hexp b1 b2)), cAnd [CQual QNum ty1, CQual QNum ty2])
+
+cExp :: Type -> Type -> TCM (Type, Constraint)
+cExp ty1 ty2            = do
+  return (ty1, COr
+                 [ cAnd [CQual QNum ty1, CEq ty2 TyN]
+                 , cAnd [CQual QDiv ty1, CEq ty2 TyZ]
+                 ])
 
 -- | Infer the type of a term.  The resulting annotations on the term
 --   are guaranteed to be free of type variables.
@@ -568,7 +588,8 @@ infer (TBin Exp t1 t2) = do
   (at2, cst2) <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  return (ATBin ty1 Exp at1 at2, cAnd [cst1, cst2, CSub ty2 TyZ, CQual QNum ty1]) -- , CExp ty2 ty1])
+  (resTy, cst3) <- cExp ty1 ty2
+  return (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3])
 
   -- An equality or inequality test always has type Bool, but we need
   -- to check a few things first. We infer the types of both subterms

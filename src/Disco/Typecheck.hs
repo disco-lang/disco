@@ -184,6 +184,13 @@ checkSigma t (Forall sig) = do
     [] -> (at, cst)
     _  -> (at, CAll (bind as cst))
 
+-- Invariant:
+--
+-- IF
+--   (at, _) <- check tm ty
+-- THEN
+--   getType at == ty
+
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM (ATerm, Constraint)

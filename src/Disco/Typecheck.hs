@@ -345,11 +345,12 @@ check (TNat x) (TyFin n) =
 
 -- Finally, to check anything else, we can fall back to inferring its
 -- type and then check that the inferred type is a *subtype* of the
--- given type.
+-- given type.  We have to be careful to call 'setType' to change the
+-- type at the root of the term to the requested type.
 check t ty = do
   (at, ct1) <- infer t
   let aty = getType at
-  return $ (at, cAnd [ct1, CSub aty ty])
+  return $ (setType ty at, cAnd [ct1, CSub aty ty])
 
 
 -- | Given the variables and their optional type annotations in the

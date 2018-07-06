@@ -471,14 +471,19 @@ cInt ty                 = do
                ])
 
 
+
+
 -- cExp ty1@(TyAtom (ABase b1)) ty2@(TyAtom (ABase b2)) =
 --   return (TyAtom (ABase (hexp b1 b2)), cAnd [CQual QNum ty1, CQual QNum ty2])
+--   where
+--     hexp 
 
 cExp :: Type -> Type -> TCM (Type, Constraint)
 cExp ty1 ty2            = do
-  return (ty1, COr
-                 [ cAnd [CQual QNum ty1, CEq ty2 TyN]
-                 , cAnd [CQual QDiv ty1, CEq ty2 TyZ]
+  tyv1 <- freshTy
+  return (tyv1, COr
+                 [ cAnd [CQual QNum tyv1, CEq ty2 TyN, CSub ty1 tyv1]
+                 , cAnd [CQual QDiv tyv1, CEq ty2 TyZ, CSub ty1 tyv1]
                  ])
 
 -- | Infer the type of a term.  The resulting annotations on the term
@@ -580,8 +585,8 @@ infer (TBin IDiv t1 t2) = do
   let ty1 = getType at1
   let ty2 = getType at2
   tyv1 <- freshTy
-  tyv2 <- freshTy
-  return (ATBin tyv2 IDiv at1 at2, cAnd [cst1, cst2, CSub ty1 tyv1, CSub ty2 tyv1, CQual QDiv tyv1]) -- , CInt tyv1 tyv2])
+  (resTy, cst3) <- cInt tyv1
+  return (ATBin resTy IDiv at1 at2, cAnd [cst1, cst2, cst3, CSub ty1 tyv1, CSub ty2 tyv1])
 
 infer (TBin Exp t1 t2) = do
   (at1, cst1) <- infer t1
@@ -780,7 +785,6 @@ inferTuple (t:ts) = do
   (ty, ats, csts) <- inferTuple ts
   return (TyPair (getType at) ty, at : ats, cst : csts)
 
--- THIS IS WHERE I LEFT OFF
 -- | Infer the type of a case expression.  The result type is the
 --   least upper bound (if it exists) of all the branches.
 inferCase :: [Branch] -> TCM (ATerm, Constraint)

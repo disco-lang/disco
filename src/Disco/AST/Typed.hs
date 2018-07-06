@@ -79,6 +79,7 @@ module Disco.AST.Typed
        , pattern ABinding
          -- * Utilities
        , getType
+       , setType
 
        , AProperty
        )
@@ -313,3 +314,22 @@ getType (ATListComp ty _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 
+-- | Set the type at the root of an 'ATerm'.
+setType :: Type -> ATerm -> ATerm
+setType ty (ATVar _ x      ) = ATVar ty x
+setType _  ATUnit            = ATUnit
+setType _  (ATBool b)        = ATBool b
+setType ty (ATNat _ x      ) = ATNat ty x
+setType _  (ATRat r)         = ATRat r
+setType ty (ATAbs _ x      ) = ATAbs ty x
+setType ty (ATApp _ x y    ) = ATApp ty x y
+setType ty (ATTup _ x      ) = ATTup ty x
+setType ty (ATInj _ x y    ) = ATInj ty x y
+setType ty (ATUn _ x y     ) = ATUn ty x y
+setType ty (ATBin _ x y z  ) = ATBin ty x y z
+setType ty (ATTyOp _ x y   ) = ATTyOp ty x y
+setType ty (ATChain _ x y  ) = ATChain ty x y
+setType ty (ATList _ x y   ) = ATList ty x y
+setType ty (ATListComp _ x ) = ATListComp ty x
+setType ty (ATLet _ x      ) = ATLet ty x
+setType ty (ATCase _ x     ) = ATCase ty x

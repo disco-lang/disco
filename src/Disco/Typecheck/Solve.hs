@@ -778,6 +778,9 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         solveVar :: Name Type -> Maybe (S' BaseTy)
         solveVar v =
           case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . (lkup "solveGraph.solveVar" relMap)) of
+            -- No sub- or supertypes; the only way this can happen is
+            -- if it has a nontrivial sort.  We just pick a type that
+            -- inhabits the sort.
             ([], []) ->
               Just (coerce v |-> pickSortBaseTy (getSort sm v))
 

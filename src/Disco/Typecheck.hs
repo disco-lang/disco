@@ -206,7 +206,7 @@ check (TTup ts) ty = do
   return $ (ATTup ty ats, cAnd csts)
 
 check t@(TList xs ell) ty = do
-  (eltTy, cst1) <- ensureList ty (Left t) 
+  (eltTy, cst1) <- ensureList ty (Left t)
   aclist <- mapM (flip check eltTy) xs
   let (axs, csts) = unzip aclist
   (aell, cst2) <- checkEllipsis ell eltTy
@@ -447,13 +447,13 @@ cPos ty@(TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CQual QNum ty)  -- 
 
 cPos ty                 = do
   res <- freshTy
-  return (res, CAnd 
-               [ CQual QNum ty 
-               , COr 
+  return (res, CAnd
+               [ CQual QNum ty
+               , COr
                  [ cAnd [CSub ty TyZ, CSub TyN res ]
                  , cAnd [CSub ty TyQ, CSub TyQP res]
                  , CEq ty res
-                 ] 
+                 ]
                ])
 
 cInt :: Type -> TCM (Type, Constraint)
@@ -465,9 +465,9 @@ cInt ty@(TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CQual QNum ty)
 
 cInt ty                 = do
   res <- freshTy
-  return (res, CAnd 
+  return (res, CAnd
                [ CQual QNum ty
-               , COr 
+               , COr
                  [ cAnd [CSub ty TyQP, CSub TyN res]
                  , cAnd [CSub ty TyQ,  CSub TyZ res]
                  , CEq ty res
@@ -480,7 +480,7 @@ cInt ty                 = do
 -- cExp ty1@(TyAtom (ABase b1)) ty2@(TyAtom (ABase b2)) =
 --   return (TyAtom (ABase (hexp b1 b2)), cAnd [CQual QNum ty1, CQual QNum ty2])
 --   where
---     hexp 
+--     hexp
 
 cExp :: Type -> Type -> TCM (Type, Constraint)
 cExp ty1 ty2            = do

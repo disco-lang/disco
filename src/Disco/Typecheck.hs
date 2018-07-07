@@ -161,6 +161,11 @@ evalTCM = fmap fst . runTCM
 execTCM :: TCM a -> Either TCError DefnCtx
 execTCM = fmap snd . runTCM
 
+-- | Solve a constraint set, generating a substitution (or failing
+--   with an error).
+solve :: Constraint -> TCM S
+solve = either (throwError . Unsolvable) return . runSolveM . solveConstraint
+
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> Defn -> TCM ()
 addDefn x b = modify (M.insert (coerce x) b)
@@ -491,9 +496,8 @@ inferTop :: Term -> TCM ATerm
 inferTop t = do
   (at, constr) <- infer t
   traceShowM at
-  case runSolveM (solveConstraint constr) of
-    Left solveErr -> throwError $ Unsolvable solveErr
-    Right theta   -> return $ substs theta at
+  theta <- solve constr
+  return $ substs theta at
 
 -- | Infer the type of a term, along with some constraints.  If it
 --   succeeds, it returns the term with all subterms annotated.
@@ -999,9 +1003,8 @@ checkDefn (DDefn x clauses) = do
       aclist <- mapM (checkClause ty) clauses
       let (aclauses, csts) = unzip aclist
           cst = cAnd csts
-      case runSolveM . solveConstraint $ CAll (bind nms cst) of
-        Left solveErr -> throwError $ Unsolvable solveErr
-        Right theta   -> addDefn x (substs theta aclauses)
+      theta <- solve $ CAll (bind nms cst)
+      addDefn x (substs theta aclauses)
   where
     numPats = length . fst . unsafeUnbind
 
@@ -1056,13 +1059,11 @@ checkProperty prop = do
   (at, cst) <- check t TyBool
 
   -- ... and solve the resulting constraints.
-  case runSolveM . solveConstraint $ cst of
-    Left solveErr -> throwError $ Unsolvable solveErr
-    Right theta   ->
+  theta <- solve cst
 
-    -- Apply the resulting substitution and fix up the types of the
-    -- variables.
-      return (bind (binds & traverse . _1 %~ coerce) (substs theta at))
+  -- Finally, apply the resulting substitution and fix up the types of
+  -- the variables.
+  return (bind (binds & traverse . _1 %~ coerce) (substs theta at))
 
 ------------------------------------------------------------
 -- Erasure

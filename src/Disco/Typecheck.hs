@@ -1035,25 +1035,15 @@ checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
-checkProperties docs = do
-  ctx <- (traverse . traverse) checkProperty properties
-  let (nms, aclistlist) = unzip (M.toList ctx)
-  let (apropll, cstl) = unpack aclistlist
-  let newctx = (M.mapKeys coerce . M.filter (not.null)) $ M.fromList (zip nms apropll)
-
-  -- XXX TODO: solve constraints
-
-  return (newctx)
+checkProperties docs =
+  (M.mapKeys coerce . M.filter (not.null))
+    <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
     properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
 
-    unpack :: [[(a,c)]] -> ([[a]],[c])
-    unpack l = foldr (\acc (apll,cstl) ->
-      let (aps, csts) = unzip acc in (aps : apll, csts ++ cstl)) ([],[]) l
-
 -- | Check the types of the terms embedded in a property.
-checkProperty :: Property -> TCM (AProperty, Constraint)
+checkProperty :: Property -> TCM AProperty
 checkProperty prop = do
 
   -- A property looks like  forall (x1:ty1) ... (xn:tyn). term.
@@ -1062,11 +1052,17 @@ checkProperty prop = do
   -- Extend the context with (x1:ty1) ... (xn:tyn) ...
   extends (M.fromList $ map (second toSigma) binds) $ do
 
-  -- ... and check that the term has type Bool.
+  -- ... check that the term has type Bool ...
   (at, cst) <- check t TyBool
 
-  -- We just have to fix up the types of the variables.
-  return (bind (binds & traverse . _1 %~ coerce) at, cst)
+  -- ... and solve the resulting constraints.
+  case runSolveM . solveConstraint $ cst of
+    Left solveErr -> throwError $ Unsolvable solveErr
+    Right theta   ->
+
+    -- Apply the resulting substitution and fix up the types of the
+    -- variables.
+      return (bind (binds & traverse . _1 %~ coerce) (substs theta at))
 
 ------------------------------------------------------------
 -- Erasure

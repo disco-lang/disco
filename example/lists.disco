@@ -3,7 +3,7 @@
 !!!   foldr (x -> y -> x + y) 0 [1,2,3] = 6
 !!!   foldr (x -> y -> x + y) 0 []      = 0
 
-foldr : (ℕ → ℚ → ℚ) → ℚ → List ℕ → ℚ
+foldr : forany a b. (a → b → b) → b → List a → b
 foldr f z []      = z
 foldr f z (x::xs) = f x (foldr f z xs)
 
@@ -15,7 +15,7 @@ foldr f z (x::xs) = f x (foldr f z xs)
 !!!   ∀      xs : List N. append ([], xs) = xs
 !!!   forall xs : List N. append (xs, []) = xs
 
-append : List ℕ × List ℕ → List ℕ
+append : forany a. List a × List a → List a
 append ([]    , ys) = ys
 append (x::xs', ys) = x :: append(xs',ys)
 
@@ -23,11 +23,11 @@ append (x::xs', ys) = x :: append(xs',ys)
 
 !!!   concat [[1,2],[3],[],[4,5,6]] = [1,2,3,4,5,6]
 
-concat : List List ℕ → List ℕ
+concat : forany a. List List a → List a
 concat []      = []
 concat (l::ls) = append(l, concat ls)
 
-map : (ℤ → Bool) → List ℤ → List Bool
+map : forany a b. (a → b) → List a → List b
 map f []      = []
 map f (x::xs) = f x :: map f xs
 
@@ -36,30 +36,30 @@ map f (x::xs) = f x :: map f xs
 !!!   take 3 [true, false] = [true, false]
 !!!   take 0 [true, false] = ([] : List Bool)
 
-take : ℕ → List Bool → List Bool
+take : forany a. ℕ → List a → List a
 take 0 _  = []
 take _ [] = []
 take (S n') (x :: xs) = x :: take n' xs
 
 ||| Repeat the given element infinitely.
 !!!   take 3 (repeat true) = [true, true, true]
-repeat : Bool → List Bool
+repeat : forany a. a → List a
 repeat x = x :: repeat x
 
 ||| The length of a list.
 !!!   length [true, false, true] = 3
 !!!   length (take 20 (repeat true)) = 20
-length : List Bool → ℕ
+length : forany a. List a → ℕ
 length [] = 0
 length (_::l) = 1 + length l
 
-iterateP : (ℕ×ℕ → ℕ×ℕ) → ℕ×ℕ → List (ℕ×ℕ)
+iterateP : forany a. (a → a) → a → List a
 iterateP f p = p :: iterateP f (f p)
 
 fib2_helper : ℕ×ℕ → ℕ×ℕ
 fib2_helper (a,b) = (b,a+b)
 
-indexP : ℕ -> List (ℕ×ℕ) -> ℕ×ℕ
+indexP : forany a. ℕ -> List a -> a
 indexP 0 (p::_) = p
 indexP (S n') (_::l') = indexP n' l'
 

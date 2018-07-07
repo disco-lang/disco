@@ -760,8 +760,18 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         -- wrote the code.
 
         -- Get only the variables we can solve on this pass, which
-        -- have base types in their predecessor or successor set.
-        as = map fst . filter (\k -> not . S.null . baseRels $ (lkup "solveGraph.go.as" relMap k)) $ M.keys relMap
+        -- have base types in their predecessor or successor set.  If
+        -- there are no such variables, then start picking any
+        -- remaining variables with a sort and pick types for them
+        -- (disco doesn't have qualified polymorphism so we can't just
+        -- leave them).
+        asBase
+          = map fst
+          . filter (not . S.null . baseRels . lkup "solveGraph.go.as" relMap)
+          $ M.keys relMap
+        as = case asBase of
+          [] -> filter ((/= topSort) . getSort sm) . map fst $ M.keys relMap
+          _  -> asBase
 
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.
@@ -769,8 +779,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         solveVar v =
           case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . (lkup "solveGraph.solveVar" relMap)) of
             ([], []) ->
-              error $ "Impossible! solveGraph.solveVar called on variable "
-                      ++ show v ++ " with no base type successors or predecessors"
+              Just (coerce v |-> pickSortBaseTy (getSort sm v))
 
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->

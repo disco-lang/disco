@@ -33,6 +33,7 @@ module Disco.Types.Rules
 
   , hasQual, hasSort
   , qualRules, sortRules
+  , pickSortBaseTy
   )
   where
 
@@ -245,3 +246,13 @@ sortRules c s = do
   -- in sort s) of lists (each one corresponds to the type args of c).
   -- We zip them together to produce a list of sorts.
   return $ foldl' (zipWith (\srt -> maybe srt (`S.insert` srt))) (repeat topSort) needQuals
+
+-- | Pick a base type that satisfies a given sort.
+pickSortBaseTy :: Sort -> BaseTy
+pickSortBaseTy s
+  | QDiv `S.member` s && QSub `S.member` s = Q
+  | QDiv `S.member` s = QP
+  | QSub `S.member` s = Z
+  | QNum `S.member` s = N
+  | otherwise         = Unit
+

@@ -1,0 +1,4 @@
+:type let f : forany a. (a -> a) -> a -> a = g -> (x -> g (g x)) in f (x -> x+x)
+:type let f : forany a. (a -> a) -> a -> a = g -> (x -> g (g x)) in f (x -> x-x)
+:type let f : forany a. (a -> a) -> a -> a = g -> (x -> g (g x)) in f (x -> x/x)
+:type let f : forany a. (a -> a) -> a -> a = g -> (x -> g (g x)) in f (x -> -x/x)

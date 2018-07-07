@@ -1,0 +1,4 @@
+let f : forany a. (a → a) → a → a = g ↦ x ↦ g (g x) in f (x ↦ x + x) : ℕ → ℕ
+let f : forany a. (a → a) → a → a = g ↦ x ↦ g (g x) in f (x ↦ x - x) : ℤ → ℤ
+let f : forany a. (a → a) → a → a = g ↦ x ↦ g (g x) in f (x ↦ x / x) : ℚ⁺ → ℚ⁺
+let f : forany a. (a → a) → a → a = g ↦ x ↦ g (g x) in f (x ↦ -x / x) : ℚ → ℚ

@@ -775,7 +775,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->
               -- trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
-              (coerce v |->) <$> glbBySort sm relMap bsupers (lkup "solveVar bsupers, sort" (unSM sm) v)
+              (coerce v |->) <$> glbBySort sm relMap bsupers (getSort sm v)
                 (varRels (lkup "solveVar bsupers, rels" relMap (v,SuperTy)))
 
             -- Only subtypes.  Just assign a to their sup.

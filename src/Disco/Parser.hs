@@ -219,8 +219,8 @@ reservedWords =
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
-  , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
-  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
+  , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
+  , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "forany"
   ]
 
@@ -682,8 +682,7 @@ parseAtomicType = label "type" $
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
-  <|> TyQP   <$ (reserved "QP" <|> reserved "ℚ⁺") -- TODO: come up with more/better ways to
-                                                  --       represent nonegative rationals.
+  <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
     -- This explicitly allows "List List N" to parse as List (List N).
     -- Since we don't have arbitrary application of higher-kinded type

@@ -58,7 +58,7 @@ plusIsoR n =
 !!! ∀ l:List Void. l = l
 !!! ∀ l:List Unit. l = reverseU l
 !!! ∀ bs : List Bool. toBin (fromBin bs) = bs
-!!! ∀ q : QP. q >= 0
+!!! ∀ q : F. q >= 0
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0
 !!! ∀ bs : B * B. {? b1 when bs is (b1,b2) if b2, false otherwise ?}
                 = {? b1 and b2 when bs is (b1,b2) ?}

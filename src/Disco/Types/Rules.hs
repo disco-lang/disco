@@ -130,10 +130,10 @@ isSubA _ _                   = False
 isSubB :: BaseTy -> BaseTy -> Bool
 isSubB b1 b2 | b1 == b2 = True
 isSubB N Z   = True
-isSubB N QP  = True
+isSubB N F   = True
 isSubB N Q   = True
 isSubB Z Q   = True
-isSubB QP Q  = True
+isSubB F Q   = True
 isSubB _ _   = False
 
 -- | Check whether one base type is a sub- or supertype of another.
@@ -143,15 +143,15 @@ isDirB SuperTy b1 b2 = isSubB b2 b1
 
 -- | List all the supertypes of a given base type.
 supertypes :: BaseTy -> [BaseTy]
-supertypes N  = [N, Z, QP, Q]
+supertypes N  = [N, Z, F, Q]
 supertypes Z  = [Z, Q]
-supertypes QP = [QP, Q]
+supertypes F  = [F, Q]
 supertypes ty = [ty]
 
 -- | List all the subtypes of a given base type.
 subtypes :: BaseTy -> [BaseTy]
-subtypes Q  = [Q, QP, Z, N]
-subtypes QP = [QP, N]
+subtypes Q  = [Q, F, Z, N]
+subtypes F  = [F, N]
 subtypes Z  = [Z, N]
 subtypes ty = [ty]
 
@@ -168,9 +168,9 @@ dirtypes SuperTy = supertypes
 hasQual :: BaseTy -> Qualifier -> Bool
 hasQual (Fin _) q    | q `elem` [QNum, QSub, QFin] = True
 hasQual (Fin n) QDiv = isPrime n
-hasQual b       QNum = b `elem` [N, Z, QP, Q]
+hasQual b       QNum = b `elem` [N, Z, F, Q]
 hasQual b       QSub = b `elem` [Z, Q]
-hasQual b       QDiv = b `elem` [QP, Q]
+hasQual b       QDiv = b `elem` [F, Q]
 hasQual _ _          = False
 
 -- | Check whether a base type has a certain sort.
@@ -251,7 +251,7 @@ sortRules c s = do
 pickSortBaseTy :: Sort -> BaseTy
 pickSortBaseTy s
   | QDiv `S.member` s && QSub `S.member` s = Q
-  | QDiv `S.member` s = QP
+  | QDiv `S.member` s = F
   | QSub `S.member` s = Z
   | QNum `S.member` s = N
   | otherwise         = Unit

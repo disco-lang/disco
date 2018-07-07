@@ -310,7 +310,7 @@ check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub] = do
 --       -- case for them to have type Q+.  On the other hand, if (x //
 --       -- y) : Z5 then x and y must also have type Z5.  So we check at
 --       -- the lub of ty and Q+ if it exists, or ty otherwise.
---       ty' <- lub ty TyQP <|> return ty
+--       ty' <- lub ty TyF <|> return ty
 
 --       at1 <- check t1 ty'
 --       at2 <- check t2 ty'
@@ -345,8 +345,8 @@ check (TBin Exp t1 t2) ty = do
 --   return $ ATBin ty Sub at1 at2
 
 -- Note, we don't have the same special case for Neg as for Sub, since
--- unlike subtraction, which can sometimes make sense on N or QP, it
--- never makes sense to negate a value of type N or QP.
+-- unlike subtraction, which can sometimes make sense on N or F, it
+-- never makes sense to negate a value of type N or F.
 check (TUn Neg t) ty = do
   (at, cst) <- check t ty
   return $ (ATUn ty Neg at, cAnd [cst, CQual (QSub) ty])
@@ -442,7 +442,7 @@ cPos :: Type -> TCM (Type, Constraint)
 cPos ty@(TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CQual QNum ty)  -- Has to be QNum!!
   where
     pos Z = N
-    pos Q = QP
+    pos Q = F
     pos _ = b
 
 cPos ty                 = do
@@ -450,8 +450,8 @@ cPos ty                 = do
   return (res, CAnd
                [ CQual QNum ty
                , COr
-                 [ cAnd [CSub ty TyZ, CSub TyN res ]
-                 , cAnd [CSub ty TyQ, CSub TyQP res]
+                 [ cAnd [CSub ty TyZ, CSub TyN res]
+                 , cAnd [CSub ty TyQ, CSub TyF res]
                  , CEq ty res
                  ]
                ])
@@ -459,17 +459,17 @@ cPos ty                 = do
 cInt :: Type -> TCM (Type, Constraint)
 cInt ty@(TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CQual QNum ty)
   where
-    int QP = N
-    int Q  = Z
-    int _  = b
+    int F = N
+    int Q = Z
+    int _ = b
 
 cInt ty                 = do
   res <- freshTy
   return (res, CAnd
                [ CQual QNum ty
                , COr
-                 [ cAnd [CSub ty TyQP, CSub TyN res]
-                 , cAnd [CSub ty TyQ,  CSub TyZ res]
+                 [ cAnd [CSub ty TyF, CSub TyN res]
+                 , cAnd [CSub ty TyQ, CSub TyZ res]
                  , CEq ty res
                  ]
                ])

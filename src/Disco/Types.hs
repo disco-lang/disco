@@ -43,7 +43,7 @@ module Disco.Types
        , pattern TyBool
        , pattern TyN
        , pattern TyZ
-       , pattern TyQP
+       , pattern TyF
        , pattern TyQ
        , pattern TyFin
        , pattern TyArr
@@ -111,8 +111,8 @@ data BaseTy where
   -- | Integers.
   Z    :: BaseTy
 
-  -- | Nonnegative rationals.
-  QP   :: BaseTy
+  -- | Fractionals (i.e. nonnegative rationals).
+  F    :: BaseTy
 
   -- | Rationals.
   Q    :: BaseTy
@@ -227,8 +227,8 @@ pattern TyN = TyAtom (ABase N)
 pattern TyZ :: Type
 pattern TyZ = TyAtom (ABase Z)
 
-pattern TyQP :: Type
-pattern TyQP = TyAtom (ABase QP)
+pattern TyF :: Type
+pattern TyF = TyAtom (ABase F)
 
 pattern TyQ :: Type
 pattern TyQ = TyAtom (ABase Q)
@@ -248,7 +248,7 @@ pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
 
-{-# COMPLETE TyUnit, TyBool, TyN, TyZ, TyQP, TyQ, TyFin, TyArr, TyPair, TySum, TyList #-}
+{-# COMPLETE TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin, TyArr, TyPair, TySum, TyList #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
@@ -305,17 +305,17 @@ countType (TyList ty)
   | isEmptyTy ty            = Just 1
   | otherwise               = Nothing
 
--- All other types are infinite. (TyN, TyZ, TyQ, TyQP)
+-- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _                 = Nothing
 
 --------------------------------------------------
 -- Type predicates
 --------------------------------------------------
 
--- | Check whether a type is a numeric type (N, Z, Q+, Q, or Zn).
+-- | Check whether a type is a numeric type (N, Z, F, Q, or Zn).
 isNumTy :: Type -> Bool
 isNumTy (TyFin _) = True
-isNumTy ty        = ty `elem` [TyN, TyZ, TyQP, TyQ]
+isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]
 
 -- | Decide whether a type supports subtraction.
 isSubtractive :: Type -> Bool

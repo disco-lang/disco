@@ -159,7 +159,7 @@ handleLoad file = do
   case mp of
     Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
     Right p  ->
-      case runTCM (checkModuleTop p) of
+      case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), defns) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)

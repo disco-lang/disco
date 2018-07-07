@@ -36,7 +36,6 @@ module Disco.Typecheck
        , checkProperties, checkProperty
 
          -- ** Whole modules
-       , checkModuleTop
        , checkModule, withTypeDecls
 
          -- * Type inference
@@ -910,20 +909,16 @@ checkTuplePat (p:ps) ty = do
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
 
-checkModuleTop :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
-checkModuleTop m = (\(a,b,c,_) -> (a,b,c)) <$> checkModule m
-  -- XXX FIX ME!! Run constraint solver etc.
-
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx, Constraint)
+checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
 checkModule (Module m docs) = do
   let (defns, typeDecls) = partition isDefn m
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
-    (aprops, cst) <- checkProperties docs
+    aprops <- checkProperties docs
     ctx <- ask
-    return (docs, aprops, ctx, cst)
+    return (docs, aprops, ctx)
 
 -- Refactor this to one function that takes a constructor as an argument
 ensureSum :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
@@ -992,7 +987,7 @@ withTypeDecls decls k = do
 
 -- | Type check a top-level definition. Precondition: only called on
 --   'DDefn's.
-checkDefn :: Decl -> TCM (Constraint)
+checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
   Forall sig <- lookupTy x
   prevDefn <- gets (M.lookup (coerce x))
@@ -1003,9 +998,10 @@ checkDefn (DDefn x clauses) = do
       (nms, ty) <- unbind sig
       aclist <- mapM (checkClause ty) clauses
       let (aclauses, csts) = unzip aclist
-      let cst = cAnd csts
-      addDefn x aclauses
-      return $ CAll (bind nms cst)
+          cst = cAnd csts
+      case runSolveM . solveConstraint $ CAll (bind nms cst) of
+        Left solveErr -> throwError $ Unsolvable solveErr
+        Right theta   -> addDefn x (substs theta aclauses)
   where
     numPats = length . fst . unsafeUnbind
 
@@ -1038,13 +1034,16 @@ checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
-checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty], Constraint)
+checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
 checkProperties docs = do
   ctx <- (traverse . traverse) checkProperty properties
   let (nms, aclistlist) = unzip (M.toList ctx)
   let (apropll, cstl) = unpack aclistlist
   let newctx = (M.mapKeys coerce . M.filter (not.null)) $ M.fromList (zip nms apropll)
-  return (newctx, cAnd cstl)
+
+  -- XXX TODO: solve constraints
+
+  return (newctx)
   where
     properties :: Ctx Term [Property]
     properties = M.map (\ds -> [p | DocProperty p <- ds]) docs

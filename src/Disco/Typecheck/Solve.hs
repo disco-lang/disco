@@ -658,19 +658,14 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
     unifyWCC :: S' BaseTy -> S' Atom
     unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ (map (coerce *** ABase) s)
       where
-        wccVarGroups :: [Set UAtom]
-        wccVarGroups  = filter (all isRight) . substs s $ G.wcc g
-        mkEquateSubst :: Set UAtom -> S' Atom
-        mkEquateSubst _ = idS
-            -- This was the code from before which doesn't type check any more.
+        wccVarGroups :: [Set (Name Type)]
+        wccVarGroups  = map (S.map getVar) . filter (all isRight) . substs s $ G.wcc g
+        getVar (Right v) = v
+        getVar (Left b)  = error
+          $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
-            -- (\(a:as) -> map (\v -> (coerce v, a)) as) . map fromRight . S.toList
-
-            -- However, since disco will never infer a polymorphic
-            -- type (for now), it doesn't really matter.  I'll leave
-            -- mkEquateSubst here as idS (+ the below comments) for
-            -- now just as a reminder of where to put this code if we
-            -- ever want it again in the future.
+        mkEquateSubst :: Set (Name Type) -> S' Atom
+        mkEquateSubst = (\(a:as) -> map (\v -> (coerce v, AVar (U a))) as) . S.toList
 
             -- After picking concrete base types for all the type
             -- variables we can, the only thing possibly remaining in

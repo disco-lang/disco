@@ -260,23 +260,18 @@ pattern APBool  b = PBool_ () b
 pattern APTup  :: [APattern] -> APattern
 pattern APTup lp = PTup_ () lp
 
--- | Injection pattern (@inl pat@ or @inr pat@).
 pattern APInj  :: Side -> APattern -> APattern
 pattern APInj s p = PInj_ () s p
 
--- | Literal natural number pattern.
 pattern APNat  :: Integer -> APattern
 pattern APNat n = PNat_ () n
 
--- | Successor pattern, @S p@.
 pattern APSucc :: APattern -> APattern
 pattern APSucc p = PSucc_ () p
 
--- | Cons pattern @p1 :: p2@.
 pattern APCons :: APattern -> APattern -> APattern
 pattern APCons  p1 p2 = PCons_ () p1 p2
 
--- | List pattern @[p1, .., pn]@.
 pattern APList :: [APattern] -> APattern
 pattern APList lp = PList_ () lp
 

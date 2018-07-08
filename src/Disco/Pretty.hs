@@ -134,10 +134,7 @@ prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
 prettySigma :: Sigma -> Doc
 prettySigma (Forall bnd) = lunbind bnd $
-  \(tyvars, body) -> case tyvars of
-                      [] -> prettyTy body
-                      _  -> text "forany" <+> prettyTyVars tyvars <> text "." <+> prettyTy body
-                      where prettyTyVars tyvars = hsep (map prettyName tyvars)
+  \(_, body) -> prettyTy body
 --------------------------------------------------
 
 mparens :: PA -> Doc -> Doc

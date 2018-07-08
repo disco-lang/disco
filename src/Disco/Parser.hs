@@ -221,7 +221,7 @@ reservedWords =
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
-  , "forall", "forany"
+  , "forall"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -333,8 +333,7 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 --   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
-
--- ADDSIGMA
+ 
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
@@ -352,7 +351,6 @@ parseDefn = label "definition" $
 term :: Parser Term
 term = between sc eof parseTerm
 
--- ADDIGMA
 -- | Parse a term, consisting of a @parseTerm'@ optionally
 --   followed by an ascription.
 parseTerm :: Parser Term
@@ -488,7 +486,6 @@ parseLet =
         <$> (toTelescope <$> (parseBinding `sepBy` comma))
         <*> (reserved "in" *> parseTerm)))
 
--- ADDSIGMA
 -- | Parse a single binding (@x [ : ty ] = t@).
 parseBinding :: Parser Binding
 parseBinding = do
@@ -701,15 +698,7 @@ parseTyVar :: Parser (Name Type)
 parseTyVar = string2Name <$> identifier
 
 parseSigma :: Parser Sigma
-parseSigma = Forall <$> (reserved "forany"
-                     *> (bind
-                           <$> (some parseTyVar)
-                           <*> (symbol "." *> parseType)
-                        )
-                    )
-         <|> toSigma <$> parseType
-
-
+parseSigma = closeSigma <$> parseType
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

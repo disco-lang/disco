@@ -558,7 +558,6 @@ infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div] = do
   tyv <- freshTy
   return (ATBin tyv op at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv, CQual (bopQual op) tyv])
 
-  -- Ask about this!
 infer (TUn Neg t) = do
   (at, cst) <- infer t
   let ty = getType at
@@ -701,8 +700,6 @@ infer (TListComp bqt) = do
   let ty = getType at
   return (ATListComp (TyList ty) (bind aqs at), cAnd [cst1, cst2])
 
--- Should enumerate and count genereate any constraints?
--- Need to add a finite Q
 infer (TTyOp Enumerate t) = do
   return (ATTyOp (TyList t) Enumerate t, CTrue)
 
@@ -924,7 +921,6 @@ checkModule (Module m docs) = do
     ctx <- ask
     return (docs, aprops, ctx)
 
--- Refactor this to one function that takes a constructor as an argument
 ensureSum :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
 ensureSum (TySum ty1 ty2) _ = return (ty1, ty2, CTrue)
 ensureSum tyv@(TyVar _) _ = do
@@ -967,8 +963,6 @@ ensureArrow tyv@(TyVar _) _ = do
 ensureArrow ty tyarg = case tyarg of
                       Left term -> throwError (NotArrow term ty)
                       Right pat -> throwError (PatternType pat ty)
-
--- ensurePair
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type

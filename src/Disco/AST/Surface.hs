@@ -317,23 +317,18 @@ pattern PBool  b = PBool_ () b
 pattern PTup  :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp
 
--- | Injection pattern (@inl pat@ or @inr pat@).
 pattern PInj  :: Side -> Pattern -> Pattern
 pattern PInj s p = PInj_ () s p
 
--- | Literal natural number pattern.
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
--- | Successor pattern, @S p@.
 pattern PSucc :: Pattern -> Pattern
 pattern PSucc p = PSucc_ () p
 
--- | Cons pattern @p1 :: p2@.
 pattern PCons :: Pattern -> Pattern -> Pattern
 pattern PCons  p1 p2 = PCons_ () p1 p2
 
--- | List pattern @[p1, .., pn]@.
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 

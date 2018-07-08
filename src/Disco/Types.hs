@@ -54,7 +54,7 @@ module Disco.Types
        -- ** Quantified types
 
        , Sigma(..)
-       , toSigma
+       , toSigma, closeSigma
 
        -- * Type predicates
 
@@ -80,6 +80,8 @@ import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Control.Arrow                    ((***))
+import           Control.Lens                     (toListOf)
+import           Data.List                        (nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
@@ -280,6 +282,11 @@ instance Subst Type Sigma
 -- | Convert a monotype into a (trivially) quantified type.
 toSigma :: Type -> Sigma
 toSigma ty = Forall (bind [] ty)
+
+-- | Convert a monotype into a polytype by quantifying over all its
+--   free type variables.
+closeSigma :: Type -> Sigma
+closeSigma ty = Forall (bind (nub $ toListOf fv ty) ty)
 
 --------------------------------------------------
 -- Counting inhabitants

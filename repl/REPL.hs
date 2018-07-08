@@ -128,8 +128,8 @@ handleLet x t = do
   let mat = runTCM (extends ctx $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
-    Right (at, _) -> do
-      topCtx   %= M.insert x (toSigma (getType at))
+    Right ((at, sig), _) -> do
+      topCtx   %= M.insert x sig
       topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
 
 handleShowDefn :: Name Term -> Disco IErr String
@@ -142,8 +142,8 @@ handleShowDefn x = do
 handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
   case evalTCM (inferTop t) of
-    Left e   -> return.show $ e
-    Right at -> return.show.runDSM.desugarTerm $ at
+    Left e       -> return.show $ e
+    Right (at,_) -> return.show.runDSM.desugarTerm $ at
 
 loadFile :: FilePath -> Disco IErr (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
@@ -256,7 +256,7 @@ evalTerm t = do
   ctx   <- use topCtx
   case evalTCM (extends ctx $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
-    Right at ->
+    Right (at,_) ->
       let ty = getType at
           c  = runDSM $ desugarTerm at
       in (withTopEnv $ mkThunk c) >>= prettyValue ty
@@ -266,7 +266,7 @@ handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (inferTop t)) of
     Left e   -> return.show $ e    -- XXX pretty-print
-    Right at -> renderDoc $ prettyTerm t <+> text ":" <+> (prettyTy.getType $ at)
+    Right (at,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"

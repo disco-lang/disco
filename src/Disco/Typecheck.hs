@@ -490,14 +490,14 @@ cExp ty1 ty2            = do
                  , cAnd [CQual QDiv tyv1, CEq ty2 TyZ, CSub ty1 tyv1]
                  ])
 
--- | Infer the type of a term.  The resulting annotations on the term
---   are guaranteed to be free of type variables.
-inferTop :: Term -> TCM ATerm
+-- | Infer the (polymorphic) type of a term.
+inferTop :: Term -> TCM (ATerm, Sigma)
 inferTop t = do
   (at, constr) <- infer t
   traceShowM at
   theta <- solve constr
-  return $ substs theta at
+  let at' = substs theta at
+  return (at', closeSigma (getType at'))
 
 -- | Infer the type of a term, along with some constraints.  If it
 --   succeeds, it returns the term with all subterms annotated.

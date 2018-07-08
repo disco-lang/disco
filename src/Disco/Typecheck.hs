@@ -880,14 +880,9 @@ checkModule (Module m docs) = do
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM ([Type], Constraint)
 ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return (tys, CTrue)
 
-ensureConstr c tyv@(TyVar _) _ | c `elem` [CSum, CPair, CArr] = do
-  ty1 <- freshTy
-  ty2 <- freshTy
-  return ([ty1, ty2], CEq tyv (TyCon c [ty1, ty2]))
-
-ensureConstr c tyv@(TyVar _) _ | c `elem` [CList] = do
-  ty <- freshTy
-  return ([ty], CEq tyv (TyCon c [ty]))
+ensureConstr c tyv@(TyVar _) _ = do
+  tyvs <- mapM (const freshTy) (arity c)
+  return (tyvs, CEq tyv (TyCon c tyvs))
 
 ensureConstr c ty targ = case targ of
                            Left term -> throwError (NotCon c term ty)

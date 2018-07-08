@@ -293,30 +293,6 @@ check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub] = do
   (at2, cst2) <- check t2 ty
   return (ATBin ty op at1 at2, cAnd [cst1, cst2, CQual (bopQual op) ty])
 
--- check (TBin Div t1 t2) ty = do
---   _ <- checkFractional ty
---   at1 <- check t1 ty
---   at2 <- check t2 ty
---   return $ ATBin ty Div at1 at2
-
--- Take this case out for now
--- check (TBin IDiv t1 t2) ty = do
---   if (isNumTy ty)
---     then do
---       -- We are trying to check that (x // y) has type @ty@. Checking
---       -- that x and y in turn have type @ty@ would be too restrictive:
---       -- For example, for (x // y) to have type Nat it need not be the
---       -- case that x and y also have type Nat.  It is enough in this
---       -- case for them to have type Q+.  On the other hand, if (x //
---       -- y) : Z5 then x and y must also have type Z5.  So we check at
---       -- the lub of ty and Q+ if it exists, or ty otherwise.
---       ty' <- lub ty TyF <|> return ty
-
---       at1 <- check t1 ty'
---       at2 <- check t2 ty'
---       return $ ATBin ty IDiv at1 at2
---     else throwError (NotNumTy ty)
-
 check (TBin Exp t1 t2) ty = do
   -- if a^b :: fractional t, then a :: t, b :: Z
   -- else if a^b :: non-fractional t, then a :: t, b :: N
@@ -327,23 +303,6 @@ check (TBin Exp t1 t2) ty = do
   (resTy, cst3) <- cExp ty1 ty2
   return $ (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3])
 
--- Notice here we only check that ty is numeric, *not* that it is
--- subtractive.  As a special case, we allow subtraction to typecheck
--- at any numeric type; when a subtraction is performed at type N or
--- Q+, it incurs a runtime check that the result is positive.
-
--- XXX should make this an opt-in feature rather than on by default.
--- check (TBin Sub t1 t2) ty = do
---   when (not (isNumTy ty)) $ throwError (NotNumTy ty)
-
---   -- when (not (isSubtractive ty)) $ do
---   --   traceM $ "Warning: checking subtraction at type " ++ show ty
---   --   traceShowM $ (TBin Sub t1 t2)
---     -- XXX emit a proper warning re: subtraction on N or Q+
---   at1 <- check t1 ty
---   at2 <- check t2 ty
---   return $ ATBin ty Sub at1 at2
-
 -- Note, we don't have the same special case for Neg as for Sub, since
 -- unlike subtraction, which can sometimes make sense on N or F, it
 -- never makes sense to negate a value of type N or F.
@@ -353,7 +312,6 @@ check (TUn Neg t) ty = do
 
 check (TNat x) (TyFin n) =
   return $ (ATNat (TyFin n) x, CTrue)
-
 
 -- Finally, to check anything else, we can fall back to inferring its
 -- type and then check that the inferred type is a *subtype* of the
@@ -474,14 +432,6 @@ cInt ty                 = do
                  ]
                ])
 
-
-
-
--- cExp ty1@(TyAtom (ABase b1)) ty2@(TyAtom (ABase b2)) =
---   return (TyAtom (ABase (hexp b1 b2)), cAnd [CQual QNum ty1, CQual QNum ty2])
---   where
---     hexp
-
 cExp :: Type -> Type -> TCM (Type, Constraint)
 cExp ty1 ty2            = do
   tyv1 <- freshTy
@@ -599,13 +549,14 @@ infer (TBin Exp t1 t2) = do
   return (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3])
 
   -- An equality or inequality test always has type Bool, but we need
-  -- to check a few things first. We infer the types of both subterms
-  -- and check that (1) they have a common supertype which (2) has
-  -- decidable equality.
+  -- to check that they have a common supertype.
 infer (TBin eqOp t1 t2) | eqOp `elem` [Eq, Neq] = do
   (at1, cst1) <- infer t1
   (at2, cst2) <- infer t2
-  return (ATBin TyBool eqOp at1 at2, cAnd [cst1, cst2])
+  let ty1 = getType at1
+  let ty2 = getType at2
+  tyv <- freshTy
+  return (ATBin TyBool eqOp at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
 
 infer (TBin op t1 t2)
   | op `elem` [Lt, Gt, Leq, Geq] = inferComp op t1 t2
@@ -872,10 +823,8 @@ checkPattern p@(PInj R pat) ty    = do
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.
-
 checkPattern (PNat n) (TyFin _) = return (emptyCtx, APNat n, CTrue)
 checkPattern (PNat n) ty = return (emptyCtx, APNat n, CSub TyN ty)
-
 
 checkPattern (PSucc p) tyv@(TyVar _)               = do
   (ctx, apt, cst) <- checkPattern p TyN

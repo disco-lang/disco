@@ -95,6 +95,7 @@ type TyCtx = Ctx Term Sigma
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | NotCon Con Term Type
   | NotArrow Term Type     -- ^ The type of a lambda should be an arrow type but isn't
   | NotFun   ATerm         -- ^ The term should be a function but has a non-arrow type
   | NotSum Term Type       -- ^ The term is an injection but is
@@ -883,44 +884,20 @@ checkModule (Module m docs) = do
 --   constructor, and a list of type variables is returned whose count matches the
 --   arity of the provided constructor.
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM ([Type], Constraint)
-ensureConstr CSum (TySum ty1 ty2) _ = return ([ty1, ty2], CTrue)
-ensureConstr CSum tyv@(TyVar _) _ = do
+ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return (tys, CTrue)
+
+ensureConstr c tyv@(TyVar _) _ | c `elem` [CSum, CPair, CArr] = do
   ty1 <- freshTy
   ty2 <- freshTy
-  return ([ty1, ty2], CEq tyv (TyPair ty1 ty2))
+  return ([ty1, ty2], CEq tyv (TyCon c [ty1, ty2]))
 
-ensureConstr CSum ty tyarg = case tyarg of
-                            Left term -> throwError (NotSum term ty)
-                            Right pat -> throwError (PatternType pat ty)
-
-ensureConstr CList (TyList ty) _ = return ([ty], CTrue)
-ensureConstr CList tyv@(TyVar _) _ = do
+ensureConstr c tyv@(TyVar _) _ | c `elem` [CList] = do
   ty <- freshTy
-  return ([ty], CEq tyv (TyList ty))
+  return ([ty], CEq tyv (TyCon c [ty]))
 
-ensureConstr CList ty tyarg = case tyarg of
-                      Left term -> throwError (NotList term ty)
-                      Right pat -> throwError (PatternType pat ty)
-
-ensureConstr CPair (TyPair ty1 ty2) _ = return ([ty1, ty2], CTrue)
-ensureConstr CPair tyv@(TyVar _) _ = do
-  ty1 <- freshTy
-  ty2 <- freshTy
-  return ([ty1, ty2], CEq tyv (TyPair ty1 ty2))
-
-ensureConstr CPair ty tyarg = case tyarg of
-                      Left term -> throwError (NotTuple term ty)
-                      Right pat -> throwError (PatternType pat ty)
-
-ensureConstr CArr (TyArr ty1 ty2) _ = return ([ty1, ty2], CTrue)
-ensureConstr CArr tyv@(TyVar _) _ = do
-  ty1 <- freshTy
-  ty2 <- freshTy
-  return ([ty1, ty2], CEq tyv (TyArr ty1 ty2))
-
-ensureConstr CArr ty tyarg = case tyarg of
-                      Left term -> throwError (NotArrow term ty)
-                      Right pat -> throwError (PatternType pat ty)
+ensureConstr c ty targ = case targ of
+                           Left term -> throwError (NotCon c term ty)
+                           Right pat -> throwError (PatternType pat ty)
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type

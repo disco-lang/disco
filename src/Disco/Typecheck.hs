@@ -206,28 +206,28 @@ check (TTup ts) ty = do
   return $ (ATTup ty ats, cAnd csts)
 
 check t@(TList xs ell) ty = do
-  (eltTy, cst1) <- ensureList ty (Left t)
-  aclist <- mapM (flip check eltTy) xs
+  ([tyelt], cst1) <- ensureConstr CList ty (Left t)
+  aclist <- mapM (flip check tyelt) xs
   let (axs, csts) = unzip aclist
-  (aell, cst2) <- checkEllipsis ell eltTy
+  (aell, cst2) <- checkEllipsis ell tyelt
   return $ (ATList ty axs aell, cAnd (cst1 : cst2 : csts))
 
 check l@(TList _ _) ty            = throwError (NotList l ty)
 
 check t@(TBin Cons x xs) ty = do
-  (eltTy, cst1) <- ensureList ty (Left t)
-  (ax, cst2) <- check x  eltTy
+  ([tyElt], cst1) <- ensureConstr CList ty (Left t)
+  (ax, cst2) <- check x  tyElt
   (axs, cst3) <- check xs ty
   return $ (ATBin ty Cons ax axs, cAnd [cst1, cst2, cst3])
 
 check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
 
 check t@(TListComp bqt) ty = do
-  (eltTy, cst1) <- ensureList ty (Left t)
+  ([tyElt], cst1) <- ensureConstr CList ty (Left t)
   (qs, term) <- unbind bqt
   (aqs, cx, cst2) <- inferTelescope inferQual qs
   extends cx $ do
-  (at, cst3) <- check term eltTy
+  (at, cst3) <- check term tyElt
   return $ (ATListComp ty (bind aqs at), cAnd [cst1, cst2, cst3])
 
 check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
@@ -251,12 +251,12 @@ check (TAbs lam) ty = do
 -- To check an injection has a sum type, recursively check the
 -- relevant type.
 check lt@(TInj L t) ty = do
-  (ty1, _, cst1) <- ensureSum ty (Left lt)
+  ([ty1, _], cst1) <- ensureConstr CSum ty (Left lt)
   (at, cst2) <- check t ty1
   return (ATInj ty L at, cAnd [cst1, cst2])
 
 check rt@(TInj R t) ty = do
-  (_, ty2, cst1) <- ensureSum ty (Left rt)
+  ([_, ty2], cst1) <- ensureConstr CSum ty (Left rt)
   (at, cst2) <- check t ty2
   return (ATInj ty R at, cAnd [cst1, cst2])
 
@@ -346,7 +346,7 @@ checkArgs [] ty _ = return (emptyCtx, ty, CTrue)
 checkArgs ((x, unembed -> mty) : args) ty term = do
 
   -- Ensure that ty is a function type
-  (ty1, ty2, cst1) <- ensureArrow ty (Left term)
+  ([ty1, ty2], cst1) <- ensureConstr CArr ty (Left term)
 
   -- Figure out the type of x:
   (xTy, cst2) <- case mty of
@@ -375,7 +375,7 @@ checkTuple [t] ty = do     -- (:[]) <$> check t ty
   (at, cst) <- check t ty
   return ([at], [cst])
 checkTuple (t:ts) ty = do
-  (ty1, ty2, cst1) <- ensurePair ty (Left $ TTup  (t:ts))
+  ([ty1, ty2], cst1) <- ensureConstr CPair ty (Left $ TTup  (t:ts))
   (at, cst2) <- check t ty1
   (ats, csts) <- checkTuple ts ty2
   return $ (at : ats, cst1 : cst2 : csts)
@@ -488,7 +488,7 @@ infer (TAbs lam)    = do
 infer (TApp t t')   = do
   (at, cst1) <- infer t
   let ty = getType at
-  (ty1, ty2, cst2) <- ensureArrow ty (Left t)
+  ([ty1, ty2], cst2) <- ensureConstr CArr ty (Left t)
   (at', cst3) <- check t' ty1
   return (ATApp ty2 at at', cAnd [cst1, cst2, cst3])
 
@@ -813,11 +813,11 @@ checkPattern (PTup ps) ty                   = do
   let (ctxs, aps, csts) = unzip3 listCtxtAps
   return (joinCtxs ctxs, APTup aps, cAnd csts)
 checkPattern p@(PInj L pat) ty       = do
-  (ty1, _, cst1) <- ensureSum ty (Right p)
+  ([ty1, _], cst1) <- ensureConstr CSum ty (Right p)
   (ctx, apt, cst2) <- checkPattern pat ty1
   return (ctx, APInj L apt, cAnd [cst1, cst2])
 checkPattern p@(PInj R pat) ty    = do
-  (_, ty2, cst1) <- ensureSum ty (Right p)
+  ([_, ty2], cst1) <- ensureConstr CSum ty (Right p)
   (ctx, apt, cst2) <- checkPattern pat ty2
   return (ctx, APInj R apt, cAnd [cst1, cst2])
 
@@ -835,13 +835,13 @@ checkPattern (PSucc p) TyN                 = do
   return (ctx, APSucc apt, cst)
 
 checkPattern p@(PCons p1 p2) ty      = do
-  (tyl, cst1) <- ensureList ty (Right p)
+  ([tyl], cst1) <- ensureConstr CList ty (Right p)
   (ctx1, ap1, cst2) <- checkPattern p1 tyl
   (ctx2, ap2, cst3) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons ap1 ap2, cAnd [cst1, cst2, cst3])
 
 checkPattern p@(PList ps) ty         = do
-  (tyl, cst) <- ensureList ty (Right p)
+  ([tyl], cst) <- ensureConstr CList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps, csts) = unzip3 listCtxtAps
   return (joinCtxs ctxs, APList aps, cAnd (cst:csts))
@@ -854,7 +854,7 @@ checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
   (ctx, apt, cst) <- checkPattern p ty
   return [(ctx, apt, cst)]
 checkTuplePat (p:ps) ty = do
-  (ty1, ty2, cst1)  <- ensurePair ty (Right $ PTup (p:ps))
+  ([ty1, ty2], cst1)  <- ensureConstr CPair ty (Right $ PTup (p:ps))
   (ctx, apt, cst2)  <- checkPattern p ty1
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
@@ -870,46 +870,49 @@ checkModule (Module m docs) = do
     ctx <- ask
     return (docs, aprops, ctx)
 
-ensureSum :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
-ensureSum (TySum ty1 ty2) _ = return (ty1, ty2, CTrue)
-ensureSum tyv@(TyVar _) _ = do
+-- | Ensures that a type's outermost constructor matches the provided constructor,
+--   returning the types within the matched constructor or throwing a type error.
+--   If the type provided is a type variable, appropriate constraints are generated
+--   to guarentee the type variable's outermost constructor matches the provided
+--   constructor, and a list of type variables is returned whose count matches the
+--   arity of the provided constructor.
+ensureConstr :: Con -> Type -> Either Term Pattern -> TCM ([Type], Constraint)
+ensureConstr CSum (TySum ty1 ty2) _ = return ([ty1, ty2], CTrue)
+ensureConstr CSum tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
-  return (ty1, ty2, CEq tyv (TyPair ty1 ty2))
+  return ([ty1, ty2], CEq tyv (TyPair ty1 ty2))
 
-ensureSum ty tyarg = case tyarg of
-                      Left term -> throwError (NotSum term ty)
-                      Right pat -> throwError (PatternType pat ty)
+ensureConstr CSum ty tyarg = case tyarg of
+                            Left term -> throwError (NotSum term ty)
+                            Right pat -> throwError (PatternType pat ty)
 
-ensureList :: Type -> Either Term Pattern -> TCM (Type, Constraint)
-ensureList (TyList ty) _ = return (ty, CTrue)
-ensureList tyv@(TyVar _) _ = do
+ensureConstr CList (TyList ty) _ = return ([ty], CTrue)
+ensureConstr CList tyv@(TyVar _) _ = do
   ty <- freshTy
-  return (ty, CEq tyv (TyList ty))
+  return ([ty], CEq tyv (TyList ty))
 
-ensureList ty tyarg = case tyarg of
+ensureConstr CList ty tyarg = case tyarg of
                       Left term -> throwError (NotList term ty)
                       Right pat -> throwError (PatternType pat ty)
 
-ensurePair :: Type -> Either Term Pattern -> TCM (Type, Type, Constraint)
-ensurePair (TyPair ty1 ty2) _ = return (ty1, ty2, CTrue)
-ensurePair tyv@(TyVar _) _ = do
+ensureConstr CPair (TyPair ty1 ty2) _ = return ([ty1, ty2], CTrue)
+ensureConstr CPair tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
-  return (ty1, ty2, CEq tyv (TyPair ty1 ty2))
+  return ([ty1, ty2], CEq tyv (TyPair ty1 ty2))
 
-ensurePair ty tyarg = case tyarg of
+ensureConstr CPair ty tyarg = case tyarg of
                       Left term -> throwError (NotTuple term ty)
                       Right pat -> throwError (PatternType pat ty)
 
-ensureArrow :: Type -> Either Term Pattern ->  TCM (Type, Type, Constraint)
-ensureArrow (TyArr ty1 ty2) _ = return (ty1, ty2, CTrue)
-ensureArrow tyv@(TyVar _) _ = do
+ensureConstr CArr (TyArr ty1 ty2) _ = return ([ty1, ty2], CTrue)
+ensureConstr CArr tyv@(TyVar _) _ = do
   ty1 <- freshTy
   ty2 <- freshTy
-  return (ty1, ty2, CEq tyv (TyArr ty1 ty2))
+  return ([ty1, ty2], CEq tyv (TyArr ty1 ty2))
 
-ensureArrow ty tyarg = case tyarg of
+ensureConstr CArr ty tyarg = case tyarg of
                       Left term -> throwError (NotArrow term ty)
                       Right pat -> throwError (PatternType pat ty)
 

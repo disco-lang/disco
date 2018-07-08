@@ -95,14 +95,9 @@ type TyCtx = Ctx Term Sigma
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
-  | NotCon Con Term Type
-  | NotArrow Term Type     -- ^ The type of a lambda should be an arrow type but isn't
+  | NotCon Con Term Type   -- ^ The term should have an outermost constructor matching
+                           --   matching Con, but it has type 'Type' instead
   | NotFun   ATerm         -- ^ The term should be a function but has a non-arrow type
-  | NotSum Term Type       -- ^ The term is an injection but is
-                           --   expected to have some type other than
-                           --   a sum type
-  | NotTuple Term Type     -- ^ The term is a tuple but has a type
-                           --   which is not an appropriate product type
   | NotTuplePattern Pattern Type
   | Mismatch Type ATerm    -- ^ Simple type mismatch: expected, actual
   | CantInfer Term         -- ^ We were asked to infer the type of the
@@ -130,7 +125,6 @@ data TCError
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
-  | NotList Term Type      -- ^ Should have a list type, but expected to have some other type
   | NotSubtractive Type
   | NotFractional Type
   | Unsolvable SolveError
@@ -213,7 +207,7 @@ check t@(TList xs ell) ty = do
   (aell, cst2) <- checkEllipsis ell tyelt
   return $ (ATList ty axs aell, cAnd (cst1 : cst2 : csts))
 
-check l@(TList _ _) ty            = throwError (NotList l ty)
+check l@(TList _ _) ty            = throwError (NotCon CList l ty)
 
 check t@(TBin Cons x xs) ty = do
   ([tyElt], cst1) <- ensureConstr CList ty (Left t)
@@ -221,7 +215,7 @@ check t@(TBin Cons x xs) ty = do
   (axs, cst3) <- check xs ty
   return $ (ATBin ty Cons ax axs, cAnd [cst1, cst2, cst3])
 
-check t@(TBin Cons _ _) ty     = throwError (NotList t ty)
+check t@(TBin Cons _ _) ty     = throwError (NotCon CList t ty)
 
 check t@(TListComp bqt) ty = do
   ([tyElt], cst1) <- ensureConstr CList ty (Left t)
@@ -231,7 +225,7 @@ check t@(TListComp bqt) ty = do
   (at, cst3) <- check term tyElt
   return $ (ATListComp ty (bind aqs at), cAnd [cst1, cst2, cst3])
 
-check (TListComp bqt) ty    = throwError (NotList (TListComp bqt) ty)
+check (TListComp bqt) ty    = throwError (NotCon CList (TListComp bqt) ty)
 
 -- To check an abstraction:
 check (TAbs lam) ty = do
@@ -262,7 +256,7 @@ check rt@(TInj R t) ty = do
   return (ATInj ty R at, cAnd [cst1, cst2])
 
 -- Trying to check an injection under a non-sum type: error.
-check t@(TInj _ _) ty = throwError (NotSum t ty)
+check t@(TInj _ _) ty = throwError (NotCon CSum t ty)
 
 -- To check a let expression:
 check (TLet l) ty = do
@@ -630,7 +624,7 @@ infer (TBin Cons t1 t2) = do
           let ty1 = getType at1
           tyv <- freshTy
           return (ATBin (TyList tyv) Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
-        ty -> throwError (NotList t2 ty)
+        ty -> throwError (NotCon CList t2 ty)
 
 infer (TUn Fact t) = do
   (at, cst) <- check t TyN
@@ -797,7 +791,7 @@ inferQual (QBind x (unembed -> t))  = do
   (at, cst) <- infer t
   case getType at of
     TyList ty -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
-    wrongTy   -> throwError $ NotList t wrongTy
+    wrongTy   -> throwError $ NotCon CList t wrongTy
 inferQual (QGuard (unembed -> t))   = do
   (at, cst) <- check t TyBool
   return (AQGuard (embed at), emptyCtx, cst)

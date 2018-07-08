@@ -14,7 +14,7 @@
 sqIso : ℕ×ℕ → ℕ
 sqIso (x,y) =
   {? y^2 + x           if x <= y,
-     (x+1)^2 - 1 - y   otherwise
+     (x+1)^2 .- 1 .- y   otherwise
   ?}
 
 ||| Inverse direction of the square isomorphism.
@@ -24,8 +24,8 @@ sqIso (x,y) =
 sqIso' : ℕ → ℕ×ℕ
 sqIso' n =
   let r = sqrt n
-  in  {? (n - r^2, r)            if  n <= r^2 + r,
-         (r, (r+1)^2 - 1 - n)    otherwise
+  in  {? (n .- r^2, r)            if  n <= r^2 + r,
+         (r, (r+1)^2 .- 1 .- n)    otherwise
       ?}
 
 ||| The classic "diagonal" isomorphism:
@@ -45,7 +45,7 @@ diagIso' : ℕ → ℕ×ℕ
 diagIso' n =
      let d = (sqrt(1 + 8n) - 1)//2 : N
   in let t = d*(d+1)//2
-  in (n - t, d - (n - t))
+  in (n .- t, d .- (n .- t))
 
 
 ||| Every POSITIVE n can be decomposed into a power of two times an

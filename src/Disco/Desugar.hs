@@ -223,16 +223,18 @@ desugarUOp _ Abs    c = COp OAbs    [c]
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
 desugarBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
 -- Special ops for modular arithmetic in finite types
-desugarBOp _ _ (TyFin n) Add c1 c2 = COp (OMAdd n) [c1, c2]
-desugarBOp _ _ (TyFin n) Mul c1 c2 = COp (OMMul n) [c1, c2]
-desugarBOp _ _ (TyFin n) Sub c1 c2 = COp (OMSub n) [c1, c2]
-desugarBOp _ _ (TyFin n) Div c1 c2 = COp (OMDiv n) [c1, c2]
-desugarBOp _ _ (TyFin n) Exp c1 c2 = COp (OMExp n) [c1, c2]
+desugarBOp _ _ (TyFin n) Add  c1 c2 = COp (OMAdd n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Mul  c1 c2 = COp (OMMul n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Sub  c1 c2 = COp (OMSub n)  [c1, c2]
+desugarBOp _ _ (TyFin n) SSub c1 c2 = COp (OMSSub n) [c1, c2]
+desugarBOp _ _ (TyFin n) Div  c1 c2 = COp (OMDiv n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Exp  c1 c2 = COp (OMExp n)  [c1, c2]
 
 desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-desugarBOp _  _ ty Sub     c1 c2
+desugarBOp _  _ ty Sub    c1 c2
   | isSubtractive ty = COp OAdd [c1, COp ONeg [c2]]
   | otherwise        = COp OPosSub [c1, c2]
+desugarBOp _  _ _ SSub   c1 c2 = COp OSSub [c1, c2]
 desugarBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
 desugarBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
 desugarBOp _  _ _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]

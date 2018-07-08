@@ -103,7 +103,8 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
-        | OPosSub  -- ^ Runtime-checked subtraction on positive numbers
+        | OPosSub
+        | OSSub    -- ^ Saturating subtraction on natural numbers (@.-@ / @∸)
         | OSqrt    -- ^ Integer square root (@sqrt@)
         | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor   -- ^ Floor of fractional type (@floor@)
@@ -131,12 +132,13 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OEnum
         | OCount
     -- Need some new operators for doing arithmetic with finite types
-        | OMAdd Integer
-        | OMMul Integer
-        | OMSub Integer
-        | OMNeg Integer
-        | OMDiv Integer
-        | OMExp Integer
+        | OMAdd  Integer
+        | OMMul  Integer
+        | OMSub  Integer
+        | OMSSub Integer
+        | OMNeg  Integer
+        | OMDiv  Integer
+        | OMExp  Integer
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.

@@ -283,10 +283,11 @@ check (TCase bs) ty = do
 
 -- Checking arithmetic binary operations involves checking both operands
 -- and then adding a constraint qualifier over binary operation and the desired type.
-check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub] = do
+check (TBin op t1 t2) ty | op `elem` [Add, Mul, Div, Sub, SSub] = do
   (at1, cst1) <- check t1 ty
   (at2, cst2) <- check t2 ty
   return (ATBin ty op at1 at2, cAnd [cst1, cst2, CQual (bopQual op) ty])
+
 
 check (TBin Exp t1 t2) ty = do
   -- if a^b :: fractional t, then a :: t, b :: Z
@@ -501,7 +502,7 @@ infer (TTup ts) = do
   -- To infer the type of addition or multiplication, infer the types
   -- of the subterms, check that they are numeric, and return their
   -- lub.
-infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div] = do
+infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div, SSub] = do
   (at1, cst1) <- infer t1
   (at2, cst2) <- infer t2
   let ty1 = getType at1

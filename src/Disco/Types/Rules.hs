@@ -82,10 +82,11 @@ instance Subst Type Qualifier
 
 -- | A helper function that returns the appropriate qualifier for a binary operation.
 bopQual :: BOp -> Qualifier
-bopQual Add = QNum
-bopQual Mul = QNum
-bopQual Div = QDiv
-bopQual Sub = QSub
+bopQual Add  = QNum
+bopQual Mul  = QNum
+bopQual Div  = QDiv
+bopQual Sub  = QSub
+bopQual SSub = QNum
 bopQual _   = error "No qualifier for binary operation"
 
 ------------------------------------------------------------

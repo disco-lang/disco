@@ -51,6 +51,8 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
          | Sub     -- ^ Subtraction (@-@)
+         | PosSub  -- ^ Runtime-checked subtraction on positive numbers
+         | SSub    -- ^ Saturating Subtraction (@.-@ / @∸@)
          | Mul     -- ^ Multiplication (@*@)
          | Div     -- ^ Division (@/@)
          | Exp     -- ^ Exponentiation (@^@)
@@ -154,6 +156,7 @@ opTable =
     ]
   , [ bopInfo InL  Add     ["+"]
     , bopInfo InL  Sub     ["-"]
+    , bopInfo InL  SSub    [".-", "∸"]
     ]
   , [ bopInfo InR  Cons    ["::"]
     ]

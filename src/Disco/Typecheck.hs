@@ -396,6 +396,8 @@ checkBranch ty b = do
   (at, cst2) <- check t ty
   return $ (bind ags at, cAnd [cst1, cst2])
 
+-- | Generates appropriate constraints for the type of an operand of
+--   an absolute value function along with constraints for the type of the result.
 cPos :: Type -> TCM (Type, Constraint)
 cPos ty@(TyAtom (ABase b)) = return (TyAtom (ABase (pos b)), CQual QNum ty)  -- Has to be QNum!!
   where
@@ -414,6 +416,8 @@ cPos ty                 = do
                  ]
                ])
 
+-- | Generates appropriate constraints for the type of an operand of a
+--   ceiling or floor function along with constraints for the type of the result.
 cInt :: Type -> TCM (Type, Constraint)
 cInt ty@(TyAtom (ABase b)) = return (TyAtom (ABase (int b)), CQual QNum ty)
   where
@@ -432,6 +436,8 @@ cInt ty                 = do
                  ]
                ])
 
+-- | Generates appropriate constraints for the types of the operands of the
+--   exponent function along with constraints for the type of the result.
 cExp :: Type -> Type -> TCM (Type, Constraint)
 cExp ty1 ty2            = do
   tyv1 <- freshTy

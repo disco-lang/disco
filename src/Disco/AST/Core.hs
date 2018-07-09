@@ -103,7 +103,6 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
-        | OPosSub
         | OSSub    -- ^ Saturating subtraction on natural numbers (@.-@ / @∸)
         | OSqrt    -- ^ Integer square root (@sqrt@)
         | OLg      -- ^ Floor of base-2 logarithm (@lg@)

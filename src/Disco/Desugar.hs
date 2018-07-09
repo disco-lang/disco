@@ -231,10 +231,8 @@ desugarBOp _ _ (TyFin n) Div  c1 c2 = COp (OMDiv n)  [c1, c2]
 desugarBOp _ _ (TyFin n) Exp  c1 c2 = COp (OMExp n)  [c1, c2]
 
 desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-desugarBOp _  _ ty Sub    c1 c2
-  | isSubtractive ty = COp OAdd [c1, COp ONeg [c2]]
-  | otherwise        = COp OPosSub [c1, c2]
-desugarBOp _  _ _ SSub   c1 c2 = COp OSSub [c1, c2]
+desugarBOp _  _ _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
+desugarBOp _  _ _ SSub    c1 c2 = COp OSSub [c1, c2]
 desugarBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
 desugarBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
 desugarBOp _  _ _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]

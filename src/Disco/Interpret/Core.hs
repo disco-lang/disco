@@ -458,7 +458,6 @@ noMatch = return Nothing
 whnfOp :: Op -> [Core] -> Disco IErr Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
-whnfOp OPosSub  = numOp' posSubOp
 whnfOp OSSub    = numOp ssubOp
 whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OLg      = lgOp
@@ -613,13 +612,6 @@ lgOp' n = return $ vnum (toInteger (integerLog2 (numerator n)) % 1)
 divOp :: Rational -> Rational -> Disco IErr Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
-
--- | Perform a checked subtraction on positive values.  Throw an
---   underflow error if the second argument is greater than the first.
-posSubOp :: Rational -> Rational -> Disco IErr Value
-posSubOp m n
-  | n > m     = throwError Underflow
-  | otherwise = return $ vnum (m - n)
 
 -- | Perform a saturating subtraction on two natural numbers. If the second argument
 --   is greater than the first, return 0.

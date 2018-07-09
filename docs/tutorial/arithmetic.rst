@@ -24,8 +24,8 @@ at the ``Disco>`` prompt:
 * ``(1 + 2)(3 + 4)``
 * ``2 ^ 5``
 * ``2 ^ 5000``
-# ``4 .- 2``
-# ``2 .- 4``
+* ``4 .- 2``
+* ``2 .- 4``
 
 The last two expressions use the saturating subtraction operator, ``.-``, which
 takes two numeric operands, :math:`a` and :math:`b`, and returns :math:`a - b`

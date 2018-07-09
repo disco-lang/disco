@@ -182,8 +182,13 @@ natural = lexeme L.decimal <?> "natural number"
 --
 --   The idea is that brackets surround an infinitely repeating
 --   sequence of digits.
+--
+--   We are careful to only parse a decimal terminated by a period if
+--   there is not another period immediately following.  This way
+--   something like @[1..]@ parses properly as the number 1 with an
+--   ellipsis.
 decimal :: Parser Rational
-decimal = lexeme (readDecimal <$> some digit <* char '.'
+decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char '.')
                               <*> many digit
                               <*> optionMaybe (brackets (some digit))
                  )

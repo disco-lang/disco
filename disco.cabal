@@ -11,7 +11,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.1
+tested-with:         GHC == 8.2.2, GHC == 8.4.1
 
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      docs/tutorial/example/*.disco
@@ -52,6 +52,11 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/poly-infer-sort/expected
+                     test/poly-infer-sort/input
+                     test/poly-instantiate/expected
+                     test/poly-instantiate/input
+                     test/poly-instantiate/poly-instantiate.disco
                      test/pretty-lazy/expected
                      test/pretty-lazy/input
                      test/pretty-type/expected

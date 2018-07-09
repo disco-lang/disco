@@ -265,8 +265,8 @@ handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
   case (evalTCM $ extends ctx (inferTop t)) of
-    Left e   -> return.show $ e    -- XXX pretty-print
-    Right (at,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
+    Left e        -> return.show $ e    -- XXX pretty-print
+    Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 
 banner :: String
 banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"

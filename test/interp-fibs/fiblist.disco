@@ -12,7 +12,7 @@ tail : List N -> List N
 tail (_::xs) = xs
 
 fibs : List N
-fibs = 0 :: 1 :: zipWith (x -> y -> x + y) fibs (tail fibs)
+fibs = 0 :: 1 :: zipWith (\x y. x + y) fibs (tail fibs)
 
 sum : List N -> N
 sum [] = 0

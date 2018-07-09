@@ -1,10 +1,10 @@
 Loading test/props-fail/bad-tests.disco...
 Running tests...
   map:
-  - Test failed: map (x ↦ x / 0) [3, 4, 5] = [6, 7, 8]
+  - Test failed: map (λx. x / 0) [3, 4, 5] = [6, 7, 8]
     DivByZero
-  - Test result mismatch for: map (x ↦ x) [1, 2] = [1, 2]
+  - Test result mismatch for: map (λx. x) [1, 2] = [1, 2]
     - Expected: [1, 2]
     - But got:  [1, 1, 2, 2, 3]
-  - Test is false: map (x ↦ x + 1) [3, 4] > [5, 6]
+  - Test is false: map (λx. x + 1) [3, 4] > [5, 6]
 Loaded.

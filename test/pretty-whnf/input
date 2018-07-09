@@ -1,2 +1,2 @@
 left () : Unit + Nat
-(x:Void) -> 3
+\(x:Void). 3

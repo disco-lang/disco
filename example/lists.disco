@@ -1,7 +1,7 @@
 ||| The eliminator for lists of natural numbers with a rational result.
 
-!!!   foldr (x -> y -> x + y) 0 [1,2,3] = 6
-!!!   foldr (x -> y -> x + y) 0 []      = 0
+!!!   foldr (\x y. x + y) 0 [1,2,3] = 6
+!!!   foldr (\x y. x + y) 0 []      = 0
 
 foldr : (ℕ → ℚ → ℚ) → ℚ → List ℕ → ℚ
 foldr f z []      = z

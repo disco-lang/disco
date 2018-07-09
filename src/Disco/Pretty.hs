@@ -154,7 +154,9 @@ prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(args, body) ->
-  hsep (map prettyArg args) <+> text "↦" <+> prettyTerm' 0 InL body
+  text "λ" <> (if length args > 1 then text " " else empty)
+           <> hsep (map prettyArg args) <> text "."
+           <+> prettyTerm' 0 InL body
   where
     prettyArg (x, unembed -> mty) = case mty of
       Nothing -> prettyName x

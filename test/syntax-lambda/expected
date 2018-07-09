@@ -1,9 +1,10 @@
 4
-let f = (x : ℕ) ↦ x + 1 in f : ℕ → ℕ
+let f = λ(x : ℕ). x + 1 in f : ℕ → ℕ
 4
-let f = (x ↦ x + 1 : ℕ → ℕ) in f : ℕ → ℕ
+let f = (λx. x + 1 : ℕ → ℕ) in f : ℕ → ℕ
 (9, 8)
 5
-(x : ℤ) (y : ℕ) ↦ x * y : ℤ → ℕ → ℤ
+λ (x : ℤ) (y : ℕ). x * y : ℤ → ℕ → ℤ
 [false, true, true]
-let f = (g : ℤ → ℕ → Bool) ↦ [g 1 1, g 1 2, g (-1) 0] in f (x (y : ℤ) ↦ x + 1 = y) : List Bool
+let f = λ(g : ℤ → ℕ → Bool). [g 1 1, g 1 2, g (-1) 0] in f (λ x (y : ℤ). x + 1 = y) : List Bool
+3

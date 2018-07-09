@@ -30,7 +30,7 @@ module Disco.Parser
          -- ** Punctuation
        , parens, braces, angles, brackets
        , semi, comma, colon, dot, pipe
-       , mapsTo
+       , lambda
 
          -- * Disco parser
 
@@ -161,10 +161,10 @@ pipe      = symbol "|"
 ellipsis :: Parser String
 ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 
--- | The symbol that separates the variable binder from the body of a
---   lambda (either @↦@, @->@, or @|->@).
-mapsTo :: Parser ()
-mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
+-- | The symbol that starts an anonymous function (either a backslash
+--   or a Greek λ).
+lambda :: Parser String
+lambda = symbol "\\" <|> symbol "λ"
 
 -- | Parse a natural number.
 natural :: Parser Integer
@@ -367,7 +367,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' = label "expression" $
-      TAbs <$> try (bind <$> some parseLambdaArg <*> (mapsTo *> parseTerm'))
+      parseLambda
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
@@ -474,6 +474,11 @@ tuple t   = TTup t
 parseInj :: Parser Side
 parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
+
+-- | Parse an anonymous function.
+parseLambda :: Parser Term
+parseLambda =
+  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
 
 -- | Parse an argument to a lambda, either a variable or a binding of
 --   the form @(x:ty)@.

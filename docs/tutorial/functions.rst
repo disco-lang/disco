@@ -67,43 +67,29 @@ function which iterates the original function three times:
 Anonymous functions
 ===================
 
-The syntax for an anonymous function in disco consists of three parts:
-one or more *bindings*, followed by a *mapsto* symbol, followed by an arbitrary
-disco expression.
+The syntax for an anonymous function in disco consists of a *lambda*
+(either a backslash or an actual ``λ``) followed by one or more
+*bindings*, a period, and an arbitrary disco expression (the *body*).
 
-* Each *binding* specifies the name of an input to the function.  A binding
-  can be either a simple variable name, or a parenthesized variable
-  name with a type annotation (*e.g.* ``(x:Nat)``).  There can be
-  multiple bindings separated by whitespace, which creates a (curried)
-  "multi-argument" function.
-* disco will accept any one of several syntaxes for the *mapsto*
-  symbol: either ``->``, ``|->``, or ``↦``.
+Each *binding* specifies the name of an input to the function.  A
+binding can be either a simple variable name, or a parenthesized
+variable name with a type annotation (*e.g.* ``(x:Nat)``).  There can
+be multiple bindings separated by whitespace, which creates a
+(curried) "multi-argument" function.
 
 .. note::
 
-   It's quite possible this syntax might change.  For example, we
-   might want to disallow ``->`` as a mapsto symbol, since that may
-   cause confusion with the same symbol used as part of a type.  Also, we
-   might want to require "lambda" syntax before the binding (*e.g.*
-   either a backslash or an actual lambda).
-
-   The current syntax was designed to mirror the syntax in most common
-   mathematical practice (*e.g.* :math:`x \mapsto x^2 + 3`), but it's
-   quite possible discrete math students will not be familiar with
-   that notation anyway, in which case we might as well introduce them
-   to the lambda calculus.
-
    Currently, bindings cannot contain patterns, but in general we
-   might want to allow this, for example, ``((x,y) |-> x + y) : N*N -> N``.
+   might want to allow this, for example, ``(λ(x,y). x + y) : N*N -> N``.
 
 Here are a few examples of using anonymous functions as arguments
 to ``thrice``:
 
 ::
 
-    Disco> thrice(x |-> x*2)(1)
+    Disco> thrice(\x. x*2)(1)
     8
-    Disco> thrice((z:Nat) ↦ z^2 + 2z + 1)(7)
+    Disco> thrice(\(z:Nat). z^2 + 2z + 1)(7)
     17859076
 
 TODO example of using multi-argument anonymous function
@@ -116,9 +102,9 @@ compared to see which is less or greater.
 
 ::
 
-    Disco> ((x:Bool) -> x) = ((x:Bool) -> not (not x))
+    Disco> (\(x:Bool). x) = (\(x:Bool). not (not x))
     true
-    Disco> ((x:Bool) -> x) = ((x:Bool) -> not x)
+    Disco> (\(x:Bool). x) = (\(x:Bool). not x)
     false
 
 There is no magic involved, and it does not work by looking at the

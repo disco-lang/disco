@@ -52,6 +52,11 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/poly-infer-sort/expected
+                     test/poly-infer-sort/input
+                     test/poly-instantiate/expected
+                     test/poly-instantiate/input
+                     test/poly-instantiate/poly-instantiate.disco
                      test/pretty-lazy/expected
                      test/pretty-lazy/input
                      test/pretty-type/expected

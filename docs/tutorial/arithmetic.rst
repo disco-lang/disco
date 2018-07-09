@@ -24,8 +24,15 @@ at the ``Disco>`` prompt:
 * ``(1 + 2)(3 + 4)``
 * ``2 ^ 5``
 * ``2 ^ 5000``
+# ``4 .- 2``
+# ``2 .- 4``
 
-Notice that it is not always necessary to write ``*`` for
+The last two expressions use the saturating subtraction operator, ``.-``, which
+takes two numeric operands, :math:`a` and :math:`b`, and returns :math:`a - b`
+if :math:`a > b`, and :math:`0` otherwise. Note that unlike regular subtraction,
+the result of a saturating subtraction will always be a natural number.
+
+Also notice that it is not always necessary to write ``*`` for
 multiplication: as is standard mathematical notation, we may often
 omit it, as in ``(1 + 2)(3 + 4)``, which means the same as ``(1 + 2) *
 (3 + 4)``. (For precise details on when the asterisk may be omitted,

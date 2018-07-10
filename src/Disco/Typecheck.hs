@@ -470,6 +470,20 @@ infer (TBool b)     = return $ (ATBool b, CTrue)
 infer (TNat n)      = return $ (ATNat TyN n, CTrue)
 infer (TRat r)      = return $ (ATRat r, CTrue)
 
+-- To infer an injection has a sum type, recursively check the
+-- relevant type, and generate a type
+infer lt@(TInj L t) = do
+  (at, cst) <- infer t
+  let ty = getType at
+  tyv <- freshTy
+  return (ATInj (TySum ty tyv) L at, cst)
+
+infer lt@(TInj R t) = do
+  (at, cst) <- infer t
+  let ty = getType at
+  tyv <- freshTy
+  return (ATInj (TySum tyv ty) R at, cst)
+
   -- We can infer the type of a lambda if the variable is annotated
   -- with a type.
 infer (TAbs lam)    = do

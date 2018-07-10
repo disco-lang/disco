@@ -1,0 +1,4 @@
+let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x + x) : ℕ → ℕ
+let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x - x) : ℤ → ℤ
+let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x / x) : 𝔽 → 𝔽
+let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. -x / x) : ℚ → ℚ

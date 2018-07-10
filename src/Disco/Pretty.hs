@@ -127,7 +127,7 @@ prettyTy (TySum  ty1 ty2) = mparens (PA 6 InR) $
 prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
-prettyTy TyQP             = text "ℚ⁺"
+prettyTy TyF              = text "𝔽"
 prettyTy (TyFin n)        = text "ℤ" <> (integer n)
 prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
@@ -137,6 +137,9 @@ prettyTy (TySet ty)      = mparens (PA 9 InR) $
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
+prettySigma :: Sigma -> Doc
+prettySigma (Forall bnd) = lunbind bnd $
+  \(_, body) -> prettyTy body
 --------------------------------------------------
 
 mparens :: PA -> Doc -> Doc
@@ -144,7 +147,7 @@ mparens pa doc = do
   parentPA <- ask
   (if (pa < parentPA) then parens else id) doc
 
-prettyName :: Name Term -> Doc
+prettyName :: (Show a) => Name a -> Doc
 prettyName = text . show
 
 prettyTerm :: Term -> Doc
@@ -172,10 +175,10 @@ prettyTerm (TContainer c ts e)  = do
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  (case c of {CList -> brackets; CSet -> braces}) (hsep (ds ++ pe))
+  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep (ds ++ pe))
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
-  (case c of {CList -> brackets; CSet -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
+  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
@@ -209,12 +212,12 @@ prettyTerm (TLet bnd) = mparens initPA $
     prettyBinding :: Binding -> Doc
     prettyBinding (Binding Nothing x (unembed -> t))
       = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
-    prettyBinding (Binding (Just ty) x (unembed -> t))
-      = hsep [prettyName x, text ":", prettyTy ty, text "=", prettyTerm' 0 InL t]
+    prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
+      = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
-prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyTy ty)
+prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettySigma ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
     prettyTyOp op <+> prettyTy' funPrec InR ty
@@ -294,7 +297,7 @@ prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
-prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettyTy ty
+prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettySigma ty
 prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
   where
     prettyClause b

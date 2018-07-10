@@ -17,8 +17,8 @@ module Disco.Messages where
 
 import           Unbound.Generics.LocallyNameless
 
-import           Data.Sequence                    (Seq)
-import qualified Data.Sequence                    as Seq
+import           Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 
 import           Disco.AST.Core
 import           Disco.AST.Surface

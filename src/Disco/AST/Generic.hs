@@ -1,5 +1,4 @@
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveFoldable        #-}
 {-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
@@ -8,14 +7,13 @@
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Generic
@@ -109,6 +107,8 @@ data Telescope b where
 
 instance Alpha b => Alpha (Telescope b)
 
+instance Subst t b => Subst t (Telescope b)
+
 -- | Fold a telescope given a combining function and a value for the
 --   empty telescope.
 foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
@@ -139,6 +139,7 @@ data Side = L | R
   deriving (Show, Eq, Enum, Generic)
 
 instance Alpha Side
+instance Subst t Side
 
 type family X_TVar e
 type family X_TLet e
@@ -221,7 +222,7 @@ data Term_ e where
   TContainerComp_ :: X_TContainerComp e -> Container -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
 
   -- | Type ascription, @(Term_ e : type)@.
-  TAscr_  :: X_TAscr e -> Term_ e -> Type -> Term_ e
+  TAscr_  :: X_TAscr e -> Term_ e -> Sigma -> Term_ e
 
   -- | A data constructor with an extension descriptor that a "concrete"
   --   implementation of a generic AST may use to carry extra information.
@@ -261,11 +262,12 @@ deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 
 -- | A container is a wrapper for sets and lists.
 data Container where
-  CList :: Container
-  CSet :: Container
+  ListContainer :: Container
+  SetContainer :: Container
   deriving (Show, Eq, Enum, Generic)
 
 instance Alpha Container
+instance Subst t Container
 
 -- | An ellipsis is an "omitted" part of a literal container (such as a list or set), of the form
 --   @..@ or @.. t@.
@@ -275,7 +277,7 @@ data Ellipsis t where
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance Alpha t => Alpha (Ellipsis t)
-
+instance Subst a t => Subst a (Ellipsis t)
 
 type family X_QBind e
 type family X_QGuard e
@@ -293,7 +295,7 @@ data Qual_ e where
 deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
 
 -- | A binding is a name along with its definition.
-data Binding_ e = Binding_ (Maybe Type) (Name (Term_ e)) (Embed (Term_ e))
+data Binding_ e = Binding_ (Maybe (Embed Sigma)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
 deriving instance Forall_t Show  e => Show (Binding_ e)
@@ -314,6 +316,7 @@ data Guard_ e where
   GBool_ :: X_GBool e -> Embed (Term_ e) -> Guard_ e
 
   -- | Pattern guard (@when term = pat@)
+
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
 
   deriving Generic
@@ -330,7 +333,6 @@ type family X_PNat e
 type family X_PSucc e
 type family X_PCons e
 type family X_PList e
-
 
 -- | Patterns.
 data Pattern_ e where

@@ -39,7 +39,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseList, parseEllipsis, parseListComp, parseQual
+       , parseContainer, parseEllipsis, parseContainerComp, parseQual
        , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
@@ -48,6 +48,7 @@ module Disco.Parser
 
          -- ** Types
        , parseType, parseAtomicType
+       , parseSigma
        )
        where
 
@@ -223,8 +224,8 @@ reservedWords =
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
-  , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
-  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
+  , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
+  , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall"
   ]
 
@@ -337,11 +338,11 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 --   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
-
+ 
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
-  DType <$> ident <*> (indented $ colon *> parseType)
+  DType <$> ident <*> (indented $ colon *> parseSigma)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser Decl
@@ -359,7 +360,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseType))
+  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseSigma))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -385,15 +386,13 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
-  <|> brackets (parseList CList)
-  <|> braces (parseList CSet)
+  <|> brackets (parseContainer ListContainer)
+  <|> braces (parseContainer SetContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
--- | Parse a list-ish thing, like a literal list or a list
+-- | Parse a container, like a literal list or set, or a
 --   comprehension (not including the square brackets).
 --
---   Note eventually this should be generalized to parse the innards
---   of literal lists, sets, or multisets.
 --
 --   > list          ::= '[' listContents ']'
 --   > listContents  ::= nonEmptyList | <empty>
@@ -401,8 +400,8 @@ parseAtom = label "expression" $
 --   > ell           ::= '..' [t]
 --   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
 
-parseList :: Container -> Parser Term
-parseList c = nonEmptyList <|> return (TContainer c [] Nothing)
+parseContainer :: Container -> Parser Term
+parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
@@ -423,7 +422,7 @@ parseList c = nonEmptyList <|> return (TContainer c [] Nothing)
     listRemainder t = do
       s <- pipe <|> comma
       case s of
-        "|" -> parseListComp c t
+        "|" -> parseContainerComp c t
         "," -> do
           -- Parse the rest of the terms in a literal list after the
           -- first, then an optional ellipsis, and return everything together.
@@ -443,8 +442,8 @@ parseEllipsis = do
 --   square brackets), i.e. a list of qualifiers.
 --
 --   @q [,q]*@
-parseListComp :: Container -> Term -> Parser Term
-parseListComp c t = do
+parseContainerComp :: Container -> Term -> Parser Term
+parseContainerComp c t = do
   qs <- toTelescope <$> (parseQual `sepBy` comma)
   return (TContainerComp c $ bind qs t)
 
@@ -500,9 +499,9 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parseType)
+  mty <- optionMaybe (colon *> parseSigma)
   t   <- symbol "=" *> (embed <$> parseTerm)
-  return $ Binding mty x t
+  return $ Binding (embed <$> mty) x t
 
 -- | Parse a case expression.
 parseCase :: Parser Term
@@ -688,8 +687,7 @@ parseAtomicType = label "type" $
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
-  <|> TyQP   <$ (reserved "QP" <|> reserved "ℚ⁺") -- TODO: come up with more/better ways to
-                                                  --       represent nonegative rationals.
+  <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
     -- This explicitly allows "List List N" to parse as List (List N).
     -- Since we don't have arbitrary application of higher-kinded type
@@ -698,11 +696,18 @@ parseAtomicType = label "type" $
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> TySet <$> (reserved "Set" *> parseAtomicType)
+  <|> TyVar <$> parseTyVar
   <|> parens parseType
 
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
+
+parseTyVar :: Parser (Name Type)
+parseTyVar = string2Name <$> identifier
+
+parseSigma :: Parser Sigma
+parseSigma = closeSigma <$> parseType
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

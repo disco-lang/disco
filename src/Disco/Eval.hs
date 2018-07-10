@@ -199,6 +199,9 @@ data IErr where
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              IErr
 
+  -- | Trying to count an infinite type.
+  InfiniteTy    :: Type      -> IErr
+
   -- | Internal error for features not yet implemented.
   Unimplemented :: String    -> IErr
 
@@ -214,7 +217,7 @@ type Loc = Int
 -- | The various pieces of state tracked by the 'Disco' monad.
 data DiscoState e = DiscoState
   {
-    _topCtx     :: Ctx Term Type
+    _topCtx     :: Ctx Term Sigma
     -- ^ Top-level type environment.
 
   , _topDefns   :: Ctx Core Core

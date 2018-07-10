@@ -1,20 +1,10 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DeriveFoldable        #-}
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE DeriveTraversable     #-}
-{-# LANGUAGE EmptyCase             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternSynonyms       #-}
-{-# LANGUAGE StandaloneDeriving    #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
-{-# LANGUAGE UndecidableInstances  #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE PatternSynonyms      #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -77,6 +67,7 @@ module Disco.AST.Surface
        , pattern QGuard
 
        , Container(..)
+
        , Ellipsis(..)
 
          -- ** Case expressions and patterns
@@ -140,7 +131,7 @@ type Property = Property_ UD
 data Decl where
 
   -- | A type declaration, @name : type@.
-  DType :: Name Term -> Type -> Decl
+  DType :: Name Term -> Sigma -> Decl
 
   -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
   --   patterns bind variables in the term. For example, @f n (x,y) =
@@ -239,7 +230,7 @@ pattern TContainer c tl mets = TContainer_ () c tl mets
 pattern TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
 pattern TContainerComp c b = TContainerComp_ () c b
 
-pattern TAscr :: Term -> Type -> Term
+pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
@@ -247,10 +238,10 @@ pattern TAscr term ty = TAscr_ () term ty
              TContainer, TContainerComp, TAscr #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
-pattern TList ts e = TContainer_ () CList ts e
+pattern TList ts e = TContainer_ () ListContainer ts e
 
 pattern TListComp :: Bind (Telescope Qual) Term -> Term
-pattern TListComp x = TContainerComp_ () CList x
+pattern TListComp x = TContainerComp_ () ListContainer x
 
 type Link = Link_ UD
 
@@ -276,7 +267,7 @@ pattern QGuard embedt = QGuard_ () embedt
 
 type Binding = Binding_ UD
 
-pattern Binding :: (Maybe Type) -> Name Term -> Embed Term -> Binding
+pattern Binding :: Maybe (Embed Sigma) -> Name Term -> Embed Term -> Binding
 pattern Binding m b n = Binding_ m b n
 
 {-# COMPLETE Binding #-}
@@ -324,23 +315,18 @@ pattern PBool  b = PBool_ () b
 pattern PTup  :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp
 
--- | Injection pattern (@inl pat@ or @inr pat@).
 pattern PInj  :: Side -> Pattern -> Pattern
 pattern PInj s p = PInj_ () s p
 
--- | Literal natural number pattern.
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
--- | Successor pattern, @S p@.
 pattern PSucc :: Pattern -> Pattern
 pattern PSucc p = PSucc_ () p
 
--- | Cons pattern @p1 :: p2@.
 pattern PCons :: Pattern -> Pattern -> Pattern
 pattern PCons  p1 p2 = PCons_ () p1 p2
 
--- | List pattern @[p1, .., pn]@.
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 

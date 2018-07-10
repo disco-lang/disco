@@ -474,7 +474,7 @@ noMatch = return Nothing
 whnfOp :: Op -> [Core] -> Disco IErr Value
 whnfOp OAdd     = numOp (+)
 whnfOp ONeg     = uNumOp negate
-whnfOp OPosSub  = numOp' posSubOp
+whnfOp OSSub    = numOp ssubOp
 whnfOp OSqrt    = uNumOp integerSqrt
 whnfOp OLg      = lgOp
 whnfOp OFloor   = uNumOp floorOp
@@ -497,12 +497,13 @@ whnfOp ONot     = notOp
 whnfOp OEnum    = enumOp
 whnfOp OCount   = countOp
 -- Modular operations, for finite types
-whnfOp (OMAdd n) = modArithBin (+) n
-whnfOp (OMMul n) = modArithBin (*) n
-whnfOp (OMSub n) = modArithBin (-) n
-whnfOp (OMNeg n) = modArithUn negate n
-whnfOp (OMDiv n) = modDiv n
-whnfOp (OMExp n) = modExp n
+whnfOp (OMAdd n)  = modArithBin (+) n
+whnfOp (OMMul n)  = modArithBin (*) n
+whnfOp (OMSub n)  = modArithBin (-) n
+whnfOp (OMSSub n) = modArithBin ssubOp n
+whnfOp (OMNeg n)  = modArithUn negate n
+whnfOp (OMDiv n)  = modDiv n
+whnfOp (OMExp n)  = modExp n
 whnfOp (OMDivides n) = modDivides n
 
 -- | Perform a numeric binary operation.
@@ -579,13 +580,17 @@ modExp n [c1,c2] = do
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
-countOp :: [Core] -> Disco e Value
-countOp [CType ty]  = return $ vnum ((fromJust $ countType ty) % 1)
+countOp :: [Core] -> Disco IErr Value
+countOp [CType ty]  = case countType ty of
+                        Just num -> return $ VCons 1 [vnum (num % 1)]
+                        Nothing  -> return $ VCons 0 [VCons 0 []]
 countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
 
 -- | Perform an enumeration of the values of a given type.
-enumOp :: [Core] -> Disco e Value
-enumOp [CType ty] = return $ (toDiscoList (enumerate ty))
+enumOp :: [Core] -> Disco IErr Value
+enumOp [CType ty] = case countType ty of
+                    Just _  -> return $ (toDiscoList (enumerate ty))
+                    Nothing -> throwError $ InfiniteTy ty
 enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
 
 -- | Perform a square root operation. If the program typechecks,
@@ -634,12 +639,12 @@ divOp :: Rational -> Rational -> Disco IErr Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
 
--- | Perform a checked subtraction on positive values.  Throw an
---   underflow error if the second argument is greater than the first.
-posSubOp :: Rational -> Rational -> Disco IErr Value
-posSubOp m n
-  | n > m     = throwError Underflow
-  | otherwise = return $ vnum (m - n)
+-- | Perform a saturating subtraction on two natural numbers. If the second argument
+--   is greater than the first, return 0.
+ssubOp :: Rational -> Rational -> Rational
+ssubOp m n
+  | n > m     = 0
+  | otherwise = m - n
 
 -- | Perform a mod operation; throw division by zero error if the
 --   second argument is zero.  Although this function takes two

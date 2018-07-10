@@ -160,12 +160,12 @@ desugarTerm (ATBin ty op t1 t2) =
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
 desugarTerm (ATContainer t c es mell) = case c of
-  CList -> do
+  ListContainer -> do
     des <- mapM desugarTerm es
     case mell of
       Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
       Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
-  CSet -> do
+  SetContainer -> do
     des <- mapM desugarTerm es
     case mell of
       Nothing  -> return $ CoreSet t des
@@ -178,7 +178,6 @@ desugarTerm (ATListComp _ bqt) =
 desugarTerm (ATLet _ t) =
   lunbind t $ \(bs, t2) -> desugarTerm $ desugarLet (fromTelescope bs) t2
 desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
-desugarTerm (ATAscr t _) = desugarTerm t
 
 -- | Desugar a let into application of a chain of lambdas.
 desugarLet :: [ABinding] -> ATerm -> ATerm
@@ -230,17 +229,17 @@ desugarUOp _ Abs    c      = COp OAbs    [c]
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
 desugarBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
 -- Special ops for modular arithmetic in finite types
-desugarBOp _ _ (TyFin n) Add     c1 c2 = COp (OMAdd n) [c1, c2]
-desugarBOp _ _ (TyFin n) Mul     c1 c2 = COp (OMMul n) [c1, c2]
-desugarBOp _ _ (TyFin n) Sub     c1 c2 = COp (OMSub n) [c1, c2]
-desugarBOp _ _ (TyFin n) Div     c1 c2 = COp (OMDiv n) [c1, c2]
-desugarBOp _ _ (TyFin n) Exp     c1 c2 = COp (OMExp n) [c1, c2]
+desugarBOp _ _ (TyFin n) Add     c1 c2 = COp (OMAdd n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Mul     c1 c2 = COp (OMMul n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Sub     c1 c2 = COp (OMSub n)  [c1, c2]
+desugarBOp _ _ (TyFin n) SSub    c1 c2 = COp (OMSSub n) [c1, c2]
+desugarBOp _ _ (TyFin n) Div     c1 c2 = COp (OMDiv n)  [c1, c2]
+desugarBOp _ _ (TyFin n) Exp     c1 c2 = COp (OMExp n)  [c1, c2]
 desugarBOp (TyFin n) _ _ Divides c1 c2 = COp (OMDivides n) [c1, c2]
 
 desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-desugarBOp _  _ ty Sub     c1 c2
-  | isSubtractive ty = COp OAdd [c1, COp ONeg [c2]]
-  | otherwise        = COp OPosSub [c1, c2]
+desugarBOp _  _ _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
+desugarBOp _  _ _ SSub    c1 c2 = COp OSSub [c1, c2]
 desugarBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
 desugarBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
 desugarBOp _  _ _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]

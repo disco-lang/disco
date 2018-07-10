@@ -179,10 +179,10 @@ discoGenerator TyN = DiscoGen
 discoGenerator TyZ = DiscoGen
   (QC.arbitrary :: QC.Gen Integer)
   (vnum . (%1))
-discoGenerator TyQP = DiscoGen
+discoGenerator TyF = DiscoGen
   (QC.arbitrary :: QC.Gen (QC.NonNegative Integer, QC.Positive Integer))
   (\(QC.NonNegative m, QC.Positive n) -> vnum (m % (n+1)))
-discoGenerator TyQ  = DiscoGen
+discoGenerator TyQ = DiscoGen
   (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
 

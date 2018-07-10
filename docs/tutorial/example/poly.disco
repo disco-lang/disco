@@ -1,0 +1,32 @@
+incr : List N -> List N
+incr [] = []
+incr (a :: as) = (a + 1) :: (incr as)
+
+single : List Z -> List (List Z)
+single [] = []
+single (a :: as) = [a] :: (single as)
+
+map : (a -> b) -> List a -> List b
+map _ [] = []
+map f (a :: as) = f a :: (map f as)
+
+-- Why can't incr' infer the type of x in the lambda?
+incr' : List N -> List N
+incr' l = let f = \(x : N). x + 1 in map f l
+
+single' : List Z -> List (List Z)
+single' l = let f = \(x : Z). [x] in map f l
+
+filter : (a -> Bool) -> List a -> List a
+filter _ [] = []
+filter f (a :: as) = {? a :: (filter f as)    if f a,
+          				filter f as           otherwise
+       				 ?}
+
+foldr : (a -> b -> b) -> b -> List a -> b
+foldr _ acc [] = acc
+foldr f acc (a :: as) = foldr f (f a acc) as
+
+-- invalid : List a -> List a
+-- invalid [] = []
+-- invalid (a :: as) = (a + 1) :: (invalid as)

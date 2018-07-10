@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -49,6 +51,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
          | Sub     -- ^ Subtraction (@-@)
+         | SSub    -- ^ Saturating Subtraction (@.-@ / @∸@)
          | Mul     -- ^ Multiplication (@*@)
          | Div     -- ^ Division (@/@)
          | Exp     -- ^ Exponentiation (@^@)
@@ -76,6 +79,10 @@ data TyOp = Enumerate -- ^ List all values of a type
 instance Alpha UOp
 instance Alpha BOp
 instance Alpha TyOp
+
+instance Subst t UOp
+instance Subst t BOp
+instance Subst t TyOp
 
 ------------------------------------------------------------
 -- Operator info
@@ -148,6 +155,7 @@ opTable =
     ]
   , [ bopInfo InL  Add     ["+"]
     , bopInfo InL  Sub     ["-"]
+    , bopInfo InL  SSub    [".-", "∸"]
     ]
   , [ bopInfo InR  Cons    ["::"]
     ]

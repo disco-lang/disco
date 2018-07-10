@@ -1,0 +1,4 @@
+:type let f : (a -> a) -> a -> a = \g. (\x. g (g x)) in f (\x. x+x)
+:type let f : (a -> a) -> a -> a = \g. (\x. g (g x)) in f (\x. x-x)
+:type let f : (a -> a) -> a -> a = \g. (\x. g (g x)) in f (\x. x/x)
+:type let f : (a -> a) -> a -> a = \g. (\x. g (g x)) in f (\x. -x/x)

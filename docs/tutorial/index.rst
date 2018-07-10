@@ -21,5 +21,6 @@ knowledge of functional programming.
    functions
    case
    lists
+   polymorphism
    laziness
    properties

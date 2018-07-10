@@ -313,6 +313,9 @@ check t ty = do
   let aty = getType at
   return $ (setType ty at, cAnd [ct1, CSub aty ty])
 
+containerTy :: Container -> Type -> Type
+containerTy c ty = TyCon (containerToCon c) [ty]
+
 containerToCon :: Container -> Con
 containerToCon ListContainer = CList
 containerToCon SetContainer  = CSet
@@ -634,13 +637,18 @@ infer (TChain t1 links) = do
   (alinks, cst2) <- inferChain t1 links
   return (ATChain TyBool at1 alinks, cAnd [cst1, cAnd cst2])
 
+infer (TContainer c [] ell) = do
+  tyv <- freshTy
+  (aell, cstell) <- inferEllipsis ell
+  return (ATContainer (containerTy c tyv) c [] aell, cstell)
+
 infer (TContainer c es@(_:_) ell)  = do
   list1 <- mapM infer es
   let (ates, cstes) = unzip list1
   (aell, cstell) <- inferEllipsis ell
   let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) ates
   tyv  <- freshTy
-  return ( ATContainer ((case c of {ListContainer -> TyList; SetContainer -> TySet}) tyv) c ates aell
+  return ( ATContainer (containerTy c tyv) c ates aell
          , cAnd [cAnd cstes, cstell, cAnd (subs tys tyv)]
          )
     where subs tylist ty = map (flip CSub ty) tylist
@@ -651,7 +659,7 @@ infer (TContainerComp c bqt) = do
   extends cx $ do
   (at, cst2) <- infer t
   let ty = getType at
-  return (ATContainerComp ((case c of {ListContainer -> TyList; SetContainer -> TySet}) ty) c (bind aqs at)
+  return (ATContainerComp (containerTy c ty) c (bind aqs at)
          , cAnd [cst1, cst2]
          )
 

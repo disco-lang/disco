@@ -50,6 +50,7 @@ module Disco.Types
        , pattern TyPair
        , pattern TySum
        , pattern TyList
+       , pattern TySet
 
        -- ** Quantified types
 
@@ -203,8 +204,6 @@ data Type where
   -- | Application of a type constructor to type arguments.
   TyCon  :: Con -> [Type] -> Type
 
-  TySet :: Type -> Type
-
   deriving (Show, Eq, Generic)
 
 instance Alpha Type
@@ -253,6 +252,9 @@ pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
 
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
+
+pattern TySet :: Type -> Type
+pattern TySet elTy = TyCon CSet [elTy]
 
 {-# COMPLETE TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin, TyArr, TyPair, TySum, TyList #-}
 

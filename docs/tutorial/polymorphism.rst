@@ -3,7 +3,7 @@
 Polymorphism
 ************
 
-Disco also supports parametric polymorphism. This is best demonstrated by an example.
+Disco also supports polymorphic functions and let expressions. This is best demonstrated by an example.
 
 Generalizing using Polymorphism
 ===============================
@@ -62,7 +62,7 @@ Now we can rewrite the functions ``incr`` and ``single`` as follows:
 
 It's a good idea to try these functions out and verify that they produce the same outputs as their non-generic counterparts.
 
-Other common polymorphic, higher-order functions are ``foldr`` and 	``filter``:
+Other common polymorphic, higher-order functions include ``foldr`` and ``filter``:
 
 ::
 

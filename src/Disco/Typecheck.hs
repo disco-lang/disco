@@ -222,6 +222,12 @@ check t@(TContainerComp c bqt) ty = do
   (at, cst3) <- check term tyElt
   return $ (ATContainerComp ty c (bind aqs at), cAnd [cst1, cst2, cst3])
 
+check t@(TBin setOp t1 t2) ty | setOp `elem` [Union, Intersection, Difference, Subset] = do
+  ([tyElt], cst) <- ensureConstr CSet ty (Left t)
+  (at1, cst1) <- check t1 (TySet tyElt)
+  (at2, cst2) <- check t2 (TySet tyElt)
+  return (ATBin ty setOp at1 at2, cAnd [cst, cst1, cst2])
+
 -- To check an abstraction:
 check (TAbs lam) ty = do
   (args, t) <- unbind lam
@@ -641,6 +647,21 @@ infer (TBin Cons t1 t2) = do
           tyv <- freshTy
           return (ATBin (TyList tyv) Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
         ty -> throwError (NotCon CList t2 ty)
+
+--To infer the type of the size of a list:
+infer (TUn Size t) = do
+  (at, cst0) <- infer t
+  ([tyElt], cst1) <- ensureConstr CSet (getType at) (Left t)
+  return (ATUn TyN Size at, cAnd [cst0, cst1])
+
+infer (TBin setOp t1 t2) | setOp `elem` [Union, Intersection, Difference, Subset] = do
+  (at1, cst1) <- infer t1
+  (at2, cst2) <- infer t2
+  tyelt <- freshTy
+  let ty1 = getType at1
+  let ty2 = getType at2
+  let ty = case setOp of {Subset -> TyBool; _ -> TySet tyelt}
+  return (ATBin ty setOp at1 at2, cAnd [cst1, cst2, CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)])
 
 infer (TUn Fact t) = do
   (at, cst) <- check t TyN

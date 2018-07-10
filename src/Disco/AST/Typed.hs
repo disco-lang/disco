@@ -116,8 +116,8 @@ type instance X_TUn TY = Type
 type instance X_TBin TY = Type
 type instance X_TChain TY = Type
 type instance X_TTyop TY = Type
-type instance X_TContainer TY = Type 
-type instance X_TContainerComp TY = Type 
+type instance X_TContainer TY = Type
+type instance X_TContainerComp TY = Type
 type instance X_TAscr TY = ()
 type instance X_Term TY = ()
 type instance X_TTup TY = Type
@@ -175,7 +175,7 @@ pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> 
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
-             ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp, 
+             ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm

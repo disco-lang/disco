@@ -222,6 +222,7 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
+  , "size", "union", "U", "∪", "intersect", "∩"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"

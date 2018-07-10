@@ -67,6 +67,7 @@ arity CArr  = [Contra, Co]
 arity CPair = [Co, Co]
 arity CSum  = [Co, Co]
 arity CList = [Co]
+arity CSet  = [Co]
 
 ------------------------------------------------------------
 -- Qualifiers
@@ -256,4 +257,3 @@ pickSortBaseTy s
   | QSub `S.member` s = Z
   | QNum `S.member` s = N
   | otherwise         = Unit
-

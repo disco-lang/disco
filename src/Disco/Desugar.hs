@@ -159,7 +159,7 @@ desugarTerm (ATBin ty op t1 t2) =
   desugarBOp (getType t1) (getType t2) ty op <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
 desugarTerm (ATChain _ t1 links) = desugarChain t1 links
-desugarTerm (ATContainer t c es mell) = case c of
+desugarTerm (ATContainer (TyCon _ [tyElt]) c es mell) = case c of
   ListContainer -> do
     des <- mapM desugarTerm es
     case mell of
@@ -168,7 +168,7 @@ desugarTerm (ATContainer t c es mell) = case c of
   SetContainer -> do
     des <- mapM desugarTerm es
     case mell of
-      Nothing  -> return $ CoreSet t des
+      Nothing  -> return $ CoreSet tyElt des
       Just ell -> error "Sets cannot have ellipses yet"
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
@@ -224,6 +224,7 @@ desugarUOp _ Lg     c      = COp OLg     [c]
 desugarUOp _ Floor  c      = COp OFloor  [c]
 desugarUOp _ Ceil   c      = COp OCeil   [c]
 desugarUOp _ Abs    c      = COp OAbs    [c]
+desugarUOp _ Size   c      = COp OSize   [c]
 
 -- | Desugar a binary operator application.
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
@@ -258,9 +259,14 @@ desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
 
 desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
 desugarBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
+desugarBOp (TySet ty) _ _ Union c1 c2        = COp (OUnion ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Intersection c1 c2 = COp (OIntersection ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Difference c1 c2   = COp (ODifference ty) [c1, c2]
+desugarBOp (TySet ty) _ _ Subset c1 c2           = COp (OSubset ty) [c1, c2]
 
 desugarBOp _  _ _ op _ _ = error $ "Impossible! " ++
   "desugarBOp " ++ show op
+
 
 -- | Desugar a type operator application.
 desugarTyOp :: TyOp -> Type -> Core

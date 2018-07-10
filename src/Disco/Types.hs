@@ -186,7 +186,7 @@ data Con where
   CSum  :: Con
   -- | Lists
   CList :: Con
-  -- | Sets 
+  -- | Sets
   CSet  :: Con
   deriving (Show, Eq, Ord, Generic)
 

@@ -2,3 +2,6 @@ let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x + x) : ℕ → �
 let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x - x) : ℤ → ℤ
 let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x / x) : 𝔽 → 𝔽
 let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. -x / x) : ℚ → ℚ
+λx. x : a → a
+λ x y. x : a1 → a → a1
+λ x y z. x + y + z : ℕ → ℕ → ℕ → ℕ

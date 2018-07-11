@@ -497,7 +497,13 @@ infer (TAbs lam)    = do
   (args, t) <- unbind lam
   let (xs, mtys) = unzip args
   case sequence (map unembed mtys) of
-    Nothing  -> throwError (CantInfer (TAbs lam))
+    Nothing  -> do
+      tyvs <- mapM (const freshTy) xs
+      let tymap = M.fromList $ zip xs (map toSigma tyvs)
+      extends tymap $ do
+      (at, cst) <- infer t
+      return (ATAbs (mkFunTy tyvs (getType at))
+                     (bind (zip (map coerce xs) (map (embed . Just) tyvs)) at), cst)
     Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
       (at, cst) <- infer t
       return (ATAbs (mkFunTy tys (getType at))

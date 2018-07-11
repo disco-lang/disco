@@ -18,20 +18,12 @@ foo n = 2n + 1
 !!! ∀ a:N, b:N. reverse [a,b] = [b,a]
 !!! ∀ xs:List N. reverse (reverse xs) = xs
 
-reverse : List N -> List N
+reverse : List a -> List a
 reverse = revHelper []
 
-revHelper : List N -> List N -> List N
+revHelper : List a -> List a -> List a
 revHelper rev [] = rev
 revHelper rev (x :: xs) = revHelper (x :: rev) xs
-
-
-reverseU : List Unit -> List Unit
-reverseU = revHelperU []
-
-revHelperU : List Unit -> List Unit -> List Unit
-revHelperU rev [] = rev
-revHelperU rev (x :: xs) = revHelperU (x :: rev) xs
 
 toBin : N -> List Bool
 toBin 0 = []
@@ -56,7 +48,7 @@ plusIsoR n =
 !!! ∀ v:Void. 2 = 3    -- this is true!
 !!! ∀ u:Unit. u = u    -- there is only one Unit value
 !!! ∀ l:List Void. l = l
-!!! ∀ l:List Unit. l = reverseU l
+!!! ∀ l:List Unit. l = reverse l
 !!! ∀ bs : List Bool. toBin (fromBin bs) = bs
 !!! ∀ q : F. q >= 0
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0

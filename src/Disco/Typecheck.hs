@@ -93,6 +93,9 @@ type DefnCtx = Ctx ATerm Defn
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
 
+-- | A type definition context is a mapping from type names to types.
+type TyDefnCtx = Ctx Type Type
+
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
@@ -129,6 +132,7 @@ data TCError
   | NotSubtractive Type
   | NotFractional Type
   | Unsolvable SolveError
+  | NotTy Type             -- ^ The type is an algebraic data type that was never defined.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -194,6 +198,8 @@ checkSigma t (Forall sig) = do
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM (ATerm, Constraint)
+
+check _ (TyAdt _) = error "Not defined yet!"
 
 check (TParens t) ty = check t ty
 
@@ -918,7 +924,8 @@ checkTuplePat (p:ps) ty = do
 --   top-level definitions.
 checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
 checkModule (Module m docs) = do
-  let (defns, typeDecls) = partition isDefn m
+  let (tydefs, rest) = partition isTyDef m
+  let (defns, typeDecls) = partition isDefn rest
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
     aprops <- checkProperties docs

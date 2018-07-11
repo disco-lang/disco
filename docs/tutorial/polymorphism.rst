@@ -53,24 +53,38 @@ Now we can rewrite the functions ``incr`` and ``single`` as follows:
 ::
 
 	incr' : List N -> List N
-	incr' l = let f = (x : N) -> x + 1 in map f l
+	incr' l = let f = \(x : N). x + 1 in map f l
 
 ::
 
 	single' : List Z -> List (List Z)
-	single' l = let f = (x : Z) -> [x] in map f l
+	single' l = let f = \(x : Z). [x] in map f l
 
 It's a good idea to try these functions out and verify that they produce the same outputs as their non-generic counterparts.
+
+Note that the definition of ``single'`` doesn't require it's argument to be a list of Integers. Therefore, we can make ``single'`` polymorphic by changing its' type annotation apporpriately. We can also remove the type ascription from ``x`` in the lambda and Disco will infer that the lambda is polymorphic!
+
+::
+
+	single'' : List a -> List (List a)
+	single'' l = let f = \x. [x] in map f l
 
 Other common polymorphic, higher-order functions include ``foldr`` and ``filter``:
 
 ::
 
+   f(x) = \begin{cases}
+            x+2           & x < 0 \\
+            x^2 - 3x + 2  & 0 \leq x < 10 \\
+            5 - x         & \text{otherwise}
+          \end{cases}
+
 	filter : (a -> Bool) -> List a -> List a
 	filter _ [] = []
-	filter f (a :: as) = {? a :: (filter f as)    if f a,
-          				    filter f as           otherwise
-       				 	 ?}
+	filter f (a :: as) = \begin{cases}
+	                       a :: (filter f as)   & if f a \\
+          				   filter f as          & \text{otherwise}
+       				 	 \end{cases}
 
 ::
 
@@ -89,9 +103,3 @@ Note that the following following function would not typecheck in Disco:
 	invalid (a : as) = (a + 1) :: (invalid as)
 
 This is because our type definition states that ``invalid`` should work lists of all types (due to the type variable ``a``), however, our definition implies that ``invalid`` only works on lists of a numeric type.
-
-Limitations
-===========
-
-
-

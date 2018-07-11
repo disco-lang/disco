@@ -298,7 +298,7 @@ check (TBin Exp t1 t2) ty = do
   let ty1 = getType at1
   let ty2 = getType at2
   (resTy, cst3) <- cExp ty1 ty2
-  return $ (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3])
+  return $ (ATBin resTy Exp at1 at2, cAnd [cst1, cst2, cst3, CSub resTy ty])
 
 -- Note, we don't have the same special case for Neg as for Sub, since
 -- unlike subtraction, which can sometimes make sense on N or F, it
@@ -443,6 +443,7 @@ cInt ty                 = do
 --   exponent function along with constraints for the type of the result.
 cExp :: Type -> Type -> TCM (Type, Constraint)
 cExp ty1 ty2            = do
+  traceM $ "cExp: " ++ show ty1 ++ " " ++ show ty2
   tyv1 <- freshTy
   return (tyv1, COr
                  [ cAnd [CQual QNum tyv1, CEq ty2 TyN, CSub ty1 tyv1]

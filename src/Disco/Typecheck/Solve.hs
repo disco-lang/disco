@@ -221,6 +221,11 @@ solveConstraintChoice quals cs = do
   traceM "Checking WCCs for skolems..."
 
   (g', theta_skolem) <- liftExcept (checkSkolems sm g)
+  traceShowM theta_skolem
+
+  -- We don't need to ensure that theta_skolem respects sorts since
+  -- checkSkolems will only unify skolem vars with unsorted variables.
+
 
   -- Step 6. Eliminate cycles from the graph, turning each strongly
   -- connected component into a single node, unifying all the atoms in
@@ -231,7 +236,12 @@ solveConstraintChoice quals cs = do
 
   (g'', theta_cyc) <- liftExcept (elimCycles g')
 
+  -- Check that the resulting substitution respects sorts...
+  when (not $ all (\(x,TyAtom (ABase ty)) -> hasSort ty (getSort sm x)) theta_cyc)
+    $ throwError NoUnify
+
   traceShowM g''
+  traceShowM theta_cyc
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
@@ -242,11 +252,13 @@ solveConstraintChoice quals cs = do
   traceM "Solving for type variables..."
 
   theta_sol       <- solveGraph sm g''
+  traceShowM theta_sol
 
   traceM "------------------------------"
   traceM "Composing final substitution..."
 
   let theta_final = (theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp)
+  traceShowM theta_final
 
   return theta_final
 

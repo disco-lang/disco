@@ -43,7 +43,7 @@ diagIso (x,y) = (x+y)*(x+y+1)//2 + x
 
 diagIso' : ℕ → ℕ×ℕ
 diagIso' n =
-     let d = (sqrt(1 + 8n) - 1)//2 : N
+     let d = (sqrt(1 + 8n) .- 1)//2 : N
   in let t = d*(d+1)//2
   in (n .- t, d .- (n .- t))
 

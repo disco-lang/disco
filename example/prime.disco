@@ -1,23 +1,57 @@
--- Prime Number Test:
---
--- Citation: "The Haskell Road to Logic, Maths, and Programming, 2nd
--- Edition, pages 4 - 11"
+{-
 
--- ldf calculates the least common divisor of n that is at least k.
+Primality test
 
-ldf : Z -> Z -> Z
+Taken from Jan van Eijck, "The Haskell Road to Logic, Maths, and Programming", 2nd
+  Edition, pp. 4--11
+
+-}
+
+
+||| ldf k n calculates the least divisor of n that is at least k and
+||| at most sqrt n.  If no such divisor exists, then it returns n.
+
+!!! ldf 2 10 = 2
+!!! ldf 3 10 = 10
+!!! ldf 2 25 = 5
+!!! ldf 5 25 = 5
+!!! ldf 6 25 = 25
+!!! forall k:N, m:N. let n = k+m in k <= ldf k n <= n
+!!! forall k:N, n:N. (ldf k n) divides n
+
+ldf : N -> N -> N
 ldf k n =
   {? k            if k divides n,
      n            if k^2 > n,
      ldf (k+1) n  otherwise
   ?}
 
--- ld calculates the least divisor of n.
-ld : Z -> Z
+
+||| ld n calculates the least nontrivial divisor of n, or returns n if
+||| n has no nontrivial divisors.
+
+!!! ld 14 = 2
+!!! ld 15 = 3
+!!! ld 16 = 2
+!!! ld 17 = 17
+!!! ld 25 = 5
+!!! forall n:N. (ld n) divides n
+
+ld : N -> N
 ld = ldf 2
 
--- Tests whether n is a prime or not.
-isPrime : Z -> Bool
+||| Tests whether n is prime or not.
+
+!!! not (isPrime 0)
+!!! not (isPrime 1)
+!!! isPrime 2
+!!! isPrime 3
+!!! not (isPrime 4)
+!!! isPrime 5
+!!! not (isPrime 91)
+!!! isPrime 113
+
+isPrime : N -> Bool
 isPrime n =
   {? false      if n <= 1,
      ld n = n   otherwise

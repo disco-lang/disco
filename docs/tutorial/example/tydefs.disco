@@ -1,4 +1,4 @@
-type Wahoo = List a
+type Wahoo = Int
 
 map : Wahoo -> Wahoo
-map w = w
+map w = w + 1

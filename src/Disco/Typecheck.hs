@@ -87,14 +87,12 @@ import           Disco.Types.Rules
 --   something like @[n, (x,y)] (n*x + y)@.
 type Defn  = [Bind [APattern] ATerm]
 
--- | A map from names to definitions.
-type DefnCtx = Ctx ATerm Defn
+-- | A tuple container a map from definition names to definitions 
+--   and a map from type definition names to types.
+type DefnCtx = (Ctx ATerm Defn, M.Map String Type)
 
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
-
--- | A type definition context is a mapping from type names to types.
-type TyDefnCtx = Ctx Type Type
 
 -- | Potential typechecking errors.
 data TCError
@@ -128,11 +126,12 @@ data TCError
   | ExpQ                   -- ^ Can't exponentiate by a rational.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
+  | DuplicateTyDefns String -- ^ Duplicate type definitions.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotSubtractive Type
   | NotFractional Type
   | Unsolvable SolveError
-  | NotTy Type             -- ^ The type is an algebraic data type that was never defined.
+  | NotTyDef String             -- ^ The type is an algebraic data type that was never defined.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -149,7 +148,7 @@ type TCM = StateT DefnCtx (ReaderT TyCtx (ExceptT TCError FreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError (a, DefnCtx)
-runTCM = runFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
+runTCM = runFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT (M.empty, M.empty)
 
 -- | Run a 'TCM' computation starting in the empty context, returning
 --   only the result of the computation.
@@ -168,7 +167,11 @@ solve = either (throwError . Unsolvable) return . runSolveM . solveConstraint
 
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> Defn -> TCM ()
-addDefn x b = modify (M.insert (coerce x) b)
+addDefn x b = modify (\(dm, tm) -> (M.insert (coerce x) b dm, tm))
+
+-- | Add a type definition to the set of current type defintions.
+addTyDefn :: String -> Type -> TCM ()
+addTyDefn x b = modify (\(dm, tm) -> (dm, M.insert x b tm))
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
@@ -199,7 +202,11 @@ checkSigma t (Forall sig) = do
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM (ATerm, Constraint)
 
-check _ (TyAdt _) = error "Not defined yet!"
+check t (TyAdt tyn) = do
+  (_, tydefmap) <- get
+  case M.lookup tyn tydefmap of
+    Just ty -> check t ty
+    Nothing -> throwError (NotTyDef tyn)
 
 check (TParens t) ty = check t ty
 
@@ -920,18 +927,6 @@ checkTuplePat (p:ps) ty = do
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
 
--- | Check all the types in a module, returning a context of types for
---   top-level definitions.
-checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
-checkModule (Module m docs) = do
-  let (tydefs, rest) = partition isTyDef m
-  let (defns, typeDecls) = partition isDefn rest
-  withTypeDecls typeDecls $ do
-    mapM_ checkDefn defns
-    aprops <- checkProperties docs
-    ctx <- ask
-    return (docs, aprops, ctx)
-
 -- | Ensures that a type's outermost constructor matches the provided constructor,
 --   returning the types within the matched constructor or throwing a type error.
 --   If the type provided is a type variable, appropriate constraints are generated
@@ -948,6 +943,32 @@ ensureConstr c tyv@(TyVar _) _ = do
 ensureConstr c ty targ = case targ of
                            Left term -> throwError (NotCon c term ty)
                            Right pat -> throwError (PatternType pat ty)
+
+-- | Check all the types in a module, returning a context of types for
+--   top-level definitions.
+checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
+checkModule (Module m docs) = do
+  let (tydefs, rest) = partition isTyDef m
+  addTyDefns tydefs
+  let (defns, typeDecls) = partition isDefn rest
+  withTypeDecls typeDecls $ do
+    mapM_ checkDefn defns
+    aprops <- checkProperties docs
+    ctx <- ask
+    return (docs, aprops, ctx)
+
+addTyDefns :: [Decl] -> TCM ()
+addTyDefns tydefs = do
+  let dups :: [(String, Int)]
+      dups = filter ((>1) . snd) . map (head &&& length) . group . sort . map tyDefName $ tydefs
+  case dups of
+    ((x,_):_) -> throwError (DuplicateTyDefns x)
+    []        -> mapM (\(x, ty) -> addTyDefn x ty) (map getTyDef tydefs) *> return ()
+  where
+    getTyDef :: Decl -> (String, Type)
+    getTyDef (DTyDef x ty) = (x, ty)
+    getTyDef d             = error $ "Impossible! addTyDefns.getTyDef called on non-DTyDef: " ++ show d
+
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type
@@ -973,7 +994,7 @@ withTypeDecls decls k = do
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
   Forall sig <- lookupTy x
-  prevDefn <- gets (M.lookup (coerce x))
+  prevDefn <- gets (\(dm, tm) -> M.lookup (coerce x) dm)
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do

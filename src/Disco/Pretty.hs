@@ -133,7 +133,7 @@ prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
 prettyTy (TySet ty)      = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
-prettyTy (TyAdt n)       = prettyName n
+prettyTy (TyAdt n)       = text n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -299,7 +299,7 @@ prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettySigma ty
-prettyDecl (DTyDef x ty) = text "type" <+> prettyName x <+> text "=" <+> prettyTy ty
+prettyDecl (DTyDef x ty) = text "type" <+> text x <+> text "=" <+> prettyTy ty
 prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
   where
     prettyClause b

@@ -161,7 +161,7 @@ handleLoad file = do
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
-        Right ((docMap, aprops, ctx), defns) -> do
+        Right ((docMap, aprops, ctx), (defns, tydefs)) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
           topDocs  .= docMap
           topCtx   .= ctx

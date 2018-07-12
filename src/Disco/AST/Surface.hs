@@ -24,7 +24,7 @@ module Disco.AST.Surface
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
-       , Decl(..), declName, isDefn, isTyDef
+       , Decl(..), declName, isDefn, tyDefName, isTyDef
 
          -- * Terms
        , UD
@@ -139,7 +139,7 @@ data Decl where
   DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
 
   -- | A user-defined algebraic data type.
-  DTyDef :: Name Type -> Type -> Decl
+  DTyDef :: String -> Type -> Decl
 
 deriving instance Forall_t Show  UD => Show Decl
 
@@ -147,6 +147,7 @@ deriving instance Forall_t Show  UD => Show Decl
 declName :: Decl -> Name Term
 declName (DType x _)  = x
 declName (DDefn x _)  = x
+declName (DTyDef _ _) = error "declName called on DTyDef"
 
 -- | Check whether a declaration is a definition.
 isDefn :: Decl -> Bool
@@ -156,6 +157,10 @@ isDefn _       = False
 isTyDef :: Decl -> Bool
 isTyDef DTyDef{} = True
 isTyDef _        = False
+
+tyDefName :: Decl -> String
+tyDefName (DTyDef x _) = x
+tyDefName _            = error "tyDefName called on decl that is not a TyDef"
 
 ------------------------------------------------------------
 -- Terms

@@ -714,8 +714,9 @@ parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
-parseTyAdt :: Parser (Name Type)
-parseTyAdt =  string2Name <$> ((:) <$> upperChar <*> identifier)
+-- | Need to change identifier to take an extra parser argument
+parseTyAdt :: Parser String
+parseTyAdt =  ((:) <$> upperChar <*> identifier)
 
 parseTyVar :: Parser (Name Type)
 parseTyVar = string2Name <$> identifier

@@ -355,9 +355,18 @@ prettyWHNF out _ (VNum d r)
       Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
       Decimal  -> out $ prettyDecimal r
 
-prettyWHNF out _ (VFun _) = out "<function>"
+prettyWHNF out ty (VFun _)    = do
+  out "<"
+  tyStr <- renderDoc (prettyTy ty)
+  out tyStr
+  out ">"
 
-prettyWHNF out _ (VClos _ _) = out "<function>"
+prettyWHNF out ty (VClos _ _) = do
+  out "<"
+  tyStr <- renderDoc (prettyTy ty)
+  out tyStr
+  out ">"
+
 prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
 
 prettyWHNF _ ty v = error $

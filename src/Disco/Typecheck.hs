@@ -866,6 +866,13 @@ inferQual _ (QGuard (unembed -> t))   = do
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern, Constraint)
+
+checkPattern p (TyAdt tyn)                  = do
+  (_, tydefnmap) <- get
+  case M.lookup tyn tydefnmap of
+    Just ty -> checkPattern p ty
+    Nothing -> throwError (NotTyDef tyn)
+
 checkPattern (PVar x) ty                    = return (singleCtx x (toSigma ty), APVar (coerce x), CTrue)
 
 checkPattern PWild    _                     = return (emptyCtx, APWild, CTrue)

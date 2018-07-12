@@ -1,4 +1,15 @@
-type Wahoo = Int
+type Wahoo = Nat
 
 map : Wahoo -> Wahoo
 map w = w + 1
+
+type Triplet = (Nat * Nat * Nat)
+
+sumTriplet : Triplet -> Nat
+sumTriplet (root, l, r) = root + l + r
+
+type Tree = Nat + (Nat * Tree * Tree)
+
+sumTree : Tree -> Nat
+sumTree (left n) = n
+sumTree (right (n, l, r)) = n + (sumTree l) + (sumTree r)

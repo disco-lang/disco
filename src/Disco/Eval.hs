@@ -37,7 +37,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, lastFile
+       , topCtx, topDefns, topTyDefns, topDocs, topEnv, memory, nextLoc, lastFile
 
          -- * Disco monad
 
@@ -60,6 +60,7 @@ import           Control.Monad.Except                    (catchError)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
+import qualified Data.Map                                as M
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Sequence                           as Seq
@@ -223,6 +224,9 @@ data DiscoState e = DiscoState
   , _topDefns   :: Ctx Core Core
     -- ^ Environment of top-level definitions.  Set by 'loadDefs'.
 
+    -- ^ Environment of top-level type definitions.
+  , _topTyDefns :: M.Map String Type
+
   , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDefs'.
@@ -251,6 +255,7 @@ initDiscoState :: DiscoState e
 initDiscoState = DiscoState
   { _topCtx     = emptyCtx
   , _topDefns   = emptyCtx
+  , _topTyDefns = M.empty
   , _topDocs    = emptyCtx
   , _topEnv     = emptyCtx
   , _memory     = IntMap.empty

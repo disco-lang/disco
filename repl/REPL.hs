@@ -163,8 +163,9 @@ handleLoad file = do
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), (defns, tydefs)) -> do
           let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
-          topDocs  .= docMap
-          topCtx   .= ctx
+          topDocs    .= docMap
+          topCtx     .= ctx
+          topTyDefns .= tydefs
           loadDefs cdefns
 
           t <- withTopEnv $ runAllTests aprops

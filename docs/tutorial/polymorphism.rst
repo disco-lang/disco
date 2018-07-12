@@ -76,9 +76,9 @@ Other common polymorphic, higher-order functions include ``foldr`` and ``filter`
 	filter : (a -> Bool) -> List a -> List a
 	filter _ [] = []
 	filter f (a :: as) = {?
-	                       a :: (filter f as)   if f a
-          				   filter f as          otherwise
-       				 	 ?}
+                           a :: (filter f as)   if f a
+                           filter f as          otherwise
+                         ?}
 
 ::
 

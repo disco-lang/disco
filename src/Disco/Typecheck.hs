@@ -496,19 +496,16 @@ infer lt@(TInj R t) = do
 infer (TAbs lam)    = do
   (args, t) <- unbind lam
   let (xs, mtys) = unzip args
-  case sequence (map unembed mtys) of
-    Nothing  -> do
-      tyvs <- mapM (const freshTy) xs
-      let tymap = M.fromList $ zip xs (map toSigma tyvs)
-      extends tymap $ do
-      (at, cst) <- infer t
-      return (ATAbs (mkFunTy tyvs (getType at))
-                     (bind (zip (map coerce xs) (map (embed . Just) tyvs)) at), cst)
-    Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
-      (at, cst) <- infer t
-      return (ATAbs (mkFunTy tys (getType at))
-                     (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
+  tys <- mapM subs (map unembed mtys)
+  let tymap = M.fromList $ zip xs (map toSigma tys)
+  extends tymap $ do
+  (at, cst) <- infer t
+  return (ATAbs (mkFunTy tys (getType at))
+                (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
   where
+    subs :: Maybe (Type) -> TCM Type
+    subs (Just ty) = return ty
+    subs _ = freshTy
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
     mkFunTy tys out = foldr TyArr out tys

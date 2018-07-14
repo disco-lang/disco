@@ -209,7 +209,7 @@ data Type where
   --   a ADT declaration.
   TyAdt :: String -> Type
 
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Type
 instance Subst Type Rational where

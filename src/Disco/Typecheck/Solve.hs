@@ -112,7 +112,7 @@ filterExcept ms = do
 data SimpleConstraint where
   (:<:) :: Type -> Type -> SimpleConstraint
   (:=:) :: Type -> Type -> SimpleConstraint
-  deriving (Show, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha SimpleConstraint
 
@@ -143,6 +143,7 @@ data SimplifyState = SS
   { _ssSortMap     :: SortMap
   , _ssConstraints :: [SimpleConstraint]
   , _ssSubst       :: S
+  , _ssSeen        :: Set SimpleConstraint
   }
 
 makeLenses ''SimplifyState
@@ -160,8 +161,8 @@ lkup msg m k = fromMaybe (error errMsg) (M.lookup k m)
 --------------------------------------------------
 -- Top-level solver algorithm
 
-solveConstraint :: Constraint -> SolveM S
-solveConstraint c = do
+solveConstraint :: M.Map String Type -> Constraint -> SolveM S
+solveConstraint tyDefns c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers.  Should result in just a list of
@@ -174,10 +175,10 @@ solveConstraint c = do
 
   qcList <- decomposeConstraint c
 
-  msum (map (uncurry solveConstraintChoice) qcList)
+  msum (map (uncurry (solveConstraintChoice tyDefns)) qcList)
 
-solveConstraintChoice :: SortMap -> [SimpleConstraint] -> SolveM S
-solveConstraintChoice quals cs = do
+solveConstraintChoice :: M.Map String Type -> SortMap -> [SimpleConstraint] -> SolveM S
+solveConstraintChoice tyDefns quals cs = do
 
   traceM (show quals)
   traceM (show cs)
@@ -187,7 +188,7 @@ solveConstraintChoice quals cs = do
 
   let toEqn (t1 :<: t2) = (t1,t2)
       toEqn (t1 :=: t2) = (t1,t2)
-  _ <- maybeError NoWeakUnifier $ weakUnify (map toEqn cs)
+  _ <- maybeError NoWeakUnifier $ weakUnify tyDefns (map toEqn cs)
 
   -- Step 3. Simplify constraints, resulting in a set of atomic
   -- subtyping constraints.  Also simplify/update qualifier set
@@ -196,7 +197,7 @@ solveConstraintChoice quals cs = do
   traceM "------------------------------"
   traceM "Running simplifier..."
 
-  (sm, atoms, theta_simp) <- liftExcept (simplify quals cs)
+  (sm, atoms, theta_simp) <- liftExcept (simplify tyDefns quals cs)
 
   traceM (show sm)
   traceM (show atoms)
@@ -220,7 +221,7 @@ solveConstraintChoice quals cs = do
   traceM "------------------------------"
   traceM "Checking WCCs for skolems..."
 
-  (g', theta_skolem) <- liftExcept (checkSkolems sm g)
+  (g', theta_skolem) <- liftExcept (checkSkolems tyDefns sm g)
   traceShowM theta_skolem
 
   -- We don't need to ensure that theta_skolem respects sorts since
@@ -234,7 +235,7 @@ solveConstraintChoice quals cs = do
   traceM "------------------------------"
   traceM "Collapsing SCCs..."
 
-  (g'', theta_cyc) <- liftExcept (elimCycles g')
+  (g'', theta_cyc) <- liftExcept (elimCycles tyDefns g')
 
   -- Check that the resulting substitution respects sorts...
   when (not $ all (\(x,TyAtom (ABase ty)) -> hasSort ty (getSort sm x)) theta_cyc)
@@ -284,6 +285,7 @@ decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstra
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
+decomposeQual ty@(TyAdt _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
 decomposeQual ty@(TyCon c tys) q
   = case (M.lookup c >=> M.lookup q) qualRules of
       Nothing -> throwError $ Unqual q ty
@@ -318,10 +320,10 @@ type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
 
-simplify :: SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
-simplify origSM cs
-  = (\(SS sm' cs' s') -> (sm', map extractAtoms cs', s'))
-  <$> contFreshMT (execStateT simplify' (SS origSM cs idS)) n
+simplify :: M.Map String Type -> SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
+simplify tyDefns origSM cs
+  = (\(SS sm' cs' s' _) -> (sm', map extractAtoms cs', s'))
+  <$> contFreshMT (execStateT simplify' (SS origSM cs idS S.empty)) n
   where
 
     fvNums :: Alpha a => [a] -> [Integer]
@@ -392,26 +394,50 @@ simplify origSM cs
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar  {})                = True
+    simplifiable (TyAdt {} :<: _)                        = True
+    simplifiable (_ :<: TyAdt {})                        = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
     simplifiable _                                       = False
 
-    -- Simplify the given simplifiable constraint.
+    -- Simplify the given simplifiable constraint.  XXX say something about recursion
     simplifyOne :: SimpleConstraint -> SimplifyM ()
+    simplifyOne c = do
+      seen <- use ssSeen
+      case c `S.member` seen of
+        True  -> return ()
+        False -> do
+          ssSeen %= S.insert c
+          simplifyOne' c
+
+    -- XXX comment me
+    simplifyOne' :: SimpleConstraint -> SimplifyM ()
 
     -- If we have an equality constraint, run unification on it.  The
     -- resulting substitution is applied to the remaining constraints
     -- as well as prepended to the current substitution.
-    simplifyOne (ty1 :=: ty2) =
-      case unify [(ty1, ty2)] of
+
+    -- XXX need to expand TyAdt here!
+    simplifyOne' (ty1 :=: ty2) =
+      case unify tyDefns [(ty1, ty2)] of
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
+
+    simplifyOne' (TyAdt t :<: ty2) =
+      case M.lookup t tyDefns of
+        Nothing  -> throwError $ Unknown
+        Just ty1 -> ssConstraints %= ((ty1 :<: ty2) :)
+
+    simplifyOne' (ty1 :<: TyAdt t) =
+      case M.lookup t tyDefns of
+        Nothing  -> throwError $ Unknown
+        Just ty2 -> ssConstraints %= ((ty1 :<: ty2) :)
 
     -- Given a subtyping constraint between two type constructors,
     -- decompose it if the constructors are the same (or fail if they
     -- aren't), taking into account the variance of each argument to
     -- the constructor.
-    simplifyOne (TyCon c1 tys1 :<: TyCon c2 tys2)
+    simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
       | c1 /= c2  = throwError NoUnify
       | otherwise =
           ssConstraints %= (zipWith3 variance (arity c1) tys1 tys2 ++)
@@ -419,8 +445,8 @@ simplify origSM cs
     -- Given a subtyping constraint between a variable and a type
     -- constructor, expand the variable into the same constructor
     -- applied to fresh type variables.
-    simplifyOne con@(TyVar a   :<: TyCon c _) = expandStruct a c con
-    simplifyOne con@(TyCon c _ :<: TyVar a  ) = expandStruct a c con
+    simplifyOne' con@(TyVar a   :<: TyCon c _) = expandStruct a c con
+    simplifyOne' con@(TyCon c _ :<: TyVar a  ) = expandStruct a c con
 
     -- Given a subtyping constraint between two base types, just check
     -- whether the first is indeed a subtype of the second.  (Note
@@ -428,7 +454,7 @@ simplify origSM cs
     -- include variables, but this will only ever get called if
     -- 'simplifiable' was true, which checks that both are base
     -- types.)
-    simplifyOne (TyAtom (ABase b1) :<: TyAtom (ABase b2)) = do
+    simplifyOne' (TyAtom (ABase b1) :<: TyAtom (ABase b2)) = do
       case isSubB b1 b2 of
         True  -> return ()
         False -> throwError NoUnify
@@ -512,8 +538,8 @@ mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
 --   If there are any WCCs with a single skolem, no base types, and
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
-checkSkolems :: SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
-checkSkolems (SM sm) graph = do
+checkSkolems :: Map String Type -> SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
+checkSkolems tyDefns (SM sm) graph = do
   let skolemWCCs :: [Set Atom]
       skolemWCCs = filter (any isSkolem) $ G.wcc graph
 
@@ -543,7 +569,7 @@ checkSkolems (SM sm) graph = do
 
       let g' = foldl' (flip G.delete) g u
 
-          ms' = unifyAtoms (S.toList u)
+          ms' = unifyAtoms tyDefns (S.toList u)
       case ms' of
         Nothing -> throwError NoUnify
         Just s' -> unifyWCCs g' (atomToTypeSubst s' @@ s) us
@@ -563,8 +589,8 @@ checkSkolems (SM sm) graph = do
 --   Of course, this step can fail if the types in a SCC are not
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
-elimCycles :: Graph UAtom -> Except SolveError (Graph UAtom, S)
-elimCycles g
+elimCycles :: Map String Type -> Graph UAtom -> Except SolveError (Graph UAtom, S)
+elimCycles tyDefns g
   = maybeError NoUnify
   $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
   where
@@ -575,7 +601,7 @@ elimCycles g
     unifySCC :: Set UAtom -> Maybe (UAtom, S' Atom)
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip substs a &&& id) <$> unifyAtoms (map uatomToAtom as)
+      as@(a:_) -> (flip substs a &&& id) <$> unifyAtoms tyDefns (map uatomToAtom as)
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution

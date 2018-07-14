@@ -57,7 +57,8 @@ import           Prelude                                 hiding (lookup)
 
 import           Control.Applicative                     ((<|>))
 import           Control.Arrow                           ((&&&))
-import           Control.Lens                            ((%~), (&), _1)
+import           Control.Lens                            (use, (%~), (&), _1,
+                                                          _2)
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -87,7 +88,7 @@ import           Disco.Types.Rules
 --   something like @[n, (x,y)] (n*x + y)@.
 type Defn  = [Bind [APattern] ATerm]
 
--- | A tuple container a map from definition names to definitions 
+-- | A tuple container a map from definition names to definitions
 --   and a map from type definition names to types.
 type DefnCtx = (Ctx ATerm Defn, M.Map String Type)
 
@@ -163,7 +164,9 @@ execTCM = fmap snd . runTCM
 -- | Solve a constraint set, generating a substitution (or failing
 --   with an error).
 solve :: Constraint -> TCM S
-solve = either (throwError . Unsolvable) return . runSolveM . solveConstraint
+solve c = do
+  tyDefns <- use _2
+  either (throwError . Unsolvable) return . runSolveM . solveConstraint tyDefns $ c
 
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> Defn -> TCM ()

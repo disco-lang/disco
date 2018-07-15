@@ -149,8 +149,8 @@ handleShowDefn x = do
 handleAnn :: Term -> Disco IErr String
 handleAnn t = do
   case evalTCM (inferTop t) of
-    Left e         -> return . show $ e
-    Right (at,sig) -> return . show $ at
+    Left e       -> return . show $ e
+    Right (at,_) -> return . show $ at
 
 handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do

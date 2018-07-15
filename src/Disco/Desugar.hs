@@ -48,11 +48,11 @@ import           Disco.Types
 
 -- | The desugaring monad.  Currently, needs only the ability to
 --   generate fresh names (to deal with binders).
-type DSM = LFreshM
+type DSM = FreshM
 
 -- | Run a computation in the desugaring monad.
 runDSM :: DSM a -> a
-runDSM = runLFreshM
+runDSM = runFreshM
 
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
@@ -69,6 +69,21 @@ infix 4 ==.
 tnot :: ATerm -> ATerm
 tnot = ATUn TyBool Not
 
+(<==.) :: ATerm -> [AGuard] -> ABranch
+t <==. gs = bind (toTelescope gs) t
+
+fls :: ATerm
+fls = ATBool False
+
+tru :: ATerm
+tru = ATBool True
+
+tif :: ATerm -> AGuard
+tif t = AGBool (embed t)
+
+nil :: Type -> ATerm
+nil ty = ATContainer (TyList ty) ListContainer [] Nothing
+
 -- | Desugar a definition (of the form @f pat1 .. patn = term@, but
 --   without the name @f@ of the thing being defined) into a core
 --   language term.  Each pattern desugars to an anonymous function,
@@ -82,21 +97,17 @@ tnot = ATUn TyBool Not
 --   @
 desugarDefn :: Defn -> DSM DTerm
 desugarDefn (Defn _ patTys bodyTy def) = do
-  lunbinds def $ \clausePairs -> do
-    let (pats, bodies) = unzip clausePairs
+  clausePairs <- mapM unbind def
+  let (pats, bodies) = unzip clausePairs
 
-    -- generate dummy variables for lambdas
-    args <- zipWithM (\_ i -> lfresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
-    avoid (map AnyName args) $ do
-      branches <- zipWithM (mkBranch (zip args patTys)) bodies pats
+  -- generate dummy variables for lambdas
+  args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
+  branches <- zipWithM (mkBranch (zip args patTys)) bodies pats
 
-      -- Create lambdas and one big case
-      return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) (DTCase bodyTy branches)
+  -- Create lambdas and one big case
+  return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) (DTCase bodyTy branches)
 
   where
-    lunbinds :: (Alpha a, Alpha b, LFresh m, Monad m) => [Bind a b] -> ([(a,b)] -> m r) -> m r
-    lunbinds bs k = mapM (flip lunbind return) bs >>= k
-
     mkBranch :: [(Name DTerm, Type)] -> ATerm -> [APattern] -> DSM DBranch
     mkBranch xs b ps = do
       b'  <- desugarTerm b
@@ -111,8 +122,9 @@ desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
-desugarTerm (ATAbs ty lam)        =
-  lunbind lam $ \(args, t) -> mkLambda ty (map fst args) <$> desugarTerm t
+desugarTerm (ATAbs ty lam)       = do
+  (args, t) <- unbind lam
+  mkLambda ty (map fst args) <$> desugarTerm t
 desugarTerm (ATApp ty t1 t2)     =
   DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTup ty ts)        = desugarTuples ty ts
@@ -125,8 +137,8 @@ desugarTerm (ATRat r)            = return $ DTRat r
 desugarTerm (ATUn _ Not t)       =
   desugarTerm $
     ATCase TyBool
-      [ bind (toTelescope [AGBool (embed t)]) (ATBool False)
-      , bind (toTelescope []) (ATBool True)
+      [ fls <==. [AGBool (embed t)]
+      , tru <==. []
       ]
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 
@@ -138,15 +150,15 @@ desugarTerm (ATBin _ And t1 t2)  = do
   -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
   desugarTerm $
     ATCase TyBool
-      [ bind (toTelescope [AGBool (embed t1)]) t2
-      , bind (toTelescope []) (ATBool False)
+      [ t2  <==. [tif t1]
+      , fls <==. []
       ]
 desugarTerm (ATBin _ Or t1 t2) = do
   -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
   desugarTerm $
     ATCase TyBool
-      [ bind (toTelescope [AGBool (embed t1)]) (ATBool True)
-      , bind (toTelescope []) t2
+      [ tru <==. [tif t1]
+      , t2  <==. []
       ]
 desugarTerm (ATBin ty Sub t1 t2)  = desugarTerm $ ATBin ty Add t1 (ATUn ty Neg t2)
 desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $ ATUn ty Floor (ATBin (getType t1) Div t1 t2)
@@ -165,16 +177,52 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
 -- XXX todo. Desugar to monadic operations.
-desugarTerm (ATContainerComp _ _ _) = error "desugar ContainerComp unimplemented"
---   lunbind bqt $ \(qs, t) -> do
---   dt <- desugarTerm t
---   dqs <- desugarQuals qs
---   return $ CListComp (bind dqs dt)
+desugarTerm (ATContainerComp ty ListContainer bqt) = do
+  (qs, t) <- unbind bqt
+  desugarComp t qs
 
-desugarTerm (ATLet _ t) =
-  lunbind t $ \(bs, t2) -> desugarLet (fromTelescope bs) t2
+desugarTerm (ATContainerComp ty _ _) = error $ "desugar ContainerComp unimplemented for " ++ show ty
+
+desugarTerm (ATLet _ t) = do
+  (bs, t2) <- unbind t
+  desugarLet (fromTelescope bs) t2
 
 desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
+
+-- XXX
+desugarComp :: ATerm -> Telescope AQual -> DSM DTerm
+desugarComp t qs = expandComp t qs >>= desugarTerm
+
+expandComp :: ATerm -> Telescope AQual -> DSM ATerm
+
+-- [ t | ] = [ t ]
+expandComp t TelEmpty = return $ ATContainer (TyList (getType t)) ListContainer [t] Nothing
+
+-- [ t | q, qs ] = ...
+expandComp t (TelCons (unrebind -> (q,qs)))
+  = case q of
+      -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
+      AQBind x (unembed -> lst) -> do
+        tqs <- expandComp t qs
+        let (TyList xTy) = getType lst
+            resTy        = TyList (getType t)
+            concatTy     = TyArr (TyList resTy) resTy
+            mapTy        = TyArr (TyArr xTy resTy) (TyArr (TyList xTy) (TyList resTy))
+        return $ ATApp resTy (ATVar concatTy (string2Name "concat")) $
+          ATApp (TyList resTy)
+            (ATApp (TyArr (TyList xTy) (TyList resTy))
+              (ATVar mapTy (string2Name "mapList"))
+              (ATAbs (TyArr xTy resTy) (bind [(x, embed xTy)] tqs))
+            )
+            lst
+
+      -- [ t | g, qs ] = if g then [ t | qs ] else []
+      AQGuard (unembed -> g)    -> do
+        tqs <- expandComp t qs
+        return $ ATCase (TyList (getType t))
+          [ tqs             <==. [tif g]
+          , nil (getType t) <==. []
+          ]
 
 -- | Desugar a let into application of a chain of lambdas.
 desugarLet :: [ABinding] -> ATerm -> DSM DTerm
@@ -215,7 +263,7 @@ expandChain t1 (ATLink op t2 : links) =
 -- | Desugar a branch.
 desugarBranch :: ABranch -> DSM DBranch
 desugarBranch b = do
-  lunbind b $ \(ags, at) -> do
+  (ags, at) <- unbind b
   dgs <- desugarGuards ags
   d   <- desugarTerm at
   return $ bind dgs d

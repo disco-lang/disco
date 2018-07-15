@@ -87,6 +87,7 @@ import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
+import           Data.Void
 
 import           Disco.Subst                      (S')
 
@@ -208,6 +209,9 @@ data Type where
 
 instance Alpha Type
 instance Subst Type Rational where
+  subst _ _ = id
+  substs _  = id
+instance Subst Type Void where
   subst _ _ = id
   substs _  = id
 

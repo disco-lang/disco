@@ -105,12 +105,12 @@ data UD
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
 data Module = Module [Decl] (Ctx Term Docs)
-deriving instance Forall_t Show  UD => Show Module
+deriving instance ForallTerm Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl
-deriving instance Forall_t Show  UD => Show TopLevel
+deriving instance ForallTerm Show  UD => Show TopLevel
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]
@@ -121,7 +121,7 @@ data DocThing
                             --   of @||| text@ items
   | DocProperty Property    -- ^ An example/doctest/property of the
                             --   form @!!! forall (x1:ty1) ... . property@
-deriving instance Forall_t Show  UD => Show DocThing
+deriving instance ForallTerm Show  UD => Show DocThing
 
 -- | A property is a universally quantified term of the form
 --   @forall v1 : T1, v2 : T2. term@.
@@ -138,7 +138,7 @@ data Decl where
   --   n*x + y@.
   DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
 
-deriving instance Forall_t Show  UD => Show Decl
+deriving instance ForallTerm Show  UD => Show Decl
 
 -- | Get the name that a declaration is about.
 declName :: Decl -> Name Term
@@ -155,26 +155,26 @@ isDefn _       = False
 ------------------------------------------------------------
 type Term = Term_ UD
 
-type instance X_TVar UD = ()
-type instance X_TLet UD = ()
-type instance X_TParens UD = ()
-type instance X_TUnit UD = ()
-type instance X_TBool UD = ()
-type instance X_TNat UD = ()
-type instance X_TRat UD = ()
-type instance X_TAbs UD = ()
-type instance X_TApp UD = ()
-type instance X_TInj UD = ()
-type instance X_TCase UD = ()
-type instance X_TUn UD = ()
-type instance X_TBin UD = ()
-type instance X_TChain UD = ()
-type instance X_TTyop UD = ()
-type instance X_TContainer UD = ()
-type instance X_TContainerComp UD = ()
-type instance X_TAscr UD = ()
-type instance X_Term UD = ()
-type instance X_TTup UD = ()
+type instance X_TVar            UD = ()
+type instance X_TLet            UD = ()
+type instance X_TParens         UD = ()
+type instance X_TUnit           UD = ()
+type instance X_TBool           UD = ()
+type instance X_TNat            UD = ()
+type instance X_TRat            UD = ()
+type instance X_TAbs            UD = ()
+type instance X_TApp            UD = ()
+type instance X_TInj            UD = ()
+type instance X_TCase           UD = ()
+type instance X_TUn             UD = ()
+type instance X_TBin            UD = ()
+type instance X_TChain          UD = ()
+type instance X_TTyOp           UD = ()
+type instance X_TContainer      UD = ()
+type instance X_TContainerComp  UD = ()
+type instance X_TAscr           UD = ()
+type instance X_Term            UD = ()
+type instance X_TTup            UD = ()
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -289,16 +289,17 @@ pattern GPat embedt pat = GPat_ () embedt pat
 
 type Pattern = Pattern_ UD
 
-type instance X_PVar UD = ()
-type instance X_PWild UD = ()
-type instance X_PUnit UD = ()
-type instance X_PBool UD = ()
-type instance X_PTup UD = ()
-type instance X_PInj UD = ()
-type instance X_PNat UD = ()
-type instance X_PSucc UD = ()
-type instance X_PCons UD = ()
-type instance X_PList UD = ()
+type instance X_PVar UD    = ()
+type instance X_PWild UD   = ()
+type instance X_PUnit UD   = ()
+type instance X_PBool UD   = ()
+type instance X_PTup UD    = ()
+type instance X_PInj UD    = ()
+type instance X_PNat UD    = ()
+type instance X_PSucc UD   = ()
+type instance X_PCons UD   = ()
+type instance X_PList UD   = ()
+type instance X_Pattern UD = ()
 
 pattern PVar :: Name Term -> Pattern
 pattern PVar name = PVar_ () name
@@ -332,11 +333,3 @@ pattern PList lp = PList_ () lp
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
              PSucc, PCons, PList #-}
-
-
-instance Alpha Link
-instance Alpha Term
-instance Alpha Binding
-instance Alpha Guard
-instance Alpha Pattern
-instance Alpha Qual

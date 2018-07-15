@@ -129,6 +129,7 @@ library
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.AST.Core
+                       Disco.AST.Desugared
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed

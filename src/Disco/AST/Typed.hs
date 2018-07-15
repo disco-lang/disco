@@ -77,6 +77,8 @@ module Disco.AST.Typed
 
 import           Unbound.Generics.LocallyNameless
 
+import           Data.Void
+
 import           Disco.AST.Generic
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -95,33 +97,27 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
-instance Subst Type APattern
-instance Subst Type AQual
-instance Subst Type AGuard
-instance Subst Type ABinding
-instance Subst Type ALink
-instance Subst Type ATerm
+type instance X_TVar            TY = Type
+type instance X_TLet            TY = Type
+type instance X_TUnit           TY = ()
+type instance X_TBool           TY = ()
+type instance X_TNat            TY = Type
+type instance X_TRat            TY = ()
+type instance X_TAbs            TY = Type
+type instance X_TApp            TY = Type
+type instance X_TInj            TY = Type
+type instance X_TCase           TY = Type
+type instance X_TUn             TY = Type
+type instance X_TBin            TY = Type
+type instance X_TChain          TY = Type
+type instance X_TTyOp           TY = Type
+type instance X_TContainer      TY = Type
+type instance X_TContainerComp  TY = Type
+type instance X_TAscr           TY = Void -- No more type ascriptions in typechecked terms
+type instance X_TTup            TY = Type
+type instance X_TParens         TY = Void -- No more explicit parens
 
-type instance X_TVar TY = Type
-type instance X_TLet TY = Type
-type instance X_TUnit TY = ()
-type instance X_TBool TY = ()
-type instance X_TNat TY = Type
-type instance X_TRat TY = ()
-type instance X_TAbs TY = Type
-type instance X_TApp TY = Type
-type instance X_TInj TY = Type
-type instance X_TCase TY = Type
-type instance X_TUn TY = Type
-type instance X_TBin TY = Type
-type instance X_TChain TY = Type
-type instance X_TTyop TY = Type
-type instance X_TContainer TY = Type
-type instance X_TContainerComp TY = Type
-type instance X_TAscr TY = ()
-type instance X_Term TY = ()
-type instance X_TTup TY = Type
-type instance X_TParens TY = ()
+type instance X_Term TY = ()              -- No extra constructors
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -243,6 +239,7 @@ type instance X_PNat TY = ()
 type instance X_PSucc TY = ()
 type instance X_PCons TY = ()
 type instance X_PList TY = ()
+type instance X_Pattern TY = ()
 
 pattern APVar :: Name ATerm -> APattern
 pattern APVar name = PVar_ () name
@@ -277,53 +274,46 @@ pattern APList lp = PList_ () lp
 {-# COMPLETE APVar, APWild, APUnit, APBool, APTup, APInj, APNat,
     APSucc, APCons, APList #-}
 
-instance Alpha ATerm
-instance Alpha ABinding
-instance Alpha ALink
-instance Alpha APattern
-instance Alpha AGuard
-instance Alpha AQual
-
 ------------------------------------------------------------
 -- getType
 ------------------------------------------------------------
 
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
-getType (ATVar ty _)      = ty
-getType ATUnit            = TyUnit
-getType (ATBool _)        = TyBool
-getType (ATNat ty _)      = ty
-getType (ATRat _)         = TyF
-getType (ATAbs ty _)      = ty
-getType (ATApp ty _ _)    = ty
-getType (ATTup ty _)      = ty
-getType (ATInj ty _ _)    = ty
-getType (ATUn ty _ _)     = ty
-getType (ATBin ty _ _ _)  = ty
-getType (ATTyOp ty _ _)   = ty
-getType (ATChain ty _ _)  = ty
+getType (ATVar ty _)             = ty
+getType ATUnit                   = TyUnit
+getType (ATBool _)               = TyBool
+getType (ATNat ty _)             = ty
+getType (ATRat _)                = TyF
+getType (ATAbs ty _)             = ty
+getType (ATApp ty _ _)           = ty
+getType (ATTup ty _)             = ty
+getType (ATInj ty _ _)           = ty
+getType (ATUn ty _ _)            = ty
+getType (ATBin ty _ _ _)         = ty
+getType (ATTyOp ty _ _)          = ty
+getType (ATChain ty _ _)         = ty
 getType (ATContainer ty _ _ _)   = ty
-getType (ATContainerComp ty _ _) = ty 
-getType (ATLet ty _)      = ty
-getType (ATCase ty _)     = ty
+getType (ATContainerComp ty _ _) = ty
+getType (ATLet ty _)             = ty
+getType (ATCase ty _)            = ty
 
 -- | Set the type at the root of an 'ATerm'.
 setType :: Type -> ATerm -> ATerm
-setType ty (ATVar _ x      ) = ATVar ty x
-setType _  ATUnit            = ATUnit
-setType _  (ATBool b)        = ATBool b
-setType ty (ATNat _ x      ) = ATNat ty x
-setType _  (ATRat r)         = ATRat r
-setType ty (ATAbs _ x      ) = ATAbs ty x
-setType ty (ATApp _ x y    ) = ATApp ty x y
-setType ty (ATTup _ x      ) = ATTup ty x
-setType ty (ATInj _ x y    ) = ATInj ty x y
-setType ty (ATUn _ x y     ) = ATUn ty x y
-setType ty (ATBin _ x y z  ) = ATBin ty x y z
-setType ty (ATTyOp _ x y   ) = ATTyOp ty x y
-setType ty (ATChain _ x y  ) = ATChain ty x y
+setType ty (ATVar _ x      )       = ATVar ty x
+setType _  ATUnit                  = ATUnit
+setType _  (ATBool b)              = ATBool b
+setType ty (ATNat _ x      )       = ATNat ty x
+setType _  (ATRat r)               = ATRat r
+setType ty (ATAbs _ x      )       = ATAbs ty x
+setType ty (ATApp _ x y    )       = ATApp ty x y
+setType ty (ATTup _ x      )       = ATTup ty x
+setType ty (ATInj _ x y    )       = ATInj ty x y
+setType ty (ATUn _ x y     )       = ATUn ty x y
+setType ty (ATBin _ x y z  )       = ATBin ty x y z
+setType ty (ATTyOp _ x y   )       = ATTyOp ty x y
+setType ty (ATChain _ x y  )       = ATChain ty x y
 setType ty (ATContainer _ x y z)   = ATContainer ty x y z
 setType ty (ATContainerComp _ x y) = ATContainerComp ty x y
-setType ty (ATLet _ x      ) = ATLet ty x
-setType ty (ATCase _ x     ) = ATCase ty x
+setType ty (ATLet _ x      )       = ATLet ty x
+setType ty (ATCase _ x     )       = ATCase ty x

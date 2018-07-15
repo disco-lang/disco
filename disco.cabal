@@ -139,6 +139,7 @@ library
                        Disco.Pretty
                        Disco.Property
                        Disco.Desugar
+                       Disco.Compile
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst

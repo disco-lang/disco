@@ -19,12 +19,15 @@
 --
 -----------------------------------------------------------------------------
 
+-- XXX TODO
+--   Write linting typechecker for DTerm?
+
 module Disco.Desugar
        ( -- * Desugaring monad
          DSM, runDSM
 
          -- * Programs and terms
-       , desugarDefn, desugarTerm, desugarUOp, desugarBOp
+       , desugarDefn, desugarTerm
 
          -- * Case expressions and patterns
        , desugarBranch, desugarGuards, desugarPattern
@@ -34,10 +37,9 @@ module Disco.Desugar
 import           Control.Monad.Cont
 
 import           Data.Coerce
-import           Data.Ratio
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Core
+import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators
@@ -52,6 +54,21 @@ type DSM = LFreshM
 runDSM :: DSM a -> a
 runDSM = runLFreshM
 
+infixr 2 ||.
+(||.) :: ATerm -> ATerm -> ATerm
+(||.) = ATBin TyBool Or
+
+infix 4 <.
+(<.) :: ATerm -> ATerm -> ATerm
+(<.) = ATBin TyBool Lt
+
+infix 4 ==.
+(==.) :: ATerm -> ATerm -> ATerm
+(==.) = ATBin TyBool Eq
+
+tnot :: ATerm -> ATerm
+tnot = ATUn TyBool Not
+
 -- | Desugar a definition (of the form @f pat1 .. patn = term@, but
 --   without the name @f@ of the thing being defined) into a core
 --   language term.  Each pattern desugars to an anonymous function,
@@ -63,275 +80,187 @@ runDSM = runLFreshM
 --   @
 --     n -> p -> { n*x + y  when p = (x,y)
 --   @
-desugarDefn :: Defn -> DSM Core
-desugarDefn def = do
+desugarDefn :: Defn -> DSM DTerm
+desugarDefn (Defn _ patTys bodyTy def) = do
   lunbinds def $ \clausePairs -> do
     let (pats, bodies) = unzip clausePairs
 
     -- generate dummy variables for lambdas
     args <- zipWithM (\_ i -> lfresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
     avoid (map AnyName args) $ do
-      branches <- zipWithM (mkBranch args) bodies pats
+      branches <- zipWithM (mkBranch (zip args patTys)) bodies pats
 
       -- Create lambdas and one big case
-      return $ mkFunction args (CCase branches)
+      return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) (DTCase bodyTy branches)
 
   where
-    lunbinds :: (Alpha a, Alpha b) => [Bind a b] -> ([(a,b)] -> DSM r) -> DSM r
+    lunbinds :: (Alpha a, Alpha b, LFresh m, Monad m) => [Bind a b] -> ([(a,b)] -> m r) -> m r
     lunbinds bs k = mapM (flip lunbind return) bs >>= k
 
-    mkBranch :: [Name Core] -> ATerm -> [APattern] -> DSM CBranch
+    mkBranch :: [(Name DTerm, Type)] -> ATerm -> [APattern] -> DSM DBranch
     mkBranch xs b ps = do
       b'  <- desugarTerm b
       let ps' = map desugarPattern ps
       return $ bind (mkGuards xs ps') b'
 
-    mkGuards :: [Name Core] -> [CPattern] -> Telescope (Embed Core, CPattern)
-    mkGuards xs ps = toTelescope (zip (map (embed . CVar) xs) ps)
-
-    mkFunction :: [Name Core] -> Core -> Core
-    mkFunction [] c     = c
-    mkFunction (x:xs) c = CAbs (bind x (mkFunction xs c))
+    mkGuards :: [(Name DTerm, Type)] -> [DPattern] -> Telescope DGuard
+    mkGuards xs ps = toTelescope $ zipWith DGPat (map (\(x,ty) -> embed (DTVar ty x)) xs) ps
 
 -- | Desugar a typechecked term.
-desugarTerm :: ATerm -> DSM Core
-desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
-desugarTerm ATUnit        = return $ CCons 0 []
-desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
-desugarTerm (ATAbs _ lam) =
-  lunbind lam $ \(args, t) -> desugarLambda (map fst args) <$> desugarTerm t
-desugarTerm (ATApp ty t1 t2) =
-  CApp (strictness ty) <$> desugarTerm t1 <*> desugarTerm t2
-desugarTerm (ATTup _ ts) = desugarTuples ts
-desugarTerm (ATInj _ s t) =
-  CCons (fromEnum s) <$> mapM desugarTerm [t]
-desugarTerm (ATNat ty n)  = desugarNat ty n
-desugarTerm (ATRat r) = return $ CNum Decimal r
-desugarTerm (ATUn ty op t) =
-  desugarUOp ty op <$> desugarTerm t
-desugarTerm (ATBin _ Impl t1 t2) =
-  desugarTerm (ATBin TyBool Or (ATUn TyBool Not t1) t2)
-desugarTerm (ATBin _ And t1 t2) = do
-  x <- lfresh (string2Name "b")
-  y <- lfresh (string2Name "c")
-  let ty1 = TyArr TyBool TyBool
-      ty2 = TyArr TyBool ty1
+desugarTerm :: ATerm -> DSM DTerm
+desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
+desugarTerm ATUnit               = return $ DTUnit
+desugarTerm (ATBool b)           = return $ DTBool b
+desugarTerm (ATAbs ty lam)        =
+  lunbind lam $ \(args, t) -> mkLambda ty (map fst args) <$> desugarTerm t
+desugarTerm (ATApp ty t1 t2)     =
+  DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
+desugarTerm (ATTup ty ts)        = desugarTuples ty ts
+desugarTerm (ATInj ty s t)       =
+  DTInj ty s <$> desugarTerm t
+desugarTerm (ATNat ty n)         = return $ DTNat ty n
+desugarTerm (ATRat r)            = return $ DTRat r
 
-  -- t1 and t2 ==> (b -> c -> {? c if b, false otherwise ?}) t1 t2
+  -- XXX Turn into std library defn
+desugarTerm (ATUn _ Not t)       =
   desugarTerm $
-    ATApp TyBool
-      (ATApp ty1
-        (ATAbs ty2
-          (bind [(x, embed Nothing), (y, embed Nothing)]
-            (ATCase TyBool
-              [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATVar TyBool y)
-              , bind (toTelescope []) (ATBool False)
-              ]
-            )
-          )
-        )
-        t1
-      )
-      t2
+    ATCase TyBool
+      [ bind (toTelescope [AGBool (embed t)]) (ATBool False)
+      , bind (toTelescope []) (ATBool True)
+      ]
+desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
+
+  -- XXX turn this into a std library defn
+desugarTerm (ATBin _ Impl t1 t2) = desugarTerm $ tnot t1 ||. t2
+
+  -- XXX turn this into a std library defn
+desugarTerm (ATBin _ And t1 t2)  = do
+  -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
+  desugarTerm $
+    ATCase TyBool
+      [ bind (toTelescope [AGBool (embed t1)]) t2
+      , bind (toTelescope []) (ATBool False)
+      ]
 desugarTerm (ATBin _ Or t1 t2) = do
-  x <- lfresh (string2Name "b")
-  y <- lfresh (string2Name "c")
-  let ty1 = TyArr TyBool TyBool
-      ty2 = TyArr TyBool ty1
-
-  -- t1 or t2 ==> (b -> c -> {? true if b, c otherwise ?}) t1 t2
+  -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
   desugarTerm $
-    ATApp TyBool
-      (ATApp ty1
-        (ATAbs ty2
-          (bind [(x, embed Nothing), (y, embed Nothing)]
-            (ATCase TyBool
-              [ bind (toTelescope [AGBool (embed (ATVar TyBool x))]) (ATBool True)
-              , bind (toTelescope []) (ATVar TyBool y)
-              ]
-            )
-          )
-        )
-        t1
-      )
-      t2
-desugarTerm (ATBin ty op t1 t2) =
-  desugarBOp (getType t1) (getType t2) ty op <$> desugarTerm t1 <*> desugarTerm t2
-desugarTerm (ATTyOp _ op t) = return $ desugarTyOp op t
-desugarTerm (ATChain _ t1 links) = desugarChain t1 links
-desugarTerm (ATContainer (TyCon _ [tyElt]) c es mell) = case c of
-  ListContainer -> do
-    des <- mapM desugarTerm es
-    case mell of
-      Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
-      Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
-  SetContainer -> do
-    des <- mapM desugarTerm es
-    case mell of
-      Nothing  -> return $ CoreSet tyElt des
-      Just ell -> error "Sets cannot have ellipses yet"
-desugarTerm (ATListComp _ bqt) =
-  lunbind bqt $ \(qs, t) -> do
-  dt <- desugarTerm t
-  dqs <- desugarQuals qs
-  return $ CListComp (bind dqs dt)
+    ATCase TyBool
+      [ bind (toTelescope [AGBool (embed t1)]) (ATBool True)
+      , bind (toTelescope []) t2
+      ]
+desugarTerm (ATBin ty Sub t1 t2)  = desugarTerm $ ATBin ty Add t1 (ATUn ty Neg t2)
+desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $ ATUn ty Floor (ATBin (getType t1) Div t1 t2)
+desugarTerm (ATBin _ Neq t1 t2)   = desugarTerm $ tnot (t1 ==. t2)
+desugarTerm (ATBin _ Gt  t1 t2)   = desugarTerm $ t2 <. t1
+desugarTerm (ATBin _ Leq t1 t2)   = desugarTerm $ tnot (t2 <. t1)
+desugarTerm (ATBin _ Geq t1 t2)   = desugarTerm $ tnot (t1 <. t2)
+
+desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
+
+desugarTerm (ATTyOp ty op t)      = return $ DTTyOp ty op t
+desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
+
+-- XXX add a primitive set insertion function, desugar a literal set
+-- to repeated applications of it?
+desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
+
+-- XXX todo. Desugar to monadic operations.
+desugarTerm (ATContainerComp _ _ _) = error "desugar ContainerComp unimplemented"
+--   lunbind bqt $ \(qs, t) -> do
+--   dt <- desugarTerm t
+--   dqs <- desugarQuals qs
+--   return $ CListComp (bind dqs dt)
+
 desugarTerm (ATLet _ t) =
-  lunbind t $ \(bs, t2) -> desugarTerm $ desugarLet (fromTelescope bs) t2
-desugarTerm (ATCase _ bs) = CCase <$> mapM desugarBranch bs
+  lunbind t $ \(bs, t2) -> desugarLet (fromTelescope bs) t2
+
+desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
 -- | Desugar a let into application of a chain of lambdas.
-desugarLet :: [ABinding] -> ATerm -> ATerm
-desugarLet [] t = t
+desugarLet :: [ABinding] -> ATerm -> DSM DTerm
+desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
-  ATApp (getType t)
-    (ATAbs (TyArr (getType t1) TyUnit {- Wrong but shouldn't matter -})
-           (bind [(x, embed Nothing)] (desugarLet ls t))
-    )
-    t1
+  DTApp (getType t)
+    <$> (DTLam (TyArr (getType t1) (getType t))
+          <$> (bind (coerce x) <$> desugarLet ls t)
+        )
+    <*> desugarTerm t1
 
--- | Desugar a lambda from a list of argument names and the desugared
---   @Core@ expression for its body. It will be desugared to a chain
---   of one-argument lambdas.
-desugarLambda :: [Name ATerm] -> Core -> Core
-desugarLambda args c = go args
+-- | Desugar a lambda from a list of argument names and types and the
+--   desugared @DTerm@ expression for its body. It will be desugared
+--   to a chain of one-argument lambdas.
+mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
+mkLambda funty args c = go funty args
   where
-    go []     = c
-    go (x:xs) = CAbs (bind (coerce x) (go xs))
+    go _ []                    = c
+    go ty@(TyArr _ ty2) (x:xs) = DTLam ty (bind (coerce x) (go ty2 xs))
 
--- | Desugar a natural number. A separate function is needed in
---   case the number is of a finite type, in which case we must
---   mod it by its type.
-desugarNat :: Type -> Integer -> DSM Core
-desugarNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
-desugarNat _ x         = return $ CNum Fraction (x % 1)
+    go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
 
 -- | Desugar a tuple to nested pairs.
-desugarTuples :: [ATerm] -> DSM Core
-desugarTuples []     = error "Impossible! desugarTuples []"
-desugarTuples [t]    = desugarTerm t
-desugarTuples (t:ts) = CCons 0 <$> sequence [desugarTerm t, desugarTuples ts]
+desugarTuples :: Type -> [ATerm] -> DSM DTerm
+desugarTuples _ [t]                    = desugarTerm t
+desugarTuples ty@(TyPair _ ty2) (t:ts) = DTPair ty <$> desugarTerm t <*> desugarTuples ty2 ts
+desugarTuples ty ats
+  = error $ "Impossible! desugarTuples " ++ show ty ++ " " ++ show ats
 
--- | Desugar a unary operator application.
-desugarUOp :: Type -> UOp -> Core -> Core
--- Special ops for modular arithmetic in finite types
-desugarUOp (TyFin n) Neg c = COp (OMNeg n) [c]
-
-desugarUOp _ Neg    c      = COp ONeg    [c]
-desugarUOp _ Not    c      = COp ONot    [c]
-desugarUOp _ Fact   c      = COp OFact   [c]
-desugarUOp _ Sqrt   c      = COp OSqrt   [c]
-desugarUOp _ Lg     c      = COp OLg     [c]
-desugarUOp _ Floor  c      = COp OFloor  [c]
-desugarUOp _ Ceil   c      = COp OCeil   [c]
-desugarUOp _ Abs    c      = COp OAbs    [c]
-desugarUOp _ Size   c      = COp OSize   [c]
-
--- | Desugar a binary operator application.
---   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
-desugarBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
--- Special ops for modular arithmetic in finite types
-desugarBOp _ _ (TyFin n) Add     c1 c2 = COp (OMAdd n)  [c1, c2]
-desugarBOp _ _ (TyFin n) Mul     c1 c2 = COp (OMMul n)  [c1, c2]
-desugarBOp _ _ (TyFin n) Sub     c1 c2 = COp (OMSub n)  [c1, c2]
-desugarBOp _ _ (TyFin n) SSub    c1 c2 = COp (OMSSub n) [c1, c2]
-desugarBOp _ _ (TyFin n) Div     c1 c2 = COp (OMDiv n)  [c1, c2]
-desugarBOp _ _ (TyFin n) Exp     c1 c2 = COp (OMExp n)  [c1, c2]
-desugarBOp (TyFin n) _ _ Divides c1 c2 = COp (OMDivides n) [c1, c2]
-
-desugarBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-desugarBOp _  _ _ Sub     c1 c2 = COp OAdd [c1, COp ONeg [c2]]
-desugarBOp _  _ _ SSub    c1 c2 = COp OSSub [c1, c2]
-desugarBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
-desugarBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
-desugarBOp _  _ _ IDiv    c1 c2 = COp OFloor [COp ODiv [c1, c2]]
-desugarBOp _  _ _ Exp     c1 c2 = COp OExp [c1, c2]
-desugarBOp ty _ _ Eq      c1 c2 = COp (OEq ty) [c1, c2]
-desugarBOp ty _ _ Neq     c1 c2 = COp ONot [COp (OEq ty) [c1, c2]]
-desugarBOp ty _ _ Lt      c1 c2 = COp (OLt ty) [c1, c2]
-desugarBOp ty _ _ Gt      c1 c2 = COp (OLt ty) [c2, c1]
-desugarBOp ty _ _ Leq     c1 c2 = COp ONot [COp (OLt ty) [c2, c1]]
-desugarBOp ty _ _ Geq     c1 c2 = COp ONot [COp (OLt ty) [c1, c2]]
-desugarBOp _  _ _ And     c1 c2 = COp OAnd [c1, c2]
-desugarBOp _  _ _ Or      c1 c2 = COp OOr  [c1, c2]
-desugarBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
-desugarBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
-desugarBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
-
-desugarBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
-desugarBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
-desugarBOp (TySet ty) _ _ Union c1 c2        = COp (OUnion ty) [c1, c2]
-desugarBOp (TySet ty) _ _ Intersection c1 c2 = COp (OIntersection ty) [c1, c2]
-desugarBOp (TySet ty) _ _ Difference c1 c2   = COp (ODifference ty) [c1, c2]
-desugarBOp (TySet ty) _ _ Subset c1 c2           = COp (OSubset ty) [c1, c2]
-
-desugarBOp _  _ _ op _ _ = error $ "Impossible! " ++
-  "desugarBOp " ++ show op
-
-
--- | Desugar a type operator application.
-desugarTyOp :: TyOp -> Type -> Core
-desugarTyOp Enumerate ty = COp OEnum  [CType ty]
-desugarTyOp Count     ty = COp OCount [CType ty]
-
-desugarChain :: ATerm -> [ALink] -> DSM Core
-desugarChain _ [] = error "Can't happen! desugarChain _ []"
-desugarChain t1 [ATLink op t2] = desugarTerm (ATBin TyBool op t1 t2)
-desugarChain t1 (ATLink op t2 : links) = do
-  c1 <- desugarTerm  (ATBin TyBool op t1 t2)
-  c2 <- desugarChain t2 links
-  return $ desugarBOp TyBool TyBool TyBool And c1 c2
+expandChain :: ATerm -> [ALink] -> ATerm
+expandChain _ [] = error "Can't happen! expandChain _ []"
+expandChain t1 [ATLink op t2] = ATBin TyBool op t1 t2
+expandChain t1 (ATLink op t2 : links) =
+  ATBin TyBool And
+    (ATBin TyBool op t1 t2)
+    (expandChain t2 links)
 
 -- | Desugar a branch.
-desugarBranch :: ABranch -> DSM CBranch
-desugarBranch b =
+desugarBranch :: ABranch -> DSM DBranch
+desugarBranch b = do
   lunbind b $ \(ags, at) -> do
-  cgs <- desugarGuards ags
-  c <- desugarTerm at
-  return $ bind cgs c
+  dgs <- desugarGuards ags
+  d   <- desugarTerm at
+  return $ bind dgs d
 
 -- | Desugar a list of guards.
-desugarGuards :: Telescope AGuard -> DSM (Telescope (Embed Core, CPattern))
+desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
 desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
   where
+    desugarGuard :: AGuard -> DSM DGuard
     -- A Boolean guard is desugared to a pattern-match on @true@.
     desugarGuard (AGBool (unembed -> at)) = do
-      c <- desugarTerm at
-      return $ (embed c, CPCons (fromEnum True) [])
+      dt <- desugarTerm at
+      return $ DGPat (embed dt) (DPBool True)
     desugarGuard (AGPat (unembed -> at) p) = do
-      c <- desugarTerm at
-      return $ (embed c, desugarPattern p)
-
--- | Desugar a telescope of list comprehension qualifiers.
-desugarQuals :: Telescope AQual -> DSM (Telescope CQual)
-desugarQuals qs = toTelescope <$> mapM desugarQual (fromTelescope qs)
-
--- | Desugar a single list comprehension qualifier.  We just translate
---   it directly into its Core counterpart, recursively desugaring
---   terms.
-desugarQual :: AQual -> DSM CQual
-desugarQual (AQBind x (unembed -> t)) = do
-  dt <- desugarTerm t
-  return $ CQBind (coerce x) (embed dt)
-desugarQual (AQGuard (unembed -> t))  = do
-  dt <- desugarTerm t
-  return $ CQGuard (embed dt)
+      dt <- desugarTerm at
+      return $ DGPat (embed dt) (desugarPattern p)
 
 -- | Desugar a pattern.
-desugarPattern :: APattern -> CPattern
-desugarPattern (APVar x)      = CPVar (coerce x)
-desugarPattern APWild         = CPWild
-desugarPattern APUnit         = CPCons 0 []
-desugarPattern (APBool b)     = CPCons (fromEnum b) []
-desugarPattern (APTup p)      = desugarTuplePats p
-desugarPattern (APInj s p)    = CPCons (fromEnum s) [desugarPattern p]
-desugarPattern (APNat n)      = CPNat n
-desugarPattern (APSucc p)     = CPSucc (desugarPattern p)
-desugarPattern (APCons p1 p2) = CPCons 1 [desugarPattern p1, desugarPattern p2]
-desugarPattern (APList ps)    = foldr (\p cp -> CPCons 1 [desugarPattern p, cp])
-                                      (CPCons 0 [])
-                                      ps
+desugarPattern :: APattern -> DPattern
+desugarPattern (APVar ty x)      = DPVar ty (coerce x)
+desugarPattern (APWild ty)       = DPWild ty
+desugarPattern APUnit            = DPUnit
+desugarPattern (APBool b)        = DPBool b
+desugarPattern (APTup _ p)       = desugarTuplePats p
+desugarPattern (APInj ty s p)    = DPInj ty s (desugarPattern p)
+desugarPattern (APNat ty n)      = DPNat ty n
+desugarPattern (APSucc p)        = DPSucc (desugarPattern p)
+desugarPattern (APCons ty p1 p2) = DPCons ty (desugarPattern p1) (desugarPattern p2)
+desugarPattern (APList ty ps)    = foldr (DPCons eltTy . desugarPattern) (DPNil ty) ps
+  where
+    eltTy = case ty of
+      TyList e -> e
+      _        -> error $ "Impossible! APList with non-TyList " ++ show ty
 
-desugarTuplePats :: [APattern] -> CPattern
+-- XXX
+desugarTuplePats :: [APattern] -> DPattern
 desugarTuplePats []     = error "Impossible! desugarTuplePats []"
 desugarTuplePats [p]    = desugarPattern p
-desugarTuplePats (p:ps) = CPCons 0 [desugarPattern p, desugarTuplePats ps]
+desugarTuplePats (p:ps) = mkDPPair (desugarPattern p) (desugarTuplePats ps)
+  where
+    mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2
+
+-- XXX
+desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
+desugarContainer ty ListContainer es Nothing =
+  foldr (DTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
+desugarContainer ty c es mell =
+  DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell

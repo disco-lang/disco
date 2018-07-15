@@ -31,8 +31,9 @@
 module Disco.AST.Generic
        ( -- * Telescopes
 
-         Telescope (..)
+         Telescope (..), telCons
        , foldTelescope, mapTelescope
+       , traverseTelescope
        , toTelescope, fromTelescope
 
          -- * Utility types
@@ -146,6 +147,9 @@ data Telescope b where
 instance Alpha b => Alpha (Telescope b)
 instance Subst t b => Subst t (Telescope b)
 
+telCons :: Alpha b => b -> Telescope b -> Telescope b
+telCons b tb = TelCons (rebind b tb)
+
 -- | Fold a telescope given a combining function and a value for the
 --   empty telescope.
 foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
@@ -156,10 +160,15 @@ foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
 mapTelescope :: (Alpha a, Alpha b) => (a -> b) -> Telescope a -> Telescope b
 mapTelescope f = toTelescope . map f . fromTelescope
 
+-- | Traverse over a telescope.
+traverseTelescope
+  :: (Applicative f, Alpha a, Alpha b)
+  => (a -> f b) -> Telescope a -> f (Telescope b)
+traverseTelescope f = foldTelescope (\a ftb -> telCons <$> f a <*> ftb) (pure TelEmpty)
+
 -- | Convert a list to a telescope.
 toTelescope :: Alpha b => [b] -> Telescope b
-toTelescope []     = TelEmpty
-toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
+toTelescope = foldr telCons TelEmpty
 
 -- | Convert a telescope to a list.
 fromTelescope :: Alpha b => Telescope b -> [b]

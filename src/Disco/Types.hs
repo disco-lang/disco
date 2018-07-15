@@ -73,6 +73,8 @@ module Disco.Types
        , unpair
        , S
 
+       -- * HasType class
+       , HasType(..)
        )
        where
 
@@ -260,7 +262,9 @@ pattern TyList elTy = TyCon CList [elTy]
 pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
 
-{-# COMPLETE TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin, TyArr, TyPair, TySum, TyList #-}
+{-# COMPLETE
+      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin,
+      TyArr, TyPair, TySum, TyList, TySet #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
@@ -383,3 +387,13 @@ atomToTypeSubst = map (coerce *** TyAtom)
 
 uatomToTypeSubst :: S' UAtom -> S' Type
 uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)
+
+------------------------------------------------------------
+-- HasType class
+------------------------------------------------------------
+
+class HasType t where
+  getType :: t -> Type
+
+  setType :: Type -> t -> t
+  setType _ = id

@@ -27,7 +27,7 @@ import           Data.Traversable                 (for)
 
 import           Disco.AST.Core
 import           Disco.AST.Typed
-import           Disco.Desugar
+import           Disco.Compile
 import           Disco.Eval
 import           Disco.Interpret.Core
 import           Disco.Syntax.Operators           (BOp (..))
@@ -106,7 +106,7 @@ runTest n aprop
             True  -> return $ TestOK success
             False -> return $ TestEqualityFailure (getType at1) v1 v2 env
   where
-    evalTerm = rnf . runDSM . desugarTerm
+    evalTerm = rnf . compileTerm
 
 -- | Check whether a term looks like a top-level equality test.
 getEquatands :: ATerm -> Maybe (ATerm, ATerm)

@@ -155,19 +155,19 @@ whnfV :: Value -> Disco IErr Value
 
 -- If the value is a thunk, use its stored environment and evaluate
 -- the expression to WHNF.
-whnfV (VThunk c e)            = withEnv e $ whnf c
+whnfV (VThunk c e) = withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
 -- and reduce the result to WHNF.
-whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
+whnfV (VDelay imv) = imv >>= whnfV
 
 -- If it is an indirection, call 'whnfIndir' which will look up the
 -- value it points to and reduce it.
-whnfV (VIndir loc)            = whnfIndir loc
+whnfV (VIndir loc) = whnfIndir loc
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
-whnfV v                       = return v
+whnfV v            = return v
 
 
 -- | Reduce the value stored at the given location to WHNF.  We need a
@@ -248,7 +248,7 @@ deduplicateSet t (x:xs) = do
   return result
 
 elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
-elemOf _ _ [] = return False
+elemOf _ _ []     = return False
 elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
 
@@ -261,7 +261,7 @@ whnfApp (VClos c e) v =
   withEnv e           $ do
   extend x v          $ do
   whnf t
-whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')
+whnfApp (VFun f) v = rnfV v >>= \v' -> whnfV (f v')
 whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 
 ------------------------------------------------------------
@@ -612,7 +612,7 @@ modDiv n [c1,c2] = do
   VNum _ b <- whnf c2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
-    Nothing -> throwError DivByZero
+    Nothing           -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 
 modDivides :: Integer -> [Core] -> Disco IErr Value
@@ -738,9 +738,9 @@ multinomOp [c1, c2] = do
   return . vnum $ multinomial (numerator n) (asList ks) % 1
   where
     asList :: Value -> [Integer]
-    asList (VCons 0 _) = []
+    asList (VCons 0 _)              = []
     asList (VCons 1 [VNum _ k, ks]) = numerator k : asList ks
-    asList v = error $ "multinomOp.asList " ++ show v
+    asList v                        = error $ "multinomOp.asList " ++ show v
 
     multinomial :: Integer -> [Integer] -> Integer
     multinomial _ []     = 1
@@ -893,7 +893,7 @@ enumerate (TySum ty1 ty2)  =
 -- values from the enumeration of @ty2@, and make a function by
 -- zipping each one together with the values of @ty1@.
 enumerate (TyArr ty1 ty2)
-  | isEmptyTy ty1 = [VFun (ValFun $ \_ -> error "void!!")]
+  | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
   | isEmptyTy ty2 = []
   | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
   where
@@ -904,7 +904,7 @@ enumerate (TyArr ty1 ty2)
     -- association list.
     mkFun :: [Value] -> Value
     mkFun outs
-      = VFun . ValFun $ \v ->
+      = VFun $ \v ->
         snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
 
     -- A custom version of fromJust' so we get a better error message
@@ -931,7 +931,7 @@ decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
 decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
-decideEqForRnf (TyArr ty1 ty2) (VFun (ValFun f1)) (VFun (ValFun f2))
+decideEqForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 

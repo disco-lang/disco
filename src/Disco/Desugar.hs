@@ -46,6 +46,10 @@ import           Disco.Syntax.Operators
 import           Disco.Typecheck
 import           Disco.Types
 
+------------------------------------------------------------
+-- Desugaring monad
+------------------------------------------------------------
+
 -- | The desugaring monad.  Currently, needs only the ability to
 --   generate fresh names (to deal with binders).
 type DSM = FreshM
@@ -53,6 +57,13 @@ type DSM = FreshM
 -- | Run a computation in the desugaring monad.
 runDSM :: DSM a -> a
 runDSM = runFreshM
+
+------------------------------------------------------------
+-- ATerm DSL
+------------------------------------------------------------
+
+-- A tiny DSL for building certain ATerms, which is helpful for
+-- writing desugaring rules.
 
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
@@ -83,6 +94,10 @@ tif t = AGBool (embed t)
 
 nil :: Type -> ATerm
 nil ty = ATContainer (TyList ty) ListContainer [] Nothing
+
+------------------------------------------------------------
+-- Definition desugaring
+------------------------------------------------------------
 
 -- | Desugar a definition (of the form @f pat1 .. patn = term@, but
 --   without the name @f@ of the thing being defined) into a core
@@ -116,6 +131,10 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 
     mkGuards :: [(Name DTerm, Type)] -> [DPattern] -> Telescope DGuard
     mkGuards xs ps = toTelescope $ zipWith DGPat (map (\(x,ty) -> embed (DTVar ty x)) xs) ps
+
+------------------------------------------------------------
+-- Term desugaring
+------------------------------------------------------------
 
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM DTerm
@@ -190,13 +209,11 @@ desugarTerm (ATBin (TyFin n) op t1 t2)
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 
 desugarTerm (ATTyOp ty op t)      = return $ DTTyOp ty op t
+
 desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
--- XXX add a primitive set insertion function, desugar a literal set
--- to repeated applications of it?
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
--- XXX todo. Desugar to monadic operations.
 desugarTerm (ATContainerComp ty ListContainer bqt) = do
   (qs, t) <- unbind bqt
   desugarComp t qs
@@ -209,10 +226,16 @@ desugarTerm (ATLet _ t) = do
 
 desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
--- XXX
+------------------------------------------------------------
+-- Desugaring other stuff
+------------------------------------------------------------
+
+-- | Desugar a list comprehension.  First translate it into an
+--   expanded ATerm and then recursively desugar that.
 desugarComp :: ATerm -> Telescope AQual -> DSM DTerm
 desugarComp t qs = expandComp t qs >>= desugarTerm
 
+-- | Expand a list comprehension into an equivalent ATerm.
 expandComp :: ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
@@ -244,7 +267,14 @@ expandComp t (TelCons (unrebind -> (q,qs)))
           , nil (getType t) <==. []
           ]
 
--- | Desugar a let into application of a chain of lambdas.
+-- | Desugar a let into applications of a chain of nested lambdas.
+--   /e.g./
+--
+--     @let x = s, y = t in q@
+--
+--   desugars to
+--
+--     @(\x. (\y. q) t) s@
 desugarLet :: [ABinding] -> ATerm -> DSM DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
@@ -256,7 +286,13 @@ desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
 
 -- | Desugar a lambda from a list of argument names and types and the
 --   desugared @DTerm@ expression for its body. It will be desugared
---   to a chain of one-argument lambdas.
+--   to a chain of one-argument lambdas. /e.g./
+--
+--     @\x y z. q@
+--
+--   desugars to
+--
+--     @\x. \y. \z. q@
 mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
 mkLambda funty args c = go funty args
   where
@@ -265,13 +301,19 @@ mkLambda funty args c = go funty args
 
     go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
 
--- | Desugar a tuple to nested pairs.
+-- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm
 desugarTuples _ [t]                    = desugarTerm t
 desugarTuples ty@(TyPair _ ty2) (t:ts) = DTPair ty <$> desugarTerm t <*> desugarTuples ty2 ts
 desugarTuples ty ats
   = error $ "Impossible! desugarTuples " ++ show ty ++ " " ++ show ats
 
+-- | Expand a chain of comparisons into a sequence of binary
+--   comparisons combined with @and@.  Note we only expand it into
+--   another 'ATerm' (which will be recursively desugared), because
+--   @and@ itself also gets desugared.
+--
+--   For example, @a < b <= c > d@ becomes @a < b and b <= c and c > d@.
 expandChain :: ATerm -> [ALink] -> ATerm
 expandChain _ [] = error "Can't happen! expandChain _ []"
 expandChain t1 [ATLink op t2] = ATBin TyBool op t1 t2
@@ -280,7 +322,7 @@ expandChain t1 (ATLink op t2 : links) =
     (ATBin TyBool op t1 t2)
     (expandChain t2 links)
 
--- | Desugar a branch.
+-- | Desugar a branch of a case expression.
 desugarBranch :: ABranch -> DSM DBranch
 desugarBranch b = do
   (ags, at) <- unbind b
@@ -288,7 +330,9 @@ desugarBranch b = do
   d   <- desugarTerm at
   return $ bind dgs d
 
--- | Desugar a list of guards.
+-- | Desugar the list of guards in one branch of a case expression.
+--   Pattern guards essentially remain as they are; boolean guards get
+--   turned into pattern guards which match against @true@.
 desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
 desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
   where
@@ -300,6 +344,21 @@ desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
     desugarGuard (AGPat (unembed -> at) p) = do
       dt <- desugarTerm at
       return $ DGPat (embed dt) (desugarPattern p)
+
+-- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
+desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
+
+-- Literal list containers desugar to nested applications of cons.
+desugarContainer ty ListContainer es Nothing =
+  foldr (DTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
+
+-- All others simply turn into a @DTContainer@ constructor, though we
+-- might in the future consider replacing DTContainer by more
+-- primitive things. For example, we could add a primitive set
+-- insertion function and desugar to repeated applications of it.
+
+desugarContainer ty c es mell =
+  DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell
 
 -- | Desugar a pattern.
 desugarPattern :: APattern -> DPattern
@@ -318,17 +377,11 @@ desugarPattern (APList ty ps)    = foldr (DPCons eltTy . desugarPattern) (DPNil 
       TyList e -> e
       _        -> error $ "Impossible! APList with non-TyList " ++ show ty
 
--- XXX
+-- | Desugar a tuple pattern into nested pair patterns.  For example,
+--   the pattern @(a,b,c,d)@ turns into @(a,(b,(c,d)))@.
 desugarTuplePats :: [APattern] -> DPattern
 desugarTuplePats []     = error "Impossible! desugarTuplePats []"
 desugarTuplePats [p]    = desugarPattern p
 desugarTuplePats (p:ps) = mkDPPair (desugarPattern p) (desugarTuplePats ps)
   where
     mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2
-
--- XXX
-desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
-desugarContainer ty ListContainer es Nothing =
-  foldr (DTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
-desugarContainer ty c es mell =
-  DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell

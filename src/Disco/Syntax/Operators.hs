@@ -79,7 +79,7 @@ data BOp = Add     -- ^ Addition (@+@)
 -- | Type operators.
 data TyOp = Enumerate -- ^ List all values of a type
           | Count     -- ^ Count how many values there are of a type
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha UOp
 instance Alpha BOp

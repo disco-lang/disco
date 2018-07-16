@@ -344,6 +344,6 @@ instance HasType APattern where
   getType (APTup ty _)    = ty
   getType (APInj ty _ _)  = ty
   getType (APNat ty _)    = ty
-  getType (APSucc _)      = TyN -- XXX ?
+  getType (APSucc _)      = TyN
   getType (APCons ty _ _) = ty
   getType (APList ty _)   = ty

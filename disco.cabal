@@ -150,6 +150,7 @@ library
                        Disco.Typecheck.Unify
                        Disco.Types
                        Disco.Types.Rules
+                       Disco.Util
 
   other-extensions:
                        GADTs

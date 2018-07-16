@@ -229,7 +229,7 @@ type family X_TContainerComp e
 type family X_TAscr e
 type family X_Term e
 
--- | XXX comment me
+-- | The base generic AST representing terms in the disco language.
 data Term_ e where
 
   -- | A variable.

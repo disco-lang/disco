@@ -90,7 +90,8 @@ import           Disco.Types.Rules
 data Defn  = Defn (Name ATerm) [Type] Type [Clause]
   deriving (Show, Generic)
 
--- | XXX
+-- | A clause in a definition consists of a list of patterns (the LHS
+--   of the =) and a term (the RHS)
 type Clause = Bind [APattern] ATerm
 
 instance Subst Type Defn
@@ -730,7 +731,6 @@ infer (TLet l) = do
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.
-  -- XXX: WHAT should I do since there will no longer be an ATAsrc
 infer (TAscr t ty) = do
   (at, cst) <- checkSigma t ty
   return (at, cst)

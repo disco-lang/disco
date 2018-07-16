@@ -124,7 +124,8 @@ data Value where
   --   be run later.
   VDelay_  :: ValDelay -> Value
 
-  -- XXX
+  -- | A literal set, containing a finite list of (perhaps only
+  --   partially evaluated) values.
   VSet :: [Value] -> Value
   deriving Show
 

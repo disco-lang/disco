@@ -95,6 +95,9 @@ tif t = AGBool (embed t)
 nil :: Type -> ATerm
 nil ty = ATContainer (TyList ty) ListContainer [] Nothing
 
+tsingleton :: ATerm -> ATerm
+tsingleton t = ATContainer (TyList (getType t)) ListContainer [t] Nothing
+
 ------------------------------------------------------------
 -- Definition desugaring
 ------------------------------------------------------------
@@ -152,22 +155,30 @@ desugarTerm (ATInj ty s t)       =
 desugarTerm (ATNat ty n)         = return $ DTNat ty n
 desugarTerm (ATRat r)            = return $ DTRat r
 
-  -- XXX Turn into std library defn
+-- not t ==> {? false if t, true otherwise ?}
+-- This should be turned into a standard library definition.
 desugarTerm (ATUn _ Not t)       =
   desugarTerm $
     ATCase TyBool
       [ fls <==. [AGBool (embed t)]
       , tru <==. []
       ]
+
+-- Desugar negation on TyFin to a negation on TyZ followed by a mod.
+-- See the comments below re: Add and Mul on TyFin.
 desugarTerm (ATUn (TyFin n) Neg t) =
   desugarTerm $ ATBin (TyFin n) Mod (ATUn TyZ Neg t) (ATNat TyN n)
 
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 
-  -- XXX turn this into a std library defn
+-- Implies, and, or should all be turned into a standard library
+-- definition.  This will require first (1) adding support for
+-- modules/a standard library, including (2) the ability to define
+-- infix operators.
+
+-- (t1 implies t2) ==> (not t1 or t2)
 desugarTerm (ATBin _ Impl t1 t2) = desugarTerm $ tnot t1 ||. t2
 
-  -- XXX turn this into a std library defn
 desugarTerm (ATBin _ And t1 t2)  = do
   -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
   desugarTerm $
@@ -199,12 +210,36 @@ desugarTerm (ATBin _ Gt  t1 t2)   = desugarTerm $ t2 <. t1
 desugarTerm (ATBin _ Leq t1 t2)   = desugarTerm $ tnot (t2 <. t1)
 desugarTerm (ATBin _ Geq t1 t2)   = desugarTerm $ tnot (t1 <. t2)
 
+-- Addition and multiplication on TyFin just desugar to the operation
+-- followed by a call to mod.
 desugarTerm (ATBin (TyFin n) op t1 t2)
   | op `elem` [Add, Mul]
   = desugarTerm $
       ATBin (TyFin n) Mod
         (ATBin TyN op t1 t2)
         (ATNat TyN n)
+    -- Note the typing of this is a bit funny: t1 and t2 presumably
+    -- have type (TyFin n), and now we are saying that applying 'op'
+    -- to them results in TyN, then applying 'mod' results in a TyFin
+    -- n again.  Using TyN as the intermediate result is necessary so
+    -- we don't fall into an infinite desugaring loop, and intuitively
+    -- makes sense because the idea is that we first do the operation
+    -- as a normal operation in "natural land" and then do a mod.
+    --
+    -- We will have to think carefully about how the linting
+    -- typechecker for DTerms should treat TyN and TyFin.  Probably
+    -- something like this will work: TyFin is a subtype of TyN, and
+    -- TyN can be turned into TyFin with mod.  (We don't want such
+    -- typing rules in the surface disco language itself because
+    -- implicit coercions from TyFin -> N don't commute with
+    -- operations like addition and multiplication, e.g. 3+3 yields 1
+    -- if we add them in Z5 and then coerce to Nat, but 6 if we first
+    -- coerce both and then add.
+
+-- Desugar normal binomial coefficient (n choose k) to a multinomial
+-- coefficient with a singleton list, (n choose [k]).
+desugarTerm (ATBin ty Choose t1 t2)
+  | getType t2 == TyN = desugarTerm $ ATBin ty Choose t1 (tsingleton t2)
 
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 
@@ -239,7 +274,7 @@ desugarComp t qs = expandComp t qs >>= desugarTerm
 expandComp :: ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp t TelEmpty = return $ ATContainer (TyList (getType t)) ListContainer [t] Nothing
+expandComp t TelEmpty = return $ tsingleton t
 
 -- [ t | q, qs ] = ...
 expandComp t (TelCons (unrebind -> (q,qs)))

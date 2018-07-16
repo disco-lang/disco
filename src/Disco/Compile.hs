@@ -24,19 +24,33 @@ import           Disco.Desugar
 import           Disco.Syntax.Operators
 import           Disco.Typecheck
 import           Disco.Types
+import           Disco.Util
 
 import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
 
--- For convenience
+------------------------------------------------------------
+-- Convenience operations
+------------------------------------------------------------
+
+-- | Compile a typechecked term ('ATerm') directly to a 'Core' term,
+--   by desugaring and then compiling.
 compileTerm :: ATerm -> Core
 compileTerm = runFreshM . compileDTerm . runDSM . desugarTerm
 
+-- | Compile a typechecked definition ('Defn') directly to a 'Core' term,
+--   by desugaring and then compiling.
 compileDefn :: Defn -> Core
 compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
 
+------------------------------------------------------------
+-- Compiling terms
+------------------------------------------------------------
+
+-- | Compile a typechecked, desugared 'DTerm' to an untyped 'Core'
+--   term.
 compileDTerm :: DTerm -> FreshM Core
 compileDTerm (DTVar _ x)  = return $ CVar (coerce x)
 compileDTerm DTUnit       = return $ CCons 0 []
@@ -61,13 +75,19 @@ compileDTerm (DTInj _ s t)
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 
-compileDTerm (DTUn ty op t)
-  = compileUOp ty op <$> compileDTerm t
+compileDTerm (DTUn _ op t)
+  = compileUOp op <$> compileDTerm t
 
 compileDTerm (DTBin ty op t1 t2)
   = compileBOp (getType t1) (getType t2) ty op <$> compileDTerm t1 <*> compileDTerm t2
 
-compileDTerm (DTTyOp _ op ty) = return $ COp (compileTyOp op) [CType ty]
+compileDTerm (DTTyOp _ op ty) = return $ COp (tyOps ! op) [CType ty]
+  where
+    tyOps = M.fromList
+      [ Enumerate ==> OEnum
+      , Count     ==> OCount
+      ]
+
 compileDTerm (DTNil _)        = return $ CCons 0 []
 
 compileDTerm (DTContainer _ ListContainer ds (Just ell))
@@ -76,6 +96,8 @@ compileDTerm (DTContainer _ ListContainer ds (Just ell))
 compileDTerm (DTContainer (TySet eltTy) SetContainer ds Nothing)
   = CoreSet eltTy <$> mapM compileDTerm ds
 
+------------------------------------------------------------
+
 -- | Compile a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
@@ -83,20 +105,29 @@ compileNat :: Type -> Integer -> FreshM Core
 compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
 compileNat _         x = return $ CNum Fraction (x % 1)
 
--- XXX
+------------------------------------------------------------
+-- Case expressions
+------------------------------------------------------------
+
+-- | Compile a desugared branch.  This does very little actual work, just
+--   translating directly from one AST to another.
 compileBranch :: DBranch -> FreshM CBranch
 compileBranch b = do
   (gs, d) <- unbind b
   bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
 
--- XXX
+-- | Compile a desugared guard.
 compileGuard :: DGuard -> FreshM (Embed Core, CPattern)
 compileGuard (DGPat (unembed -> d) dpat) =
   (,)
     <$> (embed <$> compileDTerm d)
     <*> compilePattern dpat
 
--- XXX
+------------------------------------------------------------
+-- Patterns
+------------------------------------------------------------
+
+-- | Compile a desugared pattern.  Turns all constructors into CPCons.
 compilePattern :: DPattern -> FreshM CPattern
 compilePattern (DPVar _ x)      = return $ CPVar (coerce x)
 compilePattern (DPWild _)       = return CPWild
@@ -109,13 +140,15 @@ compilePattern (DPSucc p)       = CPSucc <$> compilePattern p
 compilePattern (DPNil _)        = return $ CPCons 0 []
 compilePattern (DPCons _ p1 p2) = CPCons 1 <$> mapM compilePattern [p1,p2]
 
--- | Compile a unary operator application.
-compileUOp :: Type -> UOp -> Core -> Core
+------------------------------------------------------------
+-- Unary and binary operators
+------------------------------------------------------------
 
--- XXX
--- Special ops for modular arithmetic in finite types
-compileUOp _ op c = COp (coreUOps ! op) [c]
+-- | Compile a unary operator application.
+compileUOp :: UOp -> Core -> Core
+compileUOp op c = COp (coreUOps ! op) [c]
   where
+    -- Just look up the corresponding core operator.
     coreUOps = M.fromList $
       [ Neg   ==> ONeg
       , Fact  ==> OFact
@@ -126,38 +159,81 @@ compileUOp _ op c = COp (coreUOps ! op) [c]
       , Abs   ==> OAbs
       ]
 
----   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@
+-- | Compile a binary operator application.  This function needs to
+--   know the types of the arguments and result since some operators
+--   are overloaded and compile to different code depending on their
+--   type.
+--
+--  @arg1 ty -> arg2 ty -> result ty -> op -> arg1 -> arg2 -> result@
 compileBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
--- Special ops for modular arithmetic in finite types
-compileBOp _ _ (TyFin n) op     c1 c2
-  | op `elem` [Div, Exp]
-  = COp (omOp op n) [c1, c2]
+
+-- First, compile some operators specially for modular arithmetic.
+-- Most operators on TyFun (add, mul, sub, etc.) have already been
+-- desugared to an operation followed by a mod.  The only operators
+-- here are the ones that have a special runtime behavior for Zn that
+-- can't be implemented in terms of other, existing operators:
+--
+--   - Division on Zn needs to find modular inverses.
+--   - Divisibility testing on Zn similarly needs to find a gcd etc.
+--   - Exponentiation on Zn could in theory be implemented as a normal
+--     exponentiation on naturals followed by a mod, but that would be
+--     silly and inefficient.  Instead we compile to a special modular
+--     exponentiation operator which takes mods along the way.  Also,
+--     negative powers have similar requirements to division.
+--
+-- We match on the type of arg1 because that is the only one which
+-- will consistently be TyFin in the case of Div, Exp, and Divides.
+compileBOp (TyFin n) _ _ op c1 c2
+  | op `elem` [Div, Exp, Divides]
+  = COp ((omOps ! op) n) [c1, c2]
   where
-    omOp Div = OMDiv
-    omOp Exp = OMExp
-compileBOp (TyFin n) _ _ Divides c1 c2 = COp (OMDivides n) [c1, c2]
+    omOps = M.fromList
+      [ Div     ==> OMDiv
+      , Exp     ==> OMExp
+      , Divides ==> OMDivides
+      ]
 
-compileBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-compileBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
-compileBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
-compileBOp _  _ _ Exp     c1 c2 = COp OExp [c1, c2]
-compileBOp ty _ _ Eq      c1 c2 = COp (OEq ty) [c1, c2]
-compileBOp ty _ _ Lt      c1 c2 = COp (OLt ty) [c1, c2]
-compileBOp _  _ _ Mod     c1 c2 = COp OMod [c1, c2]
-compileBOp _  _ _ Divides c1 c2 = COp ODivides [c1, c2]
-compileBOp _  _ _ Cons    c1 c2 = CCons 1 [c1, c2]
+-- Some regular arithmetic operations that just translate straightforwardly.
+compileBOp _ _ _ op c1 c2
+  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
+  = COp (regularOps ! op) [c1, c2]
+  where
+    regularOps = M.fromList
+      [ Add     ==> OAdd
+      , Mul     ==> OMul
+      , Div     ==> ODiv
+      , Exp     ==> OExp
+      , Mod     ==> OMod
+      , Divides ==> ODivides
+      , Choose  ==> OMultinom
+      ]
 
-compileBOp _ TyN _ Choose c1 c2 = COp OBinom [c1, c2]
-compileBOp _ _   _ Choose c1 c2 = COp OMultinom [c1, c2]
-compileBOp (TySet ty) _ _ Union c1 c2        = COp (OUnion ty) [c1, c2]
-compileBOp (TySet ty) _ _ Intersection c1 c2 = COp (OIntersection ty) [c1, c2]
-compileBOp (TySet ty) _ _ Difference c1 c2   = COp (ODifference ty) [c1, c2]
-compileBOp (TySet ty) _ _ Subset c1 c2           = COp (OSubset ty) [c1, c2]
+-- Eq and Lt need to remember the type of the things being compared so
+-- it can work properly at runtime. (Eq and Lt are overloaded:
+-- essentially instead of storing a dictionary here as Haskell might,
+-- we just store the type itself, and compute the comparison function
+-- in a type-directed way; see Disco.Interpret.Core.decideEqFor and
+-- decideOrdFor.)
+compileBOp ty _ _ Eq c1 c2 = COp (OEq ty) [c1, c2]
+compileBOp ty _ _ Lt c1 c2 = COp (OLt ty) [c1, c2]
 
-compileBOp _  _ _ op _ _ = error $ "Impossible! " -- XXX
+-- The Cons binary operator compiles to an application of a
+-- constructor.
+compileBOp _ _ _ Cons c1 c2 = CCons 1 [c1, c2]
 
-compileTyOp Enumerate = OEnum
-compileTyOp Count     = OCount
+-- Operations on sets compile straightforwardly, except that they also
+-- need to store the element type so they can compare the elements
+-- appropriately.
+compileBOp (TySet ty) _ _ op c1 c2
+  | op `elem` [Union, Intersection, Difference, Subset]
+  = COp ((setOps ! op) ty) [c1, c2]
+  where
+    setOps = M.fromList
+      [ Union        ==> OUnion
+      , Intersection ==> OIntersection
+      , Difference   ==> ODifference
+      , Subset       ==> OSubset
+      ]
 
--- XXX
-(==>) = (,)
+compileBOp ty1 ty2 resTy op c1 c2
+  = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op, c1, c2)

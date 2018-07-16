@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -231,24 +232,31 @@ pattern AGPat embedt pat = GPat_ () embedt pat
 
 type APattern = Pattern_ TY
 
-type instance X_PVar     TY = Type
-type instance X_PWild    TY = Type
+-- We have to use Embed Type because we don't want any type variables
+-- inside the types being treated as binders!
+
+type instance X_PVar     TY = Embed Type
+type instance X_PWild    TY = Embed Type
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
-type instance X_PTup     TY = Type
-type instance X_PInj     TY = Type
-type instance X_PNat     TY = Type
+type instance X_PTup     TY = Embed Type
+type instance X_PInj     TY = Embed Type
+type instance X_PNat     TY = Embed Type
 type instance X_PSucc    TY = ()
-type instance X_PCons    TY = Type
-type instance X_PList    TY = Type
+type instance X_PCons    TY = Embed Type
+type instance X_PList    TY = Embed Type
 
 type instance X_Pattern  TY = ()
 
 pattern APVar :: Type -> Name ATerm -> APattern
-pattern APVar ty name = PVar_ ty name
+pattern APVar ty name <- PVar_ (unembed -> ty) name
+  where
+    APVar ty name = PVar_ (embed ty) name
 
 pattern APWild :: Type -> APattern
-pattern APWild ty = PWild_ ty
+pattern APWild ty <- PWild_ (unembed -> ty)
+  where
+    APWild ty = PWild_ (embed ty)
 
 pattern APUnit :: APattern
 pattern APUnit = PUnit_ ()
@@ -257,22 +265,32 @@ pattern APBool :: Bool -> APattern
 pattern APBool  b = PBool_ () b
 
 pattern APTup  :: Type -> [APattern] -> APattern
-pattern APTup ty lp = PTup_ ty lp
+pattern APTup ty lp <- PTup_ (unembed -> ty) lp
+  where
+    APTup ty lp = PTup_ (embed ty) lp
 
 pattern APInj  :: Type -> Side -> APattern -> APattern
-pattern APInj ty s p = PInj_ ty s p
+pattern APInj ty s p <- PInj_ (unembed -> ty) s p
+  where
+    APInj ty s p = PInj_ (embed ty) s p
 
 pattern APNat  :: Type -> Integer -> APattern
-pattern APNat ty n = PNat_ ty n
+pattern APNat ty n <- PNat_ (unembed -> ty) n
+  where
+    APNat ty n = PNat_ (embed ty) n
 
 pattern APSucc :: APattern -> APattern
 pattern APSucc p = PSucc_ () p
 
 pattern APCons :: Type -> APattern -> APattern -> APattern
-pattern APCons ty p1 p2 = PCons_ ty p1 p2
+pattern APCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
+  where
+    APCons ty p1 p2 = PCons_ (embed ty) p1 p2
 
 pattern APList :: Type -> [APattern] -> APattern
-pattern APList ty lp = PList_ ty lp
+pattern APList ty lp <- PList_ (unembed -> ty) lp
+  where
+    APList ty lp = PList_ (embed ty) lp
 
 {-# COMPLETE APVar, APWild, APUnit, APBool, APTup, APInj, APNat,
     APSucc, APCons, APList #-}

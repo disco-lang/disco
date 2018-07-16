@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -182,27 +183,31 @@ pattern DGPat embedt pat = GPat_ () embedt pat
 
 type DPattern = Pattern_ DS
 
-type instance X_PVar     DS = Type
-type instance X_PWild    DS = Type
+type instance X_PVar     DS = Embed Type
+type instance X_PWild    DS = Embed Type
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()
 type instance X_PTup     DS = Void
-type instance X_PInj     DS = Type
-type instance X_PNat     DS = Type
+type instance X_PInj     DS = Embed Type
+type instance X_PNat     DS = Embed Type
 type instance X_PSucc    DS = ()
-type instance X_PCons    DS = Type
+type instance X_PCons    DS = Embed Type
 type instance X_PList    DS = Void
 
 type instance X_Pattern  DS =
   Either
-    (Type, DPattern, DPattern) -- DPair
-    (Type)                     -- DNil
+    (Embed Type, DPattern, DPattern) -- DPair
+    (Embed Type)                     -- DNil
 
 pattern DPVar :: Type -> Name DTerm -> DPattern
-pattern DPVar ty name = PVar_ ty name
+pattern DPVar ty name <- PVar_ (unembed -> ty) name
+  where
+    DPVar ty name = PVar_ (embed ty) name
 
 pattern DPWild :: Type -> DPattern
-pattern DPWild ty = PWild_ ty
+pattern DPWild ty <- PWild_ (unembed -> ty)
+  where
+    DPWild ty = PWild_ (embed ty)
 
 pattern DPUnit :: DPattern
 pattern DPUnit = PUnit_ ()
@@ -211,22 +216,32 @@ pattern DPBool :: Bool -> DPattern
 pattern DPBool  b = PBool_ () b
 
 pattern DPPair  :: Type -> DPattern -> DPattern -> DPattern
-pattern DPPair ty p1 p2 = XPattern_ (Left (ty, p1, p2))
+pattern DPPair ty p1 p2 <- XPattern_ (Left ((unembed -> ty), p1, p2))
+  where
+    DPPair ty p1 p2 = XPattern_ (Left ((embed ty), p1, p2))
 
 pattern DPInj  :: Type -> Side -> DPattern -> DPattern
-pattern DPInj ty s p = PInj_ ty s p
+pattern DPInj ty s p <- PInj_ (unembed -> ty) s p
+  where
+    DPInj ty s p = PInj_ (embed ty) s p
 
 pattern DPNat  :: Type -> Integer -> DPattern
-pattern DPNat ty n = PNat_ ty n
+pattern DPNat ty n <- PNat_ (unembed -> ty) n
+  where
+    DPNat ty n = PNat_ (embed ty) n
 
 pattern DPSucc :: DPattern -> DPattern
 pattern DPSucc p = PSucc_ () p
 
 pattern DPCons :: Type -> DPattern -> DPattern -> DPattern
-pattern DPCons ty p1 p2 = PCons_ ty p1 p2
+pattern DPCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
+  where
+    DPCons ty p1 p2 = PCons_ (embed ty) p1 p2
 
 pattern DPNil :: Type -> DPattern
-pattern DPNil ty = XPattern_ (Right ty)
+pattern DPNil ty <- XPattern_ (Right (unembed -> ty))
+  where
+    DPNil ty = XPattern_ (Right (embed ty))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPPair, DPInj, DPNat,
     DPSucc, DPNil, DPCons #-}

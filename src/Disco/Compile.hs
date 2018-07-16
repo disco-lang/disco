@@ -119,7 +119,6 @@ compileUOp _ op c = COp (coreUOps ! op) [c]
   where
     coreUOps = M.fromList $
       [ Neg   ==> ONeg
-      , Not   ==> ONot
       , Fact  ==> OFact
       , Sqrt  ==> OSqrt
       , Lg    ==> OLg

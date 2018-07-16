@@ -48,7 +48,6 @@ import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.List                          (find)
 import qualified Data.Map                           as M
-import           Data.Maybe                         (fromJust)
 import           Data.Monoid
 import           Data.Ratio
 
@@ -586,21 +585,6 @@ uNumOp' f [c] = do
   VNum d <$> f m
 uNumOp' _ _ = error "Impossible! Second argument to uNumOp' has length /= 1"
 
--- | For performing a modular unary operation within a finite type
-modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> Disco IErr Value
-modArithUn op n [c] = do
-  VNum _ r <- whnf c
-  modOp (op r) (n % 1)
-modArithUn _ _ _ = error "Impossible! modArithUn error (too many Cores)"
-
--- | For performing a modular binary operation within a finite type.
-modArithBin :: (Rational -> Rational -> Rational) -> Integer -> [Core] -> Disco IErr Value
-modArithBin op n [c1,c2] = do
-  VNum _ r1 <- whnf c1
-  VNum _ r2 <- whnf c2
-  modOp (op r1 r2) (n % 1)
-modArithBin _ _ _ = error "Impossible! modArithBin error (wrong # of Cores)"
-
 -- | For performing modular division within a finite type.
 modDiv :: Integer -> [Core] -> Disco IErr Value
 modDiv n [c1,c2] = do
@@ -692,13 +676,6 @@ divOp :: Rational -> Rational -> Disco IErr Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
 
--- | Perform a saturating subtraction on two natural numbers. If the second argument
---   is greater than the first, return 0.
-ssubOp :: Rational -> Rational -> Rational
-ssubOp m n
-  | n > m     = 0
-  | otherwise = m - n
-
 -- | Perform a mod operation; throw division by zero error if the
 --   second argument is zero.  Although this function takes two
 --   'Rational' arguments, note that if the disco program typechecks
@@ -709,12 +686,6 @@ modOp m n
   | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
-
--- | Perform a boolean operation.
-boolOp :: (Bool -> Bool -> Bool) -> [Core] -> Disco IErr Value
-boolOp (#) cs = do
-  [VCons i [], VCons j []] <- mapM whnf cs
-  return . mkEnum $ toEnum i # toEnum j
 
 -- | Test whether one number divides another.
 divides :: Rational -> Rational -> Bool
@@ -751,13 +722,6 @@ fact :: Rational -> Disco IErr Rational
 fact (numerator -> n)
   | n > fromIntegral (maxBound :: Int) = throwError Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
-
--- | Perform boolean negation.
-notOp :: [Core] -> Disco IErr Value
-notOp [c] = do
-  VCons i [] <- whnf c
-  return . mkEnum . not . toEnum $ i
-notOp _ = error "Impossible! notOp called on list of length /= 1"
 
 ------------------------------------------------------------
 -- Equality testing

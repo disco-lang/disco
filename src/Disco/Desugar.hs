@@ -140,6 +140,9 @@ desugarTerm (ATUn _ Not t)       =
       [ fls <==. [AGBool (embed t)]
       , tru <==. []
       ]
+desugarTerm (ATUn (TyFin n) Neg t) =
+  desugarTerm $ ATBin (TyFin n) Mod (ATUn TyZ Neg t) (ATNat TyN n)
+
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 
   -- XXX turn this into a std library defn
@@ -161,11 +164,28 @@ desugarTerm (ATBin _ Or t1 t2) = do
       , t2  <==. []
       ]
 desugarTerm (ATBin ty Sub t1 t2)  = desugarTerm $ ATBin ty Add t1 (ATUn ty Neg t2)
+desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
+  -- t1 -. t2 ==> {? 0 if t1 < t2, t1 - t2 otherwise ?}
+  ATCase ty
+    [ ATNat ty 0         <==. [tif (t1 <. t2)]
+    , ATBin ty Sub t1 t2 <==. []
+      -- NOTE, the above is slightly bogus since the whole point of SSub is
+      -- because we can't subtract naturals.  However, this will
+      -- immediately desugar to a DTerm.  When we write a linting
+      -- typechecker for DTerms we should allow subtraction on TyN!
+    ]
 desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $ ATUn ty Floor (ATBin (getType t1) Div t1 t2)
 desugarTerm (ATBin _ Neq t1 t2)   = desugarTerm $ tnot (t1 ==. t2)
 desugarTerm (ATBin _ Gt  t1 t2)   = desugarTerm $ t2 <. t1
 desugarTerm (ATBin _ Leq t1 t2)   = desugarTerm $ tnot (t2 <. t1)
 desugarTerm (ATBin _ Geq t1 t2)   = desugarTerm $ tnot (t1 <. t2)
+
+desugarTerm (ATBin (TyFin n) op t1 t2)
+  | op `elem` [Add, Mul]
+  = desugarTerm $
+      ATBin (TyFin n) Mod
+        (ATBin TyN op t1 t2)
+        (ATNat TyN n)
 
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 

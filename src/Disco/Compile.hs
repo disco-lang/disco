@@ -114,7 +114,6 @@ compileUOp :: Type -> UOp -> Core -> Core
 
 -- XXX
 -- Special ops for modular arithmetic in finite types
-compileUOp (TyFin n) Neg c = COp (OMNeg n) [c]
 compileUOp _ op c = COp (coreUOps ! op) [c]
   where
     coreUOps = M.fromList $
@@ -131,19 +130,14 @@ compileUOp _ op c = COp (coreUOps ! op) [c]
 compileBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
 -- Special ops for modular arithmetic in finite types
 compileBOp _ _ (TyFin n) op     c1 c2
-  | op `elem` [Add, Mul, Sub, SSub, Div, Exp]
+  | op `elem` [Div, Exp]
   = COp (omOp op n) [c1, c2]
   where
-    omOp Add  = OMAdd
-    omOp Mul  = OMMul
-    omOp Sub  = OMSub
-    omOp SSub = OMSSub
-    omOp Div  = OMDiv
-    omOp Exp  = OMExp
+    omOp Div = OMDiv
+    omOp Exp = OMExp
 compileBOp (TyFin n) _ _ Divides c1 c2 = COp (OMDivides n) [c1, c2]
 
 compileBOp _  _ _ Add     c1 c2 = COp OAdd [c1,c2]
-compileBOp _  _ _ SSub    c1 c2 = COp OSSub [c1, c2]
 compileBOp _  _ _ Mul     c1 c2 = COp OMul [c1, c2]
 compileBOp _  _ _ Div     c1 c2 = COp ODiv [c1, c2]
 compileBOp _  _ _ Exp     c1 c2 = COp OExp [c1, c2]

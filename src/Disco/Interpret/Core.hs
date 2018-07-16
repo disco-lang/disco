@@ -474,7 +474,6 @@ noMatch = return Nothing
 whnfOp :: Op -> [Core] -> Disco IErr Value
 whnfOp OAdd               = numOp (+)
 whnfOp ONeg               = uNumOp negate
-whnfOp OSSub              = numOp ssubOp
 whnfOp OSqrt              = uNumOp integerSqrt
 whnfOp OLg                = lgOp
 whnfOp OFloor             = uNumOp floorOp
@@ -493,16 +492,13 @@ whnfOp (OEq ty)           = eqOp ty
 whnfOp (OLt ty)           = ltOp ty
 whnfOp OEnum              = enumOp
 whnfOp OCount             = countOp
--- Modular operations, for finite types
 
-whnfOp (OMAdd n)          = modArithBin (+) n
-whnfOp (OMMul n)          = modArithBin (*) n
-whnfOp (OMSub n)          = modArithBin (-) n
-whnfOp (OMSSub n)         = modArithBin ssubOp n
-whnfOp (OMNeg n)          = modArithUn negate n
+-- Modular operations, for finite types
 whnfOp (OMDiv n)          = modDiv n
 whnfOp (OMExp n)          = modExp n
 whnfOp (OMDivides n)      = modDivides n
+
+-- Set operations
 whnfOp (OSize)            = setSize
 whnfOp (OUnion ty)        = setUnion ty
 whnfOp (OIntersection ty) = setIntersection ty

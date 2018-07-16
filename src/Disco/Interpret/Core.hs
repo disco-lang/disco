@@ -571,17 +571,22 @@ modDivides n [c1,c2] = do
 
 modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
 
-
 -- | For performing modular exponentiation within a finite type.
 modExp :: Integer -> [Core] -> Disco IErr Value
 modExp n [c1,c2] = do
   VNum _ r1 <- whnf c1
   VNum _ r2 <- whnf c2
-  let a = numerator r1
-  let b = numerator r2
-  let v = powSomeMod (a `modulo` fromInteger n) b
-  case v of
-    SomeMod v' -> return $ vnum (getVal v' % 1)
+  let base = numerator r1 `modulo` fromInteger n
+      ma = if (numerator r2 >= 0)
+             then Just base
+             else invertSomeMod base
+      b = abs (numerator r2)
+  case ma of
+    Nothing -> throwError DivByZero
+    Just a  ->
+      case powSomeMod a b of
+        SomeMod v' -> return $ vnum (getVal v' % 1)
+        InfMod {}  -> error "Impossible, got InfMod in modExp"
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.

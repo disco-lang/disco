@@ -65,9 +65,6 @@ data Core where
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
-  -- | A list comprehension.
-  CListComp :: Bind (Telescope CQual) Core -> Core
-
   -- | A list with an ellipsis.
   CEllipsis :: [Core] -> Ellipsis Core -> Core
 

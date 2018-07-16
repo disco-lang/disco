@@ -222,12 +222,8 @@ whnf (CApp str c1 c2) = do
   -- Finally, call 'whnfApp' to do the application.
   whnfApp v1 v2
 
--- List comprehensions and ellipses, case expressions, and operators
+-- Ellipses, case expressions, and operators
 -- all have their own function to do reduction.
-whnf (CListComp b)  =
-  lunbind b $ \(qs, t) -> do
-    lcmp <- expandComp t (fromTelescope qs)
-    whnfV lcmp
 whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CCase bs)     = whnfCase bs
 whnf (COp op cs)    = whnfOp op cs
@@ -303,34 +299,6 @@ vconcat = vfoldr vappend (VCons 0 [])
 -- | Lazy map on 'Value' lists, implemented via 'vfoldr'.
 vmap :: (Value -> Disco IErr Value) -> Value -> Disco IErr Value
 vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
-
---------------------------------------------------
--- List comprehensions
-
--- | Expand a list comprehension to a lazy 'Value' list.
-expandComp :: Core -> [CQual] -> Disco IErr Value
-
--- [ t | ] = [ t ]
-expandComp t [] = do
-  c <- mkThunk t
-  return $ VCons 1 [c, VCons 0 []]
-
--- [ t | q, qs ] = ...
-expandComp t (q:qs) = do
-  case q of
-
-    -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
-    CQBind x (unembed -> lst) -> do
-      c <- mkThunk lst
-      vmap (\v -> extend x v $ expandComp t qs) c >>= vconcat
-
-    -- [ t | b, qs ] = if b then [ t | qs ] else []
-    CQGuard (unembed -> g)    -> do
-      v <- whnf g
-      case v of
-        VCons 0 [] {- False -} -> return $ VCons 0 []  {- Nil -}
-        VCons 1 [] {- True  -} -> expandComp t qs
-        _ -> error $ "Impossible! Got " ++ show v ++ " in expandComp CQGuard."
 
 --------------------------------------------------
 -- Polynomial sequences [a,b,c,d .. e]

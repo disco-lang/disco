@@ -489,13 +489,13 @@ infer (TRat r)      = return $ (ATRat r, CTrue)
 
 -- To infer an injection has a sum type, recursively check the
 -- relevant type, and generate a type
-infer lt@(TInj L t) = do
+infer (TInj L t) = do
   (at, cst) <- infer t
   let ty = getType at
   tyv <- freshTy
   return (ATInj (TySum ty tyv) L at, cst)
 
-infer lt@(TInj R t) = do
+infer (TInj R t) = do
   (at, cst) <- infer t
   let ty = getType at
   tyv <- freshTy
@@ -665,10 +665,10 @@ infer (TBin Cons t1 t2) = do
           return (ATBin (TyList tyv) Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
         ty -> throwError (NotCon CList t2 ty)
 
---To infer the type of the size of a list:
+-- To infer the type of the size of a list:
 infer (TUn Size t) = do
   (at, cst0) <- infer t
-  ([tyElt], cst1) <- ensureConstr CSet (getType at) (Left t)
+  (_, cst1) <- ensureConstr CSet (getType at) (Left t)
   return (ATUn TyN Size at, cAnd [cst0, cst1])
 
 infer (TBin setOp t1 t2) | setOp `elem` [Union, Intersection, Difference, Subset] = do
@@ -1080,8 +1080,8 @@ erase (ATUn _ uop at)       = TUn uop (erase at)
 erase (ATBin _ bop at1 at2) = TBin bop (erase at1) (erase at2)
 erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
 erase (ATTyOp _ op ty)      = TTyOp op ty
-erase (ATList _ ats aell)   = TList (map erase ats) ((fmap . fmap) erase aell)
-erase (ATListComp _ b)      = TListComp $ bind (mapTelescope eraseQual tel) (erase at)
+erase (ATContainer _ c ats aell)   = TContainer c (map erase ats) ((fmap . fmap) erase aell)
+erase (ATContainerComp _ c b)      = TContainerComp c $ bind (mapTelescope eraseQual tel) (erase at)
   where (tel,at) = unsafeUnbind b
 
 eraseBinding :: ABinding -> Binding

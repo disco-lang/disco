@@ -57,7 +57,6 @@ import           Prelude                                 hiding (lookup)
 
 import           GHC.Generics                            (Generic)
 
-import           Control.Applicative                     ((<|>))
 import           Control.Arrow                           ((&&&), (***))
 import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
@@ -635,8 +634,11 @@ infer (TBin Choose t1 t2) = do
 
   -- t2 can be either a Nat (a binomial coefficient)
   -- or a list of Nat (a multinomial coefficient).
-  (at2, cst2) <- check t2 TyN <|> check t2 (TyList TyN)
-  return (ATBin TyN Choose at1 at2, cAnd [cst1, cst2])
+  (at2, cst2) <- infer t2
+  let ty2 = getType at2
+  return ( ATBin TyN Choose at1 at2
+         , cAnd [cst1, cst2, COr [CEq ty2 TyN, CEq ty2 (TyList TyN)]]
+         )
 
 -- To infer the type of a cons:
 infer (TBin Cons t1 t2) = do

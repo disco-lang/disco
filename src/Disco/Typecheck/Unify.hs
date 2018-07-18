@@ -86,13 +86,13 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     unifyOne' (Skolem _, _) = mzero
     unifyOne' (_, Skolem _) = mzero
 
-    unifyOne' p@(TyAdt t, ty2) = do
+    unifyOne' p@(TyDef t, ty2) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
         Nothing  -> mzero
         Just ty1 -> return $ Right [(ty1,ty2)]
 
-    unifyOne' p@(ty1, TyAdt t) = do
+    unifyOne' p@(ty1, TyDef t) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
         Nothing  -> mzero

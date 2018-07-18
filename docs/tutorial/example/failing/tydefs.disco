@@ -1,0 +1,7 @@
+type Apple = Cat
+
+type Cat = Tree
+
+type Tree = Rain
+
+type Rain = Cat

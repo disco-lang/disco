@@ -1,5 +1,15 @@
 type Wahoo = Nat
 
+type Apple = Apple
+
+type Cat = Corn
+
+type Corn = Rain
+
+type Rain = Groot
+
+type Bat = Nat
+
 map : Wahoo -> Wahoo
 map w = w + 1
 

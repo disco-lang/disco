@@ -285,7 +285,7 @@ decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstra
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
-decomposeQual ty@(TyAdt _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
+decomposeQual ty@(TyDef _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
 decomposeQual ty@(TyCon c tys) q
   = case (M.lookup c >=> M.lookup q) qualRules of
       Nothing -> throwError $ Unqual q ty
@@ -394,8 +394,8 @@ simplify tyDefns origSM cs
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar  {})                = True
-    simplifiable (TyAdt {} :<: _)                        = True
-    simplifiable (_ :<: TyAdt {})                        = True
+    simplifiable (TyDef {} :<: _)                        = True
+    simplifiable (_ :<: TyDef {})                        = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
     simplifiable _                                       = False
@@ -417,18 +417,18 @@ simplify tyDefns origSM cs
     -- resulting substitution is applied to the remaining constraints
     -- as well as prepended to the current substitution.
 
-    -- XXX need to expand TyAdt here!
+    -- XXX need to expand TyDef here!
     simplifyOne' (ty1 :=: ty2) =
       case unify tyDefns [(ty1, ty2)] of
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
 
-    simplifyOne' (TyAdt t :<: ty2) =
+    simplifyOne' (TyDef t :<: ty2) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
         Just ty1 -> ssConstraints %= ((ty1 :<: ty2) :)
 
-    simplifyOne' (ty1 :<: TyAdt t) =
+    simplifyOne' (ty1 :<: TyDef t) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
         Just ty2 -> ssConstraints %= ((ty1 :<: ty2) :)

@@ -133,7 +133,7 @@ prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
 prettyTy (TySet ty)      = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
-prettyTy (TyAdt n)       = text n
+prettyTy (TyDef n)       = text n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)

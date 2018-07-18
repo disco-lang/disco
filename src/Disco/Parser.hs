@@ -359,7 +359,7 @@ parseDefn = label "definition" $
 parseTyDefn :: Parser Decl
 parseTyDefn = label "ADT defintion" $
   DTyDef
-  <$> (reserved "type" *> (parseTyAdt)) <*> ((symbol "=") *> parseType)  
+  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)  
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -706,7 +706,7 @@ parseAtomicType = label "type" $
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> TySet <$> (reserved "Set" *> parseAtomicType)
-  <|> TyAdt <$> parseTyAdt
+  <|> TyDef <$> parseTyDef
   <|> TyVar <$> parseTyVar
   <|> parens parseType
 
@@ -715,8 +715,8 @@ parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
 -- | Need to change identifier to take an extra parser argument
-parseTyAdt :: Parser String
-parseTyAdt =  ((:) <$> upperChar <*> identifier)
+parseTyDef :: Parser String
+parseTyDef =  ((:) <$> upperChar <*> identifier)
 
 parseTyVar :: Parser (Name Type)
 parseTyVar = string2Name <$> identifier

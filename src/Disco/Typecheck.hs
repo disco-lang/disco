@@ -67,6 +67,7 @@ import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
 import qualified Data.Map                                as M
+import qualified Data.Set                                as S
 
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -128,6 +129,7 @@ data TCError
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | DuplicateTyDefns String -- ^ Duplicate type definitions.
+  | CyclicTyDef String     -- ^ Cyclic type definition.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotSubtractive Type
   | NotFractional Type
@@ -205,7 +207,7 @@ checkSigma t (Forall sig) = do
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM (ATerm, Constraint)
 
-check t (TyAdt tyn) = do
+check t (TyDef tyn) = do
   (_, tydefmap) <- get
   case M.lookup tyn tydefmap of
     Just ty -> check t ty
@@ -870,7 +872,7 @@ inferQual _ (QGuard (unembed -> t))   = do
 --   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern, Constraint)
 
-checkPattern p (TyAdt tyn)                  = do
+checkPattern p (TyDef tyn)                  = do
   (_, tydefnmap) <- get
   case M.lookup tyn tydefnmap of
     Just ty -> checkPattern p ty
@@ -960,6 +962,7 @@ checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
 checkModule (Module m docs) = do
   let (tydefs, rest) = partition isTyDef m
   addTyDefns tydefs
+  checkCyclicTys tydefs
   let (defns, typeDecls) = partition isDefn rest
   withTypeDecls typeDecls $ do
     mapM_ checkDefn defns
@@ -978,6 +981,31 @@ addTyDefns tydefs = do
     getTyDef :: Decl -> (String, Type)
     getTyDef (DTyDef x ty) = (x, ty)
     getTyDef d             = error $ "Impossible! addTyDefns.getTyDef called on non-DTyDef: " ++ show d
+
+checkCyclicTys :: [Decl] -> TCM ()
+checkCyclicTys decls = mapM (\decl -> unwrap decl) decls *> return ()
+  where
+    unwrap :: Decl -> TCM (S.Set String)
+    unwrap (DTyDef x _) = checkCyclicTy (TyDef x) S.empty 
+    unwrap d = error $ "Impossible: checkCyclicTys.unwrap called on non-TyDef: " ++ show d
+
+-- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
+-- 1.) 'ty' is a TyDef.
+-- 2.) Repeated expansions of the TyDef yield nothing but other TyDefs.
+-- 3.) An expansion of a TyDef yields another TyDef that has been previously encountered.
+-- The function returns the set of TyDefs encountered during expansion if the TyDef is not cyclic.
+checkCyclicTy :: Type -> S.Set String -> TCM (S.Set String)
+checkCyclicTy (TyDef name) set = do
+  case S.member name set of
+    True -> throwError (CyclicTyDef name)
+    False -> do
+                (_, tydefmap) <- get
+                case M.lookup name tydefmap of
+                  Nothing -> throwError $ NotTyDef name
+                  Just ty -> checkCyclicTy ty (S.insert name set)
+
+
+checkCyclicTy _ set = return set
 
 
 -- | Run a type checking computation in the context of some type

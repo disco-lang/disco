@@ -47,6 +47,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
          | Abs   -- ^ Absolute value (@abs@)
          | Size  -- ^ The size of a set.
+         | PowerSet -- ^ The powerset of a given set.
   deriving (Show, Eq, Ord, Generic)
 
 -- | Binary operators.
@@ -151,6 +152,7 @@ opTable =
     , uopInfo Pre  Abs     ["abs"]
     ]
   , [ uopInfo Pre Size     ["size"]
+    , uopInfo Pre PowerSet ["powerSet"]
     ]
 
   , [ bopInfo In   Choose   ["choose"]
@@ -158,7 +160,7 @@ opTable =
   , [ bopInfo InL  Union    ["union", "∪", "U"]
     , bopInfo InL  Intersection ["intersect", "∩"]
     , bopInfo InL  Difference ["\\"]
-    , bopInfo InL Subset ["⊆"]
+    , bopInfo InL Subset ["⊆", "subset"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]

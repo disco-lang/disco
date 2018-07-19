@@ -53,6 +53,9 @@ brackets = fmap PP.brackets
 braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
 
+hashBraces :: Monad f => f PP.Doc -> f PP.Doc
+hashBraces d = text "{#" <+> d <+> text "#}"
+
 text :: Monad m => String -> m PP.Doc
 text     = return . PP.text
 
@@ -133,6 +136,8 @@ prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
 prettyTy (TySet ty)      = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
+prettyTy (TyMultiset ty)   = mparens (PA 9 InR) $
+  text "Multiset" <+> prettyTy' 9 InR ty
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -152,6 +157,7 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
+prettyTerm (TPrim x)     = text x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
@@ -175,7 +181,7 @@ prettyTerm (TContainer c ts e)  = do
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep (ds ++ pe))
+  (case c of {ListContainer -> brackets; SetContainer -> braces; MultisetContainer -> hashBraces}) (hsep (ds ++ pe))
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
   (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
@@ -359,6 +365,7 @@ prettyWHNF out _ (VFun _) = out "<function>"
 
 prettyWHNF out _ (VClos _ _) = out "<function>"
 prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
+prettyWHNF out (TyMultiset t) (VMultiset xs) = out "{# " >> prettyIteration' out t xs >> out " #}"
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
@@ -366,11 +373,17 @@ prettyWHNF _ ty v = error $
 
 --prettyIteration handles the pretty-printing of lists of values,
 --such as those found in sets.
-prettyIteration :: (String -> Disco IErr()) -> Type -> [Value] -> Disco IErr ()
+prettyIteration :: (String -> Disco IErr ()) -> Type -> [Value] -> Disco IErr ()
 prettyIteration out _ []     = out ""
 prettyIteration out t [x]    = prettyValueWith out t x
 prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
 
+--Does the same as above, but with special multiset annotation.
+prettyIteration' :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
+prettyIteration' out _ []         = out ""
+prettyIteration' out t [(x,n)]    = prettyValueWith out t x >> (out " # ") >> (out $ show n)
+prettyIteration' out t ((x,n):xs) = prettyValueWith out t x >> (out " # ") >> (out $ show n)
+                                    >> out ", " >> prettyIteration' out t xs
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v

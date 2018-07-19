@@ -325,6 +325,7 @@ containerTy c ty = TyCon (containerToCon c) [ty]
 containerToCon :: Container -> Con
 containerToCon ListContainer = CList
 containerToCon SetContainer  = CSet
+containerToCon MultisetContainer = CMultiset
 
 -- | Given the variables and their optional type annotations in the
 --   head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
@@ -506,6 +507,10 @@ infer (TAbs lam)    = do
     mkFunTy :: [Type] -> Type -> Type
     mkFunTy tys out = foldr TyArr out tys
 
+infer (TPrim "mapSet") = do
+  a <- freshTy
+  b <- freshTy
+  return $ (ATPrim (TyArr (TyArr a b) (TyArr (TySet a) (TySet b))) "mapSet", CTrue)
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.
 infer (TApp t t')   = do
@@ -653,6 +658,11 @@ infer (TUn Size t) = do
   (at, cst0) <- infer t
   ([tyElt], cst1) <- ensureConstr CSet (getType at) (Left t)
   return (ATUn TyN Size at, cAnd [cst0, cst1])
+
+infer (TUn PowerSet t) = do
+  (at, cst1) <- infer t
+  ([tyElt], cst2) <- ensureConstr CSet (getType at) (Left t)
+  return (ATUn (TySet (TySet tyElt)) PowerSet at, cAnd [cst1, cst2])
 
 infer (TBin setOp t1 t2) | setOp `elem` [Union, Intersection, Difference, Subset] = do
   (at1, cst1) <- infer t1

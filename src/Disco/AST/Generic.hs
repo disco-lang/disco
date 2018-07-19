@@ -29,6 +29,7 @@ module Disco.AST.Generic
        (
        Term_ (..)
       , X_TVar
+      , X_TPrim
       , X_TLet
       , X_TParens
       , X_TUnit
@@ -142,6 +143,7 @@ instance Alpha Side
 instance Subst t Side
 
 type family X_TVar e
+type family X_TPrim e
 type family X_TLet e
 type family X_TParens e
 type family X_TUnit e
@@ -166,6 +168,8 @@ data Term_ e where
 
   -- | A variable.
   TVar_   :: X_TVar e -> Name (Term_ e) -> Term_ e
+
+  TPrim_  :: X_TPrim e -> String -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e
@@ -229,10 +233,11 @@ data Term_ e where
   XTerm_   :: X_Term e -> Term_ e
   deriving (Generic)
 
--- A type that abstracts over constraints for generic data constructors. 
+-- A type that abstracts over constraints for generic data constructors.
 -- This makes it easier to derive typeclass instances for generic types.
 type Forall_t (a :: * -> Constraint) e
       = (a (X_TVar e), a (X_TLet e),
+         a (X_TPrim e),
          a (X_TParens e), a (X_TUnit e),
          a (X_TBool e), a (X_TNat e),
          a (X_TRat e), a (X_TAbs e),
@@ -264,6 +269,7 @@ deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
 data Container where
   ListContainer :: Container
   SetContainer :: Container
+  MultisetContainer :: Container
   deriving (Show, Eq, Enum, Generic)
 
 instance Alpha Container
@@ -373,4 +379,3 @@ deriving instance (Show (X_PVar e), Show (X_PWild e), Show (X_PUnit e),
                    Show (X_PTup e), Show (X_PInj e), Show (X_PNat e),
                    Show (X_PSucc e), Show (X_PCons e), Show (X_PList e),
                    Show (X_PBool e), Show (Term_ e)) => Show (Pattern_ e)
-

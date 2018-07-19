@@ -96,6 +96,7 @@ desugarDefn def = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM Core
 desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
+desugarTerm (ATPrim (TyArr (TyArr _ b) _) "mapSet")  = return $ CMap b
 desugarTerm ATUnit        = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =
@@ -165,11 +166,17 @@ desugarTerm (ATContainer (TyCon _ [tyElt]) c es mell) = case c of
     case mell of
       Nothing  -> return $ foldr (\x y -> CCons 1 [x, y]) (CCons 0 []) des
       Just ell -> CEllipsis des <$> (traverse desugarTerm ell)
-  SetContainer -> do
+  containerTy -> do
     des <- mapM desugarTerm es
     case mell of
-      Nothing  -> return $ CoreSet tyElt des
-      Just ell -> error "Sets cannot have ellipses yet"
+      Nothing  -> return $ (case containerTy of
+        {SetContainer -> CoreSet; MultisetContainer -> CoreMultiset}) tyElt des
+      Just ell -> error "These cannot have ellipses yet"
+  -- MultisetContainer -> do
+  --   des <- mapM desugarTerm es
+  --   case mell of
+  --     Nothing -> return $ CoreMultiset tyElt des
+  --     Just ell -> error "Multisets cannot have ellipses yet"
 desugarTerm (ATListComp _ bqt) =
   lunbind bqt $ \(qs, t) -> do
   dt <- desugarTerm t
@@ -225,6 +232,7 @@ desugarUOp _ Floor  c      = COp OFloor  [c]
 desugarUOp _ Ceil   c      = COp OCeil   [c]
 desugarUOp _ Abs    c      = COp OAbs    [c]
 desugarUOp _ Size   c      = COp OSize   [c]
+desugarUOp _ PowerSet c    = COp OPowerSet [c]
 
 -- | Desugar a binary operator application.
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@

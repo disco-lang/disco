@@ -57,6 +57,8 @@ data Core where
   -- | A variable.
   CVar  :: Name Core -> Core
 
+  CMap :: Type -> Core
+
   -- | A constructor, identified by number, with arguments.  For
   --   example, false and true are represented by @CCons 0 []@ and
   --   @CCons 1 []@, respectively; a pair is represented by @CCons 0
@@ -101,6 +103,11 @@ data Core where
   --   defined in Disco.AST.Surace
   -- Type stores the type of the elements.
   CoreSet :: Type -> [Core] -> Core
+
+  -- | A multiset.
+  CoreMultiset :: Type -> [Core] -> Core
+
+
 
   deriving (Show, Generic)
 
@@ -147,6 +154,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMDivides Integer
         -- Set Operations
         | OSize    -- ^ Size of two sets (@size@)
+        | OPowerSet -- ^ Power set of a given set (@powerSet@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
         | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
         | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)

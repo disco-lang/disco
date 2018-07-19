@@ -143,13 +143,14 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
-parens    = between (symbol "(") (symbol ")")
-braces    = between (symbol "{") (symbol "}")
-angles    = between (symbol "<") (symbol ">")
-brackets  = between (symbol "[") (symbol "]")
-fbrack    = between (symbol "⌊") (symbol "⌋")
-cbrack    = between (symbol "⌈") (symbol "⌉")
+parens, braces, angles, brackets, hashBraces, fbrack, cbrack :: Parser a -> Parser a
+parens     = between (symbol "(") (symbol ")")
+braces     = between (symbol "{") (symbol "}")
+hashBraces = between (symbol "{#") (symbol "#}")
+angles     = between (symbol "<") (symbol ">")
+brackets   = between (symbol "[") (symbol "]")
+fbrack     = between (symbol "⌊") (symbol "⌋")
+cbrack     = between (symbol "⌈") (symbol "⌉")
 
 semi, comma, colon, dot, pipe :: Parser String
 semi      = symbol ";"
@@ -222,7 +223,7 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
-  , "size", "union", "U", "∪", "intersect", "∩"
+  , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet", "mapSet"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
@@ -339,7 +340,7 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 --   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
- 
+
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
@@ -380,6 +381,7 @@ parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
+  <|> TPrim <$> ("mapSet" <$ reserved "mapSet")
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -388,6 +390,7 @@ parseAtom = label "expression" $
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
   <|> brackets (parseContainer ListContainer)
+  <|> hashBraces (parseContainer MultisetContainer)
   <|> braces (parseContainer SetContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 

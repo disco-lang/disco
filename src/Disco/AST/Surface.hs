@@ -30,6 +30,7 @@ module Disco.AST.Surface
        , UD
        , Term
        , pattern TVar
+       , pattern TPrim
        , pattern TUn
        , pattern TLet
        , pattern TParens
@@ -156,6 +157,7 @@ isDefn _       = False
 type Term = Term_ UD
 
 type instance X_TVar UD = ()
+type instance X_TPrim UD = ()
 type instance X_TLet UD = ()
 type instance X_TParens UD = ()
 type instance X_TUnit UD = ()
@@ -178,6 +180,9 @@ type instance X_TTup UD = ()
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
+
+pattern TPrim :: String -> Term
+pattern TPrim name = TPrim_ () name
 
 pattern TUn :: UOp -> Term -> Term
 pattern TUn uop term = TUn_ () uop term
@@ -233,7 +238,7 @@ pattern TContainerComp c b = TContainerComp_ () c b
 pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
-{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
+{-# COMPLETE TVar, TPrim, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
              TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TContainer, TContainerComp, TAscr #-}
 

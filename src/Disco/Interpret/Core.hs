@@ -46,7 +46,7 @@ import           Control.Monad.Except               (throwError)
 import           Data.Coerce                        (coerce)
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
-import           Data.List                          (find)
+import           Data.List                          (find, subsequences)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (fromJust)
 import           Data.Monoid
@@ -197,6 +197,9 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
 
+whnf (CMap ty) =
+  return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
+
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
@@ -238,8 +241,15 @@ whnf (CoreSet t es) = do
   dres <- deduplicateSet t res
   return $ VSet dres
 
+whnf (CoreMultiset tyElt es) = do
+  res <- mapM mkThunk es
+  cres <- countElements tyElt res
+  return $ VMultiset cres
+
 whnf (CType _)      = error "Called whnf on CType"
 
+-- Removes all but one of each value in a list of values;
+-- for deduplicating sets.
 deduplicateSet :: Type -> [Value] -> Disco IErr [Value]
 deduplicateSet _ [] = return []
 deduplicateSet t (x:xs) = do
@@ -247,9 +257,30 @@ deduplicateSet t (x:xs) = do
   result <- if xInXs then deduplicateSet t xs else (x:) <$> (deduplicateSet t xs)
   return result
 
+-- Determines if a given value (with associated type) is an
+-- element of a list of values.
 elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
 elemOf _ _ [] = return False
 elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+
+mapSet :: Value -> Value -> Type -> Disco IErr Value
+mapSet f s ty = do
+  fcn <- whnfV f
+  (VSet xs) <- whnfV s
+  ys <- mapM (whnfApp fcn) xs
+  VSet <$> deduplicateSet ty ys
+
+countElements :: Type -> [Value] -> Disco IErr [(Value, Integer)]
+countElements _ [] = return []
+countElements ty (x:xs) = do
+  countedXs <- countElements ty xs
+  countInsert ty x countedXs
+
+countInsert :: Type -> Value -> [(Value, Integer)] -> Disco IErr[(Value, Integer)]
+countInsert _ v [] = return [(v, 1)]
+countInsert t v1 ((v2, n):xs) = do
+  isElem <- decideEqFor t v1 v2
+  if isElem then return $ (v2, n+1):xs else ((v2, n):) <$> countInsert t v1 xs
 
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -507,6 +538,7 @@ whnfOp (OMDiv n)  = modDiv n
 whnfOp (OMExp n)  = modExp n
 whnfOp (OMDivides n) = modDivides n
 whnfOp (OSize)   = setSize
+whnfOp (OPowerSet)        = powerSet
 whnfOp (OUnion ty)        = setUnion ty
 whnfOp (OIntersection ty) = setIntersection ty
 whnfOp (ODifference ty)   = setDifference ty
@@ -564,7 +596,10 @@ subset :: Type -> [Value] -> [Value] -> Disco IErr Bool
 subset ty xs ys = do
   foldr (\x acc -> (&&) <$> elemOf ty x ys <*> acc) (return True) xs
 
-
+powerSet :: [Core] -> Disco IErr Value
+powerSet [c] = do
+  (VSet xs) <- whnf c
+  return $ VSet (map VSet (subsequences xs))
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value

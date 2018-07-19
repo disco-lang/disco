@@ -20,6 +20,7 @@ module Disco.AST.Typed
        ( -- * Type-annotated terms
        ATerm
        , pattern ATVar
+       , pattern ATPrim
        , pattern ATUn
        , pattern ATLet
        , pattern ATUnit
@@ -103,6 +104,7 @@ instance Subst Type ALink
 instance Subst Type ATerm
 
 type instance X_TVar TY = Type
+type instance X_TPrim TY = Type
 type instance X_TLet TY = Type
 type instance X_TUnit TY = ()
 type instance X_TBool TY = ()
@@ -125,6 +127,9 @@ type instance X_TParens TY = ()
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
+
+pattern ATPrim :: Type -> String -> ATerm
+pattern ATPrim ty name = TPrim_ ty name
 
 pattern ATUn :: Type -> UOp -> ATerm -> ATerm
 pattern ATUn ty uop term = TUn_ ty uop term
@@ -174,7 +179,7 @@ pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
-{-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
+{-# COMPLETE ATVar, ATPrim, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
              ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
@@ -291,6 +296,7 @@ instance Alpha AQual
 -- | Get the type at the root of an 'ATerm'.
 getType :: ATerm -> Type
 getType (ATVar ty _)      = ty
+getType (ATPrim ty _)     = ty
 getType ATUnit            = TyUnit
 getType (ATBool _)        = TyBool
 getType (ATNat ty _)      = ty
@@ -304,7 +310,7 @@ getType (ATBin ty _ _ _)  = ty
 getType (ATTyOp ty _ _)   = ty
 getType (ATChain ty _ _)  = ty
 getType (ATContainer ty _ _ _)   = ty
-getType (ATContainerComp ty _ _) = ty 
+getType (ATContainerComp ty _ _) = ty
 getType (ATLet ty _)      = ty
 getType (ATCase ty _)     = ty
 

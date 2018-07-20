@@ -8,7 +8,7 @@
 -----------------------------------------------------------------------------
 --
 -- Module      :  Disco.Parser
--- Copyright   :  (c) 2016 disco team (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
 -- SPDX-License-Identifier: BSD-3-Clause
@@ -340,7 +340,7 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 --   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
- 
+
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $

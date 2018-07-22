@@ -255,7 +255,8 @@ handleDocs x = do
 evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
-  case evalTCM (extends ctx $ inferTop t) of
+  tymap <- use topTyDefns
+  case evalTCM (extends ctx $ extendTyDefs tymap (inferTop t)) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
@@ -265,7 +266,8 @@ evalTerm t = do
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
-  case (evalTCM $ extends ctx (inferTop t)) of
+  tymap <- use topTyDefns
+  case (evalTCM $ extends ctx $ extendTyDefs tymap (inferTop t)) of
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 

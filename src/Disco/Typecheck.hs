@@ -25,7 +25,7 @@
 
 module Disco.Typecheck
        ( -- * Type checking monad
-         TCM, TyCtx, runTCM, evalTCM, execTCM
+         TCM, TyCtx, runTCM, evalTCM, execTCM, extendTyDefs
          -- ** Definitions
        , Defn, DefnCtx
          -- ** Errors
@@ -91,10 +91,13 @@ type Defn  = [Bind [APattern] ATerm]
 
 -- | A tuple container a map from definition names to definitions
 --   and a map from type definition names to types.
-type DefnCtx = (Ctx ATerm Defn, M.Map String Type)
+type DefnCtx = (Ctx ATerm Defn, TyDefCtx)
 
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
+
+-- |  A map from type definition strings to their corresponding types.
+type TyDefCtx = M.Map String Type
 
 -- | Potential typechecking errors.
 data TCError
@@ -177,6 +180,14 @@ addDefn x b = modify (\(dm, tm) -> (M.insert (coerce x) b dm, tm))
 -- | Add a type definition to the set of current type defintions.
 addTyDefn :: String -> Type -> TCM ()
 addTyDefn x b = modify (\(dm, tm) -> (dm, M.insert x b tm))
+
+-- | Extend the current TyDefCtx with a provided tydef context.
+extendTyDefs :: TyDefCtx -> TCM a -> TCM a
+extendTyDefs newtyctx tcm = withStateT updatetys tcm
+  where
+    updatetys :: DefnCtx -> DefnCtx
+    updatetys = (\(defns, oldtyctx) -> (defns, M.union newtyctx oldtyctx))
+  
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.

@@ -14,6 +14,9 @@
 {-# LANGUAGE UndecidableInstances  #-}
 {-# LANGUAGE ViewPatterns          #-}
 
+-- Orphan Alpha Void instance
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Generic
@@ -26,69 +29,105 @@
 -----------------------------------------------------------------------------
 
 module Disco.AST.Generic
-       (
-       Term_ (..)
-      , X_TVar
-      , X_TLet
-      , X_TParens
-      , X_TUnit
-      , X_TBool
-      , X_TNat
-      , X_TRat
-      , X_TAbs
-      , X_TApp
-      , X_TInj
-      , X_TCase
-      , X_TUn
-      , X_TBin
-      , X_TChain
-      , X_TTyop
-      , X_TContainer
-      , X_TContainerComp
-      , X_TAscr
-      , X_Term
-      , X_TTup
-      , Telescope (..)
-      , Container (..)
-      , Link_ (..)
-      , X_TLink
-      , Qual_ (..)
-      , X_QBind
-      , X_QGuard
-      , Binding_ (..)
-      , Branch_
-      , Guard_ (..)
-      , X_GBool
-      , X_GPat
-      , Forall_t
-      , Side (..)
-      , Ellipsis (..)
-      , Pattern_ (..)
-      , X_PVar
-      , X_PWild
-      , X_PUnit
-      , X_PBool
-      , X_PTup
-      , X_PInj
-      , X_PNat
-      , X_PSucc
-      , X_PCons
-      , X_PList
-      , foldTelescope
-      , mapTelescope
-      , toTelescope
-      , fromTelescope
-      , Property_
+       ( -- * Telescopes
+
+         Telescope (..), telCons
+       , foldTelescope, mapTelescope
+       , traverseTelescope
+       , toTelescope, fromTelescope
+
+         -- * Utility types
+
+       , Side (..)
+       , Container (..)
+       , Ellipsis (..)
+
+         -- * Term
+
+       , Term_ (..)
+
+       , X_TVar
+       , X_TLet
+       , X_TParens
+       , X_TUnit
+       , X_TBool
+       , X_TNat
+       , X_TRat
+       , X_TAbs
+       , X_TApp
+       , X_TTup
+       , X_TInj
+       , X_TCase
+       , X_TUn
+       , X_TBin
+       , X_TChain
+       , X_TTyOp
+       , X_TContainer
+       , X_TContainerComp
+       , X_TAscr
+       , X_Term
+
+       , ForallTerm
+
+       -- * Link
+
+       , Link_ (..)
+       , X_TLink
+       , ForallLink
+
+       -- * Qual
+
+       , Qual_ (..)
+       , X_QBind
+       , X_QGuard
+       , ForallQual
+
+       -- * Binding
+
+       , Binding_ (..)
+
+       -- * Branch
+       , Branch_
+
+       -- * Guard
+
+       , Guard_ (..)
+       , X_GBool
+       , X_GPat
+       , ForallGuard
+
+       -- * Pattern
+
+       , Pattern_ (..)
+       , X_PVar
+       , X_PWild
+       , X_PUnit
+       , X_PBool
+       , X_PTup
+       , X_PInj
+       , X_PNat
+       , X_PSucc
+       , X_PCons
+       , X_PList
+       , X_Pattern
+       , ForallPattern
+
+       -- * Property
+
+       , Property_
        )
        where
 
+import           Data.Typeable
 import           GHC.Generics                     (Generic)
 
+import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Syntax.Operators
 import           Disco.Types
 import           GHC.Exts                         (Constraint)
+
 ------------------------------------------------------------
 -- Telescopes
 ------------------------------------------------------------
@@ -106,8 +145,10 @@ data Telescope b where
   deriving (Show, Generic)
 
 instance Alpha b => Alpha (Telescope b)
-
 instance Subst t b => Subst t (Telescope b)
+
+telCons :: Alpha b => b -> Telescope b -> Telescope b
+telCons b tb = TelCons (rebind b tb)
 
 -- | Fold a telescope given a combining function and a value for the
 --   empty telescope.
@@ -119,19 +160,22 @@ foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
 mapTelescope :: (Alpha a, Alpha b) => (a -> b) -> Telescope a -> Telescope b
 mapTelescope f = toTelescope . map f . fromTelescope
 
+-- | Traverse over a telescope.
+traverseTelescope
+  :: (Applicative f, Alpha a, Alpha b)
+  => (a -> f b) -> Telescope a -> f (Telescope b)
+traverseTelescope f = foldTelescope (\a ftb -> telCons <$> f a <*> ftb) (pure TelEmpty)
+
 -- | Convert a list to a telescope.
 toTelescope :: Alpha b => [b] -> Telescope b
-toTelescope []     = TelEmpty
-toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
+toTelescope = foldr telCons TelEmpty
 
 -- | Convert a telescope to a list.
 fromTelescope :: Alpha b => Telescope b -> [b]
 fromTelescope = foldTelescope (:) []
 
-type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
-
 ------------------------------------------------------------
--- Terms
+-- Utility types
 ------------------------------------------------------------
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
@@ -140,6 +184,29 @@ data Side = L | R
 
 instance Alpha Side
 instance Subst t Side
+
+-- | A container is a wrapper for sets and lists.
+data Container where
+  ListContainer :: Container
+  SetContainer :: Container
+  deriving (Show, Eq, Enum, Generic)
+
+instance Alpha Container
+instance Subst t Container
+
+-- | An ellipsis is an "omitted" part of a literal container (such as a list or set), of the form
+--   @..@ or @.. t@.
+data Ellipsis t where
+  Forever ::      Ellipsis t   -- @..@
+  Until   :: t -> Ellipsis t   -- @.. t@
+  deriving (Show, Generic, Functor, Foldable, Traversable)
+
+instance Alpha t => Alpha (Ellipsis t)
+instance Subst a t => Subst a (Ellipsis t)
+
+------------------------------------------------------------
+-- Terms
+------------------------------------------------------------
 
 type family X_TVar e
 type family X_TLet e
@@ -150,18 +217,19 @@ type family X_TNat e
 type family X_TRat e
 type family X_TAbs e
 type family X_TApp e
+type family X_TTup e
 type family X_TInj e
 type family X_TCase e
 type family X_TUn e
 type family X_TBin e
 type family X_TChain e
-type family X_TTyop e
+type family X_TTyOp e
 type family X_TContainer e
 type family X_TContainerComp e
 type family X_TAscr e
 type family X_Term e
-type family X_TTup e
 
+-- | The base generic AST representing terms in the disco language.
 data Term_ e where
 
   -- | A variable.
@@ -213,7 +281,7 @@ data Term_ e where
   TChain_ :: X_TChain e -> Term_ e -> [Link_ e] -> Term_ e
 
   -- | An application of a type operator.
-  TTyOp_  :: X_TTyop e -> TyOp -> Type -> Term_ e
+  TTyOp_  :: X_TTyOp e -> TyOp -> Type -> Term_ e
 
   -- | A containter for sets and lsits.
   TContainer_ :: X_TContainer e -> Container -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
@@ -229,28 +297,48 @@ data Term_ e where
   XTerm_   :: X_Term e -> Term_ e
   deriving (Generic)
 
--- A type that abstracts over constraints for generic data constructors. 
+-- A type that abstracts over constraints for generic data constructors.
 -- This makes it easier to derive typeclass instances for generic types.
-type Forall_t (a :: * -> Constraint) e
-      = (a (X_TVar e), a (X_TLet e),
-         a (X_TParens e), a (X_TUnit e),
-         a (X_TBool e), a (X_TNat e),
-         a (X_TRat e), a (X_TAbs e),
-         a (X_TApp e), a (X_TInj e),
-         a (X_TCase e), a (X_TUn e),
-         a (X_TBin e), a (X_TChain e),
-         a (X_TTyop e), a (X_TContainer e),
-         a (X_TContainerComp e), a (X_TAscr e),
-         a (X_Term e), a (X_TTup e),
-         a (X_QBind e), a (X_QGuard e),
-         a (X_GBool e), a (X_GPat e),
-         a (X_TLink e), a (Binding_ e),
-         a (X_PVar e), a (X_PWild e), a (X_PUnit e),
-         a (X_PBool e), a (X_PTup e), a (X_PInj e),
-         a (X_PNat e), a (X_PSucc e), a (X_PCons e),
-         a (X_PList e))
+type ForallTerm (a :: * -> Constraint) e
+  = ( a (X_TVar e)
+    , a (X_TLet e)
+    , a (X_TParens e)
+    , a (X_TUnit e)
+    , a (X_TBool e)
+    , a (X_TNat e)
+    , a (X_TRat e)
+    , a (X_TAbs e)
+    , a (X_TApp e)
+    , a (X_TInj e)
+    , a (X_TCase e)
+    , a (X_TUn e)
+    , a (X_TBin e)
+    , a (X_TChain e)
+    , a (X_TTyOp e)
+    , a (X_TContainer e)
+    , a (X_TContainerComp e)
+    , a (X_TAscr e)
+    , a (X_Term e)
+    , a (X_TTup e)
+    , a (Qual_ e)
+    , a (Guard_ e)
+    , a (Link_ e)
+    , a (Binding_ e)
+    , a (Pattern_ e)
+    )
 
-deriving instance Forall_t Show e => Show (Term_ e)
+deriving instance ForallTerm Show e => Show (Term_ e)
+instance
+  ( Typeable e
+  , ForallTerm (Subst Type) e
+  , ForallTerm Alpha e
+  )
+  => Subst Type (Term_ e)
+instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
+
+------------------------------------------------------------
+-- Link
+------------------------------------------------------------
 
 type family X_TLink e
 
@@ -258,26 +346,18 @@ data Link_ e where
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
   deriving Generic
 
-deriving instance (Show (X_TLink e), Show (Term_ e)) => Show (Link_ e)
+type ForallLink (a :: * -> Constraint) e
+  = ( a (X_TLink e)
+    , a (Term_ e)
+    )
 
--- | A container is a wrapper for sets and lists.
-data Container where
-  ListContainer :: Container
-  SetContainer :: Container
-  deriving (Show, Eq, Enum, Generic)
+deriving instance ForallLink Show e         => Show       (Link_ e)
+instance          ForallLink (Subst Type) e => Subst Type (Link_ e)
+instance (Typeable e, Show (Link_ e), ForallLink Alpha e) => Alpha (Link_ e)
 
-instance Alpha Container
-instance Subst t Container
-
--- | An ellipsis is an "omitted" part of a literal container (such as a list or set), of the form
---   @..@ or @.. t@.
-data Ellipsis t where
-  Forever ::      Ellipsis t   -- @..@
-  Until   :: t -> Ellipsis t   -- @.. t@
-  deriving (Show, Generic, Functor, Foldable, Traversable)
-
-instance Alpha t => Alpha (Ellipsis t)
-instance Subst a t => Subst a (Ellipsis t)
+------------------------------------------------------------
+-- Qual
+------------------------------------------------------------
 
 type family X_QBind e
 type family X_QGuard e
@@ -292,13 +372,31 @@ data Qual_ e where
 
   deriving Generic
 
-deriving instance (Show (X_QBind e), Show (X_QGuard e), Show (Term_ e)) => Show (Qual_ e)
+type ForallQual (a :: * -> Constraint) e
+  = ( a (X_QBind e)
+    , a (X_QGuard e)
+    , a (Term_ e)
+    )
+
+deriving instance ForallQual Show         e => Show       (Qual_ e)
+instance          ForallQual (Subst Type) e => Subst Type (Qual_ e)
+instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
+
+------------------------------------------------------------
+-- Binding
+------------------------------------------------------------
 
 -- | A binding is a name along with its definition.
 data Binding_ e = Binding_ (Maybe (Embed Sigma)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
-deriving instance Forall_t Show  e => Show (Binding_ e)
+deriving instance ForallTerm Show  e => Show (Binding_ e)
+instance Subst Type (Term_ e) => Subst Type (Binding_ e)
+instance (Typeable e, Show (Binding_ e), Alpha (Term_ e)) => Alpha (Binding_ e)
+
+------------------------------------------------------------
+-- Branch
+------------------------------------------------------------
 
 -- | A branch of a case is a list of guards with an accompanying term.
 --   The guards scope over the term.  Additionally, each guard scopes
@@ -306,6 +404,9 @@ deriving instance Forall_t Show  e => Show (Binding_ e)
 
 type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
 
+------------------------------------------------------------
+-- Guard
+------------------------------------------------------------
 
 type family X_GBool e
 type family X_GPat e
@@ -321,7 +422,20 @@ data Guard_ e where
 
   deriving Generic
 
-deriving instance Forall_t Show  e => Show (Guard_ e)
+type ForallGuard (a :: * -> Constraint) e
+  = ( a (X_GBool e)
+    , a (X_GPat  e)
+    , a (Term_ e)
+    , a (Pattern_ e)
+    )
+
+deriving instance ForallGuard Show         e => Show       (Guard_ e)
+instance          ForallGuard (Subst Type) e => Subst Type (Guard_ e)
+instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
+
+------------------------------------------------------------
+-- Pattern
+------------------------------------------------------------
 
 type family X_PVar e
 type family X_PWild e
@@ -333,6 +447,7 @@ type family X_PNat e
 type family X_PSucc e
 type family X_PCons e
 type family X_PList e
+type family X_Pattern e
 
 -- | Patterns.
 data Pattern_ e where
@@ -367,10 +482,39 @@ data Pattern_ e where
   -- | List pattern @[p1, .., pn]@.
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
 
+  -- | Expansion slot.
+  XPattern_ :: X_Pattern e -> Pattern_ e
+
   deriving (Generic)
 
-deriving instance (Show (X_PVar e), Show (X_PWild e), Show (X_PUnit e),
-                   Show (X_PTup e), Show (X_PInj e), Show (X_PNat e),
-                   Show (X_PSucc e), Show (X_PCons e), Show (X_PList e),
-                   Show (X_PBool e), Show (Term_ e)) => Show (Pattern_ e)
+type ForallPattern (a :: * -> Constraint) e
+      = ( a (X_PVar e)
+        , a (X_PWild e)
+        , a (X_PUnit e)
+        , a (X_PBool e)
+        , a (X_PNat e)
+        , a (X_PTup e)
+        , a (X_PInj e)
+        , a (X_PSucc e)
+        , a (X_PCons e)
+        , a (X_PList e)
+        , a (X_Pattern e)
+        )
 
+deriving instance ForallPattern Show         e => Show       (Pattern_ e)
+instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
+instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
+
+------------------------------------------------------------
+-- Property
+------------------------------------------------------------
+
+type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
+
+------------------------------------------------------------
+-- Orphan instances
+------------------------------------------------------------
+
+-- Need this if we want to put 'Void' as the type
+-- of an extension slot (to kill a constructor)
+instance Alpha Void

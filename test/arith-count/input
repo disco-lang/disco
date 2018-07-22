@@ -24,3 +24,5 @@
 10 choose [2,3,5]
 10 choose [2,3,6]
 10 choose [1,1,1,1,1,1,1,1,1,1]
+let x = 3 in 5 choose x
+let x = [1,2,2] in 5 choose x

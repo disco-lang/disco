@@ -48,7 +48,6 @@ import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.List                          (find)
 import qualified Data.Map                           as M
-import           Data.Maybe                         (fromJust)
 import           Data.Monoid
 import           Data.Ratio
 
@@ -155,19 +154,19 @@ whnfV :: Value -> Disco IErr Value
 
 -- If the value is a thunk, use its stored environment and evaluate
 -- the expression to WHNF.
-whnfV (VThunk c e)            = withEnv e $ whnf c
+whnfV (VThunk c e) = withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
 -- and reduce the result to WHNF.
-whnfV (VDelay (ValDelay imv)) = imv >>= whnfV
+whnfV (VDelay imv) = imv >>= whnfV
 
 -- If it is an indirection, call 'whnfIndir' which will look up the
 -- value it points to and reduce it.
-whnfV (VIndir loc)            = whnfIndir loc
+whnfV (VIndir loc) = whnfIndir loc
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
-whnfV v                       = return v
+whnfV v            = return v
 
 
 -- | Reduce the value stored at the given location to WHNF.  We need a
@@ -223,12 +222,8 @@ whnf (CApp str c1 c2) = do
   -- Finally, call 'whnfApp' to do the application.
   whnfApp v1 v2
 
--- List comprehensions and ellipses, case expressions, and operators
+-- Ellipses, case expressions, and operators
 -- all have their own function to do reduction.
-whnf (CListComp b)  =
-  lunbind b $ \(qs, t) -> do
-    lcmp <- expandComp t (fromTelescope qs)
-    whnfV lcmp
 whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CCase bs)     = whnfCase bs
 whnf (COp op cs)    = whnfOp op cs
@@ -248,7 +243,7 @@ deduplicateSet t (x:xs) = do
   return result
 
 elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
-elemOf _ _ [] = return False
+elemOf _ _ []     = return False
 elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
 
@@ -261,7 +256,7 @@ whnfApp (VClos c e) v =
   withEnv e           $ do
   extend x v          $ do
   whnf t
-whnfApp (VFun (ValFun f)) v = rnfV v >>= \v' -> whnfV (f v')
+whnfApp (VFun f) v = rnfV v >>= \v' -> whnfV (f v')
 whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
 
 ------------------------------------------------------------
@@ -304,34 +299,6 @@ vconcat = vfoldr vappend (VCons 0 [])
 -- | Lazy map on 'Value' lists, implemented via 'vfoldr'.
 vmap :: (Value -> Disco IErr Value) -> Value -> Disco IErr Value
 vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
-
---------------------------------------------------
--- List comprehensions
-
--- | Expand a list comprehension to a lazy 'Value' list.
-expandComp :: Core -> [CQual] -> Disco IErr Value
-
--- [ t | ] = [ t ]
-expandComp t [] = do
-  c <- mkThunk t
-  return $ VCons 1 [c, VCons 0 []]
-
--- [ t | q, qs ] = ...
-expandComp t (q:qs) = do
-  case q of
-
-    -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
-    CQBind x (unembed -> lst) -> do
-      c <- mkThunk lst
-      vmap (\v -> extend x v $ expandComp t qs) c >>= vconcat
-
-    -- [ t | b, qs ] = if b then [ t | qs ] else []
-    CQGuard (unembed -> g)    -> do
-      v <- whnf g
-      case v of
-        VCons 0 [] {- False -} -> return $ VCons 0 []  {- Nil -}
-        VCons 1 [] {- True  -} -> expandComp t qs
-        _ -> error $ "Impossible! Got " ++ show v ++ " in expandComp CQGuard."
 
 --------------------------------------------------
 -- Polynomial sequences [a,b,c,d .. e]
@@ -472,41 +439,34 @@ noMatch = return Nothing
 
 -- | Reduce an operator application to WHNF.
 whnfOp :: Op -> [Core] -> Disco IErr Value
-whnfOp OAdd     = numOp (+)
-whnfOp ONeg     = uNumOp negate
-whnfOp OSSub    = numOp ssubOp
-whnfOp OSqrt    = uNumOp integerSqrt
-whnfOp OLg      = lgOp
-whnfOp OFloor   = uNumOp floorOp
-whnfOp OCeil    = uNumOp ceilOp
-whnfOp OAbs     = uNumOp abs
-whnfOp OMul     = numOp (*)
-whnfOp ODiv     = numOp' divOp
-whnfOp OExp     = numOp (\m n -> m ^^ numerator n)
+whnfOp OAdd               = numOp (+)
+whnfOp ONeg               = uNumOp negate
+whnfOp OSqrt              = uNumOp integerSqrt
+whnfOp OLg                = lgOp
+whnfOp OFloor             = uNumOp floorOp
+whnfOp OCeil              = uNumOp ceilOp
+whnfOp OAbs               = uNumOp abs
+whnfOp OMul               = numOp (*)
+whnfOp ODiv               = numOp' divOp
+whnfOp OExp               = numOp (\m n -> m ^^ numerator n)
   -- If the program typechecks, n will be an integer.
-whnfOp OAnd     = boolOp (&&)
-whnfOp OOr      = boolOp (||)
-whnfOp OMod     = numOp' modOp
-whnfOp ODivides = numOp' (\m n -> return (mkEnum $ divides m n))
-whnfOp OBinom   = numOp binom
-whnfOp OMultinom = multinomOp
-whnfOp OFact    = uNumOp' fact
-whnfOp (OEq ty) = eqOp ty
-whnfOp (OLt ty) = ltOp ty
-whnfOp ONot     = notOp
-whnfOp OEnum    = enumOp
-whnfOp OCount   = countOp
--- Modular operations, for finite types
+whnfOp OMod               = numOp' modOp
+whnfOp ODivides           = numOp' (\m n -> return (mkEnum $ divides m n))
+whnfOp OBinom             = numOp binom
+whnfOp OMultinom          = multinomOp
+whnfOp OFact              = uNumOp' fact
+whnfOp (OEq ty)           = eqOp ty
+whnfOp (OLt ty)           = ltOp ty
+whnfOp OEnum              = enumOp
+whnfOp OCount             = countOp
 
-whnfOp (OMAdd n)  = modArithBin (+) n
-whnfOp (OMMul n)  = modArithBin (*) n
-whnfOp (OMSub n)  = modArithBin (-) n
-whnfOp (OMSSub n) = modArithBin ssubOp n
-whnfOp (OMNeg n)  = modArithUn negate n
-whnfOp (OMDiv n)  = modDiv n
-whnfOp (OMExp n)  = modExp n
-whnfOp (OMDivides n) = modDivides n
-whnfOp (OSize)   = setSize
+-- Modular operations, for finite types
+whnfOp (OMDiv n)          = modDiv n
+whnfOp (OMExp n)          = modExp n
+whnfOp (OMDivides n)      = modDivides n
+
+-- Set operations
+whnfOp (OSize)            = setSize
 whnfOp (OUnion ty)        = setUnion ty
 whnfOp (OIntersection ty) = setIntersection ty
 whnfOp (ODifference ty)   = setDifference ty
@@ -593,21 +553,6 @@ uNumOp' f [c] = do
   VNum d <$> f m
 uNumOp' _ _ = error "Impossible! Second argument to uNumOp' has length /= 1"
 
--- | For performing a modular unary operation within a finite type
-modArithUn :: (Rational -> Rational) -> Integer -> [Core] -> Disco IErr Value
-modArithUn op n [c] = do
-  VNum _ r <- whnf c
-  modOp (op r) (n % 1)
-modArithUn _ _ _ = error "Impossible! modArithUn error (too many Cores)"
-
--- | For performing a modular binary operation within a finite type.
-modArithBin :: (Rational -> Rational -> Rational) -> Integer -> [Core] -> Disco IErr Value
-modArithBin op n [c1,c2] = do
-  VNum _ r1 <- whnf c1
-  VNum _ r2 <- whnf c2
-  modOp (op r1 r2) (n % 1)
-modArithBin _ _ _ = error "Impossible! modArithBin error (wrong # of Cores)"
-
 -- | For performing modular division within a finite type.
 modDiv :: Integer -> [Core] -> Disco IErr Value
 modDiv n [c1,c2] = do
@@ -615,7 +560,7 @@ modDiv n [c1,c2] = do
   VNum _ b <- whnf c2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
-    Nothing -> throwError DivByZero
+    Nothing           -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 
 modDivides :: Integer -> [Core] -> Disco IErr Value
@@ -626,17 +571,22 @@ modDivides n [c1,c2] = do
 
 modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
 
-
 -- | For performing modular exponentiation within a finite type.
 modExp :: Integer -> [Core] -> Disco IErr Value
 modExp n [c1,c2] = do
   VNum _ r1 <- whnf c1
   VNum _ r2 <- whnf c2
-  let a = numerator r1
-  let b = numerator r2
-  let v = powSomeMod (a `modulo` fromInteger n) b
-  case v of
-    SomeMod v' -> return $ vnum (getVal v' % 1)
+  let base = numerator r1 `modulo` fromInteger n
+      ma = if (numerator r2 >= 0)
+             then Just base
+             else invertSomeMod base
+      b = abs (numerator r2)
+  case ma of
+    Nothing -> throwError DivByZero
+    Just a  ->
+      case powSomeMod a b of
+        SomeMod v' -> return $ vnum (getVal v' % 1)
+        InfMod {}  -> error "Impossible, got InfMod in modExp"
 modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
@@ -699,13 +649,6 @@ divOp :: Rational -> Rational -> Disco IErr Value
 divOp _ 0 = throwError DivByZero
 divOp m n = return $ vnum (m / n)
 
--- | Perform a saturating subtraction on two natural numbers. If the second argument
---   is greater than the first, return 0.
-ssubOp :: Rational -> Rational -> Rational
-ssubOp m n
-  | n > m     = 0
-  | otherwise = m - n
-
 -- | Perform a mod operation; throw division by zero error if the
 --   second argument is zero.  Although this function takes two
 --   'Rational' arguments, note that if the disco program typechecks
@@ -716,12 +659,6 @@ modOp m n
   | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
-
--- | Perform a boolean operation.
-boolOp :: (Bool -> Bool -> Bool) -> [Core] -> Disco IErr Value
-boolOp (#) cs = do
-  [VCons i [], VCons j []] <- mapM whnf cs
-  return . mkEnum $ toEnum i # toEnum j
 
 -- | Test whether one number divides another.
 divides :: Rational -> Rational -> Bool
@@ -741,9 +678,9 @@ multinomOp [c1, c2] = do
   return . vnum $ multinomial (numerator n) (asList ks) % 1
   where
     asList :: Value -> [Integer]
-    asList (VCons 0 _) = []
+    asList (VCons 0 _)              = []
     asList (VCons 1 [VNum _ k, ks]) = numerator k : asList ks
-    asList v = error $ "multinomOp.asList " ++ show v
+    asList v                        = error $ "multinomOp.asList " ++ show v
 
     multinomial :: Integer -> [Integer] -> Integer
     multinomial _ []     = 1
@@ -758,13 +695,6 @@ fact :: Rational -> Disco IErr Rational
 fact (numerator -> n)
   | n > fromIntegral (maxBound :: Int) = throwError Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
-
--- | Perform boolean negation.
-notOp :: [Core] -> Disco IErr Value
-notOp [c] = do
-  VCons i [] <- whnf c
-  return . mkEnum . not . toEnum $ i
-notOp _ = error "Impossible! notOp called on list of length /= 1"
 
 ------------------------------------------------------------
 -- Equality testing
@@ -896,7 +826,7 @@ enumerate (TySum ty1 ty2)  =
 -- values from the enumeration of @ty2@, and make a function by
 -- zipping each one together with the values of @ty1@.
 enumerate (TyArr ty1 ty2)
-  | isEmptyTy ty1 = [VFun (ValFun $ \_ -> error "void!!")]
+  | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
   | isEmptyTy ty2 = []
   | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
   where
@@ -907,7 +837,7 @@ enumerate (TyArr ty1 ty2)
     -- association list.
     mkFun :: [Value] -> Value
     mkFun outs
-      = VFun . ValFun $ \v ->
+      = VFun $ \v ->
         snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
 
     -- A custom version of fromJust' so we get a better error message
@@ -934,7 +864,7 @@ decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
 decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
-decideEqForRnf (TyArr ty1 ty2) (VFun (ValFun f1)) (VFun (ValFun f2))
+decideEqForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 

@@ -129,6 +129,7 @@ library
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.AST.Core
+                       Disco.AST.Desugared
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
@@ -138,6 +139,7 @@ library
                        Disco.Pretty
                        Disco.Property
                        Disco.Desugar
+                       Disco.Compile
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst
@@ -148,6 +150,7 @@ library
                        Disco.Typecheck.Unify
                        Disco.Types
                        Disco.Types.Rules
+                       Disco.Util
 
   other-extensions:
                        GADTs

@@ -184,6 +184,7 @@ pattern DGPat embedt pat = GPat_ () embedt pat
 type DPattern = Pattern_ DS
 
 type instance X_PVar     DS = Embed Type
+type instance X_PDup     DS = Void        -- duplicated vars desugar to equality checks
 type instance X_PWild    DS = Embed Type
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()

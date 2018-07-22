@@ -100,6 +100,7 @@ module Disco.AST.Generic
 
        , Pattern_ (..)
        , X_PVar
+       , X_PDup
        , X_PWild
        , X_PUnit
        , X_PBool
@@ -438,6 +439,7 @@ instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
 ------------------------------------------------------------
 
 type family X_PVar e
+type family X_PDup e
 type family X_PWild e
 type family X_PUnit e
 type family X_PBool e
@@ -454,6 +456,10 @@ data Pattern_ e where
 
   -- | Variable pattern: matches anything and binds the variable.
   PVar_  :: X_PVar e -> Name (Term_ e) -> Pattern_ e
+
+  -- | Duplicate variable in a non-linear pattern.  The Int refers to
+  --   the binder (counting L-R through the enclosing pattern).
+  PDup_  :: X_PDup e -> Int -> Pattern_ e
 
   -- | Wildcard pattern @_@: matches anything.
   PWild_ :: X_PWild e -> Pattern_ e
@@ -489,6 +495,7 @@ data Pattern_ e where
 
 type ForallPattern (a :: * -> Constraint) e
       = ( a (X_PVar e)
+        , a (X_PDup e)
         , a (X_PWild e)
         , a (X_PUnit e)
         , a (X_PBool e)

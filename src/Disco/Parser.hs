@@ -1,9 +1,5 @@
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE MultiWayIf      #-}
-{-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
 --
@@ -53,9 +49,9 @@ module Disco.Parser
        where
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name)
+                                                   name2String, string2Name)
 
-import           Text.Megaparsec                  hiding (runParser)
+import           Text.Megaparsec                  hiding (State, runParser)
 import qualified Text.Megaparsec                  as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer       as L
@@ -65,6 +61,7 @@ import           Control.Applicative              (many, (<|>))
 import           Control.Lens                     (makeLenses, use, (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
+import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
@@ -339,7 +336,7 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 --   or single definition clause).
 parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn
- 
+
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
@@ -350,7 +347,10 @@ parseDefn :: Parser Decl
 parseDefn = label "definition" $
   DDefn
   <$> ident
-  <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+  <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPatternTop
+                                  <*> (symbol "=" *> parseTerm)
+                            )
+      )
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -524,8 +524,11 @@ parseGuard = parseGBool <|> parseGPat
   where
     parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
     parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
-                      <*> (reserved "is" *> parsePattern)
+                      <*> (reserved "is" *> parsePatternTop)
 
+-- | XXX
+parseAtomicPatternTop :: Parser Pattern
+parseAtomicPatternTop = replaceRepeatedPVars <$> parseAtomicPattern
 
 -- | Parse an atomic pattern.
 parseAtomicPattern :: Parser Pattern
@@ -543,6 +546,11 @@ tuplePat []  = PUnit
 tuplePat [x] = x
 tuplePat t   = PTup t
 
+-- | Parse a pattern which could be nonlinear, replacing any repeated
+--   variables by @PDup@ constructors.
+parsePatternTop :: Parser Pattern
+parsePatternTop = replaceRepeatedPVars <$> parsePattern
+
 -- | Parse a pattern.
 parsePattern :: Parser Pattern
 parsePattern = makeExprParser parseAtomicPattern table
@@ -555,6 +563,32 @@ parsePattern = makeExprParser parseAtomicPattern table
             ]
     prefix name fun = Prefix (reserved name >> return fun)
     infixR name fun = InfixR (reservedOp name >> return fun)
+
+-- | XXX
+replaceRepeatedPVars :: Pattern -> Pattern
+replaceRepeatedPVars = flip evalState (0, M.empty) . go
+  where
+    go :: Pattern -> State (Int, Map String Int) Pattern
+
+    go (PVar x)      = do
+      (n, m) <- get
+      let xName = name2String x
+      case M.lookup xName m of
+        Just i  -> return $ PDup i
+        Nothing -> do
+          put (n+1, M.insert xName n m)
+          return $ PVar x
+
+    go (PDup _)      = error "Impossible! replaceRepeatedPVars PDup"
+    go PWild         = return PWild
+    go PUnit         = return PUnit
+    go (PBool b)     = return $ PBool b
+    go (PTup ps)     = PTup <$> mapM go ps
+    go (PInj s p)    = PInj s <$> go p
+    go (PNat n)      = return $ PNat n
+    go (PSucc p)     = PSucc <$> go p
+    go (PCons p1 p2) = PCons <$> go p1 <*> go p2
+    go (PList ps)    = PList <$> mapM go ps
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

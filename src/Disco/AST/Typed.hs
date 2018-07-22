@@ -58,6 +58,7 @@ module Disco.AST.Typed
 
        , APattern
        , pattern APVar
+       , pattern APDup
        , pattern APWild
        , pattern APUnit
        , pattern APBool
@@ -236,6 +237,7 @@ type APattern = Pattern_ TY
 -- inside the types being treated as binders!
 
 type instance X_PVar     TY = Embed Type
+type instance X_PDup     TY = Embed Type
 type instance X_PWild    TY = Embed Type
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
@@ -252,6 +254,11 @@ pattern APVar :: Type -> Name ATerm -> APattern
 pattern APVar ty name <- PVar_ (unembed -> ty) name
   where
     APVar ty name = PVar_ (embed ty) name
+
+pattern APDup :: Type -> Int -> APattern
+pattern APDup ty i <- PDup_ (unembed -> ty) i
+  where
+    APDup ty i = PDup_ (embed ty) i
 
 pattern APWild :: Type -> APattern
 pattern APWild ty <- PWild_ (unembed -> ty)

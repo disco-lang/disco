@@ -35,8 +35,16 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
+import           Control.Monad.State
 
+import           Control.Lens                     (makeLenses, toListOf, use,
+                                                   (%=), (<+=))
 import           Data.Coerce
+import qualified Data.Foldable                    as F
+import           Data.Map                         (Map, (!))
+import qualified Data.Map                         as M
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Desugared
@@ -45,6 +53,8 @@ import           Disco.AST.Typed
 import           Disco.Syntax.Operators
 import           Disco.Typecheck
 import           Disco.Types
+
+import           Debug.Trace
 
 ------------------------------------------------------------
 -- Desugaring monad
@@ -99,6 +109,25 @@ tsingleton :: ATerm -> ATerm
 tsingleton t = ATContainer (TyList (getType t)) ListContainer [t] Nothing
 
 ------------------------------------------------------------
+-- XXX
+------------------------------------------------------------
+
+data PatternState = PS
+  { _nextIndex :: Int
+  , _indexMap  :: Map Int (Name DTerm)
+  , _groupMap  :: Map (Name DTerm) (Set (Name DTerm))
+  }
+
+initPatternState :: PatternState
+initPatternState = PS
+  { _nextIndex = 0
+  , _indexMap  = M.empty
+  , _groupMap  = M.empty
+  }
+
+makeLenses ''PatternState
+
+------------------------------------------------------------
 -- Definition desugaring
 ------------------------------------------------------------
 
@@ -129,7 +158,7 @@ desugarDefn (Defn _ patTys bodyTy def) = do
     mkBranch :: [(Name DTerm, Type)] -> ATerm -> [APattern] -> DSM DBranch
     mkBranch xs b ps = do
       b'  <- desugarTerm b
-      let ps' = map desugarPattern ps
+      let ps' = map desugarPatternTop ps
       return $ bind (mkGuards xs ps') b'
 
     mkGuards :: [(Name DTerm, Type)] -> [DPattern] -> Telescope DGuard
@@ -249,7 +278,7 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp ty ListContainer bqt) = do
+desugarTerm (ATContainerComp _ ListContainer bqt) = do
   (qs, t) <- unbind bqt
   desugarComp t qs
 
@@ -378,7 +407,7 @@ desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
       return $ DGPat (embed dt) (DPBool True)
     desugarGuard (AGPat (unembed -> at) p) = do
       dt <- desugarTerm at
-      return $ DGPat (embed dt) (desugarPattern p)
+      return $ DGPat (embed dt) (desugarPatternTop p)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
@@ -395,18 +424,39 @@ desugarContainer ty ListContainer es Nothing =
 desugarContainer ty c es mell =
   DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell
 
--- | Desugar a pattern.
-desugarPattern :: APattern -> DPattern
-desugarPattern (APVar ty x)      = DPVar ty (coerce x)
-desugarPattern (APWild ty)       = DPWild ty
-desugarPattern APUnit            = DPUnit
-desugarPattern (APBool b)        = DPBool b
+-- XXX could have multiple patterns in a definition that have nonlinearity among them!
+--     have to figure out how to deal with this properly.
+--   e.g.   f : a -> a -> Bool
+--          f x x = True
+--          f x y = False
+
+-- | Desugar a pattern. XXX
+desugarPatternTop :: APattern -> DPattern
+desugarPatternTop = flip evalState initPatternState . runFreshMT . desugarPattern
+
+desugarPattern :: APattern -> FreshMT (State PatternState) DPattern
+desugarPattern (APVar ty x)      = do
+  n <- (nextIndex <+= 1)
+  let x' = coerce x
+  indexMap %= M.insert n x'
+  return $ DPVar ty x'
+desugarPattern (APDup ty i)      = do
+  im <- use indexMap
+  let x = im ! i
+  x' <- fresh x
+  groupMap %= M.insertWith S.union x (S.singleton x')
+  return $ DPVar ty x'
+
+desugarPattern (APWild ty)       = return $ DPWild ty
+desugarPattern APUnit            = return DPUnit
+desugarPattern (APBool b)        = return $ DPBool b
 desugarPattern (APTup _ p)       = desugarTuplePats p
-desugarPattern (APInj ty s p)    = DPInj ty s (desugarPattern p)
-desugarPattern (APNat ty n)      = DPNat ty n
-desugarPattern (APSucc p)        = DPSucc (desugarPattern p)
-desugarPattern (APCons ty p1 p2) = DPCons ty (desugarPattern p1) (desugarPattern p2)
-desugarPattern (APList ty ps)    = foldr (DPCons eltTy . desugarPattern) (DPNil ty) ps
+desugarPattern (APInj ty s p)    = DPInj ty s <$> desugarPattern p
+desugarPattern (APNat ty n)      = return $ DPNat ty n
+desugarPattern (APSucc p)        = DPSucc <$> desugarPattern p
+desugarPattern (APCons ty p1 p2) = DPCons ty <$> desugarPattern p1 <*> desugarPattern p2
+desugarPattern (APList ty ps)    =
+  F.foldrM (\a d -> DPCons eltTy <$> desugarPattern a <*> pure d) (DPNil ty) ps
   where
     eltTy = case ty of
       TyList e -> e
@@ -414,9 +464,9 @@ desugarPattern (APList ty ps)    = foldr (DPCons eltTy . desugarPattern) (DPNil 
 
 -- | Desugar a tuple pattern into nested pair patterns.  For example,
 --   the pattern @(a,b,c,d)@ turns into @(a,(b,(c,d)))@.
-desugarTuplePats :: [APattern] -> DPattern
+desugarTuplePats :: [APattern] -> FreshMT (State PatternState) DPattern
 desugarTuplePats []     = error "Impossible! desugarTuplePats []"
 desugarTuplePats [p]    = desugarPattern p
-desugarTuplePats (p:ps) = mkDPPair (desugarPattern p) (desugarTuplePats ps)
+desugarTuplePats (p:ps) = mkDPPair <$> desugarPattern p <*> desugarTuplePats ps
   where
     mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2

@@ -79,6 +79,7 @@ module Disco.AST.Surface
 
        , Pattern
        , pattern PVar
+       , pattern PDup
        , pattern PWild
        , pattern PUnit
        , pattern PBool
@@ -289,20 +290,24 @@ pattern GPat embedt pat = GPat_ () embedt pat
 
 type Pattern = Pattern_ UD
 
-type instance X_PVar UD    = ()
-type instance X_PWild UD   = ()
-type instance X_PUnit UD   = ()
-type instance X_PBool UD   = ()
-type instance X_PTup UD    = ()
-type instance X_PInj UD    = ()
-type instance X_PNat UD    = ()
-type instance X_PSucc UD   = ()
-type instance X_PCons UD   = ()
-type instance X_PList UD   = ()
+type instance X_PVar    UD = ()
+type instance X_PDup    UD = ()
+type instance X_PWild   UD = ()
+type instance X_PUnit   UD = ()
+type instance X_PBool   UD = ()
+type instance X_PTup    UD = ()
+type instance X_PInj    UD = ()
+type instance X_PNat    UD = ()
+type instance X_PSucc   UD = ()
+type instance X_PCons   UD = ()
+type instance X_PList   UD = ()
 type instance X_Pattern UD = ()
 
 pattern PVar :: Name Term -> Pattern
 pattern PVar name = PVar_ () name
+
+pattern PDup :: Int -> Pattern
+pattern PDup i = PDup_ () i
 
 pattern PWild :: Pattern
 pattern PWild = PWild_ ()

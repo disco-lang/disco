@@ -1,0 +1,12 @@
+f : N*N -> N
+f (x,x) = x
+f (x,y) = x + y
+
+g : N * List N -> N
+g (x,[x])     = 0
+g (x,[x,x,x]) = 1
+g (x,[y,y,x]) = 2
+g (x,[y,y,z]) = 3
+g (x,[y,z,q]) = 4
+g (x,(x :: [y])) = 5
+g (_,_) = 6

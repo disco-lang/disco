@@ -312,3 +312,28 @@ Talked about this with Harley Eades.  Apply for grant to develop this?
 
   Layout parsing:
     http://hackage.haskell.org/package/located
+
+* Nonlinear patterns
+
+  Trickier than I thought.  The problem is that once we've done "bind"
+  it's too late, because upon unbinding, the variables in the pattern
+  will be chosen to be distinct.
+
+  Basically we need to take care of this while parsing.
+  - Add a new constructor for "back references" (in place of
+    variables), which store some kind of de Bruijn index, or just an
+    index counting unique variables in the pattern.
+
+  - Keep track of which variable names we've seen while parsing a
+    pattern.
+
+  - When we see a name again, store it as a back reference.  These
+    don't bind anything of course.
+
+  When typechecking, need to similarly keep track of types of
+  variables we've seen and their indices, and be able to look them up
+  when encountering a "duplicate" variable.
+
+  When desugaring, we have to replace duplicate markers with fresh
+  names, and generate sets of variables that need to be tested for
+  equality.

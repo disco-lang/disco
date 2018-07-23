@@ -15,8 +15,8 @@ map w = w + 1
 
 type Triplet = (Nat * Nat * Nat)
 
-sumTriplet : Triplet -> Nat
-sumTriplet (root, l, r) = root + l + r
+sumTripletList : List (N * N * N) -> N
+sumTripletList ((n1, n2, n3) :: rest) = (n1 + n2 + n3 + (sumTripletList rest))
 
 type Tree = Nat + (Nat * Tree * Tree)
 

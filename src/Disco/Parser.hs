@@ -214,7 +214,7 @@ decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char 
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
-reserved w = lexeme $ string w *> notFollowedBy alphaNumChar
+reserved w = (lexeme . try) $ string w *> notFollowedBy alphaNumChar
 
 -- | The list of all reserved words.
 reservedWords :: [String]

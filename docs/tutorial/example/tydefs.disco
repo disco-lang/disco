@@ -1,18 +1,3 @@
-type Wahoo = Cat
-
-type Cat = Corn
-
-type Corn = Rain
-
-type Rain = Groot
-
-type Groot = Bat
-
-type Bat = Nat
-
-incr : Wahoo -> Wahoo
-incr w = w + 1
-
 type Triplet = (Nat * Nat * Nat)
 
 sumTripletList : List (N * N * N) -> N

@@ -11,6 +11,7 @@ returns the sum of all the triplets in the list:
 ::
 
 	sumTripletList : List (Nat * Nat * Nat) -> Nat
+	sumTripletList [] = 0
 	sumTripletList ((n1, n2, n3) :: rest) = (n1 + n2 + n3 + (sumTripletList rest))
 
 ::  Disco> sumTripletList [(1,2,3), (4,5,6)]

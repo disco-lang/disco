@@ -125,7 +125,8 @@ handleCMD s =
 handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
-  let mat = runTCM (extends ctx $ inferTop t)
+  tymap <- use topTyDefns
+  let mat = runTCM (extends ctx $ extendTyDefs tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right ((at, sig), _) -> do

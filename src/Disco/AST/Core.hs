@@ -22,6 +22,7 @@ module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
+       , PrimType(..)
        , Op(..)
 
          -- * Case expressions and patterns
@@ -57,7 +58,7 @@ data Core where
   -- | A variable.
   CVar  :: Name Core -> Core
 
-  CMap :: Type -> Core
+  CPrim :: PrimType -> Type -> Core
 
   -- | A constructor, identified by number, with arguments.  For
   --   example, false and true are represented by @CCons 0 []@ and
@@ -109,6 +110,13 @@ data Core where
 
 
 
+  deriving (Show, Generic)
+
+-- | Signifies the specific type of primitive
+--   core
+data PrimType = PMap
+              | PStoM
+              | PMtoS
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
@@ -200,6 +208,7 @@ data CPattern where
 
 instance Alpha RationalDisplay
 instance Alpha Core
+instance Alpha PrimType
 instance Alpha Op
 instance Alpha CPattern
 instance Alpha CQual

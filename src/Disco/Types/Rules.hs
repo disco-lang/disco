@@ -68,6 +68,7 @@ arity CPair = [Co, Co]
 arity CSum  = [Co, Co]
 arity CList = [Co]
 arity CSet  = [Co]
+arity CMultiset = [Co]
 
 ------------------------------------------------------------
 -- Qualifiers

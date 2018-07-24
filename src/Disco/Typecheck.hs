@@ -511,6 +511,14 @@ infer (TPrim "mapSet") = do
   a <- freshTy
   b <- freshTy
   return $ (ATPrim (TyArr (TyArr a b) (TyArr (TySet a) (TySet b))) "mapSet", CTrue)
+
+infer (TPrim "setToMultiset") = do
+  a <- freshTy
+  return  (ATPrim (TyArr (TySet a) (TyMultiset a)) "setToMultiset", CTrue)
+
+infer (TPrim "multisetToSet") = do
+  a <- freshTy
+  return (ATPrim (TyArr (TyMultiset a) (TySet (TyPair a TyN))) "multisetToSet", CTrue)
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.
 infer (TApp t t')   = do
@@ -847,6 +855,7 @@ inferQual c (QBind x (unembed -> t))  = do
   case (c, getType at) of
     (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
     (SetContainer, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
+    (MultisetContainer, TyMultiset ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
     (_, wrongTy)   -> throwError $ NotCon (containerToCon c) t wrongTy
 
 inferQual _ (QGuard (unembed -> t))   = do

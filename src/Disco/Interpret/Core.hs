@@ -197,8 +197,14 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
 
-whnf (CMap ty) =
+whnf (CPrim PMap ty) =
   return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
+
+whnf (CPrim PStoM _) =
+  return $ VFun (ValFun (\s -> VDelay (ValDelay (setToMultiset s))))
+
+whnf (CPrim PMtoS _) =
+  return $ VFun (ValFun (\m -> VDelay (ValDelay (multisetToSet m))))
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
@@ -276,11 +282,21 @@ countElements ty (x:xs) = do
   countedXs <- countElements ty xs
   countInsert ty x countedXs
 
-countInsert :: Type -> Value -> [(Value, Integer)] -> Disco IErr[(Value, Integer)]
+countInsert :: Type -> Value -> [(Value, Integer)] -> Disco IErr [(Value, Integer)]
 countInsert _ v [] = return [(v, 1)]
 countInsert t v1 ((v2, n):xs) = do
   isElem <- decideEqFor t v1 v2
   if isElem then return $ (v2, n+1):xs else ((v2, n):) <$> countInsert t v1 xs
+
+setToMultiset :: Value -> Disco IErr Value
+setToMultiset s = do
+  (VSet xs) <- whnfV s
+  return $ VMultiset (map (\x -> (x, 1)) xs)
+
+multisetToSet :: Value -> Disco IErr Value
+multisetToSet m = do
+  (VMultiset xs) <- whnfV m
+  return $ VSet (map (\(v,n) -> VCons 0 [v, VNum Fraction (n % 1)]) xs)
 
 
 -- | Reduce an application to weak head normal form (WHNF).

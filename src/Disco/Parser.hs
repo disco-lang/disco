@@ -224,6 +224,7 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet", "mapSet"
+  , "setToMultiset", "multisetToSet"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
@@ -382,6 +383,8 @@ parseAtom = label "expression" $
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
   <|> TPrim <$> ("mapSet" <$ reserved "mapSet")
+  <|> TPrim <$> ("setToMultiset" <$ reserved "setToMultiset")
+  <|> TPrim <$> ("multisetToSet" <$ reserved "multisetToSet")
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom

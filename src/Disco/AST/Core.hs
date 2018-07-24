@@ -65,9 +65,6 @@ data Core where
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
-  -- | A list comprehension.
-  CListComp :: Bind (Telescope CQual) Core -> Core
-
   -- | A list with an ellipsis.
   CEllipsis :: [Core] -> Ellipsis Core -> Core
 
@@ -109,7 +106,6 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
-        | OSSub    -- ^ Saturating subtraction on natural numbers (@.-@ / @∸)
         | OSqrt    -- ^ Integer square root (@sqrt@)
         | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor   -- ^ Floor of fractional type (@floor@)
@@ -118,9 +114,6 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMul     -- ^ Multiplication (@*@)
         | ODiv     -- ^ Division (@/@)
         | OExp     -- ^ Exponentiation (@^@)
-        | OAnd     -- ^ Logical and (@&&@ / @and@)
-        | OOr      -- ^ Logical or (@||@ / @or@)
-        | ONot     -- ^ Arithmetic negation (@not@)
         | OMod     -- ^ Modulo (@mod@)
         | ODivides -- ^ Divisibility test (@|@)
         | OBinom   -- ^ Binomial coefficient (@choose@)
@@ -136,15 +129,12 @@ data Op = OAdd     -- ^ Addition (@+@)
                    --   ordering relation.
         | OEnum
         | OCount
-    -- Need some new operators for doing arithmetic with finite types
-        | OMAdd  Integer
-        | OMMul  Integer
-        | OMSub  Integer
-        | OMSSub Integer
-        | OMNeg  Integer
+
+        -- Arithmetic operators with special runtime behavior for finite types
         | OMDiv  Integer
         | OMExp  Integer
         | OMDivides Integer
+
         -- Set Operations
         | OSize    -- ^ Size of two sets (@size@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)

@@ -620,6 +620,11 @@ data Rels = Rels
 --   variable predecessors and successors in the constraint graph.
 type RelMap = Map (Name Type, Dir) Rels
 
+-- | Modify a @RelMap@ to record the fact that we have solved for a
+--   type variable.  In particular, delete the variable from the
+--   @RelMap@ as a key, and also update the relative sets of every
+--   other variable to remove this variable and add the base type we
+--   chose for it.
 substRel :: Name Type -> BaseTy -> RelMap -> RelMap
 substRel x ty
   = M.delete (x,SuperTy)

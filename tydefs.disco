@@ -1,0 +1,4 @@
+type Wahoo = List a
+
+map : Wahoo -> Wahoo
+map w = w

@@ -12,9 +12,9 @@ Consider the task of incrementing each number in a list of natural numbers. In o
 
 ::
 	
-	incr : List N -> List N
-	incr [] = []
-	incr (a :: as) = (a + 1) :: (incr as)
+	incr1 : List N -> List N
+	incr1 [] = []
+	incr1 (a :: as) = (a + 1) :: (incr as)
 
 ::
 
@@ -25,16 +25,16 @@ Now consider the task of producing a list of singleton lists containing each ele
 
 ::
 
-	single : List Z -> List (List Z)
-	single [] = []
-	single (a :: as) = [a] :: (single as)
+	single1 : List Z -> List (List Z)
+	single1 [] = []
+	single1 (a :: as) = [a] :: (single as)
 
 :: 
 
 	Disco> single [-1,2,-3]
 	[[-1],[2],[-3]]
 
-Do you see the similarities between the two functions? Both functions take a list, apply a function to each element in the list, concatenate the results into a new list, and return this new list. This pattern emerges quite often, and it would be tedious to have to write this same structure twice for two functions as similar as ``incr`` and ``single``. Instead, since generalization is the bread and butter of programming, we can capture the essence of the above pattern with the following polymorphic function:
+Do you see the similarities between the two functions? Both functions take a list, apply a function to each element in the list, concatenate the results into a new list, and return this new list. This pattern emerges quite often, and it would be tedious to have to write this same structure twice for two functions as similar as ``incr1`` and ``single1``. Instead, since generalization is the bread and butter of programming, we can capture the essence of the above pattern with the following polymorphic function:
 
 ::
 	
@@ -48,43 +48,37 @@ The function ``map`` is a polymorphic, higher-order function which takes as inpu
 	
 	-- map : for all types a and b, (a -> b) -> List a -> List b
 
-Now we can rewrite the functions ``incr`` and ``single`` as follows:
+Now we can rewrite the functions ``incr1`` and ``single1`` as follows:
 
 ::
 
-	incr' : List N -> List N
-	incr' l = let f = \(x : N). x + 1 in map f l
+	incr2 : List N -> List N
+	incr2 l = let f = \(x : N). x + 1 in map f l
 
 ::
 
-	single' : List Z -> List (List Z)
-	single' l = let f = \(x : Z). [x] in map f l
+	single2 : List Z -> List (List Z)
+	single2 l = let f = \(x : Z). [x] in map f l
 
 It's a good idea to try these functions out and verify that they produce the same outputs as their non-generic counterparts.
 
-Note that the definition of ``single'`` doesn't require it's argument to be a list of Integers. Therefore, we can make ``single'`` polymorphic by changing its' type annotation apporpriately. We can also remove the type ascription from ``x`` in the lambda and Disco will infer that the lambda is polymorphic!
+Note that the definition of ``single2`` doesn't require it's argument to be a list of Integers. Therefore, we can make ``single2`` polymorphic by changing its' type annotation apporpriately. We can also remove the type ascription from ``x`` in the lambda and Disco will infer that the lambda is polymorphic!
 
 ::
 
-	single'' : List a -> List (List a)
-	single'' l = let f = \x. [x] in map f l
+	single3 : List a -> List (List a)
+	single3 l = let f = \x. [x] in map f l
 
 Other common polymorphic, higher-order functions include ``foldr`` and ``filter``:
 
 ::
 
-   f(x) = \begin{cases}
-            x+2           & x < 0 \\
-            x^2 - 3x + 2  & 0 \leq x < 10 \\
-            5 - x         & \text{otherwise}
-          \end{cases}
-
 	filter : (a -> Bool) -> List a -> List a
 	filter _ [] = []
-	filter f (a :: as) = \begin{cases}
-	                       a :: (filter f as)   & if f a \\
-          				   filter f as          & \text{otherwise}
-       				 	 \end{cases}
+	filter f (a :: as) = {?
+                           a :: (filter f as)   if f a
+                           filter f as          otherwise
+                         ?}
 
 ::
 

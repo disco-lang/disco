@@ -27,7 +27,7 @@ module Disco.Typecheck
        ( -- * Type checking monad
          TCM, TyCtx, runTCM, evalTCM, execTCM, extendTyDefs
          -- ** Definitions
-       , Defn, DefnCtx
+       , Defn(..), DefnCtx
          -- ** Errors
        , TCError(..)
 
@@ -56,13 +56,15 @@ module Disco.Typecheck
 import           Prelude                                 hiding (lookup)
 
 import           Control.Applicative                     ((<|>))
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (use, (%~), (&), _1,
-                                                          _2)
+import           GHC.Generics                            (Generic)
+
+import           Control.Arrow                           ((&&&), (***))
+import           Control.Lens                            ((%~), (&), _1, _2, use)
+
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
-import           Data.Bifunctor                          (second)
+import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
@@ -87,7 +89,14 @@ import           Disco.Types.Rules
 --   function being defined.  For example, given the concrete syntax
 --   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
 --   something like @[n, (x,y)] (n*x + y)@.
-type Defn  = [Bind [APattern] ATerm]
+data Defn  = Defn (Name ATerm) [Type] Type [Clause]
+  deriving (Show, Generic)
+
+-- | A clause in a definition consists of a list of patterns (the LHS
+--   of the =) and a term (the RHS)
+type Clause = Bind [APattern] ATerm
+
+instance Subst Type Defn
 
 -- | A tuple container a map from definition names to definitions
 --   and a map from type definition names to types.
@@ -265,13 +274,13 @@ check (TAbs lam) ty = do
   -- ... -> resTy, where the types ty1, ty2 ... match up with any
   -- types declared for the arguments to the lambda (e.g.  (x:tyA)
   -- (y:tyB) -> ...).
-  (ctx, resTy, cst1) <- checkArgs args ty (TAbs lam)
+  (ctx, typedArgs, resTy, cst1) <- checkArgs args ty (TAbs lam)
 
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
   extends ctx $ do
   (at, cst2) <- check t resTy
-  return (ATAbs ty (bind (coerce args) at), cAnd [cst1, cst2])
+  return (ATAbs ty (bind (coerce typedArgs) at), cAnd [cst1, cst2])
 
 -- To check an injection has a sum type, recursively check the
 -- relevant type.
@@ -367,11 +376,13 @@ containerToCon SetContainer  = CSet
 --   (taken either from their annotation or from the type to be
 --   checked, as appropriate) which we can use to extend when checking
 --   the body, along with the result type of the function.
-checkArgs :: [(Name Term, Embed (Maybe Type))] -> Type -> Term ->  TCM (TyCtx, Type, Constraint)
+checkArgs
+  :: [(Name Term, Embed (Maybe Type))] -> Type -> Term
+  ->  TCM (TyCtx, [(Name Term, Embed Type)], Type, Constraint)
 
 -- If we're all out of arguments, the remaining checking type is the
 -- result, and there are no variables to bind in the context.
-checkArgs [] ty _ = return (emptyCtx, ty, CTrue)
+checkArgs [] ty _ = return (emptyCtx, [], ty, CTrue)
 
 -- Take the next variable and its annotation; the checking type must
 -- be a function type ty1 -> ty2.
@@ -392,11 +403,11 @@ checkArgs ((x, unembed -> mty) : args) ty term = do
 
   -- Check the rest of the arguments under the type ty2, returning a
   -- context with the rest of the arguments and the final result type.
-  (ctx, resTy, cst3) <- checkArgs args ty2 term
+  (ctx, typedArgs, resTy, cst3) <- checkArgs args ty2 term
 
   -- Pass the result type through, and add x with its type to the
   -- generated context.
-  return (singleCtx x (toSigma xTy) `joinCtx` ctx, resTy, cAnd [cst1, cst2, cst3])
+  return (singleCtx x (toSigma xTy) `joinCtx` ctx, (x, embed xTy) : typedArgs, resTy, cAnd [cst1, cst2, cst3])
 
 
 -- | Check the types of terms in a tuple against a nested
@@ -508,13 +519,13 @@ infer (TRat r)      = return $ (ATRat r, CTrue)
 
 -- To infer an injection has a sum type, recursively check the
 -- relevant type, and generate a type
-infer lt@(TInj L t) = do
+infer (TInj L t) = do
   (at, cst) <- infer t
   let ty = getType at
   tyv <- freshTy
   return (ATInj (TySum ty tyv) L at, cst)
 
-infer lt@(TInj R t) = do
+infer (TInj R t) = do
   (at, cst) <- infer t
   let ty = getType at
   tyv <- freshTy
@@ -525,19 +536,16 @@ infer lt@(TInj R t) = do
 infer (TAbs lam)    = do
   (args, t) <- unbind lam
   let (xs, mtys) = unzip args
-  case sequence (map unembed mtys) of
-    Nothing  -> do
-      tyvs <- mapM (const freshTy) xs
-      let tymap = M.fromList $ zip xs (map toSigma tyvs)
-      extends tymap $ do
-      (at, cst) <- infer t
-      return (ATAbs (mkFunTy tyvs (getType at))
-                     (bind (zip (map coerce xs) (map (embed . Just) tyvs)) at), cst)
-    Just tys -> extends (M.fromList $ zip xs (map toSigma tys)) $ do
-      (at, cst) <- infer t
-      return (ATAbs (mkFunTy tys (getType at))
-                     (bind (zip (map coerce xs) (map (embed . Just) tys)) at), cst)
+  tys <- mapM subs (map unembed mtys)
+  let tymap = M.fromList $ zip xs (map toSigma tys)
+  extends tymap $ do
+  (at, cst) <- infer t
+  return (ATAbs (mkFunTy tys (getType at))
+                (bind (zip (map coerce xs) (map embed tys)) at), cst)
   where
+    subs :: Maybe (Type) -> TCM Type
+    subs (Just ty) = return ty
+    subs _         = freshTy
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
     mkFunTy tys out = foldr TyArr out tys
@@ -656,8 +664,11 @@ infer (TBin Choose t1 t2) = do
 
   -- t2 can be either a Nat (a binomial coefficient)
   -- or a list of Nat (a multinomial coefficient).
-  (at2, cst2) <- check t2 TyN <|> check t2 (TyList TyN)
-  return (ATBin TyN Choose at1 at2, cAnd [cst1, cst2])
+  (at2, cst2) <- infer t2
+  let ty2 = getType at2
+  return ( ATBin TyN Choose at1 at2
+         , cAnd [cst1, cst2, COr [CEq ty2 TyN, CEq ty2 (TyList TyN)]]
+         )
 
 -- To infer the type of a cons:
 infer (TBin Cons t1 t2) = do
@@ -684,10 +695,10 @@ infer (TBin Cons t1 t2) = do
           return (ATBin (TyList tyv) Cons at1 at2, cAnd [cst1, cst2, CSub ty1 tyv, CSub ty2 tyv])
         ty -> throwError (NotCon CList t2 ty)
 
---To infer the type of the size of a list:
+-- To infer the type of the size of a list:
 infer (TUn Size t) = do
   (at, cst0) <- infer t
-  ([tyElt], cst1) <- ensureConstr CSet (getType at) (Left t)
+  (_, cst1) <- ensureConstr CSet (getType at) (Left t)
   return (ATUn TyN Size at, cAnd [cst0, cst1])
 
 infer (TBin setOp t1 t2) | setOp `elem` [Union, Intersection, Difference, Subset] = do
@@ -752,7 +763,6 @@ infer (TLet l) = do
 
   -- Ascriptions are what let us flip from inference mode into
   -- checking mode.
-  -- XXX: WHAT should I do since there will no longer be an ATAsrc
 infer (TAscr t ty) = do
   (at, cst) <- checkSigma t ty
   return (at, cst)
@@ -889,33 +899,37 @@ checkPattern p (TyDef tyn)                  = do
     Just ty -> checkPattern p ty
     Nothing -> throwError (NotTyDef tyn)
 
-checkPattern (PVar x) ty                    = return (singleCtx x (toSigma ty), APVar (coerce x), CTrue)
+checkPattern (PVar x) ty                    = return (singleCtx x (toSigma ty), APVar ty (coerce x), CTrue)
 
-checkPattern PWild    _                     = return (emptyCtx, APWild, CTrue)
+checkPattern PWild    ty                    = return (emptyCtx, APWild ty, CTrue)
 
 checkPattern PUnit tyv@(TyVar _)            = return (emptyCtx, APUnit, CEq tyv TyUnit)
 checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit, CTrue)
 
-checkPattern PUnit tyv@(TyVar _)            = return (emptyCtx, APUnit, CEq tyv TyBool)
+checkPattern (PBool b) tyv@(TyVar _)        = return (emptyCtx, APBool b, CEq tyv TyBool)
 checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b, CTrue)
 
 checkPattern (PTup ps) ty                   = do
   listCtxtAps <- checkTuplePat ps ty
   let (ctxs, aps, csts) = unzip3 listCtxtAps
-  return (joinCtxs ctxs, APTup aps, cAnd csts)
+  return (joinCtxs ctxs, APTup (foldr1 TyPair (map getType aps)) aps, cAnd csts)
 checkPattern p@(PInj L pat) ty       = do
-  ([ty1, _], cst1) <- ensureConstr CSum ty (Right p)
-  (ctx, apt, cst2) <- checkPattern pat ty1
-  return (ctx, APInj L apt, cAnd [cst1, cst2])
+  ([ty1, ty2], cst1) <- ensureConstr CSum ty (Right p)
+  (ctx, apt, cst2)   <- checkPattern pat ty1
+  return (ctx, APInj (TySum ty1 ty2) L apt, cAnd [cst1, cst2])
 checkPattern p@(PInj R pat) ty    = do
-  ([_, ty2], cst1) <- ensureConstr CSum ty (Right p)
+  ([ty1, ty2], cst1) <- ensureConstr CSum ty (Right p)
   (ctx, apt, cst2) <- checkPattern pat ty2
-  return (ctx, APInj R apt, cAnd [cst1, cst2])
+  return (ctx, APInj (TySum ty1 ty2) R apt, cAnd [cst1, cst2])
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.
-checkPattern (PNat n) (TyFin _) = return (emptyCtx, APNat n, CTrue)
-checkPattern (PNat n) ty = return (emptyCtx, APNat n, CSub TyN ty)
+
+-- XXX this isn't quite right, what if we're checking at a type
+-- variable but we need to solve it to be a TyFin?  Can this ever
+-- happen?  We would need a COr, except we can't express the constraint "exists m. ty = TyFin m"
+checkPattern (PNat n) (TyFin m) = return (emptyCtx, APNat (TyFin m) n, CTrue)
+checkPattern (PNat n) ty        = return (emptyCtx, APNat ty n, CSub TyN ty)
 
 checkPattern (PSucc p) tyv@(TyVar _)               = do
   (ctx, apt, cst) <- checkPattern p TyN
@@ -929,13 +943,13 @@ checkPattern p@(PCons p1 p2) ty      = do
   ([tyl], cst1) <- ensureConstr CList ty (Right p)
   (ctx1, ap1, cst2) <- checkPattern p1 tyl
   (ctx2, ap2, cst3) <- checkPattern p2 (TyList tyl)
-  return (joinCtx ctx1 ctx2, APCons ap1 ap2, cAnd [cst1, cst2, cst3])
+  return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2, cAnd [cst1, cst2, cst3])
 
 checkPattern p@(PList ps) ty         = do
   ([tyl], cst) <- ensureConstr CList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps, csts) = unzip3 listCtxtAps
-  return (joinCtxs ctxs, APList aps, cAnd (cst:csts))
+  return (joinCtxs ctxs, APList (TyList tyl) aps, cAnd (cst:csts))
 
 checkPattern p ty = throwError (PatternType p ty)
 
@@ -959,7 +973,7 @@ checkTuplePat (p:ps) ty = do
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM ([Type], Constraint)
 ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return (tys, CTrue)
 
-ensureConstr c tyv@(TyVar _) _ = do
+ensureConstr c tyv@(TyAtom (AVar (U _))) _ = do
   tyvs <- mapM (const freshTy) (arity c)
   return (tyvs, CEq tyv (TyCon c tyvs))
 
@@ -1053,7 +1067,9 @@ checkDefn (DDefn x clauses) = do
       let (aclauses, csts) = unzip aclist
           cst = cAnd csts
       theta <- solve $ CAll (bind nms cst)
-      addDefn x (substs theta aclauses)
+      let defnTy = substs theta ty
+          (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
+      addDefn x (substs theta (Defn (coerce x) patTys bodyTy aclauses))
   where
     numPats = length . fst . unsafeUnbind
 
@@ -1066,7 +1082,7 @@ checkDefn (DDefn x clauses) = do
                -- patterns don't match across different clauses
       | otherwise = return ()
 
-    checkClause :: Type -> Bind [Pattern] Term -> TCM (Bind [APattern] ATerm, Constraint)
+    checkClause :: Type -> Bind [Pattern] Term -> TCM (Clause, Constraint)
     checkClause ty clause = do
       (pats, body) <- unbind clause
       (aps, at, cst) <- go pats ty body
@@ -1082,6 +1098,10 @@ checkDefn (DDefn x clauses) = do
       (apts, at, cst2) <- extends ctx $ go ps ty2 body
       return (apt:apts, at, cAnd [cst1, cst2])
     go _ _ _ = throwError NumPatterns   -- XXX include more info
+
+    decomposeDefnTy 0 ty = ([], ty)
+    decomposeDefnTy n (TyArr ty1 ty2) = first (ty1:) (decomposeDefnTy (n-1) ty2)
+    decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
 
 checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
@@ -1128,7 +1148,7 @@ erase ATUnit                = TUnit
 erase (ATBool b)            = TBool b
 erase (ATNat _ i)           = TNat i
 erase (ATRat r)             = TRat r
-erase (ATAbs _ b)           = TAbs $ bind (coerce x) (erase at)
+erase (ATAbs _ b)           = TAbs $ bind (map (coerce *** (embed . Just . unembed)) x) (erase at)
   where (x,at) = unsafeUnbind b
 erase (ATApp _ t1 t2)       = TApp (erase t1) (erase t2)
 erase (ATTup _ ats)         = TTup (map erase ats)
@@ -1138,24 +1158,24 @@ erase (ATUn _ uop at)       = TUn uop (erase at)
 erase (ATBin _ bop at1 at2) = TBin bop (erase at1) (erase at2)
 erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
 erase (ATTyOp _ op ty)      = TTyOp op ty
-erase (ATList _ ats aell)   = TList (map erase ats) ((fmap . fmap) erase aell)
-erase (ATListComp _ b)      = TListComp $ bind (mapTelescope eraseQual tel) (erase at)
+erase (ATContainer _ c ats aell)   = TContainer c (map erase ats) ((fmap . fmap) erase aell)
+erase (ATContainerComp _ c b)      = TContainerComp c $ bind (mapTelescope eraseQual tel) (erase at)
   where (tel,at) = unsafeUnbind b
 
 eraseBinding :: ABinding -> Binding
 eraseBinding (ABinding mty x (unembed -> at)) = Binding mty (coerce x) (embed (erase at))
 
 erasePattern :: APattern -> Pattern
-erasePattern (APVar n)        = PVar (coerce n)
-erasePattern APWild           = PWild
-erasePattern APUnit           = PUnit
-erasePattern (APBool b)       = PBool b
-erasePattern (APTup alp)      = PTup $ map erasePattern alp
-erasePattern (APInj s apt)    = PInj s (erasePattern apt)
-erasePattern (APNat n)        = PNat n
-erasePattern (APSucc apt)     = PSucc $ erasePattern apt
-erasePattern (APCons ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
-erasePattern (APList alp)     = PList $ map erasePattern alp
+erasePattern (APVar _ n)        = PVar (coerce n)
+erasePattern (APWild _)         = PWild
+erasePattern APUnit             = PUnit
+erasePattern (APBool b)         = PBool b
+erasePattern (APTup _ alp)      = PTup $ map erasePattern alp
+erasePattern (APInj _ s apt)    = PInj s (erasePattern apt)
+erasePattern (APNat _ n)        = PNat n
+erasePattern (APSucc apt)       = PSucc $ erasePattern apt
+erasePattern (APCons _ ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
+erasePattern (APList _ alp)     = PList $ map erasePattern alp
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)

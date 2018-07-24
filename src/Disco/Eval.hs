@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs           #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
@@ -21,7 +22,7 @@ module Disco.Eval
 
          -- * Values
 
-         Value(..), ValFun(..), ValDelay(..)
+         Value(.., VFun, VDelay)
 
          -- * Environments
 
@@ -118,11 +119,14 @@ data Value where
   --   We assume that all @VFun@ values are /strict/, that is, their
   --   arguments should be fully evaluated to RNF before being
   --   passed to the function.
-  VFun   :: ValFun -> Value
+  VFun_   :: ValFun -> Value
 
   -- | A delayed value, containing a @Disco Value@ computation which can
   --   be run later.
-  VDelay  :: ValDelay -> Value
+  VDelay_  :: ValDelay -> Value
+
+  -- | A literal set, containing a finite list of (perhaps only
+  --   partially evaluated) values.
   VSet :: [Value] -> Value
   deriving Show
 
@@ -134,6 +138,9 @@ newtype ValFun = ValFun (Value -> Value)
 instance Show ValFun where
   show _ = "<fun>"
 
+pattern VFun :: (Value -> Value) -> Value
+pattern VFun f = VFun_ (ValFun f)
+
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
@@ -141,6 +148,9 @@ newtype ValDelay = ValDelay (Disco IErr Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
+
+pattern VDelay :: Disco IErr Value -> Value
+pattern VDelay m = VDelay_ (ValDelay m)
 
 ------------------------------------------------------------
 -- Environments
@@ -372,7 +382,7 @@ allocate v = do
 delay :: Disco IErr Value -> Disco IErr Value
 delay imv = do
   e <- getEnv
-  return (VDelay . ValDelay $ withEnv e imv)
+  return (VDelay $ withEnv e imv)
 
 -- | Create a thunk by packaging up a @Core@ expression with the
 --   current environment.  The thunk is stored in a new location in

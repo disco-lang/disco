@@ -24,6 +24,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Compile
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
@@ -45,7 +46,9 @@ data REPLExpr =
  | ShowDefn (Name Term)         -- Show a variable's definition
  | Parse Term                   -- Show the parsed AST
  | Pretty Term                  -- Pretty-print a term
+ | Ann Term                     -- Show type-annotated typechecked term
  | Desugar Term                 -- Show a desugared term
+ | Compile Term                 -- Show a compiled term
  | Load FilePath                -- Load a file.
  | Reload                       -- Reloads the most recently loaded file.
  | Doc (Name Term)              -- Show documentation.
@@ -70,7 +73,9 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       , ("defn",    ShowDefn  <$> (sc *> ident))
       , ("parse",   Parse     <$> term)
       , ("pretty",  Pretty    <$> term)
+      , ("ann",     Ann       <$> term)
       , ("desugar", Desugar   <$> term)
+      , ("compile", Compile   <$> term)
       , ("load",    Load      <$> fileParser)
       , ("reload",  return Reload)
       , ("doc",     Doc       <$> (sc *> ident))
@@ -111,7 +116,9 @@ handleCMD s =
     handleLine (ShowDefn x)  = handleShowDefn x         >>= iputStrLn
     handleLine (Parse t)     = iprint $ t
     handleLine (Pretty t)    = renderDoc (prettyTerm t) >>= iputStrLn
+    handleLine (Ann t)       = handleAnn t              >>= iputStrLn
     handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
+    handleLine (Compile t)   = handleCompile t          >>= iputStrLn
     handleLine (Load file)   = handleLoad file >> lastFile .= Just file >>return ()
     handleLine (Reload)      = do
       file <- use lastFile
@@ -131,7 +138,7 @@ handleLet x t = do
     Left e -> io.print $ e   -- XXX pretty print
     Right ((at, sig), _) -> do
       topCtx   %= M.insert x sig
-      topDefns %= M.insert (coerce x) (runDSM $ desugarTerm at)
+      topDefns %= M.insert (coerce x) (compileTerm at)
 
 handleShowDefn :: Name Term -> Disco IErr String
 handleShowDefn x = do
@@ -140,11 +147,23 @@ handleShowDefn x = do
     Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
 
+handleAnn :: Term -> Disco IErr String
+handleAnn t = do
+  case evalTCM (inferTop t) of
+    Left e       -> return . show $ e
+    Right (at,_) -> return . show $ at
+
 handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
   case evalTCM (inferTop t) of
     Left e       -> return.show $ e
-    Right (at,_) -> return.show.runDSM.desugarTerm $ at
+    Right (at,_) -> return . show . runDSM . desugarTerm $ at
+
+handleCompile :: Term -> Disco IErr String
+handleCompile t = do
+  case evalTCM (inferTop t) of
+    Left e       -> return.show $ e
+    Right (at,_) -> return.show.compileTerm $ at
 
 loadFile :: FilePath -> Disco IErr (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
@@ -163,9 +182,9 @@ handleLoad file = do
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
         Right ((docMap, aprops, ctx), (defns, tydefs)) -> do
-          let cdefns = M.mapKeys coerce $ runDSM (mapM desugarDefn defns)
-          topDocs    .= docMap
-          topCtx     .= ctx
+          let cdefns = M.mapKeys coerce $ fmap compileDefn defns
+          topDocs  .= docMap
+          topCtx   .= ctx
           topTyDefns .= tydefs
           loadDefs cdefns
 
@@ -261,7 +280,7 @@ evalTerm t = do
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
-          c  = runDSM $ desugarTerm at
+          c  = compileTerm at
       in (withTopEnv $ mkThunk c) >>= prettyValue ty
 
 handleTypeCheck :: Term -> Disco IErr String

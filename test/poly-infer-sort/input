@@ -5,3 +5,7 @@
 :type \x.x
 :type \x y. x
 :type \x y z. x + y + z
+:type \x (y:Nat). x - y
+:type \w (x:Nat) y (z : Frac). w - x + y + z
+\x (y:Bool). x - y
+

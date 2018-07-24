@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE ViewPatterns          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -77,6 +78,8 @@ module Disco.AST.Typed
 
 import           Unbound.Generics.LocallyNameless
 
+import           Data.Void
+
 import           Disco.AST.Generic
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -95,33 +98,29 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
-instance Subst Type APattern
-instance Subst Type AQual
-instance Subst Type AGuard
-instance Subst Type ABinding
-instance Subst Type ALink
-instance Subst Type ATerm
+type instance X_TVar            TY = Type
+type instance X_TLet            TY = Type
+type instance X_TUnit           TY = ()
+type instance X_TBool           TY = ()
+type instance X_TNat            TY = Type
+type instance X_TRat            TY = ()
+type instance X_TAbs            TY = Void -- Replace TAbs with a version that
+                                          -- definitely has all type annotations
+type instance X_TApp            TY = Type
+type instance X_TInj            TY = Type
+type instance X_TCase           TY = Type
+type instance X_TUn             TY = Type
+type instance X_TBin            TY = Type
+type instance X_TChain          TY = Type
+type instance X_TTyOp           TY = Type
+type instance X_TContainer      TY = Type
+type instance X_TContainerComp  TY = Type
+type instance X_TAscr           TY = Void -- No more type ascriptions in typechecked terms
+type instance X_TTup            TY = Type
+type instance X_TParens         TY = Void -- No more explicit parens
 
-type instance X_TVar TY = Type
-type instance X_TLet TY = Type
-type instance X_TUnit TY = ()
-type instance X_TBool TY = ()
-type instance X_TNat TY = Type
-type instance X_TRat TY = ()
-type instance X_TAbs TY = Type
-type instance X_TApp TY = Type
-type instance X_TInj TY = Type
-type instance X_TCase TY = Type
-type instance X_TUn TY = Type
-type instance X_TBin TY = Type
-type instance X_TChain TY = Type
-type instance X_TTyop TY = Type
-type instance X_TContainer TY = Type
-type instance X_TContainerComp TY = Type
-type instance X_TAscr TY = ()
-type instance X_Term TY = ()
-type instance X_TTup TY = Type
-type instance X_TParens TY = ()
+type instance X_Term TY
+  = (Type, Bind [(Name ATerm, Embed Type)] ATerm)   -- ATAbs
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -144,8 +143,8 @@ pattern ATNat ty int = TNat_ ty int
 pattern ATRat :: Rational -> ATerm
 pattern ATRat rat = TRat_ () rat
 
-pattern ATAbs :: Type -> Bind [(Name ATerm, Embed (Maybe Type))] ATerm -> ATerm
-pattern ATAbs ty bind = TAbs_ ty bind
+pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
+pattern ATAbs ty bind = XTerm_ (ty, bind)
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
 pattern ATApp ty term1 term2 = TApp_ ty term1 term2
@@ -233,22 +232,31 @@ pattern AGPat embedt pat = GPat_ () embedt pat
 
 type APattern = Pattern_ TY
 
-type instance X_PVar TY = ()
-type instance X_PWild TY = ()
-type instance X_PUnit TY = ()
-type instance X_PBool TY = ()
-type instance X_PTup TY = ()
-type instance X_PInj TY = ()
-type instance X_PNat TY = ()
-type instance X_PSucc TY = ()
-type instance X_PCons TY = ()
-type instance X_PList TY = ()
+-- We have to use Embed Type because we don't want any type variables
+-- inside the types being treated as binders!
 
-pattern APVar :: Name ATerm -> APattern
-pattern APVar name = PVar_ () name
+type instance X_PVar     TY = Embed Type
+type instance X_PWild    TY = Embed Type
+type instance X_PUnit    TY = ()
+type instance X_PBool    TY = ()
+type instance X_PTup     TY = Embed Type
+type instance X_PInj     TY = Embed Type
+type instance X_PNat     TY = Embed Type
+type instance X_PSucc    TY = ()
+type instance X_PCons    TY = Embed Type
+type instance X_PList    TY = Embed Type
 
-pattern APWild :: APattern
-pattern APWild = PWild_ ()
+type instance X_Pattern  TY = ()
+
+pattern APVar :: Type -> Name ATerm -> APattern
+pattern APVar ty name <- PVar_ (unembed -> ty) name
+  where
+    APVar ty name = PVar_ (embed ty) name
+
+pattern APWild :: Type -> APattern
+pattern APWild ty <- PWild_ (unembed -> ty)
+  where
+    APWild ty = PWild_ (embed ty)
 
 pattern APUnit :: APattern
 pattern APUnit = PUnit_ ()
@@ -256,74 +264,86 @@ pattern APUnit = PUnit_ ()
 pattern APBool :: Bool -> APattern
 pattern APBool  b = PBool_ () b
 
-pattern APTup  :: [APattern] -> APattern
-pattern APTup lp = PTup_ () lp
+pattern APTup  :: Type -> [APattern] -> APattern
+pattern APTup ty lp <- PTup_ (unembed -> ty) lp
+  where
+    APTup ty lp = PTup_ (embed ty) lp
 
-pattern APInj  :: Side -> APattern -> APattern
-pattern APInj s p = PInj_ () s p
+pattern APInj  :: Type -> Side -> APattern -> APattern
+pattern APInj ty s p <- PInj_ (unembed -> ty) s p
+  where
+    APInj ty s p = PInj_ (embed ty) s p
 
-pattern APNat  :: Integer -> APattern
-pattern APNat n = PNat_ () n
+pattern APNat  :: Type -> Integer -> APattern
+pattern APNat ty n <- PNat_ (unembed -> ty) n
+  where
+    APNat ty n = PNat_ (embed ty) n
 
 pattern APSucc :: APattern -> APattern
 pattern APSucc p = PSucc_ () p
 
-pattern APCons :: APattern -> APattern -> APattern
-pattern APCons  p1 p2 = PCons_ () p1 p2
+pattern APCons :: Type -> APattern -> APattern -> APattern
+pattern APCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
+  where
+    APCons ty p1 p2 = PCons_ (embed ty) p1 p2
 
-pattern APList :: [APattern] -> APattern
-pattern APList lp = PList_ () lp
+pattern APList :: Type -> [APattern] -> APattern
+pattern APList ty lp <- PList_ (unembed -> ty) lp
+  where
+    APList ty lp = PList_ (embed ty) lp
 
 {-# COMPLETE APVar, APWild, APUnit, APBool, APTup, APInj, APNat,
     APSucc, APCons, APList #-}
-
-instance Alpha ATerm
-instance Alpha ABinding
-instance Alpha ALink
-instance Alpha APattern
-instance Alpha AGuard
-instance Alpha AQual
 
 ------------------------------------------------------------
 -- getType
 ------------------------------------------------------------
 
--- | Get the type at the root of an 'ATerm'.
-getType :: ATerm -> Type
-getType (ATVar ty _)      = ty
-getType ATUnit            = TyUnit
-getType (ATBool _)        = TyBool
-getType (ATNat ty _)      = ty
-getType (ATRat _)         = TyF
-getType (ATAbs ty _)      = ty
-getType (ATApp ty _ _)    = ty
-getType (ATTup ty _)      = ty
-getType (ATInj ty _ _)    = ty
-getType (ATUn ty _ _)     = ty
-getType (ATBin ty _ _ _)  = ty
-getType (ATTyOp ty _ _)   = ty
-getType (ATChain ty _ _)  = ty
-getType (ATContainer ty _ _ _)   = ty
-getType (ATContainerComp ty _ _) = ty 
-getType (ATLet ty _)      = ty
-getType (ATCase ty _)     = ty
+instance HasType ATerm where
+  getType (ATVar ty _)             = ty
+  getType ATUnit                   = TyUnit
+  getType (ATBool _)               = TyBool
+  getType (ATNat ty _)             = ty
+  getType (ATRat _)                = TyF
+  getType (ATAbs ty _)             = ty
+  getType (ATApp ty _ _)           = ty
+  getType (ATTup ty _)             = ty
+  getType (ATInj ty _ _)           = ty
+  getType (ATUn ty _ _)            = ty
+  getType (ATBin ty _ _ _)         = ty
+  getType (ATTyOp ty _ _)          = ty
+  getType (ATChain ty _ _)         = ty
+  getType (ATContainer ty _ _ _)   = ty
+  getType (ATContainerComp ty _ _) = ty
+  getType (ATLet ty _)             = ty
+  getType (ATCase ty _)            = ty
 
--- | Set the type at the root of an 'ATerm'.
-setType :: Type -> ATerm -> ATerm
-setType ty (ATVar _ x      ) = ATVar ty x
-setType _  ATUnit            = ATUnit
-setType _  (ATBool b)        = ATBool b
-setType ty (ATNat _ x      ) = ATNat ty x
-setType _  (ATRat r)         = ATRat r
-setType ty (ATAbs _ x      ) = ATAbs ty x
-setType ty (ATApp _ x y    ) = ATApp ty x y
-setType ty (ATTup _ x      ) = ATTup ty x
-setType ty (ATInj _ x y    ) = ATInj ty x y
-setType ty (ATUn _ x y     ) = ATUn ty x y
-setType ty (ATBin _ x y z  ) = ATBin ty x y z
-setType ty (ATTyOp _ x y   ) = ATTyOp ty x y
-setType ty (ATChain _ x y  ) = ATChain ty x y
-setType ty (ATContainer _ x y z)   = ATContainer ty x y z
-setType ty (ATContainerComp _ x y) = ATContainerComp ty x y
-setType ty (ATLet _ x      ) = ATLet ty x
-setType ty (ATCase _ x     ) = ATCase ty x
+  setType ty (ATVar _ x      )       = ATVar ty x
+  setType _  ATUnit                  = ATUnit
+  setType _  (ATBool b)              = ATBool b
+  setType ty (ATNat _ x      )       = ATNat ty x
+  setType _  (ATRat r)               = ATRat r
+  setType ty (ATAbs _ x      )       = ATAbs ty x
+  setType ty (ATApp _ x y    )       = ATApp ty x y
+  setType ty (ATTup _ x      )       = ATTup ty x
+  setType ty (ATInj _ x y    )       = ATInj ty x y
+  setType ty (ATUn _ x y     )       = ATUn ty x y
+  setType ty (ATBin _ x y z  )       = ATBin ty x y z
+  setType ty (ATTyOp _ x y   )       = ATTyOp ty x y
+  setType ty (ATChain _ x y  )       = ATChain ty x y
+  setType ty (ATContainer _ x y z)   = ATContainer ty x y z
+  setType ty (ATContainerComp _ x y) = ATContainerComp ty x y
+  setType ty (ATLet _ x      )       = ATLet ty x
+  setType ty (ATCase _ x     )       = ATCase ty x
+
+instance HasType APattern where
+  getType (APVar ty _)    = ty
+  getType (APWild ty)     = ty
+  getType APUnit          = TyUnit
+  getType (APBool _)      = TyBool
+  getType (APTup ty _)    = ty
+  getType (APInj ty _ _)  = ty
+  getType (APNat ty _)    = ty
+  getType (APSucc _)      = TyN
+  getType (APCons ty _ _) = ty
+  getType (APList ty _)   = ty

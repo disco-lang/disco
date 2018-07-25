@@ -118,6 +118,7 @@ prettyTy (TyVar v)        = text (show v)
 prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
+prettyTy TyC              = text "Char"
 prettyTy (TyArr ty1 ty2)  = mparens arrPA $
   prettyTy' 1 InL ty1 <+> text "→" <+> prettyTy' 1 InR ty2
 prettyTy (TyPair ty1 ty2) = mparens (PA 7 InR) $
@@ -155,6 +156,7 @@ prettyTerm (TVar x)      = prettyName x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
+prettyTerm (TChar c)     = text "'" <> text (show c) <> text "'"
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(args, body) ->
   text "λ" <> (if length args > 1 then text " " else empty)
@@ -282,6 +284,7 @@ prettyPattern (PVar x) = prettyName x
 prettyPattern PWild = text "_"
 prettyPattern PUnit = text "()"
 prettyPattern (PBool b) = text $ map toLower $ show b
+prettyPattern (PChar c) = text "'" <> text (show c) <> text "'"
 prettyPattern (PTup ts) = do
   ds <- punctuate (text ",") (map prettyPattern ts)
   parens (hsep ds)

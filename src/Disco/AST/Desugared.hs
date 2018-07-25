@@ -81,6 +81,7 @@ type instance X_TVar DS           = Type
 type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
 type instance X_TBool DS          = ()
+type instance X_TChar DS          = ()
 type instance X_TNat DS           = Type
 type instance X_TRat DS           = ()
 type instance X_TAbs DS           = Void -- TAbs represents lambdas with multiple args;
@@ -129,6 +130,9 @@ pattern DTNat ty int = TNat_ ty int
 pattern DTRat :: Rational -> DTerm
 pattern DTRat rat = TRat_ () rat
 
+pattern DTChar :: Char -> DTerm
+pattern DTChar c = TChar_ () c
+
 pattern DTLam :: Type -> Bind (Name DTerm) DTerm -> DTerm
 pattern DTLam ty lam = XTerm_ (Right (Left (ty, lam)))
 
@@ -156,7 +160,7 @@ pattern DTNil ty = XTerm_ (Right (Right ty))
 pattern DTContainer :: Type -> Container -> [DTerm] -> Maybe (Ellipsis DTerm) -> DTerm
 pattern DTContainer ty c tl mets = TContainer_ ty c tl mets
 
-{-# COMPLETE DTVar, DTUnit, DTBool, DTNat, DTRat,
+{-# COMPLETE DTVar, DTUnit, DTBool, DTChar, DTNat, DTRat,
              DTLam, DTApp, DTPair, DTInj, DTCase, DTUn, DTBin, DTTyOp,
              DTNil, DTContainer #-}
 
@@ -187,6 +191,7 @@ type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()
+type instance X_PChar    DS = ()
 type instance X_PTup     DS = Void
 type instance X_PInj     DS = Embed Type
 type instance X_PNat     DS = Embed Type
@@ -214,6 +219,9 @@ pattern DPUnit = PUnit_ ()
 
 pattern DPBool :: Bool -> DPattern
 pattern DPBool  b = PBool_ () b
+
+pattern DPChar :: Char -> DPattern
+pattern DPChar  c = PChar_ () c
 
 pattern DPPair  :: Type -> DPattern -> DPattern -> DPattern
 pattern DPPair ty p1 p2 <- XPattern_ (Left ((unembed -> ty), p1, p2))
@@ -243,8 +251,8 @@ pattern DPNil ty <- XPattern_ (Right (unembed -> ty))
   where
     DPNil ty = XPattern_ (Right (embed ty))
 
-{-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPPair, DPInj, DPNat,
-    DPSucc, DPNil, DPCons #-}
+{-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
+    DPNat, DPSucc, DPNil, DPCons #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -257,6 +265,7 @@ instance HasType DTerm where
   getType (DTVar ty _)           = ty
   getType DTUnit                 = TyUnit
   getType (DTBool _)             = TyBool
+  getType (DTChar _)             = TyC
   getType (DTNat ty _)           = ty
   getType (DTRat _)              = TyF
   getType (DTLam ty _)           = ty
@@ -275,6 +284,7 @@ instance HasType DPattern where
   getType (DPWild ty)     = ty
   getType DPUnit          = TyUnit
   getType (DPBool _)      = TyBool
+  getType (DPChar _)      = TyC
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
   getType (DPNat ty _)    = ty

@@ -27,6 +27,7 @@ module Disco.AST.Typed
        , pattern ATBool
        , pattern ATNat
        , pattern ATRat
+       , pattern ATChar
        , pattern ATAbs
        , pattern ATApp
        , pattern ATTup
@@ -64,6 +65,7 @@ module Disco.AST.Typed
        , pattern APTup
        , pattern APInj
        , pattern APNat
+       , pattern APChar
        , pattern APSucc
        , pattern APCons
        , pattern APList
@@ -104,6 +106,7 @@ type instance X_TUnit           TY = ()
 type instance X_TBool           TY = ()
 type instance X_TNat            TY = Type
 type instance X_TRat            TY = ()
+type instance X_TChar           TY = ()
 type instance X_TAbs            TY = Void -- Replace TAbs with a version that
                                           -- definitely has all type annotations
 type instance X_TApp            TY = Type
@@ -143,6 +146,9 @@ pattern ATNat ty int = TNat_ ty int
 pattern ATRat :: Rational -> ATerm
 pattern ATRat rat = TRat_ () rat
 
+pattern ATChar :: Char -> ATerm
+pattern ATChar c = TChar_ () c
+
 pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
 pattern ATAbs ty bind = XTerm_ (ty, bind)
 
@@ -173,7 +179,7 @@ pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
-{-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat,
+{-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
              ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
@@ -239,6 +245,7 @@ type instance X_PVar     TY = Embed Type
 type instance X_PWild    TY = Embed Type
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
+type instance X_PChar    TY = ()
 type instance X_PTup     TY = Embed Type
 type instance X_PInj     TY = Embed Type
 type instance X_PNat     TY = Embed Type
@@ -263,6 +270,9 @@ pattern APUnit = PUnit_ ()
 
 pattern APBool :: Bool -> APattern
 pattern APBool  b = PBool_ () b
+
+pattern APChar :: Char -> APattern
+pattern APChar  c = PChar_ () c
 
 pattern APTup  :: Type -> [APattern] -> APattern
 pattern APTup ty lp <- PTup_ (unembed -> ty) lp
@@ -292,8 +302,8 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   where
     APList ty lp = PList_ (embed ty) lp
 
-{-# COMPLETE APVar, APWild, APUnit, APBool, APTup, APInj, APNat,
-    APSucc, APCons, APList #-}
+{-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APTup, APInj,
+    APNat, APSucc, APCons, APList #-}
 
 ------------------------------------------------------------
 -- getType
@@ -305,6 +315,7 @@ instance HasType ATerm where
   getType (ATBool _)               = TyBool
   getType (ATNat ty _)             = ty
   getType (ATRat _)                = TyF
+  getType (ATChar _)               = TyC
   getType (ATAbs ty _)             = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
@@ -323,6 +334,7 @@ instance HasType ATerm where
   setType _  (ATBool b)              = ATBool b
   setType ty (ATNat _ x      )       = ATNat ty x
   setType _  (ATRat r)               = ATRat r
+  setType _ (ATChar c)               = ATChar c 
   setType ty (ATAbs _ x      )       = ATAbs ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
@@ -341,6 +353,7 @@ instance HasType APattern where
   getType (APWild ty)     = ty
   getType APUnit          = TyUnit
   getType (APBool _)      = TyBool
+  getType (APChar _)      = TyC
   getType (APTup ty _)    = ty
   getType (APInj ty _ _)  = ty
   getType (APNat ty _)    = ty

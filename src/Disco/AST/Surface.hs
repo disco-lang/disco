@@ -35,6 +35,7 @@ module Disco.AST.Surface
        , pattern TParens
        , pattern TUnit
        , pattern TBool
+       , pattern TChar
        , pattern TNat
        , pattern TRat
        , pattern TAbs
@@ -82,6 +83,7 @@ module Disco.AST.Surface
        , pattern PWild
        , pattern PUnit
        , pattern PBool
+       , pattern PChar
        , pattern PTup
        , pattern PInj
        , pattern PNat
@@ -162,6 +164,7 @@ type instance X_TUnit           UD = ()
 type instance X_TBool           UD = ()
 type instance X_TNat            UD = ()
 type instance X_TRat            UD = ()
+type instance X_TChar           UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
 type instance X_TInj            UD = ()
@@ -200,6 +203,9 @@ pattern TNat int = TNat_ () int
 pattern TRat :: Rational -> Term
 pattern TRat rat = TRat_ () rat
 
+pattern TChar :: Char -> Term
+pattern TChar c = TChar_ () c
+
 pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 pattern TAbs bind = TAbs_ () bind
 
@@ -233,7 +239,7 @@ pattern TContainerComp c b = TContainerComp_ () c b
 pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
-{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
+{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
              TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TContainer, TContainerComp, TAscr #-}
 
@@ -296,6 +302,7 @@ type instance X_PBool UD   = ()
 type instance X_PTup UD    = ()
 type instance X_PInj UD    = ()
 type instance X_PNat UD    = ()
+type instance X_PChar UD   = ()
 type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
@@ -322,6 +329,9 @@ pattern PInj s p = PInj_ () s p
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
+pattern PChar :: Char -> Pattern
+pattern PChar c = PChar_ () c
+
 pattern PSucc :: Pattern -> Pattern
 pattern PSucc p = PSucc_ () p
 
@@ -332,4 +342,4 @@ pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PSucc, PCons, PList #-}
+             PChar, PSucc, PCons, PList #-}

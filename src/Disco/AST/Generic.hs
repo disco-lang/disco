@@ -53,6 +53,7 @@ module Disco.AST.Generic
        , X_TBool
        , X_TNat
        , X_TRat
+       , X_TChar
        , X_TAbs
        , X_TApp
        , X_TTup
@@ -106,6 +107,7 @@ module Disco.AST.Generic
        , X_PTup
        , X_PInj
        , X_PNat
+       , X_PChar
        , X_PSucc
        , X_PCons
        , X_PList
@@ -215,6 +217,7 @@ type family X_TUnit e
 type family X_TBool e
 type family X_TNat e
 type family X_TRat e
+type family X_TChar e
 type family X_TAbs e
 type family X_TApp e
 type family X_TTup e
@@ -254,6 +257,9 @@ data Term_ e where
 
   -- | A nonnegative rational number, parsed as a decimal.
   TRat_   :: X_TRat e -> Rational -> Term_ e
+
+  -- | A unicode character.
+  TChar_  :: X_TChar e -> Char -> Term_ e
 
   -- | An anonymous function.
   TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
@@ -307,6 +313,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TBool e)
     , a (X_TNat e)
     , a (X_TRat e)
+    , a (X_TChar e)
     , a (X_TAbs e)
     , a (X_TApp e)
     , a (X_TInj e)
@@ -444,6 +451,7 @@ type family X_PBool e
 type family X_PTup e
 type family X_PInj e
 type family X_PNat e
+type family X_PChar e
 type family X_PSucc e
 type family X_PCons e
 type family X_PList e
@@ -473,6 +481,9 @@ data Pattern_ e where
   -- | Literal natural number pattern.
   PNat_  :: X_PNat e -> Integer -> Pattern_ e
 
+  -- | Unicode character pattern
+  PChar_ :: X_PChar e -> Char -> Pattern_ e
+
   -- | Successor pattern, @S p@.
   PSucc_ :: X_PSucc e -> Pattern_ e -> Pattern_ e
 
@@ -493,6 +504,7 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PUnit e)
         , a (X_PBool e)
         , a (X_PNat e)
+        , a (X_PChar e)
         , a (X_PTup e)
         , a (X_PInj e)
         , a (X_PSucc e)

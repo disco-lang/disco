@@ -22,6 +22,7 @@ module Disco.AST.Desugared
        , pattern DTVar
        , pattern DTUnit
        , pattern DTBool
+       , pattern DTChar
        , pattern DTNat
        , pattern DTRat
        , pattern DTLam
@@ -49,6 +50,7 @@ module Disco.AST.Desugared
        , pattern DPWild
        , pattern DPUnit
        , pattern DPBool
+       , pattern DPChar
        , pattern DPPair
        , pattern DPInj
        , pattern DPNat

@@ -55,6 +55,7 @@ compileDTerm :: DTerm -> FreshM Core
 compileDTerm (DTVar _ x)  = return $ CVar (coerce x)
 compileDTerm DTUnit       = return $ CCons 0 []
 compileDTerm (DTBool b)   = return $ CCons (fromEnum b) []
+compileDTerm (DTChar c)   = return $ CChar c
 compileDTerm (DTNat ty n) = compileNat ty n
 compileDTerm (DTRat r)    = return $ CNum Decimal r
 

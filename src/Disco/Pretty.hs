@@ -345,6 +345,7 @@ prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
+prettyWHNF out TyC             (VChar c)    = out (show c)
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (TySum ty1 ty2) (VCons i [v])

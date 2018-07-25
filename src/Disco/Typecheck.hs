@@ -484,6 +484,7 @@ infer (TVar x)      = do
   -- A few trivial cases.
 infer TUnit         = return (ATUnit, CTrue)
 infer (TBool b)     = return $ (ATBool b, CTrue)
+infer (TChar c)     = return $ (ATChar c, CTrue)
 infer (TNat n)      = return $ (ATNat TyN n, CTrue)
 infer (TRat r)      = return $ (ATRat r, CTrue)
 
@@ -1068,6 +1069,7 @@ erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase
   where (tel,at) = unsafeUnbind bs
 erase ATUnit                = TUnit
 erase (ATBool b)            = TBool b
+erase (ATChar c)            = TChar c
 erase (ATNat _ i)           = TNat i
 erase (ATRat r)             = TRat r
 erase (ATAbs _ b)           = TAbs $ bind (map (coerce *** (embed . Just . unembed)) x) (erase at)
@@ -1092,6 +1094,7 @@ erasePattern (APVar _ n)        = PVar (coerce n)
 erasePattern (APWild _)         = PWild
 erasePattern APUnit             = PUnit
 erasePattern (APBool b)         = PBool b
+erasePattern (APChar c)         = PChar c
 erasePattern (APTup _ alp)      = PTup $ map erasePattern alp
 erasePattern (APInj _ s apt)    = PInj s (erasePattern apt)
 erasePattern (APNat _ n)        = PNat n

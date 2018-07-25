@@ -203,6 +203,8 @@ whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
 -- A number is in WHNF, just turn it into a VNum.
 whnf (CNum d n)     = return $ VNum d n
 
+whnf (CChar c)      = return $ VChar c
+
 -- A lambda abstraction is already in WHNF; just package it up as a
 -- closure with the current environment.
 whnf (CAbs b)       = VClos b <$> getEnv

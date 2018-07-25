@@ -234,8 +234,8 @@ data DiscoState e = DiscoState
   , _topDefns   :: Ctx Core Core
     -- ^ Environment of top-level definitions.  Set by 'loadDefs'.
 
-    -- ^ Environment of top-level type definitions.
   , _topTyDefns :: M.Map String Type
+    -- ^ Environment of top-level type definitions.
 
   , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all

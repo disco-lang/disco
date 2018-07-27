@@ -326,6 +326,9 @@ pattern PUnit = PUnit_ ()
 pattern PBool :: Bool -> Pattern
 pattern PBool  b = PBool_ () b
 
+pattern PChar :: Char -> Pattern
+pattern PChar c = PChar_ () c
+
 pattern PTup  :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp
 
@@ -334,9 +337,6 @@ pattern PInj s p = PInj_ () s p
 
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
-
-pattern PChar :: Char -> Pattern
-pattern PChar c = PChar_ () c
 
 pattern PSucc :: Pattern -> Pattern
 pattern PSucc p = PSucc_ () p

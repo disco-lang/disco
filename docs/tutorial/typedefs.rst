@@ -8,11 +8,10 @@ Disco supports recursive type definitions. Let's look at a few example.
 Consider the following function which takes a list of natural number triplets and
 returns the sum of all the triplets in the list:
 
-::
-
-	sumTripletList : List (Nat * Nat * Nat) -> Nat
-	sumTripletList [] = 0
-	sumTripletList ((n1, n2, n3) :: rest) = (n1 + n2 + n3 + (sumTripletList rest))
+.. literalinclude:: example/tydefs.disco
+   :lines: 3-5
+   :language: idris
+   :caption:
 
 ::  Disco> sumTripletList [(1,2,3), (4,5,6)]
      21
@@ -48,11 +47,10 @@ right subtrees of type ``Tree`` as the second and third elements, respectively.
 
 Here's a function which takes a ``Tree`` and returns the sum of all it's node values.
 
-::
-
-	sumTree : Tree -> Nat
-	sumTree (left n) = n
-	sumTree (right (n, l, r)) = n + (sumTree l) + (sumTree r)
+.. literalinclude:: example/tydefs.disco
+   :lines: 9-11
+   :language: idris
+   :caption:
 
 Cyclic Type Definitions
 =======================
@@ -64,14 +62,16 @@ the following conditions hold:
 
 2.) The same type definition is encountered twice during repeated expansion.
 
-Here are a two examples of cyclic type definitions:
+Here are a few examples of cyclic type definitions:
 
 ::
-	-- Apple is cyclic because it expands to itself.
-	type Apple = Apple
-	-- Brain is cyclic because it expands to Human which expands to Brain.
-	type Brain = Human
-	type Human = Brain
+	-- Foo is cyclic because it expands to itself.
+	type Foo = Foo
+	-- Bar is cyclic because it expands to Baz which expands to Bar.
+	type Bar = Baz
+	type Baz = Bar
+
+::
 	-- Pair is not cyclic because it expands to a type which is not a type definition (although it's expansion contains type definitions)
 	type Pair = (Pair, Pair)
 

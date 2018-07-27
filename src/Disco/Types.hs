@@ -52,6 +52,7 @@ module Disco.Types
        , pattern TySum
        , pattern TyList
        , pattern TySet
+       , pattern TyStr
 
        -- ** Quantified types
 
@@ -269,6 +270,9 @@ pattern TyList elTy = TyCon CList [elTy]
 
 pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
+
+pattern TyStr :: Type
+pattern TyStr = TyList TyC
 
 {-# COMPLETE
       TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin,

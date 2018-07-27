@@ -51,6 +51,7 @@ module Disco.AST.Surface
        , pattern TAscr
        , pattern TList
        , pattern TListComp
+       , pattern TString
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
@@ -248,6 +249,11 @@ pattern TList ts e = TContainer_ () ListContainer ts e
 
 pattern TListComp :: Bind (Telescope Qual) Term -> Term
 pattern TListComp x = TContainerComp_ () ListContainer x
+
+pattern TString :: [Term] -> Term
+pattern TString cs = TContainer ListContainer cs Nothing
+
+
 
 type Link = Link_ UD
 

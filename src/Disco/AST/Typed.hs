@@ -189,6 +189,8 @@ pattern ATList t xs e = ATContainer t ListContainer xs e
 pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATListComp t b = ATContainerComp t ListContainer b
 
+-- pattern ATString :: [ATerm] -> ATerm
+-- pattern ATString chars = ATContainer TyC ListContainer chars Nothing
 
 type ALink = Link_ TY
 

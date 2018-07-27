@@ -143,7 +143,7 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets, fbrack, cbrack, squote :: Parser a -> Parser a
+parens, braces, angles, brackets, fbrack, cbrack, squote, dquote :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
@@ -151,6 +151,7 @@ brackets  = between (symbol "[") (symbol "]")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 squote    = between (symbol "'") (symbol "'")
+dquote    = between (char '"')   (char '"')
 
 
 semi, comma, colon, dot, pipe :: Parser String
@@ -226,7 +227,7 @@ reservedWords =
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "size", "union", "U", "∪", "intersect", "∩"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
+  , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C", "String"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall"
@@ -382,6 +383,7 @@ parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> squote anyChar
+  <|> TString <$> (\cs -> TChar <$> cs) <$> dquote (many anyChar)
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -537,6 +539,7 @@ parseAtomicPattern = label "pattern" $
   <|> PWild <$ symbol "_"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
+  <|> PChar <$> squote anyChar
   <|> PNat <$> natural
   <|> PList <$> brackets (parsePattern `sepBy` comma)
   <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
@@ -688,6 +691,7 @@ parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
+  <|> TyStr  <$ (reserved "String")
   <|> TyC    <$ (reserved "Char" <|> reserved "C")
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")

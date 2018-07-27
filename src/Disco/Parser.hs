@@ -718,7 +718,7 @@ parseTyDef :: Parser String
 parseTyDef =  identifier upperChar
 
 parseTyVar :: Parser (Name Type)
-parseTyVar = string2Name <$> (identifier letterChar)
+parseTyVar = string2Name <$> (identifier lowerChar)
 
 parseSigma :: Parser Sigma
 parseSigma = closeSigma <$> parseType

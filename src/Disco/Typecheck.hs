@@ -25,7 +25,7 @@
 
 module Disco.Typecheck
        ( -- * Type checking monad
-         TCM, TyCtx, runTCM, evalTCM, execTCM
+         TCM, TyCtx, runTCM, evalTCM, execTCM, extendTyDefs
          -- ** Definitions
        , Defn(..), DefnCtx
          -- ** Errors
@@ -55,10 +55,13 @@ module Disco.Typecheck
 
 import           Prelude                                 hiding (lookup)
 
+import           Control.Applicative                     ((<|>))
 import           GHC.Generics                            (Generic)
 
 import           Control.Arrow                           ((&&&), (***))
-import           Control.Lens                            ((%~), (&), _1)
+import           Control.Lens                            (use, (%~), (&), _1,
+                                                          _2)
+
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Control.Monad.State
@@ -67,6 +70,7 @@ import           Data.Coerce
 import           Data.List                               (group, partition,
                                                           sort)
 import qualified Data.Map                                as M
+import qualified Data.Set                                as S
 
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -95,11 +99,15 @@ type Clause = Bind [APattern] ATerm
 
 instance Subst Type Defn
 
--- | A map from names to definitions.
-type DefnCtx = Ctx ATerm Defn
+-- | A tuple container a map from definition names to definitions
+--   and a map from type definition names to types.
+type DefnCtx = (Ctx ATerm Defn, TyDefCtx)
 
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
+
+-- |  A map from type definition strings to their corresponding types.
+type TyDefCtx = M.Map String Type
 
 -- | Potential typechecking errors.
 data TCError
@@ -133,10 +141,13 @@ data TCError
   | ExpQ                   -- ^ Can't exponentiate by a rational.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
+  | DuplicateTyDefns String -- ^ Duplicate type definitions.
+  | CyclicTyDef String     -- ^ Cyclic type definition.
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | NotSubtractive Type
   | NotFractional Type
   | Unsolvable SolveError
+  | NotTyDef String             -- ^ The type is an algebraic data type that was never defined.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
@@ -153,7 +164,7 @@ type TCM = StateT DefnCtx (ReaderT TyCtx (ExceptT TCError FreshM))
 
 -- | Run a 'TCM' computation starting in the empty context.
 runTCM :: TCM a -> Either TCError (a, DefnCtx)
-runTCM = runFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT M.empty
+runTCM = runFreshM . runExceptT . flip runReaderT emptyCtx . flip runStateT (M.empty, M.empty)
 
 -- | Run a 'TCM' computation starting in the empty context, returning
 --   only the result of the computation.
@@ -168,11 +179,25 @@ execTCM = fmap snd . runTCM
 -- | Solve a constraint set, generating a substitution (or failing
 --   with an error).
 solve :: Constraint -> TCM S
-solve = either (throwError . Unsolvable) return . runSolveM . solveConstraint
+solve c = do
+  tyDefns <- use _2
+  either (throwError . Unsolvable) return . runSolveM . solveConstraint tyDefns $ c
 
 -- | Add a definition to the set of current definitions.
 addDefn :: Name Term -> Defn -> TCM ()
-addDefn x b = modify (M.insert (coerce x) b)
+addDefn x b = modify (\(dm, tm) -> (M.insert (coerce x) b dm, tm))
+
+-- | Add a type definition to the set of current type defintions.
+addTyDefn :: String -> Type -> TCM ()
+addTyDefn x b = modify (\(dm, tm) -> (dm, M.insert x b tm))
+
+-- | Extend the current TyDefCtx with a provided tydef context.
+extendTyDefs :: TyDefCtx -> TCM a -> TCM a
+extendTyDefs newtyctx tcm = withStateT updatetys tcm
+  where
+    updatetys :: DefnCtx -> DefnCtx
+    updatetys = (\(defns, oldtyctx) -> (defns, M.union newtyctx oldtyctx))
+
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
@@ -202,6 +227,12 @@ checkSigma t (Forall sig) = do
 -- | Check that a term has the given type.  Either throws an error, or
 --   returns the term annotated with types for all subterms.
 check :: Term -> Type -> TCM (ATerm, Constraint)
+
+check t (TyDef tyn) = do
+  (_, tydefmap) <- get
+  case M.lookup tyn tydefmap of
+    Just ty -> check t ty
+    Nothing -> throwError (NotTyDef tyn)
 
 check (TParens t) ty = check t ty
 
@@ -862,6 +893,13 @@ inferQual _ (QGuard (unembed -> t))   = do
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern, Constraint)
+
+checkPattern p (TyDef tyn)                  = do
+  (_, tydefnmap) <- get
+  case M.lookup tyn tydefnmap of
+    Just ty -> checkPattern p ty
+    Nothing -> throwError (NotTyDef tyn)
+
 checkPattern (PVar x) ty                    = return (singleCtx x (toSigma ty), APVar ty (coerce x), CTrue)
 
 checkPattern PWild    ty                    = return (emptyCtx, APWild ty, CTrue)
@@ -927,17 +965,6 @@ checkTuplePat (p:ps) ty = do
   rest <- checkTuplePat ps ty2
   return ((ctx, apt, cAnd [cst1, cst2]) : rest)
 
--- | Check all the types in a module, returning a context of types for
---   top-level definitions.
-checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
-checkModule (Module m docs) = do
-  let (defns, typeDecls) = partition isDefn m
-  withTypeDecls typeDecls $ do
-    mapM_ checkDefn defns
-    aprops <- checkProperties docs
-    ctx <- ask
-    return (docs, aprops, ctx)
-
 -- | Ensures that a type's outermost constructor matches the provided constructor,
 --   returning the types within the matched constructor or throwing a type error.
 --   If the type provided is a type variable, appropriate constraints are generated
@@ -954,6 +981,58 @@ ensureConstr c tyv@(TyAtom (AVar (U _))) _ = do
 ensureConstr c ty targ = case targ of
                            Left term -> throwError (NotCon c term ty)
                            Right pat -> throwError (PatternType pat ty)
+
+-- | Check all the types in a module, returning a context of types for
+--   top-level definitions.
+checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
+checkModule (Module m docs) = do
+  let (tydefs, rest) = partition isTyDef m
+  addTyDefns tydefs
+  checkCyclicTys tydefs
+  let (defns, typeDecls) = partition isDefn rest
+  withTypeDecls typeDecls $ do
+    mapM_ checkDefn defns
+    aprops <- checkProperties docs
+    ctx <- ask
+    return (docs, aprops, ctx)
+
+addTyDefns :: [Decl] -> TCM ()
+addTyDefns tydefs = do
+  let dups :: [(String, Int)]
+      dups = filter ((>1) . snd) . map (head &&& length) . group . sort . map tyDefName $ tydefs
+  case dups of
+    ((x,_):_) -> throwError (DuplicateTyDefns x)
+    []        -> mapM (\(x, ty) -> addTyDefn x ty) (map getTyDef tydefs) *> return ()
+  where
+    getTyDef :: Decl -> (String, Type)
+    getTyDef (DTyDef x ty) = (x, ty)
+    getTyDef d             = error $ "Impossible! addTyDefns.getTyDef called on non-DTyDef: " ++ show d
+
+checkCyclicTys :: [Decl] -> TCM ()
+checkCyclicTys decls = mapM (\decl -> unwrap decl) decls *> return ()
+  where
+    unwrap :: Decl -> TCM (S.Set String)
+    unwrap (DTyDef x _) = checkCyclicTy (TyDef x) S.empty
+    unwrap d = error $ "Impossible: checkCyclicTys.unwrap called on non-TyDef: " ++ show d
+
+-- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
+-- 1.) 'ty' is a TyDef.
+-- 2.) Repeated expansions of the TyDef yield nothing but other TyDefs.
+-- 3.) An expansion of a TyDef yields another TyDef that has been previously encountered.
+-- The function returns the set of TyDefs encountered during expansion if the TyDef is not cyclic.
+checkCyclicTy :: Type -> S.Set String -> TCM (S.Set String)
+checkCyclicTy (TyDef name) set = do
+  case S.member name set of
+    True -> throwError (CyclicTyDef name)
+    False -> do
+                (_, tydefmap) <- get
+                case M.lookup name tydefmap of
+                  Nothing -> throwError $ NotTyDef name
+                  Just ty -> checkCyclicTy ty (S.insert name set)
+
+
+checkCyclicTy _ set = return set
+
 
 -- | Run a type checking computation in the context of some type
 --   declarations. First check that there are no duplicate type
@@ -979,7 +1058,7 @@ withTypeDecls decls k = do
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
   Forall sig <- lookupTy x
-  prevDefn <- gets (M.lookup (coerce x))
+  prevDefn <- gets (\(dm, tm) -> M.lookup (coerce x) dm)
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do

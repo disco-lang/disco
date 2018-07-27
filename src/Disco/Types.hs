@@ -207,7 +207,12 @@ data Type where
   -- | Application of a type constructor to type arguments.
   TyCon  :: Con -> [Type] -> Type
 
-  deriving (Show, Eq, Generic)
+  -- | A user defined algrbraic datatype. In order for an ADT to be a valid
+  --   type, the string representing the ADT must appear on the left hand side of
+  --   a ADT declaration.
+  TyDef :: String -> Type
+
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Type
 instance Subst Type Rational where

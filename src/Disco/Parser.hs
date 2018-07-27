@@ -233,17 +233,17 @@ reservedWords =
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a letter and continuing with alphanumerics, underscores, and
 --   apostrophes.
-identifier :: Parser String
-identifier = (lexeme . try) (p >>= check) <?> "variable name"
+identifier :: Parser Char -> Parser String
+identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> letterChar <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
                 else return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
-ident = string2Name <$> identifier
+ident = string2Name <$> (identifier letterChar)
 
 -- | Optionally parse, succesfully returning 'Nothing' if the parse
 --   fails.
@@ -357,7 +357,7 @@ parseDefn = label "definition" $
 
 -- | Parse the definition of a user-defined algebraic data type.
 parseTyDefn :: Parser Decl
-parseTyDefn = label "ADT defintion" $
+parseTyDefn = label "type defintion" $
   DTyDef
   <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)  
 
@@ -714,12 +714,11 @@ parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
--- | Need to change identifier to take an extra parser argument
 parseTyDef :: Parser String
-parseTyDef =  ((:) <$> upperChar <*> identifier)
+parseTyDef =  identifier upperChar
 
 parseTyVar :: Parser (Name Type)
-parseTyVar = string2Name <$> identifier
+parseTyVar = string2Name <$> (identifier letterChar)
 
 parseSigma :: Parser Sigma
 parseSigma = closeSigma <$> parseType

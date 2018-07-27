@@ -59,7 +59,8 @@ import           Control.Applicative                     ((<|>))
 import           GHC.Generics                            (Generic)
 
 import           Control.Arrow                           ((&&&), (***))
-import           Control.Lens                            ((%~), (&), _1, _2, use)
+import           Control.Lens                            (use, (%~), (&), _1,
+                                                          _2)
 
 import           Control.Monad.Except
 import           Control.Monad.Reader
@@ -196,7 +197,7 @@ extendTyDefs newtyctx tcm = withStateT updatetys tcm
   where
     updatetys :: DefnCtx -> DefnCtx
     updatetys = (\(defns, oldtyctx) -> (defns, M.union newtyctx oldtyctx))
-  
+
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
@@ -1011,7 +1012,7 @@ checkCyclicTys :: [Decl] -> TCM ()
 checkCyclicTys decls = mapM (\decl -> unwrap decl) decls *> return ()
   where
     unwrap :: Decl -> TCM (S.Set String)
-    unwrap (DTyDef x _) = checkCyclicTy (TyDef x) S.empty 
+    unwrap (DTyDef x _) = checkCyclicTy (TyDef x) S.empty
     unwrap d = error $ "Impossible: checkCyclicTys.unwrap called on non-TyDef: " ++ show d
 
 -- | Checks if a given type is cyclic. A type 'ty' is cyclic if:

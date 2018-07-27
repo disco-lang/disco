@@ -340,9 +340,9 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
-parseDecl :: Parser Decl 
+parseDecl :: Parser Decl
 parseDecl = try parseTyDecl <|> parseDefn <|> parseTyDefn
- 
+
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
@@ -359,7 +359,7 @@ parseDefn = label "definition" $
 parseTyDefn :: Parser Decl
 parseTyDefn = label "type defintion" $
   DTyDef
-  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)  
+  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).

@@ -383,7 +383,7 @@ parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> squote anyChar
-  <|> TString <$> (\cs -> TChar <$> cs) <$> dquote (many anyChar)
+  <|> parseString
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -405,6 +405,11 @@ parseAtom = label "expression" $
 --   > nonEmptyList  ::= t [ell] | t listRemainder
 --   > ell           ::= '..' [t]
 --   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
+
+parseString :: Parser Term
+parseString = TString <$> (\cs -> TChar <$> cs) <$> dquote parseInner
+  where parseInner :: Parser [Char]
+        parseInner = (many (satisfy (\c -> not $ (==) c '"')))
 
 parseContainer :: Container -> Parser Term
 parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)

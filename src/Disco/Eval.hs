@@ -61,9 +61,9 @@ import           Control.Monad.Except                    (catchError)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
-import qualified Data.Map                                as M
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
+import qualified Data.Map                                as M
 import qualified Data.Sequence                           as Seq
 
 import           Unbound.Generics.LocallyNameless

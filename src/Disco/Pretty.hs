@@ -24,13 +24,16 @@ import qualified Data.Map                         as M
 import           Data.Maybe                       (fromJust)
 import           Data.Ratio
 
+import           Control.Lens                     (use)
+
 import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, Value (..), io,
-                                                   iputStr, iputStrLn)
+import           Disco.Eval                       (Disco, topTyDefns, IErr,
+                                                   Value (..), io, iputStr,
+                                                   iputStrLn)
 import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -342,6 +345,12 @@ prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyWHNF out (TyDef n) v = do
+  tymap <- use topTyDefns
+  case M.lookup n tymap of
+    Just ty -> prettyWHNF out ty v
+    Nothing -> error "Impossible! TyDef name does not exist in TyMap"
+
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
 prettyWHNF out (TyList ty)     v            = prettyList out ty v

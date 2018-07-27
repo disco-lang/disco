@@ -31,9 +31,9 @@ import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, topTyDefns, IErr,
-                                                   Value (..), io, iputStr,
-                                                   iputStrLn)
+import           Disco.Eval                       (Disco, IErr, Value (..), io,
+                                                   iputStr, iputStrLn,
+                                                   topTyDefns)
 import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
 import           Disco.Types

@@ -19,6 +19,8 @@ module Disco.Typecheck.Constraints
   )
   where
 
+import qualified Data.List.NonEmpty               as NE
+import           Data.Semigroup
 import           GHC.Generics                     (Generic)
 
 import           Disco.Types
@@ -52,3 +54,13 @@ cAnd cs = case filter nontrivial cs of
   where
     nontrivial CTrue = False
     nontrivial _     = True
+
+instance Semigroup Constraint where
+  c1 <> c2 = cAnd [c1,c2]
+  sconcat  = cAnd . NE.toList
+  stimes   = stimesIdempotent
+
+instance Monoid Constraint where
+  mempty  = CTrue
+  mappend = (<>)
+  mconcat = cAnd

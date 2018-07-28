@@ -145,6 +145,7 @@ library
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints
+                       Disco.Typecheck.Erase
                        Disco.Typecheck.Graph
                        Disco.Typecheck.Solve
                        Disco.Typecheck.Unify

@@ -99,38 +99,13 @@ data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
   | NotCon Con Term Type   -- ^ The term should have an outermost constructor matching
                            --   matching Con, but it has type 'Type' instead
-  | NotFun   ATerm         -- ^ The term should be a function but has a non-arrow type
-  | NotTuplePattern Pattern Type
-  | Mismatch Type ATerm    -- ^ Simple type mismatch: expected, actual
-  | CantInfer Term         -- ^ We were asked to infer the type of the
-                           --   term, but its type cannot be inferred
-  | NotNum ATerm           -- ^ The term is expected to have a numeric type but it doesn't
-  | NotNumTy Type          -- ^ The type should be numeric, but is not.
-  | IncompatibleTypes Type Type  -- ^ The types should have a lub
-                                 -- (i.e. common supertype) but they
-                                 -- don't.
-  | Juxtaposition ATerm Term
-                           -- ^ The first term is juxtaposed with the
-                           --   second, but typechecks as neither
-                           --   function application nor
-                           --   multiplication
-  | Undecidable Type       -- ^ The type should be decidable so we can
-                           --   check equality, but it isn't.
-  | Unordered Type         -- ^ The type should be totally ordered so
-                           --   we can check less than, but it isn't.
-  | Infinite Type
   | EmptyCase              -- ^ Case analyses cannot be empty.
-  | NoLub Type Type        -- ^ The given types have no lub.
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
-  | ModQ                   -- ^ Can't do mod on rationals.
-  | ExpQ                   -- ^ Can't exponentiate by a rational.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | DuplicateTyDefns String -- ^ Duplicate type definitions.
   | CyclicTyDef String     -- ^ Cyclic type definition.
   | NumPatterns            -- ^ # of patterns does not match type in definition
-  | NotSubtractive Type
-  | NotFractional Type
   | Unsolvable SolveError
   | NotTyDef String             -- ^ The type is an algebraic data type that was never defined.
   | NoError                -- ^ Not an error.  The identity of the

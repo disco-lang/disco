@@ -34,6 +34,7 @@ import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
+import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------------------

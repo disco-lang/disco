@@ -22,7 +22,7 @@ import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Syntax.Operators
-import           Disco.Typecheck
+import           Disco.Typecheck.Monad
 import           Disco.Types
 import           Disco.Util
 

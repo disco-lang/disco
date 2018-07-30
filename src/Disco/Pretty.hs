@@ -19,7 +19,7 @@ import           System.IO                        (hFlush, stdout)
 
 import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
-import           Data.Char                        (isAlpha, toLower)
+import           Data.Char                        (isAlpha, toLower, chr)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (fromJust)
 import           Data.Ratio
@@ -52,6 +52,12 @@ brackets = fmap PP.brackets
 
 braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
+
+quotes :: Functor f => f PP.Doc -> f PP.Doc
+quotes = fmap PP.quotes
+
+doubleQuotes :: Functor f => f PP.Doc -> f PP.Doc
+doubleQuotes = fmap PP.doubleQuotes
 
 text :: Monad m => String -> m PP.Doc
 text     = return . PP.text
@@ -156,7 +162,8 @@ prettyTerm (TVar x)      = prettyName x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
-prettyTerm (TChar c)     = text "'" <> text (show c) <> text "'"
+prettyTerm (TChar c)     = quotes $ text (show c)
+prettyTerm (TString cs)  = doubleQuotes $ text cs
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(args, body) ->
   text "λ" <> (if length args > 1 then text " " else empty)
@@ -345,7 +352,8 @@ prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
-prettyWHNF out TyC             (VChar c)    = out (show c)
+prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
+-- prettyWHNF out (TyList TyC)    v            = prettyString out v
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (TySum ty1 ty2) (VCons i [v])
@@ -384,6 +392,21 @@ prettyIteration out _ []     = out ""
 prettyIteration out t [x]    = prettyValueWith out t x
 prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
 
+-- prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
+-- prettyString out v = out "\"" >> go v >> out "\""
+--   where
+--     toChar :: Value -> String
+--     toChar (VNum _ c) = show $ chr (fromIntegral (numerator c))
+--     toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
+
+--     go :: Value -> Disco IErr () 
+--     go (VCons 0 []) = out ""
+--     go (VCons 1 [hd, tl]) = do
+--       out (toChar hd)
+--       tlWHNF <- whnfV tl
+--       go tlWHNF
+
+--     go v' = error $ "Impossible! Value that's not a string in prettyString: " ++ show v'
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v

@@ -54,6 +54,7 @@ module Disco.AST.Generic
        , X_TNat
        , X_TRat
        , X_TChar
+       , X_TString
        , X_TAbs
        , X_TApp
        , X_TTup
@@ -218,6 +219,7 @@ type family X_TBool e
 type family X_TNat e
 type family X_TRat e
 type family X_TChar e
+type family X_TString e
 type family X_TAbs e
 type family X_TApp e
 type family X_TTup e
@@ -260,6 +262,9 @@ data Term_ e where
 
   -- | A unicode character.
   TChar_  :: X_TChar e -> Char -> Term_ e
+
+  -- | A string of characters.
+  TString_ :: X_TString e -> [Char] -> Term_ e
 
   -- | An anonymous function.
   TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
@@ -314,6 +319,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TNat e)
     , a (X_TRat e)
     , a (X_TChar e)
+    , a (X_TString e)
     , a (X_TAbs e)
     , a (X_TApp e)
     , a (X_TInj e)

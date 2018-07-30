@@ -85,9 +85,6 @@ data Value where
   --   fractional values should be diplayed.
   VNum   :: RationalDisplay -> Rational -> Value
 
-  -- | A unicode character value
-  VChar  :: Char -> Value
-
   -- | A constructor with arguments.  The Int indicates which
   --   constructor it is.  For example, False is represented by
   --   @VCons 0 []@, and True by @VCons 1 []@.  A pair is

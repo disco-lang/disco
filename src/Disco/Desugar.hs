@@ -145,6 +145,7 @@ desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
 desugarTerm (ATChar c)           = return $ DTChar c
+desugarTerm (ATString cs)        = desugarContainer TyC ListContainer (map ATChar cs) Nothing
 desugarTerm (ATAbs ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t

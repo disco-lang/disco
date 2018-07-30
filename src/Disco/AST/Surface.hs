@@ -36,6 +36,7 @@ module Disco.AST.Surface
        , pattern TUnit
        , pattern TBool
        , pattern TChar
+       , pattern TString
        , pattern TNat
        , pattern TRat
        , pattern TAbs
@@ -51,7 +52,6 @@ module Disco.AST.Surface
        , pattern TAscr
        , pattern TList
        , pattern TListComp
-       , pattern TString
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
@@ -166,6 +166,7 @@ type instance X_TBool           UD = ()
 type instance X_TNat            UD = ()
 type instance X_TRat            UD = ()
 type instance X_TChar           UD = ()
+type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
 type instance X_TInj            UD = ()
@@ -207,6 +208,9 @@ pattern TRat rat = TRat_ () rat
 pattern TChar :: Char -> Term
 pattern TChar c = TChar_ () c
 
+pattern TString :: [Char] -> Term
+pattern TString cs = TString_ () cs
+
 pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 pattern TAbs bind = TAbs_ () bind
 
@@ -241,7 +245,7 @@ pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
-             TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
+             TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TContainer, TContainerComp, TAscr #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
@@ -249,11 +253,6 @@ pattern TList ts e = TContainer_ () ListContainer ts e
 
 pattern TListComp :: Bind (Telescope Qual) Term -> Term
 pattern TListComp x = TContainerComp_ () ListContainer x
-
-pattern TString :: [Term] -> Term
-pattern TString cs = TContainer ListContainer cs Nothing
-
-
 
 type Link = Link_ UD
 

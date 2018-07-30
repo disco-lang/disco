@@ -84,6 +84,7 @@ type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
 type instance X_TBool DS          = ()
 type instance X_TChar DS          = ()
+type instance X_TString DS        = ()
 type instance X_TNat DS           = Type
 type instance X_TRat DS           = ()
 type instance X_TAbs DS           = Void -- TAbs represents lambdas with multiple args;

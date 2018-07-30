@@ -485,6 +485,7 @@ infer (TVar x)      = do
 infer TUnit         = return (ATUnit, CTrue)
 infer (TBool b)     = return $ (ATBool b, CTrue)
 infer (TChar c)     = return $ (ATChar c, CTrue)
+infer (TString cs)  = return $ (ATString cs, CTrue)
 infer (TNat n)      = return $ (ATNat TyN n, CTrue)
 infer (TRat r)      = return $ (ATRat r, CTrue)
 

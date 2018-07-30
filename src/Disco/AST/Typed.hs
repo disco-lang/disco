@@ -28,6 +28,7 @@ module Disco.AST.Typed
        , pattern ATNat
        , pattern ATRat
        , pattern ATChar
+       , pattern ATString
        , pattern ATAbs
        , pattern ATApp
        , pattern ATTup
@@ -107,6 +108,7 @@ type instance X_TBool           TY = ()
 type instance X_TNat            TY = Type
 type instance X_TRat            TY = ()
 type instance X_TChar           TY = ()
+type instance X_TString         TY = ()
 type instance X_TAbs            TY = Void -- Replace TAbs with a version that
                                           -- definitely has all type annotations
 type instance X_TApp            TY = Type
@@ -149,6 +151,9 @@ pattern ATRat rat = TRat_ () rat
 pattern ATChar :: Char -> ATerm
 pattern ATChar c = TChar_ () c
 
+pattern ATString :: [Char] -> ATerm
+pattern ATString cs = TString_ () cs
+
 pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
 pattern ATAbs ty bind = XTerm_ (ty, bind)
 
@@ -180,7 +185,7 @@ pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> 
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 {-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
-             ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
+             ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
@@ -318,6 +323,7 @@ instance HasType ATerm where
   getType (ATNat ty _)             = ty
   getType (ATRat _)                = TyF
   getType (ATChar _)               = TyC
+  getType (ATString _)             = TyList TyC
   getType (ATAbs ty _)             = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
@@ -336,7 +342,8 @@ instance HasType ATerm where
   setType _  (ATBool b)              = ATBool b
   setType ty (ATNat _ x      )       = ATNat ty x
   setType _  (ATRat r)               = ATRat r
-  setType _ (ATChar c)               = ATChar c 
+  setType _ (ATChar c)               = ATChar c
+  setType _ (ATString cs)            = ATString cs    
   setType ty (ATAbs _ x      )       = ATAbs ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x

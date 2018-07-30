@@ -71,9 +71,6 @@ data Core where
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core
 
-  -- | A unicode character.
-  CChar :: Char -> Core
-
   -- | An anonymous function.
   CAbs  :: Bind (Name Core) Core -> Core
 

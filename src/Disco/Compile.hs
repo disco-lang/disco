@@ -94,8 +94,20 @@ compileDTerm (DTNil _)        = return $ CCons 0 []
 compileDTerm (DTContainer _ ListContainer ds (Just ell))
   = CEllipsis <$> mapM compileDTerm ds <*> traverse compileDTerm ell
 
+compileDTerm (DTContainer _ ListContainer _ Nothing)
+  = error $ unlines
+      [ "Impossible: compileDTerm on DTContainer ListContainer with no ellipsis"
+      , "(should have already been desugared)"
+      ]
+
 compileDTerm (DTContainer (TySet eltTy) SetContainer ds Nothing)
   = CoreSet eltTy <$> mapM compileDTerm ds
+
+compileDTerm (DTContainer (TySet _) SetContainer _ (Just _))
+  = error $ "compileDTerm DTContainer SetContainer with ellipsis: unimplemented"
+
+compileDTerm (DTContainer ty c _ _)
+  = error $ "Impossible: compileDTerm on DTContiner " ++ show c ++ " with non-Set type " ++ show ty
 
 ------------------------------------------------------------
 

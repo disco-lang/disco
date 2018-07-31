@@ -710,7 +710,10 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
           $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
         mkEquateSubst :: Set (Name Type) -> S' Atom
-        mkEquateSubst = (\(a:as) -> map (\v -> (coerce v, AVar (U a))) as) . S.toList
+        mkEquateSubst = mkEquations . S.toList
+
+        mkEquations (a:as) = map (\v -> (coerce v, AVar (U a))) as
+        mkEquations []     = error "Impossible! Empty set of names in mkEquateSubst"
 
             -- After picking concrete base types for all the type
             -- variables we can, the only thing possibly remaining in
@@ -743,7 +746,10 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
     (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
 
     onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
-    onlyVars = M.mapKeys (\(Right n) -> n) . M.filterWithKey (\a _ -> isRight a)
+    onlyVars = M.mapKeys fromRight . M.filterWithKey (\a _ -> isRight a)
+      where
+        fromRight (Right n) = n
+        fromRight (Left _)  = error "Impossible! isRight but is Left."
 
     go :: RelMap -> SolveM (S' BaseTy)
     go relMap = case as of

@@ -345,7 +345,7 @@ instance HasType ATerm where
   setType ty (ATNat _ x      )       = ATNat ty x
   setType _  (ATRat r)               = ATRat r
   setType _ (ATChar c)               = ATChar c
-  setType _ (ATString cs)            = ATString cs    
+  setType _ (ATString cs)            = ATString cs
   setType ty (ATAbs _ x      )       = ATAbs ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x

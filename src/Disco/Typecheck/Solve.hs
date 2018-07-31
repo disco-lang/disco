@@ -52,7 +52,7 @@ import           Disco.Typecheck.Unify
 import           Disco.Types
 import           Disco.Types.Rules
 
-import qualified Debug.Trace                      as Debug
+-- import qualified Debug.Trace                      as Debug
 
 traceM :: Applicative f => String -> f ()
 traceM _ = pure ()
@@ -238,7 +238,9 @@ solveConstraintChoice tyDefns quals cs = do
   (g'', theta_cyc) <- liftExcept (elimCycles tyDefns g')
 
   -- Check that the resulting substitution respects sorts...
-  when (not $ all (\(x,TyAtom (ABase ty)) -> hasSort ty (getSort sm x)) theta_cyc)
+  let sortOK (x,TyAtom (ABase ty)) = hasSort ty (getSort sm x)
+      sortOK p                     = error $ "Impossible! sortOK " ++ show p
+  when (not $ all sortOK theta_cyc)
     $ throwError NoUnify
 
   traceShowM g''

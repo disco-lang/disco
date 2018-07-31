@@ -33,6 +33,8 @@ import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
+import           Disco.Typecheck.Erase
+import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------------------
@@ -136,7 +138,7 @@ handleLet x t = do
   let mat = runTCM (extends ctx $ extendTyDefs tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
-    Right ((at, sig), _) -> do
+    Right ((at, sig), _, _) -> do
       topCtx   %= M.insert x sig
       topDefns %= M.insert (coerce x) (compileTerm at)
 
@@ -181,7 +183,7 @@ handleLoad file = do
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
-        Right ((docMap, aprops, ctx), (defns, tydefs)) -> do
+        Right ((docMap, aprops, ctx), DefnCtx defns tydefs, _) -> do
           let cdefns = M.mapKeys coerce $ fmap compileDefn defns
           topDocs  .= docMap
           topCtx   .= ctx

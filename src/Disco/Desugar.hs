@@ -43,7 +43,7 @@ import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators
-import           Disco.Typecheck
+import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -255,7 +255,7 @@ desugarTerm (ATContainerComp (TyList eltTy) ListContainer bqt) = do
   (qs, t) <- unbind bqt
   desugarComp eltTy t qs
 
-desugarTerm (ATContainerComp ty ListContainer _) = 
+desugarTerm (ATContainerComp ty ListContainer _) =
   error $ "Non-TyList type passed to desugarTerm for a ListContainer" ++ show ty
 
 desugarTerm (ATContainerComp ty _ _) = error $ "desugar ContainerComp unimplemented for " ++ show ty

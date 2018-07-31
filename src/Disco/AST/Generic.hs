@@ -38,7 +38,7 @@ module Disco.AST.Generic
 
          -- * Utility types
 
-       , Side (..)
+       , Side (..), selectSide
        , Container (..)
        , Ellipsis (..)
 
@@ -188,6 +188,10 @@ data Side = L | R
 
 instance Alpha Side
 instance Subst t Side
+
+selectSide :: Side -> a -> a -> a
+selectSide L a _ = a
+selectSide R _ b = b
 
 -- | A container is a wrapper for sets and lists.
 data Container where

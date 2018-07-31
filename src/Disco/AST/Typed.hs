@@ -81,6 +81,7 @@ module Disco.AST.Typed
        where
 
 import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Unsafe
 
 import           Data.Void
 
@@ -372,3 +373,6 @@ instance HasType APattern where
   getType (APSucc _)      = TyN
   getType (APCons ty _ _) = ty
   getType (APList ty _)   = ty
+
+instance HasType ABranch where
+  getType = getType . snd . unsafeUnbind

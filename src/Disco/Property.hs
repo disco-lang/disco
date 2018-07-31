@@ -19,6 +19,7 @@ import           Unbound.Generics.LocallyNameless (Name, lunbind)
 import qualified Test.QuickCheck                  as QC
 
 import           Control.Monad.Except
+import           Data.Char                        (ord)
 import           Data.Coerce
 import           Data.List                        (transpose)
 import qualified Data.Map                         as M
@@ -185,13 +186,17 @@ discoGenerator TyF = DiscoGen
 discoGenerator TyQ = DiscoGen
   (QC.arbitrary :: QC.Gen (Integer, QC.Positive Integer))
   (\(m, QC.Positive n) -> vnum (m % (n+1)))
+discoGenerator TyC = DiscoGen
+  (QC.arbitrary :: QC.Gen Char)
+  (vnum . (%1) . toInteger . ord)
 
 discoGenerator (TyFin 0) = emptyGenerator
 discoGenerator (TyFin n) = DiscoGen
   (QC.choose (0,n-1) :: QC.Gen Integer)
   (vnum . (%1))
 
-discoGenerator ty@(TyVar _) = error $ "discoGenerator " ++ show ty
+discoGenerator ty@(TyVar _)  = error $ "discoGenerator " ++ show ty
+discoGenerator ty@(Skolem _) = error $ "discoGenerator " ++ show ty
 
 discoGenerator TyVoid       = emptyGenerator
 discoGenerator TyUnit       = DiscoGen (return ()) (const (VCons 0 []))
@@ -225,8 +230,20 @@ discoGenerator (TyList ty) =
     DiscoGen tyGen tyToValue ->
       DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
 
+-- discoGenerator (TySet ty) =
+--   case discoGenerator ty of
+--     EmptyGen -> DiscoGen (return ()) (const (VSet []))
+--     DiscoGen tyGen tyToValue ->
+--       DiscoGen (QC.listOf tyGen) (_ . map tyToValue)
+
+discoGenerator (TySet _ty) =
+  error "discoGenerator is not yet implemented for TySet"
+
 discoGenerator (TyArr _ty1 _ty2) =
   error "discoGenerator is not yet implemented for TyArr"
+
+discoGenerator (TyDef _name) =
+  error "discoGenerator is not yet implemented for TyDef"
 
 -- | @genValues n ty@ generates a random sequence of @n@ increasingly
 --   complex values of type @ty@, using the 'DiscoGen' for @ty@.

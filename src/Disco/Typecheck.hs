@@ -844,13 +844,6 @@ typecheck (Check ty) t = do
   constraint $ CSub (getType at) ty
   return $ setType ty at
 
---------------------------------------------------
--- Catch-all (error)
-
--- This should never happen.  We should at least be able to infer a
--- type for everything.
-typecheck mode t = error $ "Impossible! No case for typecheck " ++ show mode ++ " " ++ show t
-
 ------------------------------------------------------------
 -- Patterns
 ------------------------------------------------------------

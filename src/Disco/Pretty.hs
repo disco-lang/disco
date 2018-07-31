@@ -162,7 +162,7 @@ prettyTerm (TVar x)      = prettyName x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
-prettyTerm (TChar c)     = quotes $ text (show c)
+prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(args, body) ->
@@ -353,7 +353,7 @@ prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
--- prettyWHNF out (TyList TyC)    v            = prettyString out v
+prettyWHNF out (TyList TyC)    v            = prettyString out v
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (TySum ty1 ty2) (VCons i [v])
@@ -392,21 +392,23 @@ prettyIteration out _ []     = out ""
 prettyIteration out t [x]    = prettyValueWith out t x
 prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
 
--- prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
--- prettyString out v = out "\"" >> go v >> out "\""
---   where
---     toChar :: Value -> String
---     toChar (VNum _ c) = show $ chr (fromIntegral (numerator c))
---     toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
+prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
+prettyString out str = out "\"" >> go str >> out "\""
+  where
+    toChar :: Value -> String
+    toChar (VNum _ c) = drop 1 . reverse . drop 1 . reverse . show $ [chr (fromIntegral (numerator c))]
+    toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
 
---     go :: Value -> Disco IErr () 
---     go (VCons 0 []) = out ""
---     go (VCons 1 [hd, tl]) = do
---       out (toChar hd)
---       tlWHNF <- whnfV tl
---       go tlWHNF
-
---     go v' = error $ "Impossible! Value that's not a string in prettyString: " ++ show v'
+    go :: Value -> Disco IErr ()
+    go v = do
+      v' <- whnfV v
+      case v' of
+        (VCons 0 []) -> return ()
+        (VCons 1 [hd, tl]) -> do
+          hd' <- whnfV hd
+          out (toChar hd')
+          go tl
+        v'' -> error $ "Impossible! Value that's not a string in prettyString: " ++ show v''
 
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v

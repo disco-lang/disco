@@ -109,6 +109,7 @@ module Disco.AST.Generic
        , X_PInj
        , X_PNat
        , X_PChar
+       , X_PString
        , X_PSucc
        , X_PCons
        , X_PList
@@ -458,6 +459,7 @@ type family X_PTup e
 type family X_PInj e
 type family X_PNat e
 type family X_PChar e
+type family X_PString e
 type family X_PSucc e
 type family X_PCons e
 type family X_PList e
@@ -490,6 +492,9 @@ data Pattern_ e where
   -- | Unicode character pattern
   PChar_ :: X_PChar e -> Char -> Pattern_ e
 
+  -- | String pattern.
+  PString_ :: X_PString e -> String -> Pattern_ e
+
   -- | Successor pattern, @S p@.
   PSucc_ :: X_PSucc e -> Pattern_ e -> Pattern_ e
 
@@ -511,6 +516,7 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PBool e)
         , a (X_PNat e)
         , a (X_PChar e)
+        , a (X_PString e)
         , a (X_PTup e)
         , a (X_PInj e)
         , a (X_PSucc e)

@@ -381,7 +381,7 @@ parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> squote L.charLiteral
-  <|> TString <$> (char '"' >> manyTill L.charLiteral (char '"'))
+  <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -537,7 +537,8 @@ parseAtomicPattern = label "pattern" $
   <|> PWild <$ symbol "_"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
-  <|> PChar <$> squote anyChar
+  <|> PChar <$> squote L.charLiteral
+  <|> PString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> PNat <$> natural
   <|> PList <$> brackets (parsePattern `sepBy` comma)
   <|> tuplePat <$> (parens (parsePattern `sepBy` comma))

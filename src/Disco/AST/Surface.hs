@@ -85,6 +85,7 @@ module Disco.AST.Surface
        , pattern PUnit
        , pattern PBool
        , pattern PChar
+       , pattern PString
        , pattern PTup
        , pattern PInj
        , pattern PNat
@@ -208,8 +209,8 @@ pattern TRat rat = TRat_ () rat
 pattern TChar :: Char -> Term
 pattern TChar c = TChar_ () c
 
-pattern TString :: [Char] -> Term
-pattern TString cs = TString_ () cs
+pattern TString :: String -> Term
+pattern TString s = TString_ () s
 
 pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 pattern TAbs bind = TAbs_ () bind
@@ -308,6 +309,7 @@ type instance X_PTup UD    = ()
 type instance X_PInj UD    = ()
 type instance X_PNat UD    = ()
 type instance X_PChar UD   = ()
+type instance X_PString UD = ()
 type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
@@ -327,6 +329,9 @@ pattern PBool  b = PBool_ () b
 
 pattern PChar :: Char -> Pattern
 pattern PChar c = PChar_ () c
+
+pattern PString :: String -> Pattern
+pattern PString s = PString_ () s
 
 pattern PTup  :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp

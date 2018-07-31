@@ -874,6 +874,12 @@ checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit, CTrue)
 checkPattern (PBool b) tyv@(TyVar _)        = return (emptyCtx, APBool b, CEq tyv TyBool)
 checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b, CTrue)
 
+checkPattern (PChar c) tyv@(TyVar _)        = return (emptyCtx, APChar c, CEq tyv TyC)
+checkPattern (PChar c) TyC                  = return (emptyCtx, APChar c, CTrue)
+
+checkPattern (PString s) tyv@(TyVar _)      = return (emptyCtx, APString s, CEq tyv (TyList TyC))
+checkPattern (PString s) (TyList TyC)       = return (emptyCtx, APString s, CTrue)
+
 checkPattern (PTup ps) ty                   = do
   listCtxtAps <- checkTuplePat ps ty
   let (ctxs, aps, csts) = unzip3 listCtxtAps

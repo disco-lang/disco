@@ -67,6 +67,7 @@ module Disco.AST.Typed
        , pattern APInj
        , pattern APNat
        , pattern APChar
+       , pattern APString
        , pattern APSucc
        , pattern APCons
        , pattern APList
@@ -151,8 +152,8 @@ pattern ATRat rat = TRat_ () rat
 pattern ATChar :: Char -> ATerm
 pattern ATChar c = TChar_ () c
 
-pattern ATString :: [Char] -> ATerm
-pattern ATString cs = TString_ () cs
+pattern ATString :: String -> ATerm
+pattern ATString s = TString_ () s
 
 pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
 pattern ATAbs ty bind = XTerm_ (ty, bind)
@@ -253,6 +254,7 @@ type instance X_PWild    TY = Embed Type
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
 type instance X_PChar    TY = ()
+type instance X_PString  TY = ()
 type instance X_PTup     TY = Embed Type
 type instance X_PInj     TY = Embed Type
 type instance X_PNat     TY = Embed Type
@@ -280,6 +282,9 @@ pattern APBool  b = PBool_ () b
 
 pattern APChar :: Char -> APattern
 pattern APChar  c = PChar_ () c
+
+pattern APString :: String -> APattern
+pattern APString s = PString_ () s
 
 pattern APTup  :: Type -> [APattern] -> APattern
 pattern APTup ty lp <- PTup_ (unembed -> ty) lp

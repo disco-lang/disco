@@ -253,7 +253,7 @@ desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
 desugarTerm (ATContainerComp (TyList eltTy) ListContainer bqt) = do
   (qs, t) <- unbind bqt
-  desugarComp (TyList eltTy) t qs
+  desugarComp eltTy t qs
 
 desugarTerm (ATContainerComp ty ListContainer _) = 
   error $ "Non-TyList type passed to desugarTerm for a ListContainer" ++ show ty
@@ -279,10 +279,10 @@ desugarComp ty t qs = expandComp ty t qs >>= desugarTerm
 expandComp :: Type -> ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp ty t TelEmpty = return $ tsingleton t
+expandComp _ t TelEmpty = return $ tsingleton t
 
 -- [ t | q, qs ] = ...
-expandComp (TyList xTy) t (TelCons (unrebind -> (q,qs)))
+expandComp xTy t (TelCons (unrebind -> (q,qs)))
   = case q of
       -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do

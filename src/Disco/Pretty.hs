@@ -295,7 +295,8 @@ prettyPattern (PVar x) = prettyName x
 prettyPattern PWild = text "_"
 prettyPattern PUnit = text "()"
 prettyPattern (PBool b) = text $ map toLower $ show b
-prettyPattern (PChar c) = text "'" <> text (show c) <> text "'"
+prettyPattern (PChar c) = text (show c)
+prettyPattern (PString s) = text (show s)
 prettyPattern (PTup ts) = do
   ds <- punctuate (text ",") (map prettyPattern ts)
   parens (hsep ds)

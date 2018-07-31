@@ -143,14 +143,13 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets, fbrack, cbrack, squote :: Parser a -> Parser a
+parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
-squote    = between (symbol "'") (symbol "'")
 
 semi, comma, colon, dot, pipe :: Parser String
 semi      = symbol ";"
@@ -389,7 +388,7 @@ parseAtom :: Parser Term
 parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
-  <|> TChar <$> squote L.charLiteral
+  <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TVar <$> ident
   <|> TRat <$> try decimal
@@ -546,7 +545,7 @@ parseAtomicPattern = label "pattern" $
   <|> PWild <$ symbol "_"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
-  <|> PChar <$> squote L.charLiteral
+  <|> PChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> PString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> PNat <$> natural
   <|> PList <$> brackets (parsePattern `sepBy` comma)

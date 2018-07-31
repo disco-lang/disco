@@ -364,4 +364,4 @@ pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PSucc, PCons, PList #-}
+             PChar, PString, PSucc, PCons, PList #-}

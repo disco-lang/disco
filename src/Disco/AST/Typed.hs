@@ -195,9 +195,6 @@ pattern ATList t xs e = ATContainer t ListContainer xs e
 pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATListComp t b = ATContainerComp t ListContainer b
 
--- pattern ATString :: [ATerm] -> ATerm
--- pattern ATString chars = ATContainer TyC ListContainer chars Nothing
-
 type ALink = Link_ TY
 
 type instance X_TLink TY = ()
@@ -314,8 +311,8 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   where
     APList ty lp = PList_ (embed ty) lp
 
-{-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APTup, APInj,
-    APNat, APSucc, APCons, APList #-}
+{-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APString,
+    APTup, APInj, APNat, APSucc, APCons, APList #-}
 
 ------------------------------------------------------------
 -- getType
@@ -368,6 +365,7 @@ instance HasType APattern where
   getType APUnit          = TyUnit
   getType (APBool _)      = TyBool
   getType (APChar _)      = TyC
+  getType (APString _)    = TyList TyC
   getType (APTup ty _)    = ty
   getType (APInj ty _ _)  = ty
   getType (APNat ty _)    = ty

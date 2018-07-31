@@ -251,9 +251,12 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp _ ListContainer bqt) = do
+desugarTerm (ATContainerComp (TyList eltTy) ListContainer bqt) = do
   (qs, t) <- unbind bqt
-  desugarComp t qs
+  desugarComp (TyList eltTy) t qs
+
+desugarTerm (ATContainerComp ty ListContainer _) = 
+  error $ "Non-TyList type passed to desugarTerm for a ListContainer" ++ show ty
 
 desugarTerm (ATContainerComp ty _ _) = error $ "desugar ContainerComp unimplemented for " ++ show ty
 
@@ -269,23 +272,22 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
 -- | Desugar a list comprehension.  First translate it into an
 --   expanded ATerm and then recursively desugar that.
-desugarComp :: ATerm -> Telescope AQual -> DSM DTerm
-desugarComp t qs = expandComp t qs >>= desugarTerm
+desugarComp :: Type -> ATerm -> Telescope AQual -> DSM DTerm
+desugarComp ty t qs = expandComp ty t qs >>= desugarTerm
 
 -- | Expand a list comprehension into an equivalent ATerm.
-expandComp :: ATerm -> Telescope AQual -> DSM ATerm
+expandComp :: Type -> ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp t TelEmpty = return $ tsingleton t
+expandComp ty t TelEmpty = return $ tsingleton t
 
 -- [ t | q, qs ] = ...
-expandComp t (TelCons (unrebind -> (q,qs)))
+expandComp (TyList xTy) t (TelCons (unrebind -> (q,qs)))
   = case q of
       -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do
-        tqs <- expandComp t qs
-        let (TyList xTy) = getType lst
-            resTy        = TyList (getType t)
+        tqs <- expandComp (TyList xTy) t qs
+        let resTy        = TyList (getType t)
             concatTy     = TyArr (TyList resTy) resTy
             mapTy        = TyArr (TyArr xTy resTy) (TyArr (TyList xTy) (TyList resTy))
         return $ ATApp resTy (ATVar concatTy (string2Name "concat")) $
@@ -298,7 +300,7 @@ expandComp t (TelCons (unrebind -> (q,qs)))
 
       -- [ t | g, qs ] = if g then [ t | qs ] else []
       AQGuard (unembed -> g)    -> do
-        tqs <- expandComp t qs
+        tqs <- expandComp (TyList xTy) t qs
         return $ ATCase (TyList (getType t))
           [ tqs             <==. [tif g]
           , nil (getType t) <==. []

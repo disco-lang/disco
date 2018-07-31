@@ -395,7 +395,7 @@ simplify tyDefns origSM cs
     simplifiable (_ :=: _)                               = True
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
-    simplifiable (TyCon {} :<: TyVar  {})                = True
+    simplifiable (TyCon {} :<: TyVar {})                 = True
     simplifiable (TyDef {} :<: _)                        = True
     simplifiable (_ :<: TyDef {})                        = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True

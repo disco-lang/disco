@@ -18,6 +18,9 @@ repository.
 
    https://math.stackexchange.com/questions/152223/why-does-mathematical-convention-deal-so-ineptly-with-multisets
 
+** A Domain-Specific Language for Discrete Mathematics
+
+   Jha, Samuel, Pawar, Kiruthika
 * Implementation
 ** Typing Haskell in Haskell
 

@@ -215,7 +215,7 @@ decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char 
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
-reserved w = lexeme $ string w *> notFollowedBy alphaNumChar
+reserved w = (lexeme . try) $ string w *> notFollowedBy alphaNumChar
 
 -- | The list of all reserved words.
 reservedWords :: [String]
@@ -228,23 +228,23 @@ reservedWords =
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
-  , "forall"
+  , "forall", "type"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a letter and continuing with alphanumerics, underscores, and
 --   apostrophes.
-identifier :: Parser String
-identifier = (lexeme . try) (p >>= check) <?> "variable name"
+identifier :: Parser Char -> Parser String
+identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> letterChar <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
                 else return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
-ident = string2Name <$> identifier
+ident = string2Name <$> (identifier letterChar)
 
 -- | Optionally parse, succesfully returning 'Nothing' if the parse
 --   fails.
@@ -267,6 +267,7 @@ parseModule = do
   let theMod = mkModule topLevel
   return theMod
   where
+    groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
     groupTLs _ [] = []
     groupTLs revDocs (TLDoc doc : rest)
       = groupTLs (doc : revDocs) rest
@@ -275,8 +276,10 @@ parseModule = do
     groupTLs _ (TLDecl defn : rest)
       = (defn, Nothing) : groupTLs [] rest
 
+    defnGroups :: [Decl] -> [Decl]
     defnGroups []                = []
     defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+    defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
     defnGroups (DDefn x bs : ds)  = DDefn x (bs ++ concatMap getClauses grp) : defnGroups rest
       where
         (grp, rest) = span matchDefn $ ds
@@ -339,8 +342,8 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
 parseDecl :: Parser Decl
-parseDecl = try parseTyDecl <|> parseDefn
- 
+parseDecl = try parseTyDecl <|> parseDefn <|> parseTyDefn
+
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser Decl
 parseTyDecl = label "type declaration" $
@@ -352,6 +355,12 @@ parseDefn = label "definition" $
   DDefn
   <$> ident
   <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+
+-- | Parse the definition of a user-defined algebraic data type.
+parseTyDefn :: Parser Decl
+parseTyDefn = label "type defintion" $
+  DTyDef
+  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -703,6 +712,7 @@ parseAtomicType = label "type" $
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
   <|> TySet <$> (reserved "Set" *> parseAtomicType)
+  <|> TyDef <$> parseTyDef
   <|> TyVar <$> parseTyVar
   <|> parens parseType
 
@@ -710,8 +720,11 @@ parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
+parseTyDef :: Parser String
+parseTyDef =  identifier upperChar
+
 parseTyVar :: Parser (Name Type)
-parseTyVar = string2Name <$> identifier
+parseTyVar = string2Name <$> (identifier lowerChar)
 
 parseSigma :: Parser Sigma
 parseSigma = closeSigma <$> parseType

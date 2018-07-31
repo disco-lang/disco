@@ -132,7 +132,8 @@ handleCMD s =
 handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
-  let mat = runTCM (extends ctx $ inferTop t)
+  tymap <- use topTyDefns
+  let mat = runTCM (extends ctx $ extendTyDefs tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right ((at, sig), _) -> do
@@ -180,10 +181,11 @@ handleLoad file = do
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
-        Right ((docMap, aprops, ctx), defns) -> do
+        Right ((docMap, aprops, ctx), (defns, tydefs)) -> do
           let cdefns = M.mapKeys coerce $ fmap compileDefn defns
           topDocs  .= docMap
           topCtx   .= ctx
+          topTyDefns .= tydefs
           loadDefs cdefns
 
           t <- withTopEnv $ runAllTests aprops
@@ -273,7 +275,8 @@ handleDocs x = do
 evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
-  case evalTCM (extends ctx $ inferTop t) of
+  tymap <- use topTyDefns
+  case evalTCM (extends ctx $ extendTyDefs tymap (inferTop t)) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
@@ -283,7 +286,8 @@ evalTerm t = do
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
-  case (evalTCM $ extends ctx (inferTop t)) of
+  tymap <- use topTyDefns
+  case (evalTCM $ extends ctx $ extendTyDefs tymap (inferTop t)) of
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 

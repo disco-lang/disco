@@ -144,6 +144,7 @@ prettyTy (TyList ty)      = mparens (PA 9 InR) $
 prettyTy (TySet ty)      = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
 prettyTy (TyDef n)       = text n
+prettyTy (Skolem n)      = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)

@@ -55,7 +55,6 @@ module Disco.Typecheck
 
 import           Prelude                                 hiding (lookup)
 
-import           Control.Applicative                     ((<|>))
 import           GHC.Generics                            (Generic)
 
 import           Control.Arrow                           ((&&&), (***))
@@ -1066,7 +1065,7 @@ withTypeDecls decls k = do
 checkDefn :: Decl -> TCM ()
 checkDefn (DDefn x clauses) = do
   Forall sig <- lookupTy x
-  prevDefn <- gets (\(dm, tm) -> M.lookup (coerce x) dm)
+  prevDefn <- gets (\(dm, _) -> M.lookup (coerce x) dm)
   case prevDefn of
     Just _ -> throwError (DuplicateDefns x)
     Nothing -> do

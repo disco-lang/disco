@@ -251,7 +251,7 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp ty ListContainer bqt) = do
+desugarTerm (ATContainerComp _ ListContainer bqt) = do
   (qs, t) <- unbind bqt
   desugarComp t qs
 

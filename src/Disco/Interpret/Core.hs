@@ -565,6 +565,7 @@ modDiv n [c1,c2] = do
   VNum _ b <- whnf c2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
+    Just (InfMod{})   -> error "Impossible! InfMod in modDiv"
     Nothing           -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 

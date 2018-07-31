@@ -276,7 +276,7 @@ pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
 
 {-# COMPLETE
-      TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin,
+      TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
       TyArr, TyPair, TySum, TyList, TySet #-}
 
 instance Subst Type Var

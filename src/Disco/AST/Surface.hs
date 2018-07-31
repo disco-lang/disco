@@ -35,6 +35,8 @@ module Disco.AST.Surface
        , pattern TParens
        , pattern TUnit
        , pattern TBool
+       , pattern TChar
+       , pattern TString
        , pattern TNat
        , pattern TRat
        , pattern TAbs
@@ -82,6 +84,8 @@ module Disco.AST.Surface
        , pattern PWild
        , pattern PUnit
        , pattern PBool
+       , pattern PChar
+       , pattern PString
        , pattern PTup
        , pattern PInj
        , pattern PNat
@@ -174,6 +178,8 @@ type instance X_TUnit           UD = ()
 type instance X_TBool           UD = ()
 type instance X_TNat            UD = ()
 type instance X_TRat            UD = ()
+type instance X_TChar           UD = ()
+type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
 type instance X_TInj            UD = ()
@@ -212,6 +218,12 @@ pattern TNat int = TNat_ () int
 pattern TRat :: Rational -> Term
 pattern TRat rat = TRat_ () rat
 
+pattern TChar :: Char -> Term
+pattern TChar c = TChar_ () c
+
+pattern TString :: String -> Term
+pattern TString s = TString_ () s
+
 pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
 pattern TAbs bind = TAbs_ () bind
 
@@ -245,8 +257,8 @@ pattern TContainerComp c b = TContainerComp_ () c b
 pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
-{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat,
-             TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
+{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
+             TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TContainer, TContainerComp, TAscr #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
@@ -308,6 +320,8 @@ type instance X_PBool UD   = ()
 type instance X_PTup UD    = ()
 type instance X_PInj UD    = ()
 type instance X_PNat UD    = ()
+type instance X_PChar UD   = ()
+type instance X_PString UD = ()
 type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
@@ -324,6 +338,12 @@ pattern PUnit = PUnit_ ()
 
 pattern PBool :: Bool -> Pattern
 pattern PBool  b = PBool_ () b
+
+pattern PChar :: Char -> Pattern
+pattern PChar c = PChar_ () c
+
+pattern PString :: String -> Pattern
+pattern PString s = PString_ () s
 
 pattern PTup  :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp
@@ -344,4 +364,4 @@ pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PSucc, PCons, PList #-}
+             PChar, PString, PSucc, PCons, PList #-}

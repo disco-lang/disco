@@ -224,7 +224,7 @@ reservedWords =
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "size", "union", "U", "∪", "intersect", "∩"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool", "Boolean"
+  , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "type"
@@ -388,6 +388,8 @@ parseAtom :: Parser Term
 parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
+  <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
+  <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -543,6 +545,8 @@ parseAtomicPattern = label "pattern" $
   <|> PWild <$ symbol "_"
   <|> PBool True  <$ (reserved "true" <|> reserved "True")
   <|> PBool False <$ (reserved "false" <|> reserved "False")
+  <|> PChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
+  <|> PString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> PNat <$> natural
   <|> PList <$> brackets (parsePattern `sepBy` comma)
   <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
@@ -694,6 +698,7 @@ parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
+  <|> TyC    <$ (reserved "Char" <|> reserved "C")
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")

@@ -144,6 +144,8 @@ desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
+desugarTerm (ATChar c)           = return $ DTChar c
+desugarTerm (ATString cs)        = desugarContainer (TyList TyC) ListContainer (map ATChar cs) Nothing
 desugarTerm (ATAbs ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t
@@ -401,6 +403,8 @@ desugarPattern (APVar ty x)      = DPVar ty (coerce x)
 desugarPattern (APWild ty)       = DPWild ty
 desugarPattern APUnit            = DPUnit
 desugarPattern (APBool b)        = DPBool b
+desugarPattern (APChar c)        = DPChar c
+desugarPattern (APString s)      = desugarPattern (APList (TyList TyC) (map APChar s))
 desugarPattern (APTup _ p)       = desugarTuplePats p
 desugarPattern (APInj ty s p)    = DPInj ty s (desugarPattern p)
 desugarPattern (APNat ty n)      = DPNat ty n

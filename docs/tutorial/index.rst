@@ -22,5 +22,6 @@ knowledge of functional programming.
    case
    lists
    polymorphism
+   typedefs
    laziness
    properties

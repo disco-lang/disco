@@ -515,6 +515,8 @@ infer (TVar x)      = do
   -- A few trivial cases.
 infer TUnit         = return (ATUnit, CTrue)
 infer (TBool b)     = return $ (ATBool b, CTrue)
+infer (TChar c)     = return $ (ATChar c, CTrue)
+infer (TString cs)  = return $ (ATString cs, CTrue)
 infer (TNat n)      = return $ (ATNat TyN n, CTrue)
 infer (TRat r)      = return $ (ATRat r, CTrue)
 
@@ -910,6 +912,12 @@ checkPattern PUnit TyUnit                   = return (emptyCtx, APUnit, CTrue)
 checkPattern (PBool b) tyv@(TyVar _)        = return (emptyCtx, APBool b, CEq tyv TyBool)
 checkPattern (PBool b) TyBool               = return (emptyCtx, APBool b, CTrue)
 
+checkPattern (PChar c) tyv@(TyVar _)        = return (emptyCtx, APChar c, CEq tyv TyC)
+checkPattern (PChar c) TyC                  = return (emptyCtx, APChar c, CTrue)
+
+checkPattern (PString s) tyv@(TyVar _)      = return (emptyCtx, APString s, CEq tyv (TyList TyC))
+checkPattern (PString s) (TyList TyC)       = return (emptyCtx, APString s, CTrue)
+
 checkPattern (PTup ps) ty                   = do
   listCtxtAps <- checkTuplePat ps ty
   let (ctxs, aps, csts) = unzip3 listCtxtAps
@@ -1147,6 +1155,8 @@ erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase
   where (tel,at) = unsafeUnbind bs
 erase ATUnit                = TUnit
 erase (ATBool b)            = TBool b
+erase (ATChar c)            = TChar c
+erase (ATString s)          = TString s
 erase (ATNat _ i)           = TNat i
 erase (ATRat r)             = TRat r
 erase (ATAbs _ b)           = TAbs $ bind (map (coerce *** (embed . Just . unembed)) x) (erase at)
@@ -1171,6 +1181,8 @@ erasePattern (APVar _ n)        = PVar (coerce n)
 erasePattern (APWild _)         = PWild
 erasePattern APUnit             = PUnit
 erasePattern (APBool b)         = PBool b
+erasePattern (APChar c)         = PChar c
+erasePattern (APString s)       = PString s
 erasePattern (APTup _ alp)      = PTup $ map erasePattern alp
 erasePattern (APInj _ s apt)    = PInj s (erasePattern apt)
 erasePattern (APNat _ n)        = PNat n

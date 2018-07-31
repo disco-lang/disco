@@ -55,6 +55,7 @@ compileDTerm :: DTerm -> FreshM Core
 compileDTerm (DTVar _ x)  = return $ CVar (coerce x)
 compileDTerm DTUnit       = return $ CCons 0 []
 compileDTerm (DTBool b)   = return $ CCons (fromEnum b) []
+compileDTerm (DTChar c)   = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
 compileDTerm (DTNat ty n) = compileNat ty n
 compileDTerm (DTRat r)    = return $ CNum Decimal r
 
@@ -133,6 +134,7 @@ compilePattern (DPVar _ x)      = return $ CPVar (coerce x)
 compilePattern (DPWild _)       = return CPWild
 compilePattern DPUnit           = return $ CPCons 0 []
 compilePattern (DPBool b)       = return $ CPCons (fromEnum b) []
+compilePattern (DPChar c)       = return $ CPNat (toInteger $ fromEnum c)
 compilePattern (DPPair _ p1 p2) = CPCons 0 <$> mapM compilePattern [p1,p2]
 compilePattern (DPInj _ s p)    = CPCons (fromEnum s) <$> mapM compilePattern [p]
 compilePattern (DPNat _ n)      = return $ CPNat n

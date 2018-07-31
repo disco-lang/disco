@@ -45,6 +45,7 @@ module Disco.Types
        , pattern TyZ
        , pattern TyF
        , pattern TyQ
+       , pattern TyC
        , pattern TyFin
        , pattern TyArr
        , pattern TyPair
@@ -122,6 +123,10 @@ data BaseTy where
 
   -- | Rationals.
   Q    :: BaseTy
+
+  -- | Unicode characters.
+  C    :: BaseTy
+
 
   -- | Finite types. The single argument is a natural number defining
   --   the exact number of inhabitants.
@@ -249,6 +254,9 @@ pattern TyF = TyAtom (ABase F)
 pattern TyQ :: Type
 pattern TyQ = TyAtom (ABase Q)
 
+pattern TyC :: Type
+pattern TyC = TyAtom (ABase C)
+
 pattern TyFin :: Integer -> Type
 pattern TyFin n = TyAtom (ABase (Fin n))
 
@@ -268,7 +276,7 @@ pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
 
 {-# COMPLETE
-      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyFin,
+      TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
       TyArr, TyPair, TySum, TyList, TySet #-}
 
 instance Subst Type Var

@@ -144,6 +144,8 @@ desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
+desugarTerm (ATChar c)           = return $ DTChar c
+desugarTerm (ATString cs)        = desugarContainer (TyList TyC) ListContainer (map ATChar cs) Nothing
 desugarTerm (ATAbs ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t
@@ -249,9 +251,12 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp _ ListContainer bqt) = do
+desugarTerm (ATContainerComp (TyList eltTy) ListContainer bqt) = do
   (qs, t) <- unbind bqt
-  desugarComp t qs
+  desugarComp eltTy t qs
+
+desugarTerm (ATContainerComp ty ListContainer _) =
+  error $ "Non-TyList type passed to desugarTerm for a ListContainer" ++ show ty
 
 desugarTerm (ATContainerComp ty _ _) = error $ "desugar ContainerComp unimplemented for " ++ show ty
 
@@ -267,23 +272,22 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
 -- | Desugar a list comprehension.  First translate it into an
 --   expanded ATerm and then recursively desugar that.
-desugarComp :: ATerm -> Telescope AQual -> DSM DTerm
-desugarComp t qs = expandComp t qs >>= desugarTerm
+desugarComp :: Type -> ATerm -> Telescope AQual -> DSM DTerm
+desugarComp ty t qs = expandComp ty t qs >>= desugarTerm
 
 -- | Expand a list comprehension into an equivalent ATerm.
-expandComp :: ATerm -> Telescope AQual -> DSM ATerm
+expandComp :: Type -> ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp t TelEmpty = return $ tsingleton t
+expandComp _ t TelEmpty = return $ tsingleton t
 
 -- [ t | q, qs ] = ...
-expandComp t (TelCons (unrebind -> (q,qs)))
+expandComp xTy t (TelCons (unrebind -> (q,qs)))
   = case q of
       -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do
-        tqs <- expandComp t qs
-        let (TyList xTy) = getType lst
-            resTy        = TyList (getType t)
+        tqs <- expandComp (TyList xTy) t qs
+        let resTy        = TyList (getType t)
             concatTy     = TyArr (TyList resTy) resTy
             mapTy        = TyArr (TyArr xTy resTy) (TyArr (TyList xTy) (TyList resTy))
         return $ ATApp resTy (ATVar concatTy (string2Name "concat")) $
@@ -296,7 +300,7 @@ expandComp t (TelCons (unrebind -> (q,qs)))
 
       -- [ t | g, qs ] = if g then [ t | qs ] else []
       AQGuard (unembed -> g)    -> do
-        tqs <- expandComp t qs
+        tqs <- expandComp (TyList xTy) t qs
         return $ ATCase (TyList (getType t))
           [ tqs             <==. [tif g]
           , nil (getType t) <==. []
@@ -401,6 +405,8 @@ desugarPattern (APVar ty x)      = DPVar ty (coerce x)
 desugarPattern (APWild ty)       = DPWild ty
 desugarPattern APUnit            = DPUnit
 desugarPattern (APBool b)        = DPBool b
+desugarPattern (APChar c)        = DPChar c
+desugarPattern (APString s)      = desugarPattern (APList (TyList TyC) (map APChar s))
 desugarPattern (APTup _ p)       = desugarTuplePats p
 desugarPattern (APInj ty s p)    = DPInj ty s (desugarPattern p)
 desugarPattern (APNat ty n)      = DPNat ty n

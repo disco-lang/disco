@@ -476,6 +476,7 @@ setSize :: [Core] -> Disco IErr Value
 setSize [x] = do
   (VSet xs) <- whnf x
   return $ vnum (fromIntegral $ length xs)
+setSize _ = error "Impossible! Wrong # of Cores in setSize"
 
 setUnion :: Type -> [Core] -> Disco IErr Value
 setUnion ty [c1, c2] = do
@@ -483,6 +484,7 @@ setUnion ty [c1, c2] = do
   (VSet ys) <- whnf c2
   zs <- deduplicateSet ty (xs ++ ys)
   return $ VSet zs
+setUnion _ _ = error "Impossible! Wrong # of Cores in setUnion"
 
 setIntersection :: Type -> [Core] -> Disco IErr Value
 setIntersection ty [c1, c2] = do
@@ -490,6 +492,7 @@ setIntersection ty [c1, c2] = do
   (VSet ys) <- whnf c2
   zs <- intersection ty xs ys
   return $ VSet zs
+setIntersection _ _ = error "Impossible! Wrong # of Cores in setIntersection"
 
 intersection :: Type -> [Value] -> [Value] -> Disco IErr [Value]
 intersection _ [] _      = return []
@@ -505,6 +508,7 @@ setDifference ty [c1, c2] = do
   (VSet ys) <- whnf c2
   zs <- difference ty xs ys
   return $ VSet zs
+setDifference _ _ = error "Impossible! Wrong # of Cores in setDifference"
 
 difference :: Type -> [Value] -> [Value] -> Disco IErr [Value]
 difference _ [] _       = return []
@@ -519,6 +523,7 @@ subsetTest ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
   mkEnum <$> subset ty xs ys
+subsetTest _ _ = error "Impossible! Wrong # of Cores in subsetTest"
 
 subset :: Type -> [Value] -> [Value] -> Disco IErr Bool
 subset ty xs ys = do
@@ -560,6 +565,7 @@ modDiv n [c1,c2] = do
   VNum _ b <- whnf c2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
+    Just (InfMod{})   -> error "Impossible! InfMod in modDiv"
     Nothing           -> throwError DivByZero
 modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 

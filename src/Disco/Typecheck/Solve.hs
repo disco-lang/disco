@@ -52,7 +52,7 @@ import           Disco.Typecheck.Unify
 import           Disco.Types
 import           Disco.Types.Rules
 
-import qualified Debug.Trace                      as Debug
+-- import qualified Debug.Trace                      as Debug
 
 traceM :: Applicative f => String -> f ()
 traceM _ = pure ()
@@ -238,7 +238,9 @@ solveConstraintChoice tyDefns quals cs = do
   (g'', theta_cyc) <- liftExcept (elimCycles tyDefns g')
 
   -- Check that the resulting substitution respects sorts...
-  when (not $ all (\(x,TyAtom (ABase ty)) -> hasSort ty (getSort sm x)) theta_cyc)
+  let sortOK (x,TyAtom (ABase ty)) = hasSort ty (getSort sm x)
+      sortOK p                     = error $ "Impossible! sortOK " ++ show p
+  when (not $ all sortOK theta_cyc)
     $ throwError NoUnify
 
   traceShowM g''
@@ -393,7 +395,7 @@ simplify tyDefns origSM cs
     simplifiable (_ :=: _)                               = True
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
-    simplifiable (TyCon {} :<: TyVar  {})                = True
+    simplifiable (TyCon {} :<: TyVar {})                 = True
     simplifiable (TyDef {} :<: _)                        = True
     simplifiable (_ :<: TyDef {})                        = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
@@ -708,7 +710,10 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
           $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
         mkEquateSubst :: Set (Name Type) -> S' Atom
-        mkEquateSubst = (\(a:as) -> map (\v -> (coerce v, AVar (U a))) as) . S.toList
+        mkEquateSubst = mkEquations . S.toList
+
+        mkEquations (a:as) = map (\v -> (coerce v, AVar (U a))) as
+        mkEquations []     = error "Impossible! Empty set of names in mkEquateSubst"
 
             -- After picking concrete base types for all the type
             -- variables we can, the only thing possibly remaining in
@@ -741,7 +746,10 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
     (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
 
     onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
-    onlyVars = M.mapKeys (\(Right n) -> n) . M.filterWithKey (\a _ -> isRight a)
+    onlyVars = M.mapKeys fromRight . M.filterWithKey (\a _ -> isRight a)
+      where
+        fromRight (Right n) = n
+        fromRight (Left _)  = error "Impossible! isRight but is Left."
 
     go :: RelMap -> SolveM (S' BaseTy)
     go relMap = case as of

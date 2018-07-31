@@ -334,11 +334,13 @@ typecheck Infer (TVar x)      = do
 -- Base types
 
 -- A few trivial cases for base types.
-typecheck Infer             TUnit     = return ATUnit
-typecheck Infer             (TBool b) = return $ ATBool b
-typecheck (Check (TyFin n)) (TNat x)  = return $ ATNat (TyFin n) x
-typecheck Infer             (TNat n)  = return $ ATNat TyN n
-typecheck Infer             (TRat r)  = return $ ATRat r
+typecheck Infer             TUnit        = return ATUnit
+typecheck Infer             (TBool b)    = return $ ATBool b
+typecheck Infer             (TChar c)    = return $ ATChar c
+typecheck Infer             (TString cs) = return $ ATString cs
+typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
+typecheck Infer             (TNat n)     = return $ ATNat TyN n
+typecheck Infer             (TRat r)     = return $ ATRat r
 
 --------------------------------------------------
 -- Lambdas
@@ -869,6 +871,18 @@ checkPattern (PBool b) tyv@(TyVar _) = do
   return (emptyCtx, APBool b)
 
 checkPattern (PBool b) TyBool = return (emptyCtx, APBool b)
+
+checkPattern (PChar c) tyv@(TyVar _) = do
+  constraint $ CEq tyv TyC
+  return (emptyCtx, APChar c)
+
+checkPattern (PChar c) TyC = return (emptyCtx, APChar c)
+
+checkPattern (PString s) tyv@(TyVar _) = do
+  constraint $ CEq tyv (TyList TyC)
+  return (emptyCtx, APString s)
+
+checkPattern (PString s) (TyList TyC) = return (emptyCtx, APString s)
 
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy

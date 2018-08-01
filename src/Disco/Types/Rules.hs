@@ -74,7 +74,7 @@ arity CSet  = [Co]
 ------------------------------------------------------------
 
 -- | Qualifiers that may appear in the CQual constraint.
-data Qualifier = QNum | QSub | QDiv | QFin
+data Qualifier = QNum | QSub | QDiv
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier
@@ -88,7 +88,7 @@ bopQual Mul  = QNum
 bopQual Div  = QDiv
 bopQual Sub  = QSub
 bopQual SSub = QNum
-bopQual _   = error "No qualifier for binary operation"
+bopQual _    = error "No qualifier for binary operation"
 
 ------------------------------------------------------------
 -- Sorts
@@ -168,7 +168,7 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual (Fin _) q    | q `elem` [QNum, QSub, QFin] = True
+hasQual (Fin _) q    | q `elem` [QNum, QSub] = True
 hasQual (Fin n) QDiv = isPrime n
 hasQual b       QNum = b `elem` [N, Z, F, Q]
 hasQual b       QSub = b `elem` [Z, Q]
@@ -194,13 +194,13 @@ hasSort = all . hasQual
 qualRules :: Map Con (Map Qualifier [Maybe Qualifier])
 qualRules = M.fromList
   [ CArr  ==> M.fromList
-    [ QFin ==> [Just QFin, Just QFin]
+    [
     ]
   , CPair ==> M.fromList
-    [ QFin ==> [Just QFin, Just QFin]
+    [
     ]
   , CSum ==> M.fromList
-    [ QFin ==> [Just QFin, Just QFin]
+    [
     ]
   -- no rules for CList
   ]
@@ -208,12 +208,12 @@ qualRules = M.fromList
     (==>) :: a -> b -> (a,b)
     (==>) = (,)
 
-  -- Once we get rid of QFin, there won't be any rules left!  But
-  -- that's OK, we'll leave the machinery here for now.  Eventually we
-  -- can easily imagine adding an opt-in mode where numeric operations
-  -- can be used on pairs and functions, then the qualRules would
-  -- become dependent on what mode was chosen.  For example we could
-  -- have rules like
+  -- At this point, there aren't any rules above!  But that's OK,
+  -- we'll leave the machinery here for now.  Eventually we can easily
+  -- imagine adding an opt-in mode where numeric operations can be
+  -- used on pairs and functions, then the qualRules would become
+  -- dependent on what mode was chosen.  For example we could have
+  -- rules like
   --
   -- [ CArr ==> M.fromList
   --   [ QNum ==> [Nothing, Just QNum]  -- (a -> b) can be +, * iff b can

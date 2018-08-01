@@ -29,6 +29,7 @@ import           Data.Bifunctor                   (second)
 import           Data.Coerce
 import qualified Data.List                        as L
 import qualified Data.Map                         as M
+import qualified Data.Semigroup                   as S
 import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
@@ -102,6 +103,9 @@ instance Monoid ModuleInfo where
           hasDupTerm trm1 trm2 = case L.intersect (M.keys trm1) (M.keys trm2) of
                               [] -> Nothing
                               (x:_) -> Just x
+
+instance S.Semigroup ModuleInfo where
+  m1 <> m2 = mappend m1 m2
 
 ------------------------------------------------------------
 -- Errors

@@ -118,9 +118,6 @@ type instance X_Term DS =
 pattern DTVar :: Type -> Name DTerm -> DTerm
 pattern DTVar ty name = TVar_ ty name
 
-pattern DTUn :: Type -> UOp -> DTerm -> DTerm
-pattern DTUn ty uop term = TUn_ ty uop term
-
 pattern DTUnit :: DTerm
 pattern DTUnit = TUnit_ ()
 
@@ -150,6 +147,9 @@ pattern DTInj ty side term = TInj_ ty side term
 
 pattern DTCase :: Type -> [DBranch] -> DTerm
 pattern DTCase ty branch = TCase_ ty branch
+
+pattern DTUn :: Type -> UOp -> DTerm -> DTerm
+pattern DTUn ty uop term = TUn_ ty uop term
 
 pattern DTBin :: Type -> BOp -> DTerm -> DTerm -> DTerm
 pattern DTBin ty bop term1 term2 = TBin_ ty bop term1 term2

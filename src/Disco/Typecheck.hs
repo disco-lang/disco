@@ -85,7 +85,7 @@ inferTelescope inferOne tel = do
 
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
-checkModule :: Module -> TCM (Ctx Term Docs, Ctx ATerm [AProperty], TyCtx)
+checkModule :: Module -> TCM ModuleInfo
 checkModule (Module m docs) = do
   let (tydefs, rest) = partition isTyDef m
   addTyDefns tydefs
@@ -95,7 +95,7 @@ checkModule (Module m docs) = do
     mapM_ checkDefn defns
     aprops <- checkProperties docs
     ctx <- ask
-    return (docs, aprops, ctx)
+    return $ ModuleInfo docs aprops ctx
 
 --------------------------------------------------
 -- Type definitions

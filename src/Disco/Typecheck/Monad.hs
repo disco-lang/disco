@@ -77,6 +77,15 @@ emptyDefnCtx = DefnCtx
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
 
+-- | Type checking a module yields a value of type ModuleInfo which contains
+--   mapping from terms to their relavent documenation, a mapping from terms to
+--   properties, and a mapping from terms to their types.
+data ModuleInfo = ModuleInfo
+  { _docs :: Ctx Term Docs
+  , _props :: Ctx ATerm [AProperty]
+  , _tys :: TyCtx
+  } 
+
 ------------------------------------------------------------
 -- Errors
 ------------------------------------------------------------

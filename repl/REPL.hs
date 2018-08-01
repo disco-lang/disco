@@ -183,7 +183,7 @@ handleLoad file = do
     Right p  ->
       case runTCM (checkModule p) of
         Left tcErr         -> io $ print tcErr >> return False
-        Right ((docMap, aprops, ctx), DefnCtx defns tydefs, _) -> do
+        Right (ModuleInfo docMap aprops ctx, DefnCtx defns tydefs, _) -> do
           let cdefns = M.mapKeys coerce $ fmap compileDefn defns
           topDocs  .= docMap
           topCtx   .= ctx

@@ -87,6 +87,9 @@ data ModuleInfo = ModuleInfo
   , _tys :: TyCtx
   }
 
+-- | To combine two values of type ModuleInfo, we first make sure that there
+--   are no term is defined in both modules. If the modules are free of duplicate
+--   terms, then join their individual contexts together.
 instance Monoid ModuleInfo where
   mempty = ModuleInfo emptyCtx emptyCtx emptyCtx
   mappend (ModuleInfo d1 p1 t1) (ModuleInfo d2 p2 t2) =

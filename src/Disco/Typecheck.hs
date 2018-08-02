@@ -342,6 +342,8 @@ typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
 typecheck Infer             (TNat n)     = return $ ATNat TyN n
 typecheck Infer             (TRat r)     = return $ ATRat r
 
+typecheck _                 TWild        = throwError $ NoTWild
+
 --------------------------------------------------
 -- Lambdas
 

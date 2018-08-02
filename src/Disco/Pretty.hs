@@ -235,6 +235,7 @@ prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettySigma ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
     prettyTyOp op <+> prettyTy' funPrec InR ty
+prettyTerm TWild = text "_"
 
 prettyTerm' :: Prec -> BFixity -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)

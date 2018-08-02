@@ -50,6 +50,7 @@ module Disco.AST.Surface
        , pattern TContainerComp
        , pattern TContainer
        , pattern TAscr
+       , pattern TWild
        , pattern TList
        , pattern TListComp
 
@@ -182,6 +183,7 @@ type instance X_TChar           UD = ()
 type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
+type instance X_TTup            UD = ()
 type instance X_TInj            UD = ()
 type instance X_TCase           UD = ()
 type instance X_TUn             UD = ()
@@ -191,8 +193,7 @@ type instance X_TTyOp           UD = ()
 type instance X_TContainer      UD = ()
 type instance X_TContainerComp  UD = ()
 type instance X_TAscr           UD = ()
-type instance X_Term            UD = ()
-type instance X_TTup            UD = ()
+type instance X_Term            UD = ()  -- TWild
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -257,9 +258,15 @@ pattern TContainerComp c b = TContainerComp_ () c b
 pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
+-- Since we parse patterns by first parsing a term and then ensuring
+-- it is a valid pattern, we have to include wildcards in the syntax
+-- of terms, although they will be rejected at a later phase.
+pattern TWild :: Term
+pattern TWild = XTerm_ ()
+
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
              TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
-             TContainer, TContainerComp, TAscr #-}
+             TContainer, TContainerComp, TAscr, TWild #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 pattern TList ts e = TContainer_ () ListContainer ts e

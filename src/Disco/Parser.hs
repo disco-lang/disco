@@ -390,6 +390,7 @@ parseAtom = label "expression" $
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
+  <|> TWild <$ symbol "_"
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -538,36 +539,47 @@ parseGuard = parseGBool <|> parseGPat
                       <*> (reserved "is" *> parsePattern)
 
 
--- | Parse an atomic pattern.
+-- | Parse an atomic pattern, by parsing a term and then attempting to
+--   convert it to a pattern.
 parseAtomicPattern :: Parser Pattern
-parseAtomicPattern = label "pattern" $
-      PVar <$> ident
-  <|> PWild <$ symbol "_"
-  <|> PBool True  <$ (reserved "true" <|> reserved "True")
-  <|> PBool False <$ (reserved "false" <|> reserved "False")
-  <|> PChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
-  <|> PString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
-  <|> PNat <$> natural
-  <|> PList <$> brackets (parsePattern `sepBy` comma)
-  <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
+parseAtomicPattern = label "pattern" $ do
+  t <- parseAtom
+  case checkPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
 
-tuplePat :: [Pattern] -> Pattern
-tuplePat []  = PUnit
-tuplePat [x] = x
-tuplePat t   = PTup t
-
--- | Parse a pattern.
+-- | Parse a pattern, by parsing a term and then attempting to convert
+--   it to a pattern.
 parsePattern :: Parser Pattern
-parsePattern = makeExprParser parseAtomicPattern table
-  where
-    table = [ [ prefix "left" (PInj L)
-              , prefix "right" (PInj R)
-              , prefix "S"   PSucc
-              ]
-            , [ infixR "::" PCons ]
-            ]
-    prefix name fun = Prefix (reserved name >> return fun)
-    infixR name fun = InfixR (reservedOp name >> return fun)
+parsePattern = label "pattern" $ do
+  t <- parseTerm
+  case checkPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
+
+-- | Attempt converting a term to a pattern.
+checkPattern :: Term -> Maybe Pattern
+checkPattern TWild       = Just $ PWild
+checkPattern (TVar x)    = Just $ PVar x
+checkPattern (TParens t) = checkPattern t
+checkPattern TUnit       = Just $ PUnit
+checkPattern (TBool b)   = Just $ PBool b
+checkPattern (TNat n)    = Just $ PNat n
+checkPattern (TChar c)   = Just $ PChar c
+checkPattern (TString s) = Just $ PString s
+checkPattern (TTup ts)   = PTup <$> mapM checkPattern ts
+checkPattern (TInj s t)  = PInj s <$> checkPattern t
+
+checkPattern (TApp (TVar s) t)
+  | s == string2Name "S" = PSucc <$> checkPattern t
+
+checkPattern (TBin Cons t1 t2)
+  = PCons <$> checkPattern t1 <*> checkPattern t2
+
+checkPattern (TContainer ListContainer ts Nothing)
+  = PList <$> mapM checkPattern ts
+
+checkPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

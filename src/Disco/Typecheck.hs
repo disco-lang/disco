@@ -94,7 +94,7 @@ checkModule (Module imps m docs) = do
   withTyDefns tyDefnCtx $ extends tyCtx $ do
     checkCyclicTys tydefs
     adefns <- mapM checkDefn defns
-    let defnCtx = M.fromList (map (getDefnName &&& id) adefns) 
+    let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
     let dups = filterDups . map getDefnName $ adefns
     case dups of
       (x:_) -> throwError $ DuplicateDefns (coerce x)
@@ -115,7 +115,7 @@ makeTyDefnCtx tydefs = do
       dups = filterDups $ newNames ++ oldNames
   case dups of
     (x:_) -> throwError (DuplicateTyDefns x)
-    []        -> return $ M.fromList (map getTyDef tydefs)
+    []    -> return $ M.fromList (map getTyDef tydefs)
   where
     getTyDef :: Decl -> (String, Type)
     getTyDef (DTyDef x ty) = (x, ty)
@@ -161,7 +161,7 @@ makeTyCtx decls = do
   let dups = filterDups . map declName $ decls
   case dups of
     (x:_) -> throwError (DuplicateDecls x)
-    []        -> return declCtx
+    []    -> return declCtx
   where
     declCtx = M.fromList $ map getDType decls
 

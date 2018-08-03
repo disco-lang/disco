@@ -1,0 +1,4 @@
+import b
+
+x : N
+x = 3 + y

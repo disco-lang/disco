@@ -4,7 +4,7 @@
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (forM_, when, foldM)
+import           Control.Monad                           (forM_, when, foldM, filterM)
 import           Control.Monad.Except                    (catchError, MonadError, throwError)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Control.Monad.Trans.State
@@ -41,6 +41,8 @@ import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
+
+import           Paths_disco
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -217,26 +219,27 @@ recCheckMod directory inProcess modName  = do
           case evalTCM (withTyDefns tydefns $ extends tyctx $ checkModule cm) of
             Left tcErr         -> throwError $ TypeCheckErr tcErr 
             Right m -> do
-              m' <- combineModuleInfo [m, imports]
+              m' <- combineModuleInfo [imports, m]
               modify (M.insert modName m')
               return m'
 
 combineModuleInfo :: (MonadError IErr m) => [ModuleInfo] -> m ModuleInfo
 combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
   where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
-        combineMods (ModuleInfo d1 p1 ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
+        combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
           case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
-            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) 
+            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) 
             (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
             (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
 
 resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
 resolveModule directory modname = do
-  let fp = directory </> replaceExtension modname "disco"
-  b <- io $ doesFileExist fp
-  case b of
-    False -> throwError $ ModuleNotFound modname
-    True -> return fp
+  datadir <- io getDataDir 
+  let fps = map (</> replaceExtension modname "disco") [directory, datadir]
+  fexists <- io $ filterM doesFileExist fps
+  case fexists of
+    [] -> throwError $ ModuleNotFound modname
+    (fp:_) -> return fp
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it

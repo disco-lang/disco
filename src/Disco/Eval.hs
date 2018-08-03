@@ -64,12 +64,15 @@ import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
+import           Data.Void
+import           Text.Megaparsec
 import qualified Data.Sequence                           as Seq
 
 import           Unbound.Generics.LocallyNameless
 
 import           System.Console.Haskeline.MonadException
 
+import           Disco.Typecheck.Monad
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Context
@@ -185,6 +188,18 @@ withEnv = local . const
 
 -- | Errors that can be generated during interpreting.
 data IErr where
+
+  -- | Module not found.
+  ModuleNotFound :: ModName -> IErr
+
+  -- | Cyclic import encountered. 
+  CyclicImport :: ModName -> IErr
+
+  -- | Error encountered during typechecking XXX. Is this okay?
+  TypeCheckErr :: TCError -> IErr
+
+  -- | Error encountered during typechecking XXX. ^^^
+  ParseErr :: (ParseError Char Data.Void.Void) -> IErr
 
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr

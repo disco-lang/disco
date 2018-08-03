@@ -29,7 +29,6 @@ import           Data.Bifunctor                   (second)
 import           Data.Coerce
 import qualified Data.List                        as L
 import qualified Data.Map                         as M
-import qualified Data.Semigroup                   as S
 import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
@@ -60,22 +59,6 @@ instance Subst Type Defn
 -- | A map from type names to their corresponding definitions.
 type TyDefCtx = M.Map String Type
 
--- | A context of definitions: a map from names of terms to their
---   (typechecked) definitions, as well as a map of named types.
-data DefnCtx = DefnCtx
-  { _termDefns :: Ctx ATerm Defn
-  , _tyDefns   :: TyDefCtx
-  }
-
-makeLenses ''DefnCtx
-
--- | The initial, empty @DefnCtx@.
-emptyDefnCtx :: DefnCtx
-emptyDefnCtx = DefnCtx
-  { _termDefns = emptyCtx
-  , _tyDefns   = M.empty
-  }
-
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
 
@@ -86,26 +69,31 @@ data ModuleInfo = ModuleInfo
   { _docs :: Ctx Term Docs
   , _props :: Ctx ATerm [AProperty]
   , _tys :: TyCtx
+  , _tydefs :: TyDefCtx
+  , _termdefs :: Ctx ATerm Defn
   }
+
+emptyModuleInfo :: ModuleInfo
+emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 
 -- | To combine two values of type ModuleInfo, we first make sure that there
 --   are no term is defined in both modules. If the modules are free of duplicate
 --   terms, then join their individual contexts together.
-instance Monoid ModuleInfo where
-  mempty = ModuleInfo emptyCtx emptyCtx emptyCtx
-  mappend (ModuleInfo d1 p1 t1) (ModuleInfo d2 p2 t2) =
-   case hasDupTerm t1 t2 of
-      Nothing -> ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx t1 t2)
-      -- XXX: Needs to throw a TCError instead
-      Just t -> error $ "Duplicate term definition:" ++ show t  
+-- instance Monoid ModuleInfo where
+--   mempty = ModuleInfo emptyCtx emptyCtx emptyCtx
+--   mappend (ModuleInfo d1 p1 t1) (ModuleInfo d2 p2 t2) =
+--    case hasDupTerm t1 t2 of
+--       Nothing -> ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx t1 t2)
+--       -- XXX: Needs to throw a TCError instead
+--       Just t -> error $ "Duplicate term definition:" ++ show t  
 
-    where hasDupTerm :: TyCtx -> TyCtx -> Maybe (Name Term)
-          hasDupTerm trm1 trm2 = case L.intersect (M.keys trm1) (M.keys trm2) of
-                              [] -> Nothing
-                              (x:_) -> Just x
+--     where hasDupTerm :: TyCtx -> TyCtx -> Maybe (Name Term)
+--           hasDupTerm trm1 trm2 = case L.intersect (M.keys trm1) (M.keys trm2) of
+--                               [] -> Nothing
+--                               (x:_) -> Just x
 
-instance S.Semigroup ModuleInfo where
-  m1 <> m2 = mappend m1 m2
+-- instance S.Semigroup ModuleInfo where
+--   m1 <> m2 = mappend m1 m2
 
 ------------------------------------------------------------
 -- Errors
@@ -142,7 +130,7 @@ instance Monoid TCError where
 --   variables and their types and a read-write context of term and
 --   type definitions; collects constraints; can throw @TCError@s; and
 --   can generate fresh names.
-type TCM = RWST TyCtx Constraint DefnCtx (ExceptT TCError FreshM)
+type TCM = RWST TyCtx Constraint TyDefCtx (ExceptT TCError FreshM)
 
 -- This is an orphan instance, but we can't very well add it to either
 -- 'containers' or 'unbound-generic'.
@@ -154,13 +142,13 @@ instance (Monoid w, Fresh m) => Fresh (RWST r w s m) where
 ------------------------------------------------------------
 
 -- | Run a 'TCM' computation starting in the empty context.
-runTCM :: TCM a -> Either TCError (a, DefnCtx, Constraint)
-runTCM = runFreshM . runExceptT . (\m -> runRWST m emptyCtx emptyDefnCtx)
+runTCM :: TCM a -> Either TCError (a, Constraint)
+runTCM = runFreshM . runExceptT . (\m -> fmap (\(a,_,c) -> (a,c)) (runRWST m emptyCtx M.empty))
 
 -- | Run a 'TCM' computation starting in the empty context, returning
 --   only the result of the computation.
 evalTCM :: TCM a -> Either TCError a
-evalTCM = fmap (\(a,_,_) -> a) . runTCM
+evalTCM = fmap (\(a,_) -> a) . runTCM
 
 ------------------------------------------------------------
 -- Constraints
@@ -190,7 +178,7 @@ withConstraint = censor (const mempty) . listen
 solve :: TCM a -> TCM (a, S)
 solve m = do
   (a, c) <- withConstraint m
-  tds <- use tyDefns
+  tds <- get
   case runSolveM . solveConstraint tds $ c of
     Left err -> throwError (Unsolvable err)
     Right s  -> return (a, s)
@@ -198,19 +186,6 @@ solve m = do
 ------------------------------------------------------------
 -- Contexts
 ------------------------------------------------------------
-
--- | Add a definition to the set of current definitions.
-addDefn :: Name Term -> Defn -> TCM ()
-addDefn x b = termDefns %= M.insert (coerce x) b
-
--- | Add a type definition to the set of current type defintions.
-addTyDefn :: String -> Type -> TCM ()
-addTyDefn x b = tyDefns %= M.insert x b
-
--- | Extend the current TyDefCtx with a provided tydef context.
-extendTyDefs :: TyDefCtx -> TCM a -> TCM a
-extendTyDefs newtyctx
-  = withRWST (curry (second (tyDefns %~ M.union newtyctx)))
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
@@ -221,10 +196,18 @@ lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 --   if it is not found.
 lookupTyDefn :: String -> TCM Type
 lookupTyDefn x = do
-  d <- use tyDefns
+  d <- get
   case M.lookup x d of
     Nothing -> throwError (NotTyDef x)
     Just ty -> return ty
+
+withTyDefns :: TyDefCtx -> TCM a -> TCM a
+withTyDefns tyDefnCtx m = do
+  oldTyDefs <- get
+  modify (M.union tyDefnCtx)
+  a <- m
+  put oldTyDefs
+  return a
 
 ------------------------------------------------------------
 -- Fresh name generation

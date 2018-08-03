@@ -66,10 +66,10 @@ type TyCtx = Ctx Term Sigma
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _docs :: Ctx Term Docs
-  , _props :: Ctx ATerm [AProperty]
-  , _tys :: TyCtx
-  , _tydefs :: TyDefCtx
+  { _docs     :: Ctx Term Docs
+  , _props    :: Ctx ATerm [AProperty]
+  , _tys      :: TyCtx
+  , _tydefs   :: TyDefCtx
   , _termdefs :: Ctx ATerm Defn
   }
 
@@ -85,7 +85,7 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 --    case hasDupTerm t1 t2 of
 --       Nothing -> ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx t1 t2)
 --       -- XXX: Needs to throw a TCError instead
---       Just t -> error $ "Duplicate term definition:" ++ show t  
+--       Just t -> error $ "Duplicate term definition:" ++ show t
 
 --     where hasDupTerm :: TyCtx -> TyCtx -> Maybe (Name Term)
 --           hasDupTerm trm1 trm2 = case L.intersect (M.keys trm1) (M.keys trm2) of

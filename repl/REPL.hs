@@ -1,21 +1,28 @@
 {-# LANGUAGE TemplateHaskell #-}
+-- XXX. Haskell says I need this for IErr in combineModuleInfo type
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (forM_, when)
-import           Control.Monad.Except                    (catchError)
+import           Control.Monad                           (forM_, when, foldM)
+import           Control.Monad.Except                    (catchError, MonadError, throwError)
 import           Control.Monad.IO.Class                  (MonadIO (..))
+import           Control.Monad.Trans.State
 import           Control.Monad.Trans.Class               (MonadTrans (..))
 import           Data.Char                               (isSpace)
 import           Data.Coerce
+import           Data.Either
 import           Data.List                               (find, isPrefixOf)
 import           Data.Map                                ((!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 
 import qualified Options.Applicative                     as O
+import qualified Data.Set                                as S
 import           System.Console.Haskeline                as H
+import           System.Directory
+import           System.FilePath
 import           System.Exit
 import           Text.Megaparsec                         hiding (runParser)
 import qualified Text.Megaparsec.Char                    as C
@@ -135,10 +142,10 @@ handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  let mat = runTCM (extends ctx $ extendTyDefs tymap $ inferTop t)
+  let mat = evalTCM (extends ctx $ withTyDefns tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
-    Right ((at, sig), _, _) -> do
+    Right (at, sig) -> do
       topCtx   %= M.insert x sig
       topDefns %= M.insert (coerce x) (compileTerm at)
 
@@ -173,26 +180,119 @@ loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
-handleLoad :: FilePath -> Disco IErr Bool
-handleLoad file = do
-  io . putStrLn $ "Loading " ++ file ++ "..."
-  str <- io $ readFile file
-  let mp = runParser wholeModule file str
-  case mp of
-    Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
-    Right p  ->
-      case runTCM (checkModule p) of
-        Left tcErr         -> io $ print tcErr >> return False
-        Right (ModuleInfo docMap aprops ctx, DefnCtx defns tydefs, _) -> do
-          let cdefns = M.mapKeys coerce $ fmap compileDefn defns
-          topDocs  .= docMap
-          topCtx   .= ctx
-          topTyDefns .= tydefs
-          loadDefs cdefns
+-- handleLoad :: FilePath -> Disco IErr Bool
+-- handleLoad file = do
+--   io . putStrLn $ "Loading " ++ file ++ "..."
+--   str <- io $ readFile file
+--   let mp = runParser wholeModule file str
+--   case mp of
+--     Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
+--     Right p  ->
+--       case evalTCM (checkModule p) of
+--         Left tcErr         -> io $ print tcErr >> return False
+--         Right (ModuleInfo docMap aprops ctx tydefs defns) -> do
+--           let cdefns = M.mapKeys coerce $ fmap compileDefn defns
+--           topDocs  .= docMap
+--           topCtx   .= ctx
+--           topTyDefns .= tydefs
+--           loadDefs cdefns
 
-          t <- withTopEnv $ runAllTests aprops
-          io . putStrLn $ "Loaded."
-          return t
+--           t <- withTopEnv $ runAllTests aprops
+--           io . putStrLn $ "Loaded."
+--           return t
+
+handleLoad :: ModName -> Disco IErr Bool
+handleLoad modName = do
+  modMap <- execStateT (recCheckMod S.empty modName) M.empty
+  results <- mapM (\(n, m) -> io $ runDisco $ addModInfo n m) (M.toList modMap)
+  case partitionEithers results of
+    ([],res) -> return $ all id res
+    ((merr:_),_) -> throwError merr
+
+addModInfo :: ModName -> ModuleInfo -> Disco IErr Bool
+addModInfo modName (ModuleInfo docs props tys tyds tmds) = do
+  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
+  topDocs  .= docs
+  topCtx   .= tys
+  topTyDefns .= tyds
+  loadDefs cdefns
+  t <- withTopEnv $ runAllTests props
+  io . putStrLn $ "Loaded " ++ modName ++ "."
+  return t
+
+-- loadModule :: ModName -> Disco IErr (M.Map ModName ModuleInfo)
+-- loadModule modName = execStateT (recCheckMod S.empty modName) M.empty
+
+recCheckMod :: S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) (Disco IErr) ModuleInfo
+recCheckMod inProcess modName  = do
+  when (S.member modName inProcess) (throwError $ CyclicImport modName)
+  modMap <- get
+  case M.lookup modName modMap of
+    Just mi -> return mi
+    Nothing -> do
+      file <- resolveModule modName 
+      io . putStrLn $ "Loading " ++ file ++ "..."
+      str <- io $ readFile file
+      let mp = runParser wholeModule file str
+      case mp of
+        Left e  -> throwError $ ParseErr e
+        Right cm@(Module mns _ _) -> do
+          mis <- mapM (recCheckMod (S.insert modName inProcess)) mns
+          minfo <- io $ runDisco $ combineModuleInfo mis
+          case minfo of
+            Left cmerr -> throwError cmerr
+            Right (ModuleInfo _ _ tyctx tydefns _) -> do
+              case evalTCM (withTyDefns tydefns $ extends tyctx $ checkModule cm) of
+                Left tcErr         -> throwError $ TypeCheckErr tcErr 
+                Right m -> do
+                  modify (M.insert modName m)
+                  return m
+      -- typecheck the module using the module info from the other mods
+      -- reuturn the module info
+
+-- combineModuleInfo :: (MonadError e m) => [ModuleInfo] -> m ModuleInfo
+-- Ask about the e
+combineModuleInfo :: [ModuleInfo] -> Disco IErr ModuleInfo
+combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
+  where combineMods :: ModuleInfo -> ModuleInfo -> Disco IErr ModuleInfo
+        combineMods (ModuleInfo d1 p1 ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
+          case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
+            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) 
+            (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
+            (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
+
+
+
+-- XXX. Make this look in different directories for the modname.
+resolveModule :: (MonadError IErr m, MonadIO m) => ModName -> m FilePath
+resolveModule modname = do
+  let fp = replaceExtension modname "disco"
+  b <- io $ doesFileExist fp
+  case b of
+    False -> throwError $ ModuleNotFound modname
+    True -> return fp
+
+
+-- getModuleInfo :: FilePath -> ModuleInfo
+-- handleLoad file = do
+--   io . putStrLn $ "Loading " ++ file ++ "..."
+--   str <- io $ readFile file
+--   let mp = runParser wholeModule file str
+--   case mp of
+--     Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
+--     Right p  ->
+--       case runTCM (checkModule p) of
+--         Left tcErr         -> io $ print tcErr >> return False
+--         Right (ModuleInfo docMap aprops ctx, DefnCtx defns tydefs, _) -> do
+--           let cdefns = M.mapKeys coerce $ fmap compileDefn defns
+--           topDocs  .= docMap
+--           topCtx   .= ctx
+--           topTyDefns .= tydefs
+--           loadDefs cdefns
+
+--           t <- withTopEnv $ runAllTests aprops
+--           io . putStrLn $ "Loaded."
+--           return t
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
@@ -278,7 +378,7 @@ evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
-  case evalTCM (extends ctx $ extendTyDefs tymap (inferTop t)) of
+  case evalTCM (extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
@@ -289,7 +389,7 @@ handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  case (evalTCM $ extends ctx $ extendTyDefs tymap (inferTop t)) of
+  case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 

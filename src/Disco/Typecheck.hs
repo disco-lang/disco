@@ -86,29 +86,37 @@ inferTelescope inferOne tel = do
 -- | Check all the types in a module, returning a context of types for
 --   top-level definitions.
 checkModule :: Module -> TCM ModuleInfo
-checkModule (Module m docs) = do
+checkModule (Module imps m docs) = do
+  -- let modInfo = foldr (\newm acc -> getModuleInfo newm <> acc) mempty mods
   let (tydefs, rest) = partition isTyDef m
-  addTyDefns tydefs
-  checkCyclicTys tydefs
   let (defns, typeDecls) = partition isDefn rest
-  withTypeDecls typeDecls $ do
-    mapM_ checkDefn defns
-    aprops <- checkProperties docs
-    ctx <- ask
-    return $ ModuleInfo docs aprops ctx
+  tyCtx <- makeTyCtx typeDecls
+  tyDefnCtx <- makeTyDefnCtx tydefs
+  withTyDefns tyDefnCtx $ extends tyCtx $ do
+    checkCyclicTys tydefs
+    adefns <- mapM checkDefn defns
+    let defnCtx = M.fromList (map (getDefnName &&& id) adefns) 
+    let dups = filterDups . map getDefnName $ adefns
+    case dups of
+      (x:_) -> throwError $ DuplicateDefns (coerce x)
+      [] -> do
+        aprops <- checkProperties docs
+        return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
+  where getDefnName :: Defn -> Name ATerm
+        getDefnName (Defn n _ _ _) = n
 
 --------------------------------------------------
 -- Type definitions
 
--- | Add all declared type definitions to the context, with checking
---   for duplicate definitions.
-addTyDefns :: [Decl] -> TCM ()
-addTyDefns tydefs = do
-  let dups :: [(String, Int)]
-      dups = filter ((>1) . snd) . map (head &&& length) . group . sort . map tyDefName $ tydefs
+makeTyDefnCtx :: [Decl] -> TCM TyDefCtx
+makeTyDefnCtx tydefs = do
+  oldTyDefs <- get
+  let oldNames = M.keys oldTyDefs
+      newNames = map tyDefName tydefs
+      dups = filterDups $ newNames ++ oldNames
   case dups of
-    ((x,_):_) -> throwError (DuplicateTyDefns x)
-    []        -> mapM_ (uncurry addTyDefn) (map getTyDef tydefs)
+    (x:_) -> throwError (DuplicateTyDefns x)
+    []        -> return $ M.fromList (map getTyDef tydefs)
   where
     getTyDef :: Decl -> (String, Type)
     getTyDef (DTyDef x ty) = (x, ty)
@@ -137,6 +145,8 @@ checkCyclicTy (TyDef name) set = do
 
 checkCyclicTy _ set = return set
 
+filterDups :: Ord a => [a] -> [a]
+filterDups = map head . filter ((>1) . length) . group . sort
 --------------------------------------------------
 -- Type declarations
 
@@ -146,13 +156,13 @@ checkCyclicTy _ set = return set
 --   the declared types.
 --
 --   Precondition: only called on 'DType's.
-withTypeDecls :: [Decl] -> TCM a -> TCM a
-withTypeDecls decls k = do
-  let dups :: [(Name Term, Int)]
-      dups = filter ((>1) . snd) . map (head &&& length) . group . sort . map declName $ decls
+
+makeTyCtx :: [Decl] -> TCM TyCtx
+makeTyCtx decls = do
+  let dups = filterDups . map declName $ decls
   case dups of
-    ((x,_):_) -> throwError (DuplicateDecls x)
-    []        -> extends declCtx k
+    (x:_) -> throwError (DuplicateDecls x)
+    []        -> return declCtx
   where
     declCtx = M.fromList $ map getDType decls
 
@@ -164,22 +174,18 @@ withTypeDecls decls k = do
 
 -- | Type check a top-level definition. Precondition: only called on
 --   'DDefn's.
-checkDefn :: Decl -> TCM ()
+checkDefn :: Decl -> TCM Defn
 checkDefn (DDefn x clauses) = do
   Forall sig <- lookupTy x
-  prevDefn <- use (termDefns . Lens.at (coerce x))
-  case prevDefn of
-    Just _ -> throwError (DuplicateDefns x)
-    Nothing -> do
-      ((acs, ty'), theta) <- solve $ do
-        checkNumPats clauses
-        (nms, ty) <- unbind sig
-        aclauses <- forAll nms $ mapM (checkClause ty) clauses
-        return (aclauses, ty)
+  ((acs, ty'), theta) <- solve $ do
+    checkNumPats clauses
+    (nms, ty) <- unbind sig
+    aclauses <- forAll nms $ mapM (checkClause ty) clauses
+    return (aclauses, ty)
 
-      let defnTy = substs theta ty'
-          (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
-      addDefn x (substs theta (Defn (coerce x) patTys bodyTy acs))
+  let defnTy = substs theta ty'
+      (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
+  return $ substs theta (Defn (coerce x) patTys bodyTy acs)
   where
     numPats = length . fst . unsafeUnbind
 

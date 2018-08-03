@@ -87,7 +87,6 @@ inferTelescope inferOne tel = do
 --   top-level definitions.
 checkModule :: Module -> TCM ModuleInfo
 checkModule (Module imps m docs) = do
-  -- let modInfo = foldr (\newm acc -> getModuleInfo newm <> acc) mempty mods
   let (tydefs, rest) = partition isTyDef m
   let (defns, typeDecls) = partition isDefn rest
   tyCtx <- makeTyCtx typeDecls

@@ -53,6 +53,7 @@ module Disco.AST.Typed
        , AGuard
        , pattern AGBool
        , pattern AGPat
+       , pattern AGLet
 
        , AQual
        , pattern AQBind
@@ -232,7 +233,8 @@ type ABranch = Bind (Telescope AGuard) ATerm
 type AGuard = Guard_ TY
 
 type instance X_GBool TY = ()
-type instance X_GPat TY = ()
+type instance X_GPat  TY = ()
+type instance X_GLet  TY = ()   -- ??? Type?
 
 pattern AGBool :: Embed ATerm -> AGuard
 pattern AGBool embedt = GBool_ () embedt
@@ -240,7 +242,10 @@ pattern AGBool embedt = GBool_ () embedt
 pattern AGPat :: Embed ATerm -> APattern -> AGuard
 pattern AGPat embedt pat = GPat_ () embedt pat
 
-{-# COMPLETE AGBool, AGPat #-}
+pattern AGLet :: ABinding -> AGuard
+pattern AGLet b = GLet_ () b
+
+{-# COMPLETE AGBool, AGPat, AGLet #-}
 
 type APattern = Pattern_ TY
 

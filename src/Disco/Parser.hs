@@ -532,12 +532,12 @@ parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parse
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
-parseGuard = parseGBool <|> parseGPat
+parseGuard = parseGBool <|> parseGPat <|> parseGLet
   where
     parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
     parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
                       <*> (reserved "is" *> parsePattern)
-
+    parseGLet  = GLet <$> (reserved "let" *> parseBinding)
 
 -- | Parse an atomic pattern, by parsing a term and then attempting to
 --   convert it to a pattern.

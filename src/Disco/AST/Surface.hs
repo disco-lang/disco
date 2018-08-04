@@ -79,6 +79,7 @@ module Disco.AST.Surface
        , Guard
        , pattern GBool
        , pattern GPat
+       , pattern GLet
 
        , Pattern
        , pattern PVar
@@ -308,7 +309,8 @@ type Branch = Branch_ UD
 type Guard = Guard_ UD
 
 type instance X_GBool UD = ()
-type instance X_GPat UD = ()
+type instance X_GPat  UD = ()
+type instance X_GLet  UD = ()
 
 pattern GBool :: Embed Term -> Guard
 pattern GBool embedt = GBool_ () embedt
@@ -316,7 +318,10 @@ pattern GBool embedt = GBool_ () embedt
 pattern GPat :: Embed Term -> Pattern -> Guard
 pattern GPat embedt pat = GPat_ () embedt pat
 
-{-# COMPLETE GBool, GPat #-}
+pattern GLet :: Binding -> Guard
+pattern GLet b = GLet_ () b
+
+{-# COMPLETE GBool, GPat, GLet #-}
 
 type Pattern = Pattern_ UD
 

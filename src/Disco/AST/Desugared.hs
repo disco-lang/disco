@@ -182,6 +182,7 @@ type DGuard = Guard_ DS
 
 type instance X_GBool DS = Void   -- Boolean guards get desugared to pattern-matching
 type instance X_GPat  DS = ()
+type instance X_GLet  DS = Void   -- Let gets desugared to 'when' with a variable
 
 pattern DGPat :: Embed DTerm -> DPattern -> DGuard
 pattern DGPat embedt pat = GPat_ () embedt pat

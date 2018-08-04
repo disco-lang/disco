@@ -96,6 +96,7 @@ module Disco.AST.Generic
        , Guard_ (..)
        , X_GBool
        , X_GPat
+       , X_GLet
        , ForallGuard
 
        -- * Pattern
@@ -428,6 +429,7 @@ type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
 
 type family X_GBool e
 type family X_GPat e
+type family X_GLet e
 
 data Guard_ e where
 
@@ -435,16 +437,20 @@ data Guard_ e where
   GBool_ :: X_GBool e -> Embed (Term_ e) -> Guard_ e
 
   -- | Pattern guard (@when term = pat@)
-
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
+
+  -- | Let (@let x = term@)
+  GLet_  :: X_GLet e -> Binding_ e -> Guard_ e
 
   deriving Generic
 
 type ForallGuard (a :: * -> Constraint) e
   = ( a (X_GBool e)
     , a (X_GPat  e)
+    , a (X_GLet  e)
     , a (Term_ e)
     , a (Pattern_ e)
+    , a (Binding_ e)
     )
 
 deriving instance ForallGuard Show         e => Show       (Guard_ e)

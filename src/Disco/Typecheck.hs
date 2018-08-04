@@ -828,6 +828,11 @@ typecheck mode (TCase bs) = do
       at <- infer t
       (ctx, apt) <- checkPattern p (getType at)
       return (AGPat (embed at) apt, ctx)
+    inferGuard (GLet (Binding mty x (unembed -> t))) = do
+      at <- case mty of
+        Just (unembed -> ty) -> checkSigma t ty
+        Nothing              -> infer t
+      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toSigma (getType at)))
 
 --------------------------------------------------
 -- Type ascription

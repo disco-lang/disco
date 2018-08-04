@@ -383,6 +383,13 @@ desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
     desugarGuard (AGPat (unembed -> at) p) = do
       dt <- desugarTerm at
       return $ DGPat (embed dt) (desugarPattern p)
+    desugarGuard (AGLet (ABinding _ x (unembed -> at))) = do
+      dt <- desugarTerm at
+      return $ DGPat (embed dt) (DPVar (getType dt) (coerce x))
+
+desugarBinding :: ABinding -> DSM DBinding
+desugarBinding (ABinding mty x (unembed -> t))
+  = DBinding mty (coerce x) <$> (embed <$> desugarTerm t)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm

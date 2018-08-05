@@ -197,16 +197,28 @@ type instance X_PBool    DS = ()
 type instance X_PChar    DS = ()
 type instance X_PString  DS = Void
 type instance X_PTup     DS = Void
-type instance X_PInj     DS = Embed Type
+type instance X_PInj     DS = Void
 type instance X_PNat     DS = Embed Type
-type instance X_PCons    DS = Embed Type
+type instance X_PCons    DS = Void
 type instance X_PList    DS = Void
 type instance X_PPlus    DS = Void
 
+-- In the desugared language, constructor patterns (DPPair, DPInj,
+-- DPCons) can only contain variables, not nested patterns.  This
+-- means that the desugaring phase has to make explicit the order of
+-- matching by exploding nested patterns into sequential guards, which
+-- makes the interpreter simpler.
+
 type instance X_Pattern  DS =
   Either
-    (Embed Type, DPattern, DPattern) -- DPair
-    (Embed Type)                     -- DNil
+    (Embed Type, Name DTerm, Name DTerm)     -- DPPair
+    (Either
+      (Embed Type, Side, Name DTerm)         -- DPInj
+      (Either
+        (Embed Type, Name DTerm, Name DTerm) -- DPCons
+        (Embed Type)                         -- DNil
+      )
+    )
 
 pattern DPVar :: Type -> Name DTerm -> DPattern
 pattern DPVar ty name <- PVar_ (unembed -> ty) name
@@ -227,30 +239,30 @@ pattern DPBool  b = PBool_ () b
 pattern DPChar :: Char -> DPattern
 pattern DPChar  c = PChar_ () c
 
-pattern DPPair  :: Type -> DPattern -> DPattern -> DPattern
-pattern DPPair ty p1 p2 <- XPattern_ (Left ((unembed -> ty), p1, p2))
+pattern DPPair  :: Type -> Name DTerm -> Name DTerm -> DPattern
+pattern DPPair ty x1 x2 <- XPattern_ (Left (unembed -> ty, x1, x2))
   where
-    DPPair ty p1 p2 = XPattern_ (Left ((embed ty), p1, p2))
+    DPPair ty x1 x2 = XPattern_ (Left (embed ty, x1, x2))
 
-pattern DPInj  :: Type -> Side -> DPattern -> DPattern
-pattern DPInj ty s p <- PInj_ (unembed -> ty) s p
+pattern DPInj  :: Type -> Side -> Name DTerm -> DPattern
+pattern DPInj ty s x <- XPattern_ (Right (Left (unembed -> ty, s, x)))
   where
-    DPInj ty s p = PInj_ (embed ty) s p
+    DPInj ty s x = XPattern_ (Right (Left (embed ty, s, x)))
 
 pattern DPNat  :: Type -> Integer -> DPattern
 pattern DPNat ty n <- PNat_ (unembed -> ty) n
   where
     DPNat ty n = PNat_ (embed ty) n
 
-pattern DPCons :: Type -> DPattern -> DPattern -> DPattern
-pattern DPCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
+pattern DPCons :: Type -> Name DTerm -> Name DTerm -> DPattern
+pattern DPCons ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2))))
   where
-    DPCons ty p1 p2 = PCons_ (embed ty) p1 p2
+    DPCons ty x1 x2 = XPattern_ (Right (Right (Left (embed ty, x1, x2))))
 
 pattern DPNil :: Type -> DPattern
-pattern DPNil ty <- XPattern_ (Right (unembed -> ty))
+pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
   where
-    DPNil ty = XPattern_ (Right (embed ty))
+    DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
     DPNat, DPNil, DPCons #-}

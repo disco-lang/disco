@@ -192,7 +192,7 @@ whnf (CVar x) = do
   e <- getEnv
   case (M.lookup (coerce x) e) of
     Just v  -> whnfV v
-    Nothing -> error $ "Unbound variable while interpreting!"
+    Nothing -> error $ "Unbound variable while interpreting! " ++ show x
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
 
@@ -397,11 +397,11 @@ checkGuards ((unembed -> c, p) : gs) = do
 match :: Value -> CPattern -> Disco IErr (Maybe Env)
 match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
 match _ CPWild        = ok
-match v (CPCons i ps) = do
+match v (CPCons i xs) = do
   VCons j vs <- whnfV v
   case i == j of
     False -> noMatch
-    True  -> matchPatterns vs ps
+    True  -> return (Just . M.fromList $ zip xs vs)
 match v (CPNat n)     = do
   VNum _ m <- whnfV v
   case m == n % 1 of

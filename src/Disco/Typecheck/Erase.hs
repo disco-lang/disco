@@ -19,6 +19,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe
 import           Control.Arrow                           ((***))
 import           Data.Coerce
 
+import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 
@@ -83,3 +84,46 @@ eraseQual (AQGuard (unembed -> at))  = QGuard (embed (erase at))
 eraseProperty :: AProperty -> Property
 eraseProperty b = bind (coerce xs) (erase at)
   where (xs, at) = unsafeUnbind b
+
+------------------------------------------------------------
+-- DTerm erasure
+
+eraseDTerm :: DTerm -> Term
+eraseDTerm (DTVar _ x)      = TVar (coerce x)
+eraseDTerm DTUnit           = TUnit
+eraseDTerm (DTBool b)       = TBool b
+eraseDTerm (DTChar c)       = TChar c
+eraseDTerm (DTNat _ n)      = TNat n
+eraseDTerm (DTRat r)        = TRat r
+eraseDTerm (DTLam _ b)      = TAbs $ bind [(coerce x, embed Nothing)] (eraseDTerm dt)
+  where (x, dt) = unsafeUnbind b
+eraseDTerm (DTApp _ d1 d2)  = TApp (eraseDTerm d1) (eraseDTerm d2)
+eraseDTerm (DTPair _ d1 d2) = TTup [eraseDTerm d1, eraseDTerm d2]
+eraseDTerm (DTInj _ s d)    = TInj s (eraseDTerm d)
+eraseDTerm (DTCase _ bs)    = TCase (map eraseDBranch bs)
+eraseDTerm (DTUn _ op d)    = TUn op (eraseDTerm d)
+eraseDTerm (DTBin _ op d1 d2) = TBin op (eraseDTerm d1) (eraseDTerm d2)
+eraseDTerm (DTTyOp _ op ty) = TTyOp op ty
+eraseDTerm (DTNil _)        = TList [] Nothing
+eraseDTerm (DTContainer _ c ds mell)
+  = TContainer c (map eraseDTerm ds) ((fmap . fmap) eraseDTerm mell)
+
+eraseDBranch :: DBranch -> Branch
+eraseDBranch b = bind (mapTelescope eraseDGuard tel) (eraseDTerm d)
+  where
+    (tel, d) = unsafeUnbind b
+
+eraseDGuard :: DGuard -> Guard
+eraseDGuard (DGPat (unembed -> d) p) = GPat (embed (eraseDTerm d)) (eraseDPattern p)
+
+eraseDPattern :: DPattern -> Pattern
+eraseDPattern (DPVar _ x)      = PVar (coerce x)
+eraseDPattern (DPWild _)       = PWild
+eraseDPattern DPUnit           = PUnit
+eraseDPattern (DPBool b)       = PBool b
+eraseDPattern (DPChar c)       = PChar c
+eraseDPattern (DPPair _ x1 x2) = PTup (map (PVar . coerce) [x1,x2])
+eraseDPattern (DPInj _ s x)    = PInj s (PVar (coerce x))
+eraseDPattern (DPNat _ n)      = PNat n
+eraseDPattern (DPNil _)        = PList []
+eraseDPattern (DPCons _ x1 x2) = PCons (PVar (coerce x1)) (PVar (coerce x2))

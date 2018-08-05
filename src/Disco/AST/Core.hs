@@ -168,9 +168,9 @@ data CPattern where
   -- | A wildcard pattern @_@, which matches anything.
   CPWild :: CPattern
 
-  -- | A cons-pattern.  @CPCons i pats@ matches @CCons j tms@ if @i ==
-  --   j@ and @pats@ all match @tms@ recursively.
-  CPCons :: Int -> [CPattern] -> CPattern
+  -- | A cons-pattern.  @CPCons i pats@ matches @CCons j xs@ if @i ==
+  --   j@.
+  CPCons :: Int -> [Name Core] -> CPattern
 
   -- | A natural number pattern.
   CPNat  :: Integer -> CPattern

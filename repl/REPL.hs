@@ -159,7 +159,7 @@ handleDesugar :: Term -> Disco IErr String
 handleDesugar t = do
   case evalTCM (inferTop t) of
     Left e       -> return.show $ e
-    Right (at,_) -> return . show . runDSM . desugarTerm $ at
+    Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
 
 handleCompile :: Term -> Disco IErr String
 handleCompile t = do

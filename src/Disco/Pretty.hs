@@ -307,8 +307,10 @@ prettyPattern (PTup ts) = do
   parens (hsep ds)
 prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
 prettyPattern (PNat n) = integer n
-prettyPattern (PCons {}) = error "prettyPattern PCons unimplemented"
-prettyPattern (PList {}) = error "prettyPattern PList unimplemented"
+prettyPattern (PCons p1 p2) = prettyPattern p1 <+> text "::" <+> prettyPattern p2
+prettyPattern (PList ps) = do
+  ds <- punctuate (text ",") (map prettyPattern ps)
+  brackets (hsep ds)
 prettyPattern (PPlus L p t) = prettyPattern p <+> text "+" <+> prettyTerm t
 prettyPattern (PPlus R p t) = prettyTerm t <+> text "+" <+> prettyPattern p
 

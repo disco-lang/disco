@@ -35,7 +35,6 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import           Control.Monad.Writer
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
@@ -382,100 +381,96 @@ desugarBranch b = do
 desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
 desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope gs)
   where
-    -- Note that in the case of arithmetic patterns, a single guard
-    -- could desugar to multiple guards.  For example,
-    --
-    --   when t is (x+1)
-    --
-    -- desugars to
-    --
-    --   when t is x0 if x0 >= 1 when x0-1 is x
-
     desugarGuard :: AGuard -> DSM [DGuard]
+
     -- A Boolean guard is desugared to a pattern-match on @true@.
     desugarGuard (AGBool (unembed -> at)) = do
       dt <- desugarTerm at
-      return [DGPat (embed dt) (DPBool True)]
-    desugarGuard (AGPat (unembed -> at) p) = do
-      dt <- desugarTerm at
+      mkMatch dt (DPBool True)
 
-      -- Desugaring a pattern can generate additional guards in
-      -- addition to a desugared pattern (see the example with the
-      -- pattern x+1 above).
-      (dp, gs') <- desugarPattern p
-
-      -- Return a DGPat, followed by the generated guards
-      return $ DGPat (embed dt) dp : gs'
+    -- 'let x = t' is desugared to 'when t is x'.
     desugarGuard (AGLet (ABinding _ x (unembed -> at))) = do
       dt <- desugarTerm at
-      return [DGPat (embed dt) (DPVar (getType dt) (coerce x))]
+      varMatch dt (coerce x)
 
-    -- | Desugar a pattern.
-    desugarPattern :: APattern -> DSM (DPattern, [DGuard])
-    desugarPattern = runWriterT . go
+    -- Desugaring 'when t is p' is the most complex case; we have to
+    -- break down the pattern and match it incrementally.
+    desugarGuard (AGPat (unembed -> at) p) = do
+      dt <- desugarTerm at
+      desugarMatch dt p
+
+    desugarMatch :: DTerm -> APattern -> DSM [DGuard]
+    desugarMatch dt (APVar ty x) = mkMatch dt (DPVar ty (coerce x))
+    desugarMatch dt (APWild ty)  = mkMatch dt (DPWild ty)
+    desugarMatch dt APUnit       = mkMatch dt DPUnit
+    desugarMatch dt (APBool b)   = mkMatch dt (DPBool b)
+    desugarMatch dt (APNat ty n) = mkMatch dt (DPNat ty n)
+    desugarMatch dt (APChar c)   = mkMatch dt (DPChar c)
+    desugarMatch dt (APString s) = desugarMatch dt (APList (TyList TyC) (map APChar s))
+    desugarMatch dt (APTup ty p) = desugarTuplePats ty dt p
       where
-        go :: APattern -> WriterT [DGuard] DSM DPattern
-        go (APVar ty x)      = return $ DPVar ty (coerce x)
-        go (APWild ty)       = return $ DPWild ty
-        go APUnit            = return DPUnit
-        go (APBool b)        = return $ DPBool b
+        desugarTuplePats :: Type -> DTerm -> [APattern] -> DSM [DGuard]
+        desugarTuplePats _ _  [] = error "Impossible! desugarTuplePats []"
+        desugarTuplePats _ t [p] = desugarMatch t p
+        desugarTuplePats ty@(TyPair ty1 ty2) t (p:ps) = do
+          x1 <- fresh (string2Name "x")
+          x2 <- fresh (string2Name "x")
+          fmap concat . sequence $
+            [ mkMatch t $ DPPair ty x1 x2
+            , desugarMatch (DTVar ty1 x1) p
+            , desugarTuplePats ty2 (DTVar ty2 x2) ps
+            ]
+        desugarTuplePats ty t (p:ps)
+          = error $ "Impossible! desugarTuplePats with non-pair type " ++ show ty
 
-        -- Have to delay matching on Nat since XXX arith patterns...
-        go (APNat ty n)      = delayMatch $ DPNat ty n
-        go (APChar c)        = return $ DPChar c
-        go (APString s)      = go (APList (TyList TyC) (map APChar s))
-        go (APTup _ p)       = desugarTuplePats p
-        go (APInj ty s p)    = DPInj ty s <$> go p
-        go (APCons ty p1 p2) = DPCons ty <$> go p1 <*> go p2
-        go (APList ty ps)    = desugarListPat ps
-          where
-            desugarListPat []      = return $ DPNil ty
-            desugarListPat (p:ps') = DPCons eltTy <$> go p <*> desugarListPat ps'
+    desugarMatch dt (APInj ty s p) = do
+      x <- fresh (string2Name "x")
+      fmap concat . sequence $
+        [ mkMatch dt $ DPInj ty s x
+        , desugarMatch (DTVar (getType p) x) p
+        ]
 
-            eltTy = case ty of
-              TyList e -> e
-              _        -> error $ "Impossible! APList with non-TyList " ++ show ty
+    desugarMatch dt (APCons ty p1 p2) = do
+      x1 <- fresh (string2Name "x")
+      x2 <- fresh (string2Name "x")
+      fmap concat . sequence $
+        [ mkMatch dt $ DPCons ty x1 x2
+        , desugarMatch (DTVar (getType p1) x1) p1
+        , desugarMatch (DTVar (getType p2) x2) p2
+        ]
 
-        -- (p+t)  ==>  x0 [let v = t; if x0 >= v; when x0-v is p]
-        go (APPlus ty _ p t) = do
-          let tTy = getType t
-              tSigma = embed (toSigma tTy)
-          x0 <- fresh (string2Name "x")
-          v  <- fresh (string2Name "v")
+    desugarMatch dt (APList ty []) = mkMatch dt (DPNil ty)
+    desugarMatch dt (APList ty ps) =
+      desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
 
-          -- let v = t
-          gs1 <- lift . desugarGuard $ AGLet (ABinding (Just tSigma) v (embed t))
-          tell gs1
-          when (ty `elem` [TyN, TyF]) $ do
+    -- when dt is (p + t) ==> when dt is x0; let v = t; [if x0 >= v]; when x0-v is p
+    desugarMatch dt (APPlus ty _ p t) = do
+      x0 <- fresh (string2Name "x")
+      v  <- fresh (string2Name "v")
 
-            -- x0 >= v
-            gs2 <- lift . desugarGuard $ AGBool (embed (ATVar ty x0 >=. ATVar tTy v))
-            tell gs2
-          (dp,gs3) <- lift $ desugarPattern p
+      g1 <- varMatch dt x0
 
-          -- when x0-v is p
-          s <- lift $ desugarTerm (ATVar ty x0 -. ATVar tTy v)
-          tell [DGPat (embed s) dp]
+      -- let v = t
+      t' <- desugarTerm t
+      g2 <- varMatch t' v
 
-          tell gs3
+      g3 <- case (ty `elem` [TyN, TyF]) of
+        False -> return []
 
-          return $ DPVar ty (coerce x0)
+        -- if x0 >= v
+        True  -> desugarGuard $ AGBool (embed (ATVar ty (coerce x0) >=. ATVar (getType t) (coerce v)))
 
-        -- | Desugar a tuple pattern into nested pair patterns.  For example,
-        --   the pattern @(a,b,c,d)@ turns into @(a,(b,(c,d)))@.
-        desugarTuplePats :: [APattern] -> WriterT [DGuard] DSM DPattern
-        desugarTuplePats []     = error "Impossible! desugarTuplePats []"
-        desugarTuplePats [p]    = go p
-        desugarTuplePats (p:ps) = mkDPPair <$> go p <*> desugarTuplePats ps
-          where
-            mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2
+      -- when x0-v is p
+      sub <- desugarTerm (ATVar ty (coerce x0) -. ATVar (getType t) (coerce v))
+      g4  <- desugarMatch sub p
 
-        delayMatch :: DPattern -> WriterT [DGuard] DSM DPattern
-        delayMatch p = do
-          x <- fresh (string2Name "x")
-          tell [DGPat (embed (DTVar (getType p) x)) p]
-          return $ DPVar (getType p) x
+      return (g1 ++ g2 ++ g3 ++ g4)
 
+    mkMatch :: DTerm -> DPattern -> DSM [DGuard]
+    mkMatch dt dp = return [DGPat (embed dt) dp]
+
+    varMatch :: DTerm -> Name DTerm -> DSM [DGuard]
+    varMatch dt x = mkMatch dt (DPVar (getType dt) x)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm

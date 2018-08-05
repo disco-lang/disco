@@ -180,6 +180,9 @@ loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
+-- | Parses, typechecks, and loads a module by first recursively loading any imported
+--   modules by calling recCheckMod. If no errors are thrown, any tests present
+--   in the parent module are executed.
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
@@ -190,6 +193,8 @@ handleLoad fp = do
   io . putStrLn $ "Loaded."
   return t
 
+-- | Added information from ModuleInfo to the Disco monad. This includes updating the
+--   Disco monad with new term definitions, documentation, types, and type definitions.
 addModInfo :: ModuleInfo -> Disco IErr ()
 addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
@@ -199,6 +204,10 @@ addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   loadDefs cdefns
   return ()
 
+-- | Typechecks a given module by first recursively typechecking it's imported modules,
+--   adding the obtained module infos to a map from module names to module infos, and then
+--   typechecking the parent module in an environment with access to this map. This is really just a
+--   depth-first search.
 recCheckMod :: FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) (Disco IErr) ModuleInfo
 recCheckMod directory inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
@@ -223,6 +232,10 @@ recCheckMod directory inProcess modName  = do
               modify (M.insert modName m')
               return m'
 
+-- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos are merged by
+--   joining their doc, type, type definition, and term contexts. The property context
+--   of the new module is the obtained from the second module. If threre are any duplicate
+--   type definitions or term definitions, a Typecheck error is thrown.
 combineModuleInfo :: (MonadError IErr m) => [ModuleInfo] -> m ModuleInfo
 combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
   where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
@@ -232,6 +245,9 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
             (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
             (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
 
+-- | Given a directory and a module name, relavent directories are searched for the file
+--   containing the provided module name. Currently, Disco searches for the module in
+--   the standard library directory (lib) and the directory where the load command was evoked.
 resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
 resolveModule directory modname = do
   datadir <- io getDataDir 

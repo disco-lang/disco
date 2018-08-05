@@ -268,7 +268,6 @@ parseModule = do
   let theMod = mkModule imports topLevel
   return theMod
   where
-    -- XXX: Change type of groupTLs to be tuple ([ModName],[(Decl, Maybe (Name Term, [DocThing]))])
     groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
     groupTLs _ [] = []
     groupTLs revDocs (TLDoc doc : rest)

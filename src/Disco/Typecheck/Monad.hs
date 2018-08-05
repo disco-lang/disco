@@ -66,34 +66,17 @@ type TyCtx = Ctx Term Sigma
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _docs :: Ctx Term Docs
-  , _props :: Ctx ATerm [AProperty]
-  , _tys :: TyCtx
-  , _tydefs :: TyDefCtx
-  , _termdefs :: Ctx ATerm Defn
+  { _modDocs :: Ctx Term Docs
+  , _modProps :: Ctx ATerm [AProperty]
+  , _modTys :: TyCtx
+  , _modTydefs :: TyDefCtx
+  , _modTermdefs :: Ctx ATerm Defn
   }
+
+makeLenses ''ModuleInfo
 
 emptyModuleInfo :: ModuleInfo
 emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
-
--- | To combine two values of type ModuleInfo, we first make sure that there
---   are no term is defined in both modules. If the modules are free of duplicate
---   terms, then join their individual contexts together.
--- instance Monoid ModuleInfo where
---   mempty = ModuleInfo emptyCtx emptyCtx emptyCtx
---   mappend (ModuleInfo d1 p1 t1) (ModuleInfo d2 p2 t2) =
---    case hasDupTerm t1 t2 of
---       Nothing -> ModuleInfo (joinCtx d1 d2) (joinCtx p1 p2) (joinCtx t1 t2)
---       -- XXX: Needs to throw a TCError instead
---       Just t -> error $ "Duplicate term definition:" ++ show t  
-
---     where hasDupTerm :: TyCtx -> TyCtx -> Maybe (Name Term)
---           hasDupTerm trm1 trm2 = case L.intersect (M.keys trm1) (M.keys trm2) of
---                               [] -> Nothing
---                               (x:_) -> Just x
-
--- instance S.Semigroup ModuleInfo where
---   m1 <> m2 = mappend m1 m2
 
 ------------------------------------------------------------
 -- Errors
@@ -127,8 +110,8 @@ instance Monoid TCError where
 ------------------------------------------------------------
 
 -- | Type checking monad. Maintains a locally-scoped context of
---   variables and their types and a read-write context of term and
---   type definitions; collects constraints; can throw @TCError@s; and
+--   variables and their types and a read-write map of type
+--   definitions; collects constraints; can throw @TCError@s; and
 --   can generate fresh names.
 type TCM = RWST TyCtx Constraint TyDefCtx (ExceptT TCError FreshM)
 

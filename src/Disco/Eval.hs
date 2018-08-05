@@ -195,10 +195,10 @@ data IErr where
   -- | Cyclic import encountered. 
   CyclicImport :: ModName -> IErr
 
-  -- | Error encountered during typechecking XXX. Is this okay?
+  -- | Error encountered during typechecking.
   TypeCheckErr :: TCError -> IErr
 
-  -- | Error encountered during typechecking XXX. ^^^
+  -- | Error encountered during parsing.
   ParseErr :: (ParseError Char Data.Void.Void) -> IErr
 
   -- | An unbound name.

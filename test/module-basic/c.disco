@@ -1,0 +1,6 @@
+-- Test for importing the standard library
+
+import list
+
+l : List N
+l = map (\x. x + 1) [1,2,3]

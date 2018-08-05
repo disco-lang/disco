@@ -1,3 +1,6 @@
+-- Test to check whether importing a single module which doesn't import any other modules works as
+-- expeced
+
 import b
 
 x : N

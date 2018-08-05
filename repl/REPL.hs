@@ -250,7 +250,7 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 
 -- | Given a directory and a module name, relavent directories are searched for the file
 --   containing the provided module name. Currently, Disco searches for the module in
---   the standard library directory (lib) and the directory where the load command was evoked.
+--   the standard library directory (lib), and the directory passed in to resolveModule.
 resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
 resolveModule directory modname = do
   datadir <- io getDataDir

@@ -419,7 +419,9 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
         go (APWild ty)       = return $ DPWild ty
         go APUnit            = return DPUnit
         go (APBool b)        = return $ DPBool b
-        go (APNat ty n)      = return $ DPNat ty n
+
+        -- Have to delay matching on Nat since XXX arith patterns...
+        go (APNat ty n)      = delayMatch $ DPNat ty n
         go (APChar c)        = return $ DPChar c
         go (APString s)      = go (APList (TyList TyC) (map APChar s))
         go (APTup _ p)       = desugarTuplePats p
@@ -467,6 +469,13 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
         desugarTuplePats (p:ps) = mkDPPair <$> go p <*> desugarTuplePats ps
           where
             mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2
+
+        delayMatch :: DPattern -> WriterT [DGuard] DSM DPattern
+        delayMatch p = do
+          x <- fresh (string2Name "x")
+          tell [DGPat (embed (DTVar (getType p) x)) p]
+          return $ DPVar (getType p) x
+
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm

@@ -1,0 +1,15 @@
+f1 : N -> N
+f1 (x + 1) = x
+f1 0       = 0
+
+f2 : N -> N
+f2 (3 + (x + 2)) = x
+f2 y             = 0
+
+f3 : Z -> Z
+f3 (3 + (x + 2)) = x
+f3 y             = 0
+
+f4 : N*Z -> N*Z + N*Z
+f4 (x+1,y+2) = left (x,y)
+f4 (x,  y+2) = right (x,y)

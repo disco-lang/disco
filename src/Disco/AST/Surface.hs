@@ -94,9 +94,13 @@ module Disco.AST.Surface
        , pattern PSucc
        , pattern PCons
        , pattern PList
+       , pattern PPlus
+
        , pattern Binding
        )
        where
+
+import           Data.Void
 
 import           Disco.AST.Generic
 import           Disco.Context
@@ -337,7 +341,8 @@ type instance X_PString UD = ()
 type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
-type instance X_Pattern UD = ()
+type instance X_PPlus UD   = ()
+type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
 pattern PVar name = PVar_ () name
@@ -375,5 +380,8 @@ pattern PCons  p1 p2 = PCons_ () p1 p2
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
+pattern PPlus :: Side -> Pattern -> Term -> Pattern
+pattern PPlus s p t = PPlus_ () s p t
+
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PSucc, PCons, PList #-}
+             PChar, PString, PSucc, PCons, PList, PPlus #-}

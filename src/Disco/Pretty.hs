@@ -222,12 +222,6 @@ prettyTerm (TLet bnd) = mparens initPA $
       , text "in"
       , prettyTerm' 0 InL t2
       ]
-  where
-    prettyBinding :: Binding -> Doc
-    prettyBinding (Binding Nothing x (unembed -> t))
-      = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
-    prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
-      = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
@@ -280,6 +274,13 @@ prettyGuards (fromTelescope -> gs)
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
+prettyGuard (GLet b)    = text "let" <+> prettyBinding b
+
+prettyBinding :: Binding -> Doc
+prettyBinding (Binding Nothing x (unembed -> t))
+  = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
+prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
+  = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyQuals :: Telescope Qual -> Doc
 prettyQuals (fromTelescope -> qs) = do
@@ -292,6 +293,8 @@ prettyQual (QBind x (unembed -> t))
 prettyQual (QGuard (unembed -> t))
   = prettyTerm' 0 InL t
 
+-- XXX TODO: now that this can have arith pats in it, it needs to
+-- actually take precedence, associativity etc. into account
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x) = prettyName x
 prettyPattern PWild = text "_"
@@ -306,7 +309,9 @@ prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
 prettyPattern (PNat n) = integer n
 prettyPattern (PSucc p) = text "S" <+> prettyPattern p
 prettyPattern (PCons {}) = error "prettyPattern PCons unimplemented"
-prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
+prettyPattern (PList {}) = error "prettyPattern PList unimplemented"
+prettyPattern (PPlus L p t) = prettyPattern p <+> text "+" <+> prettyTerm t
+prettyPattern (PPlus R p t) = prettyTerm t <+> text "+" <+> prettyPattern p
 
 ------------------------------------------------------------
 

@@ -867,29 +867,21 @@ checkPattern (PVar x) ty = return (singleCtx x (toSigma ty), APVar ty (coerce x)
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
 
-checkPattern PUnit tyv@(TyVar _) = do
-  constraint $ CEq tyv TyUnit
+checkPattern PUnit ty = do
+  ensureEq ty TyUnit
   return (emptyCtx, APUnit)
 
-checkPattern PUnit TyUnit = return (emptyCtx, APUnit)
-
-checkPattern (PBool b) tyv@(TyVar _) = do
-  constraint $ CEq tyv TyBool
+checkPattern (PBool b) ty = do
+  ensureEq ty TyBool
   return (emptyCtx, APBool b)
 
-checkPattern (PBool b) TyBool = return (emptyCtx, APBool b)
-
-checkPattern (PChar c) tyv@(TyVar _) = do
-  constraint $ CEq tyv TyC
+checkPattern (PChar c) ty = do
+  ensureEq ty TyC
   return (emptyCtx, APChar c)
 
-checkPattern (PChar c) TyC = return (emptyCtx, APChar c)
-
-checkPattern (PString s) tyv@(TyVar _) = do
-  constraint $ CEq tyv (TyList TyC)
+checkPattern (PString s) ty = do
+  ensureEq ty (TyList TyC)
   return (emptyCtx, APString s)
-
-checkPattern (PString s) (TyList TyC) = return (emptyCtx, APString s)
 
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy
@@ -928,12 +920,8 @@ checkPattern (PNat n) ty        = do
   constraint $ CSub TyN ty
   return (emptyCtx, APNat ty n)
 
-checkPattern (PSucc p) tyv@(TyVar _) = do
-  (ctx, apt) <- checkPattern p TyN
-  constraint $ CEq tyv TyN
-  return (ctx, APSucc apt)
-
-checkPattern (PSucc p) TyN = do
+checkPattern (PSucc p) ty = do
+  ensureEq ty TyN
   (ctx, apt) <- checkPattern p TyN
   return (ctx, APSucc apt)
 
@@ -948,6 +936,12 @@ checkPattern p@(PList ps) ty = do
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
+
+checkPattern (PPlus s p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APPlus ty s apt at)
 
 checkPattern p ty = throwError (PatternType p ty)
 
@@ -1065,3 +1059,11 @@ ensureConstr c ty targ =
 ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
+
+-- | Ensure that two types are equal:
+--     1. Do nothing if they are literally equal
+--     2. Generate an equality constraint otherwise
+ensureEq :: Type -> Type -> TCM ()
+ensureEq ty1 ty2
+  | ty1 == ty2 = return ()
+  | otherwise  = constraint $ CEq ty1 ty2

@@ -252,9 +252,9 @@ prettyCounterexample ctx env
   | otherwise  = do
       iputStrLn "    Counterexample:"
       let maxNameLen = maximum . map (length . name2String) $ M.keys env
-      mapM_ (prettyBinding maxNameLen) $ M.assocs env
+      mapM_ (prettyBind maxNameLen) $ M.assocs env
   where
-    prettyBinding maxNameLen (x,v) = do
+    prettyBind maxNameLen (x,v) = do
       iputStr "      "
       iputStr =<< (renderDoc . prettyName $ x)
       iputStr (replicate (maxNameLen - length (name2String x)) ' ')

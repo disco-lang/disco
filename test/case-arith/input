@@ -1,0 +1,13 @@
+:load test/case-arith/case-arith.disco
+f1 1
+f1 2
+f1 541
+f1 0
+
+f2 7
+f2 4
+f3 7
+f3 4
+
+f4 (2,1)
+f4 (0,1)

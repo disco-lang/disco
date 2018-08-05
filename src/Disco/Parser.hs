@@ -53,7 +53,7 @@ module Disco.Parser
        where
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name)
+                                                   fvAny, string2Name)
 
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
@@ -62,7 +62,8 @@ import qualified Text.Megaparsec.Char.Lexer       as L
 import           Text.Megaparsec.Expr
 
 import           Control.Applicative              (many, (<|>))
-import           Control.Lens                     (makeLenses, use, (.=))
+import           Control.Lens                     (makeLenses, toListOf, use,
+                                                   (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
 import qualified Data.Map                         as M
@@ -575,6 +576,20 @@ checkPattern (TApp (TVar s) t)
 
 checkPattern (TBin Cons t1 t2)
   = PCons <$> checkPattern t1 <*> checkPattern t2
+
+checkPattern (TBin Add t1 t2)
+  = case (checkPattern t1, checkPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PPlus L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PPlus R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PPlus L.  Also vice versa for PPlus R.
 
 checkPattern (TContainer ListContainer ts Nothing)
   = PList <$> mapM checkPattern ts

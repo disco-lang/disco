@@ -63,6 +63,7 @@ erasePattern (APNat _ n)        = PNat n
 erasePattern (APSucc apt)       = PSucc $ erasePattern apt
 erasePattern (APCons _ ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
 erasePattern (APList _ alp)     = PList $ map erasePattern alp
+erasePattern (APPlus _ s p t)   = PPlus s (erasePattern p) (erase t)
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)
@@ -71,6 +72,7 @@ eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)
 eraseGuard :: AGuard -> Guard
 eraseGuard (AGBool (unembed -> at))  = GBool (embed (erase at))
 eraseGuard (AGPat (unembed -> at) p) = GPat (embed (erase at)) (erasePattern p)
+eraseGuard (AGLet b)                 = GLet (eraseBinding b)
 
 eraseLink :: ALink -> Link
 eraseLink (ATLink bop at) = TLink bop (erase at)

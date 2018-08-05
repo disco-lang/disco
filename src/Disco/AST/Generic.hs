@@ -114,6 +114,7 @@ module Disco.AST.Generic
        , X_PSucc
        , X_PCons
        , X_PList
+       , X_PPlus
        , X_Pattern
        , ForallPattern
 
@@ -330,6 +331,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TApp e)
     , a (X_TInj e)
     , a (X_TCase e)
+    , a (X_TTup e)
     , a (X_TUn e)
     , a (X_TBin e)
     , a (X_TChain e)
@@ -338,7 +340,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TContainerComp e)
     , a (X_TAscr e)
     , a (X_Term e)
-    , a (X_TTup e)
     , a (Qual_ e)
     , a (Guard_ e)
     , a (Link_ e)
@@ -473,6 +474,7 @@ type family X_PString e
 type family X_PSucc e
 type family X_PCons e
 type family X_PList e
+type family X_PPlus e
 type family X_Pattern e
 
 -- | Patterns.
@@ -514,6 +516,9 @@ data Pattern_ e where
   -- | List pattern @[p1, .., pn]@.
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
 
+  -- | Addition pattern, @p + t@ or @t + p@
+  PPlus_ :: X_PPlus e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
+
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e
 
@@ -532,7 +537,9 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PSucc e)
         , a (X_PCons e)
         , a (X_PList e)
+        , a (X_PPlus e)
         , a (X_Pattern e)
+        , a (Term_ e)
         )
 
 deriving instance ForallPattern Show         e => Show       (Pattern_ e)

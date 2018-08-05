@@ -30,11 +30,12 @@ module Disco.Desugar
        , desugarDefn, desugarTerm
 
          -- * Case expressions and patterns
-       , desugarBranch, desugarGuards, desugarPattern
+       , desugarBranch, desugarGuards
        )
        where
 
 import           Control.Monad.Cont
+import           Control.Monad.Writer
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
@@ -69,9 +70,16 @@ infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
 (||.) = ATBin TyBool Or
 
-infix 4 <.
+infixl 6 -.
+(-.) :: ATerm -> ATerm -> ATerm
+at1 -. at2 = ATBin (getType at1) Sub at1 at2
+
+infix 4 <., >=.
 (<.) :: ATerm -> ATerm -> ATerm
 (<.) = ATBin TyBool Lt
+
+(>=.) :: ATerm -> ATerm -> ATerm
+(>=.) = ATBin TyBool Geq
 
 infix 4 ==.
 (==.) :: ATerm -> ATerm -> ATerm
@@ -120,20 +128,19 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 
   -- generate dummy variables for lambdas
   args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
-  branches <- zipWithM (mkBranch (zip args patTys)) bodies pats
 
-  -- Create lambdas and one big case
-  return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) (DTCase bodyTy branches)
+  -- Create lambdas and one big case.  Recursively desugar the case to
+  -- deal with arithmetic patterns.
+  let branches = zipWith (mkBranch (zip args patTys)) bodies pats
+  dcase <- desugarTerm $ ATCase bodyTy branches
+  return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) dcase
 
   where
-    mkBranch :: [(Name DTerm, Type)] -> ATerm -> [APattern] -> DSM DBranch
-    mkBranch xs b ps = do
-      b'  <- desugarTerm b
-      let ps' = map desugarPattern ps
-      return $ bind (mkGuards xs ps') b'
+    mkBranch :: [(Name ATerm, Type)] -> ATerm -> [APattern] -> ABranch
+    mkBranch xs b ps = bind (mkGuards xs ps) b
 
-    mkGuards :: [(Name DTerm, Type)] -> [DPattern] -> Telescope DGuard
-    mkGuards xs ps = toTelescope $ zipWith DGPat (map (\(x,ty) -> embed (DTVar ty x)) xs) ps
+    mkGuards :: [(Name ATerm, Type)] -> [APattern] -> Telescope AGuard
+    mkGuards xs ps = toTelescope $ zipWith AGPat (map (\(x,ty) -> embed (ATVar ty x)) xs) ps
 
 ------------------------------------------------------------
 -- Term desugaring
@@ -373,23 +380,94 @@ desugarBranch b = do
 --   Pattern guards essentially remain as they are; boolean guards get
 --   turned into pattern guards which match against @true@.
 desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
-desugarGuards gs = toTelescope <$> mapM desugarGuard (fromTelescope gs)
+desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope gs)
   where
-    desugarGuard :: AGuard -> DSM DGuard
+    -- Note that in the case of arithmetic patterns, a single guard
+    -- could desugar to multiple guards.  For example,
+    --
+    --   when t is (x+1)
+    --
+    -- desugars to
+    --
+    --   when t is x0 if x0 >= 1 when x0-1 is x
+
+    desugarGuard :: AGuard -> DSM [DGuard]
     -- A Boolean guard is desugared to a pattern-match on @true@.
     desugarGuard (AGBool (unembed -> at)) = do
       dt <- desugarTerm at
-      return $ DGPat (embed dt) (DPBool True)
+      return [DGPat (embed dt) (DPBool True)]
     desugarGuard (AGPat (unembed -> at) p) = do
       dt <- desugarTerm at
-      return $ DGPat (embed dt) (desugarPattern p)
+
+      -- Desugaring a pattern can generate additional guards in
+      -- addition to a desugared pattern (see the example with the
+      -- pattern x+1 above).
+      (dp, gs') <- desugarPattern p
+
+      -- Return a DGPat, followed by the generated guards
+      return $ DGPat (embed dt) dp : gs'
     desugarGuard (AGLet (ABinding _ x (unembed -> at))) = do
       dt <- desugarTerm at
-      return $ DGPat (embed dt) (DPVar (getType dt) (coerce x))
+      return [DGPat (embed dt) (DPVar (getType dt) (coerce x))]
 
-desugarBinding :: ABinding -> DSM DBinding
-desugarBinding (ABinding mty x (unembed -> t))
-  = DBinding mty (coerce x) <$> (embed <$> desugarTerm t)
+    -- | Desugar a pattern.
+    desugarPattern :: APattern -> DSM (DPattern, [DGuard])
+    desugarPattern = runWriterT . go
+      where
+        go :: APattern -> WriterT [DGuard] DSM DPattern
+        go (APVar ty x)      = return $ DPVar ty (coerce x)
+        go (APWild ty)       = return $ DPWild ty
+        go APUnit            = return DPUnit
+        go (APBool b)        = return $ DPBool b
+        go (APNat ty n)      = return $ DPNat ty n
+        go (APChar c)        = return $ DPChar c
+        go (APString s)      = go (APList (TyList TyC) (map APChar s))
+        go (APTup _ p)       = desugarTuplePats p
+        go (APInj ty s p)    = DPInj ty s <$> go p
+        go (APSucc p)        = DPSucc <$> go p
+        go (APCons ty p1 p2) = DPCons ty <$> go p1 <*> go p2
+        go (APList ty ps)    = desugarListPat ps
+          where
+            desugarListPat []      = return $ DPNil ty
+            desugarListPat (p:ps') = DPCons eltTy <$> go p <*> desugarListPat ps'
+
+            eltTy = case ty of
+              TyList e -> e
+              _        -> error $ "Impossible! APList with non-TyList " ++ show ty
+
+        -- (p+t)  ==>  x0 [let v = t; if x0 >= v; when x0-v is p]
+        go (APPlus ty _ p t) = do
+          let tTy = getType t
+              tSigma = embed (toSigma tTy)
+          x0 <- fresh (string2Name "x")
+          v  <- fresh (string2Name "v")
+
+          -- let v = t
+          gs1 <- lift . desugarGuard $ AGLet (ABinding (Just tSigma) v (embed t))
+          tell gs1
+          when (ty `elem` [TyN, TyF]) $ do
+
+            -- x0 >= v
+            gs2 <- lift . desugarGuard $ AGBool (embed (ATVar ty x0 >=. ATVar tTy v))
+            tell gs2
+          (dp,gs3) <- lift $ desugarPattern p
+
+          -- when x0-v is p
+          s <- lift $ desugarTerm (ATVar ty x0 -. ATVar tTy v)
+          tell [DGPat (embed s) dp]
+
+          tell gs3
+
+          return $ DPVar ty (coerce x0)
+
+        -- | Desugar a tuple pattern into nested pair patterns.  For example,
+        --   the pattern @(a,b,c,d)@ turns into @(a,(b,(c,d)))@.
+        desugarTuplePats :: [APattern] -> WriterT [DGuard] DSM DPattern
+        desugarTuplePats []     = error "Impossible! desugarTuplePats []"
+        desugarTuplePats [p]    = go p
+        desugarTuplePats (p:ps) = mkDPPair <$> go p <*> desugarTuplePats ps
+          where
+            mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
@@ -405,31 +483,3 @@ desugarContainer ty ListContainer es Nothing =
 
 desugarContainer ty c es mell =
   DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell
-
--- | Desugar a pattern.
-desugarPattern :: APattern -> DPattern
-desugarPattern (APVar ty x)      = DPVar ty (coerce x)
-desugarPattern (APWild ty)       = DPWild ty
-desugarPattern APUnit            = DPUnit
-desugarPattern (APBool b)        = DPBool b
-desugarPattern (APChar c)        = DPChar c
-desugarPattern (APString s)      = desugarPattern (APList (TyList TyC) (map APChar s))
-desugarPattern (APTup _ p)       = desugarTuplePats p
-desugarPattern (APInj ty s p)    = DPInj ty s (desugarPattern p)
-desugarPattern (APNat ty n)      = DPNat ty n
-desugarPattern (APSucc p)        = DPSucc (desugarPattern p)
-desugarPattern (APCons ty p1 p2) = DPCons ty (desugarPattern p1) (desugarPattern p2)
-desugarPattern (APList ty ps)    = foldr (DPCons eltTy . desugarPattern) (DPNil ty) ps
-  where
-    eltTy = case ty of
-      TyList e -> e
-      _        -> error $ "Impossible! APList with non-TyList " ++ show ty
-
--- | Desugar a tuple pattern into nested pair patterns.  For example,
---   the pattern @(a,b,c,d)@ turns into @(a,(b,(c,d)))@.
-desugarTuplePats :: [APattern] -> DPattern
-desugarTuplePats []     = error "Impossible! desugarTuplePats []"
-desugarTuplePats [p]    = desugarPattern p
-desugarTuplePats (p:ps) = mkDPPair (desugarPattern p) (desugarTuplePats ps)
-  where
-    mkDPPair p1 p2 = DPPair (TyPair (getType p1) (getType p2)) p1 p2

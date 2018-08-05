@@ -1,14 +1,17 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (forM_, when, foldM, filterM)
-import           Control.Monad.Except                    (catchError, MonadError, throwError)
+import           Control.Monad                           (filterM, foldM, forM_,
+                                                          when)
+import           Control.Monad.Except                    (MonadError,
+                                                          catchError,
+                                                          throwError)
 import           Control.Monad.IO.Class                  (MonadIO (..))
-import           Control.Monad.Trans.State
 import           Control.Monad.Trans.Class               (MonadTrans (..))
+import           Control.Monad.Trans.State
 import           Data.Char                               (isSpace)
 import           Data.Coerce
 import           Data.List                               (find, isPrefixOf)
@@ -16,12 +19,12 @@ import           Data.Map                                ((!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 
-import qualified Options.Applicative                     as O
 import qualified Data.Set                                as S
+import qualified Options.Applicative                     as O
 import           System.Console.Haskeline                as H
 import           System.Directory
-import           System.FilePath
 import           System.Exit
+import           System.FilePath
 import           Text.Megaparsec                         hiding (runParser)
 import qualified Text.Megaparsec.Char                    as C
 import           Unbound.Generics.LocallyNameless
@@ -215,7 +218,7 @@ recCheckMod directory inProcess modName  = do
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
-      file <- resolveModule directory modName 
+      file <- resolveModule directory modName
       io . putStrLn $ "Loading " ++ file ++ "..."
       str <- io $ readFile file
       let mp = runParser wholeModule file str
@@ -226,7 +229,7 @@ recCheckMod directory inProcess modName  = do
           mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns
           imports@(ModuleInfo _ _ tyctx tydefns _) <- combineModuleInfo mis
           case evalTCM (withTyDefns tydefns $ extends tyctx $ checkModule cm) of
-            Left tcErr         -> throwError $ TypeCheckErr tcErr 
+            Left tcErr         -> throwError $ TypeCheckErr tcErr
             Right m -> do
               m' <- combineModuleInfo [imports, m]
               modify (M.insert modName m')
@@ -241,7 +244,7 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
   where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
         combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
           case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
-            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) 
+            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2)
             (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
             (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
 
@@ -250,11 +253,11 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 --   the standard library directory (lib) and the directory where the load command was evoked.
 resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
 resolveModule directory modname = do
-  datadir <- io getDataDir 
+  datadir <- io getDataDir
   let fps = map (</> replaceExtension modname "disco") [directory, datadir]
   fexists <- io $ filterM doesFileExist fps
   case fexists of
-    [] -> throwError $ ModuleNotFound modname
+    []     -> throwError $ ModuleNotFound modname
     (fp:_) -> return fp
 
 -- XXX Return a structured summary of the results, not a Bool;

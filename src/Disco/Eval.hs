@@ -64,19 +64,19 @@ import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
+import qualified Data.Sequence                           as Seq
 import           Data.Void
 import           Text.Megaparsec
-import qualified Data.Sequence                           as Seq
 
 import           Unbound.Generics.LocallyNameless
 
 import           System.Console.Haskeline.MonadException
 
-import           Disco.Typecheck.Monad
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
+import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -192,7 +192,7 @@ data IErr where
   -- | Module not found.
   ModuleNotFound :: ModName -> IErr
 
-  -- | Cyclic import encountered. 
+  -- | Cyclic import encountered.
   CyclicImport :: ModName -> IErr
 
   -- | Error encountered during typechecking.

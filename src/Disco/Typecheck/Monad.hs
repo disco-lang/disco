@@ -66,10 +66,10 @@ type TyCtx = Ctx Term Sigma
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _modDocs :: Ctx Term Docs
-  , _modProps :: Ctx ATerm [AProperty]
-  , _modTys :: TyCtx
-  , _modTydefs :: TyDefCtx
+  { _modDocs     :: Ctx Term Docs
+  , _modProps    :: Ctx ATerm [AProperty]
+  , _modTys      :: TyCtx
+  , _modTydefs   :: TyDefCtx
   , _modTermdefs :: Ctx ATerm Defn
   }
 

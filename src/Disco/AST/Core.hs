@@ -175,9 +175,6 @@ data CPattern where
   -- | A natural number pattern.
   CPNat  :: Integer -> CPattern
 
-  -- | A successor pattern, @S p@.
-  CPSucc :: CPattern -> CPattern
-
   deriving (Show, Generic)
 
 instance Alpha RationalDisplay

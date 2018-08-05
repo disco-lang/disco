@@ -54,7 +54,6 @@ module Disco.AST.Desugared
        , pattern DPPair
        , pattern DPInj
        , pattern DPNat
-       , pattern DPSucc
        , pattern DPCons
        , pattern DPNil
 
@@ -200,7 +199,6 @@ type instance X_PString  DS = Void
 type instance X_PTup     DS = Void
 type instance X_PInj     DS = Embed Type
 type instance X_PNat     DS = Embed Type
-type instance X_PSucc    DS = ()
 type instance X_PCons    DS = Embed Type
 type instance X_PList    DS = Void
 type instance X_PPlus    DS = Void
@@ -244,9 +242,6 @@ pattern DPNat ty n <- PNat_ (unembed -> ty) n
   where
     DPNat ty n = PNat_ (embed ty) n
 
-pattern DPSucc :: DPattern -> DPattern
-pattern DPSucc p = PSucc_ () p
-
 pattern DPCons :: Type -> DPattern -> DPattern -> DPattern
 pattern DPCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
   where
@@ -258,7 +253,7 @@ pattern DPNil ty <- XPattern_ (Right (unembed -> ty))
     DPNil ty = XPattern_ (Right (embed ty))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
-    DPNat, DPSucc, DPNil, DPCons #-}
+    DPNat, DPNil, DPCons #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -294,6 +289,5 @@ instance HasType DPattern where
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
   getType (DPNat ty _)    = ty
-  getType (DPSucc _)      = TyN
   getType (DPNil ty)      = ty
   getType (DPCons ty _ _) = ty

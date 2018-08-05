@@ -91,7 +91,6 @@ module Disco.AST.Surface
        , pattern PTup
        , pattern PInj
        , pattern PNat
-       , pattern PSucc
        , pattern PCons
        , pattern PList
        , pattern PPlus
@@ -338,7 +337,6 @@ type instance X_PInj UD    = ()
 type instance X_PNat UD    = ()
 type instance X_PChar UD   = ()
 type instance X_PString UD = ()
-type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
 type instance X_PPlus UD   = ()
@@ -371,9 +369,6 @@ pattern PInj s p = PInj_ () s p
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
-pattern PSucc :: Pattern -> Pattern
-pattern PSucc p = PSucc_ () p
-
 pattern PCons :: Pattern -> Pattern -> Pattern
 pattern PCons  p1 p2 = PCons_ () p1 p2
 
@@ -384,4 +379,4 @@ pattern PPlus :: Side -> Pattern -> Term -> Pattern
 pattern PPlus s p t = PPlus_ () s p t
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PSucc, PCons, PList, PPlus #-}
+             PChar, PString, PCons, PList, PPlus #-}

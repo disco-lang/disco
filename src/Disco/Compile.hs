@@ -150,7 +150,6 @@ compilePattern (DPChar c)       = return $ CPNat (toInteger $ fromEnum c)
 compilePattern (DPPair _ p1 p2) = CPCons 0 <$> mapM compilePattern [p1,p2]
 compilePattern (DPInj _ s p)    = CPCons (fromEnum s) <$> mapM compilePattern [p]
 compilePattern (DPNat _ n)      = return $ CPNat n
-compilePattern (DPSucc p)       = CPSucc <$> compilePattern p
 compilePattern (DPNil _)        = return $ CPCons 0 []
 compilePattern (DPCons _ p1 p2) = CPCons 1 <$> mapM compilePattern [p1,p2]
 

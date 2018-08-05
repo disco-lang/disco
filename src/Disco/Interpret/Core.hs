@@ -407,11 +407,6 @@ match v (CPNat n)     = do
   case m == n % 1 of
     False -> noMatch
     True  -> ok
-match v (CPSucc p) = do
-  VNum _ n <- whnfV v
-  case n > 0 of
-    True  -> match (vnum (n-1)) p
-    False -> noMatch
 
 -- | Lazily match a list of values against a list of patterns
 --   pairwise, returning @Nothing@ as soon as one match fails, and

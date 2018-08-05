@@ -920,11 +920,6 @@ checkPattern (PNat n) ty        = do
   constraint $ CSub TyN ty
   return (emptyCtx, APNat ty n)
 
-checkPattern (PSucc p) ty = do
-  ensureEq ty TyN
-  (ctx, apt) <- checkPattern p TyN
-  return (ctx, APSucc apt)
-
 checkPattern p@(PCons p1 p2) ty = do
   [tyl] <- ensureConstr CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl

@@ -60,7 +60,6 @@ erasePattern (APString s)       = PString s
 erasePattern (APTup _ alp)      = PTup $ map erasePattern alp
 erasePattern (APInj _ s apt)    = PInj s (erasePattern apt)
 erasePattern (APNat _ n)        = PNat n
-erasePattern (APSucc apt)       = PSucc $ erasePattern apt
 erasePattern (APCons _ ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
 erasePattern (APList _ alp)     = PList $ map erasePattern alp
 erasePattern (APPlus _ s p t)   = PPlus s (erasePattern p) (erase t)

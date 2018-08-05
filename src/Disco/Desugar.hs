@@ -424,7 +424,6 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
         go (APString s)      = go (APList (TyList TyC) (map APChar s))
         go (APTup _ p)       = desugarTuplePats p
         go (APInj ty s p)    = DPInj ty s <$> go p
-        go (APSucc p)        = DPSucc <$> go p
         go (APCons ty p1 p2) = DPCons ty <$> go p1 <*> go p2
         go (APList ty ps)    = desugarListPat ps
           where

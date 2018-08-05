@@ -69,7 +69,6 @@ module Disco.AST.Typed
        , pattern APNat
        , pattern APChar
        , pattern APString
-       , pattern APSucc
        , pattern APCons
        , pattern APList
        , pattern APPlus
@@ -263,7 +262,6 @@ type instance X_PString  TY = ()
 type instance X_PTup     TY = Embed Type
 type instance X_PInj     TY = Embed Type
 type instance X_PNat     TY = Embed Type
-type instance X_PSucc    TY = ()
 type instance X_PCons    TY = Embed Type
 type instance X_PList    TY = Embed Type
 type instance X_PPlus    TY = Embed Type
@@ -307,9 +305,6 @@ pattern APNat ty n <- PNat_ (unembed -> ty) n
   where
     APNat ty n = PNat_ (embed ty) n
 
-pattern APSucc :: APattern -> APattern
-pattern APSucc p = PSucc_ () p
-
 pattern APCons :: Type -> APattern -> APattern -> APattern
 pattern APCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
   where
@@ -326,7 +321,7 @@ pattern APPlus ty s p t <- PPlus_ (unembed -> ty) s p t
     APPlus ty s p t = PPlus_ (embed ty) s p t
 
 {-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APString,
-    APTup, APInj, APNat, APSucc, APCons, APList, APPlus #-}
+    APTup, APInj, APNat, APCons, APList, APPlus #-}
 
 ------------------------------------------------------------
 -- getType
@@ -383,7 +378,6 @@ instance HasType APattern where
   getType (APTup ty _)      = ty
   getType (APInj ty _ _)    = ty
   getType (APNat ty _)      = ty
-  getType (APSucc _)        = TyN
   getType (APCons ty _ _)   = ty
   getType (APList ty _)     = ty
   getType (APPlus ty _ _ _) = ty

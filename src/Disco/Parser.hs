@@ -571,9 +571,6 @@ checkPattern (TString s) = Just $ PString s
 checkPattern (TTup ts)   = PTup <$> mapM checkPattern ts
 checkPattern (TInj s t)  = PInj s <$> checkPattern t
 
-checkPattern (TApp (TVar s) t)
-  | s == string2Name "S" = PSucc <$> checkPattern t
-
 checkPattern (TBin Cons t1 t2)
   = PCons <$> checkPattern t1 <*> checkPattern t2
 

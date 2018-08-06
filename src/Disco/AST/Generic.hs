@@ -113,7 +113,8 @@ module Disco.AST.Generic
        , X_PString
        , X_PCons
        , X_PList
-       , X_PPlus
+       , X_PAdd
+       , X_PMul
        , X_Pattern
        , ForallPattern
 
@@ -472,7 +473,8 @@ type family X_PChar e
 type family X_PString e
 type family X_PCons e
 type family X_PList e
-type family X_PPlus e
+type family X_PAdd e
+type family X_PMul e
 type family X_Pattern e
 
 -- | Patterns.
@@ -512,7 +514,10 @@ data Pattern_ e where
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
 
   -- | Addition pattern, @p + t@ or @t + p@
-  PPlus_ :: X_PPlus e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
+  PAdd_  :: X_PAdd e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
+
+  -- | Multiplication pattern, @p * t@ or @t * p@
+  PMul_  :: X_PMul e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
 
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e
@@ -531,7 +536,8 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PInj e)
         , a (X_PCons e)
         , a (X_PList e)
-        , a (X_PPlus e)
+        , a (X_PAdd e)
+        , a (X_PMul e)
         , a (X_Pattern e)
         , a (Term_ e)
         )

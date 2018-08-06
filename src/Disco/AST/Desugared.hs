@@ -201,7 +201,8 @@ type instance X_PInj     DS = Void
 type instance X_PNat     DS = Embed Type
 type instance X_PCons    DS = Void
 type instance X_PList    DS = Void
-type instance X_PPlus    DS = Void
+type instance X_PAdd     DS = Void
+type instance X_PMul     DS = Void
 
 -- In the desugared language, constructor patterns (DPPair, DPInj,
 -- DPCons) can only contain variables, not nested patterns.  This

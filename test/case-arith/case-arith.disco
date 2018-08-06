@@ -13,3 +13,8 @@ f3 y             = 0
 f4 : N*Z -> N*Z + N*Z
 f4 (x+1,y+2) = left (x,y)
 f4 (x,  y+2) = right (x,y)
+
+h : N -> N
+h(0)    = 1
+h(2k+1) = h(k)
+h(2k+2) = h(k+1) + h(k)

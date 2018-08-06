@@ -11,3 +11,13 @@ f3 4
 
 f4 (2,1)
 f4 (0,1)
+
+h(0)
+h(1)
+h(10)
+h(22)
+h(29360127)
+
+{? x when 5/3 is 2x+1, 200 otherwise ?}
+{? x when 2/3 is 2x+1, 200 otherwise ?}
+{? x when (2/3 : Q) is 2x+1, 200 otherwise ?}

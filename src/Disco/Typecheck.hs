@@ -932,11 +932,17 @@ checkPattern p@(PList ps) ty = do
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
 
-checkPattern (PPlus s p t) ty = do
+checkPattern (PAdd s p t) ty = do
   constraint $ CQual QNum ty
   (ctx, apt) <- checkPattern p ty
   at <- check t ty
-  return (ctx, APPlus ty s apt at)
+  return (ctx, APAdd ty s apt at)
+
+checkPattern (PMul s p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APMul ty s apt at)
 
 checkPattern p ty = throwError (PatternType p ty)
 

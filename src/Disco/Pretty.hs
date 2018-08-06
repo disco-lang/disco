@@ -311,8 +311,10 @@ prettyPattern (PCons p1 p2) = prettyPattern p1 <+> text "::" <+> prettyPattern p
 prettyPattern (PList ps) = do
   ds <- punctuate (text ",") (map prettyPattern ps)
   brackets (hsep ds)
-prettyPattern (PPlus L p t) = prettyPattern p <+> text "+" <+> prettyTerm t
-prettyPattern (PPlus R p t) = prettyTerm t <+> text "+" <+> prettyPattern p
+prettyPattern (PAdd L p t) = prettyPattern p <+> text "+" <+> prettyTerm t
+prettyPattern (PAdd R p t) = prettyTerm t <+> text "+" <+> prettyPattern p
+prettyPattern (PMul L p t) = prettyPattern p <+> text "*" <+> prettyTerm t
+prettyPattern (PMul R p t) = prettyTerm t <+> text "*" <+> prettyPattern p
 
 ------------------------------------------------------------
 

@@ -78,12 +78,19 @@ infixl 6 -.
 (-.) :: ATerm -> ATerm -> ATerm
 at1 -. at2 = ATBin (getType at1) Sub at1 at2
 
+infixl 7 /.
+(/.) :: ATerm -> ATerm -> ATerm
+at1 /. at2 = ATBin (getType at1) Div at1 at2
+
 infix 4 <., >=.
 (<.) :: ATerm -> ATerm -> ATerm
 (<.) = ATBin TyBool Lt
 
 (>=.) :: ATerm -> ATerm -> ATerm
 (>=.) = ATBin TyBool Geq
+
+(|.) :: ATerm -> ATerm -> ATerm
+(|.) = ATBin TyBool Divides
 
 infix 4 ==.
 (==.) :: ATerm -> ATerm -> ATerm
@@ -469,10 +476,17 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
 
     -- when dt is (p + t) ==> when dt is x0; let v = t; [if x0 >= v]; when x0-v is p
-    desugarMatch dt (APPlus ty _ p t) = arithBinMatch posRestrict (-.) dt ty p t
+    desugarMatch dt (APAdd ty _ p t) = arithBinMatch posRestrict (-.) dt ty p t
       where
         posRestrict plusty
           | plusty `elem` [TyN, TyF] = Just (>=.)
+          | otherwise                = Nothing
+
+    -- when dt is (p * t) ==> when dt is x0; let v = t; [if v divides x0]; when x0 / v is p
+    desugarMatch dt (APMul ty _ p t) = arithBinMatch intRestrict (/.) dt ty p t
+      where
+        intRestrict plusty
+          | plusty `elem` [TyN, TyZ] = Just (flip (|.))
           | otherwise                = Nothing
 
     mkMatch :: DTerm -> DPattern -> DSM [DGuard]

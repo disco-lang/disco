@@ -71,7 +71,8 @@ module Disco.AST.Typed
        , pattern APString
        , pattern APCons
        , pattern APList
-       , pattern APPlus
+       , pattern APAdd
+       , pattern APMul
 
        , pattern ABinding
          -- * Utilities
@@ -264,7 +265,8 @@ type instance X_PInj     TY = Embed Type
 type instance X_PNat     TY = Embed Type
 type instance X_PCons    TY = Embed Type
 type instance X_PList    TY = Embed Type
-type instance X_PPlus    TY = Embed Type
+type instance X_PAdd     TY = Embed Type
+type instance X_PMul     TY = Embed Type
 
 type instance X_Pattern  TY = ()
 
@@ -315,13 +317,18 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   where
     APList ty lp = PList_ (embed ty) lp
 
-pattern APPlus :: Type -> Side -> APattern -> ATerm -> APattern
-pattern APPlus ty s p t <- PPlus_ (unembed -> ty) s p t
+pattern APAdd :: Type -> Side -> APattern -> ATerm -> APattern
+pattern APAdd ty s p t <- PAdd_ (unembed -> ty) s p t
   where
-    APPlus ty s p t = PPlus_ (embed ty) s p t
+    APAdd ty s p t = PAdd_ (embed ty) s p t
+
+pattern APMul :: Type -> Side -> APattern -> ATerm -> APattern
+pattern APMul ty s p t <- PMul_ (unembed -> ty) s p t
+  where
+    APMul ty s p t = PMul_ (embed ty) s p t
 
 {-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APString,
-    APTup, APInj, APNat, APCons, APList, APPlus #-}
+    APTup, APInj, APNat, APCons, APList, APAdd, APMul #-}
 
 ------------------------------------------------------------
 -- getType
@@ -369,18 +376,19 @@ instance HasType ATerm where
   setType ty (ATCase _ x     )       = ATCase ty x
 
 instance HasType APattern where
-  getType (APVar ty _)      = ty
-  getType (APWild ty)       = ty
-  getType APUnit            = TyUnit
-  getType (APBool _)        = TyBool
-  getType (APChar _)        = TyC
-  getType (APString _)      = TyList TyC
-  getType (APTup ty _)      = ty
-  getType (APInj ty _ _)    = ty
-  getType (APNat ty _)      = ty
-  getType (APCons ty _ _)   = ty
-  getType (APList ty _)     = ty
-  getType (APPlus ty _ _ _) = ty
+  getType (APVar ty _)     = ty
+  getType (APWild ty)      = ty
+  getType APUnit           = TyUnit
+  getType (APBool _)       = TyBool
+  getType (APChar _)       = TyC
+  getType (APString _)     = TyList TyC
+  getType (APTup ty _)     = ty
+  getType (APInj ty _ _)   = ty
+  getType (APNat ty _)     = ty
+  getType (APCons ty _ _)  = ty
+  getType (APList ty _)    = ty
+  getType (APAdd ty _ _ _) = ty
+  getType (APMul ty _ _ _) = ty
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind

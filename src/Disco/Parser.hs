@@ -579,14 +579,28 @@ checkPattern (TBin Add t1 t2)
       (Just p, _)
         |  length (toListOf fvAny p) == 1
         && length (toListOf fvAny t2) == 0
-        -> Just $ PPlus L p t2
+        -> Just $ PAdd L p t2
       (_, Just p)
         |  length (toListOf fvAny p) == 1
         && length (toListOf fvAny t1) == 0
-        -> Just $ PPlus R p t1
+        -> Just $ PAdd R p t1
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
-      -- this can be a PPlus L.  Also vice versa for PPlus R.
+      -- this can be a PAdd L.  Also vice versa for PAdd R.
+
+checkPattern (TBin Mul t1 t2)
+  = case (checkPattern t1, checkPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PMul L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PMul R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PMul L.  Also vice versa for PMul R.
 
 checkPattern (TContainer ListContainer ts Nothing)
   = PList <$> mapM checkPattern ts

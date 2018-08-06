@@ -74,9 +74,12 @@ infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
 (||.) = ATBin TyBool Or
 
-infixl 6 -.
+infixl 6 -., +.
 (-.) :: ATerm -> ATerm -> ATerm
 at1 -. at2 = ATBin (getType at1) Sub at1 at2
+
+(+.) :: ATerm -> ATerm -> ATerm
+at1 +. at2 = ATBin (getType at1) Add at1 at2
 
 infixl 7 /.
 (/.) :: ATerm -> ATerm -> ATerm
@@ -488,6 +491,9 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         intRestrict plusty
           | plusty `elem` [TyN, TyZ] = Just (flip (|.))
           | otherwise                = Nothing
+
+    -- when dt is (p - t) ==> when dt is x0; let v = t; when x0 + v is p
+    desugarMatch dt (APSub ty p t) = arithBinMatch (const Nothing) (+.) dt ty p t
 
     mkMatch :: DTerm -> DPattern -> DSM [DGuard]
     mkMatch dt dp = return [DGPat (embed dt) dp]

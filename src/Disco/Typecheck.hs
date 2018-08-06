@@ -944,6 +944,12 @@ checkPattern (PMul s p t) ty = do
   at <- check t ty
   return (ctx, APMul ty s apt at)
 
+checkPattern (PSub p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APSub ty apt at)
+
 checkPattern p ty = throwError (PatternType p ty)
 
 ------------------------------------------------------------

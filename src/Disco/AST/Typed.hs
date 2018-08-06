@@ -73,6 +73,7 @@ module Disco.AST.Typed
        , pattern APList
        , pattern APAdd
        , pattern APMul
+       , pattern APSub
 
        , pattern ABinding
          -- * Utilities
@@ -267,6 +268,7 @@ type instance X_PCons    TY = Embed Type
 type instance X_PList    TY = Embed Type
 type instance X_PAdd     TY = Embed Type
 type instance X_PMul     TY = Embed Type
+type instance X_PSub     TY = Embed Type
 
 type instance X_Pattern  TY = ()
 
@@ -327,8 +329,13 @@ pattern APMul ty s p t <- PMul_ (unembed -> ty) s p t
   where
     APMul ty s p t = PMul_ (embed ty) s p t
 
+pattern APSub :: Type -> APattern -> ATerm -> APattern
+pattern APSub ty p t <- PSub_ (unembed -> ty) p t
+  where
+    APSub ty p t = PSub_ (embed ty) p t
+
 {-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APString,
-    APTup, APInj, APNat, APCons, APList, APAdd, APMul #-}
+    APTup, APInj, APNat, APCons, APList, APAdd, APMul, APSub #-}
 
 ------------------------------------------------------------
 -- getType
@@ -389,6 +396,7 @@ instance HasType APattern where
   getType (APList ty _)    = ty
   getType (APAdd ty _ _ _) = ty
   getType (APMul ty _ _ _) = ty
+  getType (APSub ty _ _)   = ty
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind

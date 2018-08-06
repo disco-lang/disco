@@ -21,3 +21,8 @@ h(29360127)
 {? x when 5/3 is 2x+1, 200 otherwise ?}
 {? x when 2/3 is 2x+1, 200 otherwise ?}
 {? x when (2/3 : Q) is 2x+1, 200 otherwise ?}
+
+f5(3)
+f5(4)
+f5(5)
+f5(6)

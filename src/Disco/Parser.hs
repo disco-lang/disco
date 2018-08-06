@@ -602,6 +602,20 @@ checkPattern (TBin Mul t1 t2)
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
       -- this can be a PMul L.  Also vice versa for PMul R.
 
+checkPattern (TBin Sub t1 t2)
+  = case checkPattern t1 of
+      Just p
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PSub p t2
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PSub.
+
+      -- For now we don't handle the case of t - p, since it seems
+      -- less useful (and desugaring it would require extra code since
+      -- subtraction is not commutative).
+
 checkPattern (TContainer ListContainer ts Nothing)
   = PList <$> mapM checkPattern ts
 

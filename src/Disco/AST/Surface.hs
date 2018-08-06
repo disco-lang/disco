@@ -95,6 +95,7 @@ module Disco.AST.Surface
        , pattern PList
        , pattern PAdd
        , pattern PMul
+       , pattern PSub
 
        , pattern Binding
        )
@@ -342,6 +343,7 @@ type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
 type instance X_PAdd UD    = ()
 type instance X_PMul UD    = ()
+type instance X_PSub UD    = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -383,5 +385,8 @@ pattern PAdd s p t = PAdd_ () s p t
 pattern PMul :: Side -> Pattern -> Term -> Pattern
 pattern PMul s p t = PMul_ () s p t
 
+pattern PSub :: Pattern -> Term -> Pattern
+pattern PSub p t = PSub_ () p t
+
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PCons, PList, PAdd, PMul #-}
+             PChar, PString, PCons, PList, PAdd, PMul, PSub #-}

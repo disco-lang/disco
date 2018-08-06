@@ -4,6 +4,7 @@
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
 
@@ -403,9 +404,10 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
       dt <- desugarTerm at
       desugarMatch dt p
 
+    -- XXX comment me
     desugarMatch :: DTerm -> APattern -> DSM [DGuard]
     desugarMatch dt (APVar ty x) = mkMatch dt (DPVar ty (coerce x))
-    desugarMatch dt (APWild ty)  = mkMatch dt (DPWild ty)
+    desugarMatch dt (APWild ty)  = return []
     desugarMatch dt APUnit       = mkMatch dt DPUnit
     desugarMatch dt (APBool b)   = mkMatch dt (DPBool b)
     desugarMatch dt (APNat ty n) = mkMatch dt (DPNat ty n)
@@ -417,31 +419,30 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
         desugarTuplePats _ _  [] = error "Impossible! desugarTuplePats []"
         desugarTuplePats _ t [p] = desugarMatch t p
         desugarTuplePats ty@(TyPair ty1 ty2) t (p:ps) = do
-          x1 <- fresh (string2Name "x")
+          (x1,gs1) <- varForPat p
+
+          -- XXX TODO: optimize
           x2 <- fresh (string2Name "x")
           fmap concat . sequence $
             [ mkMatch t $ DPPair ty x1 x2
-            , desugarMatch (DTVar ty1 x1) p
+            , return gs1
             , desugarTuplePats ty2 (DTVar ty2 x2) ps
             ]
         desugarTuplePats ty t (p:ps)
           = error $ "Impossible! desugarTuplePats with non-pair type " ++ show ty
 
     desugarMatch dt (APInj ty s p) = do
-      x <- fresh (string2Name "x")
+      (x,gs) <- varForPat p
       fmap concat . sequence $
         [ mkMatch dt $ DPInj ty s x
-        , desugarMatch (DTVar (getType p) x) p
+        , return gs
         ]
 
     desugarMatch dt (APCons ty p1 p2) = do
-      x1 <- fresh (string2Name "x")
-      x2 <- fresh (string2Name "x")
+      (x1, gs1) <- varForPat p1
+      (x2, gs2) <- varForPat p2
       fmap concat . sequence $
-        [ mkMatch dt $ DPCons ty x1 x2
-        , desugarMatch (DTVar (getType p1) x1) p1
-        , desugarMatch (DTVar (getType p2) x2) p2
-        ]
+        [ mkMatch dt $ DPCons ty x1 x2, return gs1, return gs2 ]
 
     desugarMatch dt (APList ty []) = mkMatch dt (DPNil ty)
     desugarMatch dt (APList ty ps) =
@@ -449,14 +450,11 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
 
     -- when dt is (p + t) ==> when dt is x0; let v = t; [if x0 >= v]; when x0-v is p
     desugarMatch dt (APPlus ty _ p t) = do
-      x0 <- fresh (string2Name "x")
-      v  <- fresh (string2Name "v")
-
-      g1 <- varMatch dt x0
+      (x0, g1) <- varFor dt
 
       -- let v = t
       t' <- desugarTerm t
-      g2 <- varMatch t' v
+      (v, g2) <- varFor t'
 
       g3 <- case (ty `elem` [TyN, TyF]) of
         False -> return []
@@ -475,6 +473,20 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
 
     varMatch :: DTerm -> Name DTerm -> DSM [DGuard]
     varMatch dt x = mkMatch dt (DPVar (getType dt) x)
+
+    varFor :: DTerm -> DSM (Name DTerm, [DGuard])
+    varFor (DTVar _ x) = return (x, [])
+    varFor dt          = do
+      x <- fresh (string2Name "x")
+      g <- varMatch dt x
+      return (x, g)
+
+    varForPat :: APattern -> DSM (Name DTerm, [DGuard])
+    varForPat (APVar _ x) = return (coerce x, [])
+    varForPat p           = do
+      x <- fresh (string2Name "x")
+      (x,) <$> desugarMatch (DTVar (getType p) x) p
+
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm

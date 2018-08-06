@@ -420,13 +420,15 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
         desugarTuplePats _ t [p] = desugarMatch t p
         desugarTuplePats ty@(TyPair ty1 ty2) t (p:ps) = do
           (x1,gs1) <- varForPat p
-
-          -- XXX TODO: optimize
-          x2 <- fresh (string2Name "x")
+          (x2,gs2) <- case ps of
+            [APVar _ px2] -> return (coerce px2, [])
+            _             -> do
+              x <- fresh (string2Name "x")
+              (x,) <$> desugarTuplePats ty2 (DTVar ty2 x) ps
           fmap concat . sequence $
             [ mkMatch t $ DPPair ty x1 x2
             , return gs1
-            , desugarTuplePats ty2 (DTVar ty2 x2) ps
+            , return gs2
             ]
         desugarTuplePats ty t (p:ps)
           = error $ "Impossible! desugarTuplePats with non-pair type " ++ show ty

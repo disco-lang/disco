@@ -384,7 +384,7 @@ desugarBranch b = do
 --   Pattern guards essentially remain as they are; boolean guards get
 --   turned into pattern guards which match against @true@.
 desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
-desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope gs)
+desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   where
     desugarGuard :: AGuard -> DSM [DGuard]
 
@@ -404,21 +404,39 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
       dt <- desugarTerm at
       desugarMatch dt p
 
-    -- XXX comment me
+    -- Desugar a guard of the form 'when dt is p'.  An entire match is
+    -- the right unit to desugar --- as opposed to, say, writing a
+    -- function to desugar a pattern --- since a match may desugar to
+    -- multiple matches, and on recursive calls we need to know what
+    -- term/variable should be bound to the pattern.
+    --
+    -- A match may desugar to multiple matches for two reasons:
+    --
+    --   1. Nested patterns 'explode' into a 'telescope' matching one
+    --   constructor at a time, for example, 'when t is (x,y,3)'
+    --   becomes 'when t is (x,x0) when x0 is (y,x1) when x1 is 3'.
+    --   This makes the order of matching explicit and enables lazy
+    --   matching without requiring special support from the
+    --   interpreter other than WHNF reduction.
+    --
+    --   2. Matches against arithmetic patterns desugar to a
+    --   combination of matching, computation, and boolean checks.
+    --   For example, 'when t is (y+1)' becomes 'when t is x0 if x0 >=
+    --   1 let y = x0-1'.
     desugarMatch :: DTerm -> APattern -> DSM [DGuard]
-    desugarMatch dt (APVar ty x) = mkMatch dt (DPVar ty (coerce x))
-    desugarMatch dt (APWild ty)  = return []
-    desugarMatch dt APUnit       = mkMatch dt DPUnit
-    desugarMatch dt (APBool b)   = mkMatch dt (DPBool b)
-    desugarMatch dt (APNat ty n) = mkMatch dt (DPNat ty n)
-    desugarMatch dt (APChar c)   = mkMatch dt (DPChar c)
-    desugarMatch dt (APString s) = desugarMatch dt (APList (TyList TyC) (map APChar s))
-    desugarMatch dt (APTup ty p) = desugarTuplePats ty dt p
+    desugarMatch dt (APVar ty x)      = mkMatch dt (DPVar ty (coerce x))
+    desugarMatch _  (APWild _)        = return []
+    desugarMatch dt APUnit            = mkMatch dt DPUnit
+    desugarMatch dt (APBool b)        = mkMatch dt (DPBool b)
+    desugarMatch dt (APNat ty n)      = mkMatch dt (DPNat ty n)
+    desugarMatch dt (APChar c)        = mkMatch dt (DPChar c)
+    desugarMatch dt (APString s)      = desugarMatch dt (APList (TyList TyC) (map APChar s))
+    desugarMatch dt (APTup tupTy pat) = desugarTuplePats tupTy dt pat
       where
         desugarTuplePats :: Type -> DTerm -> [APattern] -> DSM [DGuard]
         desugarTuplePats _ _  [] = error "Impossible! desugarTuplePats []"
         desugarTuplePats _ t [p] = desugarMatch t p
-        desugarTuplePats ty@(TyPair ty1 ty2) t (p:ps) = do
+        desugarTuplePats ty@(TyPair _ ty2) t (p:ps) = do
           (x1,gs1) <- varForPat p
           (x2,gs2) <- case ps of
             [APVar _ px2] -> return (coerce px2, [])
@@ -430,7 +448,7 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
             , return gs1
             , return gs2
             ]
-        desugarTuplePats ty t (p:ps)
+        desugarTuplePats ty _ _
           = error $ "Impossible! desugarTuplePats with non-pair type " ++ show ty
 
     desugarMatch dt (APInj ty s p) = do
@@ -451,24 +469,11 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
       desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
 
     -- when dt is (p + t) ==> when dt is x0; let v = t; [if x0 >= v]; when x0-v is p
-    desugarMatch dt (APPlus ty _ p t) = do
-      (x0, g1) <- varFor dt
-
-      -- let v = t
-      t' <- desugarTerm t
-      (v, g2) <- varFor t'
-
-      g3 <- case (ty `elem` [TyN, TyF]) of
-        False -> return []
-
-        -- if x0 >= v
-        True  -> desugarGuard $ AGBool (embed (ATVar ty (coerce x0) >=. ATVar (getType t) (coerce v)))
-
-      -- when x0-v is p
-      sub <- desugarTerm (ATVar ty (coerce x0) -. ATVar (getType t) (coerce v))
-      g4  <- desugarMatch sub p
-
-      return (g1 ++ g2 ++ g3 ++ g4)
+    desugarMatch dt (APPlus ty _ p t) = arithBinMatch posRestrict (-.) dt ty p t
+      where
+        posRestrict plusty
+          | plusty `elem` [TyN, TyF] = Just (>=.)
+          | otherwise                = Nothing
 
     mkMatch :: DTerm -> DPattern -> DSM [DGuard]
     mkMatch dt dp = return [DGPat (embed dt) dp]
@@ -489,6 +494,30 @@ desugarGuards gs = (toTelescope . concat) <$> mapM desugarGuard (fromTelescope g
       x <- fresh (string2Name "x")
       (x,) <$> desugarMatch (DTVar (getType p) x) p
 
+    arithBinMatch
+      :: (Type -> Maybe (ATerm -> ATerm -> ATerm))
+      -> (ATerm -> ATerm -> ATerm)
+      -> DTerm -> Type -> APattern -> ATerm -> DSM [DGuard]
+    arithBinMatch restrict inverse dt ty p t = do
+      (x0, g1) <- varFor dt
+
+      -- let v = t
+      t' <- desugarTerm t
+      (v, g2) <- varFor t'
+
+      g3 <- case restrict ty of
+        Nothing -> return []
+
+        -- if x0 `cmp` v
+        Just cmp ->
+          desugarGuard $
+            AGBool (embed (ATVar ty (coerce x0) `cmp` ATVar (getType t) (coerce v)))
+
+      -- when x0 `inverse` v is p
+      inv <- desugarTerm (ATVar ty (coerce x0) `inverse` ATVar (getType t) (coerce v))
+      g4  <- desugarMatch inv p
+
+      return (g1 ++ g2 ++ g3 ++ g4)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm

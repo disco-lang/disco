@@ -408,18 +408,6 @@ match v (CPNat n)     = do
     False -> noMatch
     True  -> ok
 
--- | Lazily match a list of values against a list of patterns
---   pairwise, returning @Nothing@ as soon as one match fails, and
---   returning an environment of bindings if all succeed.
-matchPatterns :: [Value] -> [CPattern] -> Disco IErr (Maybe Env)
-matchPatterns []     _      = return (Just emptyCtx)
-matchPatterns (v:vs) (p:ps) = do
-  res <- match v p
-  case res of
-    Nothing -> noMatch
-    Just e  -> (fmap.fmap) (joinCtx e) $ matchPatterns vs ps
-matchPatterns _ _ = error "Different number of values and patterns in matchPatterns!"
-
 -- | Convenience function: successfully match with no bindings.
 ok :: Disco e (Maybe Env)
 ok = return $ Just M.empty

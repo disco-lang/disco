@@ -495,6 +495,21 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     -- when dt is (p - t) ==> when dt is x0; let v = t; when x0 + v is p
     desugarMatch dt (APSub ty p t) = arithBinMatch (const Nothing) (+.) dt ty p t
 
+    -- when dt is (-p) ==> when dt is x0; if x0 < 0; when -x0 is p
+    desugarMatch dt (APNeg ty p) = do
+
+      -- when dt is x0
+      (x0, g1) <- varFor dt
+
+      -- if x0 < 0
+      g2  <- desugarGuard $ AGBool (embed (ATVar ty (coerce x0) <. ATNat ty 0))
+
+      -- when -x0 is p
+      neg <- desugarTerm $ ATUn ty Neg (ATVar ty (coerce x0))
+      g3  <- desugarMatch neg p
+
+      return (g1 ++ g2 ++ g3)
+
     mkMatch :: DTerm -> DPattern -> DSM [DGuard]
     mkMatch dt dp = return [DGPat (embed dt) dp]
 

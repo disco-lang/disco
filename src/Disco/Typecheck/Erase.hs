@@ -66,6 +66,7 @@ erasePattern (APList _ alp)     = PList $ map erasePattern alp
 erasePattern (APAdd _ s p t)    = PAdd s (erasePattern p) (erase t)
 erasePattern (APMul _ s p t)    = PMul s (erasePattern p) (erase t)
 erasePattern (APSub _ p t)      = PSub (erasePattern p) (erase t)
+erasePattern (APNeg _ p)        = PNeg (erasePattern p)
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)

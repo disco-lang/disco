@@ -22,3 +22,8 @@ h(2k+2) = h(k+1) + h(k)
 f5 : N -> N
 f5 (2x)   = x
 f5 (2x-1) = x
+
+!!! forall x:Z. Zabs(x) >= 0
+Zabs : Z -> Z
+Zabs (-x) = x
+Zabs x    = x

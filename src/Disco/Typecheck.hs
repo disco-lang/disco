@@ -950,6 +950,11 @@ checkPattern (PSub p t) ty = do
   at <- check t ty
   return (ctx, APSub ty apt at)
 
+checkPattern (PNeg p) ty = do
+  constraint $ CQual QSub ty
+  (ctx, apt) <- checkPattern p ty
+  return (ctx, APNeg ty apt)
+
 checkPattern p ty = throwError (PatternType p ty)
 
 ------------------------------------------------------------

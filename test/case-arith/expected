@@ -1,4 +1,6 @@
 Loading test/case-arith/case-arith.disco...
+Running tests...
+  Zabs: OK
 Loaded.
 0
 1
@@ -22,3 +24,6 @@ right (0, -1)
 2
 3
 3
+17
+17
+0

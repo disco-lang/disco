@@ -616,6 +616,8 @@ checkPattern (TBin Sub t1 t2)
       -- less useful (and desugaring it would require extra code since
       -- subtraction is not commutative).
 
+checkPattern (TUn Neg t) = PNeg <$> checkPattern t
+
 checkPattern (TContainer ListContainer ts Nothing)
   = PList <$> mapM checkPattern ts
 

@@ -316,6 +316,7 @@ prettyPattern (PAdd R p t) = prettyTerm t <+> text "+" <+> prettyPattern p
 prettyPattern (PMul L p t) = prettyPattern p <+> text "*" <+> prettyTerm t
 prettyPattern (PMul R p t) = prettyTerm t <+> text "*" <+> prettyPattern p
 prettyPattern (PSub p t)   = prettyPattern p <+> text "-" <+> prettyTerm t
+prettyPattern (PNeg p)     = text "-" <> prettyPattern p
 
 ------------------------------------------------------------
 

@@ -30,3 +30,12 @@ f5(6)
 Zabs(17)
 Zabs(-17)
 Zabs(0)
+
+inorder 3 cwTree
+
+numerator 5
+denominator 5
+numerator (2/5)
+numerator (2/(-5))
+denominator (2/5)
+denominator (2/(-5))

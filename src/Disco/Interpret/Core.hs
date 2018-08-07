@@ -407,6 +407,11 @@ match v (CPNat n)     = do
   case m == n % 1 of
     False -> noMatch
     True  -> ok
+match v (CPFrac x y) = do
+  VNum _ r <- whnfV v
+  return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
+                               , (y, vnum (denominator r % 1))
+                               ]
 
 -- | Convenience function: successfully match with no bindings.
 ok :: Disco e (Maybe Env)

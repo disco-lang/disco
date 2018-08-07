@@ -952,8 +952,17 @@ checkPattern (PSub p t) ty = do
 
 checkPattern (PNeg p) ty = do
   constraint $ CQual QSub ty
-  (ctx, apt) <- checkPattern p ty
+  tyInner <- cPos ty
+  (ctx, apt) <- checkPattern p tyInner
   return (ctx, APNeg ty apt)
+
+checkPattern (PFrac p q) ty = do
+  constraint $ CQual QDiv ty
+  tyP <- cInt ty
+  tyQ <- cPos tyP
+  (ctx1, ap1) <- checkPattern p tyP
+  (ctx2, ap2) <- checkPattern q tyQ
+  return (joinCtx ctx1 ctx2, APFrac ty ap1 ap2)
 
 checkPattern p ty = throwError (PatternType p ty)
 

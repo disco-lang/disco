@@ -175,6 +175,9 @@ data CPattern where
   -- | A natural number pattern.
   CPNat  :: Integer -> CPattern
 
+  -- | A fraction pattern, @x/y@.
+  CPFrac :: Name Core -> Name Core -> CPattern
+
   deriving (Show, Generic)
 
 instance Alpha RationalDisplay

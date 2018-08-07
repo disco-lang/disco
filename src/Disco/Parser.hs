@@ -616,6 +616,9 @@ checkPattern (TBin Sub t1 t2)
       -- less useful (and desugaring it would require extra code since
       -- subtraction is not commutative).
 
+checkPattern (TBin Div t1 t2)
+  = PFrac <$> checkPattern t1 <*> checkPattern t2
+
 checkPattern (TUn Neg t) = PNeg <$> checkPattern t
 
 checkPattern (TContainer ListContainer ts Nothing)

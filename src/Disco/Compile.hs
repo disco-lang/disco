@@ -150,6 +150,7 @@ compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
 compilePattern (DPPair _ x1 x2) = CPCons 0 (map coerce [x1,x2])
 compilePattern (DPInj _ s x)    = CPCons (fromEnum s) [coerce x]
 compilePattern (DPNat _ n)      = CPNat n
+compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
 compilePattern (DPNil _)        = CPCons 0 []
 compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
 

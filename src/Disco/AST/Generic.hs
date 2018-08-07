@@ -117,6 +117,7 @@ module Disco.AST.Generic
        , X_PMul
        , X_PSub
        , X_PNeg
+       , X_PFrac
        , X_Pattern
        , ForallPattern
 
@@ -479,6 +480,7 @@ type family X_PAdd e
 type family X_PMul e
 type family X_PSub e
 type family X_PNeg e
+type family X_PFrac e
 type family X_Pattern e
 
 -- | Patterns.
@@ -529,6 +531,9 @@ data Pattern_ e where
   -- | Negation pattern, @-p@
   PNeg_  :: X_PNeg e -> Pattern_ e -> Pattern_ e
 
+  -- | Fraction pattern, @p1/p2@
+  PFrac_ :: X_PFrac e -> Pattern_ e -> Pattern_ e -> Pattern_ e
+
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e
 
@@ -550,6 +555,7 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PMul e)
         , a (X_PSub e)
         , a (X_PNeg e)
+        , a (X_PFrac e)
         , a (X_Pattern e)
         , a (Term_ e)
         )

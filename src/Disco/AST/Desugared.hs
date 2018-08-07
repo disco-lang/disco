@@ -54,6 +54,7 @@ module Disco.AST.Desugared
        , pattern DPPair
        , pattern DPInj
        , pattern DPNat
+       , pattern DPFrac
        , pattern DPCons
        , pattern DPNil
 
@@ -205,6 +206,7 @@ type instance X_PAdd     DS = Void
 type instance X_PMul     DS = Void
 type instance X_PSub     DS = Void
 type instance X_PNeg     DS = Void
+type instance X_PFrac    DS = Void
 
 -- In the desugared language, constructor patterns (DPPair, DPInj,
 -- DPCons) can only contain variables, not nested patterns.  This
@@ -219,7 +221,10 @@ type instance X_Pattern  DS =
       (Embed Type, Side, Name DTerm)         -- DPInj
       (Either
         (Embed Type, Name DTerm, Name DTerm) -- DPCons
-        (Embed Type)                         -- DNil
+        (Either
+          (Embed Type, Name DTerm, Name DTerm) -- DPFrac
+          (Embed Type)                         -- DNil
+        )
       )
     )
 
@@ -262,13 +267,18 @@ pattern DPCons ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2)
   where
     DPCons ty x1 x2 = XPattern_ (Right (Right (Left (embed ty, x1, x2))))
 
-pattern DPNil :: Type -> DPattern
-pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
+pattern DPFrac :: Type -> Name DTerm -> Name DTerm -> DPattern
+pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (Right (Left (unembed -> ty, x1, x2)))))
   where
-    DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
+    DPFrac ty x1 x2 = XPattern_ (Right (Right (Right (Left (embed ty, x1, x2)))))
+
+pattern DPNil :: Type -> DPattern
+pattern DPNil ty <- XPattern_ (Right (Right (Right (Right (unembed -> ty)))))
+  where
+    DPNil ty = XPattern_ (Right (Right (Right (Right (embed ty)))))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
-    DPNat, DPNil, DPCons #-}
+    DPNat, DPFrac, DPNil, DPCons #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void

@@ -23,7 +23,33 @@ f5 : N -> N
 f5 (2x)   = x
 f5 (2x-1) = x
 
+f6 : Q -> Bool
+f6 (-2/3) = True
+f6 _      = False
+
 !!! forall x:Z. Zabs(x) >= 0
 Zabs : Z -> Z
 Zabs (-x) = x
 Zabs x    = x
+
+type Tree = F * Tree * Tree
+
+expandTree : F -> Tree
+expandTree (a/b) = (a/b, expandTree (a/(a+b)), expandTree ((a+b)/b))
+
+cwTree : Tree
+cwTree = expandTree 1
+
+append : List a -> List a -> List a
+append []      ys = ys
+append (x::xs) ys = x :: append xs ys
+
+inorder : N -> Tree -> List F
+inorder 0     (x,_,_) = [x]
+inorder (n+1) (x,l,r) = append (inorder n l) (x :: inorder n r)
+
+numerator : Q -> Z
+numerator (p/q) = p
+
+denominator : Q -> N
+denominator (p/q) = q

@@ -219,7 +219,7 @@ recCheckMod directory inProcess modName  = do
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule directory modName
-      io . putStrLn $ "Loading " ++ file ++ "..."
+      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       str <- io $ readFile file
       let mp = runParser wholeModule file str
       case mp of

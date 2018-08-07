@@ -20,8 +20,7 @@
 module Disco.Typecheck where
 
 import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (use, (%~), (&), _1)
-import qualified Control.Lens                            as Lens
+import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
 import           Control.Monad.RWS
 import           Data.Bifunctor                          (first, second)

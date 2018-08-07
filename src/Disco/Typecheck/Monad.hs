@@ -22,12 +22,9 @@ import           GHC.Generics                     (Generic)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Control.Lens                     (makeLenses, use, (%=), (%~))
+import           Control.Lens                     (makeLenses)
 import           Control.Monad.Except
 import           Control.Monad.RWS
-import           Data.Bifunctor                   (second)
-import           Data.Coerce
-import qualified Data.List                        as L
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
 

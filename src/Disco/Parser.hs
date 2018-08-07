@@ -545,7 +545,7 @@ parseGuard = parseGBool <|> parseGPat <|> parseGLet
 parseAtomicPattern :: Parser Pattern
 parseAtomicPattern = label "pattern" $ do
   t <- parseAtom
-  case checkPattern t of
+  case termToPattern t of
     Nothing -> fail $ "Invalid pattern: " ++ show t
     Just p  -> return p
 
@@ -554,28 +554,28 @@ parseAtomicPattern = label "pattern" $ do
 parsePattern :: Parser Pattern
 parsePattern = label "pattern" $ do
   t <- parseTerm
-  case checkPattern t of
+  case termToPattern t of
     Nothing -> fail $ "Invalid pattern: " ++ show t
     Just p  -> return p
 
 -- | Attempt converting a term to a pattern.
-checkPattern :: Term -> Maybe Pattern
-checkPattern TWild       = Just $ PWild
-checkPattern (TVar x)    = Just $ PVar x
-checkPattern (TParens t) = checkPattern t
-checkPattern TUnit       = Just $ PUnit
-checkPattern (TBool b)   = Just $ PBool b
-checkPattern (TNat n)    = Just $ PNat n
-checkPattern (TChar c)   = Just $ PChar c
-checkPattern (TString s) = Just $ PString s
-checkPattern (TTup ts)   = PTup <$> mapM checkPattern ts
-checkPattern (TInj s t)  = PInj s <$> checkPattern t
+termToPattern :: Term -> Maybe Pattern
+termToPattern TWild       = Just $ PWild
+termToPattern (TVar x)    = Just $ PVar x
+termToPattern (TParens t) = termToPattern t
+termToPattern TUnit       = Just $ PUnit
+termToPattern (TBool b)   = Just $ PBool b
+termToPattern (TNat n)    = Just $ PNat n
+termToPattern (TChar c)   = Just $ PChar c
+termToPattern (TString s) = Just $ PString s
+termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
+termToPattern (TInj s t)  = PInj s <$> termToPattern t
 
-checkPattern (TBin Cons t1 t2)
-  = PCons <$> checkPattern t1 <*> checkPattern t2
+termToPattern (TBin Cons t1 t2)
+  = PCons <$> termToPattern t1 <*> termToPattern t2
 
-checkPattern (TBin Add t1 t2)
-  = case (checkPattern t1, checkPattern t2) of
+termToPattern (TBin Add t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
         && length (toListOf fvAny t2) == 0
@@ -588,8 +588,8 @@ checkPattern (TBin Add t1 t2)
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
       -- this can be a PAdd L.  Also vice versa for PAdd R.
 
-checkPattern (TBin Mul t1 t2)
-  = case (checkPattern t1, checkPattern t2) of
+termToPattern (TBin Mul t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
         && length (toListOf fvAny t2) == 0
@@ -602,8 +602,8 @@ checkPattern (TBin Mul t1 t2)
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
       -- this can be a PMul L.  Also vice versa for PMul R.
 
-checkPattern (TBin Sub t1 t2)
-  = case checkPattern t1 of
+termToPattern (TBin Sub t1 t2)
+  = case termToPattern t1 of
       Just p
         |  length (toListOf fvAny p) == 1
         && length (toListOf fvAny t2) == 0
@@ -616,15 +616,15 @@ checkPattern (TBin Sub t1 t2)
       -- less useful (and desugaring it would require extra code since
       -- subtraction is not commutative).
 
-checkPattern (TBin Div t1 t2)
-  = PFrac <$> checkPattern t1 <*> checkPattern t2
+termToPattern (TBin Div t1 t2)
+  = PFrac <$> termToPattern t1 <*> termToPattern t2
 
-checkPattern (TUn Neg t) = PNeg <$> checkPattern t
+termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
-checkPattern (TContainer ListContainer ts Nothing)
-  = PList <$> mapM checkPattern ts
+termToPattern (TContainer ListContainer ts Nothing)
+  = PList <$> mapM termToPattern ts
 
-checkPattern _           = Nothing
+termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

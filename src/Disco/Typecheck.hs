@@ -83,8 +83,9 @@ inferTelescope inferOne tel = do
 -- Modules
 ------------------------------------------------------------
 
--- | Check all the types in a module, returning a context of types for
---   top-level definitions.
+-- | Check all the types and extract all relevant info (docs,
+--   properties, types) from a module, returning a 'ModuleInfo' record
+--   on success.
 checkModule :: Module -> TCM ModuleInfo
 checkModule (Module _ m docs) = do
   let (tydefs, rest) = partition isTyDef m
@@ -107,6 +108,10 @@ checkModule (Module _ m docs) = do
 --------------------------------------------------
 -- Type definitions
 
+-- | Turn a list of type definitions (which *must* all consist of
+--   'DTyDef', /i.e./ @type name = ...@) into a 'TyDefCtx', checking
+--   for duplicate names among the definitions and also any type
+--   definitions already in the context.
 makeTyDefnCtx :: [Decl] -> TCM TyDefCtx
 makeTyDefnCtx tydefs = do
   oldTyDefs <- get

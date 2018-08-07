@@ -1,24 +1,10 @@
+import list
+
 -- For desugaring list comprehensions ----------------------
 mapList : (a -> b) -> List a -> List b
 mapList _ [] = []
 mapList f (a :: as) = f a :: mapList f as
-
-concat : List List a -> List a
-concat [] = []
-concat (l :: ls) = append l (concat ls)
-
-append : List a -> List a -> List a
-append [] bs = bs
-append (a :: as) bs = a :: append as bs
 ------------------------------------------------------------
-
-take : ℕ → List Q → List Q
-take 0 _  = []
-take _ [] = []
-take (S n') (x :: xs) = x :: take n' xs
-
-repeat : Q → List Q
-repeat x = x :: repeat x
 
 downfrom : N -> List N
 downfrom 0     = []

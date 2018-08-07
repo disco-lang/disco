@@ -173,7 +173,6 @@ hasQual (Fin n) QDiv = isPrime n
 hasQual b       QNum = b `elem` [N, Z, F, Q]
 hasQual b       QSub = b `elem` [Z, Q]
 hasQual b       QDiv = b `elem` [F, Q]
-hasQual _ _          = False
 
 -- | Check whether a base type has a certain sort.
 hasSort :: BaseTy -> Sort -> Bool

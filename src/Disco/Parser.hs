@@ -228,6 +228,7 @@ reservedWords =
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "type"
+  , "import"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -262,11 +263,12 @@ wholeModule = between sc eof parseModule
 --   semicolons).
 parseModule :: Parser Module
 parseModule = do
+  imports <- many parseImport
   topLevel <- many parseTopLevel
-  let theMod = mkModule topLevel
+  let theMod = mkModule imports topLevel
   return theMod
   where
-    groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
+    groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
     groupTLs _ [] = []
     groupTLs revDocs (TLDoc doc : rest)
       = groupTLs (doc : revDocs) rest
@@ -289,7 +291,7 @@ parseModule = do
           -- Impossible since we only call getClauses on things that
           -- passed matchDefn
 
-    mkModule tls = Module (defnGroups decls) (M.fromList (catMaybes docs))
+    mkModule imps tls = Module imps (defnGroups decls) (M.fromList (catMaybes docs))
       where
         (decls, docs) = unzip $ groupTLs [] tls
 
@@ -299,6 +301,10 @@ parseTopLevel :: Parser TopLevel
 parseTopLevel = L.nonIndented sc $
       TLDoc  <$> parseDocThing
   <|> TLDecl <$> parseDecl
+
+parseImport :: Parser ModName
+parseImport = L.nonIndented sc $
+      reserved "import" *> identifier letterChar
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@

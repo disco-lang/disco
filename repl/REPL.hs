@@ -1,12 +1,17 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TemplateHaskell  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (forM_, when)
-import           Control.Monad.Except                    (catchError)
+import           Control.Monad                           (filterM, foldM, forM_,
+                                                          when)
+import           Control.Monad.Except                    (MonadError,
+                                                          catchError,
+                                                          throwError)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Control.Monad.Trans.Class               (MonadTrans (..))
+import           Control.Monad.Trans.State
 import           Data.Char                               (isSpace)
 import           Data.Coerce
 import           Data.List                               (find, isPrefixOf)
@@ -14,9 +19,12 @@ import           Data.Map                                ((!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 
+import qualified Data.Set                                as S
 import qualified Options.Applicative                     as O
 import           System.Console.Haskeline                as H
+import           System.Directory
 import           System.Exit
+import           System.FilePath
 import           Text.Megaparsec                         hiding (runParser)
 import qualified Text.Megaparsec.Char                    as C
 import           Unbound.Generics.LocallyNameless
@@ -36,6 +44,8 @@ import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
+
+import           Paths_disco
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -135,10 +145,10 @@ handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  let mat = runTCM (extends ctx $ extendTyDefs tymap $ inferTop t)
+  let mat = evalTCM (extends ctx $ withTyDefns tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
-    Right ((at, sig), _, _) -> do
+    Right (at, sig) -> do
       topCtx   %= M.insert x sig
       topDefns %= M.insert (coerce x) (compileTerm at)
 
@@ -173,26 +183,82 @@ loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
+-- | Parses, typechecks, and loads a module by first recursively loading any imported
+--   modules by calling recCheckMod. If no errors are thrown, any tests present
+--   in the parent module are executed.
 handleLoad :: FilePath -> Disco IErr Bool
-handleLoad file = do
-  io . putStrLn $ "Loading " ++ file ++ "..."
-  str <- io $ readFile file
-  let mp = runParser wholeModule file str
-  case mp of
-    Left e   -> io $ putStrLn (parseErrorPretty' str e) >> return False
-    Right p  ->
-      case runTCM (checkModule p) of
-        Left tcErr         -> io $ print tcErr >> return False
-        Right ((docMap, aprops, ctx), DefnCtx defns tydefs, _) -> do
-          let cdefns = M.mapKeys coerce $ fmap compileDefn defns
-          topDocs  .= docMap
-          topCtx   .= ctx
-          topTyDefns .= tydefs
-          loadDefs cdefns
+handleLoad fp = do
+  let (directory, modName) = splitFileName fp
+  modMap <- execStateT (recCheckMod directory S.empty modName) M.empty
+  let m@(ModuleInfo _ props _ _ _) = modMap M.! modName
+  addModInfo m
+  t <- withTopEnv $ runAllTests props
+  io . putStrLn $ "Loaded."
+  return t
 
-          t <- withTopEnv $ runAllTests aprops
-          io . putStrLn $ "Loaded."
-          return t
+-- | Added information from ModuleInfo to the Disco monad. This includes updating the
+--   Disco monad with new term definitions, documentation, types, and type definitions.
+addModInfo :: ModuleInfo -> Disco IErr ()
+addModInfo (ModuleInfo docs _ tys tyds tmds) = do
+  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
+  topDocs  .= docs
+  topCtx   .= tys
+  topTyDefns .= tyds
+  loadDefs cdefns
+  return ()
+
+-- | Typechecks a given module by first recursively typechecking it's imported modules,
+--   adding the obtained module infos to a map from module names to module infos, and then
+--   typechecking the parent module in an environment with access to this map. This is really just a
+--   depth-first search.
+recCheckMod :: FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) (Disco IErr) ModuleInfo
+recCheckMod directory inProcess modName  = do
+  when (S.member modName inProcess) (throwError $ CyclicImport modName)
+  modMap <- get
+  case M.lookup modName modMap of
+    Just mi -> return mi
+    Nothing -> do
+      file <- resolveModule directory modName
+      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
+      str <- io $ readFile file
+      let mp = runParser wholeModule file str
+      case mp of
+        Left e  -> throwError $ ParseErr e
+        Right cm@(Module mns _ _) -> do
+          -- mis only contains the module info from direct imports.
+          mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns
+          imports@(ModuleInfo _ _ tyctx tydefns _) <- combineModuleInfo mis
+          case evalTCM (withTyDefns tydefns $ extends tyctx $ checkModule cm) of
+            Left tcErr         -> throwError $ TypeCheckErr tcErr
+            Right m -> do
+              m' <- combineModuleInfo [imports, m]
+              modify (M.insert modName m')
+              return m'
+
+-- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos are merged by
+--   joining their doc, type, type definition, and term contexts. The property context
+--   of the new module is the obtained from the second module. If threre are any duplicate
+--   type definitions or term definitions, a Typecheck error is thrown.
+combineModuleInfo :: (MonadError IErr m) => [ModuleInfo] -> m ModuleInfo
+combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
+  where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
+        combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
+          case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
+            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2)
+            (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
+            (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
+
+-- | Given a directory and a module name, relavent directories are searched for the file
+--   containing the provided module name. Currently, Disco searches for the module in
+--   the standard library directory (lib), and the directory passed in to resolveModule.
+resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
+resolveModule directory modname = do
+  datadir <- io getDataDir
+  let fps = map (</> replaceExtension modname "disco") [directory, datadir]
+  fexists <- io $ filterM doesFileExist fps
+  case fexists of
+    []     -> throwError $ ModuleNotFound modname
+    (fp:_) -> return fp
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
@@ -278,7 +344,7 @@ evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
-  case evalTCM (extends ctx $ extendTyDefs tymap (inferTop t)) of
+  case evalTCM (extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
@@ -289,7 +355,7 @@ handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  case (evalTCM $ extends ctx $ extendTyDefs tymap (inferTop t)) of
+  case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
 

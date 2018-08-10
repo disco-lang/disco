@@ -134,25 +134,25 @@ compileGuard :: DGuard -> FreshM (Embed Core, CPattern)
 compileGuard (DGPat (unembed -> d) dpat) =
   (,)
     <$> (embed <$> compileDTerm d)
-    <*> compilePattern dpat
+    <*> pure (compilePattern dpat)
 
 ------------------------------------------------------------
 -- Patterns
 ------------------------------------------------------------
 
 -- | Compile a desugared pattern.  Turns all constructors into CPCons.
-compilePattern :: DPattern -> FreshM CPattern
-compilePattern (DPVar _ x)      = return $ CPVar (coerce x)
-compilePattern (DPWild _)       = return CPWild
-compilePattern DPUnit           = return $ CPCons 0 []
-compilePattern (DPBool b)       = return $ CPCons (fromEnum b) []
-compilePattern (DPChar c)       = return $ CPNat (toInteger $ fromEnum c)
-compilePattern (DPPair _ p1 p2) = CPCons 0 <$> mapM compilePattern [p1,p2]
-compilePattern (DPInj _ s p)    = CPCons (fromEnum s) <$> mapM compilePattern [p]
-compilePattern (DPNat _ n)      = return $ CPNat n
-compilePattern (DPSucc p)       = CPSucc <$> compilePattern p
-compilePattern (DPNil _)        = return $ CPCons 0 []
-compilePattern (DPCons _ p1 p2) = CPCons 1 <$> mapM compilePattern [p1,p2]
+compilePattern :: DPattern -> CPattern
+compilePattern (DPVar _ x)      = CPVar (coerce x)
+compilePattern (DPWild _)       = CPWild
+compilePattern DPUnit           = CPCons 0 []
+compilePattern (DPBool b)       = CPCons (fromEnum b) []
+compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
+compilePattern (DPPair _ x1 x2) = CPCons 0 (map coerce [x1,x2])
+compilePattern (DPInj _ s x)    = CPCons (fromEnum s) [coerce x]
+compilePattern (DPNat _ n)      = CPNat n
+compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
+compilePattern (DPNil _)        = CPCons 0 []
+compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
 
 ------------------------------------------------------------
 -- Unary and binary operators

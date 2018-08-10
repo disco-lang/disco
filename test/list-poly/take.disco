@@ -15,7 +15,7 @@ append (a :: as) bs = a :: append as bs
 take : N -> List Q -> List Q
 take 0 _ = []
 take _ [] = []
-take (S n) (x::xs) = x :: take n xs
+take (n+1) (x::xs) = x :: take n xs
 
 length : List Q -> N
 length [] = 0

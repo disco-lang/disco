@@ -192,7 +192,7 @@ whnf (CVar x) = do
   e <- getEnv
   case (M.lookup (coerce x) e) of
     Just v  -> whnfV v
-    Nothing -> error $ "Unbound variable while interpreting!"
+    Nothing -> error $ "Unbound variable while interpreting! " ++ show x
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
 
@@ -397,33 +397,21 @@ checkGuards ((unembed -> c, p) : gs) = do
 match :: Value -> CPattern -> Disco IErr (Maybe Env)
 match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
 match _ CPWild        = ok
-match v (CPCons i ps) = do
+match v (CPCons i xs) = do
   VCons j vs <- whnfV v
   case i == j of
     False -> noMatch
-    True  -> matchPatterns vs ps
+    True  -> return (Just . M.fromList $ zip xs vs)
 match v (CPNat n)     = do
   VNum _ m <- whnfV v
   case m == n % 1 of
     False -> noMatch
     True  -> ok
-match v (CPSucc p) = do
-  VNum _ n <- whnfV v
-  case n > 0 of
-    True  -> match (vnum (n-1)) p
-    False -> noMatch
-
--- | Lazily match a list of values against a list of patterns
---   pairwise, returning @Nothing@ as soon as one match fails, and
---   returning an environment of bindings if all succeed.
-matchPatterns :: [Value] -> [CPattern] -> Disco IErr (Maybe Env)
-matchPatterns []     _      = return (Just emptyCtx)
-matchPatterns (v:vs) (p:ps) = do
-  res <- match v p
-  case res of
-    Nothing -> noMatch
-    Just e  -> (fmap.fmap) (joinCtx e) $ matchPatterns vs ps
-matchPatterns _ _ = error "Different number of values and patterns in matchPatterns!"
+match v (CPFrac x y) = do
+  VNum _ r <- whnfV v
+  return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
+                               , (y, vnum (denominator r % 1))
+                               ]
 
 -- | Convenience function: successfully match with no bindings.
 ok :: Disco e (Maybe Env)

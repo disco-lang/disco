@@ -1,0 +1,41 @@
+:load test/case-arith/case-arith.disco
+f1 1
+f1 2
+f1 541
+f1 0
+
+f2 7
+f2 4
+f3 7
+f3 4
+
+f4 (2,1)
+f4 (0,1)
+
+h(0)
+h(1)
+h(10)
+h(22)
+h(29360127)
+
+{? x when 5/3 is 2x+1, 200 otherwise ?}
+{? x when 2/3 is 2x+1, 200 otherwise ?}
+{? x when (2/3 : Q) is 2x+1, 200 otherwise ?}
+
+f5(3)
+f5(4)
+f5(5)
+f5(6)
+
+Zabs(17)
+Zabs(-17)
+Zabs(0)
+
+inorder 3 cwTree
+
+numerator 5
+denominator 5
+numerator (2/5)
+numerator (2/(-5))
+denominator (2/5)
+denominator (2/(-5))

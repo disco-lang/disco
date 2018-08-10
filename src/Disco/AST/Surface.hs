@@ -50,6 +50,7 @@ module Disco.AST.Surface
        , pattern TContainerComp
        , pattern TContainer
        , pattern TAscr
+       , pattern TWild
        , pattern TList
        , pattern TListComp
 
@@ -78,6 +79,7 @@ module Disco.AST.Surface
        , Guard
        , pattern GBool
        , pattern GPat
+       , pattern GLet
 
        , Pattern
        , pattern PVar
@@ -89,12 +91,19 @@ module Disco.AST.Surface
        , pattern PTup
        , pattern PInj
        , pattern PNat
-       , pattern PSucc
        , pattern PCons
        , pattern PList
+       , pattern PAdd
+       , pattern PMul
+       , pattern PSub
+       , pattern PNeg
+       , pattern PFrac
+
        , pattern Binding
        )
        where
+
+import           Data.Void
 
 import           Disco.AST.Generic
 import           Disco.Context
@@ -185,6 +194,7 @@ type instance X_TChar           UD = ()
 type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
+type instance X_TTup            UD = ()
 type instance X_TInj            UD = ()
 type instance X_TCase           UD = ()
 type instance X_TUn             UD = ()
@@ -194,8 +204,7 @@ type instance X_TTyOp           UD = ()
 type instance X_TContainer      UD = ()
 type instance X_TContainerComp  UD = ()
 type instance X_TAscr           UD = ()
-type instance X_Term            UD = ()
-type instance X_TTup            UD = ()
+type instance X_Term            UD = ()  -- TWild
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -260,9 +269,15 @@ pattern TContainerComp c b = TContainerComp_ () c b
 pattern TAscr :: Term -> Sigma -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
+-- Since we parse patterns by first parsing a term and then ensuring
+-- it is a valid pattern, we have to include wildcards in the syntax
+-- of terms, although they will be rejected at a later phase.
+pattern TWild :: Term
+pattern TWild = XTerm_ ()
+
 {-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
              TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
-             TContainer, TContainerComp, TAscr #-}
+             TContainer, TContainerComp, TAscr, TWild #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 pattern TList ts e = TContainer_ () ListContainer ts e
@@ -304,7 +319,8 @@ type Branch = Branch_ UD
 type Guard = Guard_ UD
 
 type instance X_GBool UD = ()
-type instance X_GPat UD = ()
+type instance X_GPat  UD = ()
+type instance X_GLet  UD = ()
 
 pattern GBool :: Embed Term -> Guard
 pattern GBool embedt = GBool_ () embedt
@@ -312,7 +328,10 @@ pattern GBool embedt = GBool_ () embedt
 pattern GPat :: Embed Term -> Pattern -> Guard
 pattern GPat embedt pat = GPat_ () embedt pat
 
-{-# COMPLETE GBool, GPat #-}
+pattern GLet :: Binding -> Guard
+pattern GLet b = GLet_ () b
+
+{-# COMPLETE GBool, GPat, GLet #-}
 
 type Pattern = Pattern_ UD
 
@@ -325,10 +344,14 @@ type instance X_PInj UD    = ()
 type instance X_PNat UD    = ()
 type instance X_PChar UD   = ()
 type instance X_PString UD = ()
-type instance X_PSucc UD   = ()
 type instance X_PCons UD   = ()
 type instance X_PList UD   = ()
-type instance X_Pattern UD = ()
+type instance X_PAdd UD    = ()
+type instance X_PMul UD    = ()
+type instance X_PSub UD    = ()
+type instance X_PNeg UD    = ()
+type instance X_PFrac UD   = ()
+type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
 pattern PVar name = PVar_ () name
@@ -357,14 +380,26 @@ pattern PInj s p = PInj_ () s p
 pattern PNat  :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
-pattern PSucc :: Pattern -> Pattern
-pattern PSucc p = PSucc_ () p
-
 pattern PCons :: Pattern -> Pattern -> Pattern
 pattern PCons  p1 p2 = PCons_ () p1 p2
 
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
+pattern PAdd :: Side -> Pattern -> Term -> Pattern
+pattern PAdd s p t = PAdd_ () s p t
+
+pattern PMul :: Side -> Pattern -> Term -> Pattern
+pattern PMul s p t = PMul_ () s p t
+
+pattern PSub :: Pattern -> Term -> Pattern
+pattern PSub p t = PSub_ () p t
+
+pattern PNeg :: Pattern -> Pattern
+pattern PNeg p = PNeg_ () p
+
+pattern PFrac :: Pattern -> Pattern -> Pattern
+pattern PFrac p1 p2 = PFrac_ () p1 p2
+
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PSucc, PCons, PList #-}
+             PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}

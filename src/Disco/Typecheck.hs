@@ -351,6 +351,8 @@ typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
 typecheck Infer             (TNat n)     = return $ ATNat TyN n
 typecheck Infer             (TRat r)     = return $ ATRat r
 
+typecheck _                 TWild        = throwError $ NoTWild
+
 --------------------------------------------------
 -- Lambdas
 
@@ -835,6 +837,11 @@ typecheck mode (TCase bs) = do
       at <- infer t
       (ctx, apt) <- checkPattern p (getType at)
       return (AGPat (embed at) apt, ctx)
+    inferGuard (GLet (Binding mty x (unembed -> t))) = do
+      at <- case mty of
+        Just (unembed -> ty) -> checkSigma t ty
+        Nothing              -> infer t
+      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toSigma (getType at)))
 
 --------------------------------------------------
 -- Type ascription
@@ -869,29 +876,21 @@ checkPattern (PVar x) ty = return (singleCtx x (toSigma ty), APVar ty (coerce x)
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
 
-checkPattern PUnit tyv@(TyVar _) = do
-  constraint $ CEq tyv TyUnit
+checkPattern PUnit ty = do
+  ensureEq ty TyUnit
   return (emptyCtx, APUnit)
 
-checkPattern PUnit TyUnit = return (emptyCtx, APUnit)
-
-checkPattern (PBool b) tyv@(TyVar _) = do
-  constraint $ CEq tyv TyBool
+checkPattern (PBool b) ty = do
+  ensureEq ty TyBool
   return (emptyCtx, APBool b)
 
-checkPattern (PBool b) TyBool = return (emptyCtx, APBool b)
-
-checkPattern (PChar c) tyv@(TyVar _) = do
-  constraint $ CEq tyv TyC
+checkPattern (PChar c) ty = do
+  ensureEq ty TyC
   return (emptyCtx, APChar c)
 
-checkPattern (PChar c) TyC = return (emptyCtx, APChar c)
-
-checkPattern (PString s) tyv@(TyVar _) = do
-  constraint $ CEq tyv (TyList TyC)
+checkPattern (PString s) ty = do
+  ensureEq ty (TyList TyC)
   return (emptyCtx, APString s)
-
-checkPattern (PString s) (TyList TyC) = return (emptyCtx, APString s)
 
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy
@@ -930,15 +929,6 @@ checkPattern (PNat n) ty        = do
   constraint $ CSub TyN ty
   return (emptyCtx, APNat ty n)
 
-checkPattern (PSucc p) tyv@(TyVar _) = do
-  (ctx, apt) <- checkPattern p TyN
-  constraint $ CEq tyv TyN
-  return (ctx, APSucc apt)
-
-checkPattern (PSucc p) TyN = do
-  (ctx, apt) <- checkPattern p TyN
-  return (ctx, APSucc apt)
-
 checkPattern p@(PCons p1 p2) ty = do
   [tyl] <- ensureConstr CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
@@ -950,6 +940,38 @@ checkPattern p@(PList ps) ty = do
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
+
+checkPattern (PAdd s p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APAdd ty s apt at)
+
+checkPattern (PMul s p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APMul ty s apt at)
+
+checkPattern (PSub p t) ty = do
+  constraint $ CQual QNum ty
+  (ctx, apt) <- checkPattern p ty
+  at <- check t ty
+  return (ctx, APSub ty apt at)
+
+checkPattern (PNeg p) ty = do
+  constraint $ CQual QSub ty
+  tyInner <- cPos ty
+  (ctx, apt) <- checkPattern p tyInner
+  return (ctx, APNeg ty apt)
+
+checkPattern (PFrac p q) ty = do
+  constraint $ CQual QDiv ty
+  tyP <- cInt ty
+  tyQ <- cPos tyP
+  (ctx1, ap1) <- checkPattern p tyP
+  (ctx2, ap2) <- checkPattern q tyQ
+  return (joinCtx ctx1 ctx2, APFrac ty ap1 ap2)
 
 checkPattern p ty = throwError (PatternType p ty)
 
@@ -1067,3 +1089,11 @@ ensureConstr c ty targ =
 ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
+
+-- | Ensure that two types are equal:
+--     1. Do nothing if they are literally equal
+--     2. Generate an equality constraint otherwise
+ensureEq :: Type -> Type -> TCM ()
+ensureEq ty1 ty2
+  | ty1 == ty2 = return ()
+  | otherwise  = constraint $ CEq ty1 ty2

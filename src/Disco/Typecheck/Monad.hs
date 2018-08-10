@@ -93,6 +93,7 @@ data TCError
   | NumPatterns            -- ^ # of patterns does not match type in definition
   | Unsolvable SolveError
   | NotTyDef String             -- ^ The type is an algebraic data type that was never defined.
+  | NoTWild                -- ^ Wildcards are not allowed in terms.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show

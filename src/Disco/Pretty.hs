@@ -222,12 +222,6 @@ prettyTerm (TLet bnd) = mparens initPA $
       , text "in"
       , prettyTerm' 0 InL t2
       ]
-  where
-    prettyBinding :: Binding -> Doc
-    prettyBinding (Binding Nothing x (unembed -> t))
-      = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
-    prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
-      = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
@@ -235,6 +229,7 @@ prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettySigma ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
     prettyTyOp op <+> prettyTy' funPrec InR ty
+prettyTerm TWild = text "_"
 
 prettyTerm' :: Prec -> BFixity -> Term -> Doc
 prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
@@ -279,6 +274,13 @@ prettyGuards (fromTelescope -> gs)
 prettyGuard :: Guard -> Doc
 prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
+prettyGuard (GLet b)    = text "let" <+> prettyBinding b
+
+prettyBinding :: Binding -> Doc
+prettyBinding (Binding Nothing x (unembed -> t))
+  = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
+prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
+  = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
 
 prettyQuals :: Telescope Qual -> Doc
 prettyQuals (fromTelescope -> qs) = do
@@ -291,6 +293,8 @@ prettyQual (QBind x (unembed -> t))
 prettyQual (QGuard (unembed -> t))
   = prettyTerm' 0 InL t
 
+-- XXX TODO: now that this can have arith pats in it, it needs to
+-- actually take precedence, associativity etc. into account
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x) = prettyName x
 prettyPattern PWild = text "_"
@@ -303,9 +307,17 @@ prettyPattern (PTup ts) = do
   parens (hsep ds)
 prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
 prettyPattern (PNat n) = integer n
-prettyPattern (PSucc p) = text "S" <+> prettyPattern p
-prettyPattern (PCons {}) = error "prettyPattern PCons unimplemented"
-prettyPattern (PList {}) = error "prettyPattern PCons unimplemented"
+prettyPattern (PCons p1 p2) = prettyPattern p1 <+> text "::" <+> prettyPattern p2
+prettyPattern (PList ps) = do
+  ds <- punctuate (text ",") (map prettyPattern ps)
+  brackets (hsep ds)
+prettyPattern (PAdd L p t)  = prettyPattern p <+> text "+" <+> prettyTerm t
+prettyPattern (PAdd R p t)  = prettyTerm t <+> text "+" <+> prettyPattern p
+prettyPattern (PMul L p t)  = prettyPattern p <+> text "*" <+> prettyTerm t
+prettyPattern (PMul R p t)  = prettyTerm t <+> text "*" <+> prettyPattern p
+prettyPattern (PSub p t)    = prettyPattern p <+> text "-" <+> prettyTerm t
+prettyPattern (PNeg p)      = text "-" <> prettyPattern p
+prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
 
 ------------------------------------------------------------
 

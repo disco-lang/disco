@@ -1,0 +1,3 @@
+:load test/case-let/case-let.disco
+f 6
+f 5

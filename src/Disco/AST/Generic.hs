@@ -96,6 +96,7 @@ module Disco.AST.Generic
        , Guard_ (..)
        , X_GBool
        , X_GPat
+       , X_GLet
        , ForallGuard
 
        -- * Pattern
@@ -110,9 +111,13 @@ module Disco.AST.Generic
        , X_PNat
        , X_PChar
        , X_PString
-       , X_PSucc
        , X_PCons
        , X_PList
+       , X_PAdd
+       , X_PMul
+       , X_PSub
+       , X_PNeg
+       , X_PFrac
        , X_Pattern
        , ForallPattern
 
@@ -329,6 +334,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TApp e)
     , a (X_TInj e)
     , a (X_TCase e)
+    , a (X_TTup e)
     , a (X_TUn e)
     , a (X_TBin e)
     , a (X_TChain e)
@@ -337,7 +343,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TContainerComp e)
     , a (X_TAscr e)
     , a (X_Term e)
-    , a (X_TTup e)
     , a (Qual_ e)
     , a (Guard_ e)
     , a (Link_ e)
@@ -428,6 +433,7 @@ type Branch_ e = Bind (Telescope (Guard_ e)) (Term_ e)
 
 type family X_GBool e
 type family X_GPat e
+type family X_GLet e
 
 data Guard_ e where
 
@@ -435,16 +441,20 @@ data Guard_ e where
   GBool_ :: X_GBool e -> Embed (Term_ e) -> Guard_ e
 
   -- | Pattern guard (@when term = pat@)
-
   GPat_  :: X_GPat e -> Embed (Term_ e) -> Pattern_ e -> Guard_ e
+
+  -- | Let (@let x = term@)
+  GLet_  :: X_GLet e -> Binding_ e -> Guard_ e
 
   deriving Generic
 
 type ForallGuard (a :: * -> Constraint) e
   = ( a (X_GBool e)
     , a (X_GPat  e)
+    , a (X_GLet  e)
     , a (Term_ e)
     , a (Pattern_ e)
+    , a (Binding_ e)
     )
 
 deriving instance ForallGuard Show         e => Show       (Guard_ e)
@@ -464,9 +474,13 @@ type family X_PInj e
 type family X_PNat e
 type family X_PChar e
 type family X_PString e
-type family X_PSucc e
 type family X_PCons e
 type family X_PList e
+type family X_PAdd e
+type family X_PMul e
+type family X_PSub e
+type family X_PNeg e
+type family X_PFrac e
 type family X_Pattern e
 
 -- | Patterns.
@@ -499,14 +513,26 @@ data Pattern_ e where
   -- | String pattern.
   PString_ :: X_PString e -> String -> Pattern_ e
 
-  -- | Successor pattern, @S p@.
-  PSucc_ :: X_PSucc e -> Pattern_ e -> Pattern_ e
-
   -- | Cons pattern @p1 :: p2@.
   PCons_ :: X_PCons e -> Pattern_ e -> Pattern_ e -> Pattern_ e
 
   -- | List pattern @[p1, .., pn]@.
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
+
+  -- | Addition pattern, @p + t@ or @t + p@
+  PAdd_  :: X_PAdd e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
+
+  -- | Multiplication pattern, @p * t@ or @t * p@
+  PMul_  :: X_PMul e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
+
+  -- | Subtraction pattern, @p - t@
+  PSub_  :: X_PSub e -> Pattern_ e -> Term_ e -> Pattern_ e
+
+  -- | Negation pattern, @-p@
+  PNeg_  :: X_PNeg e -> Pattern_ e -> Pattern_ e
+
+  -- | Fraction pattern, @p1/p2@
+  PFrac_ :: X_PFrac e -> Pattern_ e -> Pattern_ e -> Pattern_ e
 
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e
@@ -523,10 +549,15 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PString e)
         , a (X_PTup e)
         , a (X_PInj e)
-        , a (X_PSucc e)
         , a (X_PCons e)
         , a (X_PList e)
+        , a (X_PAdd e)
+        , a (X_PMul e)
+        , a (X_PSub e)
+        , a (X_PNeg e)
+        , a (X_PFrac e)
         , a (X_Pattern e)
+        , a (Term_ e)
         )
 
 deriving instance ForallPattern Show         e => Show       (Pattern_ e)

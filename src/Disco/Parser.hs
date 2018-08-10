@@ -53,7 +53,7 @@ module Disco.Parser
        where
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name)
+                                                   fvAny, string2Name)
 
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
@@ -62,7 +62,8 @@ import qualified Text.Megaparsec.Char.Lexer       as L
 import           Text.Megaparsec.Expr
 
 import           Control.Applicative              (many, (<|>))
-import           Control.Lens                     (makeLenses, use, (.=))
+import           Control.Lens                     (makeLenses, toListOf, use,
+                                                   (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
 import qualified Data.Map                         as M
@@ -396,6 +397,7 @@ parseAtom = label "expression" $
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
+  <|> TWild <$ symbol "_"
   <|> TVar <$> ident
   <|> TRat <$> try decimal
   <|> TNat <$> natural
@@ -537,43 +539,98 @@ parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parse
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
-parseGuard = parseGBool <|> parseGPat
+parseGuard = parseGBool <|> parseGPat <|> parseGLet
   where
     parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
     parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
                       <*> (reserved "is" *> parsePattern)
+    parseGLet  = GLet <$> (reserved "let" *> parseBinding)
 
-
--- | Parse an atomic pattern.
+-- | Parse an atomic pattern, by parsing a term and then attempting to
+--   convert it to a pattern.
 parseAtomicPattern :: Parser Pattern
-parseAtomicPattern = label "pattern" $
-      PVar <$> ident
-  <|> PWild <$ symbol "_"
-  <|> PBool True  <$ (reserved "true" <|> reserved "True")
-  <|> PBool False <$ (reserved "false" <|> reserved "False")
-  <|> PChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
-  <|> PString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
-  <|> PNat <$> natural
-  <|> PList <$> brackets (parsePattern `sepBy` comma)
-  <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
+parseAtomicPattern = label "pattern" $ do
+  t <- parseAtom
+  case termToPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
 
-tuplePat :: [Pattern] -> Pattern
-tuplePat []  = PUnit
-tuplePat [x] = x
-tuplePat t   = PTup t
-
--- | Parse a pattern.
+-- | Parse a pattern, by parsing a term and then attempting to convert
+--   it to a pattern.
 parsePattern :: Parser Pattern
-parsePattern = makeExprParser parseAtomicPattern table
-  where
-    table = [ [ prefix "left" (PInj L)
-              , prefix "right" (PInj R)
-              , prefix "S"   PSucc
-              ]
-            , [ infixR "::" PCons ]
-            ]
-    prefix name fun = Prefix (reserved name >> return fun)
-    infixR name fun = InfixR (reservedOp name >> return fun)
+parsePattern = label "pattern" $ do
+  t <- parseTerm
+  case termToPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
+
+-- | Attempt converting a term to a pattern.
+termToPattern :: Term -> Maybe Pattern
+termToPattern TWild       = Just $ PWild
+termToPattern (TVar x)    = Just $ PVar x
+termToPattern (TParens t) = termToPattern t
+termToPattern TUnit       = Just $ PUnit
+termToPattern (TBool b)   = Just $ PBool b
+termToPattern (TNat n)    = Just $ PNat n
+termToPattern (TChar c)   = Just $ PChar c
+termToPattern (TString s) = Just $ PString s
+termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
+termToPattern (TInj s t)  = PInj s <$> termToPattern t
+
+termToPattern (TBin Cons t1 t2)
+  = PCons <$> termToPattern t1 <*> termToPattern t2
+
+termToPattern (TBin Add t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PAdd L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PAdd R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PAdd L.  Also vice versa for PAdd R.
+
+termToPattern (TBin Mul t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PMul L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PMul R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PMul L.  Also vice versa for PMul R.
+
+termToPattern (TBin Sub t1 t2)
+  = case termToPattern t1 of
+      Just p
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PSub p t2
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PSub.
+
+      -- For now we don't handle the case of t - p, since it seems
+      -- less useful (and desugaring it would require extra code since
+      -- subtraction is not commutative).
+
+termToPattern (TBin Div t1 t2)
+  = PFrac <$> termToPattern t1 <*> termToPattern t2
+
+termToPattern (TUn Neg t) = PNeg <$> termToPattern t
+
+termToPattern (TContainer ListContainer ts Nothing)
+  = PList <$> mapM termToPattern ts
+
+termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

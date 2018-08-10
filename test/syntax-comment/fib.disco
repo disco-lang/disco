@@ -11,7 +11,7 @@ fib n =
           is 0 {- a comment -}   -- note how a single branch can be
                                  -- broken across multiple lines
   ,  n                  when {- another comment -} n is 1  -- comment
-  ,  fib m + fib (m+1)  when n is S (S m)
+  ,  fib (n .- 1) + fib (n .- 2)  otherwise
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise
     -- since that doesn't pass the type checker: it doesn't believe

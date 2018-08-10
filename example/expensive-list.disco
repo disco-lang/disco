@@ -13,13 +13,12 @@
 -- expensiveList', it will immediately print out the first 100 numbers
 -- and then slowly progress through the numbers not yet evaluated.
 
-
 expensiveList : List N
 expensiveList = map expensiveId [0 ..]
 
 expensiveId : N -> N
 expensiveId 0     = 0
-expensiveId (S n) = 1 + expensiveId n
+expensiveId (n+1) = 1 + expensiveId n
 
 map : (N -> N) -> List N -> List N
 map _ [] = []
@@ -28,4 +27,4 @@ map f (x :: xs) = f x :: map f xs
 take : N -> List N -> List N
 take 0 _ = []
 take _ [] = []
-take (S n) (x::xs) = x :: take n xs
+take (n+1) (x::xs) = x :: take n xs

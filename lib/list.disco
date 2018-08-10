@@ -1,0 +1,68 @@
+||| A right fold for lists.
+|||   foldr f z [a,b,c] = f a (f b (f c z)
+
+!!!   foldr (\x y. x + y) 0 [1,2,3] = 6
+!!!   foldr (\x y. x + y) 0 []      = 0
+
+foldr : (a → b → b) → b → List a → b
+foldr f z []      = z
+foldr f z (x::xs) = f x (foldr f z xs)
+
+||| Append two lists into a single list.
+
+!!!   append [] []           = []
+!!!   append [1,2,3] []      = [1,2,3]
+!!!   append [1,2,3] [4,5,6] = [1,2,3,4,5,6]
+!!!   ∀      xs : List N. append [] xs = xs
+!!!   forall xs : List N. append xs [] = xs
+
+append : List a → List a → List a
+append []      ys = ys
+append (x::xs) ys = x :: append xs ys
+
+||| Flatten a list of lists into a single list.
+
+!!!   concat [[1,2],[3],[],[4,5,6]] = [1,2,3,4,5,6]
+
+concat : List List a → List a
+concat []      = []
+concat (l::ls) = append l (concat ls)
+
+||| Apply a function to each element of a list, returning a new list
+||| of the results.
+
+!!!   map (\x.x+1) [] = []
+!!!   map (\x.2)   "hello" = [2,2,2,2,2]
+!!!   map (\x. 5x) [2,4,1,7] = [10,20,5,35]
+
+map : (a → b) → List a → List b
+map f []      = []
+map f (x::xs) = f x :: map f xs
+
+||| Take the first n elements of a list.
+!!!   take 1 [true, false, true] = [true]
+!!!   take 3 [true, false] = [true, false]
+!!!   take 0 [true, false] = ([] : List Bool)
+
+take : ℕ → List a → List a
+take 0 _  = []
+take _ [] = []
+take (S n') (x :: xs) = x :: take n' xs
+
+||| Repeat the given element infinitely.
+!!!   take 3 (repeat true) = [true, true, true]
+repeat : a → List a
+repeat x = x :: repeat x
+
+||| The length of a list.
+!!!   length [true, false, true] = 3
+!!!   length (take 20 (repeat true)) = 20
+length : List a → ℕ
+length [] = 0
+length (_::l) = 1 + length l
+
+zipWith : (a -> b -> c) -> List a -> List b -> List c
+zipWith _ [] _ = []
+zipWith _ _ [] = []
+zipWith f (a::as) (b::bs) = f a b :: zipWith f as bs
+

@@ -20,7 +20,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..)
+         Module(..), TopLevel(..), ModName
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -117,13 +117,16 @@ data UD
 
 -- | A module is a list of declarations together with a collection of
 --   documentation for top-level names.
-data Module = Module [Decl] (Ctx Term Docs)
+data Module = Module [ModName] [Decl] (Ctx Term Docs)
 deriving instance ForallTerm Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl
 deriving instance ForallTerm Show  UD => Show TopLevel
+
+-- | A module to be imported.
+type ModName = String
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]

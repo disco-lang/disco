@@ -65,6 +65,8 @@ import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
 import qualified Data.Sequence                           as Seq
+import           Data.Void
+import           Text.Megaparsec
 
 import           Unbound.Generics.LocallyNameless
 
@@ -74,6 +76,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
+import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -185,6 +188,18 @@ withEnv = local . const
 
 -- | Errors that can be generated during interpreting.
 data IErr where
+
+  -- | Module not found.
+  ModuleNotFound :: ModName -> IErr
+
+  -- | Cyclic import encountered.
+  CyclicImport :: ModName -> IErr
+
+  -- | Error encountered during typechecking.
+  TypeCheckErr :: TCError -> IErr
+
+  -- | Error encountered during parsing.
+  ParseErr :: (ParseError Char Data.Void.Void) -> IErr
 
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr

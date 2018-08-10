@@ -1,0 +1,5 @@
+:l test/module-basic/a.disco
+x
+y
+:l test/module-basic/c.disco
+l

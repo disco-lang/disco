@@ -13,6 +13,10 @@ category:            Language
 
 tested-with:         GHC == 8.2.2, GHC == 8.4.1
 
+data-dir:            lib
+
+data-files:          *.disco
+
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      docs/tutorial/example/*.disco
                      --- TEST FILES BEGIN (updated automatically by add-test-files.hs) ---
@@ -188,8 +192,12 @@ library
 executable disco
   hs-source-dirs:      repl
   main-is:             REPL.hs
+  other-modules:       Paths_disco
+  autogen-modules:     Paths_disco
   build-depends:       base,
                        disco,
+                       directory,
+                       filepath,
                        haskeline >=0.7 && <0.8,
                        mtl >=2.2 && <2.3,
                        transformers >= 0.4 && < 0.6,

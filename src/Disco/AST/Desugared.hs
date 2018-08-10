@@ -314,5 +314,6 @@ instance HasType DPattern where
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
   getType (DPNat ty _)    = ty
+  getType (DPFrac ty _ _) = ty
   getType (DPNil ty)      = ty
   getType (DPCons ty _ _) = ty

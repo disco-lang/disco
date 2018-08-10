@@ -47,7 +47,7 @@ map f (x::xs) = f x :: map f xs
 take : ℕ → List a → List a
 take 0 _  = []
 take _ [] = []
-take (S n') (x :: xs) = x :: take n' xs
+take (n+1) (x :: xs) = x :: take n xs
 
 ||| Repeat the given element infinitely.
 !!!   take 3 (repeat true) = [true, true, true]

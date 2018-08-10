@@ -1,5 +1,6 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ViewPatterns             #-}
+{-# LANGUAGE TupleSections #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -51,6 +52,7 @@ import qualified Data.Map                           as M
 import           Data.Maybe                         (fromJust)
 import           Data.Monoid
 import           Data.Ratio
+import           Data.Bifunctor                     (first)
 
 import           Unbound.Generics.LocallyNameless
 
@@ -244,60 +246,83 @@ whnf (COp op cs)    = whnfOp op cs
 
 whnf (CoreSet t es) = do
   res <- mapM mkThunk es
-  dres <- deduplicateSet t res
-  return $ VSet dres
+  dres <- countValues t res
+  return $ VSet ((map (fmap (const 1))) dres)
 
 whnf (CoreMultiset tyElt es) = do
   res <- mapM mkThunk es
-  cres <- countElements tyElt res
+  cres <- countValues tyElt res
   return $ VMultiset cres
 
 whnf (CType _)      = error "Called whnf on CType"
 
--- Removes all but one of each value in a list of values;
--- for deduplicating sets.
-deduplicateSet :: Type -> [Value] -> Disco IErr [Value]
-deduplicateSet _ [] = return []
-deduplicateSet t (x:xs) = do
-  xInXs <- elemOf t x xs
-  result <- if xInXs then deduplicateSet t xs else (x:) <$> (deduplicateSet t xs)
-  return result
+countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
+countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
 
--- Determines if a given value (with associated type) is an
--- element of a list of values.
-elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
-elemOf _ _ [] = return False
-elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+-- Merge sorts the values in the list using the given function, while
+-- also counting the number of occurences of each element.
+sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
+sortNCount _ []  = return []
+sortNCount _ [x] = return [x]
+sortNCount f xs  = do
+  fstSorted <- sortNCount f firstHalf
+  sndSorted <- sortNCount f secondHalf
+  merge (+) f fstSorted sndSorted
+  where
+    (firstHalf, secondHalf) = splitAt n xs
+    n = length xs `div` 2
+
+-- Merges two lists of type [(a,Integer)] together a la merge sort.  Is guaranteed to
+-- work provided that the two lists given have already been sorted and counted.
+merge :: (Monad m) => (Integer -> Integer -> Integer) -> (a -> a -> m Ordering) -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+merge g _ [] ys                    = case g 0 1 of
+  1 -> return ys
+  0 -> return []
+merge g _ xs []                    = case g 1 0 of
+  1 -> return xs
+  0 -> return []
+merge g comp ((x,n1):xs) ((y,n2): ys) = do
+  ord <- comp x y
+  case ord of
+    LT -> (mergeCons x n1 0) <$> merge g comp xs ((y,n2):ys)
+    EQ -> (mergeCons x n1 n2) <$> merge g comp xs ys
+    GT -> (mergeCons y 0 n2) <$> merge g comp ((x,n1):xs) ys
+    where
+      mergeCons a m1 m2 zs = case g m1 m2 of
+        0 -> zs
+        n -> ((a,n):zs)
 
 mapSet :: Value -> Value -> Type -> Disco IErr Value
 mapSet f s ty = do
   fcn <- whnfV f
   (VSet xs) <- whnfV s
-  ys <- mapM (whnfApp fcn) xs
-  VSet <$> deduplicateSet ty ys
+  ys <- mapM (\(x,n) -> (,n) <$> whnfApp fcn x) xs
+  VSet <$> sortNCount (decideOrdFor ty) ys
 
-countElements :: Type -> [Value] -> Disco IErr [(Value, Integer)]
-countElements _ [] = return []
-countElements ty (x:xs) = do
-  countedXs <- countElements ty xs
-  countInsert ty x countedXs
-
-countInsert :: Type -> Value -> [(Value, Integer)] -> Disco IErr [(Value, Integer)]
-countInsert _ v [] = return [(v, 1)]
-countInsert t v1 ((v2, n):xs) = do
-  isElem <- decideEqFor t v1 v2
-  if isElem then return $ (v2, n+1):xs else ((v2, n):) <$> countInsert t v1 xs
+-- foldrValues :: Value -> Value -> [Value] -> Disco IErr Value
+-- foldrValues _ b []     = return b
+-- foldrValues f b (x:xs) = do
+--   fx <- whnfApp f x
+--   foldedList <- foldrValues f b xs
+--   whnfApp fx foldedList
+--
+-- foldSet :: Value -> Value -> Value -> Type -> Disco IErr Value
+-- foldSet f b s ty = do
+--   fcn <- whnfV f
+--   vb <- whnfV b
+--   (VSet xs) <- whnfV s
+--   sortedXs <- mergeSort xs ty
+--   foldrValues fcn vb sortedXs
 
 setToMultiset :: Value -> Disco IErr Value
 setToMultiset s = do
   (VSet xs) <- whnfV s
-  return $ VMultiset (map (\x -> (x, 1)) xs)
+  return $ VMultiset xs
 
 multisetToSet :: Value -> Disco IErr Value
 multisetToSet m = do
   (VMultiset xs) <- whnfV m
-  return $ VSet (map (\(v,n) -> VCons 0 [v, VNum Fraction (n % 1)]) xs)
-
+  return $ VSet (map (\(v,n) -> (VCons 0 [v, VNum Fraction (n % 1)], 1)) xs)
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
@@ -553,8 +578,8 @@ whnfOp (OMNeg n)  = modArithUn negate n
 whnfOp (OMDiv n)  = modDiv n
 whnfOp (OMExp n)  = modExp n
 whnfOp (OMDivides n) = modDivides n
-whnfOp (OSize)   = setSize
-whnfOp (OPowerSet)        = powerSet
+whnfOp (OSize)            = setSize
+--whnfOp (OPowerSet)        = powerSet
 whnfOp (OUnion ty)        = setUnion ty
 whnfOp (OIntersection ty) = setIntersection ty
 whnfOp (ODifference ty)   = setDifference ty
@@ -563,59 +588,40 @@ whnfOp (OSubset ty)       = subsetTest ty
 setSize :: [Core] -> Disco IErr Value
 setSize [x] = do
   (VSet xs) <- whnf x
-  return $ vnum (fromIntegral $ length xs)
+  return $ vnum (fromIntegral $ sum (map snd xs))
 
 setUnion :: Type -> [Core] -> Disco IErr Value
 setUnion ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- deduplicateSet ty (xs ++ ys)
+  zs <- merge max (decideOrdFor ty) xs ys
   return $ VSet zs
 
 setIntersection :: Type -> [Core] -> Disco IErr Value
 setIntersection ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- intersection ty xs ys
+  zs <- merge min (decideOrdFor ty) xs ys
   return $ VSet zs
-
-intersection :: Type -> [Value] -> [Value] -> Disco IErr [Value]
-intersection _ [] _      = return []
-intersection _ _ []      = return []
-intersection t (x:xs) ys = do
-  xInYs <- elemOf t x ys
-  result <- if xInYs then (x:) <$> (intersection t xs ys) else intersection t xs ys
-  return result
 
 setDifference :: Type -> [Core] -> Disco IErr Value
 setDifference ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- difference ty xs ys
+  zs <- merge (\x y -> max 0 (x - y)) (decideOrdFor ty) xs ys
   return $ VSet zs
-
-difference :: Type -> [Value] -> [Value] -> Disco IErr [Value]
-difference _ [] _       = return []
-difference _ xs []      = return xs
-difference ty (x:xs) ys = do
-  xInYs <- elemOf ty x ys
-  result <- if xInYs then difference ty xs ys else (x:) <$> (difference ty xs ys)
-  return result
 
 subsetTest :: Type -> [Core] -> Disco IErr Value
 subsetTest ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  mkEnum <$> subset ty xs ys
+  ys' <- merge (max) (decideOrdFor ty) xs ys
+  mkEnum <$> setEquality ty ys ys'
 
-subset :: Type -> [Value] -> [Value] -> Disco IErr Bool
-subset ty xs ys = do
-  foldr (\x acc -> (&&) <$> elemOf ty x ys <*> acc) (return True) xs
-
-powerSet :: [Core] -> Disco IErr Value
-powerSet [c] = do
-  (VSet xs) <- whnf c
-  return $ VSet (map VSet (subsequences xs))
+-- powerSet :: [Core] -> Disco IErr Value
+-- powerSet [c] = do
+--   (VSet xs) <- whnf c
+--   return $ VSet (map VSet (subsequences xs))
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value
@@ -905,12 +911,24 @@ decideEqFor (TyList elTy) v1 v2 = do
 decideEqFor (TySet ty) v1 v2 = do
   (VSet xs) <- whnfV v1
   (VSet ys) <- whnfV v2
-  (&&) <$> subset ty xs ys <*> subset ty ys xs
+  setEquality ty xs ys
 
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
+
+
+setEquality :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Bool
+setEquality _ [] [] = return True
+setEquality _ [] _ = return False
+setEquality _ _ [] = return False
+setEquality ty ((x,n1):xs) ((y,n2):ys) = do
+  eq <- (n1 == n2 &&) <$> decideEqFor ty x y
+  case eq of
+    False -> return False
+    True -> setEquality ty xs ys
+
 
 -- TODO: can the functions built by 'enumerate' be more efficient if
 -- enumerate builds *both* a list and a bijection to a prefix of the

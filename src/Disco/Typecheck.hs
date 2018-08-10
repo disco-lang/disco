@@ -519,6 +519,16 @@ infer (TPrim "setToMultiset") = do
 infer (TPrim "multisetToSet") = do
   a <- freshTy
   return (ATPrim (TyArr (TyMultiset a) (TySet (TyPair a TyN))) "multisetToSet", CTrue)
+
+infer (TPrim "foldSet") = do
+  a <- freshTy
+  b <- freshTy
+  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TySet a) b))) "foldSet", CTrue)
+
+infer (TPrim "foldMultiset") = do
+  a <- freshTy
+  b <- freshTy
+  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TyMultiset a) b))) "foldMultiset", CTrue)
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.
 infer (TApp t t')   = do

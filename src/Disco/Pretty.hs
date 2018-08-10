@@ -364,7 +364,7 @@ prettyWHNF out _ (VNum d r)
 prettyWHNF out _ (VFun _) = out "<function>"
 
 prettyWHNF out _ (VClos _ _) = out "<function>"
-prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
+prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t (map fst xs) >> out "}"
 prettyWHNF out (TyMultiset t) (VMultiset xs) = out "{# " >> prettyIteration' out t xs >> out " #}"
 
 prettyWHNF _ ty v = error $

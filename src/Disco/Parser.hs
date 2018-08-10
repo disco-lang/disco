@@ -152,12 +152,13 @@ brackets   = between (symbol "[") (symbol "]")
 fbrack     = between (symbol "⌊") (symbol "⌋")
 cbrack     = between (symbol "⌈") (symbol "⌉")
 
-semi, comma, colon, dot, pipe :: Parser String
+semi, comma, colon, dot, pipe, hash :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
 pipe      = symbol "|"
+hash      = symbol "#" <* notFollowedBy (symbol "}")
 
 -- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String
@@ -224,7 +225,7 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
   , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet", "mapSet"
-  , "setToMultiset", "multisetToSet"
+  , "setToMultiset", "multisetToSet", "foldSet", "foldMultiset"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
@@ -385,6 +386,8 @@ parseAtom = label "expression" $
   <|> TPrim <$> ("mapSet" <$ reserved "mapSet")
   <|> TPrim <$> ("setToMultiset" <$ reserved "setToMultiset")
   <|> TPrim <$> ("multisetToSet" <$ reserved "multisetToSet")
+  <|> TPrim <$> ("foldSet" <$ reserved "foldSet")
+  <|> TPrim <$> ("foldMultiset" <$ reserved "foldMultiset")
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -414,13 +417,25 @@ parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)
   -- example, a very deeply nested list).
 
   where
+    parseMultiset t = do
+      n <- hash *> natural <* comma
+      rt <- return $ replicate (fromIntegral n) t
+      ts <- parseMultiplicity `sepBy` comma
+      cts <- return $ concat (rt:ts)
+      return $ TContainer c cts Nothing
+
+    parseMultiplicity = do
+      t <- parseTerm <* hash
+      n <- natural
+      return $ replicate (fromIntegral n) t
+
     -- Any non-empty list starts with a term, followed by some
     -- remainder (which could either be the rest of a literal list, or
     -- a list comprehension).  If there is no remainder just return a
     -- singleton list, optionally with an ellipsis.
     nonEmptyList = do
       t <- parseTerm
-      (listRemainder t <|> singletonList t)
+      (parseMultiset t <|> listRemainder t <|> singletonList t)
 
     singletonList t = TContainer c [t] <$> optionMaybe parseEllipsis
 

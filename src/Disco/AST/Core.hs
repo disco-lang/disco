@@ -117,6 +117,8 @@ data Core where
 data PrimType = PMap
               | PStoM
               | PMtoS
+              | PFoldSet
+              | PFoldMultiset
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not

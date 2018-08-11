@@ -273,8 +273,8 @@ parseModule = do
     groupTLs _ [] = []
     groupTLs revDocs (TLDoc doc : rest)
       = groupTLs (doc : revDocs) rest
-    groupTLs revDocs (TLDecl decl@(DType{}) : rest)
-      = (decl, Just (declName decl, reverse revDocs)) : groupTLs [] rest
+    groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
+      = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
     groupTLs _ (TLDecl defn : rest)
       = (defn, Nothing) : groupTLs [] rest
 
@@ -282,15 +282,14 @@ parseModule = do
     defnGroups []                = []
     defnGroups (d@DType{}  : ds)  = d : defnGroups ds
     defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
-    defnGroups (DDefn x bs : ds)  = DDefn x (bs ++ concatMap getClauses grp) : defnGroups rest
+    defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
       where
-        (grp, rest) = span matchDefn $ ds
-        matchDefn (DDefn x' _) = x == x'
-        matchDefn _            = False
-        getClauses (DDefn _ cs) = cs
-        getClauses _ = error "Impossible! parseModule.defnGroups.getClauses on non-DDefn"
-          -- Impossible since we only call getClauses on things that
-          -- passed matchDefn
+        (grp, rest) = matchDefn ds
+        matchDefn :: [Decl] -> ([TermDefn], [Decl])
+        matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = (t:ts, ds2')
+          where
+            (ts, ds2') = matchDefn ds2
+        matchDefn ds2 = ([], ds2)
 
     mkModule imps tls = Module imps (defnGroups decls) (M.fromList (catMaybes docs))
       where
@@ -348,24 +347,24 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
 parseDecl :: Parser Decl
-parseDecl = try parseTyDecl <|> parseDefn <|> parseTyDefn
+parseDecl = try (DType <$> parseTyDecl) <|> DDefn <$> parseDefn <|> DTyDef <$> parseTyDefn
 
 -- | Parse a top-level type declaration of the form @x : ty@.
-parseTyDecl :: Parser Decl
+parseTyDecl :: Parser TypeDecl
 parseTyDecl = label "type declaration" $
-  DType <$> ident <*> (indented $ colon *> parseSigma)
+  TypeDecl <$> ident <*> (indented $ colon *> parseSigma)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
-parseDefn :: Parser Decl
+parseDefn :: Parser TermDefn
 parseDefn = label "definition" $
-  DDefn
+  TermDefn
   <$> ident
   <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the definition of a user-defined algebraic data type.
-parseTyDefn :: Parser Decl
+parseTyDefn :: Parser TypeDefn
 parseTyDefn = label "type defintion" $
-  DTyDef
+  TypeDefn
   <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)
 
 -- | Parse the entire input as a term (with leading whitespace and

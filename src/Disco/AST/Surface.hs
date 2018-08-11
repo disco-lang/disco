@@ -24,7 +24,8 @@ module Disco.AST.Surface
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
-       , Decl(..), declName, isDefn, tyDefName, isTyDef
+       , TypeDecl(..), TermDefn(..), TypeDefn(..)
+       , Decl(..), partitionDecls
 
          -- * Terms
        , UD
@@ -103,6 +104,7 @@ module Disco.AST.Surface
        )
        where
 
+import           Control.Lens                     ((%~), _1, _2, _3)
 import           Data.Void
 
 import           Disco.AST.Generic
@@ -143,40 +145,34 @@ deriving instance ForallTerm Show  UD => Show DocThing
 --   @forall v1 : T1, v2 : T2. term@.
 type Property = Property_ UD
 
--- | A declaration is either a type declaration or a definition.
+-- | A type declaration, @name : type@.
+data TypeDecl = TypeDecl (Name Term) Sigma
+
+-- | A group of definition clauses of the form @name pat1 .. patn = term@. The
+--   patterns bind variables in the term. For example, @f n (x,y) =
+--   n*x + y@.
+data TermDefn = TermDefn (Name Term) [Bind [Pattern] Term]
+
+-- | A user-defined type (potentially recursive).
+data TypeDefn = TypeDefn String Type
+  deriving Show
+
+-- | A declaration is either a type declaration, a term definition, or
+--   a type definition.
 data Decl where
+  DType  :: TypeDecl -> Decl
+  DDefn  :: TermDefn -> Decl
+  DTyDef :: TypeDefn -> Decl
 
-  -- | A type declaration, @name : type@.
-  DType :: Name Term -> Sigma -> Decl
-
-  -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
-  --   patterns bind variables in the term. For example, @f n (x,y) =
-  --   n*x + y@.
-  DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
-
-  -- | A user-defined algebraic data type.
-  DTyDef :: String -> Type -> Decl
-
+deriving instance ForallTerm Show  UD => Show TypeDecl
+deriving instance ForallTerm Show  UD => Show TermDefn
 deriving instance ForallTerm Show  UD => Show Decl
 
--- | Get the name that a declaration is about.
-declName :: Decl -> Name Term
-declName (DType x _)  = x
-declName (DDefn x _)  = x
-declName (DTyDef _ _) = error "declName called on DTyDef"
-
--- | Check whether a declaration is a definition.
-isDefn :: Decl -> Bool
-isDefn DDefn{} = True
-isDefn _       = False
-
-isTyDef :: Decl -> Bool
-isTyDef DTyDef{} = True
-isTyDef _        = False
-
-tyDefName :: Decl -> String
-tyDefName (DTyDef x _) = x
-tyDefName _            = error "tyDefName called on decl that is not a TyDef"
+partitionDecls :: [Decl] -> ([TypeDecl], [TermDefn], [TypeDefn])
+partitionDecls (DType  tyDecl : ds) = (_1 %~ (tyDecl:)) (partitionDecls ds)
+partitionDecls (DDefn  def    : ds) = (_2 %~ (def:))    (partitionDecls ds)
+partitionDecls (DTyDef def    : ds) = (_3 %~ (def:))    (partitionDecls ds)
+partitionDecls []                   = ([], [], [])
 
 ------------------------------------------------------------
 -- Terms

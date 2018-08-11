@@ -325,9 +325,9 @@ prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
-prettyDecl (DType x ty) = prettyName x <+> text ":" <+> prettySigma ty
-prettyDecl (DTyDef x ty) = text "type" <+> text x <+> text "=" <+> prettyTy ty
-prettyDecl (DDefn x bs) = vcat $ map prettyClause bs
+prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettySigma ty
+prettyDecl (DTyDef (TypeDefn x ty)) = text "type" <+> text x <+> text "=" <+> prettyTy ty
+prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map prettyClause bs
   where
     prettyClause b
       = lunbind b $ \(ps, t) ->

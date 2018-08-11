@@ -25,8 +25,7 @@ import           Control.Monad.Except
 import           Control.Monad.RWS
 import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
-import           Data.List                               (group, partition,
-                                                          sort)
+import           Data.List                               (group, sort)
 import qualified Data.Map                                as M
 import qualified Data.Set                                as S
 import           Prelude                                 hiding (lookup)
@@ -87,8 +86,7 @@ inferTelescope inferOne tel = do
 --   on success.
 checkModule :: Module -> TCM ModuleInfo
 checkModule (Module _ m docs) = do
-  let (tydefs, rest) = partition isTyDef m
-  let (defns, typeDecls) = partition isDefn rest
+  let (typeDecls, defns, tydefs) = partitionDecls m
   tyCtx <- makeTyCtx typeDecls
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ extends tyCtx $ do
@@ -111,27 +109,22 @@ checkModule (Module _ m docs) = do
 --   'DTyDef', /i.e./ @type name = ...@) into a 'TyDefCtx', checking
 --   for duplicate names among the definitions and also any type
 --   definitions already in the context.
-makeTyDefnCtx :: [Decl] -> TCM TyDefCtx
+makeTyDefnCtx :: [TypeDefn] -> TCM TyDefCtx
 makeTyDefnCtx tydefs = do
   oldTyDefs <- get
   let oldNames = M.keys oldTyDefs
-      newNames = map tyDefName tydefs
+      newNames = map (\(TypeDefn x _) -> x) tydefs
       dups = filterDups $ newNames ++ oldNames
   case dups of
     (x:_) -> throwError (DuplicateTyDefns x)
-    []    -> return $ M.fromList (map getTyDef tydefs)
-  where
-    getTyDef :: Decl -> (String, Type)
-    getTyDef (DTyDef x ty) = (x, ty)
-    getTyDef d             = error $ "Impossible! addTyDefns.getTyDef called on non-DTyDef: " ++ show d
+    []    -> return $ M.fromList (map (\(TypeDefn x ty) -> (x,ty)) tydefs)
 
 -- | Make sure there are no directly cyclic type definitions.
-checkCyclicTys :: [Decl] -> TCM ()
+checkCyclicTys :: [TypeDefn] -> TCM ()
 checkCyclicTys = mapM_ unwrap
   where
-    unwrap :: Decl -> TCM (S.Set String)
-    unwrap (DTyDef x _) = checkCyclicTy (TyDef x) S.empty
-    unwrap d = error $ "Impossible: checkCyclicTys.unwrap called on non-TyDef: " ++ show d
+    unwrap :: TypeDefn -> TCM (S.Set String)
+    unwrap (TypeDefn x _) = checkCyclicTy (TyDef x) S.empty
 
 -- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
 -- 1.) 'ty' is a TyDef.
@@ -157,28 +150,22 @@ filterDups = map head . filter ((>1) . length) . group . sort
 --   declarations. First check that there are no duplicate type
 --   declarations; then run the computation in a context extended with
 --   the declared types.
---
---   Precondition: only called on 'DType's.
 
-makeTyCtx :: [Decl] -> TCM TyCtx
+makeTyCtx :: [TypeDecl] -> TCM TyCtx
 makeTyCtx decls = do
-  let dups = filterDups . map declName $ decls
+  let dups = filterDups . map (\(TypeDecl x _) -> x) $ decls
   case dups of
     (x:_) -> throwError (DuplicateDecls x)
     []    -> return declCtx
   where
-    declCtx = M.fromList $ map getDType decls
-
-    getDType (DType x ty) = (x,ty)
-    getDType d            = error $ "Impossible! withTypeDecls.getDType called on non-DType: " ++ show d
+    declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
 
 --------------------------------------------------
 -- Top-level definitions
 
--- | Type check a top-level definition. Precondition: only called on
---   'DDefn's.
-checkDefn :: Decl -> TCM Defn
-checkDefn (DDefn x clauses) = do
+-- | Type check a top-level definition.
+checkDefn :: TermDefn -> TCM Defn
+checkDefn (TermDefn x clauses) = do
   Forall sig <- lookupTy x
   ((acs, ty'), theta) <- solve $ do
     checkNumPats clauses
@@ -220,8 +207,6 @@ checkDefn (DDefn x clauses) = do
     decomposeDefnTy 0 ty = ([], ty)
     decomposeDefnTy n (TyArr ty1 ty2) = first (ty1:) (decomposeDefnTy (n-1) ty2)
     decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
-
-checkDefn d = error $ "Impossible! checkDefn called on non-Defn: " ++ show d
 
 --------------------------------------------------
 -- Properties

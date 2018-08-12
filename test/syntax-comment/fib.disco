@@ -7,10 +7,9 @@
 fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
   {? n when
-        n
-          is 0 {- a comment -}   -- note how a single branch can be
-                                 -- broken across multiple lines
-  ,  n                  when {- another comment -} n is 1  -- comment
+        n           -- note how a single branch can be
+          is 0      -- broken across multiple lines
+  ,  n                  when n is 1  -- comment
   ,  fib (n .- 1) + fib (n .- 2)  otherwise
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise

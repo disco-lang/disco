@@ -1,12 +1,7 @@
-{-
-
-Primality test
-
-Taken from Jan van Eijck, "The Haskell Road to Logic, Maths, and Programming", 2nd
-  Edition, pp. 4--11
-
--}
-
+-- Primality test
+--
+-- Taken from Jan van Eijck, "The Haskell Road to Logic, Maths, and Programming", 2nd
+--   Edition, pp. 4--11
 
 ||| ldf k n calculates the least divisor of n that is at least k and
 ||| at most sqrt n.  If no such divisor exists, then it returns n.

@@ -8,7 +8,7 @@ approx_pi = 22/7   -- an OK approximation
 ||| Should not be used while operating heavy machinery.
 -- This comment will be ignored.
 increment : N -> N
-increment n {- the input -} = n + 1 {- one more than the input -}
+increment n = n + 1
 
 fizz : N
 fizz = 1

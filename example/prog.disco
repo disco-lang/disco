@@ -18,8 +18,8 @@ fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
   {? n when
         n
-          is 0 {- a comment -}
-  ,  n                  when {- another comment -} n is 1  -- comment
+          is 0
+  ,  n                  when n is 1  -- comment
   ,  fib (n.-1) + fib (n.-2)  otherwise
     -- note we can't write
     --   fib (n-1) + fib (n-2) otherwise

@@ -122,10 +122,9 @@ requireIndent p = do
 
 -- | Generically consume whitespace, including comments.
 sc :: Parser ()
-sc = L.space space1 lineComment blockComment
+sc = L.space space1 lineComment empty {- no block comments in disco -}
   where
     lineComment  = L.skipLineComment "--"
-    blockComment = L.skipBlockComment "{-" "-}"
 
 -- | Parse a lexeme, that is, a parser followed by consuming
 --   whitespace.

@@ -91,8 +91,10 @@ data TCError
   | DuplicateTyDefns String -- ^ Duplicate type definitions.
   | CyclicTyDef String     -- ^ Cyclic type definition.
   | NumPatterns            -- ^ # of patterns does not match type in definition
-  | Unsolvable SolveError
-  | NotTyDef String             -- ^ The type is an algebraic data type that was never defined.
+  | NoLub Type Type        -- ^ No least upper bound.
+  | NoNeg Type             -- ^ Type can't support negation.
+  | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
+  | NotTyDef String        -- ^ An undefined type name was used.
   | NoTWild                -- ^ Wildcards are not allowed in terms.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.

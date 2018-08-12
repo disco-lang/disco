@@ -498,10 +498,8 @@ typecheck Infer (TBin Cons t1 t2) = do
 
         -- ...make sure it is a list, and find the lub of the element types.
         TyList ty2 -> do
-          let ty1 = getType at1
-          tyv <- freshTy
-          constraints $ [CSub ty1 tyv, CSub ty2 tyv]
-          return $ ATBin (TyList tyv) Cons at1 at2
+          eltTy <- lub (getType at1) ty2
+          return $ ATBin (TyList eltTy) Cons at1 at2
         ty -> throwError (NotCon CList t2 ty)
 
 --------------------------------------------------
@@ -535,6 +533,13 @@ typecheck Infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div, SSub] = do
       ty2 = getType at2
   tyv <- freshTy
 
+  -- Note, it looks like we would want to use 'lub' here, but that's
+  -- not quite right because we don't want the *least* upper bound, we
+  -- want the least upper bound which satisfies (bopQual op).  For
+  -- example, 2 - 3 has type Z even though 2 and 3 are both inferred
+  -- to have type N.  In the future we could make a variant of lub
+  -- that takes sorts into account, or we could use lub and then
+  -- another function to handle the sort, etc.
   constraints $
     [ CSub ty1 tyv
     , CSub ty2 tyv
@@ -548,10 +553,8 @@ typecheck (Check ty) (TUn Neg t) = do
 
 typecheck Infer (TUn Neg t) = do
   at <- infer t
-  let ty = getType at
-  tyv <- freshTy
-  constraints $ [CSub ty tyv, CQual QSub tyv]
-  return $ ATUn tyv Neg at
+  negTy <- cNeg (getType at)
+  return $ ATUn negTy Neg at
 
 ----------------------------------------
 -- sqrt, lg, fact, floor, ceil, abs, idiv
@@ -575,11 +578,8 @@ typecheck Infer (TUn Abs t) = do
 typecheck Infer (TBin IDiv t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
-  let ty1 = getType at1
-  let ty2 = getType at2
-  tyv1 <- freshTy
-  resTy <- cInt tyv1
-  constraints $ [CSub ty1 tyv1, CSub ty2 tyv1]
+  tyLub <- lub (getType at1) (getType at2)
+  resTy <- cInt tyLub
   return $ ATBin resTy IDiv at1 at2
 
 ----------------------------------------
@@ -596,9 +596,7 @@ typecheck (Check ty) (TBin Exp t1 t2) = do
 typecheck Infer (TBin Exp t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
-  let ty1 = getType at1
-  let ty2 = getType at2
-  resTy <- cExp ty1 ty2
+  resTy <- cExp (getType at1) (getType at2)
   return $ ATBin resTy Exp at1 at2
 
 ----------------------------------------
@@ -609,10 +607,7 @@ typecheck Infer (TBin Exp t1 t2) = do
 typecheck Infer (TBin op t1 t2) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
   at1 <- infer t1
   at2 <- infer t2
-  let ty1 = getType at1
-      ty2 = getType at2
-  tyv <- freshTy
-  constraints $ [CSub ty1 tyv, CSub ty2 tyv]
+  _ <- lub (getType at1) (getType at2)
   return $ ATBin TyBool op at1 at2
 
 ----------------------------------------
@@ -648,9 +643,9 @@ typecheck Infer (TBin Mod t1 t2) = do
   at2 <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  tyv <- freshTy
-  constraints $ [CSub ty1 tyv, CSub ty2 tyv, CSub tyv TyZ]
-  return $ ATBin tyv Mod at1 at2
+  tyLub <- lub ty1 ty2
+  constraint $ CSub tyLub TyZ
+  return $ ATBin tyLub Mod at1 at2
 
 ----------------------------------------
 -- Divisibility
@@ -660,8 +655,8 @@ typecheck Infer (TBin Divides t1 t2) = do
   at2 <- infer t2
   let ty1 = getType at1
   let ty2 = getType at2
-  tyv <- freshTy
-  constraints $ [CSub ty1 tyv, CSub ty2 tyv, CQual QNum tyv]
+  tyLub <- lub ty1 ty2
+  constraint $ CQual QNum tyLub
   return $ ATBin TyBool Divides at1 at2
 
 ----------------------------------------
@@ -1027,6 +1022,13 @@ cInt ty = do
 --   which represents the output type, and generate appropriate
 --   constraints.
 cExp :: Type -> Type -> TCM Type
+cExp ty1 TyN = do
+  constraint $ CQual QNum ty1
+  return ty1
+
+-- We could include a special case for TyZ, but for that we would need
+-- a function to find a supertype of a given type that satisfies QDiv.
+
 cExp ty1 ty2 = do
 
   -- Create a fresh type variable to represent the result type.  The
@@ -1042,6 +1044,74 @@ cExp ty1 ty2 = do
     , cAnd [CQual QDiv resTy, CEq ty2 TyZ]
     ]
   return resTy
+
+cNeg :: Type -> TCM Type
+cNeg (TyAtom (ABase b)) = (TyAtom . ABase) <$> negBase
+  where
+    negBase = case b of
+      N     -> return Z
+      F     -> return Q
+      Z     -> return Z
+      Q     -> return Q
+      Fin n -> return $ Fin n
+      _     -> throwError $ NoNeg (TyAtom (ABase b))
+cNeg ty = do
+  negTy <- freshTy
+  constraints $ [CSub ty negTy, CQual QSub negTy]
+  return negTy
+
+------------------------------------------------------------
+-- Subtyping and least upper bounds
+------------------------------------------------------------
+
+-- | Decide whether one type is /known/ to be a subtype of another.
+--   Returns False if either one is a type variable (and they are not
+--   equal).
+isKnownSub :: Type -> Type -> Bool
+isKnownSub ty1 ty2 | ty1 == ty2 = True
+isKnownSub (TyAtom (ABase b1)) (TyAtom (ABase b2)) = isKnownSubBase b1 b2
+isKnownSub (TyCon c1 ts1) (TyCon c2 ts2)
+  = c1 == c2 && and (zipWith3 checkKnownSub (arity c1) ts1 ts2)
+  where
+    checkKnownSub Co t1 t2     = isKnownSub t1 t2
+    checkKnownSub Contra t1 t2 = isKnownSub t2 t1
+isKnownSub _ _ = False
+
+-- XXX
+isKnownSubBase :: BaseTy -> BaseTy -> Bool
+isKnownSubBase b1 b2 = (b1,b2) `elem` basePairs
+  where
+    basePairs = [ (N,Z), (N,F), (N,Q)
+                , (Z,Q), (F,Q)
+                ]
+
+-- | Compute the least upper bound of two types.  If they are concrete
+--   types, either compute their lub directly or throw an error if
+--   they are incompatible.  Otherwise, generate a new type variable
+--   and appropriate constraints.
+--
+--   This saves work in the constraint solver, makes it easier to
+--   generate good error messages, and even sometimes saves us the
+--   indignity of exponential time complexity in the constraint solver.
+lub :: Type -> Type -> TCM Type
+lub ty1 ty2
+  | isKnownSub ty1 ty2 = return ty2
+  | isKnownSub ty2 ty1 = return ty1
+lub TyF TyZ = return TyQ
+lub TyZ TyF = return TyQ
+lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throwError $ NoLub ty1 ty2
+
+-- Would make sense eventually to add this case, but we would need a glb function too
+-- lub ty1@(TyCon c1 ts) ty2@(TyCon c2 t2)
+--   | c1 == c2  = ...  -- need glb here for contravariant arguments
+--   | otherwise = throwError $ NoLub ty1 ty2
+
+-- Fallback case: generate a fresh type variable and constrain both input types
+-- to be subtypes of it
+lub ty1 ty2 = do
+  tyLub <- freshTy
+  constraints $ [CSub ty1 tyLub, CSub ty2 tyLub]
+  return tyLub
 
 ------------------------------------------------------------
 -- Decomposing type constructors

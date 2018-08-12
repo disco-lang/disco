@@ -66,6 +66,7 @@ import           Control.Lens                     (makeLenses, toListOf, use,
                                                    (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
+import           Data.List                        (intercalate)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
@@ -303,7 +304,10 @@ parseTopLevel = L.nonIndented sc $
 
 parseImport :: Parser ModName
 parseImport = L.nonIndented sc $
-      reserved "import" *> identifier letterChar
+  reserved "import" *> moduleName
+  where
+    moduleName = lexeme $
+      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@

@@ -33,6 +33,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Generic                (PrimType(..))
 import           Disco.AST.Surface                (Ellipsis, Telescope)
 import           Disco.Types
 
@@ -110,15 +111,6 @@ data Core where
 
 
 
-  deriving (Show, Generic)
-
--- | Signifies the specific type of primitive
---   core
-data PrimType = PMap
-              | PStoM
-              | PMtoS
-              | PFoldSet
-              | PFoldMultiset
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
@@ -210,7 +202,6 @@ data CPattern where
 
 instance Alpha RationalDisplay
 instance Alpha Core
-instance Alpha PrimType
 instance Alpha Op
 instance Alpha CPattern
 instance Alpha CQual

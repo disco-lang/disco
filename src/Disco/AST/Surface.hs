@@ -181,8 +181,8 @@ type instance X_TTup UD = ()
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
 
-pattern TPrim :: String -> Term
-pattern TPrim name = TPrim_ () name
+pattern TPrim :: PrimType -> Term
+pattern TPrim pTy = TPrim_ () pTy
 
 pattern TUn :: UOp -> Term -> Term
 pattern TUn uop term = TUn_ () uop term

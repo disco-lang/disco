@@ -70,6 +70,7 @@ import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
 import           Data.Void
 
+import           Disco.AST.Generic (PrimType(..))
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -86,6 +87,7 @@ data ParserState = ParserState
                                --   should be indented more than column
                                --   @p@.
   }
+
 
 makeLenses ''ParserState
 
@@ -383,11 +385,11 @@ parseAtom = label "expression" $
        TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TVar <$> ident
-  <|> TPrim <$> ("mapSet" <$ reserved "mapSet")
-  <|> TPrim <$> ("setToMultiset" <$ reserved "setToMultiset")
-  <|> TPrim <$> ("multisetToSet" <$ reserved "multisetToSet")
-  <|> TPrim <$> ("foldSet" <$ reserved "foldSet")
-  <|> TPrim <$> ("foldMultiset" <$ reserved "foldMultiset")
+  <|> TPrim <$> (PMap <$ reserved "mapSet")
+  <|> TPrim <$> (PStoM <$ reserved "setToMultiset")
+  <|> TPrim <$> (PMtoS <$ reserved "multisetToSet")
+  <|> TPrim <$> (PFoldSet <$ reserved "foldSet")
+  <|> TPrim <$> (PFoldMultiset <$ reserved "foldMultiset")
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom

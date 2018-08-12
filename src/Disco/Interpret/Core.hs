@@ -202,6 +202,11 @@ whnf (CVar x) = do
 whnf (CPrim PMap ty) =
   return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
 
+-- whnf (CPrim PFoldSet ty) =
+--   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\s -> VDelay (ValDelay (foldSet f b s ty))))))))
+
+-- whnf (CPrim PFoldMultiset ty) =
+--   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\m -> VDelay (ValDelay (foldMultiset f b m ty))))))))
 whnf (CPrim PStoM _) =
   return $ VFun (ValFun (\s -> VDelay (ValDelay (setToMultiset s))))
 
@@ -1123,9 +1128,27 @@ decideOrdFor (TyList ty) v1 v2 = do
         _  -> return o
     _ -> error $ "Impossible! decideOrdFor " ++ show (TyList ty, v1, v2)
 
+-- To decide the ordering for two sets:
+decideOrdFor (TySet ty) v1 v2 = do
+  (VSet xs) <- whnfV v1
+  (VSet ys) <- whnfV v2
+  setComparison ty xs ys
+
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
+
+-- Helper function which decides the order for two sets.
+setComparison :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Ordering
+setComparison _ [] [] = return EQ
+setComparison _ _ [] = return GT
+setComparison _ [] _ = return LT
+setComparison ty ((x,_):xs) ((y,_):ys) = do
+  ord <- decideOrdFor ty x y
+  case ord of
+    EQ    -> setComparison ty xs ys
+    other -> return other
+
 
 -- | Compare two functions lazily.  Functions are ordered
 --   lexicographically, if we think of a function @f : ty1 -> ty2@ as

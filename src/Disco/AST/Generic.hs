@@ -28,6 +28,7 @@
 module Disco.AST.Generic
        (
        Term_ (..)
+      , PrimType(..)
       , X_TVar
       , X_TPrim
       , X_TLet
@@ -142,6 +143,17 @@ data Side = L | R
 instance Alpha Side
 instance Subst t Side
 
+-- | Signifies the specific type of primitive.
+data PrimType = PMap
+              | PStoM
+              | PMtoS
+              | PFoldSet
+              | PFoldMultiset
+  deriving (Show, Generic)
+
+instance Alpha PrimType
+instance Subst t PrimType
+
 type family X_TVar e
 type family X_TPrim e
 type family X_TLet e
@@ -169,7 +181,7 @@ data Term_ e where
   -- | A variable.
   TVar_   :: X_TVar e -> Name (Term_ e) -> Term_ e
 
-  TPrim_  :: X_TPrim e -> String -> Term_ e
+  TPrim_  :: X_TPrim e -> PrimType -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e

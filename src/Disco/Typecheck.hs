@@ -70,6 +70,7 @@ import qualified Data.Map                                as M
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           Disco.AST.Generic (PrimType(..))
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 
@@ -507,28 +508,28 @@ infer (TAbs lam)    = do
     mkFunTy :: [Type] -> Type -> Type
     mkFunTy tys out = foldr TyArr out tys
 
-infer (TPrim "mapSet") = do
+infer (TPrim PMap) = do
   a <- freshTy
   b <- freshTy
-  return $ (ATPrim (TyArr (TyArr a b) (TyArr (TySet a) (TySet b))) "mapSet", CTrue)
+  return $ (ATPrim (TyArr (TyArr a b) (TyArr (TySet a) (TySet b))) PMap, CTrue)
 
-infer (TPrim "setToMultiset") = do
+infer (TPrim PStoM) = do
   a <- freshTy
-  return  (ATPrim (TyArr (TySet a) (TyMultiset a)) "setToMultiset", CTrue)
+  return  (ATPrim (TyArr (TySet a) (TyMultiset a)) PStoM, CTrue)
 
-infer (TPrim "multisetToSet") = do
+infer (TPrim PMtoS) = do
   a <- freshTy
-  return (ATPrim (TyArr (TyMultiset a) (TySet (TyPair a TyN))) "multisetToSet", CTrue)
+  return (ATPrim (TyArr (TyMultiset a) (TySet (TyPair a TyN))) PMtoS, CTrue)
 
-infer (TPrim "foldSet") = do
-  a <- freshTy
-  b <- freshTy
-  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TySet a) b))) "foldSet", CTrue)
-
-infer (TPrim "foldMultiset") = do
+infer (TPrim PFoldSet) = do
   a <- freshTy
   b <- freshTy
-  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TyMultiset a) b))) "foldMultiset", CTrue)
+  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TySet a) b))) PFoldSet, CTrue)
+
+infer (TPrim PFoldMultiset) = do
+  a <- freshTy
+  b <- freshTy
+  return $ (ATPrim (TyArr (TyArr a (TyArr b b)) (TyArr b (TyArr (TyMultiset a) b))) PFoldMultiset, CTrue)
   -- Infer the type of a function application by inferring the
   -- function type and then checking the argument type.
 infer (TApp t t')   = do

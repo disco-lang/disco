@@ -37,6 +37,7 @@ import           Data.Coerce
 import           Data.Ratio
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Generic (PrimType(..))
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -96,9 +97,13 @@ desugarDefn def = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM Core
 desugarTerm (ATVar _ x)   = return $ CVar (coerce x)
-desugarTerm (ATPrim (TyArr (TyArr _ b) _) "mapSet")  = return $ CPrim PMap b
-desugarTerm (ATPrim (TyArr (TySet a) (TyMultiset _)) "setToMultiset") = return $ CPrim PStoM a
-desugarTerm (ATPrim (TyArr (TyMultiset a) (TySet (TyPair _ TyN))) "multisetToSet") = return $ CPrim PMtoS a
+desugarTerm (ATPrim (TyArr (TyArr _ b) _) PMap)  = return $ CPrim PMap b
+desugarTerm (ATPrim (TyArr (TySet a) (TyMultiset _)) PStoM) = return $ CPrim PStoM a
+desugarTerm (ATPrim (TyArr (TyMultiset a) (TySet (TyPair _ TyN))) PMtoS) = return $ CPrim PMtoS a
+desugarTerm (ATPrim (TyArr (TyArr a (TyArr _ _)) (TyArr _ (TyArr (TySet _) b))) PFoldSet)
+  = return $ CPrim PFoldSet a
+desugarTerm (ATPrim (TyArr (TyArr a (TyArr _ _)) (TyArr _ (TyArr (TyMultiset _) b))) PFoldMultiset)
+  = return $ CPrim PFoldMultiset a
 desugarTerm ATUnit        = return $ CCons 0 []
 desugarTerm (ATBool b)    = return $ CCons (fromEnum b) []
 desugarTerm (ATAbs _ lam) =

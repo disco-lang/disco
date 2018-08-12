@@ -157,7 +157,12 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
-prettyTerm (TPrim x)     = text x
+prettyTerm (TPrim x)     = text $ case x of
+  PMap -> "setMap"
+  PStoM -> "setToMultiset"
+  PMtoS -> "multisetToSet"
+  PFoldSet -> "foldSet"
+  PFoldMultiset -> "foldMultiset"
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)

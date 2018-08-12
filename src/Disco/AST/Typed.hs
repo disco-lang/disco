@@ -128,8 +128,8 @@ type instance X_TParens TY = ()
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
 
-pattern ATPrim :: Type -> String -> ATerm
-pattern ATPrim ty name = TPrim_ ty name
+pattern ATPrim :: Type -> PrimType -> ATerm
+pattern ATPrim ty pTy = TPrim_ ty pTy
 
 pattern ATUn :: Type -> UOp -> ATerm -> ATerm
 pattern ATUn ty uop term = TUn_ ty uop term

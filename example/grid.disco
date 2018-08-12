@@ -9,7 +9,7 @@
 ||| and so on, where the first column contains the square numbers.
 ||| sqIso' is the inverse.
 
-!!! ∀ n : Nat. sqIso (sqIso' n) = n
+!!! ∀ n : Nat. sqIso (sqIso' n) == n
 
 sqIso : ℕ×ℕ → ℕ
 sqIso (x,y) =
@@ -19,7 +19,7 @@ sqIso (x,y) =
 
 ||| Inverse direction of the square isomorphism.
 
-!!! ∀ p : Nat*Nat. sqIso' (sqIso p) = p
+!!! ∀ p : Nat*Nat. sqIso' (sqIso p) == p
 
 sqIso' : ℕ → ℕ×ℕ
 sqIso' n =
@@ -36,7 +36,7 @@ sqIso' n =
 |||
 ||| where the first column contains the triangular numbers.
 
-!!! ∀ n : Nat. diagIso (diagIso' n) = n
+!!! ∀ n : Nat. diagIso (diagIso' n) == n
 
 diagIso : ℕ×ℕ → ℕ
 diagIso (x,y) = (x+y)*(x+y+1)//2 + x
@@ -58,12 +58,12 @@ diagIso' n =
 -- We have to be careful not to call powerIso' 0 because it gets stuck
 -- in infinite recursion!  One way would is to write the test as follows:
 
-!!! forall n:Nat. powerIso (powerIso' (n+1)) = (n+1)
+!!! forall n:Nat. powerIso (powerIso' (n+1)) == (n+1)
 
 -- Alternatively, since 'implies' is lazy (i.e. "short-circuiting"),
 -- we can write
 
-!!! ∀ n : Nat. (n > 0) ==> powerIso (powerIso' n) = n
+!!! ∀ n : Nat. (n > 0) ==> powerIso (powerIso' n) == n
 
 powerIso : ℕ×ℕ → ℕ
 powerIso (x,y) = 2^x * (2y + 1)

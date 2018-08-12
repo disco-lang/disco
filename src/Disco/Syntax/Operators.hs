@@ -172,7 +172,7 @@ opTable =
     ]
   , [ bopInfo InR  Cons    ["::"]
     ]
-  , [ bopInfo InR  Eq      ["="]
+  , [ bopInfo InR  Eq      ["=="]
     , bopInfo InR  Neq     ["≠", "/="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]

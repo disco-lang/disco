@@ -6,5 +6,5 @@ pythagTriples = [ (a,b,c)
   | a in [1 .. 100]
   , b in [1 .. 100]
   , c in [1 .. 100]
-  , a^2 + b^2 = c^2
+  , a^2 + b^2 == c^2
   ]

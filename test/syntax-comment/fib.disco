@@ -1,9 +1,9 @@
 ||| A naive implementation of the fibonacci function.
-!!!   fib 0 = 0
-!!!   fib 1 = 1
-!!!   fib 2 = 1
-!!!   fib 5 = 5
-!!!   fib 12 = 144
+!!!   fib 0 == 0
+!!!   fib 1 == 1
+!!!   fib 2 == 1
+!!!   fib 5 == 5
+!!!   fib 12 == 144
 fib : Nat -> Nat                 -- a top-level recursive function
 fib n =
   {? n when

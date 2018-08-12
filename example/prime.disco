@@ -6,11 +6,11 @@
 ||| ldf k n calculates the least divisor of n that is at least k and
 ||| at most sqrt n.  If no such divisor exists, then it returns n.
 
-!!! ldf 2 10 = 2
-!!! ldf 3 10 = 10
-!!! ldf 2 25 = 5
-!!! ldf 5 25 = 5
-!!! ldf 6 25 = 25
+!!! ldf 2 10 == 2
+!!! ldf 3 10 == 10
+!!! ldf 2 25 == 5
+!!! ldf 5 25 == 5
+!!! ldf 6 25 == 25
 !!! forall k:N, m:N. let n = k+m in k <= ldf k n <= n
 !!! forall k:N, n:N. (ldf k n) divides n
 
@@ -25,11 +25,11 @@ ldf k n =
 ||| ld n calculates the least nontrivial divisor of n, or returns n if
 ||| n has no nontrivial divisors.
 
-!!! ld 14 = 2
-!!! ld 15 = 3
-!!! ld 16 = 2
-!!! ld 17 = 17
-!!! ld 25 = 5
+!!! ld 14 == 2
+!!! ld 15 == 3
+!!! ld 16 == 2
+!!! ld 17 == 17
+!!! ld 25 == 5
 !!! forall n:N. (ld n) divides n
 
 ld : N -> N
@@ -49,5 +49,5 @@ ld = ldf 2
 isPrime : N -> Bool
 isPrime n =
   {? false      if n <= 1,
-     ld n = n   otherwise
+     ld n == n  otherwise
   ?}

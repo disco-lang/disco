@@ -47,17 +47,22 @@ module Disco.Eval
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
        , emitMessage, info, warning, err, panic, debug
-       , runDisco, catchAsMessage
+       , runDisco, catchAsMessage, catchAndPrintErrors
 
          -- ** Memory/environment utilities
        , allocate, delay, mkThunk
+
+         -- ** Top level phases
+       , parseDiscoModule
+       , typecheckDisco
 
        )
        where
 
 import           Control.Lens                            (makeLenses, use, (%=),
                                                           (<+=), (<>=))
-import           Control.Monad.Except                    (catchError)
+import           Control.Monad.Except                    (catchError,
+                                                          throwError)
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
@@ -66,7 +71,7 @@ import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
 import qualified Data.Sequence                           as Seq
 import           Data.Void
-import           Text.Megaparsec
+import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
@@ -76,6 +81,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
+import           Disco.Parser
 import           Disco.Typecheck.Monad
 import           Disco.Types
 
@@ -198,8 +204,8 @@ data IErr where
   -- | Error encountered during typechecking.
   TypeCheckErr :: TCError -> IErr
 
-  -- | Error encountered during parsing.
-  ParseErr :: (ParseError Char Data.Void.Void) -> IErr
+  -- | Error encountered during parsing, with the original input.
+  ParseErr :: String -> ParseError Char Data.Void.Void -> IErr
 
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr
@@ -378,6 +384,14 @@ runDisco
 catchAsMessage :: Disco e () -> Disco e ()
 catchAsMessage m = m `catchError` (err . Item)
 
+-- XXX eventually we should get rid of this and replace with catchAsMessage
+catchAndPrintErrors :: a -> Disco IErr a -> Disco IErr a
+catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
+  where
+    handler (ParseErr s e)   = iputStrLn $ parseErrorPretty' s e
+    handler (TypeCheckErr e) = iprint e
+    handler e                = iprint e
+
 ------------------------------------------------------------
 -- Memory/environment utilities
 ------------------------------------------------------------
@@ -413,3 +427,25 @@ withTopEnv :: Disco e a -> Disco e a
 withTopEnv m = do
   env <- use topEnv
   withEnv env m
+
+------------------------------------------------------------
+-- High-level disco phases
+------------------------------------------------------------
+
+-- | Utility function: given an 'Either', wrap a 'Left' in the given
+--   function and throw it as a 'Disco' error, or return a 'Right'.
+adaptError :: (e1 -> e2) -> Either e1 a -> Disco e2 a
+adaptError f = either (throwError . f) return
+
+-- | Parse a module from a file, re-throwing a parse error if it
+--   fails.
+parseDiscoModule :: FilePath -> Disco IErr Module
+parseDiscoModule file = do
+  str <- io $ readFile file
+  adaptError (ParseErr str) $ runParser wholeModule file str
+
+-- | Run a typechecking computation, re-throwing a wrapped error if it
+--   fails.
+typecheckDisco :: TyCtx -> TyDefCtx -> TCM a -> Disco IErr a
+typecheckDisco tyctx tydefs tcm =
+  adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends tyctx $ tcm)

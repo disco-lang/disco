@@ -113,6 +113,7 @@ parseLine s =
 -- XXX eventually this should switch from using IErr specifically to
 -- an umbrella error type in which IErr can be embedded, along with
 -- e.g. parse or type errors
+
 handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
 handleCMD s =
@@ -187,7 +188,7 @@ fileNotFound file _ = putStrLn $ "File not found: " ++ file
 --   modules by calling recCheckMod. If no errors are thrown, any tests present
 --   in the parent module are executed.
 handleLoad :: FilePath -> Disco IErr Bool
-handleLoad fp = do
+handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
   modMap <- execStateT (recCheckMod directory S.empty modName) M.empty
   let m@(ModuleInfo _ props _ _ _) = modMap M.! modName
@@ -220,20 +221,15 @@ recCheckMod directory inProcess modName  = do
     Nothing -> do
       file <- resolveModule directory modName
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      str <- io $ readFile file
-      let mp = runParser wholeModule file str
-      case mp of
-        Left e  -> throwError $ ParseErr e
-        Right cm@(Module mns _ _) -> do
-          -- mis only contains the module info from direct imports.
-          mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns
-          imports@(ModuleInfo _ _ tyctx tydefns _) <- combineModuleInfo mis
-          case evalTCM (withTyDefns tydefns $ extends tyctx $ checkModule cm) of
-            Left tcErr         -> throwError $ TypeCheckErr tcErr
-            Right m -> do
-              m' <- combineModuleInfo [imports, m]
-              modify (M.insert modName m')
-              return m'
+      cm@(Module mns _ _) <- lift $ parseDiscoModule file
+
+      -- mis only contains the module info from direct imports.
+      mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns
+      imports@(ModuleInfo _ _ tyctx tydefns _) <- combineModuleInfo mis
+      m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
+      m' <- combineModuleInfo [imports, m]
+      modify (M.insert modName m')
+      return m'
 
 -- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos are merged by
 --   joining their doc, type, type definition, and term contexts. The property context

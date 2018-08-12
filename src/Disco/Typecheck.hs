@@ -903,7 +903,16 @@ checkPattern p@(PInj R pat) ty    = do
 
 -- XXX this isn't quite right, what if we're checking at a type
 -- variable but we need to solve it to be a TyFin?  Can this ever
--- happen?  We would need a COr, except we can't express the constraint "exists m. ty = TyFin m"
+-- happen?  We would need a COr, except we can't express the
+-- constraint "exists m. ty = TyFin m"
+--
+-- Yes, this can happen, and here's an example:
+--
+--   > (\x. {? true when x is 3, false otherwise ?}) (2 : Z5)
+--   Unsolvable NoUnify
+--   > (\(x : Z5). {? true when x is 3, false otherwise ?}) (2 : Z5)
+--   false
+
 checkPattern (PNat n) (TyFin m) = return (emptyCtx, APNat (TyFin m) n)
 checkPattern (PNat n) ty        = do
   constraint $ CSub TyN ty

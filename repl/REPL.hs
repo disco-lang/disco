@@ -150,8 +150,11 @@ handleLet x t = do
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
+      let c = compileTerm at
+      thnk <- mkThunk c
       topCtx   %= M.insert x sig
-      topDefns %= M.insert (coerce x) (compileTerm at)
+      topDefns %= M.insert (coerce x) c
+      topEnv   %= M.insert (coerce x) thnk
 
 handleShowDefn :: Name Term -> Disco IErr String
 handleShowDefn x = do

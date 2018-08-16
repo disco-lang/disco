@@ -156,7 +156,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMDivides Integer
         -- Set Operations
         | OSize    -- ^ Size of two sets (@size@)
-        | OPowerSet -- ^ Power set of a given set (@powerSet@)
+        | OPowerSet Type -- ^ Power set of a given set (@powerSet@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
         | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
         | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)

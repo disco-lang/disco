@@ -239,7 +239,7 @@ desugarUOp _ Floor  c      = COp OFloor  [c]
 desugarUOp _ Ceil   c      = COp OCeil   [c]
 desugarUOp _ Abs    c      = COp OAbs    [c]
 desugarUOp _ Size   c      = COp OSize   [c]
-desugarUOp _ PowerSet c    = COp OPowerSet [c]
+desugarUOp (TySet ty) PowerSet c    = COp (OPowerSet ty) [c]
 
 -- | Desugar a binary operator application.
 --   @arg1 ty -> arg2 ty -> result ty -> op -> desugared arg1 -> desugared arg2 -> result@

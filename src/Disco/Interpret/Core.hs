@@ -584,7 +584,7 @@ whnfOp (OMDiv n)  = modDiv n
 whnfOp (OMExp n)  = modExp n
 whnfOp (OMDivides n) = modDivides n
 whnfOp (OSize)            = setSize
---whnfOp (OPowerSet)        = powerSet
+whnfOp (OPowerSet ty)        = powerSet ty
 whnfOp (OUnion ty)        = setUnion ty
 whnfOp (OIntersection ty) = setIntersection ty
 whnfOp (ODifference ty)   = setDifference ty
@@ -623,10 +623,11 @@ subsetTest ty [c1, c2] = do
   ys' <- merge (max) (decideOrdFor ty) xs ys
   mkEnum <$> setEquality ty ys ys'
 
--- powerSet :: [Core] -> Disco IErr Value
--- powerSet [c] = do
---   (VSet xs) <- whnf c
---   return $ VSet (map VSet (subsequences xs))
+powerSet :: Type -> [Core] -> Disco IErr Value
+powerSet ty [c] = do
+  (VSet xs) <- whnf c
+  ys <- sortNCount (decideOrdFor ty) (map (\x -> (VSet x, 1)) (subsequences xs))
+  return $ VSet ys
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value

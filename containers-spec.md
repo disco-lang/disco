@@ -84,16 +84,45 @@ countSet : Multiset a -> Set (a * N)
 ```
 which turns a multiset into the set of its (element, count) pairs.
 
-Other primitives
-----------------
+Primitives
+----------
 
-`fold : (a -> b -> b) -> b -> Container a -> b` should work for any
-kind of container.  (???)
+* `list`, `multiset`, `set` (as discussed above)
+* `countSet : Multiset a -> Set (a * N)`
+* `union : Set a -> Set a -> Set a`
+* `maxUnion : Multiset a -> Multiset a -> Multiset a`
+* `plusUnion : Multiset a -> Multiset a -> Multiset a`
+* `intersect`:
+    - `Set a -> Set a -> Set a` OR
+    - `Multiset a -> Multiset a -> Multiset a` OR
+    - `List a -> Set a -> List a` (OR vice-versa)
+* `difference`:
+    - `Set a -> Set a -> Set a` OR
+    - `Multiset a -> Multiset a -> Multiset a` OR
+    - `List a -> Set a -> List a` OR
+    - `List a -> Multiset a -> List a`
+* `power`: ??
+    - `Set a -> Set (Set a)`
+    - `Multiset a -> Multiset (Multiset a)`
+    - `List a -> Multiset (List a)`
+* `subthingy`: ??
+    - `Set a -> Set a -> Bool`
+    - `Multiset a -> Multiset a -> Bool`
+    - `List a -> List a -> Bool`
+
+Standard library functions
+--------------------------
+
+* `length`, `setSize`, `multisetSize`
+    - Have primitive `size` that turns into one of the above?
+* `foldr`
+* `sum`, etc. on lists only
+    - If you want to e.g. sum a set, have to do  `sum(list(s))` ?
 
 Typechecking
 ------------
 
-
+XXX
 
 If a function `f` expects a set, you can't call it with a list, `f
 [1,2,3]`, but you could instead say `f (set [1,2,3])`.  It also won't

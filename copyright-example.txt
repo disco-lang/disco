@@ -1,3 +1,0 @@
-# Copyright The ______ Project and contributors
-# SPDX-License-Identifier: Apache-2.0
-

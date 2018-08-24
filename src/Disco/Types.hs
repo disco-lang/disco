@@ -12,9 +12,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Disco language types.
 --

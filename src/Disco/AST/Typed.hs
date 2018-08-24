@@ -7,9 +7,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Typed
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Typed abstract syntax trees representing the typechecked surface
 -- syntax of the Disco language.  Each tree node is annotated with the

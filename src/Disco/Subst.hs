@@ -1,9 +1,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Subst
--- Copyright   :  (c) 2018 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Generic definition of substitutions.
 --

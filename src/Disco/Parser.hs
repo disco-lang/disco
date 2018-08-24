@@ -6,7 +6,7 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
---
+-- |
 -- Module      :  Disco.Parser
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com

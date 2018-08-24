@@ -5,9 +5,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Operators
--- Copyright   :  (c) 2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Unary and binary operators along with information like precedence,
 -- fixity, and concrete syntax.

@@ -9,9 +9,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Abstract syntax trees representing the surface syntax of the Disco
 -- language.

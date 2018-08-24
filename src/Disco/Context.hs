@@ -1,11 +1,12 @@
-{-# LANGUAGE FlexibleContexts         #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Context
--- Copyright   :  (c) 2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Contexts manage mappings from names to other things (such as types
 -- or values).
@@ -19,10 +20,10 @@ module Disco.Context
 
        ) where
 
-import           Prelude                                 hiding (lookup)
+import           Prelude                          hiding (lookup)
 
 import           Control.Monad.Reader
-import qualified Data.Map                                as M
+import qualified Data.Map                         as M
 
 import           Unbound.Generics.LocallyNameless
 

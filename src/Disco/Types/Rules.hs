@@ -3,9 +3,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types.Rules
--- Copyright   :  (c) 2018 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Rules about arity, subtyping, and sorts for disco base types.
 --

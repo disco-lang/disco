@@ -3,9 +3,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Property
--- Copyright   :  (c) 2016-2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Properties of disco functions.
 --

@@ -20,9 +20,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Generic
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Abstract syntax trees representing the generic syntax of the Disco
 -- language. Concrete AST instances may use this module as a template.

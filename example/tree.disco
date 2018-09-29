@@ -1,0 +1,26 @@
+type Tree = Unit + N * Tree * Tree
+
+leaf : Tree
+leaf = left ()
+
+node : N -> Tree -> Tree -> Tree
+node x l r = right (x,l,r)
+
+tree1 : Tree
+tree1 = node 3 (node 5 (node 1 leaf leaf) leaf) (node 6 (node 2 leaf leaf) (node 8 leaf leaf))
+
+treeFold : r -> (N -> r -> r -> r) -> Tree -> r
+treeFold x f (left  ())      = x
+treeFold x f (right (n,l,r)) = f n (treeFold x f l) (treeFold x f r)
+
+treeSum : Tree -> N
+treeSum = treeFold 0 (\x l r. x + l + r)
+
+treeSize : Tree -> N
+treeSize = treeFold 0 (\x l r. 1 + l + r)
+
+max : N -> N -> N
+max a b = {? a if a >= b, b otherwise ?}
+
+treeHeight : Tree -> N
+treeHeight = treeFold 0 (\x l r. 1 + max l r)

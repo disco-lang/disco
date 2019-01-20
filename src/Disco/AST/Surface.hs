@@ -119,8 +119,8 @@ data UD
 
 -- | Enumeration of optional language extensions.
 data Ext
-  = Primitives
-  | Randomness
+  = Primitives   -- ^ Allow primitives, i.e. @$prim@
+  | Randomness   -- ^ Allow non-deterministic semantics via primitives like @uniform@
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | A list of all possible language extensions, provided for convenience.

@@ -21,6 +21,7 @@ module Disco.AST.Desugared
        ( -- * Desugared, type-annotated terms
        DTerm
        , pattern DTVar
+       , pattern DTPrim
        , pattern DTUnit
        , pattern DTBool
        , pattern DTChar
@@ -81,6 +82,7 @@ type DProperty = Property_ DS
 type DTerm = Term_ DS
 
 type instance X_TVar DS           = Type
+type instance X_TPrim DS          = Type
 type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
 type instance X_TBool DS          = ()
@@ -118,6 +120,9 @@ type instance X_Term DS =
 
 pattern DTVar :: Type -> Name DTerm -> DTerm
 pattern DTVar ty name = TVar_ ty name
+
+pattern DTPrim :: Type -> String -> DTerm
+pattern DTPrim ty name = TPrim_ ty name
 
 pattern DTUnit :: DTerm
 pattern DTUnit = TUnit_ ()
@@ -164,7 +169,7 @@ pattern DTNil ty = XTerm_ (Right (Right ty))
 pattern DTContainer :: Type -> Container -> [DTerm] -> Maybe (Ellipsis DTerm) -> DTerm
 pattern DTContainer ty c tl mets = TContainer_ ty c tl mets
 
-{-# COMPLETE DTVar, DTUnit, DTBool, DTChar, DTNat, DTRat,
+{-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
              DTLam, DTApp, DTPair, DTInj, DTCase, DTUn, DTBin, DTTyOp,
              DTNil, DTContainer #-}
 
@@ -290,6 +295,7 @@ type instance X_QGuard DS = Void
 
 instance HasType DTerm where
   getType (DTVar ty _)           = ty
+  getType (DTPrim ty _)          = ty
   getType DTUnit                 = TyUnit
   getType (DTBool _)             = TyBool
   getType (DTChar _)             = TyC

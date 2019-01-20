@@ -326,6 +326,14 @@ typecheck Infer (TVar x)      = do
   return $ ATVar ty (coerce x)
 
 --------------------------------------------------
+-- Primitives
+
+-- We can't infer the type of a primitive; in checking mode we always
+-- assume that the given type is OK.  If you use a primitive you have
+-- to know what type you expect it to have.
+typecheck (Check ty) (TPrim x) = return $ ATPrim ty x
+
+--------------------------------------------------
 -- Base types
 
 -- A few trivial cases for base types.

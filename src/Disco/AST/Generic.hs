@@ -48,6 +48,7 @@ module Disco.AST.Generic
        , Term_ (..)
 
        , X_TVar
+       , X_TPrim
        , X_TLet
        , X_TParens
        , X_TUnit
@@ -223,6 +224,7 @@ instance Subst a t => Subst a (Ellipsis t)
 ------------------------------------------------------------
 
 type family X_TVar e
+type family X_TPrim e
 type family X_TLet e
 type family X_TParens e
 type family X_TUnit e
@@ -250,6 +252,10 @@ data Term_ e where
 
   -- | A variable.
   TVar_   :: X_TVar e -> Name (Term_ e) -> Term_ e
+
+  -- | A primitive, i.e. an identifier which is interpreted specially
+  --   at runtime.
+  TPrim_  :: X_TPrim e -> String -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e
@@ -323,6 +329,7 @@ data Term_ e where
 -- This makes it easier to derive typeclass instances for generic types.
 type ForallTerm (a :: * -> Constraint) e
   = ( a (X_TVar e)
+    , a (X_TPrim e)
     , a (X_TLet e)
     , a (X_TParens e)
     , a (X_TUnit e)

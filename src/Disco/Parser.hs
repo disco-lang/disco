@@ -71,6 +71,8 @@ import           Data.List                        (intercalate)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.AST.Surface
@@ -88,12 +90,14 @@ data ParserState = ParserState
   { _indentLevel :: Maybe Pos  -- ^ When this is @Just p@, everything
                                --   should be indented more than column
                                --   @p@.
+  , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
+                               --   (some of which may affect parsing).
   }
 
 makeLenses ''ParserState
 
 initParserState :: ParserState
-initParserState = ParserState Nothing
+initParserState = ParserState Nothing S.empty
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level.  For now
@@ -122,6 +126,30 @@ requireIndent p = do
   case l of
     Just pos -> L.indentGuard sc GT pos >> p
     _        -> p
+
+-- | XXX
+withExts :: Set Ext -> Parser a -> Parser a
+withExts exts p = do
+  oldExts <- use enabledExts
+  enabledExts .= exts
+  a <- p
+  enabledExts .= oldExts
+  return a
+
+-- | XXX
+withAdditionalExts :: Set Ext -> Parser a -> Parser a
+withAdditionalExts exts p = do
+  oldExts <- use enabledExts
+  enabledExts .= (oldExts `S.union` exts)
+  a <- p
+  enabledExts .= oldExts
+  return a
+
+-- | XXX
+ensureEnabled :: Ext -> Parser ()
+ensureEnabled e = do
+  exts <- use enabledExts
+  guard $ e `S.member` exts
 
 -- | Generically consume whitespace, including comments.
 sc :: Parser ()
@@ -266,37 +294,38 @@ wholeModule = between sc eof parseModule
 --   semicolons).
 parseModule :: Parser Module
 parseModule = do
-  exts     <- many parseExtension
-  imports  <- many parseImport
-  topLevel <- many parseTopLevel
-  let theMod = mkModule exts imports topLevel
-  return theMod
-  where
-    groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
-    groupTLs _ [] = []
-    groupTLs revDocs (TLDoc doc : rest)
-      = groupTLs (doc : revDocs) rest
-    groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
-      = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
-    groupTLs _ (TLDecl defn : rest)
-      = (defn, Nothing) : groupTLs [] rest
+  exts     <- S.fromList <$> many parseExtension
+  withExts exts $ do
+    imports  <- many parseImport
+    topLevel <- many parseTopLevel
+    let theMod = mkModule exts imports topLevel
+    return theMod
+    where
+      groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
+      groupTLs _ [] = []
+      groupTLs revDocs (TLDoc doc : rest)
+        = groupTLs (doc : revDocs) rest
+      groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
+        = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
+      groupTLs _ (TLDecl defn : rest)
+        = (defn, Nothing) : groupTLs [] rest
 
-    defnGroups :: [Decl] -> [Decl]
-    defnGroups []                = []
-    defnGroups (d@DType{}  : ds)  = d : defnGroups ds
-    defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
-    defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
-      where
-        (grp, rest) = matchDefn ds
-        matchDefn :: [Decl] -> ([TermDefn], [Decl])
-        matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = (t:ts, ds2')
-          where
-            (ts, ds2') = matchDefn ds2
-        matchDefn ds2 = ([], ds2)
+      defnGroups :: [Decl] -> [Decl]
+      defnGroups []                = []
+      defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+      defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
+      defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
+        where
+          (grp, rest) = matchDefn ds
+          matchDefn :: [Decl] -> ([TermDefn], [Decl])
+          matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = (t:ts, ds2')
+            where
+              (ts, ds2') = matchDefn ds2
+          matchDefn ds2 = ([], ds2)
 
-    mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
-      where
-        (decls, docs) = unzip $ groupTLs [] tls
+      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
+        where
+          (decls, docs) = unzip $ groupTLs [] tls
 
 -- | Parse an extension.
 parseExtension :: Parser Ext
@@ -416,6 +445,7 @@ parseAtom = label "expression" $
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
+  <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom

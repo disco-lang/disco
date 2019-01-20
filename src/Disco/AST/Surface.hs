@@ -32,6 +32,7 @@ module Disco.AST.Surface
        , UD
        , Term
        , pattern TVar
+       , pattern TPrim
        , pattern TUn
        , pattern TLet
        , pattern TParens
@@ -106,6 +107,7 @@ module Disco.AST.Surface
        where
 
 import           Control.Lens                     ((%~), _1, _2, _3)
+import           Data.Set                         (Set)
 import           Data.Void
 
 import           Disco.AST.Generic
@@ -129,7 +131,7 @@ allExts = [minBound .. maxBound]
 
 -- | A module contains all the information from one disco source file.
 data Module = Module
-  { modExts    :: [Ext]         -- ^ Enabled extensions
+  { modExts    :: Set Ext       -- ^ Enabled extensions
   , modImports :: [ModName]     -- ^ Module imports
   , modDecls   :: [Decl]        -- ^ Declarations
   , modDocs    :: Ctx Term Docs -- ^ Documentation
@@ -194,6 +196,7 @@ partitionDecls []                   = ([], [], [])
 type Term = Term_ UD
 
 type instance X_TVar            UD = ()
+type instance X_TPrim           UD = ()
 type instance X_TLet            UD = ()
 type instance X_TParens         UD = ()
 type instance X_TUnit           UD = ()
@@ -218,6 +221,9 @@ type instance X_Term            UD = ()  -- TWild
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
+
+pattern TPrim :: String -> Term
+pattern TPrim name = TPrim_ () name
 
 pattern TUn :: UOp -> Term -> Term
 pattern TUn uop term = TUn_ () uop term
@@ -285,7 +291,7 @@ pattern TAscr term ty = TAscr_ () term ty
 pattern TWild :: Term
 pattern TWild = XTerm_ ()
 
-{-# COMPLETE TVar, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
+{-# COMPLETE TVar, TPrim, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
              TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
              TContainer, TContainerComp, TAscr, TWild #-}
 

@@ -165,6 +165,7 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
+prettyTerm (TPrim x)     = text "$" <> text x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)

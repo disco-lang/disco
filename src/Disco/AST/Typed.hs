@@ -22,6 +22,7 @@ module Disco.AST.Typed
        ( -- * Type-annotated terms
        ATerm
        , pattern ATVar
+       , pattern ATPrim
        , pattern ATUn
        , pattern ATLet
        , pattern ATUnit
@@ -111,6 +112,7 @@ type AProperty = Property_ TY
 type ATerm = Term_ TY
 
 type instance X_TVar            TY = Type
+type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
 type instance X_TBool           TY = ()
@@ -138,6 +140,9 @@ type instance X_Term TY
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
+
+pattern ATPrim :: Type -> String -> ATerm
+pattern ATPrim ty name = TPrim_ ty name
 
 pattern ATUn :: Type -> UOp -> ATerm -> ATerm
 pattern ATUn ty uop term = TUn_ ty uop term
@@ -193,7 +198,7 @@ pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
-{-# COMPLETE ATVar, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
+{-# COMPLETE ATVar, ATPrim, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
              ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
@@ -358,6 +363,7 @@ pattern APFrac ty p1 p2 <- PFrac_ (unembed -> ty) p1 p2
 
 instance HasType ATerm where
   getType (ATVar ty _)             = ty
+  getType (ATPrim ty _)            = ty
   getType ATUnit                   = TyUnit
   getType (ATBool _)               = TyBool
   getType (ATNat ty _)             = ty
@@ -378,6 +384,7 @@ instance HasType ATerm where
   getType (ATCase ty _)            = ty
 
   setType ty (ATVar _ x      )       = ATVar ty x
+  setType ty (ATPrim _ x     )       = ATPrim ty x
   setType _  ATUnit                  = ATUnit
   setType _  (ATBool b)              = ATBool b
   setType ty (ATNat _ x      )       = ATNat ty x

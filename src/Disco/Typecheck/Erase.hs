@@ -26,6 +26,7 @@ import           Disco.AST.Typed
 -- | Erase all the type annotations from a term.
 erase :: ATerm -> Term
 erase (ATVar _ x)           = TVar (coerce x)
+erase (ATPrim _ x)          = TPrim x
 erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)
   where (tel,at) = unsafeUnbind bs
 erase ATUnit                = TUnit
@@ -94,6 +95,7 @@ eraseProperty b = bind (coerce xs) (erase at)
 
 eraseDTerm :: DTerm -> Term
 eraseDTerm (DTVar _ x)      = TVar (coerce x)
+eraseDTerm (DTPrim _ x)     = TPrim x
 eraseDTerm DTUnit           = TUnit
 eraseDTerm (DTBool b)       = TBool b
 eraseDTerm (DTChar c)       = TChar c

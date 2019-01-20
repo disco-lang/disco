@@ -58,6 +58,9 @@ data Core where
   -- | A variable.
   CVar  :: Name Core -> Core
 
+  -- | A primitive.
+  CPrim :: String -> Core
+
   -- | A constructor, identified by number, with arguments.  For
   --   example, false and true are represented by @CCons 0 []@ and
   --   @CCons 1 []@, respectively; a pair is represented by @CCons 0

@@ -164,6 +164,7 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
+desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
 desugarTerm (ATChar c)           = return $ DTChar c

@@ -1,0 +1,4 @@
+using primitives
+
+x : N
+x = $foo

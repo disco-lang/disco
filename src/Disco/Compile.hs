@@ -54,6 +54,7 @@ compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
 --   term.
 compileDTerm :: DTerm -> FreshM Core
 compileDTerm (DTVar _ x)  = return $ CVar (coerce x)
+compileDTerm (DTPrim _ x) = return $ CPrim x
 compileDTerm DTUnit       = return $ CCons 0 []
 compileDTerm (DTBool b)   = return $ CCons (fromEnum b) []
 compileDTerm (DTChar c)   = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)

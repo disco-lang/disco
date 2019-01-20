@@ -21,7 +21,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..), ModName
+         Ext(..), allExts, Module(..), TopLevel(..), ModName
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -115,12 +115,25 @@ import           Disco.Types
 import           Unbound.Generics.LocallyNameless
 
 -- | The extension descriptor for Surface specific AST types.
-
 data UD
 
--- | A module is a list of declarations together with a collection of
---   documentation for top-level names.
-data Module = Module [ModName] [Decl] (Ctx Term Docs)
+-- | Enumeration of optional language extensions.
+data Ext
+  = Primitives
+  | Randomness
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+-- | A list of all possible language extensions, provided for convenience.
+allExts :: [Ext]
+allExts = [minBound .. maxBound]
+
+-- | A module contains all the information from one disco source file.
+data Module = Module
+  { modExts    :: [Ext]         -- ^ Enabled extensions
+  , modImports :: [ModName]     -- ^ Module imports
+  , modDecls   :: [Decl]        -- ^ Declarations
+  , modDocs    :: Ctx Term Docs -- ^ Documentation
+  }
 deriving instance ForallTerm Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a

@@ -95,8 +95,9 @@ makeLenses ''ParserState
 initParserState :: ParserState
 initParserState = ParserState Nothing
 
--- | A parser is just a megaparsec parser of strings.  Megaparsec can
---   keep track of indentation.  For now we have no custom errors.
+-- | A parser is a megaparsec parser of strings, with an extra layer
+--   of state to keep track of the current indentation level.  For now
+--   we have no custom errors.
 type Parser = StateT ParserState (MP.Parsec Void String)
 
 -- | Run a parser from the initial state.
@@ -230,7 +231,7 @@ reservedWords =
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "type"
-  , "import"
+  , "import", "using"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -265,9 +266,10 @@ wholeModule = between sc eof parseModule
 --   semicolons).
 parseModule :: Parser Module
 parseModule = do
-  imports <- many parseImport
+  exts     <- many parseExtension
+  imports  <- many parseImport
   topLevel <- many parseTopLevel
-  let theMod = mkModule imports topLevel
+  let theMod = mkModule exts imports topLevel
   return theMod
   where
     groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
@@ -292,9 +294,28 @@ parseModule = do
             (ts, ds2') = matchDefn ds2
         matchDefn ds2 = ([], ds2)
 
-    mkModule imps tls = Module imps (defnGroups decls) (M.fromList (catMaybes docs))
+    mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
       where
         (decls, docs) = unzip $ groupTLs [] tls
+
+-- | Parse an extension.
+parseExtension :: Parser Ext
+parseExtension = L.nonIndented sc $
+  reserved "using" *> parseExtName
+
+-- | Parse the name of a language extension (case-insensitive).
+parseExtName :: Parser Ext
+parseExtName = choice (map parseOneExt allExts) <?> "language extension name"
+  where
+    parseOneExt ext = ext <$ lexeme (string' (show ext) :: Parser String)
+
+-- | Parse an import, of the form @import <modulename>@.
+parseImport :: Parser ModName
+parseImport = L.nonIndented sc $
+  reserved "import" *> moduleName
+  where
+    moduleName = lexeme $
+      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.
@@ -302,13 +323,6 @@ parseTopLevel :: Parser TopLevel
 parseTopLevel = L.nonIndented sc $
       TLDoc  <$> parseDocThing
   <|> TLDecl <$> parseDecl
-
-parseImport :: Parser ModName
-parseImport = L.nonIndented sc $
-  reserved "import" *> moduleName
-  where
-    moduleName = lexeme $
-      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@

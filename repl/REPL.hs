@@ -236,7 +236,7 @@ recCheckMod directory inProcess modName  = do
     Nothing -> do
       file <- resolveModule directory modName
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      cm@(Module mns _ _) <- lift $ parseDiscoModule file
+      cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
       mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns

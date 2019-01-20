@@ -86,7 +86,7 @@ inferTelescope inferOne tel = do
 --   properties, types) from a module, returning a 'ModuleInfo' record
 --   on success.
 checkModule :: Module -> TCM ModuleInfo
-checkModule (Module _ m docs) = do
+checkModule (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyCtx <- makeTyCtx typeDecls
   tyDefnCtx <- makeTyDefnCtx tydefs

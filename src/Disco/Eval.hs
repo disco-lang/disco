@@ -64,6 +64,8 @@ import           Control.Lens                            (makeLenses, use, (%=),
                                                           (<+=), (<>=))
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
+import           Control.Monad.Fail                      (MonadFail)
+import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
@@ -205,8 +207,8 @@ data IErr where
   -- | Error encountered during typechecking.
   TypeCheckErr :: TCError -> IErr
 
-  -- | Error encountered during parsing, with the original input.
-  ParseErr :: String -> ParseError Char Data.Void.Void -> IErr
+  -- | Error encountered during parsing.
+  ParseErr :: ParseErrorBundle String Data.Void.Void -> IErr
 
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr
@@ -330,6 +332,9 @@ instance MonadException m => MonadException (LFreshMT m) where
                   run' = RunIO (fmap LFreshMT . run . unLFreshMT)
                   in unLFreshMT <$> f run'
 
+-- This should eventually move into unbound-generics.
+instance MonadFail m => MonadFail (LFreshMT m) where
+  fail = LFreshMT . Fail.fail
 
 -- We need this orphan instance too.  It would seem to make sense for
 -- haskeline to provide an instance for ExceptT, but see:
@@ -395,7 +400,7 @@ catchAsMessage m = m `catchError` (err . Item)
 catchAndPrintErrors :: a -> Disco IErr a -> Disco IErr a
 catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
   where
-    handler (ParseErr s e)   = iputStrLn $ parseErrorPretty' s e
+    handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
     handler (TypeCheckErr e) = iprint e
     handler e                = iprint e
 
@@ -449,7 +454,7 @@ adaptError f = either (throwError . f) return
 parseDiscoModule :: FilePath -> Disco IErr Module
 parseDiscoModule file = do
   str <- io $ readFile file
-  adaptError (ParseErr str) $ runParser wholeModule file str
+  adaptError ParseErr $ runParser wholeModule file str
 
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.

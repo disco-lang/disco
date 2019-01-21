@@ -50,7 +50,6 @@ import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
 import           Data.List                          (find)
 import qualified Data.Map                           as M
-import           Data.Monoid
 import           Data.Ratio
 
 import           Unbound.Generics.LocallyNameless

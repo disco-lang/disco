@@ -41,16 +41,19 @@ import           Disco.Types
 data RationalDisplay = Fraction | Decimal
   deriving (Eq, Show, Generic)
 
+instance Semigroup RationalDisplay where
+  Decimal <> _ = Decimal
+  _ <> Decimal = Decimal
+  _ <> _       = Fraction
+
 -- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
 --   idea that the result should be displayed as a decimal if any
 --   decimal literals are used in the input; otherwise, the default is
 --   to display as a fraction.  So the identity element is 'Fraction',
 --   and 'Decimal' always wins when combining.
 instance Monoid RationalDisplay where
-  mempty = Fraction
-  Decimal `mappend` _ = Decimal
-  _ `mappend` Decimal = Decimal
-  _ `mappend` _       = Fraction
+  mempty  = Fraction
+  mappend = (<>)
 
 -- | AST for the desugared, untyped core language.
 data Core where

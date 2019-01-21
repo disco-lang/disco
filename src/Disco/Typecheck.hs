@@ -392,7 +392,8 @@ typecheck (Check checkTy) (TAbs lam) = do
     checkArgs ((x, unembed -> mty) : args) ty term = do
 
       -- Ensure that ty is a function type
-      [ty1, ty2] <- ensureConstr CArr ty (Left term)
+      tys <- ensureConstr CArr ty (Left term)
+      let [ty1, ty2] = tys
 
       -- Figure out the type of x:
       xTy <- case mty of
@@ -446,7 +447,8 @@ typecheck Infer (TAbs lam)    = do
 typecheck Infer (TApp t t')   = do
   at <- infer t
   let ty = getType at
-  [ty1, ty2] <- ensureConstr CArr ty (Left t)
+  tys <- ensureConstr CArr ty (Left t)
+  let [ty1, ty2] = tys
   ATApp ty2 at <$> check t' ty1
 
 --------------------------------------------------
@@ -459,7 +461,8 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
-      [m, ms]   <- ensureConstrMode CPair mode (Left $ TTup (t:ts))
+      mms       <- ensureConstrMode CPair mode (Left $ TTup (t:ts))
+      let [m, ms] = mms
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return $ (TyPair (getType at) ty, at : ats)
@@ -469,7 +472,8 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
 
 -- Check/infer the type of an injection into a sum type.
 typecheck mode lt@(TInj s t) = do
-  [mL, mR] <- ensureConstrMode CSum mode (Left lt)
+  ms <- ensureConstrMode CSum mode (Left lt)
+  let [mL, mR] = ms
   at <- typecheck (selectSide s mL mR) t
   resTy <- case mode of
     Infer    ->
@@ -484,7 +488,8 @@ typecheck mode lt@(TInj s t) = do
 -- To check a cons, make sure the type is a list type, then
 -- check the two arguments appropriately.
 typecheck (Check ty) t@(TBin Cons x xs) = do
-  [tyElt] <- ensureConstr CList ty (Left t)
+  tys <- ensureConstr CList ty (Left t)
+  let [tyElt] = tys
   ATBin ty Cons <$> check x tyElt <*> check xs (TyList tyElt)
 
 -- To infer the type of a cons:
@@ -694,7 +699,8 @@ typecheck Infer (TUn Size t) = do
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
     | setOp `elem` [Union, Intersection, Difference] = do
-  [tyElt] <- ensureConstr CSet ty (Left t)
+  tys <- ensureConstr CSet ty (Left t)
+  let [tyElt] = tys
   ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
 
 typecheck Infer (TBin setOp t1 t2)
@@ -720,7 +726,8 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 
 -- Literal containers
 typecheck mode t@(TContainer c xs ell)  = do
-  [eltMode] <- ensureConstrMode (containerToCon c) mode (Left t)
+  m <- ensureConstrMode (containerToCon c) mode (Left t)
+  let [eltMode] = m
   axs  <- mapM (typecheck eltMode) xs
   aell <- typecheckEllipsis eltMode ell
   resTy <- case mode of
@@ -740,7 +747,8 @@ typecheck mode t@(TContainer c xs ell)  = do
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do
-  [eltMode] <- ensureConstrMode (containerToCon c) mode (Left tcc)
+  m <- ensureConstrMode (containerToCon c) mode (Left tcc)
+  let [eltMode] = m
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
@@ -893,17 +901,20 @@ checkPattern (PTup tup) tupTy = do
       (ctx, apt) <- checkPattern p ty
       return [(ctx, apt)]
     checkTuplePat (p:ps) ty = do
-      [ty1, ty2]  <- ensureConstr CPair ty (Right $ PTup (p:ps))
+      tys         <- ensureConstr CPair ty (Right $ PTup (p:ps))
+      let [ty1, ty2] = tys
       (ctx, apt)  <- checkPattern p ty1
       rest <- checkTuplePat ps ty2
       return ((ctx, apt) : rest)
 
 checkPattern p@(PInj L pat) ty       = do
-  [ty1, ty2] <- ensureConstr CSum ty (Right p)
+  tys <- ensureConstr CSum ty (Right p)
+  let [ty1, ty2] = tys
   (ctx, apt) <- checkPattern pat ty1
   return (ctx, APInj (TySum ty1 ty2) L apt)
 checkPattern p@(PInj R pat) ty    = do
-  [ty1, ty2] <- ensureConstr CSum ty (Right p)
+  tys <- ensureConstr CSum ty (Right p)
+  let [ty1, ty2] = tys
   (ctx, apt) <- checkPattern pat ty2
   return (ctx, APInj (TySum ty1 ty2) R apt)
 
@@ -928,13 +939,15 @@ checkPattern (PNat n) ty        = do
   return (emptyCtx, APNat ty n)
 
 checkPattern p@(PCons p1 p2) ty = do
-  [tyl] <- ensureConstr CList ty (Right p)
+  tys <- ensureConstr CList ty (Right p)
+  let [tyl] = tys
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
-  [tyl] <- ensureConstr CList ty (Right p)
+  tys <- ensureConstr CList ty (Right p)
+  let [tyl] = tys
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)

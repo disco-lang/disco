@@ -107,7 +107,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       ]
 
 fileParser :: Parser FilePath
-fileParser = many C.spaceChar *> many (C.satisfy (not . isSpace))
+fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 
 lineParser :: Parser REPLExpr
 lineParser
@@ -119,7 +119,7 @@ lineParser
 parseLine :: String -> Either String REPLExpr
 parseLine s =
   case (runParser lineParser "" s) of
-    Left  e -> Left $ parseErrorPretty' s e
+    Left  e -> Left $ errorBundlePretty e
     Right l -> Right l
 
 -- XXX eventually this should switch from using IErr specifically to

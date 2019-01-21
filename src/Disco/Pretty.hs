@@ -16,6 +16,7 @@
 
 module Disco.Pretty where
 
+import           Prelude                          hiding ((<>))
 import           System.IO                        (hFlush, stdout)
 
 import           Control.Applicative              hiding (empty)

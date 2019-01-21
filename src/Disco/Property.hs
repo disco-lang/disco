@@ -65,17 +65,23 @@ data TestResult
     --   values we got on either side of the =, as well as the
     --   counterexample which led to the failure.
 
+instance Semigroup SuccessType where
+  Exhaustive <> s = s
+  s <> Exhaustive = s
+  Randomized m <> Randomized n = Randomized (m + n)
+
 instance Monoid SuccessType where
-  mempty = Exhaustive
-  Exhaustive `mappend` s = s
-  s `mappend` Exhaustive = s
-  Randomized m `mappend` Randomized n = Randomized (m + n)
+  mempty  = Exhaustive
+  mappend = (<>)
+
+instance Semigroup TestResult where
+  TestOK s1 <> TestOK s2 = TestOK (s1 <> s2)
+  TestOK _ <> r          = r
+  r        <> _          = r
 
 instance Monoid TestResult where
-  mempty = TestOK mempty
-  TestOK s1 `mappend` TestOK s2 = TestOK (s1 `mappend` s2)
-  TestOK _ `mappend` r          = r
-  r        `mappend` _          = r
+  mempty  = TestOK mempty
+  mappend = (<>)
 
 testIsOK :: TestResult -> Bool
 testIsOK (TestOK {}) = True

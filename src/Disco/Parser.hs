@@ -56,13 +56,13 @@ module Disco.Parser
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
                                                    fvAny, string2Name)
 
+import           Control.Monad.Combinators        (many, (<|>))
+import           Control.Monad.Combinators.Expr
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer       as L
-import           Text.Megaparsec.Expr
 
-import           Control.Applicative              (many, (<|>))
 import           Control.Lens                     (makeLenses, toListOf, use,
                                                    (.=))
 import           Control.Monad.State
@@ -105,7 +105,7 @@ initParserState = ParserState Nothing S.empty
 type Parser = StateT ParserState (MP.Parsec Void String)
 
 -- | Run a parser from the initial state.
-runParser :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
+runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
 runParser = MP.runParser . flip evalStateT initParserState
 
 -- | @indented p@ is just like @p@, except that every token must not

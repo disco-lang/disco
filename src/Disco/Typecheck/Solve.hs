@@ -40,7 +40,6 @@ import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes, fromJust,
                                                    fromMaybe)
-import           Data.Semigroup
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Tuple
@@ -77,9 +76,12 @@ data SolveError where
   Unknown       :: SolveError
   deriving Show
 
+instance Semigroup SolveError where
+  e <> _ = e
+
 instance Monoid SolveError where
-  mempty = Unknown
-  e `mappend` _ = e
+  mempty  = Unknown
+  mappend = (<>)
 
 -- | Convert 'Nothing' into the given error.
 maybeError :: MonadError e m => e -> Maybe a -> m a

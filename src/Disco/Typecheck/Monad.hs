@@ -1,6 +1,8 @@
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeSynonymInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
@@ -24,6 +26,8 @@ import           Unbound.Generics.LocallyNameless
 
 import           Control.Lens                     (makeLenses)
 import           Control.Monad.Except
+import           Control.Monad.Fail               (MonadFail)
+import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.RWS
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
@@ -96,14 +100,18 @@ data TCError
   | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
   | NotTyDef String        -- ^ An undefined type name was used.
   | NoTWild                -- ^ Wildcards are not allowed in terms.
+  | Failure String         -- ^ Generic failure.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
 
+instance Semigroup TCError where
+  _ <> r = r
+
 -- | 'TCError' is a monoid where we simply discard the first error.
 instance Monoid TCError where
-  mempty = NoError
-  mappend _ r = r
+  mempty  = NoError
+  mappend = (<>)
 
 ------------------------------------------------------------
 -- TCM monad definition

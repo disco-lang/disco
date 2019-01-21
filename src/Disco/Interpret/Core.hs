@@ -61,6 +61,7 @@ import           Math.NumberTheory.Logarithms       (integerLog2)
 import           Math.NumberTheory.Moduli.Class     (SomeMod (..), getVal,
                                                      invertSomeMod, modulo,
                                                      powSomeMod)
+import           Math.NumberTheory.Primes.Testing   (isPrime)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface                  (Ellipsis (..),
@@ -196,6 +197,10 @@ whnf (CVar x) = do
     Nothing -> error $ "Unbound variable while interpreting! " ++ show x
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
+
+-- Interpret each supported primitive.
+whnf (CPrim "isPrime") = return $ VFun primIsPrime
+whnf (CPrim x)         = throwError $ UnknownPrim x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
@@ -690,6 +695,12 @@ fact :: Rational -> Disco IErr Rational
 fact (numerator -> n)
   | n > fromIntegral (maxBound :: Int) = throwError Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
+
+-- | Relatively fast test for primality using the 'isPrime' function
+--   from @arithmoi@ (trial division + Baille-PSW).
+primIsPrime :: Value -> Value
+primIsPrime (VNum _ n) = mkEnum (isPrime (numerator n))
+primIsPrime _          = error "impossible!  primIsPrime on non-VNum"
 
 ------------------------------------------------------------
 -- Equality testing

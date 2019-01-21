@@ -1,0 +1,10 @@
+using Primitives
+
+||| Test whether the given natural number is prime.
+!!! not (isPrime 0)
+!!! not (isPrime 1)
+!!! isPrime 2
+!!! isPrime 3
+!!! isPrime 1000000007
+isPrime : N -> Bool
+isPrime = $isPrime

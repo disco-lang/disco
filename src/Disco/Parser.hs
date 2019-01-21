@@ -127,7 +127,7 @@ requireIndent p = do
     Just pos -> L.indentGuard sc GT pos >> p
     _        -> p
 
--- | XXX
+-- | Locally set the enabled extensions within a subparser.
 withExts :: Set Ext -> Parser a -> Parser a
 withExts exts p = do
   oldExts <- use enabledExts
@@ -136,16 +136,7 @@ withExts exts p = do
   enabledExts .= oldExts
   return a
 
--- | XXX
-withAdditionalExts :: Set Ext -> Parser a -> Parser a
-withAdditionalExts exts p = do
-  oldExts <- use enabledExts
-  enabledExts .= (oldExts `S.union` exts)
-  a <- p
-  enabledExts .= oldExts
-  return a
-
--- | XXX
+-- | Ensure that a specific extension is enabled, fail if not.
 ensureEnabled :: Ext -> Parser ()
 ensureEnabled e = do
   exts <- use enabledExts

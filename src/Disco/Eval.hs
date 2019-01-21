@@ -211,6 +211,9 @@ data IErr where
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr
 
+  -- | An unknown prim name.
+  UnknownPrim   :: String    -> IErr
+
   -- | v should be a number, but isn't.
   NotANum       :: Value     -> IErr
 

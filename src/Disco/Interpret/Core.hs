@@ -44,6 +44,7 @@ module Disco.Interpret.Core
 
 import           Control.Lens                       (use, (%=), (.=))
 import           Control.Monad.Except               (throwError)
+import           Data.Char
 import           Data.Coerce                        (coerce)
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
@@ -200,6 +201,7 @@ whnf (CVar x) = do
 
 -- Interpret each supported primitive.
 whnf (CPrim "isPrime") = return $ VFun primIsPrime
+whnf (CPrim "crash")   = return $ VFun primCrash
 whnf (CPrim x)         = throwError $ UnknownPrim x
 
 -- A constructor is already in WHNF, so just turn its contents into
@@ -696,11 +698,36 @@ fact (numerator -> n)
   | n > fromIntegral (maxBound :: Int) = throwError Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
 
--- | Relatively fast test for primality using the 'isPrime' function
---   from @arithmoi@ (trial division + Baille-PSW).
+-- | Semantics of the @$isPrime@ prim: a relatively fast test for
+--   primality using the 'isPrime' function from @arithmoi@ (trial
+--   division + Baille-PSW).
+--
+--   Note @$isPrime@ should always be used at type @N -> Bool@; using
+--   it at a different type will cause undefined behavior or a runtime
+--   error.
 primIsPrime :: Value -> Value
-primIsPrime (VNum _ n) = mkEnum (isPrime (numerator n))
-primIsPrime _          = error "impossible!  primIsPrime on non-VNum"
+primIsPrime (VNum _ (numerator -> n)) = mkEnum (isPrime n)
+primIsPrime _                         = error "impossible!  primIsPrime on non-VNum"
+
+-- | Semantics of the @$crash@ prim, which crashes with a
+--   user-supplied message.
+--
+--   @$crash@ should always be used at type @List Char -> a@; using it
+--   at a different type will cause undefined behavior or a runtime
+--   error.
+primCrash :: Value -> Value
+primCrash v = VDelay $ do
+  s <- valueToString v
+  throwError (Crash s)
+
+-- | Convert a Disco value representing a list of characters into a
+--   Haskell 'String'.
+valueToString :: Value -> Disco IErr String
+valueToString = fmap toString . rnfV
+  where
+    toString (VCons 0 _)              = ""
+    toString (VCons 1 [VNum _ c, cs]) = chr (fromIntegral $ numerator c) : toString cs
+    toString _ = "Impossible: valueToString.toString, non-list"
 
 ------------------------------------------------------------
 -- Equality testing

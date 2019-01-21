@@ -241,6 +241,9 @@ data IErr where
   -- | Internal error for features not yet implemented.
   Unimplemented :: String    -> IErr
 
+  -- | User-generated crash.
+  Crash         :: String    -> IErr
+
   deriving Show
 
 ------------------------------------------------------------

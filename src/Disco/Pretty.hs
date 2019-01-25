@@ -20,8 +20,8 @@ import           Prelude                          hiding ((<>))
 import           System.IO                        (hFlush, stdout)
 
 import           Control.Applicative              hiding (empty)
-import           Data.Bifunctor
 import           Control.Monad.Reader
+import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio

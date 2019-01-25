@@ -20,8 +20,8 @@ import           Prelude                          hiding ((<>))
 import           System.IO                        (hFlush, stdout)
 
 import           Control.Applicative              hiding (empty)
-import           Data.Bifunctor
 import           Control.Monad.Reader
+import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
@@ -471,8 +471,14 @@ prettyDecimal r = printedDecimal
      (n,d) = properFraction r :: (Integer, Rational)
      (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
      printedDecimal
-      |length (take 101 expan) == 101 = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
-      |otherwise                      = show n ++ "." ++ concatMap show (take len expan) ++ "[" ++ concatMap show (drop len expan) ++ "]"
+       | length (take 101 expan) == 101
+         = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
+       | rep == [0]
+         = show n ++ "." ++ concatMap show pre
+       | otherwise
+         = show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
+       where
+         (pre, rep) = splitAt len expan
 --     (prefix,rep) = digitalExpansion 10 (numerator d) (denominator d)
 --     fractionalDigits = truncatedPrefix ++ finalRepetend
 --     repetend = case rep of
@@ -502,6 +508,9 @@ findRep' _ _ [] = error "Impossible. Empty list in findRep'"
 findRep' prevs ix (x:xs)
   | x `M.member` prevs = ([], prevs M.! x)
   | otherwise          = first (x:) $ findRep' (M.insert x ix prevs) (ix+1) xs
+
+
+-- XXX fix the below comment
 
 -- | @digitalExpansion b n d@ takes the numerator and denominator of a
 --   fraction n/d between 0 and 1, and returns two lists of digits

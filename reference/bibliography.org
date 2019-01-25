@@ -18,6 +18,9 @@ repository.
 
    https://math.stackexchange.com/questions/152223/why-does-mathematical-convention-deal-so-ineptly-with-multisets
 
+** A Domain-Specific Language for Discrete Mathematics
+
+   Jha, Samuel, Pawar, Kiruthika
 * Implementation
 ** Typing Haskell in Haskell
 
@@ -34,6 +37,14 @@ repository.
    is useful for its description of practical implementation of type
    inference/checking, and for its discussion of bidirectional
    typechecking.
+
+   This paper builds upon the following paper.
+** Local Type Inference (2000)
+   This is the paper by Pierce and Turner that Jones et. al build
+   upon.  It seems relevant for us in showing how to eschew global
+   constraint solving.  Doing everything locally seems like it will
+   result in better/easier-to-generate error messages.
+
 * Subtyping
   One of disco's key features is subtyping on its numeric type
   hierarchy:

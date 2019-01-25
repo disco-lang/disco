@@ -1,2 +1,2 @@
 :load test/syntax-juxt-app/juxt-app.disco
-f (x -> x^2) (3,4) 2
+f (\x.x^2) (3,4) 2

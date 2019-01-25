@@ -1,0 +1,5 @@
+using rAnDOMnesS
+using Primitives
+
+x : N
+x = 5

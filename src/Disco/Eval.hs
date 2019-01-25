@@ -1,5 +1,6 @@
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE GADTs           #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -7,9 +8,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Eval
--- Copyright   :  (c) 2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Disco values and evaluation monad. This is the main monad used in
 -- the REPL and for evaluation and pretty-printing.
@@ -21,7 +23,7 @@ module Disco.Eval
 
          -- * Values
 
-         Value(..), ValFun(..), ValDelay(..)
+         Value(.., VFun, VDelay)
 
          -- * Environments
 
@@ -37,7 +39,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topDocs, topEnv, memory, nextLoc, lastFile
+       , topCtx, topDefns, topTyDefns, topDocs, topEnv, memory, nextLoc, lastFile
 
          -- * Disco monad
 
@@ -46,32 +48,45 @@ module Disco.Eval
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
        , emitMessage, info, warning, err, panic, debug
-       , runDisco, catchAsMessage
+       , runDisco, catchAsMessage, catchAndPrintErrors
 
          -- ** Memory/environment utilities
        , allocate, delay, mkThunk
 
+         -- ** Top level phases
+       , parseDiscoModule
+       , typecheckDisco
+
        )
        where
 
-import           Control.Lens                       ((<+=), (%=), (<>=), makeLenses, use)
-import           Control.Monad.Trans.Except
-import           Control.Monad.Except               (catchError)
+import           Control.Lens                            (makeLenses, use, (%=),
+                                                          (<+=), (<>=))
+import           Control.Monad.Except                    (catchError,
+                                                          throwError)
+import           Control.Monad.Fail                      (MonadFail)
+import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
-import           Data.IntMap.Lazy                   (IntMap)
-import qualified Data.IntMap.Lazy                   as IntMap
-import qualified Data.Sequence as Seq
+import           Data.IntMap.Lazy                        (IntMap)
+import qualified Data.IntMap.Lazy                        as IntMap
+import qualified Data.Map                                as M
+import qualified Data.Sequence                           as Seq
+import           Data.Void
+import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
 import           System.Console.Haskeline.MonadException
 
-import           Disco.Context
-import           Disco.Messages
-import           Disco.Types
 import           Disco.AST.Core
 import           Disco.AST.Surface
+import           Disco.Context
+import           Disco.Messages
+import           Disco.Parser
+import           Disco.Typecheck.Monad
+import           Disco.Types
 
 ------------------------------------------------------------
 -- Values
@@ -116,11 +131,15 @@ data Value where
   --   We assume that all @VFun@ values are /strict/, that is, their
   --   arguments should be fully evaluated to RNF before being
   --   passed to the function.
-  VFun   :: ValFun -> Value
+  VFun_   :: ValFun -> Value
 
   -- | A delayed value, containing a @Disco Value@ computation which can
   --   be run later.
-  VDelay  :: ValDelay -> Value
+  VDelay_  :: ValDelay -> Value
+
+  -- | A literal set, containing a finite list of (perhaps only
+  --   partially evaluated) values.
+  VSet :: [Value] -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
@@ -131,6 +150,9 @@ newtype ValFun = ValFun (Value -> Value)
 instance Show ValFun where
   show _ = "<fun>"
 
+pattern VFun :: (Value -> Value) -> Value
+pattern VFun f = VFun_ (ValFun f)
+
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
@@ -138,6 +160,9 @@ newtype ValDelay = ValDelay (Disco IErr Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
+
+pattern VDelay :: Disco IErr Value -> Value
+pattern VDelay m = VDelay_ (ValDelay m)
 
 ------------------------------------------------------------
 -- Environments
@@ -173,8 +198,23 @@ withEnv = local . const
 -- | Errors that can be generated during interpreting.
 data IErr where
 
+  -- | Module not found.
+  ModuleNotFound :: ModName -> IErr
+
+  -- | Cyclic import encountered.
+  CyclicImport :: ModName -> IErr
+
+  -- | Error encountered during typechecking.
+  TypeCheckErr :: TCError -> IErr
+
+  -- | Error encountered during parsing.
+  ParseErr :: ParseErrorBundle String Data.Void.Void -> IErr
+
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr
+
+  -- | An unknown prim name.
+  UnknownPrim   :: String    -> IErr
 
   -- | v should be a number, but isn't.
   NotANum       :: Value     -> IErr
@@ -197,8 +237,14 @@ data IErr where
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              IErr
 
+  -- | Trying to count an infinite type.
+  InfiniteTy    :: Type      -> IErr
+
   -- | Internal error for features not yet implemented.
   Unimplemented :: String    -> IErr
+
+  -- | User-generated crash.
+  Crash         :: String    -> IErr
 
   deriving Show
 
@@ -212,11 +258,14 @@ type Loc = Int
 -- | The various pieces of state tracked by the 'Disco' monad.
 data DiscoState e = DiscoState
   {
-    _topCtx     :: Ctx Term Type
+    _topCtx     :: Ctx Term Sigma
     -- ^ Top-level type environment.
 
   , _topDefns   :: Ctx Core Core
     -- ^ Environment of top-level definitions.  Set by 'loadDefs'.
+
+  , _topTyDefns :: M.Map String Type
+    -- ^ Environment of top-level type definitions.
 
   , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all
@@ -238,7 +287,7 @@ data DiscoState e = DiscoState
 
   , _messageLog :: MessageLog e
 
-  , _lastFile :: Maybe FilePath
+  , _lastFile   :: Maybe FilePath
   }
 
 -- | The initial state for the @Disco@ monad.
@@ -246,6 +295,7 @@ initDiscoState :: DiscoState e
 initDiscoState = DiscoState
   { _topCtx     = emptyCtx
   , _topDefns   = emptyCtx
+  , _topTyDefns = M.empty
   , _topDocs    = emptyCtx
   , _topEnv     = emptyCtx
   , _memory     = IntMap.empty
@@ -282,6 +332,9 @@ instance MonadException m => MonadException (LFreshMT m) where
                   run' = RunIO (fmap LFreshMT . run . unLFreshMT)
                   in unLFreshMT <$> f run'
 
+-- This should eventually move into unbound-generics.
+instance MonadFail m => MonadFail (LFreshMT m) where
+  fail = LFreshMT . Fail.fail
 
 -- We need this orphan instance too.  It would seem to make sense for
 -- haskeline to provide an instance for ExceptT, but see:
@@ -343,6 +396,14 @@ runDisco
 catchAsMessage :: Disco e () -> Disco e ()
 catchAsMessage m = m `catchError` (err . Item)
 
+-- XXX eventually we should get rid of this and replace with catchAsMessage
+catchAndPrintErrors :: a -> Disco IErr a -> Disco IErr a
+catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
+  where
+    handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
+    handler (TypeCheckErr e) = iprint e
+    handler e                = iprint e
+
 ------------------------------------------------------------
 -- Memory/environment utilities
 ------------------------------------------------------------
@@ -362,7 +423,7 @@ allocate v = do
 delay :: Disco IErr Value -> Disco IErr Value
 delay imv = do
   e <- getEnv
-  return (VDelay . ValDelay $ withEnv e imv)
+  return (VDelay $ withEnv e imv)
 
 -- | Create a thunk by packaging up a @Core@ expression with the
 --   current environment.  The thunk is stored in a new location in
@@ -378,3 +439,25 @@ withTopEnv :: Disco e a -> Disco e a
 withTopEnv m = do
   env <- use topEnv
   withEnv env m
+
+------------------------------------------------------------
+-- High-level disco phases
+------------------------------------------------------------
+
+-- | Utility function: given an 'Either', wrap a 'Left' in the given
+--   function and throw it as a 'Disco' error, or return a 'Right'.
+adaptError :: (e1 -> e2) -> Either e1 a -> Disco e2 a
+adaptError f = either (throwError . f) return
+
+-- | Parse a module from a file, re-throwing a parse error if it
+--   fails.
+parseDiscoModule :: FilePath -> Disco IErr Module
+parseDiscoModule file = do
+  str <- io $ readFile file
+  adaptError ParseErr $ runParser wholeModule file str
+
+-- | Run a typechecking computation, re-throwing a wrapped error if it
+--   fails.
+typecheckDisco :: TyCtx -> TyDefCtx -> TCM a -> Disco IErr a
+typecheckDisco tyctx tydefs tcm =
+  adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends tyctx $ tcm)

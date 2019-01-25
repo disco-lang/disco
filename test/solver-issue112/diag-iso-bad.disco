@@ -1,0 +1,9 @@
+diagIso' : ℕ → ℕ×ℕ
+diagIso' n =
+     let d = (sqrt(1 + 8n) - 1)//2 : N
+  in let t = d*(d+1)//2
+  in (n .- t, d .- (n .- t))
+
+-- The above shouldn't typecheck, because of the use of normal
+-- subtraction in the definition of d.  However, it was erroneously
+-- being accepted before fixing issue #112.

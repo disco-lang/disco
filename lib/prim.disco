@@ -1,0 +1,4 @@
+using Primitives
+
+crash : List Char -> a
+crash = $crash

@@ -122,7 +122,7 @@ tutorial).
 ::
 
     Disco> count ((Z2 * Z4) + Bool)
-    10
+    right 10
     Disco> enumerate ((Z2 * Z4) + Bool)
     [left (0, 0), left (0, 1), left (0, 2), left (0, 3),
      left (1, 0), left (1, 1), left (1, 2), left (1, 3),

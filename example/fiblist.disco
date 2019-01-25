@@ -1,7 +1,7 @@
 take : N -> List N -> List N
 take 0 _ = []
 take _ [] = []
-take (S n) (x::xs) = x :: take n xs
+take (n+1) (x::xs) = x :: take n xs
 
 zipWith : (N -> N -> N) -> List N -> List N -> List N
 zipWith _ [] _ = []
@@ -12,4 +12,4 @@ tail : List N -> List N
 tail (_::xs) = xs
 
 fibs : List N
-fibs = 0 :: 1 :: zipWith (x -> y -> x + y) fibs (tail fibs)
+fibs = 0 :: 1 :: zipWith (\x y. x + y) fibs (tail fibs)

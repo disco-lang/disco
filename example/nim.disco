@@ -1,10 +1,10 @@
 ||| Convert a natural number into a list of bits, with the *least*
 ||| significant bit first.
 
-!!! toBinary 0 = ([] : List Z2)
-!!! toBinary 1 = ([1] : List Z2)
-!!! toBinary 2 = ([0,1] : List Z2)
-!!! toBinary 534 = ([0,1,1,0,1,0,0,0,0,1] : List Z2)
+!!! toBinary 0 == ([] : List Z2)
+!!! toBinary 1 == ([1] : List Z2)
+!!! toBinary 2 == ([0,1] : List Z2)
+!!! toBinary 534 == ([0,1,1,0,1,0,0,0,0,1] : List Z2)
 toBinary : N -> List Z2
 toBinary 0 = []
 toBinary n =
@@ -15,9 +15,9 @@ toBinary n =
 ||| Convert a list of bits (with the least significant bit first) back
 ||| into a natural number.  Left inverse of toBinary.
 
-!!! fromBinary [0,0,1,1] = 12
-!!! fromBinary [0,0,0,0] = 0
-!!! ∀ n : N. fromBinary (toBinary n) = n
+!!! fromBinary [0,0,1,1] == 12
+!!! fromBinary [0,0,0,0] == 0
+!!! ∀ n : N. fromBinary (toBinary n) == n
 
 fromBinary : List Z2 -> N
 fromBinary []       = 0
@@ -46,11 +46,11 @@ xorPile x (n :: ns)
 ||| Perform the optimal nim move, or report that the position is a
 ||| losing position.
 
-!!! nimMove [1,5,8] = (right [1,5,4] : Unit + List N)
+!!! nimMove [1,5,8] == (right [1,5,4] : Unit + List N)
 nimMove : List N -> Unit + List N
 nimMove ls =
   let s   = nimSum ls
     , ls' = xorPile s ls
-  in  {? left ()   if ls = ls'
+  in  {? left ()   if ls == ls'
       ,  right ls' otherwise
       ?}

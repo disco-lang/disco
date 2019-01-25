@@ -1,21 +1,18 @@
-{-# LANGUAGE DeriveFoldable        #-}
-{-# LANGUAGE DeriveFunctor         #-}
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE DeriveTraversable     #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE UndecidableInstances  #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE FlexibleContexts     #-}
+{-# LANGUAGE FlexibleInstances    #-}
+{-# LANGUAGE GADTs                #-}
+{-# LANGUAGE PatternSynonyms      #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TypeFamilies         #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Surface
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Abstract syntax trees representing the surface syntax of the Disco
 -- language.
@@ -24,47 +21,130 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..)
+         Ext(..), allExts, Module(..), TopLevel(..), ModName
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
-       , Decl(..), declName, isDefn
+       , TypeDecl(..), TermDefn(..), TypeDefn(..)
+       , Decl(..), partitionDecls
 
          -- * Terms
-
-       , Term(..)
+       , UD
+       , Term
+       , pattern TVar
+       , pattern TPrim
+       , pattern TUn
+       , pattern TLet
+       , pattern TParens
+       , pattern TUnit
+       , pattern TBool
+       , pattern TChar
+       , pattern TString
+       , pattern TNat
+       , pattern TRat
+       , pattern TAbs
+       , pattern TApp
+       , pattern TTup
+       , pattern TInj
+       , pattern TCase
+       , pattern TBin
+       , pattern TChain
+       , pattern TTyOp
+       , pattern TContainerComp
+       , pattern TContainer
+       , pattern TAscr
+       , pattern TWild
+       , pattern TList
+       , pattern TListComp
 
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
-
          -- ** Expressions
-       , Side(..), Link(..), Binding(..)
+       , Side(..)
+
+       , Link
+       , pattern TLink
+
+       , Binding
 
          -- ** Lists
-       , Qual(..), Ellipsis(..)
+       , Qual
+       , pattern QBind
+       , pattern QGuard
+
+       , Container(..)
+
+       , Ellipsis(..)
 
          -- ** Case expressions and patterns
-       , Branch, Guard(..), Pattern(..)
+       , Branch
+
+       , Guard
+       , pattern GBool
+       , pattern GPat
+       , pattern GLet
+
+       , Pattern
+       , pattern PVar
+       , pattern PWild
+       , pattern PUnit
+       , pattern PBool
+       , pattern PChar
+       , pattern PString
+       , pattern PTup
+       , pattern PInj
+       , pattern PNat
+       , pattern PCons
+       , pattern PList
+       , pattern PAdd
+       , pattern PMul
+       , pattern PSub
+       , pattern PNeg
+       , pattern PFrac
+
+       , pattern Binding
        )
        where
 
-import           GHC.Generics                     (Generic)
+import           Control.Lens                     ((%~), _1, _2, _3)
+import           Data.Set                         (Set)
+import           Data.Void
 
-import           Unbound.Generics.LocallyNameless
-
+import           Disco.AST.Generic
 import           Disco.Context
 import           Disco.Syntax.Operators
 import           Disco.Types
+import           Unbound.Generics.LocallyNameless
 
--- | A module is a list of declarations together with a collection of
---   documentation for top-level names.
-data Module = Module [Decl] (Ctx Term Docs)
-  deriving Show
+-- | The extension descriptor for Surface specific AST types.
+data UD
+
+-- | Enumeration of optional language extensions.
+data Ext
+  = Primitives   -- ^ Allow primitives, i.e. @$prim@
+  | Randomness   -- ^ Allow non-deterministic semantics via primitives like @uniform@
+  deriving (Eq, Ord, Show, Read, Enum, Bounded)
+
+-- | A list of all possible language extensions, provided for convenience.
+allExts :: [Ext]
+allExts = [minBound .. maxBound]
+
+-- | A module contains all the information from one disco source file.
+data Module = Module
+  { modExts    :: Set Ext       -- ^ Enabled extensions
+  , modImports :: [ModName]     -- ^ Module imports
+  , modDecls   :: [Decl]        -- ^ Declarations
+  , modDocs    :: Ctx Term Docs -- ^ Documentation
+  }
+deriving instance ForallTerm Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl
-  deriving Show
+deriving instance ForallTerm Show  UD => Show TopLevel
+
+-- | A module to be imported.
+type ModName = String
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]
@@ -75,229 +155,267 @@ data DocThing
                             --   of @||| text@ items
   | DocProperty Property    -- ^ An example/doctest/property of the
                             --   form @!!! forall (x1:ty1) ... . property@
-  deriving Show
+deriving instance ForallTerm Show  UD => Show DocThing
 
 -- | A property is a universally quantified term of the form
 --   @forall v1 : T1, v2 : T2. term@.
-type Property = Bind [(Name Term, Type)] Term
+type Property = Property_ UD
 
--- | A declaration is either a type declaration or a definition.
-data Decl where
+-- | A type declaration, @name : type@.
+data TypeDecl = TypeDecl (Name Term) Sigma
 
-  -- | A type declaration, @name : type@.
-  DType :: Name Term -> Type -> Decl
+-- | A group of definition clauses of the form @name pat1 .. patn = term@. The
+--   patterns bind variables in the term. For example, @f n (x,y) =
+--   n*x + y@.
+data TermDefn = TermDefn (Name Term) [Bind [Pattern] Term]
 
-  -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
-  --   patterns bind variables in the term. For example, @f n (x,y) =
-  --   n*x + y@.
-  DDefn :: Name Term -> [Bind [Pattern] Term] -> Decl
+-- | A user-defined type (potentially recursive).
+data TypeDefn = TypeDefn String Type
   deriving Show
 
--- | Get the name that a declaration is about.
-declName :: Decl -> Name Term
-declName (DType x _) = x
-declName (DDefn x _) = x
+-- | A declaration is either a type declaration, a term definition, or
+--   a type definition.
+data Decl where
+  DType  :: TypeDecl -> Decl
+  DDefn  :: TermDefn -> Decl
+  DTyDef :: TypeDefn -> Decl
 
--- | Check whether a declaration is a definition.
-isDefn :: Decl -> Bool
-isDefn DDefn{} = True
-isDefn _       = False
+deriving instance ForallTerm Show  UD => Show TypeDecl
+deriving instance ForallTerm Show  UD => Show TermDefn
+deriving instance ForallTerm Show  UD => Show Decl
 
-------------------------------------------------------------
--- Telescopes
-------------------------------------------------------------
-
--- | A telescope is essentially a list, except that each item can bind
---   names in the rest of the list.
-data Telescope b where
-
-  -- | The empty telescope.
-  TelEmpty :: Telescope b
-
-  -- | A binder of type @b@ followed by zero or more @b@'s.  This @b@
-  --   can bind variables in the subsequent @b@'s.
-  TelCons  :: Rebind b (Telescope b) -> Telescope b
-  deriving (Show, Generic)
-
-instance Alpha b => Alpha (Telescope b)
-
--- | Fold a telescope given a combining function and a value for the
---   empty telescope.
-foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
-foldTelescope _ z TelEmpty = z
-foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
-
--- | Map over a telescope.
-mapTelescope :: (Alpha a, Alpha b) => (a -> b) -> Telescope a -> Telescope b
-mapTelescope f = toTelescope . map f . fromTelescope
-
--- | Convert a list to a telescope.
-toTelescope :: Alpha b => [b] -> Telescope b
-toTelescope []     = TelEmpty
-toTelescope (b:bs) = TelCons (rebind b (toTelescope bs))
-
--- | Convert a telescope to a list.
-fromTelescope :: Alpha b => Telescope b -> [b]
-fromTelescope = foldTelescope (:) []
+partitionDecls :: [Decl] -> ([TypeDecl], [TermDefn], [TypeDefn])
+partitionDecls (DType  tyDecl : ds) = (_1 %~ (tyDecl:)) (partitionDecls ds)
+partitionDecls (DDefn  def    : ds) = (_2 %~ (def:))    (partitionDecls ds)
+partitionDecls (DTyDef def    : ds) = (_3 %~ (def:))    (partitionDecls ds)
+partitionDecls []                   = ([], [], [])
 
 ------------------------------------------------------------
 -- Terms
 ------------------------------------------------------------
+type Term = Term_ UD
 
--- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
-data Side = L | R
-  deriving (Show, Eq, Enum, Generic)
+type instance X_TVar            UD = ()
+type instance X_TPrim           UD = ()
+type instance X_TLet            UD = ()
+type instance X_TParens         UD = ()
+type instance X_TUnit           UD = ()
+type instance X_TBool           UD = ()
+type instance X_TNat            UD = ()
+type instance X_TRat            UD = ()
+type instance X_TChar           UD = ()
+type instance X_TString         UD = ()
+type instance X_TAbs            UD = ()
+type instance X_TApp            UD = ()
+type instance X_TTup            UD = ()
+type instance X_TInj            UD = ()
+type instance X_TCase           UD = ()
+type instance X_TUn             UD = ()
+type instance X_TBin            UD = ()
+type instance X_TChain          UD = ()
+type instance X_TTyOp           UD = ()
+type instance X_TContainer      UD = ()
+type instance X_TContainerComp  UD = ()
+type instance X_TAscr           UD = ()
+type instance X_Term            UD = ()  -- TWild
 
--- | Terms.
-data Term where
+pattern TVar :: Name Term -> Term
+pattern TVar name = TVar_ () name
 
-  -- | A variable.
-  TVar   :: Name Term -> Term
+pattern TPrim :: String -> Term
+pattern TPrim name = TPrim_ () name
 
-  -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
-  TLet   :: Bind (Telescope Binding) Term -> Term
+pattern TUn :: UOp -> Term -> Term
+pattern TUn uop term = TUn_ () uop term
 
-  -- | Explicit parentheses.  We need to keep track of these in order
-  --   to syntactically distinguish multiplication and function
-  --   application.
-  TParens :: Term -> Term
+pattern TLet :: Bind (Telescope Binding) Term -> Term
+pattern TLet bind = TLet_ () bind
 
-  -- | The unit value, (), of type Unit.
-  TUnit  :: Term
+pattern TParens :: Term -> Term
+pattern TParens term  = TParens_ () term
 
-  -- | True or false.
-  TBool  :: Bool -> Term
+pattern TUnit :: Term
+pattern TUnit = TUnit_ ()
 
-  -- | A natural number.
-  TNat   :: Integer -> Term
+pattern TBool :: Bool -> Term
+pattern TBool bool = TBool_ () bool
 
-  -- | A nonnegative rational number, parsed as a decimal.
-  TRat   :: Rational -> Term
+pattern TNat  :: Integer -> Term
+pattern TNat int = TNat_ () int
 
-  -- | An anonymous function.
-  TAbs   :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
+pattern TRat :: Rational -> Term
+pattern TRat rat = TRat_ () rat
 
-  -- | Function application.
-  TApp  :: Term -> Term -> Term
+pattern TChar :: Char -> Term
+pattern TChar c = TChar_ () c
 
-  -- | An n-tuple, @(t1, ..., tn)@.
-  TTup   :: [Term] -> Term
+pattern TString :: String -> Term
+pattern TString s = TString_ () s
 
-  -- | An injection into a sum type.
-  TInj   :: Side -> Term -> Term
+pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
+pattern TAbs bind = TAbs_ () bind
 
-  -- | A case expression.
-  TCase  :: [Branch] -> Term
+pattern TApp  :: Term -> Term -> Term
+pattern TApp term1 term2 = TApp_ () term1 term2
 
-  -- | An application of a unary operator.
-  TUn    :: UOp -> Term -> Term
+pattern TTup :: [Term] -> Term
+pattern TTup termlist = TTup_ () termlist
 
-  -- | An application of a binary operator.
-  TBin   :: BOp -> Term -> Term -> Term
+pattern TInj :: Side -> Term -> Term
+pattern TInj side term = TInj_ () side term
 
-  -- | A chained comparison.  Should contain only comparison
-  --   operators.
-  TChain :: Term -> [Link] -> Term
+pattern TCase :: [Branch] -> Term
+pattern TCase branch = TCase_ () branch
 
-  -- | An application of a type operator.
-  TTyOp  :: TyOp -> Type -> Term
+pattern TBin :: BOp -> Term -> Term -> Term
+pattern TBin bop term1 term2 = TBin_ () bop term1 term2
 
-  -- | A literal list.
-  TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TChain :: Term -> [Link] -> Term
+pattern TChain term linklist = TChain_ () term linklist
 
-  -- | List comprehension.
-  TListComp :: Bind (Telescope Qual) Term -> Term
+pattern TTyOp :: TyOp -> Type -> Term
+pattern TTyOp tyop ty = TTyOp_ () tyop ty
 
-  -- | Type ascription, @(term : type)@.
-  TAscr  :: Term -> Type -> Term
-  deriving (Show, Generic)
+pattern TContainer :: Container -> [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TContainer c tl mets = TContainer_ () c tl mets
 
-data Link where
-  TLink :: BOp -> Term -> Link
-  deriving (Show, Generic)
+pattern TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
+pattern TContainerComp c b = TContainerComp_ () c b
 
--- | An ellipsis is an "omitted" part of a literal list, of the form
---   @..@ or @.. t@.
-data Ellipsis t where
-  Forever ::      Ellipsis t   -- @..@
-  Until   :: t -> Ellipsis t   -- @.. t@
-  deriving (Show, Generic, Functor, Foldable, Traversable)
+pattern TAscr :: Term -> Sigma -> Term
+pattern TAscr term ty = TAscr_ () term ty
 
--- Note: very similar to guards-
---  maybe some generalization in the future?
+-- Since we parse patterns by first parsing a term and then ensuring
+-- it is a valid pattern, we have to include wildcards in the syntax
+-- of terms, although they will be rejected at a later phase.
+pattern TWild :: Term
+pattern TWild = XTerm_ ()
 
--- | A single qualifier in a list comprehension.
-data Qual where
+{-# COMPLETE TVar, TPrim, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
+             TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
+             TContainer, TContainerComp, TAscr, TWild #-}
 
-  -- | A binding qualifier (i.e. @x <- t@)
-  QBind   :: Name Term -> Embed Term -> Qual
+pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TList ts e = TContainer_ () ListContainer ts e
 
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  QGuard  :: Embed Term -> Qual
+pattern TListComp :: Bind (Telescope Qual) Term -> Term
+pattern TListComp x = TContainerComp_ () ListContainer x
 
-  deriving (Show, Generic)
+type Link = Link_ UD
 
--- | A binding is a name along with its definition.
-data Binding = Binding (Maybe Type) (Name Term) (Embed Term)
-  deriving (Show, Generic)
+type instance X_TLink UD = ()
 
--- | A branch of a case is a list of guards with an accompanying term.
---   The guards scope over the term.  Additionally, each guard scopes
---   over subsequent guards.
-type Branch = Bind (Telescope Guard) Term
+pattern TLink :: BOp -> Term -> Link
+pattern TLink bop term = TLink_ () bop term
 
--- | A single guard in a branch: either an @if@ or a @when@.
-data Guard where
+{-# COMPLETE TLink #-}
 
-  -- | Boolean guard (@if <test>@)
-  GBool :: Embed Term -> Guard
+type Qual = Qual_ UD
 
-  -- | Pattern guard (@when term = pat@)
-  GPat  :: Embed Term -> Pattern -> Guard
+type instance X_QBind UD = ()
+type instance X_QGuard UD = ()
 
-  deriving (Show, Generic)
+pattern QBind :: Name Term -> Embed Term -> Qual
+pattern QBind namet embedt = QBind_ () namet embedt
 
--- | Patterns.
-data Pattern where
+pattern QGuard :: Embed Term -> Qual
+pattern QGuard embedt = QGuard_ () embedt
 
-  -- | Variable pattern: matches anything and binds the variable.
-  PVar  :: Name Term -> Pattern
+{-# COMPLETE QBind, QGuard #-}
 
-  -- | Wildcard pattern @_@: matches anything.
-  PWild :: Pattern
+type Binding = Binding_ UD
 
-  -- | Unit pattern @()@: matches @()@.
-  PUnit :: Pattern
+pattern Binding :: Maybe (Embed Sigma) -> Name Term -> Embed Term -> Binding
+pattern Binding m b n = Binding_ m b n
 
-  -- | Literal boolean pattern.
-  PBool :: Bool -> Pattern
+{-# COMPLETE Binding #-}
 
-  -- | Tuple pattern @(pat1, .. , patn)@.
-  PTup  :: [Pattern] -> Pattern
+type Branch = Branch_ UD
 
-  -- | Injection pattern (@inl pat@ or @inr pat@).
-  PInj  :: Side -> Pattern -> Pattern
+type Guard = Guard_ UD
 
-  -- | Literal natural number pattern.
-  PNat  :: Integer -> Pattern
+type instance X_GBool UD = ()
+type instance X_GPat  UD = ()
+type instance X_GLet  UD = ()
 
-  -- | Successor pattern, @S p@.
-  PSucc :: Pattern -> Pattern
+pattern GBool :: Embed Term -> Guard
+pattern GBool embedt = GBool_ () embedt
 
-  -- | Cons pattern @p1 :: p2@.
-  PCons :: Pattern -> Pattern -> Pattern
+pattern GPat :: Embed Term -> Pattern -> Guard
+pattern GPat embedt pat = GPat_ () embedt pat
 
-  -- | List pattern @[p1, .., pn]@.
-  PList :: [Pattern] -> Pattern
+pattern GLet :: Binding -> Guard
+pattern GLet b = GLet_ () b
 
-  deriving (Show, Generic)
-  -- TODO: figure out how to match on Z or Q!
+{-# COMPLETE GBool, GPat, GLet #-}
 
-instance Alpha Side
-instance Alpha Link
-instance Alpha Term
-instance Alpha Binding
-instance Alpha t => Alpha (Ellipsis t)
-instance Alpha Guard
-instance Alpha Pattern
-instance Alpha Qual
+type Pattern = Pattern_ UD
+
+type instance X_PVar UD    = ()
+type instance X_PWild UD   = ()
+type instance X_PUnit UD   = ()
+type instance X_PBool UD   = ()
+type instance X_PTup UD    = ()
+type instance X_PInj UD    = ()
+type instance X_PNat UD    = ()
+type instance X_PChar UD   = ()
+type instance X_PString UD = ()
+type instance X_PCons UD   = ()
+type instance X_PList UD   = ()
+type instance X_PAdd UD    = ()
+type instance X_PMul UD    = ()
+type instance X_PSub UD    = ()
+type instance X_PNeg UD    = ()
+type instance X_PFrac UD   = ()
+type instance X_Pattern UD = Void
+
+pattern PVar :: Name Term -> Pattern
+pattern PVar name = PVar_ () name
+
+pattern PWild :: Pattern
+pattern PWild = PWild_ ()
+
+pattern PUnit :: Pattern
+pattern PUnit = PUnit_ ()
+
+pattern PBool :: Bool -> Pattern
+pattern PBool  b = PBool_ () b
+
+pattern PChar :: Char -> Pattern
+pattern PChar c = PChar_ () c
+
+pattern PString :: String -> Pattern
+pattern PString s = PString_ () s
+
+pattern PTup  :: [Pattern] -> Pattern
+pattern PTup lp = PTup_ () lp
+
+pattern PInj  :: Side -> Pattern -> Pattern
+pattern PInj s p = PInj_ () s p
+
+pattern PNat  :: Integer -> Pattern
+pattern PNat n = PNat_ () n
+
+pattern PCons :: Pattern -> Pattern -> Pattern
+pattern PCons  p1 p2 = PCons_ () p1 p2
+
+pattern PList :: [Pattern] -> Pattern
+pattern PList lp = PList_ () lp
+
+pattern PAdd :: Side -> Pattern -> Term -> Pattern
+pattern PAdd s p t = PAdd_ () s p t
+
+pattern PMul :: Side -> Pattern -> Term -> Pattern
+pattern PMul s p t = PMul_ () s p t
+
+pattern PSub :: Pattern -> Term -> Pattern
+pattern PSub p t = PSub_ () p t
+
+pattern PNeg :: Pattern -> Pattern
+pattern PNeg p = PNeg_ () p
+
+pattern PFrac :: Pattern -> Pattern -> Pattern
+pattern PFrac p1 p2 = PFrac_ () p1 p2
+
+{-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
+             PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}

@@ -1,15 +1,15 @@
-take : ℕ → List Q → List Q
-take 0 _  = []
-take _ [] = []
-take (S n') (x :: xs) = x :: take n' xs
+import list
 
-repeat : Q → List Q
-repeat x = x :: repeat x
+-- For desugaring list comprehensions ----------------------
+mapList : (a -> b) -> List a -> List b
+mapList _ [] = []
+mapList f (a :: as) = f a :: mapList f as
+------------------------------------------------------------
 
 downfrom : N -> List N
 downfrom 0     = []
-downfrom (S n) = (n+1) :: downfrom n
+downfrom (n+1) = (n+1) :: downfrom n
 
 even : N -> Bool
 even 0     = true
-even (S n) = not (even n)
+even (n+1) = not (even n)

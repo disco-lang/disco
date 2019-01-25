@@ -1,11 +1,14 @@
 {-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Operators
--- Copyright   :  (c) 2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Unary and binary operators along with information like precedence,
 -- fixity, and concrete syntax.
@@ -44,11 +47,13 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Floor -- ^ Floor of fractional type (@floor@)
          | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
          | Abs   -- ^ Absolute value (@abs@)
+         | Size  -- ^ The size of a set.
   deriving (Show, Eq, Ord, Generic)
 
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
          | Sub     -- ^ Subtraction (@-@)
+         | SSub    -- ^ Saturating Subtraction (@.-@ / @∸@)
          | Mul     -- ^ Multiplication (@*@)
          | Div     -- ^ Division (@/@)
          | Exp     -- ^ Exponentiation (@^@)
@@ -66,16 +71,24 @@ data BOp = Add     -- ^ Addition (@+@)
          | Divides -- ^ Divisibility test (@|@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
+         | Union   -- ^ Union of two sets (@union@ / @∪@)
+         | Intersection -- ^ Intersection of two sets (@intersect@ / @∩@)
+         | Difference  -- ^ Difference between two sets (@\@)
+         | Subset      -- ^ Subset test (@⊆@)
   deriving (Show, Eq, Ord, Generic)
 
 -- | Type operators.
 data TyOp = Enumerate -- ^ List all values of a type
           | Count     -- ^ Count how many values there are of a type
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance Alpha UOp
 instance Alpha BOp
 instance Alpha TyOp
+
+instance Subst t UOp
+instance Subst t BOp
+instance Subst t TyOp
 
 ------------------------------------------------------------
 -- Operator info
@@ -138,7 +151,15 @@ opTable =
     , uopInfo Pre  Ceil    ["ceiling"]
     , uopInfo Pre  Abs     ["abs"]
     ]
+  , [ uopInfo Pre Size     ["size"]
+    ]
+
   , [ bopInfo In   Choose   ["choose"]
+    ]
+  , [ bopInfo InL  Union    ["union", "∪", "U"]
+    , bopInfo InL  Intersection ["intersect", "∩"]
+    , bopInfo InL  Difference ["\\"]
+    , bopInfo InL Subset ["⊆"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]
@@ -148,10 +169,11 @@ opTable =
     ]
   , [ bopInfo InL  Add     ["+"]
     , bopInfo InL  Sub     ["-"]
+    , bopInfo InL  SSub    [".-", "∸"]
     ]
   , [ bopInfo InR  Cons    ["::"]
     ]
-  , [ bopInfo InR  Eq      ["="]
+  , [ bopInfo InR  Eq      ["=="]
     , bopInfo InR  Neq     ["≠", "/="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]
@@ -203,4 +225,3 @@ assoc op =
 --   other precedence level).
 funPrec :: Int
 funPrec = length opTable
-

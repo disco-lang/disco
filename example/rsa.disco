@@ -1,3 +1,5 @@
+import list
+
 -- Implementation of RSA encryption algorithm.
 -- Reference: https://simple.wikipedia.org/wiki/RSA_(algorithm)
 
@@ -16,16 +18,16 @@ decrypt = encrypt
 -- takes two primes, returns a pair of pairs containing the RSA public/private keys
 -- prime -> prime -> (public key, private key)
 getKeys : N -> N -> (N * N) * (N * N)
-getKeys (S p1) (S p2) =
-  let m = (p1+1)*(p2+1),
-      totient = p1*p2,
+getKeys p1 p2 =
+  let m = p1 * p2,
+      totient = (p1 .- 1)*(p2 .- 1),
       e = getPubExp 2 totient
   in ((m, e), (m, getPrivExp e totient))
 
 -- guess -> totient -> e
 getPubExp : N -> N -> N
 getPubExp e totient =
-  {? e                          if gcd(e, totient) = 1
+  {? e                          if gcd(e, totient) == 1
    , getPubExp (e+1) totient    otherwise
   ?}
 
@@ -45,7 +47,7 @@ getPrivExp e totient =
 -- https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Computing_multiplicative_inverses_in_modular_structures)
 inverse : (Z * Z) -> (Z * Z) -> Z
 inverse (t,newt) (r,newr) =
-  {? t                                                                    if newr=0
+  {? t                                                                    if newr==0
    , let q = r // newr in (inverse (newt, t-q*newt) (newr,r-q*newr))      otherwise
   ?}
 
@@ -63,8 +65,8 @@ decrypt1 = encrypt1
 -- https://simple.wikipedia.org/wiki/Exponentiation_by_squaring
 modPower : Nat -> Nat -> Nat -> Nat
 modPower n p m =
-  {? 1                                     if p=0
-   , n % m                                 if p=1
+  {? 1                                     if p==0
+   , n % m                                 if p==1
    , (modPower (n^2) (p//2) m) % m         if (even p)
    , (n * (modPower (n^2) (p//2) m)) % m   if (p>2) && (odd p)
   ?}
@@ -77,18 +79,6 @@ even x = 2 divides x
 
 odd : Z -> B
 odd x = ¬(2 divides x)
-
--- This could be generalized once polymorphism is complete
-map : (Nat -> Nat) -> List N -> List N
-map f l =
-  {? []                    when l is []
-   , (f x) :: (map f xs)   when l is x::xs
-  ?}
-
--- Same as `map`, just with a lil more sugar
-map2 : (Nat -> Nat) -> List N -> List N
-map2 f []      = []
-map2 f (x::xs) = (f x) :: (map f xs)
 
 -- Features that would be helpful:
 --  even, odd, and isPrime functions (as part of some standard library)

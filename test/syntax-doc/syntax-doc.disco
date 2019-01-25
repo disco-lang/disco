@@ -2,7 +2,7 @@
 |||
 ||| More documentation after a blank line.
 
-!!! x = 3 -- A property
+!!! x == 3 -- A property
 
 ||| Yet more documentation.
 

@@ -1,0 +1,5 @@
+-- Importing a module in a subdirectory, with a .disco extension
+import subdir/d.disco
+
+zz : Z
+zz = qq + 1

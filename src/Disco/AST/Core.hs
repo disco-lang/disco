@@ -9,9 +9,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Core
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Abstract syntax trees representing the desugared, untyped core
 -- language for Disco.
@@ -32,7 +33,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Surface (Ellipsis, Telescope)
+import           Disco.AST.Surface                (Ellipsis, Telescope)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -40,22 +41,28 @@ import           Disco.Types
 data RationalDisplay = Fraction | Decimal
   deriving (Eq, Show, Generic)
 
+instance Semigroup RationalDisplay where
+  Decimal <> _ = Decimal
+  _ <> Decimal = Decimal
+  _ <> _       = Fraction
+
 -- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
 --   idea that the result should be displayed as a decimal if any
 --   decimal literals are used in the input; otherwise, the default is
 --   to display as a fraction.  So the identity element is 'Fraction',
 --   and 'Decimal' always wins when combining.
 instance Monoid RationalDisplay where
-  mempty = Fraction
-  Decimal `mappend` _ = Decimal
-  _ `mappend` Decimal = Decimal
-  _ `mappend` _       = Fraction
+  mempty  = Fraction
+  mappend = (<>)
 
 -- | AST for the desugared, untyped core language.
 data Core where
 
   -- | A variable.
   CVar  :: Name Core -> Core
+
+  -- | A primitive.
+  CPrim :: String -> Core
 
   -- | A constructor, identified by number, with arguments.  For
   --   example, false and true are represented by @CCons 0 []@ and
@@ -64,9 +71,6 @@ data Core where
   --   constructor came from; if the program typechecked then we will
   --   never end up comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
-
-  -- | A list comprehension.
-  CListComp :: Bind (Telescope CQual) Core -> Core
 
   -- | A list with an ellipsis.
   CEllipsis :: [Core] -> Ellipsis Core -> Core
@@ -96,6 +100,12 @@ data Core where
   -- | A type.
   CType :: Type -> Core
 
+  -- | A Set
+  --   Named so because CSet conflicts with the type Container type
+  --   defined in Disco.AST.Surace
+  -- Type stores the type of the elements.
+  CoreSet :: Type -> [Core] -> Core
+
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
@@ -103,7 +113,6 @@ data Core where
 --   desugared into combinators of the operators here.
 data Op = OAdd     -- ^ Addition (@+@)
         | ONeg     -- ^ Arithmetic negation (@-@)
-        | OPosSub  -- ^ Runtime-checked subtraction on positive numbers
         | OSqrt    -- ^ Integer square root (@sqrt@)
         | OLg      -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor   -- ^ Floor of fractional type (@floor@)
@@ -112,9 +121,6 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMul     -- ^ Multiplication (@*@)
         | ODiv     -- ^ Division (@/@)
         | OExp     -- ^ Exponentiation (@^@)
-        | OAnd     -- ^ Logical and (@&&@ / @and@)
-        | OOr      -- ^ Logical or (@||@ / @or@)
-        | ONot     -- ^ Arithmetic negation (@not@)
         | OMod     -- ^ Modulo (@mod@)
         | ODivides -- ^ Divisibility test (@|@)
         | OBinom   -- ^ Binomial coefficient (@choose@)
@@ -130,13 +136,19 @@ data Op = OAdd     -- ^ Addition (@+@)
                    --   ordering relation.
         | OEnum
         | OCount
-    -- Need some new operators for doing arithmetic with finite types
-        | OMAdd Integer
-        | OMMul Integer
-        | OMSub Integer
-        | OMNeg Integer
-        | OMDiv Integer
-        | OMExp Integer
+
+        -- Arithmetic operators with special runtime behavior for finite types
+        | OMDiv  Integer
+        | OMExp  Integer
+        | OMDivides Integer
+
+        -- Set Operations
+        | OSize    -- ^ Size of two sets (@size@)
+        | OSubset Type -- ^ Subset test for two sets (@⊆@)
+        | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
+        | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)
+        | ODifference Type   -- ^ Difference of two sets (@\@)
+
   deriving (Show, Generic)
 
 -- | A branch, consisting of a list of guards and a term.
@@ -163,15 +175,15 @@ data CPattern where
   -- | A wildcard pattern @_@, which matches anything.
   CPWild :: CPattern
 
-  -- | A cons-pattern.  @CPCons i pats@ matches @CCons j tms@ if @i ==
-  --   j@ and @pats@ all match @tms@ recursively.
-  CPCons :: Int -> [CPattern] -> CPattern
+  -- | A cons-pattern.  @CPCons i pats@ matches @CCons j xs@ if @i ==
+  --   j@.
+  CPCons :: Int -> [Name Core] -> CPattern
 
   -- | A natural number pattern.
   CPNat  :: Integer -> CPattern
 
-  -- | A successor pattern, @S p@.
-  CPSucc :: CPattern -> CPattern
+  -- | A fraction pattern, @x/y@.
+  CPFrac :: Name Core -> Name Core -> CPattern
 
   deriving (Show, Generic)
 

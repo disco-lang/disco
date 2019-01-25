@@ -1,0 +1,30 @@
+-- Chars
+'a'
+:type 'a'
+'c'
+'\n'
+'''
+'"'
+'#'
+'\\'
+'\"'
+'a' < 'b'
+(\x. {? 1 when x is 'a', 2 when x is 'z', 3 otherwise ?}) 'a'
+(\x. {? 1 when x is 'a', 2 when x is 'z', 3 otherwise ?}) 'z'
+(\x. {? 1 when x is 'a', 2 when x is 'z', 3 otherwise ?}) 'k'
+:pretty (\x. {? 1 when x is 'a' ?}) "Disco"
+' a'
+' '
+
+-- Strings
+"Disco"
+:type "Disco"
+"Di sco"
+"\'"
+"\n"
+"'"
+"a\na\a\a\""
+"\\"
+"bed" < "boat"
+(\x. {? 1 when x is "Disco", 2 otherwise ?}) "blahblah"
+(\x. {? 1 when x is "Disco", 2 otherwise ?}) "Disco"

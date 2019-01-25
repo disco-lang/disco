@@ -1,8 +1,8 @@
-Loading test/syntax-juxt-mul/juxt-mul.disco...
+Loading juxt-mul.disco...
 Loaded.
 200
 200
-NotFun (ATVar TyN x)
+NotCon CArr (TVar_ () x) (TyAtom (ABase N))
 24
 14
 600

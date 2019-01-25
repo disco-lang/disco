@@ -3,6 +3,6 @@ gcd(a,0) = a
 gcd(a,b) = gcd(b, a mod b)
 
 gcd2 : N * N -> N
-gcd2 = p ↦ {? a                when p is (a,0),
+gcd2 = λp. {? a                when p is (a,0),
               gcd2(b, a mod b) when p is (a,b)
            ?}

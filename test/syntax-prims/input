@@ -1,0 +1,2 @@
+:load test/syntax-prims/syntax-prims.disco
+:type x

@@ -4,9 +4,10 @@
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Messages
--- Copyright   :  (c) 2017 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Message logging framework (e.g. for errors, warnings, etc.) for
 -- disco.
@@ -15,15 +16,14 @@
 
 module Disco.Messages where
 
-import Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless
 
-import           Control.Monad.Writer
-import           Data.Sequence (Seq)
-import qualified Data.Sequence as Seq
+import           Data.Sequence                    (Seq)
+import qualified Data.Sequence                    as Seq
 
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.AST.Core
+import           Disco.AST.Core
+import           Disco.AST.Surface
+import           Disco.AST.Typed
 
 data MessageLevel
   = Info

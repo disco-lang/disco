@@ -1,0 +1,3 @@
+-- A function to produce a runtime exception at any type
+bomb : a -> a
+bomb x = {? x if 0 == 1 ?}

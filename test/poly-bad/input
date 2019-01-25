@@ -1,0 +1,4 @@
+let f : a -> a = \x. x+1 in f
+let f : a -> a = \x. x+x in f
+let f : a -> b -> a = \x y. y in f
+let f : a*b -> b = \p. {? a when p is (a,_) ?} in f

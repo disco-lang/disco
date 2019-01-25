@@ -11,7 +11,11 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.1
+tested-with:         GHC == 8.6.3
+
+data-dir:            lib
+
+data-files:          *.disco
 
 extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      docs/tutorial/example/*.disco
@@ -20,139 +24,102 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/Tests.hs
                      test/arith-basic-bin/expected
                      test/arith-basic-bin/input
-                     test/arith-basic-bin/output
                      test/arith-basic-un/expected
                      test/arith-basic-un/input
-                     test/arith-basic-un/output
                      test/arith-count/expected
                      test/arith-count/input
-                     test/arith-count/output
                      test/arith-finite-types/expected
                      test/arith-finite-types/input
-                     test/arith-finite-types/output
                      test/arith-numthry/expected
                      test/arith-numthry/input
-                     test/arith-numthry/output
-                     test/arith-pos-sub/expected
-                     test/arith-pos-sub/input
-                     test/arith-pos-sub/output
                      test/arith-round/expected
                      test/arith-round/input
-                     test/arith-round/output
                      test/case-basic/case-basic.disco
                      test/case-basic/expected
                      test/case-basic/input
-                     test/case-basic/output
                      test/interp-fibs/expected
                      test/interp-fibs/fiblist.disco
                      test/interp-fibs/input
-                     test/interp-fibs/output
                      test/interp-lazymatch/expected
                      test/interp-lazymatch/input
-                     test/interp-lazymatch/output
                      test/list-comp/expected
                      test/list-comp/input
                      test/list-comp/listcomp.disco
-                     test/list-comp/output
                      test/list-poly/expected
                      test/list-poly/input
-                     test/list-poly/output
                      test/list-poly/take.disco
                      test/logic-bools/expected
                      test/logic-bools/input
-                     test/logic-bools/output
                      test/logic-cmp/expected
                      test/logic-cmp/input
-                     test/logic-cmp/output
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
-                     test/parse-case-expr/output
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
-                     test/parse-nested-list/output
+                     test/poly-infer-sort/expected
+                     test/poly-infer-sort/input
+                     test/poly-instantiate/expected
+                     test/poly-instantiate/input
+                     test/poly-instantiate/poly-instantiate.disco
                      test/pretty-lazy/expected
                      test/pretty-lazy/input
-                     test/pretty-lazy/output
                      test/pretty-type/expected
                      test/pretty-type/input
-                     test/pretty-type/output
                      test/pretty-whnf/expected
                      test/pretty-whnf/input
-                     test/pretty-whnf/output
                      test/props-basic/expected
                      test/props-basic/input
-                     test/props-basic/output
                      test/props-basic/props-basic.disco
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
-                     test/props-fail/output
                      test/syntax-chain/expected
                      test/syntax-chain/inRange.disco
                      test/syntax-chain/input
-                     test/syntax-chain/output
                      test/syntax-clause/clauses.disco
                      test/syntax-clause/expected
                      test/syntax-clause/input
-                     test/syntax-clause/output
                      test/syntax-comment/expected
                      test/syntax-comment/fib.disco
                      test/syntax-comment/input
-                     test/syntax-comment/output
                      test/syntax-decimals/expected
                      test/syntax-decimals/input
-                     test/syntax-decimals/output
                      test/syntax-doc/expected
                      test/syntax-doc/input
-                     test/syntax-doc/output
                      test/syntax-doc/syntax-doc.disco
                      test/syntax-juxt-app/expected
                      test/syntax-juxt-app/input
                      test/syntax-juxt-app/juxt-app.disco
-                     test/syntax-juxt-app/output
                      test/syntax-juxt-mul/expected
                      test/syntax-juxt-mul/input
                      test/syntax-juxt-mul/juxt-mul.disco
-                     test/syntax-juxt-mul/output
                      test/syntax-lambda/expected
                      test/syntax-lambda/input
-                     test/syntax-lambda/output
                      test/syntax-let/expected
                      test/syntax-let/input
-                     test/syntax-let/output
                      test/syntax-many-args/expected
                      test/syntax-many-args/input
                      test/syntax-many-args/many-args.disco
-                     test/syntax-many-args/output
                      test/syntax-many-clauses/expected
                      test/syntax-many-clauses/input
                      test/syntax-many-clauses/many-clauses.disco
-                     test/syntax-many-clauses/output
                      test/syntax-patclause/expected
                      test/syntax-patclause/fact.disco
                      test/syntax-patclause/input
-                     test/syntax-patclause/output
                      test/syntax-tuples/expected
                      test/syntax-tuples/input
-                     test/syntax-tuples/output
                      test/syntax-types/expected
                      test/syntax-types/input
-                     test/syntax-types/output
                      test/types-bind/expected
                      test/types-bind/input
-                     test/types-bind/output
                      test/types-compare/expected
                      test/types-compare/input
-                     test/types-compare/output
                      test/types-ops/expected
                      test/types-ops/input
-                     test/types-ops/output
                      test/types-rational/expected
                      test/types-rational/input
-                     test/types-rational/output
                      test/types-squash/expected
                      test/types-squash/input
-                     test/types-squash/output
                      --- TEST FILES END ---
 
 cabal-version:       1.18
@@ -166,6 +133,8 @@ library
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.AST.Core
+                       Disco.AST.Desugared
+                       Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
                        Disco.Context
@@ -174,10 +143,20 @@ library
                        Disco.Pretty
                        Disco.Property
                        Disco.Desugar
+                       Disco.Compile
                        Disco.Eval
                        Disco.Interpret.Core
+                       Disco.Subst
                        Disco.Typecheck
+                       Disco.Typecheck.Constraints
+                       Disco.Typecheck.Erase
+                       Disco.Typecheck.Graph
+                       Disco.Typecheck.Monad
+                       Disco.Typecheck.Solve
+                       Disco.Typecheck.Unify
                        Disco.Types
+                       Disco.Types.Rules
+                       Disco.Util
 
   other-extensions:
                        GADTs
@@ -191,20 +170,22 @@ library
                        TemplateHaskell
                        UndecidableInstances
 
-  build-depends:       base >=4.8 && <4.12,
+  build-depends:       base >=4.8 && <4.13,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 6.3,
+                       megaparsec >= 6.1.1 && < 7.1,
+                       parser-combinators >= 1.0.0 && < 1.1,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,
-                       containers >=0.5 && <0.6,
-                       unbound-generics >= 0.3 && < 0.4,
-                       lens >= 4.14 && < 4.17,
+                       containers >=0.5 && <0.7,
+                       unbound-generics >= 0.3 && < 0.5,
+                       lens >= 4.14 && < 4.18,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.6 && < 0.8,
+                       arithmoi >= 0.6 && < 0.9,
                        integer-logarithms >= 1.0 && < 1.1,
                        haskeline >=0.7 && <0.8,
-                       QuickCheck >= 2.9 && < 2.12
+                       QuickCheck >= 2.9 && < 2.13,
+                       fgl >= 5.5 && < 5.8
 
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -212,15 +193,19 @@ library
 executable disco
   hs-source-dirs:      repl
   main-is:             REPL.hs
+  other-modules:       Paths_disco
+  autogen-modules:     Paths_disco
   build-depends:       base,
                        disco,
+                       directory,
+                       filepath,
                        haskeline >=0.7 && <0.8,
                        mtl >=2.2 && <2.3,
                        transformers >= 0.4 && < 0.6,
-                       megaparsec >= 6.1.1 && < 6.6,
-                       containers >= 0.5 && < 0.6,
-                       unbound-generics >= 0.3 && < 0.4,
-                       lens >= 4.14 && < 4.17,
+                       megaparsec >= 6.1.1 && < 7.1,
+                       containers >= 0.5 && < 0.7,
+                       unbound-generics >= 0.3 && < 0.5,
+                       lens >= 4.14 && < 4.18,
                        optparse-applicative >= 0.12 && < 0.15
 
   default-language:    Haskell2010
@@ -229,8 +214,8 @@ test-suite disco-tests
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   hs-source-dirs: test
-  build-depends:    base >= 4.7 && < 4.12,
-                    tasty >= 0.10 && < 1.1,
+  build-depends:    base >= 4.7 && < 4.13,
+                    tasty >= 0.10 && < 1.3,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
@@ -243,7 +228,7 @@ test-suite disco-examples
   type: exitcode-stdio-1.0
   main-is: TestExamples.hs
   hs-source-dirs: example
-  build-depends:    base >= 4.7 && < 4.12,
+  build-depends:    base >= 4.7 && < 4.13,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

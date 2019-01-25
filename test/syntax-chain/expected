@@ -1,4 +1,4 @@
-Loading test/syntax-chain/inRange.disco...
+Loading inRange.disco...
 Loaded.
 false
 false
@@ -7,6 +7,7 @@ true
 true
 false
 true
+false
 false
 false
 false

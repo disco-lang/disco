@@ -1,0 +1,5 @@
+import num
+import list
+
+ps : List N
+ps = filter isPrime [1 .. 100]

@@ -1,0 +1,20 @@
+type Wahoo = Cat
+
+type Cat = Corn
+
+type Corn = Rain
+
+type Rain = Groot
+
+type Groot = Bat
+
+type Bat = Nat
+
+incr : Wahoo -> Wahoo
+incr w = w + 1
+
+type Triplet = (Nat * Nat * Nat)
+
+sumTripletList : List Triplet -> N
+sumTripletList [] = 0
+sumTripletList ((n1, n2, n3) :: rest) = (n1 + n2 + n3 + (sumTripletList rest))

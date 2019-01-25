@@ -6,11 +6,12 @@
 {-# LANGUAGE TypeFamilies    #-}
 
 -----------------------------------------------------------------------------
---
+-- |
 -- Module      :  Disco.Parser
--- Copyright   :  (c) 2016 disco team (see LICENSE)
--- License     :  BSD-style (see LICENSE)
+-- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Parser to convert concrete Disco syntax into an (untyped, surface
 -- language) AST.
@@ -30,7 +31,7 @@ module Disco.Parser
          -- ** Punctuation
        , parens, braces, angles, brackets
        , semi, comma, colon, dot, pipe
-       , mapsTo
+       , lambda
 
          -- * Disco parser
 
@@ -39,7 +40,7 @@ module Disco.Parser
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
-       , parseList, parseEllipsis, parseListComp, parseQual
+       , parseContainer, parseEllipsis, parseContainerComp, parseQual
        , parseInj, parseLet, parseTypeOp
 
          -- ** Case and patterns
@@ -48,25 +49,30 @@ module Disco.Parser
 
          -- ** Types
        , parseType, parseAtomicType
+       , parseSigma
        )
        where
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name)
+                                                   fvAny, string2Name)
 
+import           Control.Monad.Combinators        (many, (<|>))
+import           Control.Monad.Combinators.Expr
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer       as L
-import           Text.Megaparsec.Expr
 
-import           Control.Applicative              (many, (<|>))
-import           Control.Lens                     (makeLenses, use, (.=))
+import           Control.Lens                     (makeLenses, toListOf, use,
+                                                   (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
+import           Data.List                        (intercalate)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.AST.Surface
@@ -84,19 +90,22 @@ data ParserState = ParserState
   { _indentLevel :: Maybe Pos  -- ^ When this is @Just p@, everything
                                --   should be indented more than column
                                --   @p@.
+  , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
+                               --   (some of which may affect parsing).
   }
 
 makeLenses ''ParserState
 
 initParserState :: ParserState
-initParserState = ParserState Nothing
+initParserState = ParserState Nothing S.empty
 
--- | A parser is just a megaparsec parser of strings.  Megaparsec can
---   keep track of indentation.  For now we have no custom errors.
+-- | A parser is a megaparsec parser of strings, with an extra layer
+--   of state to keep track of the current indentation level.  For now
+--   we have no custom errors.
 type Parser = StateT ParserState (MP.Parsec Void String)
 
 -- | Run a parser from the initial state.
-runParser :: Parser a -> FilePath -> String -> Either (ParseError Char Void) a
+runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
 runParser = MP.runParser . flip evalStateT initParserState
 
 -- | @indented p@ is just like @p@, except that every token must not
@@ -118,12 +127,26 @@ requireIndent p = do
     Just pos -> L.indentGuard sc GT pos >> p
     _        -> p
 
+-- | Locally set the enabled extensions within a subparser.
+withExts :: Set Ext -> Parser a -> Parser a
+withExts exts p = do
+  oldExts <- use enabledExts
+  enabledExts .= exts
+  a <- p
+  enabledExts .= oldExts
+  return a
+
+-- | Ensure that a specific extension is enabled, fail if not.
+ensureEnabled :: Ext -> Parser ()
+ensureEnabled e = do
+  exts <- use enabledExts
+  guard $ e `S.member` exts
+
 -- | Generically consume whitespace, including comments.
 sc :: Parser ()
-sc = L.space space1 lineComment blockComment
+sc = L.space space1 lineComment empty {- no block comments in disco -}
   where
     lineComment  = L.skipLineComment "--"
-    blockComment = L.skipBlockComment "{-" "-}"
 
 -- | Parse a lexeme, that is, a parser followed by consuming
 --   whitespace.
@@ -161,10 +184,10 @@ pipe      = symbol "|"
 ellipsis :: Parser String
 ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 
--- | The symbol that separates the variable binder from the body of a
---   lambda (either @↦@, @->@, or @|->@).
-mapsTo :: Parser ()
-mapsTo = reservedOp "↦" <|> reservedOp "->" <|> reservedOp "|->"
+-- | The symbol that starts an anonymous function (either a backslash
+--   or a Greek λ).
+lambda :: Parser String
+lambda = symbol "\\" <|> symbol "λ"
 
 -- | Parse a natural number.
 natural :: Parser Integer
@@ -182,8 +205,13 @@ natural = lexeme L.decimal <?> "natural number"
 --
 --   The idea is that brackets surround an infinitely repeating
 --   sequence of digits.
+--
+--   We are careful to only parse a decimal terminated by a period if
+--   there is not another period immediately following.  This way
+--   something like @[1..]@ parses properly as the number 1 with an
+--   ellipsis.
 decimal :: Parser Rational
-decimal = lexeme (readDecimal <$> some digit <* char '.'
+decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char '.')
                               <*> many digit
                               <*> optionMaybe (brackets (some digit))
                  )
@@ -208,7 +236,7 @@ decimal = lexeme (readDecimal <$> some digit <* char '.'
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
-reserved w = lexeme $ string w *> notFollowedBy alphaNumChar
+reserved w = (lexeme . try) $ string w *> notFollowedBy alphaNumChar
 
 -- | The list of all reserved words.
 reservedWords :: [String]
@@ -216,27 +244,29 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
+  , "size", "union", "U", "∪", "intersect", "∩"
   , "enumerate", "count", "floor", "ceiling", "divides"
-  , "Void", "Unit", "Bool", "Boolean"
-  , "Nat", "Natural", "Int", "Integer", "Rational", "Fin"
-  , "N", "Z", "Q", "ℕ", "ℤ", "ℚ", "QP", "ℚ⁺"
-  , "forall"
+  , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
+  , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
+  , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
+  , "forall", "type"
+  , "import", "using"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a letter and continuing with alphanumerics, underscores, and
 --   apostrophes.
-identifier :: Parser String
-identifier = (lexeme . try) (p >>= check) <?> "variable name"
+identifier :: Parser Char -> Parser String
+identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> letterChar <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
                 else return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
-ident = string2Name <$> identifier
+ident = string2Name <$> (identifier letterChar)
 
 -- | Optionally parse, succesfully returning 'Nothing' if the parse
 --   fails.
@@ -255,33 +285,57 @@ wholeModule = between sc eof parseModule
 --   semicolons).
 parseModule :: Parser Module
 parseModule = do
-  topLevel <- many parseTopLevel
-  let theMod = mkModule topLevel
-  return theMod
+  exts     <- S.fromList <$> many parseExtension
+  withExts exts $ do
+    imports  <- many parseImport
+    topLevel <- many parseTopLevel
+    let theMod = mkModule exts imports topLevel
+    return theMod
+    where
+      groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
+      groupTLs _ [] = []
+      groupTLs revDocs (TLDoc doc : rest)
+        = groupTLs (doc : revDocs) rest
+      groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
+        = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
+      groupTLs _ (TLDecl defn : rest)
+        = (defn, Nothing) : groupTLs [] rest
+
+      defnGroups :: [Decl] -> [Decl]
+      defnGroups []                = []
+      defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+      defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
+      defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
+        where
+          (grp, rest) = matchDefn ds
+          matchDefn :: [Decl] -> ([TermDefn], [Decl])
+          matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = (t:ts, ds2')
+            where
+              (ts, ds2') = matchDefn ds2
+          matchDefn ds2 = ([], ds2)
+
+      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
+        where
+          (decls, docs) = unzip $ groupTLs [] tls
+
+-- | Parse an extension.
+parseExtension :: Parser Ext
+parseExtension = L.nonIndented sc $
+  reserved "using" *> parseExtName
+
+-- | Parse the name of a language extension (case-insensitive).
+parseExtName :: Parser Ext
+parseExtName = choice (map parseOneExt allExts) <?> "language extension name"
   where
-    groupTLs _ [] = []
-    groupTLs revDocs (TLDoc doc : rest)
-      = groupTLs (doc : revDocs) rest
-    groupTLs revDocs (TLDecl decl@(DType{}) : rest)
-      = (decl, Just (declName decl, reverse revDocs)) : groupTLs [] rest
-    groupTLs _ (TLDecl defn : rest)
-      = (defn, Nothing) : groupTLs [] rest
+    parseOneExt ext = ext <$ lexeme (string' (show ext) :: Parser String)
 
-    defnGroups []                = []
-    defnGroups (d@DType{}  : ds)  = d : defnGroups ds
-    defnGroups (DDefn x bs : ds)  = DDefn x (bs ++ concatMap getClauses grp) : defnGroups rest
-      where
-        (grp, rest) = span matchDefn $ ds
-        matchDefn (DDefn x' _) = x == x'
-        matchDefn _ = False
-        getClauses (DDefn _ cs) = cs
-        getClauses _ = error "Impossible! parseModule.defnGroups.getClauses on non-DDefn"
-          -- Impossible since we only call getClauses on things that
-          -- passed matchDefn
-
-    mkModule tls = Module (defnGroups decls) (M.fromList (catMaybes docs))
-      where
-        (decls, docs) = unzip $ groupTLs [] tls
+-- | Parse an import, of the form @import <modulename>@.
+parseImport :: Parser ModName
+parseImport = L.nonIndented sc $
+  reserved "import" *> moduleName
+  where
+    moduleName = lexeme $
+      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.
@@ -331,19 +385,25 @@ parseProperty = label "property" $ L.nonIndented sc $ do
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
 parseDecl :: Parser Decl
-parseDecl = try parseTyDecl <|> parseDefn
+parseDecl = try (DType <$> parseTyDecl) <|> DDefn <$> parseDefn <|> DTyDef <$> parseTyDefn
 
 -- | Parse a top-level type declaration of the form @x : ty@.
-parseTyDecl :: Parser Decl
+parseTyDecl :: Parser TypeDecl
 parseTyDecl = label "type declaration" $
-  DType <$> ident <*> (indented $ colon *> parseType)
+  TypeDecl <$> ident <*> (indented $ colon *> parseSigma)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
-parseDefn :: Parser Decl
+parseDefn :: Parser TermDefn
 parseDefn = label "definition" $
-  DDefn
+  TermDefn
   <$> ident
   <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+
+-- | Parse the definition of a user-defined algebraic data type.
+parseTyDefn :: Parser TypeDefn
+parseTyDefn = label "type defintion" $
+  TypeDefn
+  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -354,7 +414,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseType))
+  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseSigma))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -362,7 +422,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' = label "expression" $
-      TAbs <$> try (bind <$> some parseLambdaArg <*> (mapsTo *> parseTerm'))
+      parseLambda
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
@@ -370,10 +430,13 @@ parseTerm' = label "expression" $
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = label "expression" $
-      brackets parseList
-  <|> TBool True  <$ (reserved "true" <|> reserved "True")
+       TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
+  <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
+  <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
+  <|> TWild <$ symbol "_"
   <|> TVar <$> ident
+  <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -381,13 +444,13 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
+  <|> brackets (parseContainer ListContainer)
+  <|> braces (parseContainer SetContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
--- | Parse a list-ish thing, like a literal list or a list
+-- | Parse a container, like a literal list or set, or a
 --   comprehension (not including the square brackets).
 --
---   Note eventually this should be generalized to parse the innards
---   of literal lists, sets, or multisets.
 --
 --   > list          ::= '[' listContents ']'
 --   > listContents  ::= nonEmptyList | <empty>
@@ -395,8 +458,8 @@ parseAtom = label "expression" $
 --   > ell           ::= '..' [t]
 --   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
 
-parseList :: Parser Term
-parseList = nonEmptyList <|> return (TList [] Nothing)
+parseContainer :: Container -> Parser Term
+parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
@@ -410,20 +473,20 @@ parseList = nonEmptyList <|> return (TList [] Nothing)
       t <- parseTerm
       (listRemainder t <|> singletonList t)
 
-    singletonList t = TList [t] <$> optionMaybe parseEllipsis
+    singletonList t = TContainer c [t] <$> optionMaybe parseEllipsis
 
     -- The remainder of a list after the first term starts with either
     -- a pipe (for a comprehension) or a comma (for a literal list).
     listRemainder t = do
       s <- pipe <|> comma
       case s of
-        "|" -> parseListComp t
+        "|" -> parseContainerComp c t
         "," -> do
           -- Parse the rest of the terms in a literal list after the
           -- first, then an optional ellipsis, and return everything together.
           ts <- parseTerm `sepBy` comma
           e  <- optionMaybe parseEllipsis
-          return $ TList (t:ts) e
+          return $ TContainer c (t:ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
@@ -437,10 +500,10 @@ parseEllipsis = do
 --   square brackets), i.e. a list of qualifiers.
 --
 --   @q [,q]*@
-parseListComp :: Term -> Parser Term
-parseListComp t = do
+parseContainerComp :: Container -> Term -> Parser Term
+parseContainerComp c t = do
   qs <- toTelescope <$> (parseQual `sepBy` comma)
-  return (TListComp $ bind qs t)
+  return (TContainerComp c $ bind qs t)
 
 -- | Parse a qualifier in a comprehension: either a binder @x in t@ or
 --   a guard @t@.
@@ -469,6 +532,11 @@ parseInj :: Parser Side
 parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
+-- | Parse an anonymous function.
+parseLambda :: Parser Term
+parseLambda =
+  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
+
 -- | Parse an argument to a lambda, either a variable or a binding of
 --   the form @(x:ty)@.
 parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
@@ -489,9 +557,9 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parseType)
+  mty <- optionMaybe (colon *> parseSigma)
   t   <- symbol "=" *> (embed <$> parseTerm)
-  return $ Binding mty x t
+  return $ Binding (embed <$> mty) x t
 
 -- | Parse a case expression.
 parseCase :: Parser Term
@@ -509,41 +577,98 @@ parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parse
 
 -- | Parse a single guard (either @if@ or @when@)
 parseGuard :: Parser Guard
-parseGuard = parseGBool <|> parseGPat
+parseGuard = parseGBool <|> parseGPat <|> parseGLet
   where
     parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
     parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
                       <*> (reserved "is" *> parsePattern)
+    parseGLet  = GLet <$> (reserved "let" *> parseBinding)
 
-
--- | Parse an atomic pattern.
+-- | Parse an atomic pattern, by parsing a term and then attempting to
+--   convert it to a pattern.
 parseAtomicPattern :: Parser Pattern
-parseAtomicPattern = label "pattern" $
-      PVar <$> ident
-  <|> PWild <$ symbol "_"
-  <|> PBool True  <$ (reserved "true" <|> reserved "True")
-  <|> PBool False <$ (reserved "false" <|> reserved "False")
-  <|> PNat <$> natural
-  <|> PList <$> brackets (parsePattern `sepBy` comma)
-  <|> tuplePat <$> (parens (parsePattern `sepBy` comma))
+parseAtomicPattern = label "pattern" $ do
+  t <- parseAtom
+  case termToPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
 
-tuplePat :: [Pattern] -> Pattern
-tuplePat []  = PUnit
-tuplePat [x] = x
-tuplePat t   = PTup t
-
--- | Parse a pattern.
+-- | Parse a pattern, by parsing a term and then attempting to convert
+--   it to a pattern.
 parsePattern :: Parser Pattern
-parsePattern = makeExprParser parseAtomicPattern table
-  where
-    table = [ [ prefix "left" (PInj L)
-              , prefix "right" (PInj R)
-              , prefix "S"   PSucc
-              ]
-            , [ infixR "::" PCons ]
-            ]
-    prefix name fun = Prefix (reserved name >> return fun)
-    infixR name fun = InfixR (reservedOp name >> return fun)
+parsePattern = label "pattern" $ do
+  t <- parseTerm
+  case termToPattern t of
+    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Just p  -> return p
+
+-- | Attempt converting a term to a pattern.
+termToPattern :: Term -> Maybe Pattern
+termToPattern TWild       = Just $ PWild
+termToPattern (TVar x)    = Just $ PVar x
+termToPattern (TParens t) = termToPattern t
+termToPattern TUnit       = Just $ PUnit
+termToPattern (TBool b)   = Just $ PBool b
+termToPattern (TNat n)    = Just $ PNat n
+termToPattern (TChar c)   = Just $ PChar c
+termToPattern (TString s) = Just $ PString s
+termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
+termToPattern (TInj s t)  = PInj s <$> termToPattern t
+
+termToPattern (TBin Cons t1 t2)
+  = PCons <$> termToPattern t1 <*> termToPattern t2
+
+termToPattern (TBin Add t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PAdd L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PAdd R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PAdd L.  Also vice versa for PAdd R.
+
+termToPattern (TBin Mul t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PMul L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t1) == 0
+        -> Just $ PMul R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PMul L.  Also vice versa for PMul R.
+
+termToPattern (TBin Sub t1 t2)
+  = case termToPattern t1 of
+      Just p
+        |  length (toListOf fvAny p) == 1
+        && length (toListOf fvAny t2) == 0
+        -> Just $ PSub p t2
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PSub.
+
+      -- For now we don't handle the case of t - p, since it seems
+      -- less useful (and desugaring it would require extra code since
+      -- subtraction is not commutative).
+
+termToPattern (TBin Div t1 t2)
+  = PFrac <$> termToPattern t1 <*> termToPattern t2
+
+termToPattern (TUn Neg t) = PNeg <$> termToPattern t
+
+termToPattern (TContainer ListContainer ts Nothing)
+  = PList <$> mapM termToPattern ts
+
+termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
@@ -569,9 +694,9 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
 
-    bfxParser InL  = InfixL
-    bfxParser InR  = InfixR
-    bfxParser In   = InfixN
+    bfxParser InL = InfixL
+    bfxParser InR = InfixR
+    bfxParser In  = InfixN
 
     isChainable op = op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides]
 
@@ -634,12 +759,11 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- application, since (x y) is not a multiplicative term: it is
     -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
-    isMultiplicativeTerm (TNat _)            = True
-    isMultiplicativeTerm (TUn {})            = True
-    isMultiplicativeTerm (TBin {})           = True
-    isMultiplicativeTerm (TParens (TUn  {})) = True
-    isMultiplicativeTerm (TParens (TBin {})) = True
-    isMultiplicativeTerm _                   = False
+    isMultiplicativeTerm (TNat _)    = True
+    isMultiplicativeTerm (TUn {})    = True
+    isMultiplicativeTerm (TBin {})   = True
+    isMultiplicativeTerm (TParens t) = isMultiplicativeTerm t
+    isMultiplicativeTerm _           = False
 
     -- Fix precedence by bubbling up any new TBin terms whose
     -- precedence is less than that of the operator above them.  We
@@ -675,11 +799,11 @@ parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
+  <|> TyC    <$ (reserved "Char" <|> reserved "C")
   <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
-  <|> TyQP   <$ (reserved "QP" <|> reserved "ℚ⁺") -- TODO: come up with more/better ways to
-                                                  --       represent nonegative rationals.
+  <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
     -- This explicitly allows "List List N" to parse as List (List N).
     -- Since we don't have arbitrary application of higher-kinded type
@@ -687,11 +811,23 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
+  <|> TySet <$> (reserved "Set" *> parseAtomicType)
+  <|> TyDef <$> parseTyDef
+  <|> TyVar <$> parseTyVar
   <|> parens parseType
 
 parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
+
+parseTyDef :: Parser String
+parseTyDef =  identifier upperChar
+
+parseTyVar :: Parser (Name Type)
+parseTyVar = string2Name <$> (identifier lowerChar)
+
+parseSigma :: Parser Sigma
+parseSigma = closeSigma <$> parseType
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

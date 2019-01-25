@@ -1,67 +1,67 @@
 ||| The eliminator for lists of natural numbers with a rational result.
 
-!!!   foldr (x -> y -> x + y) 0 [1,2,3] = 6
-!!!   foldr (x -> y -> x + y) 0 []      = 0
+!!!   foldr (\x y. x + y) 0 [1,2,3] == 6
+!!!   foldr (\x y. x + y) 0 []      == 0
 
-foldr : (ℕ → ℚ → ℚ) → ℚ → List ℕ → ℚ
+foldr : (a → b → b) → b → List a → b
 foldr f z []      = z
 foldr f z (x::xs) = f x (foldr f z xs)
 
 ||| Append two lists into a single list.
 
-!!!   append ([], [])          = ([] : List N)
-!!!   append ([1,2,3],[])      = [1,2,3]
-!!!   append ([1,2,3],[4,5,6]) = [1,2,3,4,5,6]
-!!!   ∀      xs : List N. append ([], xs) = xs
-!!!   forall xs : List N. append (xs, []) = xs
+!!!   append ([], [])          == ([] : List N)
+!!!   append ([1,2,3],[])      == [1,2,3]
+!!!   append ([1,2,3],[4,5,6]) == [1,2,3,4,5,6]
+!!!   ∀      xs : List N. append ([], xs) == xs
+!!!   forall xs : List N. append (xs, []) == xs
 
-append : List ℕ × List ℕ → List ℕ
+append : List a × List a → List a
 append ([]    , ys) = ys
 append (x::xs', ys) = x :: append(xs',ys)
 
 ||| Flatten a list of lists into a single list.
 
-!!!   concat [[1,2],[3],[],[4,5,6]] = [1,2,3,4,5,6]
+!!!   concat [[1,2],[3],[],[4,5,6]] == [1,2,3,4,5,6]
 
-concat : List List ℕ → List ℕ
+concat : List List a → List a
 concat []      = []
 concat (l::ls) = append(l, concat ls)
 
-map : (ℤ → Bool) → List ℤ → List Bool
+map : (a → b) → List a → List b
 map f []      = []
 map f (x::xs) = f x :: map f xs
 
 ||| Take the first n elements of a list.
-!!!   take 1 [true, false, true] = [true]
-!!!   take 3 [true, false] = [true, false]
-!!!   take 0 [true, false] = ([] : List Bool)
+!!!   take 1 [true, false, true] == [true]
+!!!   take 3 [true, false] == [true, false]
+!!!   take 0 [true, false] == ([] : List Bool)
 
-take : ℕ → List Bool → List Bool
+take : ℕ → List a → List a
 take 0 _  = []
 take _ [] = []
-take (S n') (x :: xs) = x :: take n' xs
+take (n+1) (x :: xs) = x :: take n xs
 
 ||| Repeat the given element infinitely.
-!!!   take 3 (repeat true) = [true, true, true]
-repeat : Bool → List Bool
+!!!   take 3 (repeat true) == [true, true, true]
+repeat : a → List a
 repeat x = x :: repeat x
 
 ||| The length of a list.
-!!!   length [true, false, true] = 3
-!!!   length (take 20 (repeat true)) = 20
-length : List Bool → ℕ
+!!!   length [true, false, true] == 3
+!!!   length (take 20 (repeat true)) == 20
+length : List a → ℕ
 length [] = 0
 length (_::l) = 1 + length l
 
-iterateP : (ℕ×ℕ → ℕ×ℕ) → ℕ×ℕ → List (ℕ×ℕ)
+iterateP : (a → a) → a → List a
 iterateP f p = p :: iterateP f (f p)
 
 fib2_helper : ℕ×ℕ → ℕ×ℕ
 fib2_helper (a,b) = (b,a+b)
 
-indexP : ℕ -> List (ℕ×ℕ) -> ℕ×ℕ
+indexP : ℕ -> List a -> a
 indexP 0 (p::_) = p
-indexP (S n') (_::l') = indexP n' l'
+indexP (n+1) (_::l') = indexP n l'
 
 fib2 : ℕ → ℕ
 fib2 n = {? x when (indexP n (iterateP fib2_helper (0,1))) is (x,_) ?}

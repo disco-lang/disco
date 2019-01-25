@@ -1,1 +1,1 @@
-((let y = 3 in (x -> x + y)) : N -> N) 5
+((let y = 3 in (\x. x + y)) : N -> N) 5

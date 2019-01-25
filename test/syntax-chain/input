@@ -12,3 +12,4 @@ inRange 3 1 1
 inRange 3 1 2
 inRange 3 1 3
 inRange 3 1 4
+2 < 1 < 1/0    -- Issue #67

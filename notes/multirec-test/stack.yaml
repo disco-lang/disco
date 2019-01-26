@@ -6,16 +6,16 @@ resolver: lts-7.9
 
 # Local packages, usually specified by relative directory name
 packages:
-  - '.'
+  - "."
   - location:
       git: git@github.com:kosmikus/multirec
       commit: 19ce71df1fb29b2b4aa27617c0d7106278deaeee
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-- multirec-0.7.7
+  - multirec-0.7.7
 
-# Override default flag values for local packages and extra-deps
+  # Override default flag values for local packages and extra-deps
 flags: {}
 
 # Extra package databases containing global packages

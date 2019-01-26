@@ -479,23 +479,6 @@ prettyDecimal r = printedDecimal
          = show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
        where
          (pre, rep) = splitAt len expan
---     (prefix,rep) = digitalExpansion 10 (numerator d) (denominator d)
---     fractionalDigits = truncatedPrefix ++ finalRepetend
---     repetend = case rep of
---       []  -> ""
---       [0] -> ""
---       _   -> "[" ++ concatMap show rep ++ "]"
---     truncatedPrefix
---       |length (take 101 prefix) == 101 = (concatMap show (take 100 prefix)) ++ "..."
---       |otherwise                       = concatMap show prefix
---     truncatedRepetend = case rep of
---       []  -> ""
---       [0] -> ""
---       _   -> concatMap show (take (100 - length truncatedPrefix) rep)
---     finalRepetend
---       | truncatedRepetend == []                               = ""
---       | (length truncatedRepetend == length rep && rep /= []) = "[" ++ truncatedRepetend ++ "]"
---       |otherwise                                              = "[" ++ truncatedRepetend ++ "...]"
 
 -- Given a list, find the indices of the list giving the first and
 -- second occurrence of the first element to repeat, or Nothing if

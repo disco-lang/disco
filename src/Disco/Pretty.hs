@@ -471,7 +471,7 @@ prettyDecimal r = printedDecimal
      (n,d) = properFraction r :: (Integer, Rational)
      (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
      printedDecimal
-       | length (take 101 expan) == 101
+       | length first102 > 101 || length first102 == 101 && (last first102 /= 0)
          = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
        | rep == [0]
          = show n ++ "." ++ concatMap show pre
@@ -479,6 +479,7 @@ prettyDecimal r = printedDecimal
          = show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
        where
          (pre, rep) = splitAt len expan
+         first102   = take 102 expan
 
 -- Given a list, find the indices of the list giving the first and
 -- second occurrence of the first element to repeat, or Nothing if
@@ -492,18 +493,16 @@ findRep' prevs ix (x:xs)
   | x `M.member` prevs = ([], prevs M.! x)
   | otherwise          = first (x:) $ findRep' (M.insert x ix prevs) (ix+1) xs
 
-
--- XXX fix the below comment
-
 -- | @digitalExpansion b n d@ takes the numerator and denominator of a
---   fraction n/d between 0 and 1, and returns two lists of digits
---   @(prefix, rep)@, such that the infinite base-b expansion of n/d is
---   0.@(prefix ++ cycle rep)@.  For example,
+--   fraction n/d between 0 and 1, and returns a pair of (1) a list of
+--   digits @ds@, and (2) a nonnegative integer k such that @splitAt k
+--   ds = (prefix, rep)@, where the infinite base-b expansion of
+--   n/d is 0.@(prefix ++ cycle rep)@.  For example,
 --
---   > digitalExpansion 10 1 4  = ([2,5],[0])
---   > digitalExpansion 10 1 7  = ([], [1,4,2,8,5,7])
---   > digitalExpansion 10 3 28 = ([1,0], [7,1,4,2,8,5])
---   > digitalExpansion 2  1 5  = ([], [0,0,1,1])
+--   > digitalExpansion 10 1 4  = ([2,5,0], 2)
+--   > digitalExpansion 10 1 7  = ([1,4,2,8,5,7], 0)
+--   > digitalExpansion 10 3 28 = ([1,0,7,1,4,2,8,5], 2)
+--   > digitalExpansion 2  1 5  = ([0,0,1,1], 0)
 --
 --   It works by performing the standard long division algorithm, and
 --   looking for the first time that the remainder repeats.

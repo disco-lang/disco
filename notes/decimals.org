@@ -1,0 +1,46 @@
+* Notes on converting to decimal representation
+
+  a/n is a repeating decimal means there exist some k, d such that
+  (10^k * 10^d * (a/n)) - (10^d * (a/n)) is an integer,
+
+  i.e. n divides (10^k * (10^d - 1) * a).
+
+  We want to find the smallest such k, d.
+
+  Note that k, d do not depend on a at all, since by assumption
+  gcd(a,n) = 1.  So WLOG we want the smallest k, d such that n divides
+  10^k * (10^d - 1).
+
+  Now note that (10^d - 1) is not divisible by 2 or 5.  So if n =
+  2^{k_2} * 5^{k_5} * n', then k = max(k_2, k_5), since this is the
+  only way to accommodate factors of 2 and 5.
+
+  Now we have reduced the problem: n divides 10^k (10^d - 1) iff n'
+  divides (10^d - 1).  This amounts to finding the order of 10 in the
+  multiplicative group U(n').
+
+  Having trouble figuring out how to compute this.  Some progress:
+
+  - http://mathforum.org/library/drmath/view/67018.html
+  - https://metacpan.org/source/Math::Prime::Util::PP#L3619
+  - https://books.google.com/books?id=tX_SBQAAQBAJ&pg=PA51&lpg=PA51&dq=A.+Das+znorder&source=bl&ots=BwrTmuz7rs&sig=ACfU3U17eV4MhNQw0dr5DCxOy5MTNhK2IQ&hl=en&sa=X&ved=2ahUKEwi59Kvvq4zgAhUKP6wKHSXPBaUQ6AEwB3oECAgQAQ#v=onepage&q=A.%20Das%20znorder&f=false
+
+    Aha, the third result has an algorithm:
+
+    - Get the prime factorization of phi(n).  Note that the order of
+      10 mod n must divide phi(n), so it suffices to determine the
+      necessary power of each prime in the factorization of phi(n).
+    - Iterate through each prime p in the factorization of phi(n) and
+      find the smallest power i such that if we replace the power of p
+      in phi(n) with p^i, we still get 1 mod n when we raise 10 to the
+      result.
+
+  Cool!  I don't know if this is actually worth doing.
+
+  See also
+
+  - https://rosettacode.org/wiki/Multiplicative_order#Haskell
+
+  We could do this only for denominators within a certain bound, so we
+  know factoring it is going to be relatively fast...?
+

@@ -163,13 +163,14 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]
-opChar = "!@#$%^&*~-+=|<>?/\\."
+opChar = "!@#$%^&*~-+=|<>?/\\.{}"
 
-parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
+parens, braces, angles, brackets, brashkets, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
+brashkets = between (symbol "{#") (symbol "#}")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
@@ -444,50 +445,74 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
-  <|> brackets (parseContainer ListContainer)
-  <|> braces (parseContainer SetContainer)
+  <|> brashkets (parseContainer BagContainer)
+  <|> braces    (parseContainer SetContainer)
+  <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
--- | Parse a container, like a literal list or set, or a
---   comprehension (not including the square brackets).
+-- | Parse a container, like a literal list, set, bag, or a
+--   comprehension (not including the square or curly brackets).
 --
+-- @
+-- <container>
+--   ::= '[' <container-contents> ']'
+--     | '{' <container-contents> '}'
 --
---   > list          ::= '[' listContents ']'
---   > listContents  ::= nonEmptyList | <empty>
---   > nonEmptyList  ::= t [ell] | t listRemainder
---   > ell           ::= '..' [t]
---   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
+-- <container-contents>
+--   ::= empty | <nonempty-container>
+--
+-- <nonempty-container>
+--   ::= <term> [ <ellipsis> ]
+--     | <term> <container-end>
+--
+-- <container-end>
+--   ::= '|' <comprehension>
+--     | ',' [ <term> (',' <item>)* ] [ <ellipsis> ]
+--
+-- <comprehension> ::= <qual> [ ',' <qual> ]*
+--
+-- <qual>
+--   ::= <ident> 'in' <term>
+--     | <term>
+--
+-- <ellipsis> ::= '..' [ <term> ]
+-- @
 
 parseContainer :: Container -> Parser Term
-parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)
+parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
 
   where
-    -- Any non-empty list starts with a term, followed by some
-    -- remainder (which could either be the rest of a literal list, or
-    -- a list comprehension).  If there is no remainder just return a
-    -- singleton list, optionally with an ellipsis.
-    nonEmptyList = do
+    -- Any non-empty container starts with a term, followed by some
+    -- remainder (which could either be the rest of a literal
+    -- container, or a container comprehension).  If there is no
+    -- remainder just return a singleton container, optionally with an
+    -- ellipsis.
+    nonEmptyContainer = do
       t <- parseTerm
-      (listRemainder t <|> singletonList t)
+      containerRemainder t <|> singletonContainer t
 
-    singletonList t = TContainer c [t] <$> optionMaybe parseEllipsis
+    singletonContainer t = TContainer c [t] <$> optionMaybe parseEllipsis
 
-    -- The remainder of a list after the first term starts with either
-    -- a pipe (for a comprehension) or a comma (for a literal list).
-    listRemainder t = do
+    -- The remainder of a container after the first term starts with
+    -- either a pipe (for a comprehension) or a comma (for a literal
+    -- container).
+    containerRemainder :: Term -> Parser Term
+    containerRemainder t = do
       s <- pipe <|> comma
       case s of
         "|" -> parseContainerComp c t
         "," -> do
-          -- Parse the rest of the terms in a literal list after the
-          -- first, then an optional ellipsis, and return everything together.
+          -- Parse the rest of the terms in a literal container after
+          -- the first, then an optional ellipsis, and return
+          -- everything together.
           ts <- parseTerm `sepBy` comma
           e  <- optionMaybe parseEllipsis
+
           return $ TContainer c (t:ts) e
-        _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
+        _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
 --   @.. [t]@.  Any number > 1 of dots may be used, just for fun.

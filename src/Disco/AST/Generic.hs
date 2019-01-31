@@ -203,7 +203,8 @@ selectSide R _ b = b
 -- | A container is a wrapper for sets and lists.
 data Container where
   ListContainer :: Container
-  SetContainer :: Container
+  BagContainer  :: Container
+  SetContainer  :: Container
   deriving (Show, Eq, Enum, Generic)
 
 instance Alpha Container

@@ -68,6 +68,7 @@ arity CArr  = [Contra, Co]
 arity CPair = [Co, Co]
 arity CSum  = [Co, Co]
 arity CList = [Co]
+arity CBag  = [Co]
 arity CSet  = [Co]
 
 ------------------------------------------------------------
@@ -202,7 +203,7 @@ qualRules = M.fromList
   , CSum ==> M.fromList
     [
     ]
-  -- no rules for CList
+  -- no rules for CList, CSet, CBag
   ]
   where
     (==>) :: a -> b -> (a,b)

@@ -249,6 +249,7 @@ reservedWords =
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
+  , "List", "Bag", "Set"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "type"
   , "import", "using"
@@ -836,9 +837,10 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
-  <|> TySet <$> (reserved "Set" *> parseAtomicType)
-  <|> TyDef <$> parseTyDef
-  <|> TyVar <$> parseTyVar
+  <|> TyBag  <$> (reserved "Bag"  *> parseAtomicType)
+  <|> TySet  <$> (reserved "Set"  *> parseAtomicType)
+  <|> TyDef  <$> parseTyDef
+  <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
 parseTyFin :: Parser Type

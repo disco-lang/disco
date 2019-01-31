@@ -52,6 +52,7 @@ module Disco.Types
        , pattern TyPair
        , pattern TySum
        , pattern TyList
+       , pattern TyBag
        , pattern TySet
 
        -- ** Quantified types
@@ -349,7 +350,6 @@ countType (TyBag ty)
   | otherwise     = Nothing
 countType (TySet ty)        = (2^) <$> countType ty
   -- XXX add some tests for this!
-  -- XXX add parser for Bag type!
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _                 = Nothing

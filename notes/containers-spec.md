@@ -6,27 +6,26 @@ Syntax
 
 ```
 <container>
-  ::= '[' <container-contents> ']'
-    | '{' <container-contents> '}'
+  ::= '['  <container-contents> ']'
+    | '{'  <container-contents> '}'
+    | '{#' <container-contents> '#}'
 
 <container-contents>
   ::= empty | <nonempty-container>
 
 <nonempty-container>
-  ::= <item> [ <ellipsis> ]
-    | <item> <container-end>
+  ::= <term> [ <ellipsis> ]
+    | <term> <container-end>
 
 <container-end>
   ::= '|' <comprehension>
-    | ',' [ <item> (',' <item>)* ] [ <ellipsis> ]
+    | ',' [ <term> (',' <term>)* ] [ <ellipsis> ]
 
 <comprehension> ::= <qual> [ ',' <qual> ]*
 
 <qual>
   ::= <ident> 'in' <term>
     | <term>
-
-<item> ::= <term> [ '#' <natural> ]
 
 <ellipsis> ::= '..' [ <term> ]
 ```
@@ -36,8 +35,8 @@ Syntax examples:
 ```
 { 'x', 'y', 'z' }
 [ 1, 3 .. ]
-{ 5 # 3 .. 100 }
-[ 'a' # 5, 'b', 'c' # 19 ]
+{# 5 .. 100 #}
+{# 3, 3, 3 #}
 ```
 
 Subtyping/conversion

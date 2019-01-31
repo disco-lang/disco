@@ -349,7 +349,6 @@ countType (TyBag ty)
   | isEmptyTy ty  = Just 1
   | otherwise     = Nothing
 countType (TySet ty)        = (2^) <$> countType ty
-  -- XXX add some tests for this!
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _                 = Nothing

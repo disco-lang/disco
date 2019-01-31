@@ -462,9 +462,9 @@ whnfOp (OMDivides n)      = modDivides n
 
 -- Set operations
 whnfOp (OSize)            = setSize
-whnfOp (OUnion ty)        = setUnion ty
-whnfOp (OIntersection ty) = setIntersection ty
-whnfOp (ODifference ty)   = setDifference ty
+whnfOp (OUnion  ty)       = setUnion ty
+whnfOp (OInter  ty)       = setIntersection ty
+whnfOp (ODiff   ty)       = setDifference ty
 whnfOp (OSubset ty)       = subsetTest ty
 
 setSize :: [Core] -> Disco IErr Value

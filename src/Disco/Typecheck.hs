@@ -698,13 +698,13 @@ typecheck Infer (TUn Size t) = do
   return $ ATUn TyN Size at
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
-    | setOp `elem` [Union, Intersection, Difference] = do
+    | setOp `elem` [Union, Inter, Diff] = do
   tys <- ensureConstr CSet ty (Left t)
   let [tyElt] = tys
   ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
 
 typecheck Infer (TBin setOp t1 t2)
-    | setOp `elem` [Union, Intersection, Difference, Subset] = do
+    | setOp `elem` [Union, Inter, Diff, Subset] = do
   at1 <- infer t1
   at2 <- infer t2
   tyelt <- freshTy

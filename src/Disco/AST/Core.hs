@@ -143,11 +143,11 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMDivides Integer
 
         -- Set Operations
-        | OSize    -- ^ Size of two sets (@size@)
+        | OSize        -- ^ Size of two sets (@size@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
-        | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
-        | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)
-        | ODifference Type   -- ^ Difference of two sets (@\@)
+        | OUnion  Type -- ^ Union of two sets (@union@ / @∪@)
+        | OInter  Type -- ^ Intersection of two sets (@intersect@ / @∩@)
+        | ODiff   Type -- ^ Difference of two sets (@\@)
 
   deriving (Show, Generic)
 

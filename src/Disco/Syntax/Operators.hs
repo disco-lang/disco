@@ -72,9 +72,10 @@ data BOp = Add     -- ^ Addition (@+@)
          | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons    -- ^ List cons (@::@)
          | Union   -- ^ Union of two sets (@union@ / @∪@)
-         | Intersection -- ^ Intersection of two sets (@intersect@ / @∩@)
-         | Difference  -- ^ Difference between two sets (@\@)
-         | Subset      -- ^ Subset test (@⊆@)
+         | Inter   -- ^ Intersection of two sets (@intersect@ / @∩@)
+         | Diff    -- ^ Difference between two sets (@\@)
+         | Subset  -- ^ Subset test (@⊆@)
+         | Rep     -- ^ Replicate to construct a bag (@#@)
   deriving (Show, Eq, Ord, Generic)
 
 -- | Type operators.
@@ -151,15 +152,17 @@ opTable =
     , uopInfo Pre  Ceil    ["ceiling"]
     , uopInfo Pre  Abs     ["abs"]
     ]
-  , [ uopInfo Pre Size     ["size"]
+  , [ uopInfo Pre  Size    ["size"]
     ]
 
-  , [ bopInfo In   Choose   ["choose"]
+  , [ bopInfo In   Choose  ["choose"]
     ]
-  , [ bopInfo InL  Union    ["union", "∪", "U"]
-    , bopInfo InL  Intersection ["intersect", "∩"]
-    , bopInfo InL  Difference ["\\"]
-    , bopInfo InL Subset ["⊆"]
+  , [ bopInfo InL  Rep     ["#"]
+    ]
+  , [ bopInfo InL  Union   ["union", "∪", "U"]
+    , bopInfo InL  Inter   ["intersect", "∩"]
+    , bopInfo InL  Diff    ["\\"]
+    , bopInfo InL  Subset  ["⊆"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]

@@ -241,14 +241,14 @@ compileBOp _ _ _ Cons c1 c2 = CCons 1 [c1, c2]
 -- need to store the element type so they can compare the elements
 -- appropriately.
 compileBOp (TySet ty) _ _ op c1 c2
-  | op `elem` [Union, Intersection, Difference, Subset]
+  | op `elem` [Union, Inter, Diff, Subset]
   = COp ((setOps ! op) ty) [c1, c2]
   where
     setOps = M.fromList
-      [ Union        ==> OUnion
-      , Intersection ==> OIntersection
-      , Difference   ==> ODifference
-      , Subset       ==> OSubset
+      [ Union  ==> OUnion
+      , Inter  ==> OInter
+      , Diff   ==> ODiff
+      , Subset ==> OSubset
       ]
 
 compileBOp ty1 ty2 resTy op c1 c2

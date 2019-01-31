@@ -342,8 +342,14 @@ countType (TyArr  ty1 ty2)
   | isEmptyTy ty2 = Just 0
   | otherwise     = (^) <$> countType ty2 <*> countType ty1
 countType (TyList ty)
-  | isEmptyTy ty            = Just 1
-  | otherwise               = Nothing
+  | isEmptyTy ty  = Just 1
+  | otherwise     = Nothing
+countType (TyBag ty)
+  | isEmptyTy ty  = Just 1
+  | otherwise     = Nothing
+countType (TySet ty)        = (2^) <$> countType ty
+  -- XXX add some tests for this!
+  -- XXX add parser for Bag type!
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _                 = Nothing

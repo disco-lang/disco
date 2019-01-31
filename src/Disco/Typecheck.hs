@@ -54,6 +54,7 @@ containerTy c ty = TyCon (containerToCon c) [ty]
 
 containerToCon :: Container -> Con
 containerToCon ListContainer = CList
+containerToCon BagContainer  = CBag
 containerToCon SetContainer  = CSet
 
 ------------------------------------------------------------

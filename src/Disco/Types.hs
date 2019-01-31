@@ -195,6 +195,8 @@ data Con where
   CSum  :: Con
   -- | Lists
   CList :: Con
+  -- | Bags
+  CBag  :: Con
   -- | Sets
   CSet  :: Con
   deriving (Show, Eq, Ord, Generic)
@@ -273,12 +275,15 @@ pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
 
+pattern TyBag  :: Type -> Type
+pattern TyBag elTy = TyCon CBag [elTy]
+
 pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
 
 {-# COMPLETE
       TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      TyArr, TyPair, TySum, TyList, TySet #-}
+      TyArr, TyPair, TySum, TyList, TyBag, TySet #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy

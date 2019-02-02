@@ -58,6 +58,9 @@ brackets = fmap PP.brackets
 braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
 
+brashes :: Monad f => f PP.Doc -> f PP.Doc
+brashes p = text "{#" <+> p <+> text "#}"
+
 quotes :: Functor f => f PP.Doc -> f PP.Doc
 quotes = fmap PP.quotes
 
@@ -143,10 +146,12 @@ prettyTy TyF              = text "𝔽"
 prettyTy (TyFin n)        = text "ℤ" <> (integer n)
 prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
-prettyTy (TySet ty)      = mparens (PA 9 InR) $
+prettyTy (TyBag ty)       = mparens (PA 9 InR) $
+  text "Bag" <+> prettyTy' 9 InR ty
+prettyTy (TySet ty)       = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
-prettyTy (TyDef n)       = text n
-prettyTy (Skolem n)      = text "%" <> prettyName n
+prettyTy (TyDef n)        = text n
+prettyTy (Skolem n)       = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -192,7 +197,7 @@ prettyTerm (TContainer c ts e)  = do
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep (ds ++ pe))
+  containerDelims c (hsep (ds ++ pe))
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
   (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
@@ -240,6 +245,11 @@ prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 prettySide :: Side -> Doc
 prettySide L = text "left"
 prettySide R = text "right"
+
+containerDelims :: Container -> (Doc -> Doc)
+containerDelims ListContainer = brackets
+containerDelims BagContainer  = brashes
+containerDelims SetContainer  = braces
 
 prettyTyOp :: TyOp -> Doc
 prettyTyOp Enumerate = text "enumerate"

@@ -256,10 +256,10 @@ whnf (CoreSet t es) = do
   dres <- countValues t res
   return $ VSet ((map (fmap (const 1))) dres)
 
-whnf (CoreMultiset tyElt es) = do
+whnf (CoreBag tyElt es) = do
   res <- mapM mkThunk es
   cres <- countValues tyElt res
-  return $ VMultiset cres
+  return $ VBag cres
 
 whnf (CType _)      = error "Called whnf on CType"
 
@@ -328,11 +328,11 @@ mapSet f s ty = do
 setToMultiset :: Value -> Disco IErr Value
 setToMultiset s = do
   (VSet xs) <- whnfV s
-  return $ VMultiset xs
+  return $ VBag xs
 
 multisetToSet :: Value -> Disco IErr Value
 multisetToSet m = do
-  (VMultiset xs) <- whnfV m
+  (VBag xs) <- whnfV m
   return $ VSet (map (\(v,n) -> (VCons 0 [v, VNum Fraction (n % 1)], 1)) xs)
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -1110,8 +1110,8 @@ setComparison _ [] [] = return EQ
 setComparison _ _ [] = return GT
 setComparison _ [] _ = return LT
 setComparison ty ((x,_):xs) ((y,_):ys) = do
-  ord <- decideOrdFor ty x y
-  case ord of
+  o <- decideOrdFor ty x y
+  case o of
     EQ    -> setComparison ty xs ys
     other -> return other
 

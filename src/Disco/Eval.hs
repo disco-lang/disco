@@ -142,7 +142,7 @@ data Value where
   VSet :: [(Value, Integer)] -> Value
 
   -- | XXX
-  VMultiset :: [(Value, Integer)] -> Value
+  VBag :: [(Value, Integer)] -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a

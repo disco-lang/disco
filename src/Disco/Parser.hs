@@ -75,7 +75,6 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
 
-import           Disco.AST.Generic                (PrimType (..))
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -176,13 +175,12 @@ brashes   = between (symbol "{#") (symbol "#}")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
-semi, comma, colon, dot, pipe, hash :: Parser String
+semi, comma, colon, dot, pipe :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
 pipe      = symbol "|"
-hash      = symbol "#" <* notFollowedBy (symbol "}")
 
 -- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String

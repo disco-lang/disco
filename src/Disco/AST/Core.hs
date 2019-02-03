@@ -23,7 +23,6 @@ module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
-       , PrimType(..)
        , Op(..)
 
          -- * Case expressions and patterns
@@ -34,7 +33,6 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Generic                (PrimType (..))
 import           Disco.AST.Surface                (Ellipsis, Telescope)
 import           Disco.Types
 
@@ -102,16 +100,14 @@ data Core where
   -- | A type.
   CType :: Type -> Core
 
-  -- | A Set
+  -- | A set.
   --   Named so because CSet conflicts with the type Container type
   --   defined in Disco.AST.Surace
   -- Type stores the type of the elements.
   CoreSet :: Type -> [Core] -> Core
 
-  -- | A multiset.
-  CoreMultiset :: Type -> [Core] -> Core
-
-
+  -- | A bag. XXX
+  CoreBag :: Type -> [Core] -> Core
 
   deriving (Show, Generic)
 

@@ -54,7 +54,6 @@ module Disco.Types
        , pattern TyList
        , pattern TyBag
        , pattern TySet
-       , pattern TyMultiset
 
        -- ** Quantified types
 

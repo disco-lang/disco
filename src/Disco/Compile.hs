@@ -109,7 +109,7 @@ compileDTerm (DTContainer (TySet _) SetContainer _ (Just _))
   = error $ "compileDTerm DTContainer SetContainer with ellipsis: unimplemented"
 
 compileDTerm (DTContainer (TyBag eltTy) BagContainer ds Nothing)
-  = error $ "compileDTerm DTContainer BagContainer: unimplemented"
+  = CoreBag eltTy <$> mapM compileDTerm ds
 
 compileDTerm (DTContainer (TyBag _) BagContainer _ (Just _))
   = error $ "compileDTerm DTContainer BagContainer with ellipsis: unimplemented"

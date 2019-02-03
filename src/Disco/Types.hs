@@ -54,6 +54,7 @@ module Disco.Types
        , pattern TyList
        , pattern TyBag
        , pattern TySet
+       , pattern TyMultiset
 
        -- ** Quantified types
 
@@ -200,6 +201,8 @@ data Con where
   CBag  :: Con
   -- | Sets
   CSet  :: Con
+  -- | Multisets
+  CMultiset :: Con
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Con

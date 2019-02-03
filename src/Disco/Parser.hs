@@ -75,6 +75,7 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
 
+import           Disco.AST.Generic                (PrimType (..))
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
 import           Disco.Types
@@ -93,6 +94,7 @@ data ParserState = ParserState
   , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
                                --   (some of which may affect parsing).
   }
+
 
 makeLenses ''ParserState
 
@@ -174,12 +176,13 @@ brashes   = between (symbol "{#") (symbol "#}")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
-semi, comma, colon, dot, pipe :: Parser String
+semi, comma, colon, dot, pipe, hash :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
 pipe      = symbol "|"
+hash      = symbol "#" <* notFollowedBy (symbol "}")
 
 -- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String
@@ -245,7 +248,8 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
-  , "size", "union", "U", "∪", "intersect", "∩"
+  , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet", "mapSet"
+  , "setToMultiset", "multisetToSet", "foldSet", "foldMultiset"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"

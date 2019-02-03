@@ -1,4 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
@@ -44,11 +45,12 @@ module Disco.Interpret.Core
 
 import           Control.Lens                       (use, (%=), (.=))
 import           Control.Monad.Except               (throwError)
+import           Data.Bifunctor                     (first)
 import           Data.Char
 import           Data.Coerce                        (coerce)
 import           Data.IntMap.Lazy                   ((!))
 import qualified Data.IntMap.Lazy                   as IntMap
-import           Data.List                          (find)
+import           Data.List                          (find, subsequences)
 import qualified Data.Map                           as M
 import           Data.Ratio
 
@@ -203,6 +205,20 @@ whnf (CPrim "isPrime") = return $ VFun primIsPrime
 whnf (CPrim "crash")   = return $ VFun primCrash
 whnf (CPrim x)         = throwError $ UnknownPrim x
 
+-- whnf (CPrim PMap ty) =
+--   return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
+
+-- -- whnf (CPrim PFoldSet ty) =
+-- --   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\s -> VDelay (ValDelay (foldSet f b s ty))))))))
+
+-- -- whnf (CPrim PFoldMultiset ty) =
+-- --   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\m -> VDelay (ValDelay (foldMultiset f b m ty))))))))
+-- whnf (CPrim PStoM _) =
+--   return $ VFun (ValFun (\s -> VDelay (ValDelay (setToMultiset s))))
+
+-- whnf (CPrim PMtoS _) =
+--   return $ VFun (ValFun (\m -> VDelay (ValDelay (multisetToSet m))))
+
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
 whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
@@ -237,22 +253,87 @@ whnf (COp op cs)    = whnfOp op cs
 
 whnf (CoreSet t es) = do
   res <- mapM mkThunk es
-  dres <- deduplicateSet t res
-  return $ VSet dres
+  dres <- countValues t res
+  return $ VSet ((map (fmap (const 1))) dres)
+
+whnf (CoreMultiset tyElt es) = do
+  res <- mapM mkThunk es
+  cres <- countValues tyElt res
+  return $ VMultiset cres
 
 whnf (CType _)      = error "Called whnf on CType"
-
-deduplicateSet :: Type -> [Value] -> Disco IErr [Value]
-deduplicateSet _ [] = return []
-deduplicateSet t (x:xs) = do
-  xInXs <- elemOf t x xs
-  result <- if xInXs then deduplicateSet t xs else (x:) <$> (deduplicateSet t xs)
-  return result
 
 elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
 elemOf _ _ []     = return False
 elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
+countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
+countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
+
+-- Merge sorts the values in the list using the given function, while
+-- also counting the number of occurences of each element.
+sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
+sortNCount _ []  = return []
+sortNCount _ [x] = return [x]
+sortNCount f xs  = do
+  fstSorted <- sortNCount f firstHalf
+  sndSorted <- sortNCount f secondHalf
+  merge (+) f fstSorted sndSorted
+  where
+    (firstHalf, secondHalf) = splitAt n xs
+    n = length xs `div` 2
+
+-- Merges two lists of type [(a,Integer)] together a la merge sort.  Is guaranteed to
+-- work provided that the two lists given have already been sorted and counted.
+merge :: (Monad m) => (Integer -> Integer -> Integer) -> (a -> a -> m Ordering) -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+merge g _ [] ys                    = case g 0 1 of
+  1 -> return ys
+  0 -> return []
+merge g _ xs []                    = case g 1 0 of
+  1 -> return xs
+  0 -> return []
+merge g comp ((x,n1):xs) ((y,n2): ys) = do
+  ord <- comp x y
+  case ord of
+    LT -> (mergeCons x n1 0) <$> merge g comp xs ((y,n2):ys)
+    EQ -> (mergeCons x n1 n2) <$> merge g comp xs ys
+    GT -> (mergeCons y 0 n2) <$> merge g comp ((x,n1):xs) ys
+    where
+      mergeCons a m1 m2 zs = case g m1 m2 of
+        0 -> zs
+        n -> ((a,n):zs)
+
+mapSet :: Value -> Value -> Type -> Disco IErr Value
+mapSet f s ty = do
+  fcn <- whnfV f
+  (VSet xs) <- whnfV s
+  ys <- mapM (\(x,n) -> (,n) <$> whnfApp fcn x) xs
+  VSet <$> sortNCount (decideOrdFor ty) ys
+
+-- foldrValues :: Value -> Value -> [Value] -> Disco IErr Value
+-- foldrValues _ b []     = return b
+-- foldrValues f b (x:xs) = do
+--   fx <- whnfApp f x
+--   foldedList <- foldrValues f b xs
+--   whnfApp fx foldedList
+--
+-- foldSet :: Value -> Value -> Value -> Type -> Disco IErr Value
+-- foldSet f b s ty = do
+--   fcn <- whnfV f
+--   vb <- whnfV b
+--   (VSet xs) <- whnfV s
+--   sortedXs <- mergeSort xs ty
+--   foldrValues fcn vb sortedXs
+
+setToMultiset :: Value -> Disco IErr Value
+setToMultiset s = do
+  (VSet xs) <- whnfV s
+  return $ VMultiset xs
+
+multisetToSet :: Value -> Disco IErr Value
+multisetToSet m = do
+  (VMultiset xs) <- whnfV m
+  return $ VSet (map (\(v,n) -> (VCons 0 [v, VNum Fraction (n % 1)], 1)) xs)
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
@@ -434,50 +515,51 @@ noMatch = return Nothing
 
 -- | Reduce an operator application to WHNF.
 whnfOp :: Op -> [Core] -> Disco IErr Value
-whnfOp OAdd               = numOp (+)
-whnfOp ONeg               = uNumOp negate
-whnfOp OSqrt              = uNumOp integerSqrt
-whnfOp OLg                = lgOp
-whnfOp OFloor             = uNumOp floorOp
-whnfOp OCeil              = uNumOp ceilOp
-whnfOp OAbs               = uNumOp abs
-whnfOp OMul               = numOp (*)
-whnfOp ODiv               = numOp' divOp
-whnfOp OExp               = numOp (\m n -> m ^^ numerator n)
+whnfOp OAdd           = numOp (+)
+whnfOp ONeg           = uNumOp negate
+whnfOp OSqrt          = uNumOp integerSqrt
+whnfOp OLg            = lgOp
+whnfOp OFloor         = uNumOp floorOp
+whnfOp OCeil          = uNumOp ceilOp
+whnfOp OAbs           = uNumOp abs
+whnfOp OMul           = numOp (*)
+whnfOp ODiv           = numOp' divOp
+whnfOp OExp           = numOp (\m n -> m ^^ numerator n)
   -- If the program typechecks, n will be an integer.
-whnfOp OMod               = numOp' modOp
-whnfOp ODivides           = numOp' (\m n -> return (mkEnum $ divides m n))
-whnfOp OBinom             = numOp binom
-whnfOp OMultinom          = multinomOp
-whnfOp OFact              = uNumOp' fact
-whnfOp (OEq ty)           = eqOp ty
-whnfOp (OLt ty)           = ltOp ty
-whnfOp OEnum              = enumOp
-whnfOp OCount             = countOp
+whnfOp OMod           = numOp' modOp
+whnfOp ODivides       = numOp' (\m n -> return (mkEnum $ divides m n))
+whnfOp OBinom         = numOp binom
+whnfOp OMultinom      = multinomOp
+whnfOp OFact          = uNumOp' fact
+whnfOp (OEq ty)       = eqOp ty
+whnfOp (OLt ty)       = ltOp ty
+whnfOp OEnum          = enumOp
+whnfOp OCount         = countOp
 
 -- Modular operations, for finite types
-whnfOp (OMDiv n)          = modDiv n
-whnfOp (OMExp n)          = modExp n
-whnfOp (OMDivides n)      = modDivides n
+whnfOp (OMDiv n)      = modDiv n
+whnfOp (OMExp n)      = modExp n
+whnfOp (OMDivides n)  = modDivides n
 
 -- Set operations
-whnfOp (OSize)            = setSize
-whnfOp (OUnion  ty)       = setUnion ty
-whnfOp (OInter  ty)       = setIntersection ty
-whnfOp (ODiff   ty)       = setDifference ty
-whnfOp (OSubset ty)       = subsetTest ty
+whnfOp (OSize)        = setSize
+whnfOp (OUnion  ty)   = setUnion ty
+whnfOp (OInter  ty)   = setIntersection ty
+whnfOp (ODiff   ty)   = setDifference ty
+whnfOp (OPowerSet ty) = powerSet ty
+whnfOp (OSubset ty)   = subsetTest ty
 
 setSize :: [Core] -> Disco IErr Value
 setSize [x] = do
   (VSet xs) <- whnf x
-  return $ vnum (fromIntegral $ length xs)
+  return $ vnum (fromIntegral $ sum (map snd xs))
 setSize _ = error "Impossible! Wrong # of Cores in setSize"
 
 setUnion :: Type -> [Core] -> Disco IErr Value
 setUnion ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- deduplicateSet ty (xs ++ ys)
+  zs <- merge max (decideOrdFor ty) xs ys
   return $ VSet zs
 setUnion _ _ = error "Impossible! Wrong # of Cores in setUnion"
 
@@ -485,46 +567,30 @@ setIntersection :: Type -> [Core] -> Disco IErr Value
 setIntersection ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- intersection ty xs ys
+  zs <- merge min (decideOrdFor ty) xs ys
   return $ VSet zs
 setIntersection _ _ = error "Impossible! Wrong # of Cores in setIntersection"
-
-intersection :: Type -> [Value] -> [Value] -> Disco IErr [Value]
-intersection _ [] _      = return []
-intersection _ _ []      = return []
-intersection t (x:xs) ys = do
-  xInYs <- elemOf t x ys
-  result <- if xInYs then (x:) <$> (intersection t xs ys) else intersection t xs ys
-  return result
 
 setDifference :: Type -> [Core] -> Disco IErr Value
 setDifference ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  zs <- difference ty xs ys
+  zs <- merge (\x y -> max 0 (x - y)) (decideOrdFor ty) xs ys
   return $ VSet zs
 setDifference _ _ = error "Impossible! Wrong # of Cores in setDifference"
-
-difference :: Type -> [Value] -> [Value] -> Disco IErr [Value]
-difference _ [] _       = return []
-difference _ xs []      = return xs
-difference ty (x:xs) ys = do
-  xInYs <- elemOf ty x ys
-  result <- if xInYs then difference ty xs ys else (x:) <$> (difference ty xs ys)
-  return result
 
 subsetTest :: Type -> [Core] -> Disco IErr Value
 subsetTest ty [c1, c2] = do
   (VSet xs) <- whnf c1
   (VSet ys) <- whnf c2
-  mkEnum <$> subset ty xs ys
-subsetTest _ _ = error "Impossible! Wrong # of Cores in subsetTest"
+  ys' <- merge (max) (decideOrdFor ty) xs ys
+  mkEnum <$> setEquality ty ys ys'
 
-subset :: Type -> [Value] -> [Value] -> Disco IErr Bool
-subset ty xs ys = do
-  foldr (\x acc -> (&&) <$> elemOf ty x ys <*> acc) (return True) xs
-
-
+powerSet :: Type -> [Core] -> Disco IErr Value
+powerSet ty [c] = do
+  (VSet xs) <- whnf c
+  ys <- sortNCount (decideOrdFor ty) (map (\x -> (VSet x, 1)) (subsequences xs))
+  return $ VSet ys
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value
@@ -816,12 +882,24 @@ decideEqFor (TyList elTy) v1 v2 = do
 decideEqFor (TySet ty) v1 v2 = do
   (VSet xs) <- whnfV v1
   (VSet ys) <- whnfV v2
-  (&&) <$> subset ty xs ys <*> subset ty ys xs
+  setEquality ty xs ys
 
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
+
+
+setEquality :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Bool
+setEquality _ [] [] = return True
+setEquality _ [] _ = return False
+setEquality _ _ [] = return False
+setEquality ty ((x,n1):xs) ((y,n2):ys) = do
+  eq <- (n1 == n2 &&) <$> decideEqFor ty x y
+  case eq of
+    False -> return False
+    True  -> setEquality ty xs ys
+
 
 -- TODO: can the functions built by 'enumerate' be more efficient if
 -- enumerate builds *both* a list and a bijection to a prefix of the
@@ -1016,9 +1094,27 @@ decideOrdFor (TyList ty) v1 v2 = do
         _  -> return o
     _ -> error $ "Impossible! decideOrdFor " ++ show (TyList ty, v1, v2)
 
+-- To decide the ordering for two sets:
+decideOrdFor (TySet ty) v1 v2 = do
+  (VSet xs) <- whnfV v1
+  (VSet ys) <- whnfV v2
+  setComparison ty xs ys
+
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
+
+-- Helper function which decides the order for two sets.
+setComparison :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Ordering
+setComparison _ [] [] = return EQ
+setComparison _ _ [] = return GT
+setComparison _ [] _ = return LT
+setComparison ty ((x,_):xs) ((y,_):ys) = do
+  ord <- decideOrdFor ty x y
+  case ord of
+    EQ    -> setComparison ty xs ys
+    other -> return other
+
 
 -- | Compare two functions lazily.  Functions are ordered
 --   lexicographically, if we think of a function @f : ty1 -> ty2@ as

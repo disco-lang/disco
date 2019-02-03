@@ -23,6 +23,7 @@ module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
+       , PrimType(..)
        , Op(..)
 
          -- * Case expressions and patterns
@@ -33,6 +34,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Generic                (PrimType (..))
 import           Disco.AST.Surface                (Ellipsis, Telescope)
 import           Disco.Types
 
@@ -106,6 +108,11 @@ data Core where
   -- Type stores the type of the elements.
   CoreSet :: Type -> [Core] -> Core
 
+  -- | A multiset.
+  CoreMultiset :: Type -> [Core] -> Core
+
+
+
   deriving (Show, Generic)
 
 -- | Operators that can show up in the core language.  Note that not
@@ -144,6 +151,7 @@ data Op = OAdd     -- ^ Addition (@+@)
 
         -- Set Operations
         | OSize        -- ^ Size of two sets (@size@)
+        | OPowerSet Type -- ^ Power set of a given set (@powerSet@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
         | OUnion  Type -- ^ Union of two sets (@union@ / @∪@)
         | OInter  Type -- ^ Intersection of two sets (@intersect@ / @∩@)

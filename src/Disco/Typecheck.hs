@@ -691,7 +691,7 @@ typecheck Infer (TBin Choose t1 t2) = do
   return $ ATBin TyN Choose at1 at2
 
 ----------------------------------------
--- Set operations
+-- Set & bag operations
 
 typecheck Infer (TUn Size t) = do
   at <- infer t
@@ -714,6 +714,11 @@ typecheck Infer (TBin setOp t1 t2)
   let ty = case setOp of {Subset -> TyBool; _ -> TySet tyelt}
   constraints [CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)]
   return $ ATBin ty setOp at1 at2
+
+-- infer (TUn PowerSet t) = do
+--   (at, cst1) <- infer t
+--   ([tyElt], cst2) <- ensureConstr CSet (getType at) (Left t)
+--   return (ATUn (TySet (TySet tyElt)) PowerSet at, cAnd [cst1, cst2])
 
 ----------------------------------------
 -- Type operations
@@ -766,6 +771,9 @@ typecheck mode tcc@(TContainerComp c bqt) = do
       case (c, getType at) of
         (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
         (SetContainer, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
+        (BagContainer, TyBag ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty), cst)
+        -- XXX need more subtyping above!
+
         (_, wrongTy)   -> throwError $ NotCon (containerToCon c) t wrongTy
 
     inferQual (QGuard (unembed -> t))   = do

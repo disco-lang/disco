@@ -417,7 +417,9 @@ prettyWHNF out ty (VClos _ _) = do
   out tyStr
   out ">"
 
-prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
+prettyWHNF out _ (VClos _ _) = out "<function>"
+prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t (map fst xs) >> out "}"
+prettyWHNF out (TyBag t) (VBag xs) = out "{# " >> prettyIteration' out t xs >> out " #}"
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
@@ -425,10 +427,18 @@ prettyWHNF _ ty v = error $
 
 --prettyIteration handles the pretty-printing of lists of values,
 --such as those found in sets.
-prettyIteration :: (String -> Disco IErr()) -> Type -> [Value] -> Disco IErr ()
+prettyIteration :: (String -> Disco IErr ()) -> Type -> [Value] -> Disco IErr ()
 prettyIteration out _ []     = out ""
 prettyIteration out t [x]    = prettyValueWith out t x
 prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
+
+-- XXX fix this, figure out multiset syntax to use.
+--Does the same as above, but with special multiset annotation.
+prettyIteration' :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
+prettyIteration' out _ []         = out ""
+prettyIteration' out t [(x,n)]    = prettyValueWith out t x >> (out " # ") >> (out $ show n)
+prettyIteration' out t ((x,n):xs) = prettyValueWith out t x >> (out " # ") >> (out $ show n)
+                                    >> out ", " >> prettyIteration' out t xs
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""

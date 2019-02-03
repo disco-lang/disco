@@ -108,8 +108,14 @@ compileDTerm (DTContainer (TySet eltTy) SetContainer ds Nothing)
 compileDTerm (DTContainer (TySet _) SetContainer _ (Just _))
   = error $ "compileDTerm DTContainer SetContainer with ellipsis: unimplemented"
 
+compileDTerm (DTContainer (TyBag eltTy) BagContainer ds Nothing)
+  = error $ "compileDTerm DTContainer BagContainer: unimplemented"
+
+compileDTerm (DTContainer (TyBag _) BagContainer _ (Just _))
+  = error $ "compileDTerm DTContainer BagContainer with ellipsis: unimplemented"
+
 compileDTerm (DTContainer ty c _ _)
-  = error $ "Impossible: compileDTerm on DTContiner " ++ show c ++ " with non-Set type " ++ show ty
+  = error $ "Impossible: compileDTerm on DTContainer " ++ show c ++ " with non-matching type " ++ show ty
 
 ------------------------------------------------------------
 

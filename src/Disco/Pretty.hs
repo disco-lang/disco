@@ -59,7 +59,7 @@ braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
 
 brashes :: Monad f => f PP.Doc -> f PP.Doc
-brashes p = text "{#" <+> p <+> text "#}"
+brashes p = text "{#" <> p <> text "#}"
 
 quotes :: Functor f => f PP.Doc -> f PP.Doc
 quotes = fmap PP.quotes
@@ -200,7 +200,7 @@ prettyTerm (TContainer c ts e)  = do
   containerDelims c (hsep (ds ++ pe))
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
-  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
+  containerDelims c (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
@@ -364,6 +364,10 @@ prettyProperty prop =
 -- Pretty-printing values
 ------------------------------------------------------------
 
+-- XXX This needs to be refactored so (1) we don't have to plumb the
+-- output callback around everywhere, and (2) to properly take
+-- associativity/precedence etc. into account.
+
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  This version actually prints the values on the console, followed
 --   by a newline.  For a more general version, see 'prettyValueWith'.
@@ -418,27 +422,27 @@ prettyWHNF out ty (VClos _ _) = do
   out ">"
 
 prettyWHNF out _ (VClos _ _) = out "<function>"
-prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t (map fst xs) >> out "}"
-prettyWHNF out (TyBag t) (VBag xs) = out "{# " >> prettyIteration' out t xs >> out " #}"
+prettyWHNF out (TySet t) (VSet xs) =
+  out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
+prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
+-- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
+prettySequence :: (String -> Disco IErr ()) -> Type -> [Value] -> String -> Disco IErr ()
+prettySequence out _ []     _   = out ""
+prettySequence out t [x]    _   = prettyValueWith out t x
+prettySequence out t (x:xs) del = (prettyValueWith out t x) >> out del >> (prettySequence out t xs del)
 
---prettyIteration handles the pretty-printing of lists of values,
---such as those found in sets.
-prettyIteration :: (String -> Disco IErr ()) -> Type -> [Value] -> Disco IErr ()
-prettyIteration out _ []     = out ""
-prettyIteration out t [x]    = prettyValueWith out t x
-prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
+prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
+prettyBag out _ []         = out "{##}"
+prettyBag out t [(v,n)]    = prettyRepBag out t v n
+prettyBag out t ((v,n):vs) = prettyRepBag out t v n >> out " + " >> prettyBag out t vs
 
--- XXX fix this, figure out multiset syntax to use.
---Does the same as above, but with special multiset annotation.
-prettyIteration' :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
-prettyIteration' out _ []         = out ""
-prettyIteration' out t [(x,n)]    = prettyValueWith out t x >> (out " # ") >> (out $ show n)
-prettyIteration' out t ((x,n):xs) = prettyValueWith out t x >> (out " # ") >> (out $ show n)
-                                    >> out ", " >> prettyIteration' out t xs
+-- XXX needs to take precedence into account?
+prettyRepBag :: (String -> Disco IErr ()) -> Type -> Value -> Integer -> Disco IErr ()
+prettyRepBag out t v n = out "(" >> prettyValueWith out t v >> out " # " >> out (show n) >> out ")"
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""

@@ -549,6 +549,8 @@ whnfOp (ODiff   ty)   = setDifference ty
 whnfOp (OPowerSet ty) = powerSet ty
 whnfOp (OSubset ty)   = subsetTest ty
 
+whnfOp ORep           = repBag
+
 setSize :: [Core] -> Disco IErr Value
 setSize [x] = do
   (VSet xs) <- whnf x
@@ -591,6 +593,12 @@ powerSet ty [c] = do
   (VSet xs) <- whnf c
   ys <- sortNCount (decideOrdFor ty) (map (\x -> (VSet x, 1)) (subsequences xs))
   return $ VSet ys
+
+repBag :: [Core] -> Disco IErr Value
+repBag [elt, rep] = do
+  VNum _ r <- whnf rep
+  e <- mkThunk elt
+  return $ VBag [(e, numerator r)]
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> [Core] -> Disco IErr Value

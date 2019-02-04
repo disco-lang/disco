@@ -145,13 +145,14 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMExp  Integer
         | OMDivides Integer
 
-        -- Set Operations
+        -- Set/bag operations
         | OSize        -- ^ Size of two sets (@size@)
         | OPowerSet Type -- ^ Power set of a given set (@powerSet@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
         | OUnion  Type -- ^ Union of two sets (@union@ / @∪@)
         | OInter  Type -- ^ Intersection of two sets (@intersect@ / @∩@)
         | ODiff   Type -- ^ Difference of two sets (@\@)
+        | ORep         -- ^ Primitive bag constructor (replicate)
 
   deriving (Show, Generic)
 

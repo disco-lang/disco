@@ -257,5 +257,7 @@ compileBOp (TySet ty) _ _ op c1 c2
       , Subset ==> OSubset
       ]
 
+compileBOp _ _ _ Rep c1 c2 = COp ORep [c1, c2]
+
 compileBOp ty1 ty2 resTy op c1 c2
   = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op, c1, c2)

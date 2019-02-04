@@ -715,6 +715,11 @@ typecheck Infer (TBin setOp t1 t2)
   constraints [CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)]
   return $ ATBin ty setOp at1 at2
 
+typecheck Infer (TBin Rep t1 t2) = do
+  at1 <- infer t1
+  at2 <- check t2 TyN
+  return $ ATBin (TyBag (getType at1)) Rep at1 at2
+
 -- infer (TUn PowerSet t) = do
 --   (at, cst1) <- infer t
 --   ([tyElt], cst2) <- ensureConstr CSet (getType at) (Left t)

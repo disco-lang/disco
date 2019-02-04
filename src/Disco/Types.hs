@@ -200,8 +200,6 @@ data Con where
   CBag  :: Con
   -- | Sets
   CSet  :: Con
-  -- | Multisets
-  CMultiset :: Con
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Con

@@ -1165,10 +1165,10 @@ lub ty1 ty2 = do
 -- | Ensure that a type's outermost constructor matches the provided
 --   constructor, returning the types within the matched constructor
 --   or throwing a type error.  If the type provided is a type
---   variable, appropriate constraints are generated to guarentee the
+--   variable, appropriate constraints are generated to guarantee the
 --   type variable's outermost constructor matches the provided
---   constructor, and a list of type variables is returned whose count
---   matches the arity of the provided constructor.
+--   constructor, and a list of fresh type variables is returned whose
+--   count matches the arity of the provided constructor.
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM [Type]
 ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return tys
 

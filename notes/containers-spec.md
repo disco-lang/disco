@@ -139,3 +139,18 @@ Dynamic (runtime) semantics
 
 
 
+To do
+-----
+
+- Add new type of Con, CVar (containing a unification variable,
+  i.e. Name Type?).  Then embed it into Type so that we can reuse all
+  the constraint solving machinery without plumbing through a parallel
+  system for solving subcontainer constraints.
+
+- Write down a specific, concrete list of the container primitives
+  we'll have, along with some concrete typing rules.
+
+- Update type checking to emit relevant constraints, in accordance
+  with the written typing rules.
+
+- Update constraint solver (just see where it crashes?)

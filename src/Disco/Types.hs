@@ -201,15 +201,9 @@ data Con where
   -- | Sets
   CSet  :: Con
 
-  -- | Variable: for solving container polymorphism
-  ConVar :: Name Type -> Con
-
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Con
-instance Subst Con Con where
-  isvar (ConVar x) = Just (SubstName (coerce x))
-  isvar _          = Nothing
 
 ----------------------------------------
 -- Types

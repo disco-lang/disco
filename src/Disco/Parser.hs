@@ -164,14 +164,14 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]
-opChar = "!@#$%^&*~-+=|<>?/\\.{}"
+opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets, brashes, fbrack, cbrack :: Parser a -> Parser a
+parens, braces, angles, brackets, bagdelims, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
-brashes   = between (symbol "{#") (symbol "#}")
+bagdelims = between (symbol "⟅") (symbol "⟆")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
@@ -448,7 +448,7 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
-  <|> brashes   (parseContainer BagContainer)
+  <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))

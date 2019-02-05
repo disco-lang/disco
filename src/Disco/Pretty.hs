@@ -58,8 +58,8 @@ brackets = fmap PP.brackets
 braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
 
-brashes :: Monad f => f PP.Doc -> f PP.Doc
-brashes p = text "{#" <> p <> text "#}"
+bag :: Monad f => f PP.Doc -> f PP.Doc
+bag p = text "⟅" <> p <> text "⟆"
 
 quotes :: Functor f => f PP.Doc -> f PP.Doc
 quotes = fmap PP.quotes
@@ -248,7 +248,7 @@ prettySide R = text "right"
 
 containerDelims :: Container -> (Doc -> Doc)
 containerDelims ListContainer = brackets
-containerDelims BagContainer  = brashes
+containerDelims BagContainer  = bag
 containerDelims SetContainer  = braces
 
 prettyTyOp :: TyOp -> Doc
@@ -436,12 +436,13 @@ prettySequence out t [x]    _   = prettyValueWith out t x
 prettySequence out t (x:xs) del = (prettyValueWith out t x) >> out del >> (prettySequence out t xs del)
 
 prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
-prettyBag out _ []         = out "{##}"
+prettyBag out _ []         = out "⟅⟆"
 prettyBag out t [(v,n)]    = prettyRepBag out t v n
 prettyBag out t ((v,n):vs) = prettyRepBag out t v n >> out " + " >> prettyBag out t vs
 
 -- XXX needs to take precedence into account?
 prettyRepBag :: (String -> Disco IErr ()) -> Type -> Value -> Integer -> Disco IErr ()
+prettyRepBag out t v 1 = out "⟅" >> prettyValueWith out t v >> out "⟆"
 prettyRepBag out t v n = out "(" >> prettyValueWith out t v >> out " # " >> out (show n) >> out ")"
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()

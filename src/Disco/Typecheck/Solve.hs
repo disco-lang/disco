@@ -168,8 +168,9 @@ solveConstraint :: M.Map String Type -> Constraint -> SolveM S
 solveConstraint tyDefns c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
-  -- collect wanted qualifiers.  Should result in just a list of
-  -- equational and subtyping constraints in addition to qualifiers.
+  -- collect wanted qualifiers; also expand disjunctions.  Result in a
+  -- list of possible constraint sets; each one consists of equational
+  -- and subtyping constraints in addition to qualifiers.
 
   traceShowM c
 
@@ -178,6 +179,8 @@ solveConstraint tyDefns c = do
 
   qcList <- decomposeConstraint c
 
+  -- Now try continuing with each set and pick the first one that has
+  -- a solution.
   msum (map (uncurry (solveConstraintChoice tyDefns)) qcList)
 
 solveConstraintChoice :: M.Map String Type -> SortMap -> [SimpleConstraint] -> SolveM S

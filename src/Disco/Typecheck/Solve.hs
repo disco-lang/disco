@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 
@@ -532,7 +533,7 @@ simplify tyDefns origSM cs
 -- | Given a list of atomic subtype constraints (each pair @(a1,a2)@
 --   corresponds to the constraint @a1 <: a2@) build the corresponding
 --   constraint graph.
-mkConstraintGraph :: [(Atom, Atom)] -> Graph Atom
+mkConstraintGraph :: Ord a => [(a, a)] -> Graph a
 mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
   where
     nodes = S.fromList $ cs ^.. traverse . each
@@ -598,18 +599,25 @@ checkSkolems tyDefns (SM sm) graph = do
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
 elimCycles :: Map String Type -> Graph UAtom -> Except SolveError (Graph UAtom, S)
-elimCycles tyDefns g
+elimCycles tyDefns = elimCyclesGen uatomToAtom atomToTypeSubst (unifyAtoms tyDefns)
+
+elimCyclesGen
+  :: forall a a' b.
+     (Subst a' a, Subst a' a', Ord a, Ord a')
+  => (a -> a') -> (S' a' -> S' b) -> ([a'] -> Maybe (S' a'))
+  -> Graph a -> Except SolveError (Graph a, S' b)
+elimCyclesGen aToa' genSubst genUnify g
   = maybeError NoUnify
-  $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
+  $ (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (UAtom, S' Atom))
+    g' :: Maybe (Graph (a, S' a'))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set UAtom -> Maybe (UAtom, S' Atom)
+    unifySCC :: Set a -> Maybe (a, S' a')
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip substs a &&& id) <$> unifyAtoms tyDefns (map uatomToAtom as)
+      as@(a:_) -> (flip substs a &&& id) <$> genUnify (map aToa' as)
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution

@@ -18,7 +18,7 @@ right 1
 []
 [[]]
 [[]]
-InfiniteTy (TyCon CList [TyAtom (ABase Unit)])
+InfiniteTy (TyCon (CContainer (ABase CtrList)) [TyAtom (ABase Unit)])
 []
 []
 [<Void → ℕ>]

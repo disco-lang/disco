@@ -445,7 +445,16 @@ simplify tyDefns origSM cs
     -- Given a subtyping constraint between two type constructors,
     -- decompose it if the constructors are the same (or fail if they
     -- aren't), taking into account the variance of each argument to
-    -- the constructor.
+    -- the constructor.  Container types are a special case;
+    -- recursively generate a subtyping constraint for their
+    -- constructors as well.
+    simplifyOne' (TyCon c1@(CContainer ctr1) tys1 :<: TyCon (CContainer ctr2) tys2) =
+      ssConstraints %=
+        (( (TyAtom ctr1 :<: TyAtom ctr2)
+         : zipWith3 variance (arity c1) tys1 tys2
+         )
+         ++)
+
     simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
       | c1 /= c2  = throwError NoUnify
       | otherwise =

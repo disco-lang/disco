@@ -137,11 +137,10 @@ data Value where
   --   be run later.
   VDelay_  :: ValDelay -> Value
 
-  -- | A literal set, containing a finite list of (perhaps only
-  --   partially evaluated) values.
-  VSet :: [(Value, Integer)] -> Value
-
-  -- | XXX
+  -- | A literal bag, containing a finite list of (perhaps only
+  --   partially evaluated) values, each paired with a count.  This is
+  --   also used to represent sets (with the invariant that all counts
+  --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
   deriving Show
 

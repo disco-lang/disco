@@ -208,4 +208,6 @@ withTyDefns tyDefnCtx m = do
 freshTy :: TCM Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
-
+-- | Generate a fresh variable as an atom.
+freshAtom :: TCM Atom
+freshAtom = (AVar . U) <$> fresh (string2Name "a")

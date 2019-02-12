@@ -7,4 +7,4 @@ using Primitives
 !!! isPrime 3
 !!! isPrime 1000000007
 isPrime : N -> Bool
-isPrime = $isPrime
+isPrime n = ($isPrime : N -> Bool) n

@@ -66,6 +66,10 @@ compileDTerm (DTLam _ l) = do
   c <- compileDTerm body
   return $ CAbs (bind (coerce x) c)
 
+compileDTerm (DTApp _ (DTPrim ty p) t2) = do
+  c2 <- compileDTerm t2
+  return $ compilePrimApp ty p c2
+
 compileDTerm (DTApp ty t1 t2)
   = CApp (strictness ty) <$> compileDTerm t1 <*> compileDTerm t2
 
@@ -125,6 +129,22 @@ compileDTerm (DTContainer ty c _ _)
 compileNat :: Type -> Integer -> FreshM Core
 compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
 compileNat _         x = return $ CNum Fraction (x % 1)
+
+------------------------------------------------------------
+
+-- | Compile an application of a primitive.
+compilePrimApp :: Type -> String -> Core -> Core
+compilePrimApp (TySet _ :->: _)  "list" c = COp OSetToList [c]
+compilePrimApp (TyBag _ :->: _)  "set"  c = COp OBagToSet  [c]
+compilePrimApp (TyBag _ :->: _)  "list" c = COp OBagToList [c]
+compilePrimApp (TyList a :->: _) "set"  c = COp (OListToSet a) [c]
+compilePrimApp (TyList a :->: _) "bag"  c = COp (OListToBag a) [c]
+compilePrimApp _ p c | p `elem` ["list", "bag", "set"] = c
+
+compilePrimApp _ "isPrime" c = COp OIsPrime [c]
+compilePrimApp _ "crash"   c = COp OCrash   [c]
+
+compilePrimApp _ s _ = error $ "compilePrimApp: unknown prim " ++ s
 
 ------------------------------------------------------------
 -- Case expressions

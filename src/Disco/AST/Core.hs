@@ -55,6 +55,11 @@ instance Monoid RationalDisplay where
   mempty  = Fraction
   mappend = (<>)
 
+-- XXX there are too many constructors in Core!  e.g. do we really
+-- need CCons to have a [Core]; couldn't we just do that with CApp?
+-- Maybe CApp should take a [Core].  Also there is really no reason at
+-- all that there should be a COp; it should just be CApp.
+
 -- | AST for the desugared, untyped core language.
 data Core where
 
@@ -145,7 +150,7 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMExp  Integer
         | OMDivides Integer
 
-        -- Set/bag operations
+        -- Container operations
         | OSize        -- ^ Size of two sets (@size@)
         | OPowerSet Type -- ^ Power set of a given set (@powerSet@)
         | OSubset Type -- ^ Subset test for two sets (@⊆@)
@@ -153,6 +158,16 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OInter  Type -- ^ Intersection of two sets (@intersect@ / @∩@)
         | ODiff   Type -- ^ Difference of two sets (@\@)
         | ORep         -- ^ Primitive bag constructor (replicate)
+
+        | OSetToList
+        | OBagToSet
+        | OBagToList
+        | OListToSet Type
+        | OListToBag Type
+
+        -- Other primitives
+        | OIsPrime
+        | OCrash
 
   deriving (Show, Generic)
 

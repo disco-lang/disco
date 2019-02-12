@@ -64,12 +64,10 @@ data Variance = Co | Contra
 --   and the variance of each argument.  This is used to decompose
 --   subtyping constraints.
 arity :: Con -> [Variance]
-arity CArr  = [Contra, Co]
-arity CPair = [Co, Co]
-arity CSum  = [Co, Co]
-arity CList = [Co]
-arity CBag  = [Co]
-arity CSet  = [Co]
+arity CArr           = [Contra, Co]
+arity CPair          = [Co, Co]
+arity CSum           = [Co, Co]
+arity (CContainer _) = [Co]
 
 ------------------------------------------------------------
 -- Qualifiers

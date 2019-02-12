@@ -26,7 +26,7 @@ module Disco.Parser
 
          -- ** Basic lexemes
        , sc, lexeme, symbol, reservedOp
-       , natural, reserved, reservedWords, ident
+       , natural, reserved, reservedWords, builtins, ident
 
          -- ** Punctuation
        , parens, braces, angles, brackets
@@ -256,6 +256,11 @@ reservedWords =
   , "forall", "type"
   , "import", "using"
   ]
+  ++ builtins
+
+-- | The list of builtin primitive names.
+builtins :: [String]
+builtins = ["list", "bag", "set"]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a letter and continuing with alphanumerics, underscores, and
@@ -441,6 +446,7 @@ parseAtom = label "expression" $
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
   <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
+  <|> TPrim <$> foldr (<|>) empty (map (\t -> (t <$ reserved t)) builtins
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom

@@ -282,6 +282,9 @@ infer t = typecheck Infer t
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
+--
+--   XXX TODO: throw an error if there are any unsolved container
+--   variables left.  Or just use list with warning?
 inferTop :: Term -> TCM (ATerm, Sigma)
 inferTop t = do
   (at, theta) <- solve $ infer t
@@ -329,9 +332,21 @@ typecheck Infer (TVar x)      = do
 --------------------------------------------------
 -- Primitives
 
--- We can't infer the type of a primitive; in checking mode we always
--- assume that the given type is OK.  If you use a primitive you have
--- to know what type you expect it to have.
+-- The 'list', 'bag', and 'set' primitives convert containers into
+-- other containers.
+typecheck Infer (TPrim conv) | conv `elem` ["list", "bag", "set"] = do
+  c <- freshAtom   -- make a unification variable for the container type
+  a <- freshTy     -- make a unification variable for the element type
+  return $ ATPrim (TyContainer c a :->: primCtrCon conv a) conv
+
+  where
+    primCtrCon "list" = TyList
+    primCtrCon "bag"  = TyBag
+    primCtrCon "set"  = TySet
+
+-- In any other case, we can't infer the type of a primitive; in
+-- checking mode we always assume that the given type is OK.  If you
+-- use a primitive you have to know what type you expect it to have.
 typecheck (Check ty) (TPrim x) = return $ ATPrim ty x
 
 --------------------------------------------------
@@ -1170,17 +1185,34 @@ lub ty1 ty2 = do
 --   constructor, and a list of fresh type variables is returned whose
 --   count matches the arity of the provided constructor.
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM [Type]
-ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return tys
+ensureConstr c ty targ = matchConTy c ty
+  where
+    matchConTy :: Con -> Type -> TCM [Type]
+    matchConTy c1 (TyCon c2 tys) = do
+      matchCon c1 c2
+      return tys
 
-ensureConstr c tyv@(TyAtom (AVar (U _))) _ = do
-  tyvs <- mapM (const freshTy) (arity c)
-  constraint $ CEq tyv (TyCon c tyvs)
-  return tyvs
+    matchConTy c1 tyv@(TyAtom (AVar (U _))) = do
+      tyvs <- mapM (const freshTy) (arity c1)
+      constraint $ CEq tyv (TyCon c1 tyvs)
+      return tyvs
 
-ensureConstr c ty targ =
-  case targ of
-    Left term -> throwError (NotCon c term ty)
-    Right pat -> throwError (PatternType pat ty)
+    matchConTy _ _ = matchError
+
+    -- | XXX comment me check whether constructors match, which can
+    --   include unifying container variables.
+    matchCon :: Con -> Con -> TCM ()
+    matchCon c1 c2                            | c1 == c2 = return ()
+    matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
+      constraint $ CEq (TyAtom v) (TyAtom ctr2)
+    matchCon (CContainer ctr1) (CContainer v@(AVar (U _))) =
+      constraint $ CEq (TyAtom ctr1) (TyAtom v)
+    matchCon _ _                              = matchError
+
+    matchError :: TCM a
+    matchError = case targ of
+      Left term -> throwError (NotCon c term ty)
+      Right pat -> throwError (PatternType pat ty)
 
 -- | A variant of 'ensureConstr' that works on 'Mode's instead of
 --   'Type's.  Behaves similarly to 'ensureConstr' if the 'Mode' is

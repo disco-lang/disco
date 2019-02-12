@@ -37,6 +37,7 @@ import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (whnfV)
+import           Disco.Parser                     (builtins)
 import           Disco.Syntax.Operators
 import           Disco.Types
 
@@ -171,7 +172,9 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
-prettyTerm (TPrim x)     = text "$" <> text x
+prettyTerm (TPrim x)
+  | x `elem` builtins      = text x
+  | otherwise              = text "$" <> text x
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
@@ -422,7 +425,7 @@ prettyWHNF out ty (VClos _ _) = do
   out ">"
 
 prettyWHNF out _ (VClos _ _) = out "<function>"
-prettyWHNF out (TySet t) (VSet xs) =
+prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 

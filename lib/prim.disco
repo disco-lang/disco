@@ -1,4 +1,4 @@
 using Primitives
 
 crash : List Char -> a
-crash = $crash
+crash msg = ($crash : List Char -> a) msg

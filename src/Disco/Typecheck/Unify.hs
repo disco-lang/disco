@@ -46,7 +46,7 @@ unify = unify' (==)
 --   types.  So, for example, Int = Nat weakly unifies but Int = (Int
 --   -> Int) does not.  This is used to check whether subtyping
 --   constraints are structurally sound before doing constraint
---   simplification/solving.
+--   simplification/solving, to ensure termination.
 weakUnify :: Map String Type -> [(Type, Type)] -> Maybe S
 weakUnify = unify' (\_ _ -> True)
 
@@ -99,6 +99,14 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
         Nothing  -> mzero
         Just ty2 -> return $ Right [(ty1,ty2)]
 
+    -- Unify two container types: unify the container descriptors as
+    -- well as the type arguments
+    unifyOne' p@(TyCon (CContainer ctr1) tys1, TyCon (CContainer ctr2) tys2) = do
+      modify (S.insert p)
+      return $ Right ((TyAtom ctr1, TyAtom ctr2) : zipWith (,) tys1 tys2)
+
+    -- Unify any other pair of type constructor applications: the type
+    -- constructors must match exactly
     unifyOne' p@(TyCon c1 tys1, TyCon c2 tys2)
       | c1 == c2  = do
           modify (S.insert p)

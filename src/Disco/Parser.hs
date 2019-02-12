@@ -446,7 +446,7 @@ parseAtom = label "expression" $
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
   <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
-  <|> TPrim <$> foldr (<|>) empty (map (\t -> (t <$ reserved t)) builtins
+  <|> TPrim <$> foldr (<|>) empty (map (\t -> (t <$ reserved t)) builtins)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom

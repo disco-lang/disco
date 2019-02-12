@@ -44,31 +44,32 @@ module Disco.Interpret.Core
        )
        where
 
-import           Control.Lens                       (use, (%=), (.=))
-import           Control.Monad.Except               (throwError)
-import           Data.Bifunctor                     (first)
+import           Control.Lens                            (use, (%=), (.=))
+import           Control.Monad.Except                    (throwError)
+import           Data.Bifunctor                          (first)
 import           Data.Char
-import           Data.Coerce                        (coerce)
-import           Data.IntMap.Lazy                   ((!))
-import qualified Data.IntMap.Lazy                   as IntMap
-import           Data.List                          (find, subsequences)
-import qualified Data.Map                           as M
+import           Data.Coerce                             (coerce)
+import           Data.IntMap.Lazy                        ((!))
+import qualified Data.IntMap.Lazy                        as IntMap
+import           Data.List                               (find, subsequences)
+import qualified Data.Map                                as M
 import           Data.Ratio
 
 import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Math.Combinatorics.Exact.Binomial  (choose)
-import           Math.Combinatorics.Exact.Factorial (factorial)
+import           Math.Combinatorics.Exact.Binomial       (choose)
+import           Math.Combinatorics.Exact.Factorial      (factorial)
 
-import           Math.NumberTheory.Logarithms       (integerLog2)
-import           Math.NumberTheory.Moduli.Class     (SomeMod (..), getVal,
-                                                     invertSomeMod, modulo,
-                                                     powSomeMod)
-import           Math.NumberTheory.Primes.Testing   (isPrime)
+import           Math.NumberTheory.Logarithms            (integerLog2)
+import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
+                                                          invertSomeMod, modulo,
+                                                          powSomeMod)
+import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 import           Disco.AST.Core
-import           Disco.AST.Surface                  (Ellipsis (..),
-                                                     fromTelescope)
+import           Disco.AST.Surface                       (Ellipsis (..),
+                                                          fromTelescope)
 import           Disco.Context
 import           Disco.Eval
 import           Disco.Types
@@ -201,6 +202,7 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage if the program
       -- already typechecked.
 
+whnf (CConst x) = return $ VConst x
 
 -- whnf (CPrim PMap ty) =
 --   return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
@@ -223,25 +225,22 @@ whnf (CNum d n)     = return $ VNum d n
 whnf (CAbs b)       = VClos b <$> getEnv
 
 -- To reduce an application:
-whnf (CApp str c1 c2) = do
+whnf (CApp c cs) = do
 
   -- First reduce the function to WHNF
-  v1 <- whnf c1
+  v <- whnf c
 
-  -- Then either reduce the argument or turn it into a thunk,
-  -- depending on whether the application is strict or lazy
-  v2 <- case str of
-    Strict -> whnf c2       -- for types with strict evaluation, whnf = full reduction
-    Lazy   -> mkThunk c2
+  -- Then either reduce each argument or turn it into a thunk,
+  -- depending on the specified strictness.
+  vs <- mapM (uncurry whnfArg) cs
 
   -- Finally, call 'whnfApp' to do the application.
-  whnfApp v1 v2
+  whnfApp v vs
 
 -- Ellipses, case expressions, and operators
 -- all have their own function to do reduction.
 whnf (CEllipsis ts ell) = expandEllipsis ts ell
 whnf (CCase bs)     = whnfCase bs
-whnf (COp op cs)    = whnfOp op cs
 
 whnf (CoreSet t es) = do
   res <- mapM mkThunk es
@@ -348,17 +347,49 @@ listToBag ty v = do
   vs <- fromDiscoList v
   VBag <$> countValues ty vs
 
+-- | XXX
+whnfArg :: Strictness -> Core -> Disco IErr Value
+whnfArg Strict = whnf
+whnfArg Lazy   = mkThunk
+
+-- | XXX, note must be in WHNF.
+funArity :: Value -> Int
+funArity (VClos b _) = length (fst (unsafeUnbind b))
+funArity (VPAp f vs) = funArity f - length vs
+funArity (VConst op) = opArity op
+funArity v           = error $ "Impossible! funArity on " ++ show v
+
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the first argument has already been reduced to WHNF
---   (which means it must be either a closure or a @VFun@).
-whnfApp :: Value -> Value -> Disco IErr Value
-whnfApp (VClos c e) v =
-  lunbind c $ \(x,t) -> do
-  withEnv e           $ do
-  extend x v          $ do
-  whnf t
-whnfApp (VFun f) v = rnfV v >>= \v' -> whnfV (f v')
-whnfApp _ _ = error "Impossible! First argument to whnfApp is not a closure."
+--   (which means it must be a closure, @VFun@, a partial application
+--   (@VPAp@), or a constant (@VConst@)).
+whnfApp :: Value -> [Value] -> Disco IErr Value
+whnfApp (VPAp f vs1) vs2 = whnfApp f (vs1 ++ vs2)
+whnfApp f vs =
+  case compare k (length vs) of
+
+      -- Exactly the right number of arguments.
+      EQ -> whnfAppExact f vs
+
+      -- More arguments than parameters: peel off the right number of arguments
+      -- to pass, and apply the result to the rest.
+      LT -> do
+        let (vs1, vs2) = splitAt k vs
+        f2 <- whnfAppExact f vs1
+        whnfApp f2 vs2
+
+      -- Fewer arguments than parameters: pack up the arguments so far
+      -- in a partial application awaiting more.
+      GT -> return $ VPAp f vs
+  where
+    k = funArity f
+
+-- | XXX
+whnfAppExact :: Value -> [Value] -> Disco IErr Value
+whnfAppExact (VClos b e) vs =
+  lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
+whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
+whnfAppExact (VConst op) vs = undefined -- XXX adapt code that used to be under whnfOp
 
 ------------------------------------------------------------
 -- Lists

@@ -23,7 +23,7 @@ module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
-       , Op(..)
+       , Op(..), opArity
 
          -- * Case expressions and patterns
        , CBranch, CPattern(..), CQual(..)
@@ -64,17 +64,17 @@ instance Monoid RationalDisplay where
 data Core where
 
   -- | A variable.
-  CVar  :: Name Core -> Core
+  CVar   :: Name Core -> Core
 
-  -- | A primitive.
-  CPrim :: String -> Core
+  -- | A function constant.
+  CConst :: Op -> Core
 
-  -- | A constructor, identified by number, with arguments.  For
-  --   example, false and true are represented by @CCons 0 []@ and
-  --   @CCons 1 []@, respectively; a pair is represented by @CCons 0
-  --   [c1, c2]@.  Note we do not need to remember which type the
-  --   constructor came from; if the program typechecked then we will
-  --   never end up comparing constructors from different types.
+  -- | A saturated constructor application.  For example, false and
+  --   true are represented by @CCons 0 []@ and @CCons 1 []@,
+  --   respectively; a pair is represented by @CCons 0 [c1, c2]@.
+  --   Note we do not need to remember which type the constructor came
+  --   from; if the program typechecked then we will never end up
+  --   comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
   -- | A list with an ellipsis.
@@ -84,20 +84,13 @@ data Core where
   CNum  :: RationalDisplay -> Rational -> Core
 
   -- | An anonymous function.
-  CAbs  :: Bind (Name Core) Core -> Core
+  CAbs  :: Bind [Name Core] Core -> Core
 
-  -- | Function application, with a strictness annotation.  The
-  --   strictness is determined by the type of the application (which
-  --   has been erased), and determines whether the argument should be
-  --   evaluated before applying the function.
-  CApp  :: Strictness -> Core -> Core -> Core
-
-  -- | Operator application, with a list of arguments.  Note there is
-  --   no longer any distinction between unary and binary operators.
-  --   Assuming this was correctly desugared from a successfully
-  --   parsed and typechecked program, operators will always have the
-  --   correct number of arguments.
-  COp   :: Op -> [Core] -> Core
+  -- | Function application, where each argument has a strictness
+  --   annotation.  The strictness is determined by the type of the
+  --   application (which has been erased), and determines whether the
+  --   argument should be evaluated before applying the function.
+  CApp  :: Core -> [(Strictness, Core)] -> Core
 
   -- | A case expression.
   CCase :: [CBranch] -> Core
@@ -168,8 +161,49 @@ data Op = OAdd     -- ^ Addition (@+@)
         -- Other primitives
         | OIsPrime
         | OCrash
+        | OId
 
   deriving (Show, Generic)
+
+-- | XXX
+opArity :: Op -> Int
+opArity OAdd           = 2
+opArity ONeg           = 1
+opArity OSqrt          = 1
+opArity OLg            = 1
+opArity OFloor         = 1
+opArity OCeil          = 1
+opArity OAbs           = 1
+opArity OMul           = 2
+opArity ODiv           = 2
+opArity OExp           = 2
+opArity OMod           = 2
+opArity ODivides       = 2
+opArity OBinom         = 2
+opArity OMultinom      = 2
+opArity OFact          = 1
+opArity (OEq _)        = 2
+opArity (OLt _)        = 2
+opArity OEnum          = 1
+opArity OCount         = 1
+opArity (OMDiv _)      = 2
+opArity (OMExp _)      = 2
+opArity (OMDivides _)  = 2
+opArity OSize          = 1
+opArity (OPowerSet _)  = 1
+opArity (OSubset _)    = 1
+opArity (OUnion _)     = 2
+opArity (OInter _)     = 2
+opArity (ODiff _)      = 2
+opArity ORep           = 2
+opArity OSetToList     = 1
+opArity OBagToSet      = 1
+opArity OBagToList     = 1
+opArity (OListToSet _) = 1
+opArity (OListToBag _) = 1
+opArity OIsPrime       = 1
+opArity OCrash         = 1
+opArity OId            = 1
 
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind (Telescope (Embed Core, CPattern)) Core

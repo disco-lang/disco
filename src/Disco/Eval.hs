@@ -105,9 +105,17 @@ data Value where
   --   [v]@.
   VCons  :: Int -> [Value] -> Value
 
+  -- | A built-in function constant.
+  VConst :: Op -> Value
+
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClos  :: Bind (Name Core) Core -> Env -> Value
+  VClos  :: Bind [Name Core] Core -> Env -> Value
+
+  -- | A partial application, i.e. an application of a thing to some
+  --   arguments which is still waiting for more.  Invariant: the
+  --   thing being applied is in WHNF.
+  VPAp   :: Value -> [Value] -> Value
 
   -- | A thunk, i.e. an unevaluated core expression together with
   --   its environment.
@@ -144,15 +152,15 @@ data Value where
   VBag :: [(Value, Integer)] -> Value
   deriving Show
 
--- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
+-- | A @ValFun@ is just a Haskell function @[Value] -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValFun = ValFun (Value -> Value)
+newtype ValFun = ValFun ([Value] -> Value)
 
 instance Show ValFun where
   show _ = "<fun>"
 
-pattern VFun :: (Value -> Value) -> Value
+pattern VFun :: ([Value] -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
 
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a

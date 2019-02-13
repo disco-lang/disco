@@ -143,8 +143,14 @@ To do
 -----
 
 - Add comments
+- Get rid of CoreSet and CoreBag, replace by conversion primitive
+  applied to list literal.
+- Get rid of CEllipsis in core, replace by one or more function
+  primitives.  Also use it to implement ellipses in sets/bags, using
+  conversion from list.
 - Refactor to get rid of strings in prims
 - Add container subtyping
+- Fix container comprehensions.
 - Write down a specific, concrete list of the container primitives
   we'll have, along with some concrete typing rules.
 - Update type checking to emit relevant constraints, in accordance

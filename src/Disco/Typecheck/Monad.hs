@@ -26,8 +26,6 @@ import           Unbound.Generics.LocallyNameless
 
 import           Control.Lens                     (makeLenses)
 import           Control.Monad.Except
-import           Control.Monad.Fail               (MonadFail)
-import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.RWS
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)

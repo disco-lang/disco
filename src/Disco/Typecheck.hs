@@ -342,7 +342,7 @@ typecheck Infer (TPrim conv) | conv `elem` ["list", "bag", "set"] = do
   where
     primCtrCon "list" = TyList
     primCtrCon "bag"  = TyBag
-    primCtrCon "set"  = TySet
+    primCtrCon _      = TySet
 
 -- In any other case, we can't infer the type of a primitive; in
 -- checking mode we always assume that the given type is OK.  If you

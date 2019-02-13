@@ -45,8 +45,8 @@ module Disco.Interpret.Core
        where
 
 import           Control.Lens                            (use, (%=), (.=))
+import           Control.Monad                           ((>=>))
 import           Control.Monad.Except                    (throwError)
-import           Data.Bifunctor                          (first)
 import           Data.Char
 import           Data.Coerce                             (coerce)
 import           Data.IntMap.Lazy                        ((!))
@@ -254,9 +254,9 @@ whnf (CoreBag tyElt es) = do
 
 whnf (CType ty)      = return $ VType ty
 
-elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
-elemOf _ _ []     = return False
-elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+-- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
+-- elemOf _ _ []     = return False
+-- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
 countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
 countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
@@ -274,21 +274,24 @@ sortNCount f xs  = do
     (firstHalf, secondHalf) = splitAt n xs
     n = length xs `div` 2
 
+-- | XXX explain what the function g is for
 -- Merges two lists of type [(a,Integer)] together a la merge sort.  Is guaranteed to
 -- work provided that the two lists given have already been sorted and counted.
-merge :: (Monad m) => (Integer -> Integer -> Integer) -> (a -> a -> m Ordering) -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+merge :: Monad m => (Integer -> Integer -> Integer) -> (a -> a -> m Ordering) -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
 merge g _ [] ys                    = case g 0 1 of
   1 -> return ys
   0 -> return []
+  _ -> error "invalid merge counting function"
 merge g _ xs []                    = case g 1 0 of
   1 -> return xs
   0 -> return []
+  _ -> error "invalid merge counting function"
 merge g comp ((x,n1):xs) ((y,n2): ys) = do
-  ord <- comp x y
-  case ord of
-    LT -> (mergeCons x n1 0) <$> merge g comp xs ((y,n2):ys)
-    EQ -> (mergeCons x n1 n2) <$> merge g comp xs ys
-    GT -> (mergeCons y 0 n2) <$> merge g comp ((x,n1):xs) ys
+  o <- comp x y
+  case o of
+    LT -> mergeCons x n1 0  <$> merge g comp xs ((y,n2):ys)
+    EQ -> mergeCons x n1 n2 <$> merge g comp xs ys
+    GT -> mergeCons y 0 n2  <$> merge g comp ((x,n1):xs) ys
     where
       mergeCons a m1 m2 zs = case g m1 m2 of
         0 -> zs
@@ -392,6 +395,7 @@ whnfAppExact (VClos b e) vs =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
 whnfAppExact (VConst op) vs = whnfOp op vs
+whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
 
 ------------------------------------------------------------
 -- Lists
@@ -413,6 +417,7 @@ fromDiscoList v =
   whnfV v >>= \case
     VCons 0 _       -> return []
     VCons 1 [x, xs] -> (x:) <$> fromDiscoList xs
+    v'              -> error $ "Impossible!  fromDiscoList on non-list value " ++ show v'
 
 -- | A lazy foldr on lists represented as 'Value's.  The entire
 --   function is wrapped in a call to 'delay', so it does not actually
@@ -585,8 +590,8 @@ whnfOp ODivides        = numOp' (\m n -> return (mkEnum $ divides m n))
 whnfOp OBinom          = numOp binom
 whnfOp OMultinom       = multinomOp
 whnfOp OFact           = uNumOp' fact
-whnfOp (OEq ty)        = eqOp ty
-whnfOp (OLt ty)        = ltOp ty
+whnfOp (OEq ty)        = arity2 "eqOp" $ eqOp ty
+whnfOp (OLt ty)        = arity2 "ltOp" $ ltOp ty
 whnfOp OEnum           = enumOp
 whnfOp OCount          = countOp
 
@@ -596,74 +601,88 @@ whnfOp (OMExp n)       = modExp n
 whnfOp (OMDivides n)   = modDivides n
 
 -- Set operations
-whnfOp (OSize)         = setSize
-whnfOp (OUnion  ty)    = setUnion ty
-whnfOp (OInter  ty)    = setIntersection ty
-whnfOp (ODiff   ty)    = setDifference ty
-whnfOp (OPowerSet ty)  = powerSet ty
-whnfOp (OSubset ty)    = subsetTest ty
+whnfOp (OSize)         = arity1 "setSize"         $ setSize
+whnfOp (OUnion  ty)    = arity2 "setUnion"        $ setUnion ty
+whnfOp (OInter  ty)    = arity2 "setIntersection" $ setIntersection ty
+whnfOp (ODiff   ty)    = arity2 "setDifference"   $ setDifference ty
+whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
+whnfOp (OSubset ty)    = arity2 "subset"          $ subsetTest ty
 
-whnfOp ORep            = repBag
+-- Bag operations
+whnfOp ORep            = arity2 "repBag" $ repBag
 
-whnfOp OBagToSet       = \[b] -> whnfV b >>= bagToSet
-whnfOp OBagToList      = \[b] -> whnfV b >>= bagToList
-
-whnfOp OSetToList      = \[s] -> whnfV s >>= setToList
-
-whnfOp (OListToSet ty) = \[l] -> whnfV l >>= listToSet ty
-whnfOp (OListToBag ty) = \[l] -> whnfV l >>= listToBag ty
+-- Container conversions
+whnfOp OBagToSet       = arity1 "bagToSet"  $ whnfV >=> bagToSet
+whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
+whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
+whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
+whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 
 -- Other primitives
-whnfOp OIsPrime        = \[n] -> primIsPrime <$> whnfV n
-whnfOp OCrash          = \[m] -> primCrash <$> whnfV m
+whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
+whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
 
-whnfOp OId             = \[v] -> whnfV v
+-- Identity
+whnfOp OId             = arity1 "id" $ whnfV
 
-setSize :: [Value] -> Disco IErr Value
-setSize [v] = do
+-- | XXX
+arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity1 _ f [v]   = f v
+arity1 name _ vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+
+-- | XXX
+arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity2 _ f [v1,v2] = f v1 v2
+arity2 name _ vs   = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+
+-- | XXX
+setSize :: Value -> Disco IErr Value
+setSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
-setSize _ = error "Impossible! Wrong # of values in setSize"
 
-setUnion :: Type -> [Value] -> Disco IErr Value
-setUnion ty [v1, v2] = do
+-- | XXX
+setUnion :: Type -> Value -> Value -> Disco IErr Value
+setUnion ty v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
   zs <- merge max (decideOrdFor ty) xs ys
   return $ VBag zs
-setUnion _ _ = error "Impossible! Wrong # of Cores in setUnion"
 
-setIntersection :: Type -> [Value] -> Disco IErr Value
-setIntersection ty [v1, v2] = do
+-- | XXX
+setIntersection :: Type -> Value -> Value -> Disco IErr Value
+setIntersection ty v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
   zs <- merge min (decideOrdFor ty) xs ys
   return $ VBag zs
-setIntersection _ _ = error "Impossible! Wrong # of Cores in setIntersection"
 
-setDifference :: Type -> [Value] -> Disco IErr Value
-setDifference ty [v1, v2] = do
+-- | XXX
+setDifference :: Type -> Value -> Value -> Disco IErr Value
+setDifference ty v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
   zs <- merge (\x y -> max 0 (x - y)) (decideOrdFor ty) xs ys
   return $ VBag zs
-setDifference _ _ = error "Impossible! Wrong # of Cores in setDifference"
 
-subsetTest :: Type -> [Value] -> Disco IErr Value
-subsetTest ty [v1,v2] = do
+-- | XXX
+subsetTest :: Type -> Value -> Value -> Disco IErr Value
+subsetTest ty v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
   ys' <- merge (max) (decideOrdFor ty) xs ys
   mkEnum <$> setEquality ty ys ys'
 
-powerSet :: Type -> [Value] -> Disco IErr Value
-powerSet ty [v] = do
+-- | XXX
+powerSet :: Type -> Value -> Disco IErr Value
+powerSet ty v = do
   VBag xs <- whnfV v
   ys <- sortNCount (decideOrdFor ty) (map (\x -> (VBag x, 1)) (subsequences xs))
   return $ VBag ys
 
-repBag :: [Value] -> Disco IErr Value
-repBag [elt, rep] = do
+-- | XXX
+repBag :: Value -> Value -> Disco IErr Value
+repBag elt rep = do
   VNum _ r <- whnfV rep
   return $ VBag [(elt, numerator r)]
 
@@ -874,8 +893,8 @@ valueToString = fmap toString . rnfV
 ------------------------------------------------------------
 
 -- | Test two expressions for equality at the given type.
-eqOp :: Type -> [Value] -> Disco IErr Value
-eqOp ty [v1,v2] = mkEnum <$> decideEqFor ty v1 v2
+eqOp :: Type -> Value -> Value -> Disco IErr Value
+eqOp ty v1 v2 = mkEnum <$> decideEqFor ty v1 v2
 
 -- | Lazily decide equality of two values at the given type.
 decideEqFor :: Type -> Value -> Value -> Disco IErr Bool
@@ -1092,8 +1111,8 @@ primValEq v1 v2                     = error $ "primValEq on non-primitive values
 
 -- | Test two expressions to see whether the first is less than the
 --   second at the given type.
-ltOp :: Type -> [Value] -> Disco IErr Value
-ltOp ty [v1,v2] = (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
+ltOp :: Type -> Value -> Value -> Disco IErr Value
+ltOp ty v1 v2 = (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
 
 -- | Lazily decide the ordering of two values at the given type.
 decideOrdFor :: Type -> Value -> Value -> Disco IErr Ordering

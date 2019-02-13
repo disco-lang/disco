@@ -142,8 +142,7 @@ Dynamic (runtime) semantics
 To do
 -----
 
-- Refactor to get rid of COp etc., and just have certain constants
-  with arity, eval/apply etc.
+- Get rid of warnings
 - Refactor to get rid of strings in prims
 - Add container subtyping
 - Write down a specific, concrete list of the container primitives

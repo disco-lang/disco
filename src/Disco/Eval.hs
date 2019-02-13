@@ -150,6 +150,11 @@ data Value where
   --   also used to represent sets (with the invariant that all counts
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
+
+  -- | A disco type can be a value.  For now, there are only a very
+  --   limited number of places this could ever show up (in
+  --   particular, as an argument to @enumerate@ or @count@).
+  VType :: Type -> Value
   deriving Show
 
 -- | A @ValFun@ is just a Haskell function @[Value] -> Value@.  It is a

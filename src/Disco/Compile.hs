@@ -65,7 +65,7 @@ compileDTerm (DTRat r)     = return $ CNum Decimal r
 compileDTerm (DTLam _ l) = do
   (x,body) <- unbind l
   c <- compileDTerm body
-  return $ CAbs (bind (coerce x) c)
+  return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
 
 compileDTerm (DTApp _ t1 t2)
   = appChain t1 [t2]
@@ -91,9 +91,9 @@ compileDTerm (DTBin _ Cons t1 t2)
   = CCons 1 <$> mapM compileDTerm [t1, t2]
 
 compileDTerm (DTBin ty op t1 t2)
-  = compileBOp (getType t1) (getType t2) ty op <$> compileDTerm t1 <*> compileDTerm t2
+  = CApp (compileBOp (getType t1) (getType t2) ty op) <$> mapM compileArg [t1, t2]
 
-compileDTerm (DTTyOp _ op ty) = return $ CApp (CLit (tyOps ! op)) [(Strict, CType ty)]
+compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CType ty)]
   where
     tyOps = M.fromList
       [ Enumerate ==> OEnum
@@ -142,15 +142,15 @@ compileArg :: DTerm -> FreshM (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
 compilePrim :: Type -> String -> FreshM Core
-compilePrim (TySet _ :->: _)  "list" = return $ CLit OSetToList
-compilePrim (TyBag _ :->: _)  "set"  = return $ CLit OBagToSet
-compilePrim (TyBag _ :->: _)  "list" = return $ CLit OBagToList
-compilePrim (TyList a :->: _) "set"  = return $ CLit (OListToSet a)
-compilePrim (TyList a :->: _) "bag"  = return $ CLit (OListToBag a)
-compilePrim _ p | p `elem` ["list", "bag", "set"] = return $ CLit OId
+compilePrim (TySet _ :->: _)  "list" = return $ CConst OSetToList
+compilePrim (TyBag _ :->: _)  "set"  = return $ CConst OBagToSet
+compilePrim (TyBag _ :->: _)  "list" = return $ CConst OBagToList
+compilePrim (TyList a :->: _) "set"  = return $ CConst (OListToSet a)
+compilePrim (TyList a :->: _) "bag"  = return $ CConst (OListToBag a)
+compilePrim _ p | p `elem` ["list", "bag", "set"] = return $ CConst OId
 
-compilePrim _ "isPrime" = return $ CLit OIsPrime
-compilePrim _ "crash"   = return $ CLit OCrash
+compilePrim _ "isPrime" = return $ CConst OIsPrime
+compilePrim _ "crash"   = return $ CConst OCrash
 
 compilePrim _ s = error $ "compilePrim: unknown prim " ++ s
 
@@ -196,7 +196,7 @@ compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
 
 -- | Compile a unary operator.
 compileUOp :: UOp -> Core
-compileUOp op = CLit (coreUOps ! op)
+compileUOp op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
     coreUOps = M.fromList $
@@ -235,7 +235,7 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 -- will consistently be TyFin in the case of Div, Exp, and Divides.
 compileBOp (TyFin n) _ _ op
   | op `elem` [Div, Exp, Divides]
-  = CLit ((omOps ! op) n)
+  = CConst ((omOps ! op) n)
   where
     omOps = M.fromList
       [ Div     ==> OMDiv
@@ -246,7 +246,7 @@ compileBOp (TyFin n) _ _ op
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op
   | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
-  = CLit (regularOps ! op)
+  = CConst (regularOps ! op)
   where
     regularOps = M.fromList
       [ Add     ==> OAdd
@@ -264,15 +264,15 @@ compileBOp _ _ _ op
 -- we just store the type itself, and compute the comparison function
 -- in a type-directed way; see Disco.Interpret.Core.decideEqFor and
 -- decideOrdFor.)
-compileBOp ty _ _ Eq = CLit (OEq ty)
-compileBOp ty _ _ Lt = CLit (OLt ty)
+compileBOp ty _ _ Eq = CConst (OEq ty)
+compileBOp ty _ _ Lt = CConst (OLt ty)
 
 -- Operations on sets compile straightforwardly, except that they also
 -- need to store the element type so they can compare the elements
 -- appropriately.
 compileBOp (TySet ty) _ _ op
   | op `elem` [Union, Inter, Diff, Subset]
-  = CLit ((setOps ! op) ty)
+  = CConst ((setOps ! op) ty)
   where
     setOps = M.fromList
       [ Union  ==> OUnion
@@ -281,7 +281,7 @@ compileBOp (TySet ty) _ _ op
       , Subset ==> OSubset
       ]
 
-compileBOp _ _ _ Rep = CLit ORep
+compileBOp _ _ _ Rep = CConst ORep
 
-compileBOp ty1 ty2 resTy op c1 c2
-  = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op, c1, c2)
+compileBOp ty1 ty2 resTy op
+  = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

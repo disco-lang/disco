@@ -243,6 +243,9 @@ discoGenerator (TyList ty) =
 --     DiscoGen tyGen tyToValue ->
 --       DiscoGen (QC.listOf tyGen) (_ . map tyToValue)
 
+discoGenerator (TyBag _ty) =
+  error "discoGenerator is not yet implemented for TyBag"
+
 discoGenerator (TySet _ty) =
   error "discoGenerator is not yet implemented for TySet"
 

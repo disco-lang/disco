@@ -303,6 +303,27 @@ inferTop t = do
 --   a given AST node to be placed together.
 typecheck :: Mode -> Term -> TCM ATerm
 
+-- ~~~~ Note [Pattern coverage]
+-- In several places we have clauses like
+--
+--   typecheck Infer (TBin op t1 t2) | op `elem` [ ... ]
+--
+-- since the typing rules for all the given operators are the same.
+-- The only problem is that the pattern coverage checker (sensibly)
+-- doesn't look at guards in general, so it thinks that there are TBin
+-- cases still uncovered.
+--
+-- However, we *don't* just want to add a catch-all case at the end,
+-- because the coverage checker is super helpful in alerting us when
+-- there's a missing typechecking case after modifying the language in
+-- some way. The (not ideal) solution for now is to add some
+-- additional explicit cases that simply call 'error', which will
+-- never be reached but which assure the coverage checker that we have
+-- handled those cases.
+--
+-- The ideal solution would be to use or-patterns, if Haskell had them
+-- (see https://github.com/ghc-proposals/ghc-proposals/pull/43).
+
 --------------------------------------------------
 -- Defined types
 
@@ -343,6 +364,8 @@ typecheck Infer (TPrim conv) | conv `elem` ["list", "bag", "set"] = do
     primCtrCon "list" = TyList
     primCtrCon "bag"  = TyBag
     primCtrCon _      = TySet
+
+typecheck Infer (TPrim p) = throwError $ UnknownPrim p
 
 -- In any other case, we can't infer the type of a primitive; in
 -- checking mode we always assume that the given type is OK.  If you
@@ -572,6 +595,14 @@ typecheck Infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div, SSub] = do
     ]
   return $ ATBin tyv op at1 at2
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Add  _ _) = error "typecheck Infer Add should be unreachable"
+typecheck Infer (TBin Mul  _ _) = error "typecheck Infer Mul should be unreachable"
+typecheck Infer (TBin Sub  _ _) = error "typecheck Infer Sub should be unreachable"
+typecheck Infer (TBin Div  _ _) = error "typecheck Infer Div should be unreachable"
+typecheck Infer (TBin SSub _ _) = error "typecheck Infer SSub should be unreachable"
+------------------------------------------------------------
+
 typecheck (Check ty) (TUn Neg t) = do
   constraint $ CQual (QSub) ty
   ATUn ty Neg <$> check t ty
@@ -607,6 +638,13 @@ typecheck Infer (TBin IDiv t1 t2) = do
   resTy <- cInt tyLub
   return $ ATBin resTy IDiv at1 at2
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TUn Sqrt  _) = error "typecheck Infer Sqrt should be unreachable"
+typecheck Infer (TUn Lg    _) = error "typecheck Infer Lg should be unreachable"
+typecheck Infer (TUn Floor _) = error "typecheck Infer Floor should be unreachable"
+typecheck Infer (TUn Ceil  _) = error "typecheck Infer Ceil should be unreachable"
+------------------------------------------------------------
+
 ----------------------------------------
 -- exp
 
@@ -635,6 +673,15 @@ typecheck Infer (TBin op t1 t2) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
   _ <- lub (getType at1) (getType at2)
   return $ ATBin TyBool op at1 at2
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Eq  _ _) = error "typecheck Infer Eq should be unreachable"
+typecheck Infer (TBin Neq _ _) = error "typecheck Infer Neq should be unreachable"
+typecheck Infer (TBin Lt  _ _) = error "typecheck Infer Lt should be unreachable"
+typecheck Infer (TBin Gt  _ _) = error "typecheck Infer Gt should be unreachable"
+typecheck Infer (TBin Leq _ _) = error "typecheck Infer Leq should be unreachable"
+typecheck Infer (TBin Geq _ _) = error "typecheck Infer Geq should be unreachable"
+------------------------------------------------------------
+
 ----------------------------------------
 -- Comparison chain
 
@@ -657,6 +704,12 @@ typecheck Infer (TChain t ls) =
 -- Bool as well.
 typecheck Infer (TBin op t1 t2) | op `elem` [And, Or, Impl] =
   ATBin TyBool op <$> check t1 TyBool <*> check t2 TyBool
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin And  _ _) = error "typecheck Infer And should be unreachable"
+typecheck Infer (TBin Or   _ _) = error "typecheck Infer Or should be unreachable"
+typecheck Infer (TBin Impl _ _) = error "typecheck Infer Impl should be unreachable"
+------------------------------------------------------------
 
 typecheck Infer (TUn Not t) = ATUn TyBool Not <$> check t TyBool
 
@@ -723,6 +776,13 @@ typecheck Infer (TBin setOp t1 t2)
   let ty = case setOp of {Subset -> TyBool; _ -> TySet tyelt}
   constraints [CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)]
   return $ ATBin ty setOp at1 at2
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Union  _ _) = error "typecheck Infer Union should be unreachable"
+typecheck Infer (TBin Inter  _ _) = error "typecheck Infer Inter should be unreachable"
+typecheck Infer (TBin Diff   _ _) = error "typecheck Infer Diff should be unreachable"
+typecheck Infer (TBin Subset _ _) = error "typecheck Infer Subset should be unreachable"
+------------------------------------------------------------
 
 typecheck Infer (TBin Rep t1 t2) = do
   at1 <- infer t1

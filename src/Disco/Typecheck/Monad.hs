@@ -84,6 +84,7 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | UnknownPrim String     -- ^ Encountered an unknown primitive
   | NotCon Con Term Type   -- ^ The term should have an outermost constructor matching
                            --   matching Con, but it has type 'Type' instead
   | EmptyCase              -- ^ Case analyses cannot be empty.

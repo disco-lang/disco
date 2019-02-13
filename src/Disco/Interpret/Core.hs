@@ -1035,8 +1035,10 @@ enumerate (TyArr ty1 ty2)
     -- association list.
     mkFun :: [Value] -> Value
     mkFun outs
-      = VFun $ \[v] ->
-        snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
+      = VFun $ \case
+          { [v] -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
+          ; vs  -> error $ "Impossible! Got " ++ show vs ++ " in enumerate.mkFun"
+          }
 
     -- A custom version of fromJust' so we get a better error message
     -- just in case it ever happens

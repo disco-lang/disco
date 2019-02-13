@@ -254,13 +254,16 @@ whnf (CoreBag tyElt es) = do
 
 whnf (CType ty)      = return $ VType ty
 
+-- | XXX comment
 -- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
 -- elemOf _ _ []     = return False
 -- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
+-- | XXX comment
 countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
 countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
 
+-- | XXX comment
 -- Merge sorts the values in the list using the given function, while
 -- also counting the number of occurences of each element.
 sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
@@ -574,31 +577,31 @@ noMatch = return Nothing
 
 -- | Reduce an operator application to WHNF.
 whnfOp :: Op -> [Value] -> Disco IErr Value
-whnfOp OAdd            = numOp (+)
-whnfOp ONeg            = uNumOp negate
-whnfOp OSqrt           = uNumOp integerSqrt
-whnfOp OLg             = lgOp
-whnfOp OFloor          = uNumOp floorOp
-whnfOp OCeil           = uNumOp ceilOp
-whnfOp OAbs            = uNumOp abs
-whnfOp OMul            = numOp (*)
-whnfOp ODiv            = numOp' divOp
-whnfOp OExp            = numOp (\m n -> m ^^ numerator n)
+whnfOp OAdd            = arity2 "+"        $ numOp (+)
+whnfOp ONeg            = arity1 "negate"   $ uNumOp negate
+whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp integerSqrt
+whnfOp OLg             = arity1 "lg"       $ lgOp
+whnfOp OFloor          = arity1 "floor"    $ uNumOp floorOp
+whnfOp OCeil           = arity1 "ceil"     $ uNumOp ceilOp
+whnfOp OAbs            = arity1 "abs"      $ uNumOp abs
+whnfOp OMul            = arity2 "*"        $ numOp (*)
+whnfOp ODiv            = arity2 "/"        $ numOp' divOp
+whnfOp OExp            = arity2 "^"        $ numOp (\m n -> m ^^ numerator n)
   -- If the program typechecks, n will be an integer.
-whnfOp OMod            = numOp' modOp
-whnfOp ODivides        = numOp' (\m n -> return (mkEnum $ divides m n))
-whnfOp OBinom          = numOp binom
-whnfOp OMultinom       = multinomOp
-whnfOp OFact           = uNumOp' fact
-whnfOp (OEq ty)        = arity2 "eqOp" $ eqOp ty
-whnfOp (OLt ty)        = arity2 "ltOp" $ ltOp ty
-whnfOp OEnum           = enumOp
-whnfOp OCount          = countOp
+whnfOp OMod            = arity2 "mod"      $ numOp' modOp
+whnfOp ODivides        = arity2 "divides"  $ numOp' (\m n -> return (mkEnum $ divides m n))
+whnfOp OBinom          = arity2 "binom"    $ numOp binom
+whnfOp OMultinom       = arity2 "multinom" $ multinomOp
+whnfOp OFact           = arity1 "fact"     $ uNumOp' fact
+whnfOp (OEq ty)        = arity2 "eqOp"     $ eqOp ty
+whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
+whnfOp OEnum           = arity1 "enum"     $ enumOp
+whnfOp OCount          = arity1 "count"    $ countOp
 
 -- Modular operations, for finite types
-whnfOp (OMDiv n)       = modDiv n
-whnfOp (OMExp n)       = modExp n
-whnfOp (OMDivides n)   = modDivides n
+whnfOp (OMDiv n)       = arity2 "modDiv"   $ modDiv n
+whnfOp (OMExp n)       = arity2 "modExp"   $ modExp n
+whnfOp (OMDivides n)   = arity2 "modDiv"   $ modDivides n
 
 -- Set operations
 whnfOp (OSize)         = arity1 "setSize"         $ setSize
@@ -687,54 +690,51 @@ repBag elt rep = do
   return $ VBag [(elt, numerator r)]
 
 -- | Perform a numeric binary operation.
-numOp :: (Rational -> Rational -> Rational) -> [Value] -> Disco IErr Value
+numOp :: (Rational -> Rational -> Rational) -> Value -> Value -> Disco IErr Value
 numOp (#) = numOp' (\m n -> return (vnum (m # n)))
 
 -- | A more general version of 'numOp' where the binary operation has
 --   a result in the @Disco@ monad (/e.g./ for operations which can throw
 --   a division by zero error).
-numOp' :: (Rational -> Rational -> Disco IErr Value) -> [Value] -> Disco IErr Value
-numOp' (#) vs = do
-  [VNum d1 m, VNum d2 n] <- mapM whnfV vs     -- If the program type checked this can
-  res <- m # n                                -- never go wrong.
+numOp' :: (Rational -> Rational -> Disco IErr Value) -> Value -> Value -> Disco IErr Value
+numOp' (#) v1 v2 = do
+  VNum d1 m <- whnfV v1    -- If the program type checked this can
+  VNum d2 n <- whnfV v2    -- never go wrong.
+  res <- m # n
   case res of
     VNum _ r -> return $ VNum (d1 <> d2) r    -- Re-flag any resulting numeric value with
     _        -> return res                    --   the combination of the input flags.
 
 -- | Perform a numeric unary operation.
-uNumOp :: (Rational -> Rational) -> [Value] -> Disco IErr Value
+uNumOp :: (Rational -> Rational) -> Value -> Disco IErr Value
 uNumOp f = uNumOp' (return . f)
 
 -- | Perform a numeric unary operation, with the ability to /e.g./
 --   throw an error (used for factorial, which can overflow).
-uNumOp' :: (Rational -> Disco IErr Rational) -> [Value] -> Disco IErr Value
-uNumOp' f [v] = do
+uNumOp' :: (Rational -> Disco IErr Rational) -> Value -> Disco IErr Value
+uNumOp' f v = do
   VNum d m <- whnfV v
   VNum d <$> f m
-uNumOp' _ _ = error "Impossible! Second argument to uNumOp' has length /= 1"
 
 -- | For performing modular division within a finite type.
-modDiv :: Integer -> [Value] -> Disco IErr Value
-modDiv n [v1,v2] = do
+modDiv :: Integer -> Value -> Value -> Disco IErr Value
+modDiv n v1 v2 = do
   VNum _ a <- whnfV v1
   VNum _ b <- whnfV v2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
     Just (InfMod{})   -> error "Impossible! InfMod in modDiv"
     Nothing           -> throwError DivByZero
-modDiv _ _ = error "Impossible! Wrong # of cores in modDiv"
 
-modDivides :: Integer -> [Value] -> Disco IErr Value
-modDivides n [v1,v2] = do
+modDivides :: Integer -> Value -> Value -> Disco IErr Value
+modDivides n v1 v2 = do
   VNum _ a <- whnfV v1
   VNum _ b <- whnfV v2
   return $ mkEnum $ divides (toRational (gcd (numerator a) n)) b
 
-modDivides _ _ = error "Impossible! Wrong # of cores in modDivides"
-
 -- | For performing modular exponentiation within a finite type.
-modExp :: Integer -> [Value] -> Disco IErr Value
-modExp n [v1,v2] = do
+modExp :: Integer -> Value -> Value -> Disco IErr Value
+modExp n v1 v2 = do
   VNum _ r1 <- whnfV v1
   VNum _ r2 <- whnfV v2
   let base = numerator r1 `modulo` fromInteger n
@@ -748,21 +748,20 @@ modExp n [v1,v2] = do
       case powSomeMod a b of
         SomeMod v' -> return $ vnum (getVal v' % 1)
         InfMod {}  -> error "Impossible, got InfMod in modExp"
-modExp _ _ = error "Impossible! Wrong # of Cores in modExp"
 
 -- | Perform a count on the number of values for the given type.
-countOp :: [Value] -> Disco IErr Value
-countOp [VType ty]  = case countType ty of
+countOp :: Value -> Disco IErr Value
+countOp (VType ty) = case countType ty of
   Just num -> return $ VCons 1 [vnum (num % 1)]
   Nothing  -> return $ VCons 0 [VCons 0 []]
-countOp cs          = error $ "Impossible! Called countOp on " ++ show cs
+countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
-enumOp :: [Value] -> Disco IErr Value
-enumOp [VType ty] = case countType ty of
+enumOp :: Value -> Disco IErr Value
+enumOp (VType ty) = case countType ty of
   Just _  -> return $ (toDiscoList (enumerate ty))
   Nothing -> throwError $ InfiniteTy ty
-enumOp cs         = error $ "Impossible! Called enumOp on " ++ show cs
+enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
@@ -794,11 +793,10 @@ ceilOp :: Rational -> Rational
 ceilOp n  = (ceiling n) % 1
 
 -- | Perform a base-2 logarithmic operation
-lgOp :: [Value] -> Disco IErr Value
-lgOp [v] = do
+lgOp :: Value -> Disco IErr Value
+lgOp v = do
   VNum _ m <- whnfV v
   lgOp' m
-lgOp cs = error $ "Impossible! lgOp on " ++ show cs
 
 lgOp' :: Rational -> Disco IErr Value
 lgOp' 0 = throwError LgOfZero
@@ -832,8 +830,8 @@ divides x y = denominator (y / x) == 1
 binom :: Rational -> Rational -> Rational
 binom (numerator -> n) (numerator -> k) = choose n k % 1
 
-multinomOp :: [Value] -> Disco IErr Value
-multinomOp [v1, v2] = do
+multinomOp :: Value -> Value -> Disco IErr Value
+multinomOp v1 v2 = do
   VNum _ n <- whnfV v1
   ks       <- rnfV  v2
   return . vnum $ multinomial (numerator n) (asList ks) % 1
@@ -848,8 +846,6 @@ multinomOp [v1, v2] = do
     multinomial n (k:ks)
       | k > n     = 0
       | otherwise = choose n k * multinomial (n-k) ks
-
-multinomOp cs = error $ "Impossible! multinomOp " ++ show cs
 
 -- | Factorial.  The argument will always be a natural number.
 fact :: Rational -> Disco IErr Rational

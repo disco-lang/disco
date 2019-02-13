@@ -789,10 +789,10 @@ typecheck Infer (TBin Rep t1 t2) = do
   at2 <- check t2 TyN
   return $ ATBin (TyBag (getType at1)) Rep at1 at2
 
--- infer (TUn PowerSet t) = do
---   (at, cst1) <- infer t
---   ([tyElt], cst2) <- ensureConstr CSet (getType at) (Left t)
---   return (ATUn (TySet (TySet tyElt)) PowerSet at, cAnd [cst1, cst2])
+typecheck Infer (TUn PowerSet t) = do
+  at <- infer t
+  tyElt <- ensureConstr1 CSet (getType at) (Left t)
+  return $ ATUn (TySet (TySet tyElt)) PowerSet at
 
 ----------------------------------------
 -- Type operations

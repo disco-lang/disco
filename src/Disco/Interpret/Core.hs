@@ -680,7 +680,7 @@ subsetTest ty v1 v2 = do
 powerSet :: Type -> Value -> Disco IErr Value
 powerSet ty v = do
   VBag xs <- whnfV v
-  ys <- sortNCount (decideOrdFor ty) (map (\x -> (VBag x, 1)) (subsequences xs))
+  ys <- sortNCount (decideOrdFor (TySet ty)) (map (\x -> (VBag x, 1)) (subsequences xs))
   return $ VBag ys
 
 -- | XXX

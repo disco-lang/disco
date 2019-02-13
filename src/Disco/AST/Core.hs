@@ -144,19 +144,21 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMDivides Integer
 
         -- Container operations
-        | OSize        -- ^ Size of two sets (@size@)
-        | OPowerSet Type -- ^ Power set of a given set (@powerSet@)
-        | OSubset Type -- ^ Subset test for two sets (@⊆@)
-        | OUnion  Type -- ^ Union of two sets (@union@ / @∪@)
-        | OInter  Type -- ^ Intersection of two sets (@intersect@ / @∩@)
-        | ODiff   Type -- ^ Difference of two sets (@\@)
-        | ORep         -- ^ Primitive bag constructor (replicate)
+        | OSize           -- ^ Size of two sets (@size@)
+        | OPowerSet Type  -- ^ Power set of a given set (@powerSet@). Stores the element type.
+        | OSubset Type    -- ^ Subset test for two sets (@⊆@). Stores the element type.
+        | OUnion  Type    -- ^ Union of two sets (@union@ / @∪@). Stores the element type.
+        | OInter  Type    -- ^ Intersection of two sets (@intersect@ / @∩@). Stores the element type.
+        | ODiff   Type    -- ^ Difference of two sets (@\@). Stores the element type.
+        | ORep            -- ^ Primitive bag constructor (replicate)
 
-        | OSetToList
-        | OBagToSet
-        | OBagToList
-        | OListToSet Type
-        | OListToBag Type
+        | OSetToList      -- ^ set -> list conversion (sorted order).
+        | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
+        | OBagToList      -- ^ bag -> list conversion (sorted order).
+        | OListToSet Type -- ^ list -> set conversion (forget order, duplicates).
+                          --   Stores the element type.
+        | OListToBag Type -- ^ list -> bag conversion (forget order).
+                          --   Stores the element type.
 
         -- Other primitives
         | OIsPrime

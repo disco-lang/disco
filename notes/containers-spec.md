@@ -142,7 +142,6 @@ Dynamic (runtime) semantics
 To do
 -----
 
-- Get rid of warnings
 - Add comments
 - Refactor to get rid of strings in prims
 - Add container subtyping

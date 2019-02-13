@@ -83,7 +83,7 @@ compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 
 compileDTerm (DTUn _ op t)
-  = CApp (compileUOp op) <$> mapM compileArg [t]
+  = CApp (compileUOp (getType t) op) <$> mapM compileArg [t]
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -195,24 +195,29 @@ compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
 ------------------------------------------------------------
 
 -- | Compile a unary operator.
-compileUOp :: UOp -> Core
-compileUOp op = CConst (coreUOps ! op)
+compileUOp
+  :: Type   -- ^ Type of the operator argument
+  -> UOp
+  -> Core
+
+compileUOp (TySet a) PowerSet = CConst (OPowerSet a)
+
+compileUOp _ op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
     coreUOps = M.fromList $
-      [ Neg   ==> ONeg
-      , Fact  ==> OFact
-      , Sqrt  ==> OSqrt
-      , Lg    ==> OLg
-      , Floor ==> OFloor
-      , Ceil  ==> OCeil
-      , Abs   ==> OAbs
+      [ Neg      ==> ONeg
+      , Fact     ==> OFact
+      , Sqrt     ==> OSqrt
+      , Lg       ==> OLg
+      , Floor    ==> OFloor
+      , Ceil     ==> OCeil
+      , Abs      ==> OAbs
       ]
 
--- | Compile a binary operator application.  This function needs to
---   know the types of the arguments and result since some operators
---   are overloaded and compile to different code depending on their
---   type.
+-- | Compile a binary operator.  This function needs to know the types
+--   of the arguments and result since some operators are overloaded
+--   and compile to different code depending on their type.
 --
 --  @arg1 ty -> arg2 ty -> result ty -> op -> result@
 compileBOp :: Type -> Type -> Type -> BOp -> Core

@@ -137,7 +137,8 @@ compileNat _         x = return $ CNum Fraction (x % 1)
 
 ------------------------------------------------------------
 
--- | XXX
+-- | Compile a DTerm which will be an argument to a function,
+--   packaging it up along with the strictness of its type.
 compileArg :: DTerm -> FreshM (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 

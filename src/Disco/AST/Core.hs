@@ -55,11 +55,6 @@ instance Monoid RationalDisplay where
   mempty  = Fraction
   mappend = (<>)
 
--- XXX there are too many constructors in Core!  e.g. do we really
--- need CCons to have a [Core]; couldn't we just do that with CApp?
--- Maybe CApp should take a [Core].  Also there is really no reason at
--- all that there should be a COp; it should just be CApp.
-
 -- | AST for the desugared, untyped core language.
 data Core where
 
@@ -77,7 +72,8 @@ data Core where
   --   comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
-  -- | A list with an ellipsis.
+  -- | A list with an ellipsis.  XXX eventually this should go away
+  -- and get replaced by a function primitive.
   CEllipsis :: [Core] -> Ellipsis Core -> Core
 
   -- | A rational number.
@@ -167,7 +163,8 @@ data Op = OAdd     -- ^ Addition (@+@)
 
   deriving (Show, Generic)
 
--- | XXX
+-- | Get the arity (desired number of arguments) of a function
+--   constant.
 opArity :: Op -> Int
 opArity OAdd           = 2
 opArity ONeg           = 1

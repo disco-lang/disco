@@ -254,18 +254,21 @@ whnf (CoreBag tyElt es) = do
 
 whnf (CType ty)      = return $ VType ty
 
--- | XXX comment
+-- | Check whether a certain value is present in a list using a linear search.
 -- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
 -- elemOf _ _ []     = return False
 -- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
--- | XXX comment
+-- | Given a list of disco values, sort and collate them into a list
+--   pairing each unique value with its count.  Used to
+--   construct/normalize bags and sets.
 countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
 countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
 
--- | XXX comment
--- Merge sorts the values in the list using the given function, while
--- also counting the number of occurences of each element.
+-- | Normalize a list of values paired with a count.  The input list
+--   could have duplicate values.  This function first uses merge sort
+--   to sort the values according to the given comparison function,
+--   then adds the counts of multiple instances of the same value.
 sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
 sortNCount _ []  = return []
 sortNCount _ [x] = return [x]
@@ -277,10 +280,16 @@ sortNCount f xs  = do
     (firstHalf, secondHalf) = splitAt n xs
     n = length xs `div` 2
 
--- | XXX explain what the function g is for
--- Merges two lists of type [(a,Integer)] together a la merge sort.  Is guaranteed to
--- work provided that the two lists given have already been sorted and counted.
-merge :: Monad m => (Integer -> Integer -> Integer) -> (a -> a -> m Ordering) -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+-- | Generic function for merging two sorted, count-annotated lists of
+--   type @[(a,Integer)]@ a la merge sort, using the given comparison
+--   function, and using the provided count combining function to
+--   decide what count to assign to each element of the output.  For
+--   example, @(+)@ corresponds to bag union; @min@ corresponds to
+--   intersection; and so on.
+merge :: Monad m
+      => (Integer -> Integer -> Integer)   -- ^ Function for combining counts
+      -> (a -> a -> m Ordering)            -- ^ Comparison function
+      -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
 merge g _ [] ys                    = case g 0 1 of
   1 -> return ys
   0 -> return []
@@ -340,25 +349,28 @@ bagToList b = do
     -- XXX could be more efficient if we add some sharing, so replicated values
     -- will only be evaluated once
 
--- | XXX
+-- | Convert a list to a set, sorting the values and removing
+--   duplicates.
 listToSet :: Type -> Value -> Disco IErr Value
 listToSet ty v = do
   vs <- fromDiscoList v
   vcs <- countValues ty vs
   return . VBag $ (map . fmap) (const 1) vcs
 
--- | XXX
+-- | Convert a list to a bag, sorting and counting the values.
 listToBag :: Type -> Value -> Disco IErr Value
 listToBag ty v = do
   vs <- fromDiscoList v
   VBag <$> countValues ty vs
 
--- | XXX
+-- | Turn a function argument into a Value according to its given
+--   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
 whnfArg :: Strictness -> Core -> Disco IErr Value
 whnfArg Strict = whnf
 whnfArg Lazy   = mkThunk
 
--- | XXX, note must be in WHNF.
+-- | Find the arity of a function-like thing.  Note that the input
+--   must already be in WHNF.
 funArity :: Value -> Int
 funArity (VClos b _) = length (fst (unsafeUnbind b))
 funArity (VPAp f vs) = funArity f - length vs
@@ -392,7 +404,8 @@ whnfApp f vs =
   where
     k = funArity f
 
--- | XXX
+-- | Apply a function-thing (must be reduced to WHNF) to a list of
+--   exactly the right number of arguments.
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
 whnfAppExact (VClos b e) vs =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t

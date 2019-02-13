@@ -408,8 +408,7 @@ typecheck (Check checkTy) (TAbs lam) = do
     checkArgs ((x, unembed -> mty) : args) ty term = do
 
       -- Ensure that ty is a function type
-      tys <- ensureConstr CArr ty (Left term)
-      let [ty1, ty2] = tys
+      (ty1, ty2) <- ensureConstr2 CArr ty (Left term)
 
       -- Figure out the type of x:
       xTy <- case mty of
@@ -463,8 +462,7 @@ typecheck Infer (TAbs lam)    = do
 typecheck Infer (TApp t t')   = do
   at <- infer t
   let ty = getType at
-  tys <- ensureConstr CArr ty (Left t)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CArr ty (Left t)
   ATApp ty2 at <$> check t' ty1
 
 --------------------------------------------------
@@ -477,8 +475,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
-      mms       <- ensureConstrMode CPair mode (Left $ TTup (t:ts))
-      let [m, ms] = mms
+      (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return $ (TyPair (getType at) ty, at : ats)
@@ -488,8 +485,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
 
 -- Check/infer the type of an injection into a sum type.
 typecheck mode lt@(TInj s t) = do
-  ms <- ensureConstrMode CSum mode (Left lt)
-  let [mL, mR] = ms
+  (mL, mR) <- ensureConstrMode2 CSum mode (Left lt)
   at <- typecheck (selectSide s mL mR) t
   resTy <- case mode of
     Infer    ->
@@ -504,8 +500,7 @@ typecheck mode lt@(TInj s t) = do
 -- To check a cons, make sure the type is a list type, then
 -- check the two arguments appropriately.
 typecheck (Check ty) t@(TBin Cons x xs) = do
-  tys <- ensureConstr CList ty (Left t)
-  let [tyElt] = tys
+  tyElt <- ensureConstr1 CList ty (Left t)
   ATBin ty Cons <$> check x tyElt <*> check xs (TyList tyElt)
 
 -- To infer the type of a cons:
@@ -715,8 +710,7 @@ typecheck Infer (TUn Size t) = do
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
     | setOp `elem` [Union, Inter, Diff] = do
-  tys <- ensureConstr CSet ty (Left t)
-  let [tyElt] = tys
+  tyElt <- ensureConstr1 CSet ty (Left t)
   ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
 
 typecheck Infer (TBin setOp t1 t2)
@@ -752,8 +746,7 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 
 -- Literal containers
 typecheck mode t@(TContainer c xs ell)  = do
-  m <- ensureConstrMode (containerToCon c) mode (Left t)
-  let [eltMode] = m
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left t)
   axs  <- mapM (typecheck eltMode) xs
   aell <- typecheckEllipsis eltMode ell
   resTy <- case mode of
@@ -773,8 +766,7 @@ typecheck mode t@(TContainer c xs ell)  = do
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do
-  m <- ensureConstrMode (containerToCon c) mode (Left tcc)
-  let [eltMode] = m
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left tcc)
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
@@ -930,20 +922,17 @@ checkPattern (PTup tup) tupTy = do
       (ctx, apt) <- checkPattern p ty
       return [(ctx, apt)]
     checkTuplePat (p:ps) ty = do
-      tys         <- ensureConstr CPair ty (Right $ PTup (p:ps))
-      let [ty1, ty2] = tys
-      (ctx, apt)  <- checkPattern p ty1
+      (ty1, ty2) <- ensureConstr2 CPair ty (Right $ PTup (p:ps))
+      (ctx, apt) <- checkPattern p ty1
       rest <- checkTuplePat ps ty2
       return ((ctx, apt) : rest)
 
 checkPattern p@(PInj L pat) ty       = do
-  tys <- ensureConstr CSum ty (Right p)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty1
   return (ctx, APInj (TySum ty1 ty2) L apt)
 checkPattern p@(PInj R pat) ty    = do
-  tys <- ensureConstr CSum ty (Right p)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty2
   return (ctx, APInj (TySum ty1 ty2) R apt)
 
@@ -968,15 +957,13 @@ checkPattern (PNat n) ty        = do
   return (emptyCtx, APNat ty n)
 
 checkPattern p@(PCons p1 p2) ty = do
-  tys <- ensureConstr CList ty (Right p)
-  let [tyl] = tys
+  tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
-  tys <- ensureConstr CList ty (Right p)
-  let [tyl] = tys
+  tyl <- ensureConstr1 CList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
@@ -1214,6 +1201,31 @@ ensureConstr c ty targ = matchConTy c ty
       Left term -> throwError (NotCon c term ty)
       Right pat -> throwError (PatternType pat ty)
 
+-- | A variant of ensureConstr that expects to get exactly one
+--   argument type out, and throws an error if we get any other
+--   number.
+ensureConstr1 :: Con -> Type -> Either Term Pattern -> TCM Type
+ensureConstr1 c ty targ = do
+  tys <- ensureConstr c ty targ
+  case tys of
+    [ty1] -> return ty1
+    _     -> error $
+      "Impossible! Wrong number of arg types in ensureConstr1 " ++ show c ++ " "
+        ++ show ty ++ ": " ++ show tys
+
+-- | A variant of ensureConstr that expects to get exactly two
+--   argument types out, and throws an error if we get any other
+--   number.
+ensureConstr2 :: Con -> Type -> Either Term Pattern -> TCM (Type, Type)
+ensureConstr2 c ty targ  = do
+  tys <- ensureConstr c ty targ
+  case tys of
+    [ty1, ty2] -> return (ty1, ty2)
+    _          -> error $
+      "Impossible! Wrong number of arg types in ensureConstr2 " ++ show c ++ " "
+        ++ show ty ++ ": " ++ show tys
+
+
 -- | A variant of 'ensureConstr' that works on 'Mode's instead of
 --   'Type's.  Behaves similarly to 'ensureConstr' if the 'Mode' is
 --   'Check'; otherwise it generates an appropriate number of copies
@@ -1221,6 +1233,26 @@ ensureConstr c ty targ = matchConTy c ty
 ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
+
+-- | XXX
+ensureConstrMode1 :: Con -> Mode -> Either Term Pattern -> TCM Mode
+ensureConstrMode1 c m targ = do
+  ms <- ensureConstrMode c m targ
+  case ms of
+    [m1] -> return m1
+    _    -> error $
+      "Impossible! Wrong number of arg types in ensureConstrMode1 " ++ show c ++ " "
+        ++ show m ++ ": " ++ show ms
+
+-- | XXX
+ensureConstrMode2 :: Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
+ensureConstrMode2 c m targ = do
+  ms <- ensureConstrMode c m targ
+  case ms of
+    [m1, m2] -> return (m1, m2)
+    _        -> error $
+      "Impossible! Wrong number of arg types in ensureConstrMode2 " ++ show c ++ " "
+        ++ show m ++ ": " ++ show ms
 
 -- | Ensure that two types are equal:
 --     1. Do nothing if they are literally equal

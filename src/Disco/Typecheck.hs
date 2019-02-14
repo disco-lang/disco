@@ -39,6 +39,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Monad
 import           Disco.Typecheck.Solve
@@ -355,22 +356,21 @@ typecheck Infer (TVar x)      = do
 
 -- The 'list', 'bag', and 'set' primitives convert containers into
 -- other containers.
-typecheck Infer (TPrim conv) | conv `elem` ["list", "bag", "set"] = do
+typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
   c <- freshAtom   -- make a unification variable for the container type
   a <- freshTy     -- make a unification variable for the element type
   return $ ATPrim (TyContainer c a :->: primCtrCon conv a) conv
 
   where
-    primCtrCon "list" = TyList
-    primCtrCon "bag"  = TyBag
-    primCtrCon _      = TySet
-
-typecheck Infer (TPrim p) = throwError $ UnknownPrim p
+    primCtrCon PrimList = TyList
+    primCtrCon PrimBag  = TyBag
+    primCtrCon _        = TySet
 
 -- In any other case, we can't infer the type of a primitive; in
 -- checking mode we always assume that the given type is OK.  If you
 -- use a primitive you have to know what type you expect it to have.
-typecheck (Check ty) (TPrim x) = return $ ATPrim ty x
+typecheck Infer      (TPrim p) = throwError $ CantInferPrim p
+typecheck (Check ty) (TPrim p) = return $ ATPrim ty p
 
 --------------------------------------------------
 -- Base types

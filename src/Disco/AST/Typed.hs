@@ -95,6 +95,7 @@ import           Data.Void
 
 import           Disco.AST.Generic
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 -- | The extension descriptor for Typed specific AST types.
@@ -141,7 +142,7 @@ type instance X_Term TY
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
 
-pattern ATPrim :: Type -> String -> ATerm
+pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name
 
 pattern ATUn :: Type -> UOp -> ATerm -> ATerm

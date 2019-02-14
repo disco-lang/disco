@@ -237,20 +237,8 @@ whnf (CApp c cs) = do
   -- Finally, call 'whnfApp' to do the application.
   whnfApp v vs
 
--- Ellipses, case expressions, and operators
--- all have their own function to do reduction.
-whnf (CEllipsis ts ell) = expandEllipsis ts ell
+-- Case expressions have their own function to do reduction.
 whnf (CCase bs)     = whnfCase bs
-
-whnf (CoreSet t es) = do
-  res <- mapM mkThunk es
-  dres <- countValues t res
-  return $ VBag ((map (fmap (const 1))) dres)
-
-whnf (CoreBag tyElt es) = do
-  res <- mapM mkThunk es
-  cres <- countValues tyElt res
-  return $ VBag cres
 
 whnf (CType ty)      = return $ VType ty
 
@@ -481,10 +469,11 @@ vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
 -- output them lazily, and evaluate them only when we need them to
 -- compute the rest of the values.
 
-expandEllipsis :: [Core] -> Ellipsis Core -> Disco IErr Value
-expandEllipsis cs ell = do
-  vs  <- mapM whnf cs
-  end <- traverse whnf ell
+
+ellipsis :: Ellipsis Value -> Value -> Disco IErr Value
+ellipsis ell xs = do
+  vs  <- mapM whnfV =<< fromDiscoList xs
+  end <- traverse whnfV ell
   let (ds,rs)   = unzip (map fromVNum vs)
       (d, end') = traverse fromVNum end
   return . toDiscoList . map (VNum (mconcat ds <> d)) $ enumEllipsis rs end'
@@ -633,6 +622,10 @@ whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
 whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
 whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
 whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
+
+-- List ellipsis
+whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
+whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 
 -- Other primitives
 whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV

@@ -136,6 +136,7 @@ import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 import           GHC.Exts                         (Constraint)
 
@@ -256,7 +257,7 @@ data Term_ e where
 
   -- | A primitive, i.e. an identifier which is interpreted specially
   --   at runtime.
-  TPrim_  :: X_TPrim e -> String -> Term_ e
+  TPrim_  :: X_TPrim e -> Prim -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e

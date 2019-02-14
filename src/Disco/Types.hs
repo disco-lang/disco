@@ -295,6 +295,8 @@ pattern TyFin n = TyAtom (ABase (Fin n))
 pattern TyArr :: Type -> Type -> Type
 pattern TyArr ty1 ty2 = TyCon CArr [ty1, ty2]
 
+infixr 5 :->:
+
 pattern (:->:) :: Type -> Type -> Type
 pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
 

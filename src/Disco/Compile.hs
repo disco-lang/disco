@@ -24,6 +24,7 @@ import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Monad
 import           Disco.Types
 import           Disco.Util
@@ -102,30 +103,6 @@ compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CT
 
 compileDTerm (DTNil _)        = return $ CCons 0 []
 
-compileDTerm (DTContainer _ ListContainer ds (Just ell))
-  = CEllipsis <$> mapM compileDTerm ds <*> traverse compileDTerm ell
-
-compileDTerm (DTContainer _ ListContainer _ Nothing)
-  = error $ unlines
-      [ "Impossible: compileDTerm on DTContainer ListContainer with no ellipsis"
-      , "(should have already been desugared)"
-      ]
-
-compileDTerm (DTContainer (TySet eltTy) SetContainer ds Nothing)
-  = CoreSet eltTy <$> mapM compileDTerm ds
-
-compileDTerm (DTContainer (TySet _) SetContainer _ (Just _))
-  = error $ "compileDTerm DTContainer SetContainer with ellipsis: unimplemented"
-
-compileDTerm (DTContainer (TyBag eltTy) BagContainer ds Nothing)
-  = CoreBag eltTy <$> mapM compileDTerm ds
-
-compileDTerm (DTContainer (TyBag _) BagContainer _ (Just _))
-  = error $ "compileDTerm DTContainer BagContainer with ellipsis: unimplemented"
-
-compileDTerm (DTContainer ty c _ _)
-  = error $ "Impossible: compileDTerm on DTContainer " ++ show c ++ " with non-matching type " ++ show ty
-
 ------------------------------------------------------------
 
 -- | Compile a natural number. A separate function is needed in
@@ -142,18 +119,23 @@ compileNat _         x = return $ CNum Fraction (x % 1)
 compileArg :: DTerm -> FreshM (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
-compilePrim :: Type -> String -> FreshM Core
-compilePrim (TySet _ :->: _)  "list" = return $ CConst OSetToList
-compilePrim (TyBag _ :->: _)  "set"  = return $ CConst OBagToSet
-compilePrim (TyBag _ :->: _)  "list" = return $ CConst OBagToList
-compilePrim (TyList a :->: _) "set"  = return $ CConst (OListToSet a)
-compilePrim (TyList a :->: _) "bag"  = return $ CConst (OListToBag a)
-compilePrim _ p | p `elem` ["list", "bag", "set"] = return $ CConst OId
+-- | Compile a primitive.  Typically primitives turn into a
+--   corresponding function constant in the core language, but
+--   sometimes the particular constant it turns into may depend on the
+--   type.
+compilePrim :: Type -> Prim -> FreshM Core
+compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
+compilePrim (TyBag _ :->: _)  PrimSet  = return $ CConst OBagToSet
+compilePrim (TyBag _ :->: _)  PrimList = return $ CConst OBagToList
+compilePrim (TyList a :->: _) PrimSet  = return $ CConst (OListToSet a)
+compilePrim (TyList a :->: _) PrimBag  = return $ CConst (OListToBag a)
+compilePrim _ p | p `elem` [PrimList, PrimBag, PrimSet] = return $ CConst OId
 
-compilePrim _ "isPrime" = return $ CConst OIsPrime
-compilePrim _ "crash"   = return $ CConst OCrash
+compilePrim _ PrimIsPrime = return $ CConst OIsPrime
+compilePrim _ PrimCrash   = return $ CConst OCrash
 
-compilePrim _ s = error $ "compilePrim: unknown prim " ++ s
+compilePrim _ PrimForever = return $ CConst OForever
+compilePrim _ PrimUntil   = return $ CConst OUntil
 
 ------------------------------------------------------------
 -- Case expressions

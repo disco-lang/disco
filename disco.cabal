@@ -132,6 +132,7 @@ source-repository head
 library
   exposed-modules:
                        Disco.Syntax.Operators
+                       Disco.Syntax.Prims
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic

@@ -1,0 +1,89 @@
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE GADTs                 #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Syntax.Prims
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- Concrete syntax for the prims supported by the language.
+--
+-----------------------------------------------------------------------------
+
+module Disco.Syntax.Prims
+       ( Prim(..)
+       , PrimInfo(..), primTable, primMap
+       ) where
+
+import           GHC.Generics                     (Generic)
+import           Unbound.Generics.LocallyNameless
+
+import           Data.Map                         (Map)
+import qualified Data.Map                         as M
+
+------------------------------------------------------------
+-- Prims
+------------------------------------------------------------
+
+-- | Primitives, /i.e./ identifiers which are interpreted specially at
+--   runtime.
+data Prim where
+  PrimList    :: Prim      -- ^ Container -> list conversion
+  PrimBag     :: Prim      -- ^ Container -> bag conversion
+  PrimSet     :: Prim      -- ^ Container -> set conversion
+
+  PrimIsPrime :: Prim      -- ^ Efficient primality test
+
+  PrimCrash   :: Prim      -- ^ Crash
+
+  PrimForever :: Prim      -- ^ @[x, y, z .. ]@
+  PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+  deriving (Show, Read, Eq, Ord, Generic, Enum, Bounded)
+
+instance Alpha Prim
+instance Subst t Prim
+
+------------------------------------------------------------
+-- Concrete syntax for prims
+------------------------------------------------------------
+
+-- | XXX
+data PrimInfo =
+  PrimInfo
+  { thePrim     :: Prim
+  , primSyntax  :: String
+  , primExposed :: Bool
+    -- Is the prim available in the normal syntax of the language?
+    --
+    --   primExposed = True means that the bare primSyntax can be used
+    --   in the surface syntax, and in particular it is a reserved
+    --   word; the prim will be pretty-printed as the primSyntax.
+    --
+    --   primExposed = False means that the only way to enter it is to
+    --   enable the Primitives language extension and write a $
+    --   followed by the primSyntax, and the primSyntax is not a
+    --   reserved word.  The prim will be pretty-printed with a $
+    --   prefix.
+  }
+
+-- | XXX
+primTable :: [PrimInfo]
+primTable =
+  [ PrimInfo PrimList    "list"    True
+  , PrimInfo PrimBag     "bag"     True
+  , PrimInfo PrimSet     "set"     True
+  , PrimInfo PrimIsPrime "isPrime" False
+  , PrimInfo PrimCrash   "crash"   False
+  , PrimInfo PrimForever "forever" False
+  , PrimInfo PrimUntil   "until"   False
+  ]
+
+-- | XXX
+primMap :: Map Prim PrimInfo
+primMap = M.fromList $
+  [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]

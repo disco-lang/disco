@@ -26,7 +26,7 @@ module Disco.Parser
 
          -- ** Basic lexemes
        , sc, lexeme, symbol, reservedOp
-       , natural, reserved, reservedWords, builtins, ident
+       , natural, reserved, reservedWords, ident
 
          -- ** Punctuation
        , parens, braces, angles, brackets
@@ -77,6 +77,7 @@ import           Data.Void
 
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -256,11 +257,9 @@ reservedWords =
   , "forall", "type"
   , "import", "using"
   ]
-  ++ builtins
 
--- | The list of builtin primitive names.
-builtins :: [String]
-builtins = ["list", "bag", "set"]
+  -- exposed primitive names
+  ++ [nm | PrimInfo _ nm True <- primTable]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a letter and continuing with alphanumerics, underscores, and
@@ -445,8 +444,8 @@ parseAtom = label "expression" $
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
-  <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
-  <|> TPrim <$> foldr (<|>) empty (map (\t -> (t <$ reserved t)) builtins)
+  <|> TPrim <$> (ensureEnabled Primitives *> parsePrim False)
+  <|> TPrim <$> parsePrim True
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -458,6 +457,14 @@ parseAtom = label "expression" $
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
+
+-- | Parse a primitive name.  If exposed = True, then we only parse
+--   exposed primitive names and don't parse a $ prefix.  If exposed =
+--   False, then we require a $ prefix and parse any primitive name.
+parsePrim :: Bool -> Parser Prim
+parsePrim exposed = do
+  when (not exposed) (void $ char '$')
+  foldr (<|>) empty [ p <$ symbol s | PrimInfo p s e <- primTable, not exposed || e ]
 
 -- | Parse a container, like a literal list, set, bag, or a
 --   comprehension (not including the square or curly brackets).

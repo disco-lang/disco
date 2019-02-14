@@ -72,10 +72,6 @@ data Core where
   --   comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
 
-  -- | A list with an ellipsis.  XXX eventually this should go away
-  -- and get replaced by a function primitive.
-  CEllipsis :: [Core] -> Ellipsis Core -> Core
-
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core
 
@@ -93,15 +89,6 @@ data Core where
 
   -- | A type.
   CType :: Type -> Core
-
-  -- | A set.
-  --   Named so because CSet conflicts with the type Container type
-  --   defined in Disco.AST.Surace
-  -- Type stores the type of the elements.
-  CoreSet :: Type -> [Core] -> Core
-
-  -- | A bag. XXX
-  CoreBag :: Type -> [Core] -> Core
 
   deriving (Show, Generic)
 
@@ -131,8 +118,10 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OLt Type -- ^ Less than (@<@).  Similarly, typechecking has
                    --   determined that the given type has a decidable
                    --   ordering relation.
-        | OEnum
-        | OCount
+
+        -- Type operators
+        | OEnum    -- ^ Enumerate the values of a type.
+        | OCount   -- ^ Count the values of a type.
 
         -- Arithmetic operators with special runtime behavior for finite types
         | OMDiv  Integer
@@ -148,6 +137,11 @@ data Op = OAdd     -- ^ Addition (@+@)
         | ODiff   Type    -- ^ Difference of two sets (@\@). Stores the element type.
         | ORep            -- ^ Primitive bag constructor (replicate)
 
+        -- Ellipses
+        | OForever        -- ^ Continue forever, @[x, y, z ..]@
+        | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
+
+        -- Container conversion
         | OSetToList      -- ^ set -> list conversion (sorted order).
         | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
         | OBagToList      -- ^ bag -> list conversion (sorted order).
@@ -195,6 +189,8 @@ opArity (OUnion _)     = 2
 opArity (OInter _)     = 2
 opArity (ODiff _)      = 2
 opArity ORep           = 2
+opArity OForever       = 1
+opArity OUntil         = 2
 opArity OSetToList     = 1
 opArity OBagToSet      = 1
 opArity OBagToList     = 1

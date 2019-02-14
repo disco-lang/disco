@@ -23,6 +23,7 @@ import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
 import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
+import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -37,8 +38,8 @@ import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (whnfV)
-import           Disco.Parser                     (builtins)
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 --------------------------------------------------
@@ -172,9 +173,10 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
-prettyTerm (TPrim x)
-  | x `elem` builtins      = text x
-  | otherwise              = text "$" <> text x
+prettyTerm (TPrim p)     =
+  case primMap ! p of
+    PrimInfo _ nm True  -> text nm
+    PrimInfo _ nm False -> text "$" <> text nm
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)

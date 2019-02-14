@@ -70,9 +70,10 @@ some sort of (idempotent) canonicalization: `List -> Bag -> List`
 is `sort`; `Bag -> Set -> Bag` drops duplicates; `List ->
 Set -> List` both sorts and drops duplicates.
 
-So *e.g.* `list` can have either of the types
+So *e.g.* `list` can have any of the types
 
 ```
+list : List a -> List a
 list : Bag a -> List a
 list : Set a -> List a
 ```
@@ -142,6 +143,7 @@ Dynamic (runtime) semantics
 To do
 -----
 
+- Add primitives 'reduce' and 'mapReduce' on containers.
 - Add container subtyping
 - Fix container comprehensions.
 - Write down a specific, concrete list of the container primitives
@@ -155,3 +157,5 @@ To do
 
   but the only way they could ever be useful is if we switched to a
   deep embedding somehow.
+
+〚〛

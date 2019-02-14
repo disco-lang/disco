@@ -52,7 +52,12 @@ instance Subst t Prim
 -- Concrete syntax for prims
 ------------------------------------------------------------
 
--- | XXX
+-- | An info record for a single primitive name, containing the
+--   primitive itself, its concrete syntax, and whether it is
+--   "exposed", /i.e./ available to be used in the surface syntax of
+--   the basic language.  Unexposed prims can only be referenced by
+--   enabling the Primitives language extension and prefixing their
+--   name by @$@.
 data PrimInfo =
   PrimInfo
   { thePrim     :: Prim
@@ -71,7 +76,8 @@ data PrimInfo =
     --   prefix.
   }
 
--- | XXX
+-- | A table containing a 'PrimInfo' record for every 'Prim'
+--   recognized by the language.
 primTable :: [PrimInfo]
 primTable =
   [ PrimInfo PrimList    "list"    True
@@ -83,7 +89,7 @@ primTable =
   , PrimInfo PrimUntil   "until"   False
   ]
 
--- | XXX
+-- | A convenient map from each 'Prim' to its info record.
 primMap :: Map Prim PrimInfo
 primMap = M.fromList $
   [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]

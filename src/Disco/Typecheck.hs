@@ -1184,7 +1184,7 @@ isKnownSub (TyCon c1 ts1) (TyCon c2 ts2)
     checkKnownSub Contra t1 t2 = isKnownSub t2 t1
 isKnownSub _ _ = False
 
--- XXX
+-- | Check whether one base type is known to be a subtype of another.
 isKnownSubBase :: BaseTy -> BaseTy -> Bool
 isKnownSubBase b1 b2 = (b1,b2) `elem` basePairs
   where
@@ -1246,8 +1246,10 @@ ensureConstr c ty targ = matchConTy c ty
 
     matchConTy _ _ = matchError
 
-    -- | XXX comment me check whether constructors match, which can
-    --   include unifying container variables.
+    -- | Check whether two constructors match, which could include
+    --   unifying container variables if we are matching two container
+    --   types; otherwise, simply ensure that the constructors are
+    --   equal.  Throw a 'matchError' if they do not match.
     matchCon :: Con -> Con -> TCM ()
     matchCon c1 c2                            | c1 == c2 = return ()
     matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
@@ -1294,7 +1296,8 @@ ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
 
--- | XXX
+-- | A variant of 'ensureConstrMode' that expects to get a single
+--   'Mode' and throws an error if it encounters any other number.
 ensureConstrMode1 :: Con -> Mode -> Either Term Pattern -> TCM Mode
 ensureConstrMode1 c m targ = do
   ms <- ensureConstrMode c m targ
@@ -1304,7 +1307,8 @@ ensureConstrMode1 c m targ = do
       "Impossible! Wrong number of arg types in ensureConstrMode1 " ++ show c ++ " "
         ++ show m ++ ": " ++ show ms
 
--- | XXX
+-- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
+--   and throws an error if it encounters any other number.
 ensureConstrMode2 :: Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
 ensureConstrMode2 c m targ = do
   ms <- ensureConstrMode c m targ

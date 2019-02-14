@@ -634,23 +634,27 @@ whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
 -- Identity
 whnfOp OId             = arity1 "id" $ whnfV
 
--- | XXX
+-- | Convert an arity-1 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
 arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity1 _ f [v]   = f v
 arity1 name _ vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
 
--- | XXX
+-- | Convert an arity-2 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
 arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity2 _ f [v1,v2] = f v1 v2
 arity2 name _ vs   = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
 
--- | XXX
+-- | Compute the size of a set.
 setSize :: Value -> Disco IErr Value
 setSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
 
--- | XXX
+-- | Compute the union of two sets.
 setUnion :: Type -> Value -> Value -> Disco IErr Value
 setUnion ty v1 v2 = do
   VBag xs <- whnfV v1
@@ -658,7 +662,7 @@ setUnion ty v1 v2 = do
   zs <- merge max (decideOrdFor ty) xs ys
   return $ VBag zs
 
--- | XXX
+-- | Compute the intersection of two sets.
 setIntersection :: Type -> Value -> Value -> Disco IErr Value
 setIntersection ty v1 v2 = do
   VBag xs <- whnfV v1
@@ -666,7 +670,7 @@ setIntersection ty v1 v2 = do
   zs <- merge min (decideOrdFor ty) xs ys
   return $ VBag zs
 
--- | XXX
+-- | Compute the difference of two sets.
 setDifference :: Type -> Value -> Value -> Disco IErr Value
 setDifference ty v1 v2 = do
   VBag xs <- whnfV v1
@@ -674,7 +678,7 @@ setDifference ty v1 v2 = do
   zs <- merge (\x y -> max 0 (x - y)) (decideOrdFor ty) xs ys
   return $ VBag zs
 
--- | XXX
+-- | Test whether one set is a subset of another.
 subsetTest :: Type -> Value -> Value -> Disco IErr Value
 subsetTest ty v1 v2 = do
   VBag xs <- whnfV v1
@@ -682,14 +686,14 @@ subsetTest ty v1 v2 = do
   ys' <- merge (max) (decideOrdFor ty) xs ys
   mkEnum <$> setEquality ty ys ys'
 
--- | XXX
+-- | Compute the power set of a set.
 powerSet :: Type -> Value -> Disco IErr Value
 powerSet ty v = do
   VBag xs <- whnfV v
   ys <- sortNCount (decideOrdFor (TySet ty)) (map (\x -> (VBag x, 1)) (subsequences xs))
   return $ VBag ys
 
--- | XXX
+-- | Create a bag having a certain number of copies of a single element.
 repBag :: Value -> Value -> Disco IErr Value
 repBag elt rep = do
   VNum _ r <- whnfV rep

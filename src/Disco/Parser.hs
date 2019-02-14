@@ -729,8 +729,11 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     mkOpParser :: OpInfo -> [Operator Parser Term]
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 
-    withOpFixity (UOpF fx op) syn = (ufxParser fx) (reservedOp syn >> return (TUn op))
-    withOpFixity (BOpF fx op) syn = (bfxParser fx) (reservedOp syn >> return (TBin op))
+    withOpFixity (UOpF fx op) syn
+      = (ufxParser fx) ((reservedOp syn <?> "operator") >> return (TUn op))
+
+    withOpFixity (BOpF fx op) syn
+      = (bfxParser fx) ((reservedOp syn <?> "operator") >> return (TBin op))
 
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix

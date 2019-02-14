@@ -143,6 +143,8 @@ Dynamic (runtime) semantics
 To do
 -----
 
+- Add type inference for isPrime, crash
+- Add factor primitive
 - Add primitives 'reduce' and 'mapReduce' on containers.
 - Add container subtyping
 - Fix container comprehensions.

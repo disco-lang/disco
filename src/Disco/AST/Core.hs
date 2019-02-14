@@ -150,8 +150,11 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OListToBag Type -- ^ list -> bag conversion (forget order).
                           --   Stores the element type.
 
+        -- Number theory primitives
+        | OIsPrime        -- ^ Primality test
+        | OFactor         -- ^ Factorization
+
         -- Other primitives
-        | OIsPrime
         | OCrash
         | OId
 
@@ -197,6 +200,7 @@ opArity OBagToList     = 1
 opArity (OListToSet _) = 1
 opArity (OListToBag _) = 1
 opArity OIsPrime       = 1
+opArity OFactor        = 1
 opArity OCrash         = 1
 opArity OId            = 1
 

@@ -38,6 +38,7 @@ data Prim where
   PrimSet     :: Prim      -- ^ Container -> set conversion
 
   PrimIsPrime :: Prim      -- ^ Efficient primality test
+  PrimFactor  :: Prim      -- ^ Factorization
 
   PrimCrash   :: Prim      -- ^ Crash
 
@@ -84,6 +85,7 @@ primTable =
   , PrimInfo PrimBag     "bag"     True
   , PrimInfo PrimSet     "set"     True
   , PrimInfo PrimIsPrime "isPrime" False
+  , PrimInfo PrimFactor  "factor"  False
   , PrimInfo PrimCrash   "crash"   False
   , PrimInfo PrimForever "forever" False
   , PrimInfo PrimUntil   "until"   False

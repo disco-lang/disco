@@ -131,7 +131,13 @@ compilePrim (TyList a :->: _) PrimSet  = return $ CConst (OListToSet a)
 compilePrim (TyList a :->: _) PrimBag  = return $ CConst (OListToBag a)
 compilePrim _ p | p `elem` [PrimList, PrimBag, PrimSet] = return $ CConst OId
 
+compilePrim ty PrimList = error $ "Impossible! compilePrim PrimList on bad type " ++ show ty
+compilePrim ty PrimBag  = error $ "Impossible! compilePrim PrimBag on bad type " ++ show ty
+compilePrim ty PrimSet  = error $ "Impossible! compilePrim PrimSet on bad type " ++ show ty
+
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
+compilePrim _ PrimFactor  = return $ CConst OFactor
+
 compilePrim _ PrimCrash   = return $ CConst OCrash
 
 compilePrim _ PrimForever = return $ CConst OForever

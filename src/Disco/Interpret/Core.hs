@@ -44,6 +44,7 @@ module Disco.Interpret.Core
        )
        where
 
+import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           ((>=>))
 import           Control.Monad.Except                    (throwError)
@@ -65,6 +66,7 @@ import           Math.NumberTheory.Logarithms            (integerLog2)
 import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
                                                           invertSomeMod, modulo,
                                                           powSomeMod)
+import           Math.NumberTheory.Primes.Factorisation  (factorise)
 import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 import           Disco.AST.Core
@@ -627,8 +629,11 @@ whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
 whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 
--- Other primitives
+-- Number theory primitives
 whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
+whnfOp OFactor         = arity1 "factor"    $ fmap primFactor . whnfV
+
+-- Other primitives
 whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
 
 -- Identity
@@ -873,6 +878,10 @@ fact (numerator -> n)
 primIsPrime :: Value -> Value
 primIsPrime (VNum _ (numerator -> n)) = mkEnum (isPrime n)
 primIsPrime _                         = error "impossible!  primIsPrime on non-VNum"
+
+primFactor :: Value -> Value
+primFactor (VNum d (numerator -> n)) = VBag $ map ((VNum d . (%1)) *** fromIntegral) (factorise n)
+primFactor _                         = error "impossible! primFactor on non-VNum"
 
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.

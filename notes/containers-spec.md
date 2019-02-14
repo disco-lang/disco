@@ -148,3 +148,10 @@ To do
   we'll have, along with some concrete typing rules.
 - Update type checking to emit relevant constraints, in accordance
   with the written typing rules.
+
+- Note, infinite ellipses in sets and bags are now allowed, e.g.
+
+  {1 ..}
+
+  but the only way they could ever be useful is if we switched to a
+  deep embedding somehow.

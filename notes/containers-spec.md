@@ -142,7 +142,6 @@ Dynamic (runtime) semantics
 To do
 -----
 
-- Add comments
 - Add container subtyping
 - Fix container comprehensions.
 - Write down a specific, concrete list of the container primitives

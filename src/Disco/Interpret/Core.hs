@@ -244,6 +244,8 @@ whnf (CCase bs)     = whnfCase bs
 
 whnf (CType ty)      = return $ VType ty
 
+-- XXX move all this container stuff to a different location in the file
+
 -- | Check whether a certain value is present in a list using a linear search.
 -- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
 -- elemOf _ _ []     = return False
@@ -631,7 +633,7 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 
 -- Number theory primitives
 whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
-whnfOp OFactor         = arity1 "factor"    $ fmap primFactor . whnfV
+whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
 
 -- Other primitives
 whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
@@ -879,8 +881,14 @@ primIsPrime :: Value -> Value
 primIsPrime (VNum _ (numerator -> n)) = mkEnum (isPrime n)
 primIsPrime _                         = error "impossible!  primIsPrime on non-VNum"
 
-primFactor :: Value -> Value
-primFactor (VNum d (numerator -> n)) = VBag $ map ((VNum d . (%1)) *** fromIntegral) (factorise n)
+-- | Semantics of the @$factor@ prim: turn a natural number into its
+--   bag of prime factors.  Crash if called on 0, which does not have
+--   a prime factorization.
+primFactor :: Value -> Disco IErr Value
+primFactor (VNum d (numerator -> n)) =
+  case n of
+    0 -> throwError (Crash "0 has no prime factorization!")
+    _ -> return . VBag $ map ((VNum d . (%1)) *** fromIntegral) (factorise n)
 primFactor _                         = error "impossible! primFactor on non-VNum"
 
 -- | Semantics of the @$crash@ prim, which crashes with a

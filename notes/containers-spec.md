@@ -144,7 +144,7 @@ To do
 -----
 
 - Add type inference for crash (& other prims??)
-- Add primitives 'reduce' and 'mapReduce' on containers.
+- Add primitives 'map', 'reduce', and 'mapReduce' for containers.
 - Add container subtyping
 - Fix container comprehensions.
 - Write down a specific, concrete list of the container primitives
@@ -158,5 +158,3 @@ To do
 
   but the only way they could ever be useful is if we switched to a
   deep embedding somehow.
-
-〚〛

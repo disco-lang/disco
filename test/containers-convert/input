@@ -7,4 +7,4 @@ bag  ⟅2,3,1,2⟆
 set  [1,2,3,3]
 set  {2,3,1,2}
 set  ⟅2,3,1,2⟆
-let sort : List a -> List a = \l. list (bag l) in sort [1,5,2,6,6,3]
+let sort : List N -> List N = \l. list (bag l) in sort [1,5,2,6,6,3]

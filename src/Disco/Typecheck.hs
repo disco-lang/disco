@@ -359,6 +359,10 @@ typecheck Infer (TVar x)      = do
 typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
   c <- freshAtom   -- make a unification variable for the container type
   a <- freshTy     -- make a unification variable for the element type
+
+  -- converting to a set or bag requires being able to sort the elements
+  when (conv /= PrimList) $ constraint $ CQual QCmp a
+
   return $ ATPrim (TyContainer c a :->: primCtrCon conv a) conv
 
   where
@@ -618,7 +622,7 @@ typecheck Infer (TBin SSub _ _) = error "typecheck Infer SSub should be unreacha
 ------------------------------------------------------------
 
 typecheck (Check ty) (TUn Neg t) = do
-  constraint $ CQual (QSub) ty
+  constraint $ CQual QSub ty
   ATUn ty Neg <$> check t ty
 
 typecheck Infer (TUn Neg t) = do
@@ -680,11 +684,16 @@ typecheck Infer (TBin Exp t1 t2) = do
 -- Comparisons
 
 -- Infer the type of a comparison. A comparison always has type Bool,
--- but we have to make sure the subterms have compatible types.
+-- but we have to make sure the subterms have compatible types.  We
+-- also generate a QCmp qualifier --- even though every type in disco
+-- has semi-decidable equality and ordering, we need to know whether
+-- e.g. a comparison was done at a certain type, so we can decide
+-- whether the type is allowed to be completely polymorphic or not.
 typecheck Infer (TBin op t1 t2) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
   at1 <- infer t1
   at2 <- infer t2
-  _ <- lub (getType at1) (getType at2)
+  ty <- lub (getType at1) (getType at2)
+  constraint $ CQual QCmp ty
   return $ ATBin TyBool op at1 at2
 
 -- See Note [Pattern coverage] -----------------------------

@@ -144,6 +144,10 @@ To do
 -----
 
 - Add type inference for crash (& other prims??)
+- Need to figure out a story for compiling polymorphic things, where
+  runtime behavior depends on choice of type.  E.g. see
+  https://github.com/disco-lang/disco/issues/149; the same problem
+  will occur with map.
 - Add primitives 'map', 'reduce', and 'mapReduce' for containers.
 - Add container subtyping
 - Fix container comprehensions.

@@ -210,4 +210,4 @@ freshTy = TyVar <$> fresh (string2Name "a")
 
 -- | Generate a fresh variable as an atom.
 freshAtom :: TCM Atom
-freshAtom = (AVar . U) <$> fresh (string2Name "a")
+freshAtom = (AVar . U) <$> fresh (string2Name "c")

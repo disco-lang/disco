@@ -152,6 +152,8 @@ prettyTy (TyBag ty)       = mparens (PA 9 InR) $
   text "Bag" <+> prettyTy' 9 InR ty
 prettyTy (TySet ty)       = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
+prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
+  text (show c) <+> prettyTy' 9 InR ty
 prettyTy (TyDef n)        = text n
 prettyTy (Skolem n)       = text "%" <> prettyName n
 

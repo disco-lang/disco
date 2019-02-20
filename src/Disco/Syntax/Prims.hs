@@ -37,6 +37,8 @@ data Prim where
   PrimBag     :: Prim      -- ^ Container -> bag conversion
   PrimSet     :: Prim      -- ^ Container -> set conversion
 
+  PrimMap     :: Prim      -- ^ Map operation for containers
+
   PrimIsPrime :: Prim      -- ^ Efficient primality test
   PrimFactor  :: Prim      -- ^ Factorization
 
@@ -84,9 +86,14 @@ primTable =
   [ PrimInfo PrimList    "list"    True
   , PrimInfo PrimBag     "bag"     True
   , PrimInfo PrimSet     "set"     True
+
+--  , PrimInfo PrimMap     "map"     True
+
   , PrimInfo PrimIsPrime "isPrime" False
   , PrimInfo PrimFactor  "factor"  False
+
   , PrimInfo PrimCrash   "crash"   False
+
   , PrimInfo PrimForever "forever" False
   , PrimInfo PrimUntil   "until"   False
   ]

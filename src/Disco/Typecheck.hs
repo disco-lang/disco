@@ -366,6 +366,17 @@ typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
     primCtrCon PrimBag  = TyBag
     primCtrCon _        = TySet
 
+typecheck Infer (TPrim PrimMap) = do
+  c <- freshAtom
+  a <- freshTy
+  b <- freshTy
+  return $ ATPrim ((a :->: b) :->: (TyContainer c a :->: TyContainer c b)) PrimMap
+
+    -- The second set of parens around TyContainer c a :->:
+    -- TyContainer c b shouldn't be necessary --- :->: is declared as
+    -- infixr --- but without them the type ends up associated the
+    -- wrong way.  Not sure why.
+
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
 typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimFactor
 

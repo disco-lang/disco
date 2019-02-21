@@ -75,6 +75,7 @@ module Disco.Types
        , Strictness(..), strictness
 
        -- * Utilities
+       , containerVars
        , countType
        , unpair
        , S
@@ -453,6 +454,13 @@ atomToTypeSubst = map (coerce *** TyAtom)
 
 uatomToTypeSubst :: S' UAtom -> S' Type
 uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)
+
+-- | Return a set of all the free container variables in a type.
+containerVars :: Type -> Set (Name Type)
+containerVars (TyCon (CContainer (AVar (U x))) tys)
+  = x `S.insert` foldMap containerVars tys
+containerVars (TyCon _ tys) = foldMap containerVars tys
+containerVars _ = S.empty
 
 ------------------------------------------------------------
 -- HasType class

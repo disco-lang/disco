@@ -288,10 +288,24 @@ infer t = typecheck Infer t
 --   variables left.  Or just use list with warning?
 inferTop :: Term -> TCM (ATerm, Sigma)
 inferTop t = do
+
+  -- Run inference on the term and try to solve the resulting
+  -- constraints.
   (at, theta) <- solve $ infer t
   traceShowM at
+
+      -- Apply the resulting substitution.
   let at' = substs theta at
-  return (at', closeSigma (getType at'))
+
+      -- Find any remaining container variables.
+      cvs = containerVars (getType at')
+
+      -- Replace them all with List.
+      at'' = substs (zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+
+  -- Finally, quantify over any remaining type variables and return
+  -- the term along with the resulting polymorphic type.
+  return (at'', closeSigma (getType at''))
 
 --------------------------------------------------
 -- The typecheck function

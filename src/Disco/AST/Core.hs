@@ -137,6 +137,9 @@ data Op = OAdd     -- ^ Addition (@+@)
         | ODiff   Type    -- ^ Difference of two sets (@\@). Stores the element type.
         | ORep            -- ^ Primitive bag constructor (replicate)
 
+        | OMapList        -- ^ Map a function over a list
+        | OMapBag         -- ^ Map a function over a bag or set
+
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
@@ -192,6 +195,8 @@ opArity (OUnion _)     = 2
 opArity (OInter _)     = 2
 opArity (ODiff _)      = 2
 opArity ORep           = 2
+opArity OMapList       = 2
+opArity OMapBag        = 2
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

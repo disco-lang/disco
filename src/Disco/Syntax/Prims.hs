@@ -87,7 +87,7 @@ primTable =
   , PrimInfo PrimBag     "bag"     True
   , PrimInfo PrimSet     "set"     True
 
---  , PrimInfo PrimMap     "map"     True
+  , PrimInfo PrimMap     "map"     True
 
   , PrimInfo PrimIsPrime "isPrime" False
   , PrimInfo PrimFactor  "factor"  False

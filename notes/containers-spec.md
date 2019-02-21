@@ -144,11 +144,15 @@ To do
 -----
 
 - Add type inference for crash (& other prims??)
-- Need to figure out a story for compiling polymorphic things, where
-  runtime behavior depends on choice of type.  E.g. see
-  https://github.com/disco-lang/disco/issues/149; the same problem
-  will occur with map.
 - Add primitives 'map', 'reduce', and 'mapReduce' for containers.
+- Bug: 
+    :type map list [{1}]  -->  List a
+- Bug: examples/expensive-list appears to no longer be memoized?
+- Bug: :type set shows you List a -> Set a  whereas  :type \x. set x
+  shows you List N -> Set N??  See also below re: special cases for :type.
+- To do at some point: add special cases for :type command so it will
+  show you a bunch of possible types. e.g. right now :type list shows
+  you List a -> List a which is a bit silly.
 - Add container subtyping
 - Fix container comprehensions.
 - Write down a specific, concrete list of the container primitives

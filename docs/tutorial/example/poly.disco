@@ -6,16 +6,16 @@ single : List Z -> List (List Z)
 single [] = []
 single (a :: as) = [a] :: (single as)
 
-map : (a -> b) -> List a -> List b
-map _ [] = []
-map f (a :: as) = f a :: (map f as)
+maplist : (a -> b) -> List a -> List b
+maplist _ [] = []
+maplist f (a :: as) = f a :: (maplist f as)
 
 -- Why can't incr' infer the type of x in the lambda?
 incr' : List N -> List N
-incr' l = let f = \(x : N). x + 1 in map f l
+incr' l = let f = \(x : N). x + 1 in maplist f l
 
 single' : List Z -> List (List Z)
-single' l = let f = \(x : Z). [x] in map f l
+single' l = let f = \(x : Z). [x] in maplist f l
 
 filter : (a -> Bool) -> List a -> List a
 filter _ [] = []

@@ -355,6 +355,12 @@ listToBag ty v = do
   vs <- fromDiscoList v
   VBag <$> countValues ty vs
 
+-- | Map a function over a list.
+primMapList :: Value -> Value -> Disco IErr Value
+primMapList f xs = do
+  f' <- whnfV f
+  vmap (\v -> whnfApp f' [v]) xs
+
 -- | Turn a function argument into a Value according to its given
 --   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
 whnfArg :: Strictness -> Core -> Disco IErr Value
@@ -626,6 +632,8 @@ whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
 whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
 whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
 whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
+
+whnfOp OMapList        = (arity2 "mapList"   $ primMapList) >=> whnfV
 
 -- List ellipsis
 whnfOp OForever        = arity1 "forever"   $ ellipsis Forever

@@ -470,6 +470,8 @@ prettyString out str = out "\"" >> go str >> out "\""
           go tl
         v'' -> error $ "Impossible! Value that's not a string in prettyString: " ++ show v''
 
+-- | Pretty-print a list with elements of a given type, assuming the
+--   list has already been reduced to WHNF.
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v
   where
@@ -482,7 +484,7 @@ prettyList out ty v = out "[" >> go v
         _         -> return ()
       go tlWHNF
 
-    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+    go v' = error $ "Impossible! Value that's not a list (or not in WHNF) in prettyList: " ++ show v'
 
 prettyTuple :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyTuple out (TyPair ty1 ty2) (VCons 0 [v1, v2]) = do

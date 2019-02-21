@@ -215,7 +215,13 @@ solveConstraintChoice tyDefns quals cs = do
 
   traceM "------------------------------"
   traceM "Generating constraint graph..."
-  let g = mkConstraintGraph atoms
+
+  -- Some variables might have qualifiers but not participate in any
+  -- equality or subtyping relations (see issue #153); make sure to
+  -- extract them and include them in the constraint graph as isolated
+  -- vertices
+  let vars = S.map (AVar . U) $ M.keysSet (unSM sm)
+  let g = mkConstraintGraph vars atoms
 
   traceShowM g
 
@@ -539,13 +545,13 @@ simplify tyDefns origSM cs
 --------------------------------------------------
 -- Step 4: Build constraint graph
 
--- | Given a list of atomic subtype constraints (each pair @(a1,a2)@
---   corresponds to the constraint @a1 <: a2@) build the corresponding
---   constraint graph.
-mkConstraintGraph :: Ord a => [(a, a)] -> Graph a
-mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
+-- | Given a list of atoms and atomic subtype constraints (each pair
+--   @(a1,a2)@ corresponds to the constraint @a1 <: a2@) build the
+--   corresponding constraint graph.
+mkConstraintGraph :: Ord a => Set a -> [(a, a)] -> Graph a
+mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
   where
-    nodes = S.fromList $ cs ^.. traverse . each
+    nodes = as `S.union` (S.fromList $ cs ^.. traverse . each)
 
 --------------------------------------------------
 -- Step 5: Check skolems

@@ -145,8 +145,6 @@ To do
 
 - Add primitives 'reduce' and 'mapReduce' for containers.
 - Bug: examples/expensive-list appears to no longer be memoized?
-- Bug: :type set shows you List a -> Set a  whereas  :type \x. set x
-  shows you List N -> Set N??  See also below re: special cases for :type.
 - To do at some point: add special cases for :type command so it will
   show you a bunch of possible types. e.g. right now :type list shows
   you List a -> List a which is a bit silly.

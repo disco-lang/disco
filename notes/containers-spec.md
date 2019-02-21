@@ -138,26 +138,3 @@ write `x in {1 .. 10}`).
 Dynamic (runtime) semantics
 ---------------------------
 
-
-
-To do
------
-
-- Add 'mapReduce' primitive for containers.
-- Bug: examples/expensive-list appears to no longer be memoized?
-- To do at some point: add special cases for :type command so it will
-  show you a bunch of possible types. e.g. right now :type list shows
-  you List a -> List a which is a bit silly.
-- Add container subtyping
-- Fix container comprehensions.
-- Write down a specific, concrete list of the container primitives
-  we'll have, along with some concrete typing rules.
-- Update type checking to emit relevant constraints, in accordance
-  with the written typing rules.
-
-- Note, infinite ellipses in sets and bags are now allowed, e.g.
-
-  {1 ..}
-
-  but the only way they could ever be useful is if we switched to a
-  deep embedding somehow.

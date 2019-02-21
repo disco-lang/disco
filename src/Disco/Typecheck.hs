@@ -569,13 +569,10 @@ typecheck Infer (TBin Cons t1 t2) = do
     -- Otherwise, infer the type of the second argument...
     _ -> do
       at2 <- infer t2
-      case getType at2 of
-
         -- ...make sure it is a list, and find the lub of the element types.
-        TyList ty2 -> do
-          eltTy <- lub (getType at1) ty2
-          return $ ATBin (TyList eltTy) Cons at1 at2
-        ty -> throwError (NotCon CList t2 ty)
+      ty2 <- ensureConstr1 CList (getType at2) (Left t2)
+      eltTy <- lub (getType at1) ty2
+      return $ ATBin (TyList eltTy) Cons at1 at2
 
 --------------------------------------------------
 -- Binary & unary operators

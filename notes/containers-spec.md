@@ -143,10 +143,7 @@ Dynamic (runtime) semantics
 To do
 -----
 
-- Add type inference for crash (& other prims??)
-- Add primitives 'map', 'reduce', and 'mapReduce' for containers.
-- Bug: 
-    :type map list [{1}]  -->  List a
+- Add primitives 'reduce' and 'mapReduce' for containers.
 - Bug: examples/expensive-list appears to no longer be memoized?
 - Bug: :type set shows you List a -> Set a  whereas  :type \x. set x
   shows you List N -> Set N??  See also below re: special cases for :type.

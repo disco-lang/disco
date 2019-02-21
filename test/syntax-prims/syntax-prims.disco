@@ -1,4 +1,4 @@
 using primitives
 
 x : N
-x = $crash
+x = $crash "bad dog!"

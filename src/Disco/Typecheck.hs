@@ -283,9 +283,6 @@ infer t = typecheck Infer t
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
---
---   XXX TODO: throw an error if there are any unsolved container
---   variables left.  Or just use list with warning?
 inferTop :: Term -> TCM (ATerm, Sigma)
 inferTop t = do
 
@@ -398,11 +395,9 @@ typecheck Infer (TPrim PrimMap) = do
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
 typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimFactor
 
--- In any other case, we can't infer the type of a primitive; in
--- checking mode we always assume that the given type is OK.  If you
--- use a primitive you have to know what type you expect it to have.
-typecheck Infer      (TPrim p) = throwError $ CantInferPrim p
-typecheck (Check ty) (TPrim p) = return $ ATPrim ty p
+typecheck Infer (TPrim PrimCrash)   = do
+  a <- freshTy
+  return $ ATPrim (TyList TyC :->: a) PrimCrash
 
 --------------------------------------------------
 -- Base types

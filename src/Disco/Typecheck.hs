@@ -381,6 +381,7 @@ typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
     primCtrCon PrimBag  = TyBag
     primCtrCon _        = TySet
 
+-- map : (a -> b) -> (c a -> c b)
 typecheck Infer (TPrim PrimMap) = do
   c <- freshAtom
   a <- freshTy
@@ -392,9 +393,18 @@ typecheck Infer (TPrim PrimMap) = do
     -- infixr --- but without them the type ends up associated the
     -- wrong way.  Not sure why.
 
+-- reduce : (a -> a -> a) -> a -> c a -> a
+typecheck Infer (TPrim PrimReduce) = do
+  c <- freshAtom
+  a <- freshTy
+  return $ ATPrim ((a :->: (a :->: a)) :->: (a :->: (TyContainer c a :->: a))) PrimReduce
+
+-- isPrime : N -> Bool
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
+-- factor : N -> Bag N
 typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimFactor
 
+-- crash : String -> a
 typecheck Infer (TPrim PrimCrash)   = do
   a <- freshTy
   return $ ATPrim (TyList TyC :->: a) PrimCrash

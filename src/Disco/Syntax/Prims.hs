@@ -38,6 +38,7 @@ data Prim where
   PrimSet     :: Prim      -- ^ Container -> set conversion
 
   PrimMap     :: Prim      -- ^ Map operation for containers
+  PrimReduce  :: Prim      -- ^ Reduce operation for containers
 
   PrimIsPrime :: Prim      -- ^ Efficient primality test
   PrimFactor  :: Prim      -- ^ Factorization
@@ -88,6 +89,7 @@ primTable =
   , PrimInfo PrimSet     "set"     True
 
   , PrimInfo PrimMap     "map"     True
+  , PrimInfo PrimReduce  "reduce"  True
 
   , PrimInfo PrimIsPrime "isPrime" False
   , PrimInfo PrimFactor  "factor"  False

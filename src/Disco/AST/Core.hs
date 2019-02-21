@@ -148,6 +148,9 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OMapSet Type    -- ^ Map a function over a set. Carries the
                           --   output type of the function.
 
+        | OReduceList     -- ^ Reduce/fold a list.
+        | OReduceBag      -- ^ Reduce/fold a bag (or set).
+
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
@@ -206,6 +209,8 @@ opArity ORep           = 2
 opArity OMapList       = 2
 opArity (OMapBag _)    = 2
 opArity (OMapSet _)    = 2
+opArity OReduceList    = 3
+opArity OReduceBag     = 3
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

@@ -1,0 +1,12 @@
+:load test/containers-reduce/containers-reduce.disco
+:type reduce
+:type reduce (\x y. x + y)
+:type reduce (\x y. x + y) 0
+:type reduce (\x y. x + y) 0 [1 .. 10]
+reduce (\x y. x + y) 0 [1 .. 10]
+reduce (\x y. x + y) 5 [1 .. 10]
+reduce (\x y. x * y) 1 [1 .. 10] == 10!
+reduce (\d r. d + 10*r) 0 [1,5,3,2]
+reduce (\x y. x + y) 0 {1, 1, 2, 3}
+reduce (\x y. x + y) 0 ⟅1, 1, 2, 3⟆
+reduce (\x y. x * y) 1 (factor 11846808) == 11846808

@@ -143,7 +143,7 @@ Dynamic (runtime) semantics
 To do
 -----
 
-- Add primitives 'reduce' and 'mapReduce' for containers.
+- Add 'mapReduce' primitive for containers.
 - Bug: examples/expensive-list appears to no longer be memoized?
 - To do at some point: add special cases for :type command so it will
   show you a bunch of possible types. e.g. right now :type list shows

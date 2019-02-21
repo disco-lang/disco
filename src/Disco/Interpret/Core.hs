@@ -373,6 +373,27 @@ primMapSet ty f xs = do
   cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
   (VBag . map (second (const 1))) <$> sortNCount (decideOrdFor ty) cts'
 
+-- | Reduce a list according to a given combining function and base
+--   case value.
+primReduceList :: Value -> Value -> Value -> Disco IErr Value
+primReduceList f z xs = do
+  f' <- whnfV f
+  vfoldr (\a b -> whnfApp f' [a,b]) z xs
+
+-- | Reduce a bag (or set) according to a given combining function and
+--   base case value.
+primReduceBag :: Value -> Value -> Value -> Disco IErr Value
+primReduceBag f z b = do
+  f' <- whnfV f
+  VBag cts <- whnfV b
+  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
+  vfoldr (\a b -> whnfApp f' [a,b]) z xs
+
+  -- XXX this is super inefficient! (1) should have some sharing so
+  -- replicated elements of bag aren't recomputed; (2) shouldn't have
+  -- to go via toDiscoList -> vfoldr, just do a monadic fold directly
+  -- in Haskell
+
 -- | Turn a function argument into a Value according to its given
 --   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
 whnfArg :: Strictness -> Core -> Disco IErr Value
@@ -649,6 +670,9 @@ whnfOp OMapList        = (arity2 "mapList"  $ primMapList  ) >=> whnfV
 whnfOp (OMapBag ty)    = (arity2 "mapBag"   $ primMapBag ty) >=> whnfV
 whnfOp (OMapSet ty)    = (arity2 "mapSet"   $ primMapSet ty) >=> whnfV
 
+whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
+whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
+
 -- List ellipsis
 whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
 whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
@@ -668,14 +692,21 @@ whnfOp OId             = arity1 "id" $ whnfV
 --   given.
 arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity1 _ f [v]   = f v
-arity1 name _ vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+arity1 name _ vs = error $ arityError name vs
 
 -- | Convert an arity-2 function to the right shape to accept a list
 --   of arguments; throw an error if the wrong number of arguments are
 --   given.
 arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity2 _ f [v1,v2] = f v1 v2
-arity2 name _ vs   = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+arity2 name _ vs   = error $ arityError name vs
+
+arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity3 _ f [v1,v2,v3] = f v1 v2 v3
+arity3 name _ vs      = error $ arityError name vs
+
+arityError :: String -> [Value] -> String
+arityError name vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
 
 -- | Compute the size of a set.
 setSize :: Value -> Disco IErr Value

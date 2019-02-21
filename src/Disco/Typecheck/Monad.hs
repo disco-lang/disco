@@ -85,8 +85,9 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
-  | NotCon Con Term Type   -- ^ The term should have an outermost constructor matching
-                           --   matching Con, but it has type 'Type' instead
+  | NotCon Con Term Type   -- ^ The type of the term should have an
+                           --   outermost constructor matching Con, but
+                           --   it has type 'Type' instead
   | EmptyCase              -- ^ Case analyses cannot be empty.
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.

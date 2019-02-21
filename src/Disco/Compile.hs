@@ -139,6 +139,10 @@ compilePrim (_ :->: (TyList _ :->: _))          PrimMap = return $ CConst OMapLi
 compilePrim (_ :->: (TyBag _ :->: TyBag outTy)) PrimMap = return $ CConst (OMapBag outTy)
 compilePrim (_ :->: (TySet _ :->: TySet outTy)) PrimMap = return $ CConst (OMapSet outTy)
 
+compilePrim (_ :->: (_ :->: (TyList _ :->: _))) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :->: (_ :->: (TyBag  _ :->: _))) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :->: (_ :->: (TySet  _ :->: _))) PrimReduce = return $ CConst OReduceBag
+
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
 

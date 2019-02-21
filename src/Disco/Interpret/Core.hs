@@ -387,7 +387,7 @@ primReduceBag f z b = do
   f' <- whnfV f
   VBag cts <- whnfV b
   let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
-  vfoldr (\a b -> whnfApp f' [a,b]) z xs
+  vfoldr (\a r -> whnfApp f' [a,r]) z xs
 
   -- XXX this is super inefficient! (1) should have some sharing so
   -- replicated elements of bag aren't recomputed; (2) shouldn't have

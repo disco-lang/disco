@@ -357,10 +357,22 @@ typecheck mode (TParens t) = typecheck mode t
 -- To infer the type of a variable, just look it up in the context.
 -- We don't need a checking case; checking the type of a variable will
 -- fall through to this case.
-typecheck Infer (TVar x)      = do
-  Forall sig <- lookupTy x
-  (_, ty)    <- unbind sig
-  return $ ATVar ty (coerce x)
+typecheck Infer (TVar x) = checkVar `catchError` checkPrim
+  where
+    checkVar = do
+      Forall sig <- lookupTy x
+      (_, ty)    <- unbind sig
+      return $ ATVar ty (coerce x)
+
+    -- If the variable is not bound, check if it is a primitive name.
+    checkPrim (Unbound _) =
+      case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
+        -- If so, infer the type of the prim instead.
+        (prim:_) -> typecheck Infer (TPrim prim)
+        _        -> throwError (Unbound x)
+
+    -- For any other error, just rethrow.
+    checkPrim e = throwError e
 
 --------------------------------------------------
 -- Primitives

@@ -67,7 +67,7 @@ import           Control.Lens                     (makeLenses, toListOf, use,
                                                    (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
-import           Data.List                        (intercalate)
+import           Data.List                        (find, intercalate)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
@@ -257,12 +257,9 @@ reservedWords =
   , "import", "using"
   ]
 
-  -- exposed primitive names
-  ++ [nm | PrimInfo _ nm True <- primTable]
-
 -- | Parse an identifier, i.e. any non-reserved string beginning with
---   a letter and continuing with alphanumerics, underscores, and
---   apostrophes.
+--   a given type of character and continuing with alphanumerics,
+--   underscores, and apostrophes.
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
@@ -443,8 +440,7 @@ parseAtom = label "expression" $
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
-  <|> TPrim <$> (ensureEnabled Primitives *> parsePrim False)
-  <|> TPrim <$> parsePrim True
+  <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -457,13 +453,14 @@ parseAtom = label "expression" $
   <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
--- | Parse a primitive name.  If exposed = True, then we only parse
---   exposed primitive names and don't parse a $ prefix.  If exposed =
---   False, then we require a $ prefix and parse any primitive name.
-parsePrim :: Bool -> Parser Prim
-parsePrim exposed = do
-  when (not exposed) (void $ char '$')
-  foldr (<|>) empty [ p <$ symbol s | PrimInfo p s e <- primTable, not exposed || e ]
+-- | Parse a primitive name starting with a $.
+parsePrim :: Parser Prim
+parsePrim = do
+  void (char '$')
+  x <- identifier letterChar
+  case find ((==x) . primSyntax) primTable of
+    Just (PrimInfo p _ _) -> return p
+    Nothing               -> fail ("Unrecognized primitive $" ++ x)
 
 -- | Parse a container, like a literal list, set, bag, or a
 --   comprehension (not including the square or curly brackets).

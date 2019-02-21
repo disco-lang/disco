@@ -48,6 +48,7 @@ import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           ((>=>))
 import           Control.Monad.Except                    (throwError)
+import           Data.Bifunctor                          (second)
 import           Data.Char
 import           Data.Coerce                             (coerce)
 import           Data.IntMap.Lazy                        ((!))
@@ -301,13 +302,6 @@ merge g comp ((x,n1):xs) ((y,n2): ys) = do
         0 -> zs
         n -> ((a,n):zs)
 
--- mapSet :: Value -> Value -> Type -> Disco IErr Value
--- mapSet f s ty = do
---   fcn <- whnfV f
---   VBag xs <- whnfV s
---   ys <- mapM (\(x,n) -> (,n) <$> whnfApp fcn x) xs
---   VBag <$> sortNCount (decideOrdFor ty) ys
-
 -- foldrValues :: Value -> Value -> [Value] -> Disco IErr Value
 -- foldrValues _ b []     = return b
 -- foldrValues f b (x:xs) = do
@@ -360,6 +354,24 @@ primMapList :: Value -> Value -> Disco IErr Value
 primMapList f xs = do
   f' <- whnfV f
   vmap (\v -> whnfApp f' [v]) xs
+
+-- | Map a function over a bag.  The type argument is the /output/
+--   type of the function.
+primMapBag :: Type -> Value -> Value -> Disco IErr Value
+primMapBag ty f xs = do
+  f'       <- whnfV f
+  VBag cts <- whnfV xs
+  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
+  VBag <$> sortNCount (decideOrdFor ty) cts'
+
+-- | Map a function over a bag.  The type argument is the /output/
+--   type of the function.
+primMapSet :: Type -> Value -> Value -> Disco IErr Value
+primMapSet ty f xs = do
+  f'       <- whnfV f
+  VBag cts <- whnfV xs
+  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
+  (VBag . map (second (const 1))) <$> sortNCount (decideOrdFor ty) cts'
 
 -- | Turn a function argument into a Value according to its given
 --   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
@@ -633,7 +645,9 @@ whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
 whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
 whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 
-whnfOp OMapList        = (arity2 "mapList"   $ primMapList) >=> whnfV
+whnfOp OMapList        = (arity2 "mapList"  $ primMapList  ) >=> whnfV
+whnfOp (OMapBag ty)    = (arity2 "mapBag"   $ primMapBag ty) >=> whnfV
+whnfOp (OMapSet ty)    = (arity2 "mapSet"   $ primMapSet ty) >=> whnfV
 
 -- List ellipsis
 whnfOp OForever        = arity1 "forever"   $ ellipsis Forever

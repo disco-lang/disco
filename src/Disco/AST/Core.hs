@@ -130,15 +130,23 @@ data Op = OAdd     -- ^ Addition (@+@)
 
         -- Container operations
         | OSize           -- ^ Size of two sets (@size@)
-        | OPowerSet Type  -- ^ Power set of a given set (@powerSet@). Stores the element type.
-        | OSubset Type    -- ^ Subset test for two sets (@⊆@). Stores the element type.
-        | OUnion  Type    -- ^ Union of two sets (@union@ / @∪@). Stores the element type.
-        | OInter  Type    -- ^ Intersection of two sets (@intersect@ / @∩@). Stores the element type.
-        | ODiff   Type    -- ^ Difference of two sets (@\@). Stores the element type.
-        | ORep            -- ^ Primitive bag constructor (replicate)
+        | OPowerSet Type  -- ^ Power set of a given set
+                          --   (@powerSet@). Carries the element type.
+        | OSubset Type    -- ^ Subset test for two sets (@⊆@). Carries
+                          --   the element type.
+        | OUnion  Type    -- ^ Union of two sets (@union@ /
+                          --   @∪@). Carries the element type.
+        | OInter  Type    -- ^ Intersection of two sets (@intersect@ /
+                          --   @∩@). Carries the element type.
+        | ODiff   Type    -- ^ Difference of two sets (@\@). Carries
+                          --   the element type.
+        | ORep            -- ^ Primitive bag constructor (replicate).
 
-        | OMapList        -- ^ Map a function over a list
-        | OMapBag         -- ^ Map a function over a bag or set
+        | OMapList        -- ^ Map a function over a list.
+        | OMapBag Type    -- ^ Map a function over a bag.  Carries the
+                          --   output type of the function.
+        | OMapSet Type    -- ^ Map a function over a set. Carries the
+                          --   output type of the function.
 
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
@@ -149,9 +157,9 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
         | OBagToList      -- ^ bag -> list conversion (sorted order).
         | OListToSet Type -- ^ list -> set conversion (forget order, duplicates).
-                          --   Stores the element type.
+                          --   Carries the element type.
         | OListToBag Type -- ^ list -> bag conversion (forget order).
-                          --   Stores the element type.
+                          --   Carries the element type.
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
@@ -196,7 +204,8 @@ opArity (OInter _)     = 2
 opArity (ODiff _)      = 2
 opArity ORep           = 2
 opArity OMapList       = 2
-opArity OMapBag        = 2
+opArity (OMapBag _)    = 2
+opArity (OMapSet _)    = 2
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

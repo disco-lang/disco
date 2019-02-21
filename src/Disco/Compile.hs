@@ -135,9 +135,9 @@ compilePrim ty PrimList = error $ "Impossible! compilePrim PrimList on bad type 
 compilePrim ty PrimBag  = error $ "Impossible! compilePrim PrimBag on bad type " ++ show ty
 compilePrim ty PrimSet  = error $ "Impossible! compilePrim PrimSet on bad type " ++ show ty
 
-compilePrim (_ :->: (TyList _ :->: _)) PrimMap = return $ CConst OMapList
-compilePrim (_ :->: (TyBag _ :->: _)) PrimMap = return $ CConst OMapBag
-compilePrim (_ :->: (TySet _ :->: _)) PrimMap = return $ CConst OMapBag
+compilePrim (_ :->: (TyList _ :->: _))          PrimMap = return $ CConst OMapList
+compilePrim (_ :->: (TyBag _ :->: TyBag outTy)) PrimMap = return $ CConst (OMapBag outTy)
+compilePrim (_ :->: (TySet _ :->: TySet outTy)) PrimMap = return $ CConst (OMapSet outTy)
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor

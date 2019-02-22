@@ -416,25 +416,21 @@ prettyWHNF out _ (VNum d r)
       Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
       Decimal  -> out $ prettyDecimal r
 
-prettyWHNF out ty (VFun _)    = do
-  out "<"
-  tyStr <- renderDoc (prettyTy ty)
-  out tyStr
-  out ">"
+prettyWHNF out ty@(_ :->: _) _ = prettyFun out ty
 
-prettyWHNF out ty (VClos _ _) = do
-  out "<"
-  tyStr <- renderDoc (prettyTy ty)
-  out tyStr
-  out ">"
-
-prettyWHNF out _ (VClos _ _) = out "<function>"
 prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
+
+prettyFun :: (String -> Disco IErr ()) -> Type -> Disco IErr ()
+prettyFun out ty = do
+  out "<"
+  tyStr <- renderDoc (prettyTy ty)
+  out tyStr
+  out ">"
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
 prettySequence :: (String -> Disco IErr ()) -> Type -> [Value] -> String -> Disco IErr ()

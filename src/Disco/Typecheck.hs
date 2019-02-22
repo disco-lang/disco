@@ -38,6 +38,7 @@ import           Disco.AST.Generic                       (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
+import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints

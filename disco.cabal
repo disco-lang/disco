@@ -194,6 +194,7 @@ library
                        Disco.AST.Typed
                        Disco.Context
                        Disco.Messages
+                       Disco.Module
                        Disco.Parser
                        Disco.Pretty
                        Disco.Property

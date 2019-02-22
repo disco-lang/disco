@@ -44,9 +44,9 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck.Monad
 import           Disco.Types
 
 ------------------------------------------------------------

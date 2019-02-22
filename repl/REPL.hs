@@ -49,6 +49,7 @@ import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
 import           Disco.Interpret.Core                    (loadDefs)
+import           Disco.Module
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Property

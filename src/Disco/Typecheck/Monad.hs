@@ -1,9 +1,3 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TypeSynonymInstances  #-}
-
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -20,18 +14,14 @@
 
 module Disco.Typecheck.Monad where
 
-import           GHC.Generics                     (Generic)
-
 import           Unbound.Generics.LocallyNameless
 
-import           Control.Lens                     (makeLenses)
 import           Control.Monad.Except
 import           Control.Monad.RWS
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
-import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
@@ -39,44 +29,14 @@ import           Disco.Typecheck.Solve
 import           Disco.Types
 
 ------------------------------------------------------------
--- Definitions and contexts
+-- Contexts
 ------------------------------------------------------------
-
--- | A definition is a group of clauses, each having a list of
---   patterns that bind names in a term, without the name of the
---   function being defined.  For example, given the concrete syntax
---   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
---   something like @[n, (x,y)] (n*x + y)@.
-data Defn  = Defn (Name ATerm) [Type] Type [Clause]
-  deriving (Show, Generic)
-
--- | A clause in a definition consists of a list of patterns (the LHS
---   of the =) and a term (the RHS).
-type Clause = Bind [APattern] ATerm
-
-instance Subst Type Defn
 
 -- | A map from type names to their corresponding definitions.
 type TyDefCtx = M.Map String Type
 
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
-
--- | Type checking a module yields a value of type ModuleInfo which contains
---   mapping from terms to their relavent documenation, a mapping from terms to
---   properties, and a mapping from terms to their types.
-data ModuleInfo = ModuleInfo
-  { _modDocs     :: Ctx Term Docs
-  , _modProps    :: Ctx ATerm [AProperty]
-  , _modTys      :: TyCtx
-  , _modTydefs   :: TyDefCtx
-  , _modTermdefs :: Ctx ATerm Defn
-  }
-
-makeLenses ''ModuleInfo
-
-emptyModuleInfo :: ModuleInfo
-emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 
 ------------------------------------------------------------
 -- Errors

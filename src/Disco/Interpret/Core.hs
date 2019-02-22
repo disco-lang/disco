@@ -730,7 +730,6 @@ whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
 --------------------------------------------------
 -- Combinatorics
 
-whnfOp OBinom          = arity2 "binom"    $ numOp binom
 whnfOp OMultinom       = arity2 "multinom" $ multinomOp
 whnfOp OFact           = arity1 "fact"     $ uNumOp' fact
 whnfOp OEnum           = arity1 "enum"     $ enumOp
@@ -954,11 +953,6 @@ divides :: Rational -> Rational -> Bool
 divides 0 0 = True
 divides 0 _ = False
 divides x y = denominator (y / x) == 1
-
--- | Binomial coefficient.  The arguments will always be natural
---   numbers.
-binom :: Rational -> Rational -> Rational
-binom (numerator -> n) (numerator -> k) = choose n k % 1
 
 -- | Multinomial coefficient.  The first argument is a number, the
 --   second is a list.

@@ -95,33 +95,32 @@ data Core where
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
 --   desugared into combinators of the operators here.
-data Op = OAdd     -- ^ Addition (@+@)
-        | ONeg     -- ^ Arithmetic negation (@-@)
-        | OSqrt    -- ^ Integer square root (@sqrt@)
-        | OLg      -- ^ Floor of base-2 logarithm (@lg@)
-        | OFloor   -- ^ Floor of fractional type (@floor@)
-        | OCeil    -- ^ Ceiling of fractional type (@ceiling@)
-        | OAbs     -- ^ Absolute value (@abs@)
-        | OMul     -- ^ Multiplication (@*@)
-        | ODiv     -- ^ Division (@/@)
-        | OExp     -- ^ Exponentiation (@^@)
-        | OMod     -- ^ Modulo (@mod@)
-        | ODivides -- ^ Divisibility test (@|@)
-        | OBinom   -- ^ Binomial coefficient (@choose@)
+data Op = OAdd      -- ^ Addition (@+@)
+        | ONeg      -- ^ Arithmetic negation (@-@)
+        | OSqrt     -- ^ Integer square root (@sqrt@)
+        | OLg       -- ^ Floor of base-2 logarithm (@lg@)
+        | OFloor    -- ^ Floor of fractional type (@floor@)
+        | OCeil     -- ^ Ceiling of fractional type (@ceiling@)
+        | OAbs      -- ^ Absolute value (@abs@)
+        | OMul      -- ^ Multiplication (@*@)
+        | ODiv      -- ^ Division (@/@)
+        | OExp      -- ^ Exponentiation (@^@)
+        | OMod      -- ^ Modulo (@mod@)
+        | ODivides  -- ^ Divisibility test (@|@)
         | OMultinom -- ^ Multinomial coefficient (@choose@)
-        | OFact    -- ^ Factorial (@!@)
-        | OEq Type -- ^ Equality test (@==@) at the given type.  At
-                   --   this point, typechecking has determined that
-                   --   the given type has decidable equality.  We
-                   --   need to know the type in order to perform the
-                   --   equality test.
-        | OLt Type -- ^ Less than (@<@).  Similarly, typechecking has
-                   --   determined that the given type has a decidable
-                   --   ordering relation.
+        | OFact     -- ^ Factorial (@!@)
+        | OEq Type  -- ^ Equality test (@==@) at the given type.  At
+                    --   this point, typechecking has determined that
+                    --   the given type has decidable equality.  We
+                    --   need to know the type in order to perform the
+                    --   equality test.
+        | OLt Type  -- ^ Less than (@<@).  Similarly, typechecking has
+                    --   determined that the given type has a decidable
+                    --   ordering relation.
 
         -- Type operators
-        | OEnum    -- ^ Enumerate the values of a type.
-        | OCount   -- ^ Count the values of a type.
+        | OEnum     -- ^ Enumerate the values of a type.
+        | OCount    -- ^ Count the values of a type.
 
         -- Arithmetic operators with special runtime behavior for finite types
         | OMDiv  Integer
@@ -169,8 +168,8 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OFactor         -- ^ Factorization
 
         -- Other primitives
-        | OCrash
-        | OId
+        | OCrash          -- ^ Crash with a user-supplied message
+        | OId             -- ^ No-op/identity function
 
   deriving (Show, Generic)
 
@@ -189,7 +188,6 @@ opArity ODiv           = 2
 opArity OExp           = 2
 opArity OMod           = 2
 opArity ODivides       = 2
-opArity OBinom         = 2
 opArity OMultinom      = 2
 opArity OFact          = 1
 opArity (OEq _)        = 2

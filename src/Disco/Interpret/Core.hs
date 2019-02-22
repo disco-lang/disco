@@ -982,10 +982,6 @@ fact (numerator -> n)
 -- | Semantics of the @$isPrime@ prim: a relatively fast test for
 --   primality using the 'isPrime' function from @arithmoi@ (trial
 --   division + Baille-PSW).
---
---   Note @$isPrime@ should always be used at type @N -> Bool@; using
---   it at a different type will cause undefined behavior or a runtime
---   error.
 primIsPrime :: Value -> Value
 primIsPrime (VNum _ (numerator -> n)) = mkEnum (isPrime n)
 primIsPrime _                         = error "impossible!  primIsPrime on non-VNum"
@@ -1002,10 +998,6 @@ primFactor _                         = error "impossible! primFactor on non-VNum
 
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.
---
---   @$crash@ should always be used at type @List Char -> a@; using it
---   at a different type will cause undefined behavior or a runtime
---   error.
 primCrash :: Value -> Value
 primCrash v = VDelay $ do
   s <- valueToString v

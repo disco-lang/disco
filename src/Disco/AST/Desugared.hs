@@ -36,7 +36,6 @@ module Disco.AST.Desugared
        , pattern DTBin
        , pattern DTTyOp
        , pattern DTNil
-       , pattern DTContainer
 
        , Container(..)
        , DBinding
@@ -69,6 +68,7 @@ import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 data DS
@@ -100,7 +100,8 @@ type instance X_TBin DS           = Type
 type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
                                          -- binary comparisons
 type instance X_TTyOp DS          = Type
-type instance X_TContainer DS     = Type
+type instance X_TContainer DS     = Void -- Literal containers are desugared into
+                                         -- conversion functions applied to list literals
 
 type instance X_TContainerComp DS = Void -- Container comprehensions are translated
                                          -- into monadic chains
@@ -121,7 +122,7 @@ type instance X_Term DS =
 pattern DTVar :: Type -> Name DTerm -> DTerm
 pattern DTVar ty name = TVar_ ty name
 
-pattern DTPrim :: Type -> String -> DTerm
+pattern DTPrim :: Type -> Prim -> DTerm
 pattern DTPrim ty name = TPrim_ ty name
 
 pattern DTUnit :: DTerm
@@ -166,12 +167,9 @@ pattern DTTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 pattern DTNil :: Type -> DTerm
 pattern DTNil ty = XTerm_ (Right (Right ty))
 
-pattern DTContainer :: Type -> Container -> [DTerm] -> Maybe (Ellipsis DTerm) -> DTerm
-pattern DTContainer ty c tl mets = TContainer_ ty c tl mets
-
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
              DTLam, DTApp, DTPair, DTInj, DTCase, DTUn, DTBin, DTTyOp,
-             DTNil, DTContainer #-}
+             DTNil #-}
 
 type instance X_TLink DS = Void
 
@@ -294,23 +292,22 @@ type instance X_QGuard DS = Void
 ------------------------------------------------------------
 
 instance HasType DTerm where
-  getType (DTVar ty _)           = ty
-  getType (DTPrim ty _)          = ty
-  getType DTUnit                 = TyUnit
-  getType (DTBool _)             = TyBool
-  getType (DTChar _)             = TyC
-  getType (DTNat ty _)           = ty
-  getType (DTRat _)              = TyF
-  getType (DTLam ty _)           = ty
-  getType (DTApp ty _ _)         = ty
-  getType (DTPair ty _ _)        = ty
-  getType (DTInj ty _ _)         = ty
-  getType (DTCase ty _)          = ty
-  getType (DTUn ty _ _)          = ty
-  getType (DTBin ty _ _ _)       = ty
-  getType (DTTyOp ty _ _)        = ty
-  getType (DTNil ty)             = ty
-  getType (DTContainer ty _ _ _) = ty
+  getType (DTVar ty _)     = ty
+  getType (DTPrim ty _)    = ty
+  getType DTUnit           = TyUnit
+  getType (DTBool _)       = TyBool
+  getType (DTChar _)       = TyC
+  getType (DTNat ty _)     = ty
+  getType (DTRat _)        = TyF
+  getType (DTLam ty _)     = ty
+  getType (DTApp ty _ _)   = ty
+  getType (DTPair ty _ _)  = ty
+  getType (DTInj ty _ _)   = ty
+  getType (DTCase ty _)    = ty
+  getType (DTUn ty _ _)    = ty
+  getType (DTBin ty _ _ _) = ty
+  getType (DTTyOp ty _ _)  = ty
+  getType (DTNil ty)       = ty
 
 instance HasType DPattern where
   getType (DPVar ty _)    = ty

@@ -136,6 +136,7 @@ import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 import           GHC.Exts                         (Constraint)
 
@@ -203,7 +204,8 @@ selectSide R _ b = b
 -- | A container is a wrapper for sets and lists.
 data Container where
   ListContainer :: Container
-  SetContainer :: Container
+  BagContainer  :: Container
+  SetContainer  :: Container
   deriving (Show, Eq, Enum, Generic)
 
 instance Alpha Container
@@ -255,7 +257,7 @@ data Term_ e where
 
   -- | A primitive, i.e. an identifier which is interpreted specially
   --   at runtime.
-  TPrim_  :: X_TPrim e -> String -> Term_ e
+  TPrim_  :: X_TPrim e -> Prim -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e
@@ -311,10 +313,10 @@ data Term_ e where
   -- | An application of a type operator.
   TTyOp_  :: X_TTyOp e -> TyOp -> Type -> Term_ e
 
-  -- | A containter for sets and lsits.
+  -- | A containter literal (set, bag, or list).
   TContainer_ :: X_TContainer e -> Container -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
 
-  -- | A container for set and list comprehensions
+  -- | A container comprehension.
   TContainerComp_ :: X_TContainerComp e -> Container -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
 
   -- | Type ascription, @(Term_ e : type)@.

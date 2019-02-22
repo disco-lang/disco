@@ -39,6 +39,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Monad
 import           Disco.Typecheck.Solve
@@ -54,6 +55,7 @@ containerTy c ty = TyCon (containerToCon c) [ty]
 
 containerToCon :: Container -> Con
 containerToCon ListContainer = CList
+containerToCon BagContainer  = CBag
 containerToCon SetContainer  = CSet
 
 ------------------------------------------------------------
@@ -283,10 +285,24 @@ infer t = typecheck Infer t
 --   constraints, and quantifying over any remaining type variables.
 inferTop :: Term -> TCM (ATerm, Sigma)
 inferTop t = do
+
+  -- Run inference on the term and try to solve the resulting
+  -- constraints.
   (at, theta) <- solve $ infer t
   traceShowM at
+
+      -- Apply the resulting substitution.
   let at' = substs theta at
-  return (at', closeSigma (getType at'))
+
+      -- Find any remaining container variables.
+      cvs = containerVars (getType at')
+
+      -- Replace them all with List.
+      at'' = substs (zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+
+  -- Finally, quantify over any remaining type variables and return
+  -- the term along with the resulting polymorphic type.
+  return (at'', closeSigma (getType at''))
 
 --------------------------------------------------
 -- The typecheck function
@@ -298,6 +314,27 @@ inferTop t = do
 --   cases, and allows all the checking and inference code related to
 --   a given AST node to be placed together.
 typecheck :: Mode -> Term -> TCM ATerm
+
+-- ~~~~ Note [Pattern coverage]
+-- In several places we have clauses like
+--
+--   typecheck Infer (TBin op t1 t2) | op `elem` [ ... ]
+--
+-- since the typing rules for all the given operators are the same.
+-- The only problem is that the pattern coverage checker (sensibly)
+-- doesn't look at guards in general, so it thinks that there are TBin
+-- cases still uncovered.
+--
+-- However, we *don't* just want to add a catch-all case at the end,
+-- because the coverage checker is super helpful in alerting us when
+-- there's a missing typechecking case after modifying the language in
+-- some way. The (not ideal) solution for now is to add some
+-- additional explicit cases that simply call 'error', which will
+-- never be reached but which assure the coverage checker that we have
+-- handled those cases.
+--
+-- The ideal solution would be to use or-patterns, if Haskell had them
+-- (see https://github.com/ghc-proposals/ghc-proposals/pull/43).
 
 --------------------------------------------------
 -- Defined types
@@ -320,18 +357,69 @@ typecheck mode (TParens t) = typecheck mode t
 -- To infer the type of a variable, just look it up in the context.
 -- We don't need a checking case; checking the type of a variable will
 -- fall through to this case.
-typecheck Infer (TVar x)      = do
-  Forall sig <- lookupTy x
-  (_, ty)    <- unbind sig
-  return $ ATVar ty (coerce x)
+typecheck Infer (TVar x) = checkVar `catchError` checkPrim
+  where
+    checkVar = do
+      Forall sig <- lookupTy x
+      (_, ty)    <- unbind sig
+      return $ ATVar ty (coerce x)
+
+    -- If the variable is not bound, check if it is a primitive name.
+    checkPrim (Unbound _) =
+      case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
+        -- If so, infer the type of the prim instead.
+        (prim:_) -> typecheck Infer (TPrim prim)
+        _        -> throwError (Unbound x)
+
+    -- For any other error, just rethrow.
+    checkPrim e = throwError e
 
 --------------------------------------------------
 -- Primitives
 
--- We can't infer the type of a primitive; in checking mode we always
--- assume that the given type is OK.  If you use a primitive you have
--- to know what type you expect it to have.
-typecheck (Check ty) (TPrim x) = return $ ATPrim ty x
+-- The 'list', 'bag', and 'set' primitives convert containers into
+-- other containers.
+typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
+  c <- freshAtom   -- make a unification variable for the container type
+  a <- freshTy     -- make a unification variable for the element type
+
+  -- converting to a set or bag requires being able to sort the elements
+  when (conv /= PrimList) $ constraint $ CQual QCmp a
+
+  return $ ATPrim (TyContainer c a :->: primCtrCon conv a) conv
+
+  where
+    primCtrCon PrimList = TyList
+    primCtrCon PrimBag  = TyBag
+    primCtrCon _        = TySet
+
+-- map : (a -> b) -> (c a -> c b)
+typecheck Infer (TPrim PrimMap) = do
+  c <- freshAtom
+  a <- freshTy
+  b <- freshTy
+  return $ ATPrim ((a :->: b) :->: (TyContainer c a :->: TyContainer c b)) PrimMap
+
+    -- The second set of parens around TyContainer c a :->:
+    -- TyContainer c b shouldn't be necessary --- :->: is declared as
+    -- infixr --- but without them the type ends up associated the
+    -- wrong way.  Not sure why.
+
+-- reduce : (a -> a -> a) -> a -> c a -> a
+typecheck Infer (TPrim PrimReduce) = do
+  c <- freshAtom
+  a <- freshTy
+  return $ ATPrim ((a :->: (a :->: a)) :->: (a :->: (TyContainer c a :->: a))) PrimReduce
+
+-- isPrime : N -> Bool
+typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
+-- factor : N -> Bag N
+typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimFactor
+
+-- crash : String -> a
+typecheck Infer (TPrim PrimCrash)   = do
+  a <- freshTy
+  return $ ATPrim (TyList TyC :->: a) PrimCrash
 
 --------------------------------------------------
 -- Base types
@@ -392,8 +480,7 @@ typecheck (Check checkTy) (TAbs lam) = do
     checkArgs ((x, unembed -> mty) : args) ty term = do
 
       -- Ensure that ty is a function type
-      tys <- ensureConstr CArr ty (Left term)
-      let [ty1, ty2] = tys
+      (ty1, ty2) <- ensureConstr2 CArr ty (Left term)
 
       -- Figure out the type of x:
       xTy <- case mty of
@@ -447,8 +534,7 @@ typecheck Infer (TAbs lam)    = do
 typecheck Infer (TApp t t')   = do
   at <- infer t
   let ty = getType at
-  tys <- ensureConstr CArr ty (Left t)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CArr ty (Left t)
   ATApp ty2 at <$> check t' ty1
 
 --------------------------------------------------
@@ -461,8 +547,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
-      mms       <- ensureConstrMode CPair mode (Left $ TTup (t:ts))
-      let [m, ms] = mms
+      (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return $ (TyPair (getType at) ty, at : ats)
@@ -472,8 +557,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
 
 -- Check/infer the type of an injection into a sum type.
 typecheck mode lt@(TInj s t) = do
-  ms <- ensureConstrMode CSum mode (Left lt)
-  let [mL, mR] = ms
+  (mL, mR) <- ensureConstrMode2 CSum mode (Left lt)
   at <- typecheck (selectSide s mL mR) t
   resTy <- case mode of
     Infer    ->
@@ -488,8 +572,7 @@ typecheck mode lt@(TInj s t) = do
 -- To check a cons, make sure the type is a list type, then
 -- check the two arguments appropriately.
 typecheck (Check ty) t@(TBin Cons x xs) = do
-  tys <- ensureConstr CList ty (Left t)
-  let [tyElt] = tys
+  tyElt <- ensureConstr1 CList ty (Left t)
   ATBin ty Cons <$> check x tyElt <*> check xs (TyList tyElt)
 
 -- To infer the type of a cons:
@@ -508,13 +591,10 @@ typecheck Infer (TBin Cons t1 t2) = do
     -- Otherwise, infer the type of the second argument...
     _ -> do
       at2 <- infer t2
-      case getType at2 of
-
         -- ...make sure it is a list, and find the lub of the element types.
-        TyList ty2 -> do
-          eltTy <- lub (getType at1) ty2
-          return $ ATBin (TyList eltTy) Cons at1 at2
-        ty -> throwError (NotCon CList t2 ty)
+      ty2 <- ensureConstr1 CList (getType at2) (Left t2)
+      eltTy <- lub (getType at1) ty2
+      return $ ATBin (TyList eltTy) Cons at1 at2
 
 --------------------------------------------------
 -- Binary & unary operators
@@ -561,8 +641,16 @@ typecheck Infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div, SSub] = do
     ]
   return $ ATBin tyv op at1 at2
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Add  _ _) = error "typecheck Infer Add should be unreachable"
+typecheck Infer (TBin Mul  _ _) = error "typecheck Infer Mul should be unreachable"
+typecheck Infer (TBin Sub  _ _) = error "typecheck Infer Sub should be unreachable"
+typecheck Infer (TBin Div  _ _) = error "typecheck Infer Div should be unreachable"
+typecheck Infer (TBin SSub _ _) = error "typecheck Infer SSub should be unreachable"
+------------------------------------------------------------
+
 typecheck (Check ty) (TUn Neg t) = do
-  constraint $ CQual (QSub) ty
+  constraint $ CQual QSub ty
   ATUn ty Neg <$> check t ty
 
 typecheck Infer (TUn Neg t) = do
@@ -596,6 +684,13 @@ typecheck Infer (TBin IDiv t1 t2) = do
   resTy <- cInt tyLub
   return $ ATBin resTy IDiv at1 at2
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TUn Sqrt  _) = error "typecheck Infer Sqrt should be unreachable"
+typecheck Infer (TUn Lg    _) = error "typecheck Infer Lg should be unreachable"
+typecheck Infer (TUn Floor _) = error "typecheck Infer Floor should be unreachable"
+typecheck Infer (TUn Ceil  _) = error "typecheck Infer Ceil should be unreachable"
+------------------------------------------------------------
+
 ----------------------------------------
 -- exp
 
@@ -617,12 +712,26 @@ typecheck Infer (TBin Exp t1 t2) = do
 -- Comparisons
 
 -- Infer the type of a comparison. A comparison always has type Bool,
--- but we have to make sure the subterms have compatible types.
+-- but we have to make sure the subterms have compatible types.  We
+-- also generate a QCmp qualifier --- even though every type in disco
+-- has semi-decidable equality and ordering, we need to know whether
+-- e.g. a comparison was done at a certain type, so we can decide
+-- whether the type is allowed to be completely polymorphic or not.
 typecheck Infer (TBin op t1 t2) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
   at1 <- infer t1
   at2 <- infer t2
-  _ <- lub (getType at1) (getType at2)
+  ty <- lub (getType at1) (getType at2)
+  constraint $ CQual QCmp ty
   return $ ATBin TyBool op at1 at2
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Eq  _ _) = error "typecheck Infer Eq should be unreachable"
+typecheck Infer (TBin Neq _ _) = error "typecheck Infer Neq should be unreachable"
+typecheck Infer (TBin Lt  _ _) = error "typecheck Infer Lt should be unreachable"
+typecheck Infer (TBin Gt  _ _) = error "typecheck Infer Gt should be unreachable"
+typecheck Infer (TBin Leq _ _) = error "typecheck Infer Leq should be unreachable"
+typecheck Infer (TBin Geq _ _) = error "typecheck Infer Geq should be unreachable"
+------------------------------------------------------------
 
 ----------------------------------------
 -- Comparison chain
@@ -646,6 +755,12 @@ typecheck Infer (TChain t ls) =
 -- Bool as well.
 typecheck Infer (TBin op t1 t2) | op `elem` [And, Or, Impl] =
   ATBin TyBool op <$> check t1 TyBool <*> check t2 TyBool
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin And  _ _) = error "typecheck Infer And should be unreachable"
+typecheck Infer (TBin Or   _ _) = error "typecheck Infer Or should be unreachable"
+typecheck Infer (TBin Impl _ _) = error "typecheck Infer Impl should be unreachable"
+------------------------------------------------------------
 
 typecheck Infer (TUn Not t) = ATUn TyBool Not <$> check t TyBool
 
@@ -690,7 +805,7 @@ typecheck Infer (TBin Choose t1 t2) = do
   return $ ATBin TyN Choose at1 at2
 
 ----------------------------------------
--- Set operations
+-- Set & bag operations
 
 typecheck Infer (TUn Size t) = do
   at <- infer t
@@ -698,13 +813,12 @@ typecheck Infer (TUn Size t) = do
   return $ ATUn TyN Size at
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
-    | setOp `elem` [Union, Intersection, Difference] = do
-  tys <- ensureConstr CSet ty (Left t)
-  let [tyElt] = tys
+    | setOp `elem` [Union, Inter, Diff] = do
+  tyElt <- ensureConstr1 CSet ty (Left t)
   ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
 
 typecheck Infer (TBin setOp t1 t2)
-    | setOp `elem` [Union, Intersection, Difference, Subset] = do
+    | setOp `elem` [Union, Inter, Diff, Subset] = do
   at1 <- infer t1
   at2 <- infer t2
   tyelt <- freshTy
@@ -713,6 +827,23 @@ typecheck Infer (TBin setOp t1 t2)
   let ty = case setOp of {Subset -> TyBool; _ -> TySet tyelt}
   constraints [CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)]
   return $ ATBin ty setOp at1 at2
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TBin Union  _ _) = error "typecheck Infer Union should be unreachable"
+typecheck Infer (TBin Inter  _ _) = error "typecheck Infer Inter should be unreachable"
+typecheck Infer (TBin Diff   _ _) = error "typecheck Infer Diff should be unreachable"
+typecheck Infer (TBin Subset _ _) = error "typecheck Infer Subset should be unreachable"
+------------------------------------------------------------
+
+typecheck Infer (TBin Rep t1 t2) = do
+  at1 <- infer t1
+  at2 <- check t2 TyN
+  return $ ATBin (TyBag (getType at1)) Rep at1 at2
+
+typecheck Infer (TUn PowerSet t) = do
+  at <- infer t
+  tyElt <- ensureConstr1 CSet (getType at) (Left t)
+  return $ ATUn (TySet (TySet tyElt)) PowerSet at
 
 ----------------------------------------
 -- Type operations
@@ -726,8 +857,7 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 
 -- Literal containers
 typecheck mode t@(TContainer c xs ell)  = do
-  m <- ensureConstrMode (containerToCon c) mode (Left t)
-  let [eltMode] = m
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left t)
   axs  <- mapM (typecheck eltMode) xs
   aell <- typecheckEllipsis eltMode ell
   resTy <- case mode of
@@ -747,8 +877,7 @@ typecheck mode t@(TContainer c xs ell)  = do
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do
-  m <- ensureConstrMode (containerToCon c) mode (Left tcc)
-  let [eltMode] = m
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left tcc)
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
@@ -765,6 +894,9 @@ typecheck mode tcc@(TContainerComp c bqt) = do
       case (c, getType at) of
         (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
         (SetContainer, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
+        (BagContainer, TyBag ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
+        -- XXX need more subtyping above!
+
         (_, wrongTy)   -> throwError $ NotCon (containerToCon c) t wrongTy
 
     inferQual (QGuard (unembed -> t))   = do
@@ -901,20 +1033,17 @@ checkPattern (PTup tup) tupTy = do
       (ctx, apt) <- checkPattern p ty
       return [(ctx, apt)]
     checkTuplePat (p:ps) ty = do
-      tys         <- ensureConstr CPair ty (Right $ PTup (p:ps))
-      let [ty1, ty2] = tys
-      (ctx, apt)  <- checkPattern p ty1
+      (ty1, ty2) <- ensureConstr2 CPair ty (Right $ PTup (p:ps))
+      (ctx, apt) <- checkPattern p ty1
       rest <- checkTuplePat ps ty2
       return ((ctx, apt) : rest)
 
 checkPattern p@(PInj L pat) ty       = do
-  tys <- ensureConstr CSum ty (Right p)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty1
   return (ctx, APInj (TySum ty1 ty2) L apt)
 checkPattern p@(PInj R pat) ty    = do
-  tys <- ensureConstr CSum ty (Right p)
-  let [ty1, ty2] = tys
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty2
   return (ctx, APInj (TySum ty1 ty2) R apt)
 
@@ -939,15 +1068,13 @@ checkPattern (PNat n) ty        = do
   return (emptyCtx, APNat ty n)
 
 checkPattern p@(PCons p1 p2) ty = do
-  tys <- ensureConstr CList ty (Right p)
-  let [tyl] = tys
+  tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
-  tys <- ensureConstr CList ty (Right p)
-  let [tyl] = tys
+  tyl <- ensureConstr1 CList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
@@ -1108,7 +1235,7 @@ isKnownSub (TyCon c1 ts1) (TyCon c2 ts2)
     checkKnownSub Contra t1 t2 = isKnownSub t2 t1
 isKnownSub _ _ = False
 
--- XXX
+-- | Check whether one base type is known to be a subtype of another.
 isKnownSubBase :: BaseTy -> BaseTy -> Bool
 isKnownSubBase b1 b2 = (b1,b2) `elem` basePairs
   where
@@ -1151,22 +1278,66 @@ lub ty1 ty2 = do
 -- | Ensure that a type's outermost constructor matches the provided
 --   constructor, returning the types within the matched constructor
 --   or throwing a type error.  If the type provided is a type
---   variable, appropriate constraints are generated to guarentee the
+--   variable, appropriate constraints are generated to guarantee the
 --   type variable's outermost constructor matches the provided
---   constructor, and a list of type variables is returned whose count
---   matches the arity of the provided constructor.
+--   constructor, and a list of fresh type variables is returned whose
+--   count matches the arity of the provided constructor.
 ensureConstr :: Con -> Type -> Either Term Pattern -> TCM [Type]
-ensureConstr c1 (TyCon c2 tys) _ | c1 == c2 = return tys
+ensureConstr c ty targ = matchConTy c ty
+  where
+    matchConTy :: Con -> Type -> TCM [Type]
+    matchConTy c1 (TyCon c2 tys) = do
+      matchCon c1 c2
+      return tys
 
-ensureConstr c tyv@(TyAtom (AVar (U _))) _ = do
-  tyvs <- mapM (const freshTy) (arity c)
-  constraint $ CEq tyv (TyCon c tyvs)
-  return tyvs
+    matchConTy c1 tyv@(TyAtom (AVar (U _))) = do
+      tyvs <- mapM (const freshTy) (arity c1)
+      constraint $ CEq tyv (TyCon c1 tyvs)
+      return tyvs
 
-ensureConstr c ty targ =
-  case targ of
-    Left term -> throwError (NotCon c term ty)
-    Right pat -> throwError (PatternType pat ty)
+    matchConTy _ _ = matchError
+
+    -- | Check whether two constructors match, which could include
+    --   unifying container variables if we are matching two container
+    --   types; otherwise, simply ensure that the constructors are
+    --   equal.  Throw a 'matchError' if they do not match.
+    matchCon :: Con -> Con -> TCM ()
+    matchCon c1 c2                            | c1 == c2 = return ()
+    matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
+      constraint $ CEq (TyAtom v) (TyAtom ctr2)
+    matchCon (CContainer ctr1) (CContainer v@(AVar (U _))) =
+      constraint $ CEq (TyAtom ctr1) (TyAtom v)
+    matchCon _ _                              = matchError
+
+    matchError :: TCM a
+    matchError = case targ of
+      Left term -> throwError (NotCon c term ty)
+      Right pat -> throwError (PatternType pat ty)
+
+-- | A variant of ensureConstr that expects to get exactly one
+--   argument type out, and throws an error if we get any other
+--   number.
+ensureConstr1 :: Con -> Type -> Either Term Pattern -> TCM Type
+ensureConstr1 c ty targ = do
+  tys <- ensureConstr c ty targ
+  case tys of
+    [ty1] -> return ty1
+    _     -> error $
+      "Impossible! Wrong number of arg types in ensureConstr1 " ++ show c ++ " "
+        ++ show ty ++ ": " ++ show tys
+
+-- | A variant of ensureConstr that expects to get exactly two
+--   argument types out, and throws an error if we get any other
+--   number.
+ensureConstr2 :: Con -> Type -> Either Term Pattern -> TCM (Type, Type)
+ensureConstr2 c ty targ  = do
+  tys <- ensureConstr c ty targ
+  case tys of
+    [ty1, ty2] -> return (ty1, ty2)
+    _          -> error $
+      "Impossible! Wrong number of arg types in ensureConstr2 " ++ show c ++ " "
+        ++ show ty ++ ": " ++ show tys
+
 
 -- | A variant of 'ensureConstr' that works on 'Mode's instead of
 --   'Type's.  Behaves similarly to 'ensureConstr' if the 'Mode' is
@@ -1175,6 +1346,28 @@ ensureConstr c ty targ =
 ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
+
+-- | A variant of 'ensureConstrMode' that expects to get a single
+--   'Mode' and throws an error if it encounters any other number.
+ensureConstrMode1 :: Con -> Mode -> Either Term Pattern -> TCM Mode
+ensureConstrMode1 c m targ = do
+  ms <- ensureConstrMode c m targ
+  case ms of
+    [m1] -> return m1
+    _    -> error $
+      "Impossible! Wrong number of arg types in ensureConstrMode1 " ++ show c ++ " "
+        ++ show m ++ ": " ++ show ms
+
+-- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
+--   and throws an error if it encounters any other number.
+ensureConstrMode2 :: Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
+ensureConstrMode2 c m targ = do
+  ms <- ensureConstrMode c m targ
+  case ms of
+    [m1, m2] -> return (m1, m2)
+    _        -> error $
+      "Impossible! Wrong number of arg types in ensureConstrMode2 " ++ show c ++ " "
+        ++ show m ++ ": " ++ show ms
 
 -- | Ensure that two types are equal:
 --     1. Do nothing if they are literally equal

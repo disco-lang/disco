@@ -23,7 +23,7 @@ module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
-       , Op(..)
+       , Op(..), opArity
 
          -- * Case expressions and patterns
        , CBranch, CPattern(..), CQual(..)
@@ -33,7 +33,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.AST.Surface                (Ellipsis, Telescope)
+import           Disco.AST.Surface                (Telescope)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -59,52 +59,36 @@ instance Monoid RationalDisplay where
 data Core where
 
   -- | A variable.
-  CVar  :: Name Core -> Core
+  CVar   :: Name Core -> Core
 
-  -- | A primitive.
-  CPrim :: String -> Core
+  -- | A function constant.
+  CConst :: Op -> Core
 
-  -- | A constructor, identified by number, with arguments.  For
-  --   example, false and true are represented by @CCons 0 []@ and
-  --   @CCons 1 []@, respectively; a pair is represented by @CCons 0
-  --   [c1, c2]@.  Note we do not need to remember which type the
-  --   constructor came from; if the program typechecked then we will
-  --   never end up comparing constructors from different types.
+  -- | A saturated constructor application.  For example, false and
+  --   true are represented by @CCons 0 []@ and @CCons 1 []@,
+  --   respectively; a pair is represented by @CCons 0 [c1, c2]@.
+  --   Note we do not need to remember which type the constructor came
+  --   from; if the program typechecked then we will never end up
+  --   comparing constructors from different types.
   CCons :: Int -> [Core] -> Core
-
-  -- | A list with an ellipsis.
-  CEllipsis :: [Core] -> Ellipsis Core -> Core
 
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core
 
   -- | An anonymous function.
-  CAbs  :: Bind (Name Core) Core -> Core
+  CAbs  :: Bind [Name Core] Core -> Core
 
-  -- | Function application, with a strictness annotation.  The
-  --   strictness is determined by the type of the application (which
-  --   has been erased), and determines whether the argument should be
-  --   evaluated before applying the function.
-  CApp  :: Strictness -> Core -> Core -> Core
-
-  -- | Operator application, with a list of arguments.  Note there is
-  --   no longer any distinction between unary and binary operators.
-  --   Assuming this was correctly desugared from a successfully
-  --   parsed and typechecked program, operators will always have the
-  --   correct number of arguments.
-  COp   :: Op -> [Core] -> Core
+  -- | Function application, where each argument has a strictness
+  --   annotation.  The strictness is determined by the type of the
+  --   application (which has been erased), and determines whether the
+  --   argument should be evaluated before applying the function.
+  CApp  :: Core -> [(Strictness, Core)] -> Core
 
   -- | A case expression.
   CCase :: [CBranch] -> Core
 
   -- | A type.
   CType :: Type -> Core
-
-  -- | A Set
-  --   Named so because CSet conflicts with the type Container type
-  --   defined in Disco.AST.Surace
-  -- Type stores the type of the elements.
-  CoreSet :: Type -> [Core] -> Core
 
   deriving (Show, Generic)
 
@@ -134,22 +118,110 @@ data Op = OAdd     -- ^ Addition (@+@)
         | OLt Type -- ^ Less than (@<@).  Similarly, typechecking has
                    --   determined that the given type has a decidable
                    --   ordering relation.
-        | OEnum
-        | OCount
+
+        -- Type operators
+        | OEnum    -- ^ Enumerate the values of a type.
+        | OCount   -- ^ Count the values of a type.
 
         -- Arithmetic operators with special runtime behavior for finite types
         | OMDiv  Integer
         | OMExp  Integer
         | OMDivides Integer
 
-        -- Set Operations
-        | OSize    -- ^ Size of two sets (@size@)
-        | OSubset Type -- ^ Subset test for two sets (@⊆@)
-        | OUnion Type   -- ^ Union of two sets (@union@ / @∪@)
-        | OIntersection Type -- ^ Intersection of two sets (@intersect@ / @∩@)
-        | ODifference Type   -- ^ Difference of two sets (@\@)
+        -- Container operations
+        | OSize           -- ^ Size of two sets (@size@)
+        | OPowerSet Type  -- ^ Power set of a given set
+                          --   (@powerSet@). Carries the element type.
+        | OSubset Type    -- ^ Subset test for two sets (@⊆@). Carries
+                          --   the element type.
+        | OUnion  Type    -- ^ Union of two sets (@union@ /
+                          --   @∪@). Carries the element type.
+        | OInter  Type    -- ^ Intersection of two sets (@intersect@ /
+                          --   @∩@). Carries the element type.
+        | ODiff   Type    -- ^ Difference of two sets (@\@). Carries
+                          --   the element type.
+        | ORep            -- ^ Primitive bag constructor (replicate).
+
+        | OMapList        -- ^ Map a function over a list.
+        | OMapBag Type    -- ^ Map a function over a bag.  Carries the
+                          --   output type of the function.
+        | OMapSet Type    -- ^ Map a function over a set. Carries the
+                          --   output type of the function.
+
+        | OReduceList     -- ^ Reduce/fold a list.
+        | OReduceBag      -- ^ Reduce/fold a bag (or set).
+
+        -- Ellipses
+        | OForever        -- ^ Continue forever, @[x, y, z ..]@
+        | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
+
+        -- Container conversion
+        | OSetToList      -- ^ set -> list conversion (sorted order).
+        | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
+        | OBagToList      -- ^ bag -> list conversion (sorted order).
+        | OListToSet Type -- ^ list -> set conversion (forget order, duplicates).
+                          --   Carries the element type.
+        | OListToBag Type -- ^ list -> bag conversion (forget order).
+                          --   Carries the element type.
+
+        -- Number theory primitives
+        | OIsPrime        -- ^ Primality test
+        | OFactor         -- ^ Factorization
+
+        -- Other primitives
+        | OCrash
+        | OId
 
   deriving (Show, Generic)
+
+-- | Get the arity (desired number of arguments) of a function
+--   constant.
+opArity :: Op -> Int
+opArity OAdd           = 2
+opArity ONeg           = 1
+opArity OSqrt          = 1
+opArity OLg            = 1
+opArity OFloor         = 1
+opArity OCeil          = 1
+opArity OAbs           = 1
+opArity OMul           = 2
+opArity ODiv           = 2
+opArity OExp           = 2
+opArity OMod           = 2
+opArity ODivides       = 2
+opArity OBinom         = 2
+opArity OMultinom      = 2
+opArity OFact          = 1
+opArity (OEq _)        = 2
+opArity (OLt _)        = 2
+opArity OEnum          = 1
+opArity OCount         = 1
+opArity (OMDiv _)      = 2
+opArity (OMExp _)      = 2
+opArity (OMDivides _)  = 2
+opArity OSize          = 1
+opArity (OPowerSet _)  = 1
+opArity (OSubset _)    = 2
+opArity (OUnion _)     = 2
+opArity (OInter _)     = 2
+opArity (ODiff _)      = 2
+opArity ORep           = 2
+opArity OMapList       = 2
+opArity (OMapBag _)    = 2
+opArity (OMapSet _)    = 2
+opArity OReduceList    = 3
+opArity OReduceBag     = 3
+opArity OForever       = 1
+opArity OUntil         = 2
+opArity OSetToList     = 1
+opArity OBagToSet      = 1
+opArity OBagToList     = 1
+opArity (OListToSet _) = 1
+opArity (OListToBag _) = 1
+opArity OIsPrime       = 1
+opArity OFactor        = 1
+opArity OCrash         = 1
+opArity OId            = 1
 
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind (Telescope (Embed Core, CPattern)) Core

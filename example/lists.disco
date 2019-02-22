@@ -27,9 +27,9 @@ concat : List List a → List a
 concat []      = []
 concat (l::ls) = append(l, concat ls)
 
-map : (a → b) → List a → List b
-map f []      = []
-map f (x::xs) = f x :: map f xs
+maplist : (a → b) → List a → List b
+maplist f []      = []
+maplist f (x::xs) = f x :: maplist f xs
 
 ||| Take the first n elements of a list.
 !!!   take 1 [true, false, true] == [true]

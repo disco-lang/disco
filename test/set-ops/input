@@ -8,3 +8,10 @@
 ({5,6} ⊆ {5,6,7} : B)
 {} ⊆ {{6}}
 {{6}} ⊆ {{6}}
+powerSet {1,2,3}
+powerSet {}
+powerSet {1,1,1}
+powerSet (powerSet {})
+powerSet (powerSet (powerSet {}))
+:type powerSet (powerSet (powerSet {}))
+powerSet {"hi", "there"}

@@ -113,6 +113,7 @@ import           Data.Void
 import           Disco.AST.Generic
 import           Disco.Context
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 import           Unbound.Generics.LocallyNameless
 
@@ -222,7 +223,7 @@ type instance X_Term            UD = ()  -- TWild
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
 
-pattern TPrim :: String -> Term
+pattern TPrim :: Prim -> Term
 pattern TPrim name = TPrim_ () name
 
 pattern TUn :: UOp -> Term -> Term

@@ -33,3 +33,8 @@ enumerate Z10
 enumerate (Z2 * Z3)
 enumerate (Z2 -> Z2)
 enumerate (Z3 + Z4)
+count (Bag Void)
+count (Bag Unit)
+count (Set Void)
+count (Set Unit)
+count (Set Bool)

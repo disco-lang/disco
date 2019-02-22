@@ -64,25 +64,25 @@ data Variance = Co | Contra
 --   and the variance of each argument.  This is used to decompose
 --   subtyping constraints.
 arity :: Con -> [Variance]
-arity CArr  = [Contra, Co]
-arity CPair = [Co, Co]
-arity CSum  = [Co, Co]
-arity CList = [Co]
-arity CSet  = [Co]
+arity CArr           = [Contra, Co]
+arity CPair          = [Co, Co]
+arity CSum           = [Co, Co]
+arity (CContainer _) = [Co]
 
 ------------------------------------------------------------
 -- Qualifiers
 ------------------------------------------------------------
 
 -- | Qualifiers that may appear in the CQual constraint.
-data Qualifier = QNum | QSub | QDiv
+data Qualifier = QNum | QSub | QDiv | QCmp
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier
 
 instance Subst Type Qualifier
 
--- | A helper function that returns the appropriate qualifier for a binary operation.
+-- | A helper function that returns the appropriate qualifier for a
+--   binary arithmetic operation.
 bopQual :: BOp -> Qualifier
 bopQual Add  = QNum
 bopQual Mul  = QNum
@@ -169,6 +169,7 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
+hasQual _ QCmp       = True
 hasQual (Fin _) q    | q `elem` [QNum, QSub] = True
 hasQual (Fin n) QDiv = isPrime n
 hasQual b       QNum = b `elem` [N, Z, F, Q]
@@ -194,26 +195,32 @@ hasSort = all . hasQual
 qualRules :: Map Con (Map Qualifier [Maybe Qualifier])
 qualRules = M.fromList
   [ CArr  ==> M.fromList
-    [
+    [ QCmp ==> [Nothing, Just QCmp]
     ]
   , CPair ==> M.fromList
-    [
+    [ QCmp ==> [Just QCmp, Just QCmp]
     ]
   , CSum ==> M.fromList
-    [
+    [ QCmp ==> [Just QCmp, Just QCmp]
     ]
-  -- no rules for CList
+  , CList ==> M.fromList
+    [ QCmp ==> [Just QCmp]
+    ]
+  , CBag ==> M.fromList
+    [ QCmp ==> [Just QCmp]
+    ]
+  , CSet ==> M.fromList
+    [ QCmp ==> [Just QCmp]
+    ]
   ]
   where
     (==>) :: a -> b -> (a,b)
     (==>) = (,)
 
-  -- At this point, there aren't any rules above!  But that's OK,
-  -- we'll leave the machinery here for now.  Eventually we can easily
-  -- imagine adding an opt-in mode where numeric operations can be
-  -- used on pairs and functions, then the qualRules would become
-  -- dependent on what mode was chosen.  For example we could have
-  -- rules like
+  -- Eventually we can easily imagine adding an opt-in mode where
+  -- numeric operations can be used on pairs and functions, then the
+  -- qualRules would become dependent on what mode was chosen.  For
+  -- example we could have rules like
   --
   -- [ CArr ==> M.fromList
   --   [ QNum ==> [Nothing, Just QNum]  -- (a -> b) can be +, * iff b can
@@ -256,4 +263,5 @@ pickSortBaseTy s
   | QDiv `S.member` s = F
   | QSub `S.member` s = Z
   | QNum `S.member` s = N
+  | QCmp `S.member` s = N
   | otherwise         = Unit

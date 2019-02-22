@@ -23,6 +23,7 @@ import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
 import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
+import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -38,6 +39,7 @@ import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 --------------------------------------------------
@@ -57,6 +59,9 @@ brackets = fmap PP.brackets
 
 braces :: Functor f => f PP.Doc -> f PP.Doc
 braces = fmap PP.braces
+
+bag :: Monad f => f PP.Doc -> f PP.Doc
+bag p = text "⟅" <> p <> text "⟆"
 
 quotes :: Functor f => f PP.Doc -> f PP.Doc
 quotes = fmap PP.quotes
@@ -143,10 +148,14 @@ prettyTy TyF              = text "𝔽"
 prettyTy (TyFin n)        = text "ℤ" <> (integer n)
 prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
-prettyTy (TySet ty)      = mparens (PA 9 InR) $
+prettyTy (TyBag ty)       = mparens (PA 9 InR) $
+  text "Bag" <+> prettyTy' 9 InR ty
+prettyTy (TySet ty)       = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
-prettyTy (TyDef n)       = text n
-prettyTy (Skolem n)      = text "%" <> prettyName n
+prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
+  text (show c) <+> prettyTy' 9 InR ty
+prettyTy (TyDef n)        = text n
+prettyTy (Skolem n)       = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -166,7 +175,10 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
-prettyTerm (TPrim x)     = text "$" <> text x
+prettyTerm (TPrim p)     =
+  case primMap ! p of
+    PrimInfo _ nm True  -> text nm
+    PrimInfo _ nm False -> text "$" <> text nm
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
@@ -192,10 +204,10 @@ prettyTerm (TContainer c ts e)  = do
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
-  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep (ds ++ pe))
+  containerDelims c (hsep (ds ++ pe))
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
-  (case c of {ListContainer -> brackets; SetContainer -> braces}) (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
+  containerDelims c (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
@@ -240,6 +252,11 @@ prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 prettySide :: Side -> Doc
 prettySide L = text "left"
 prettySide R = text "right"
+
+containerDelims :: Container -> (Doc -> Doc)
+containerDelims ListContainer = brackets
+containerDelims BagContainer  = bag
+containerDelims SetContainer  = braces
 
 prettyTyOp :: TyOp -> Doc
 prettyTyOp Enumerate = text "enumerate"
@@ -354,6 +371,10 @@ prettyProperty prop =
 -- Pretty-printing values
 ------------------------------------------------------------
 
+-- XXX This needs to be refactored so (1) we don't have to plumb the
+-- output callback around everywhere, and (2) to properly take
+-- associativity/precedence etc. into account.
+
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  This version actually prints the values on the console, followed
 --   by a newline.  For a more general version, see 'prettyValueWith'.
@@ -395,30 +416,37 @@ prettyWHNF out _ (VNum d r)
       Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
       Decimal  -> out $ prettyDecimal r
 
-prettyWHNF out ty (VFun _)    = do
-  out "<"
-  tyStr <- renderDoc (prettyTy ty)
-  out tyStr
-  out ">"
+prettyWHNF out ty@(_ :->: _) _ = prettyFun out ty
 
-prettyWHNF out ty (VClos _ _) = do
-  out "<"
-  tyStr <- renderDoc (prettyTy ty)
-  out tyStr
-  out ">"
-
-prettyWHNF out (TySet t) (VSet xs) = out "{" >> prettyIteration out t xs >> out "}"
+prettyWHNF out (TySet t) (VBag xs) =
+  out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
+prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
+prettyFun :: (String -> Disco IErr ()) -> Type -> Disco IErr ()
+prettyFun out ty = do
+  out "<"
+  tyStr <- renderDoc (prettyTy ty)
+  out tyStr
+  out ">"
 
---prettyIteration handles the pretty-printing of lists of values,
---such as those found in sets.
-prettyIteration :: (String -> Disco IErr()) -> Type -> [Value] -> Disco IErr ()
-prettyIteration out _ []     = out ""
-prettyIteration out t [x]    = prettyValueWith out t x
-prettyIteration out t (x:xs) = (prettyValueWith out t x) >> (out ", ") >> (prettyIteration out t xs)
+-- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
+prettySequence :: (String -> Disco IErr ()) -> Type -> [Value] -> String -> Disco IErr ()
+prettySequence out _ []     _   = out ""
+prettySequence out t [x]    _   = prettyValueWith out t x
+prettySequence out t (x:xs) del = (prettyValueWith out t x) >> out del >> (prettySequence out t xs del)
+
+prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
+prettyBag out _ []         = out "⟅⟆"
+prettyBag out t [(v,n)]    = prettyRepBag out t v n
+prettyBag out t ((v,n):vs) = prettyRepBag out t v n >> out " + " >> prettyBag out t vs
+
+-- XXX needs to take precedence into account?
+prettyRepBag :: (String -> Disco IErr ()) -> Type -> Value -> Integer -> Disco IErr ()
+prettyRepBag out t v 1 = out "⟅" >> prettyValueWith out t v >> out "⟆"
+prettyRepBag out t v n = out "(" >> prettyValueWith out t v >> out " # " >> out (show n) >> out ")"
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""
@@ -438,6 +466,8 @@ prettyString out str = out "\"" >> go str >> out "\""
           go tl
         v'' -> error $ "Impossible! Value that's not a string in prettyString: " ++ show v''
 
+-- | Pretty-print a list with elements of a given type, assuming the
+--   list has already been reduced to WHNF.
 prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyList out ty v = out "[" >> go v
   where
@@ -450,7 +480,7 @@ prettyList out ty v = out "[" >> go v
         _         -> return ()
       go tlWHNF
 
-    go v' = error $ "Impossible! Value that's not a list in prettyList: " ++ show v'
+    go v' = error $ "Impossible! Value that's not a list (or not in WHNF) in prettyList: " ++ show v'
 
 prettyTuple :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyTuple out (TyPair ty1 ty2) (VCons 0 [v1, v2]) = do

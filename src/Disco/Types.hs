@@ -26,12 +26,13 @@ module Disco.Types
        -- * Disco language types
        -- ** Atomic types
 
-         BaseTy(..), Var(..), Atom(..), UAtom
+         BaseTy(..), isCtr, Var(..), Atom(..), UAtom
        , uatomToAtom, isVar, isBase, isSkolem
 
        -- ** Type constructors
 
        , Con(..)
+       , pattern CList, pattern CBag, pattern CSet
 
        -- ** Type AST
 
@@ -48,11 +49,14 @@ module Disco.Types
        , pattern TyQ
        , pattern TyC
        , pattern TyFin
-       , pattern TyArr
+       , pattern TyArr   -- XXX todo: get rid of TyArr in favor of :->:
+       , pattern (:->:)
        , pattern TyPair
        , pattern TySum
        , pattern TyList
+       , pattern TyBag
        , pattern TySet
+       , pattern TyContainer
 
        -- ** Quantified types
 
@@ -71,6 +75,7 @@ module Disco.Types
        , Strictness(..), strictness
 
        -- * Utilities
+       , containerVars
        , countType
        , unpair
        , S
@@ -128,15 +133,30 @@ data BaseTy where
   -- | Unicode characters.
   C    :: BaseTy
 
-
   -- | Finite types. The single argument is a natural number defining
   --   the exact number of inhabitants.
   Fin  :: Integer -> BaseTy
+
+  -- | Set container type.  It's somewhat odd putting these here since
+  --   they have kind * -> * and all the other base types have kind *;
+  --   but this allows us to reuse all the existing constraint solving
+  --   machinery for container subtyping.
+  CtrSet :: BaseTy
+
+  -- | Bag container type.
+  CtrBag :: BaseTy
+
+  -- | List container type.
+  CtrList :: BaseTy
 
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha BaseTy
 instance Subst BaseTy BaseTy
+
+-- | Test whether a 'BaseTy' is a container (set, bag, or list).
+isCtr :: BaseTy -> Bool
+isCtr = (`elem` [CtrSet, CtrBag, CtrList])
 
 ----------------------------------------
 -- Type variables
@@ -193,13 +213,25 @@ data Con where
   CPair :: Con
   -- | Sum type, T1 + T2
   CSum  :: Con
-  -- | Lists
-  CList :: Con
-  -- | Sets
-  CSet  :: Con
+
+  -- | Container type (list, bag, or set).  Note this looks like it
+  --   could contain any Atom, but it will only ever contain either a
+  --   variable or a CtrList, CtrBag, or CtrSet.
+  CContainer :: Atom -> Con
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Con
+
+pattern CList :: Con
+pattern CList = CContainer (ABase CtrList)
+
+pattern CBag :: Con
+pattern CBag = CContainer (ABase CtrBag)
+
+pattern CSet :: Con
+pattern CSet = CContainer (ABase CtrSet)
+
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet #-}
 
 ----------------------------------------
 -- Types
@@ -264,6 +296,11 @@ pattern TyFin n = TyAtom (ABase (Fin n))
 pattern TyArr :: Type -> Type -> Type
 pattern TyArr ty1 ty2 = TyCon CArr [ty1, ty2]
 
+infixr 5 :->:
+
+pattern (:->:) :: Type -> Type -> Type
+pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
+
 pattern TyPair :: Type -> Type -> Type
 pattern TyPair ty1 ty2 = TyCon CPair [ty1, ty2]
 
@@ -273,17 +310,29 @@ pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
 
+pattern TyBag  :: Type -> Type
+pattern TyBag elTy = TyCon CBag [elTy]
+
 pattern TySet :: Type -> Type
 pattern TySet elTy = TyCon CSet [elTy]
 
+pattern TyContainer :: Atom -> Type -> Type
+pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
+
 {-# COMPLETE
       TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      TyArr, TyPair, TySum, TyList, TySet #-}
+      TyArr, TyPair, TySum, TyList, TyBag, TySet #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
 instance Subst Type Atom
-instance Subst Type Con
+instance Subst Type Con where
+  isCoerceVar (CContainer (AVar (U x)))
+    = Just (SubstCoerce x substCtrTy)
+    where
+      substCtrTy (TyAtom a) = Just (CContainer a)
+      substCtrTy _          = Nothing
+  isCoerceVar _                         = Nothing
 instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
   isvar _                     = Nothing
@@ -337,8 +386,12 @@ countType (TyArr  ty1 ty2)
   | isEmptyTy ty2 = Just 0
   | otherwise     = (^) <$> countType ty2 <*> countType ty1
 countType (TyList ty)
-  | isEmptyTy ty            = Just 1
-  | otherwise               = Nothing
+  | isEmptyTy ty  = Just 1
+  | otherwise     = Nothing
+countType (TyBag ty)
+  | isEmptyTy ty  = Just 1
+  | otherwise     = Nothing
+countType (TySet ty)        = (2^) <$> countType ty
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _                 = Nothing
@@ -401,6 +454,13 @@ atomToTypeSubst = map (coerce *** TyAtom)
 
 uatomToTypeSubst :: S' UAtom -> S' Type
 uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)
+
+-- | Return a set of all the free container variables in a type.
+containerVars :: Type -> Set (Name Type)
+containerVars (TyCon (CContainer (AVar (U x))) tys)
+  = x `S.insert` foldMap containerVars tys
+containerVars (TyCon _ tys) = foldMap containerVars tys
+containerVars _ = S.empty
 
 ------------------------------------------------------------
 -- HasType class

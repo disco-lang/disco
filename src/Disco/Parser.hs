@@ -67,7 +67,7 @@ import           Control.Lens                     (makeLenses, toListOf, use,
                                                    (.=))
 import           Control.Monad.State
 import           Data.Char                        (isDigit)
-import           Data.List                        (intercalate)
+import           Data.List                        (find, intercalate)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes)
 import           Data.Ratio
@@ -77,6 +77,7 @@ import           Data.Void
 
 import           Disco.AST.Surface
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -93,6 +94,7 @@ data ParserState = ParserState
   , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
                                --   (some of which may affect parsing).
   }
+
 
 makeLenses ''ParserState
 
@@ -165,11 +167,12 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 opChar :: [Char]
 opChar = "!@#$%^&*~-+=|<>?/\\."
 
-parens, braces, angles, brackets, fbrack, cbrack :: Parser a -> Parser a
+parens, braces, angles, brackets, bagdelims, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
 braces    = between (symbol "{") (symbol "}")
 angles    = between (symbol "<") (symbol ">")
 brackets  = between (symbol "[") (symbol "]")
+bagdelims = between (symbol "⟅") (symbol "⟆")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
@@ -244,18 +247,19 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
-  , "size", "union", "U", "∪", "intersect", "∩"
+  , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
+  , "List", "Bag", "Set"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "forall", "type"
   , "import", "using"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
---   a letter and continuing with alphanumerics, underscores, and
---   apostrophes.
+--   a given type of character and continuing with alphanumerics,
+--   underscores, and apostrophes.
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
@@ -436,7 +440,7 @@ parseAtom = label "expression" $
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ symbol "_"
   <|> TVar <$> ident
-  <|> TPrim <$> (ensureEnabled Primitives *> char '$' *> identifier letterChar)
+  <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
@@ -444,50 +448,83 @@ parseAtom = label "expression" $
   <|> (TUn Floor . TParens) <$> fbrack parseTerm
   <|> (TUn Ceil . TParens) <$> cbrack parseTerm
   <|> parseCase
-  <|> brackets (parseContainer ListContainer)
-  <|> braces (parseContainer SetContainer)
+  <|> bagdelims (parseContainer BagContainer)
+  <|> braces    (parseContainer SetContainer)
+  <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
 
--- | Parse a container, like a literal list or set, or a
---   comprehension (not including the square brackets).
+-- | Parse a primitive name starting with a $.
+parsePrim :: Parser Prim
+parsePrim = do
+  void (char '$')
+  x <- identifier letterChar
+  case find ((==x) . primSyntax) primTable of
+    Just (PrimInfo p _ _) -> return p
+    Nothing               -> fail ("Unrecognized primitive $" ++ x)
+
+-- | Parse a container, like a literal list, set, bag, or a
+--   comprehension (not including the square or curly brackets).
 --
+-- @
+-- <container>
+--   ::= '[' <container-contents> ']'
+--     | '{' <container-contents> '}'
 --
---   > list          ::= '[' listContents ']'
---   > listContents  ::= nonEmptyList | <empty>
---   > nonEmptyList  ::= t [ell] | t listRemainder
---   > ell           ::= '..' [t]
---   > listRemainder ::= '|' listComp | ',' [t (,t)*] [ell]
+-- <container-contents>
+--   ::= empty | <nonempty-container>
+--
+-- <nonempty-container>
+--   ::= <term> [ <ellipsis> ]
+--     | <term> <container-end>
+--
+-- <container-end>
+--   ::= '|' <comprehension>
+--     | ',' [ <term> (',' <item>)* ] [ <ellipsis> ]
+--
+-- <comprehension> ::= <qual> [ ',' <qual> ]*
+--
+-- <qual>
+--   ::= <ident> 'in' <term>
+--     | <term>
+--
+-- <ellipsis> ::= '..' [ <term> ]
+-- @
 
 parseContainer :: Container -> Parser Term
-parseContainer c = nonEmptyList <|> return (TContainer c [] Nothing)
+parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
   -- Careful to do this without backtracking, since backtracking can
   -- lead to bad performance in certain pathological cases (for
   -- example, a very deeply nested list).
 
   where
-    -- Any non-empty list starts with a term, followed by some
-    -- remainder (which could either be the rest of a literal list, or
-    -- a list comprehension).  If there is no remainder just return a
-    -- singleton list, optionally with an ellipsis.
-    nonEmptyList = do
+    -- Any non-empty container starts with a term, followed by some
+    -- remainder (which could either be the rest of a literal
+    -- container, or a container comprehension).  If there is no
+    -- remainder just return a singleton container, optionally with an
+    -- ellipsis.
+    nonEmptyContainer = do
       t <- parseTerm
-      (listRemainder t <|> singletonList t)
+      containerRemainder t <|> singletonContainer t
 
-    singletonList t = TContainer c [t] <$> optionMaybe parseEllipsis
+    singletonContainer t = TContainer c [t] <$> optionMaybe parseEllipsis
 
-    -- The remainder of a list after the first term starts with either
-    -- a pipe (for a comprehension) or a comma (for a literal list).
-    listRemainder t = do
+    -- The remainder of a container after the first term starts with
+    -- either a pipe (for a comprehension) or a comma (for a literal
+    -- container).
+    containerRemainder :: Term -> Parser Term
+    containerRemainder t = do
       s <- pipe <|> comma
       case s of
         "|" -> parseContainerComp c t
         "," -> do
-          -- Parse the rest of the terms in a literal list after the
-          -- first, then an optional ellipsis, and return everything together.
+          -- Parse the rest of the terms in a literal container after
+          -- the first, then an optional ellipsis, and return
+          -- everything together.
           ts <- parseTerm `sepBy` comma
           e  <- optionMaybe parseEllipsis
+
           return $ TContainer c (t:ts) e
-        _   -> error "Impossible, got a symbol other than '|' or ',' in listRemainder"
+        _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
 --   @.. [t]@.  Any number > 1 of dots may be used, just for fun.
@@ -688,8 +725,11 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     mkOpParser :: OpInfo -> [Operator Parser Term]
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 
-    withOpFixity (UOpF fx op) syn = (ufxParser fx) (reservedOp syn >> return (TUn op))
-    withOpFixity (BOpF fx op) syn = (bfxParser fx) (reservedOp syn >> return (TBin op))
+    withOpFixity (UOpF fx op) syn
+      = (ufxParser fx) ((reservedOp syn <?> "operator") >> return (TUn op))
+
+    withOpFixity (BOpF fx op) syn
+      = (bfxParser fx) ((reservedOp syn <?> "operator") >> return (TBin op))
 
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
@@ -811,9 +851,10 @@ parseAtomicType = label "type" $
     -- right-associative single-argument type formers (e.g. List, and
     -- eventually things like Set), this can't cause any ambiguity.
   <|> TyList <$> (reserved "List" *> parseAtomicType)
-  <|> TySet <$> (reserved "Set" *> parseAtomicType)
-  <|> TyDef <$> parseTyDef
-  <|> TyVar <$> parseTyVar
+  <|> TyBag  <$> (reserved "Bag"  *> parseAtomicType)
+  <|> TySet  <$> (reserved "Set"  *> parseAtomicType)
+  <|> TyDef  <$> parseTyDef
+  <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
 parseTyFin :: Parser Type

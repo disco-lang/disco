@@ -45,6 +45,7 @@ import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Monad
 import           Disco.Types
 
@@ -570,10 +571,25 @@ desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DS
 desugarContainer ty ListContainer es Nothing =
   foldr (DTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
 
--- All others simply turn into a @DTContainer@ constructor, though we
--- might in the future consider replacing DTContainer by more
--- primitive things. For example, we could add a primitive set
--- insertion function and desugar to repeated applications of it.
+-- A list container with an ellipsis (@[x, y, z ..]@) desugars to
+-- an application of the primitive 'forever' function...
+desugarContainer ty ListContainer es (Just Forever) =
+  DTApp ty (DTPrim (ty :->: ty) PrimForever) <$> desugarContainer ty ListContainer es Nothing
 
-desugarContainer ty c es mell =
-  DTContainer ty c <$> mapM desugarTerm es <*> (traverse . traverse) desugarTerm mell
+-- ... or @[x, y, z .. e]@ desugars to an application of the primitive
+-- 'until' function.
+desugarContainer ty@(TyList eltTy) ListContainer es (Just (Until t)) =
+  DTApp ty
+    <$> (DTApp (ty :->: ty) (DTPrim (eltTy :->: ty :->: ty) PrimUntil) <$> desugarTerm t)
+    <*> desugarContainer ty ListContainer es Nothing
+
+-- Other containers with ellipses desugar to an application of the
+-- appropriate container conversion function to the corresponding desugared list.
+desugarContainer ty _ es mell =
+  DTApp ty (DTPrim (TyList eltTy :->: ty) conv)
+    <$> desugarContainer (TyList eltTy) ListContainer es mell
+  where
+    (conv, eltTy) = case ty of
+      TyBag e -> (PrimBag, e)
+      TySet e -> (PrimSet, e)
+      _       -> error $ "Impossible! Non-container type " ++ show ty ++ " in desugarContainer"

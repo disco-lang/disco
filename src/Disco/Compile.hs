@@ -1,4 +1,5 @@
-{-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns  #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Compile
@@ -23,6 +24,7 @@ import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Monad
 import           Disco.Types
 import           Disco.Util
@@ -53,21 +55,24 @@ compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
 -- | Compile a typechecked, desugared 'DTerm' to an untyped 'Core'
 --   term.
 compileDTerm :: DTerm -> FreshM Core
-compileDTerm (DTVar _ x)  = return $ CVar (coerce x)
-compileDTerm (DTPrim _ x) = return $ CPrim x
-compileDTerm DTUnit       = return $ CCons 0 []
-compileDTerm (DTBool b)   = return $ CCons (fromEnum b) []
-compileDTerm (DTChar c)   = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
-compileDTerm (DTNat ty n) = compileNat ty n
-compileDTerm (DTRat r)    = return $ CNum Decimal r
+compileDTerm (DTVar _ x)   = return $ CVar (coerce x)
+compileDTerm (DTPrim ty x) = compilePrim ty x
+compileDTerm DTUnit        = return $ CCons 0 []
+compileDTerm (DTBool b)    = return $ CCons (fromEnum b) []
+compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
+compileDTerm (DTNat ty n)  = compileNat ty n
+compileDTerm (DTRat r)     = return $ CNum Decimal r
 
 compileDTerm (DTLam _ l) = do
   (x,body) <- unbind l
   c <- compileDTerm body
-  return $ CAbs (bind (coerce x) c)
+  return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
 
-compileDTerm (DTApp ty t1 t2)
-  = CApp (strictness ty) <$> compileDTerm t1 <*> compileDTerm t2
+compileDTerm (DTApp _ t1 t2)
+  = appChain t1 [t2]
+  where
+    appChain (DTApp _ t1' t2') ts = appChain t1' (t2':ts)
+    appChain t1' ts               = CApp <$> compileDTerm t1' <*> mapM compileArg ts
 
 compileDTerm (DTPair _ t1 t2)
   = CCons 0 <$> mapM compileDTerm [t1,t2]
@@ -79,12 +84,17 @@ compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 
 compileDTerm (DTUn _ op t)
-  = compileUOp op <$> compileDTerm t
+  = CApp (compileUOp (getType t) op) <$> mapM compileArg [t]
+
+-- Special case for Cons, which compiles to a constructor application
+-- rather than a function application.
+compileDTerm (DTBin _ Cons t1 t2)
+  = CCons 1 <$> mapM compileDTerm [t1, t2]
 
 compileDTerm (DTBin ty op t1 t2)
-  = compileBOp (getType t1) (getType t2) ty op <$> compileDTerm t1 <*> compileDTerm t2
+  = CApp (compileBOp (getType t1) (getType t2) ty op) <$> mapM compileArg [t1, t2]
 
-compileDTerm (DTTyOp _ op ty) = return $ COp (tyOps ! op) [CType ty]
+compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CType ty)]
   where
     tyOps = M.fromList
       [ Enumerate ==> OEnum
@@ -92,24 +102,6 @@ compileDTerm (DTTyOp _ op ty) = return $ COp (tyOps ! op) [CType ty]
       ]
 
 compileDTerm (DTNil _)        = return $ CCons 0 []
-
-compileDTerm (DTContainer _ ListContainer ds (Just ell))
-  = CEllipsis <$> mapM compileDTerm ds <*> traverse compileDTerm ell
-
-compileDTerm (DTContainer _ ListContainer _ Nothing)
-  = error $ unlines
-      [ "Impossible: compileDTerm on DTContainer ListContainer with no ellipsis"
-      , "(should have already been desugared)"
-      ]
-
-compileDTerm (DTContainer (TySet eltTy) SetContainer ds Nothing)
-  = CoreSet eltTy <$> mapM compileDTerm ds
-
-compileDTerm (DTContainer (TySet _) SetContainer _ (Just _))
-  = error $ "compileDTerm DTContainer SetContainer with ellipsis: unimplemented"
-
-compileDTerm (DTContainer ty c _ _)
-  = error $ "Impossible: compileDTerm on DTContiner " ++ show c ++ " with non-Set type " ++ show ty
 
 ------------------------------------------------------------
 
@@ -119,6 +111,45 @@ compileDTerm (DTContainer ty c _ _)
 compileNat :: Type -> Integer -> FreshM Core
 compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
 compileNat _         x = return $ CNum Fraction (x % 1)
+
+------------------------------------------------------------
+
+-- | Compile a DTerm which will be an argument to a function,
+--   packaging it up along with the strictness of its type.
+compileArg :: DTerm -> FreshM (Strictness, Core)
+compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
+
+-- | Compile a primitive.  Typically primitives turn into a
+--   corresponding function constant in the core language, but
+--   sometimes the particular constant it turns into may depend on the
+--   type.
+compilePrim :: Type -> Prim -> FreshM Core
+compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
+compilePrim (TyBag _ :->: _)  PrimSet  = return $ CConst OBagToSet
+compilePrim (TyBag _ :->: _)  PrimList = return $ CConst OBagToList
+compilePrim (TyList a :->: _) PrimSet  = return $ CConst (OListToSet a)
+compilePrim (TyList a :->: _) PrimBag  = return $ CConst (OListToBag a)
+compilePrim _ p | p `elem` [PrimList, PrimBag, PrimSet] = return $ CConst OId
+
+compilePrim ty PrimList = error $ "Impossible! compilePrim PrimList on bad type " ++ show ty
+compilePrim ty PrimBag  = error $ "Impossible! compilePrim PrimBag on bad type " ++ show ty
+compilePrim ty PrimSet  = error $ "Impossible! compilePrim PrimSet on bad type " ++ show ty
+
+compilePrim (_ :->: (TyList _ :->: _))          PrimMap = return $ CConst OMapList
+compilePrim (_ :->: (TyBag _ :->: TyBag outTy)) PrimMap = return $ CConst (OMapBag outTy)
+compilePrim (_ :->: (TySet _ :->: TySet outTy)) PrimMap = return $ CConst (OMapSet outTy)
+
+compilePrim (_ :->: (_ :->: (TyList _ :->: _))) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :->: (_ :->: (TyBag  _ :->: _))) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :->: (_ :->: (TySet  _ :->: _))) PrimReduce = return $ CConst OReduceBag
+
+compilePrim _ PrimIsPrime = return $ CConst OIsPrime
+compilePrim _ PrimFactor  = return $ CConst OFactor
+
+compilePrim _ PrimCrash   = return $ CConst OCrash
+
+compilePrim _ PrimForever = return $ CConst OForever
+compilePrim _ PrimUntil   = return $ CConst OUntil
 
 ------------------------------------------------------------
 -- Case expressions
@@ -160,28 +191,33 @@ compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
 -- Unary and binary operators
 ------------------------------------------------------------
 
--- | Compile a unary operator application.
-compileUOp :: UOp -> Core -> Core
-compileUOp op c = COp (coreUOps ! op) [c]
+-- | Compile a unary operator.
+compileUOp
+  :: Type   -- ^ Type of the operator argument
+  -> UOp
+  -> Core
+
+compileUOp (TySet a) PowerSet = CConst (OPowerSet a)
+
+compileUOp _ op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
     coreUOps = M.fromList $
-      [ Neg   ==> ONeg
-      , Fact  ==> OFact
-      , Sqrt  ==> OSqrt
-      , Lg    ==> OLg
-      , Floor ==> OFloor
-      , Ceil  ==> OCeil
-      , Abs   ==> OAbs
+      [ Neg      ==> ONeg
+      , Fact     ==> OFact
+      , Sqrt     ==> OSqrt
+      , Lg       ==> OLg
+      , Floor    ==> OFloor
+      , Ceil     ==> OCeil
+      , Abs      ==> OAbs
       ]
 
--- | Compile a binary operator application.  This function needs to
---   know the types of the arguments and result since some operators
---   are overloaded and compile to different code depending on their
---   type.
+-- | Compile a binary operator.  This function needs to know the types
+--   of the arguments and result since some operators are overloaded
+--   and compile to different code depending on their type.
 --
---  @arg1 ty -> arg2 ty -> result ty -> op -> arg1 -> arg2 -> result@
-compileBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
+--  @arg1 ty -> arg2 ty -> result ty -> op -> result@
+compileBOp :: Type -> Type -> Type -> BOp -> Core
 
 -- First, compile some operators specially for modular arithmetic.
 -- Most operators on TyFun (add, mul, sub, etc.) have already been
@@ -199,9 +235,9 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core -> Core -> Core
 --
 -- We match on the type of arg1 because that is the only one which
 -- will consistently be TyFin in the case of Div, Exp, and Divides.
-compileBOp (TyFin n) _ _ op c1 c2
+compileBOp (TyFin n) _ _ op
   | op `elem` [Div, Exp, Divides]
-  = COp ((omOps ! op) n) [c1, c2]
+  = CConst ((omOps ! op) n)
   where
     omOps = M.fromList
       [ Div     ==> OMDiv
@@ -210,9 +246,9 @@ compileBOp (TyFin n) _ _ op c1 c2
       ]
 
 -- Some regular arithmetic operations that just translate straightforwardly.
-compileBOp _ _ _ op c1 c2
+compileBOp _ _ _ op
   | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
-  = COp (regularOps ! op) [c1, c2]
+  = CConst (regularOps ! op)
   where
     regularOps = M.fromList
       [ Add     ==> OAdd
@@ -230,26 +266,24 @@ compileBOp _ _ _ op c1 c2
 -- we just store the type itself, and compute the comparison function
 -- in a type-directed way; see Disco.Interpret.Core.decideEqFor and
 -- decideOrdFor.)
-compileBOp ty _ _ Eq c1 c2 = COp (OEq ty) [c1, c2]
-compileBOp ty _ _ Lt c1 c2 = COp (OLt ty) [c1, c2]
-
--- The Cons binary operator compiles to an application of a
--- constructor.
-compileBOp _ _ _ Cons c1 c2 = CCons 1 [c1, c2]
+compileBOp ty _ _ Eq = CConst (OEq ty)
+compileBOp ty _ _ Lt = CConst (OLt ty)
 
 -- Operations on sets compile straightforwardly, except that they also
 -- need to store the element type so they can compare the elements
 -- appropriately.
-compileBOp (TySet ty) _ _ op c1 c2
-  | op `elem` [Union, Intersection, Difference, Subset]
-  = COp ((setOps ! op) ty) [c1, c2]
+compileBOp (TySet ty) _ _ op
+  | op `elem` [Union, Inter, Diff, Subset]
+  = CConst ((setOps ! op) ty)
   where
     setOps = M.fromList
-      [ Union        ==> OUnion
-      , Intersection ==> OIntersection
-      , Difference   ==> ODifference
-      , Subset       ==> OSubset
+      [ Union  ==> OUnion
+      , Inter  ==> OInter
+      , Diff   ==> ODiff
+      , Subset ==> OSubset
       ]
 
-compileBOp ty1 ty2 resTy op c1 c2
-  = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op, c1, c2)
+compileBOp _ _ _ Rep = CConst ORep
+
+compileBOp ty1 ty2 resTy op
+  = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

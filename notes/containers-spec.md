@@ -6,27 +6,26 @@ Syntax
 
 ```
 <container>
-  ::= '[' <container-contents> ']'
-    | '{' <container-contents> '}'
+  ::= '['  <container-contents> ']'
+    | '{'  <container-contents> '}'
+    | '{#' <container-contents> '#}'
 
 <container-contents>
   ::= empty | <nonempty-container>
 
 <nonempty-container>
-  ::= <item> [ <ellipsis> ]
-    | <item> <container-end>
+  ::= <term> [ <ellipsis> ]
+    | <term> <container-end>
 
 <container-end>
   ::= '|' <comprehension>
-    | ',' [ <item> (',' <item>)* ] [ <ellipsis> ]
+    | ',' [ <term> (',' <term>)* ] [ <ellipsis> ]
 
 <comprehension> ::= <qual> [ ',' <qual> ]*
 
 <qual>
   ::= <ident> 'in' <term>
     | <term>
-
-<item> ::= <term> [ '#' <natural> ]
 
 <ellipsis> ::= '..' [ <term> ]
 ```
@@ -36,8 +35,8 @@ Syntax examples:
 ```
 { 'x', 'y', 'z' }
 [ 1, 3 .. ]
-{ 5 # 3 .. 100 }
-[ 'a' # 5, 'b', 'c' # 19 ]
+{# 5 .. 100 #}
+{# 3, 3, 3 #}
 ```
 
 Subtyping/conversion
@@ -71,9 +70,10 @@ some sort of (idempotent) canonicalization: `List -> Bag -> List`
 is `sort`; `Bag -> Set -> Bag` drops duplicates; `List ->
 Set -> List` both sorts and drops duplicates.
 
-So *e.g.* `list` can have either of the types
+So *e.g.* `list` can have any of the types
 
 ```
+list : List a -> List a
 list : Bag a -> List a
 list : Set a -> List a
 ```
@@ -137,6 +137,4 @@ write `x in {1 .. 10}`).
 
 Dynamic (runtime) semantics
 ---------------------------
-
-
 

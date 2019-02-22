@@ -26,8 +26,6 @@ import           Unbound.Generics.LocallyNameless
 
 import           Control.Lens                     (makeLenses)
 import           Control.Monad.Except
-import           Control.Monad.Fail               (MonadFail)
-import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.RWS
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
@@ -35,6 +33,7 @@ import           Prelude                          hiding (lookup)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
@@ -86,8 +85,9 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
-  | NotCon Con Term Type   -- ^ The term should have an outermost constructor matching
-                           --   matching Con, but it has type 'Type' instead
+  | NotCon Con Term Type   -- ^ The type of the term should have an
+                           --   outermost constructor matching Con, but
+                           --   it has type 'Type' instead
   | EmptyCase              -- ^ Case analyses cannot be empty.
   | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
@@ -100,6 +100,7 @@ data TCError
   | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
   | NotTyDef String        -- ^ An undefined type name was used.
   | NoTWild                -- ^ Wildcards are not allowed in terms.
+  | CantInferPrim Prim     -- ^ Can't infer the type of some prims
   | Failure String         -- ^ Generic failure.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
@@ -208,4 +209,6 @@ withTyDefns tyDefnCtx m = do
 freshTy :: TCM Type
 freshTy = TyVar <$> fresh (string2Name "a")
 
-
+-- | Generate a fresh variable as an atom.
+freshAtom :: TCM Atom
+freshAtom = (AVar . U) <$> fresh (string2Name "c")

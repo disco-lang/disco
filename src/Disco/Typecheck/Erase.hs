@@ -111,8 +111,6 @@ eraseDTerm (DTUn _ op d)    = TUn op (eraseDTerm d)
 eraseDTerm (DTBin _ op d1 d2) = TBin op (eraseDTerm d1) (eraseDTerm d2)
 eraseDTerm (DTTyOp _ op ty) = TTyOp op ty
 eraseDTerm (DTNil _)        = TList [] Nothing
-eraseDTerm (DTContainer _ c ds mell)
-  = TContainer c (map eraseDTerm ds) ((fmap . fmap) eraseDTerm mell)
 
 eraseDBranch :: DBranch -> Branch
 eraseDBranch b = bind (mapTelescope eraseDGuard tel) (eraseDTerm d)

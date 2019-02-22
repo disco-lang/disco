@@ -1,4 +1,12 @@
 []
 {}
+⟅⟆
 [] : List a
 {} : Set a
+⟅⟆ : Bag a
+[3] : List ℕ
+{3} : Set ℕ
+⟅3⟆ : Bag ℕ
+list : List a → List a
+bag : List ℕ → Bag ℕ
+set : List ℕ → Set ℕ

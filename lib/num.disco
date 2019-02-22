@@ -8,3 +8,7 @@ using Primitives
 !!! isPrime 1000000007
 isPrime : N -> Bool
 isPrime = $isPrime
+
+||| Compute the prime factorization of the given natural number.
+factor : N -> Bag N
+factor = $factor

@@ -3,6 +3,7 @@
 {-# LANGUAGE GADTs                 #-}
 {-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE TupleSections         #-}
 
@@ -168,8 +169,9 @@ solveConstraint :: M.Map String Type -> Constraint -> SolveM S
 solveConstraint tyDefns c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
-  -- collect wanted qualifiers.  Should result in just a list of
-  -- equational and subtyping constraints in addition to qualifiers.
+  -- collect wanted qualifiers; also expand disjunctions.  Result in a
+  -- list of possible constraint sets; each one consists of equational
+  -- and subtyping constraints in addition to qualifiers.
 
   traceShowM c
 
@@ -178,6 +180,8 @@ solveConstraint tyDefns c = do
 
   qcList <- decomposeConstraint c
 
+  -- Now try continuing with each set and pick the first one that has
+  -- a solution.
   msum (map (uncurry (solveConstraintChoice tyDefns)) qcList)
 
 solveConstraintChoice :: M.Map String Type -> SortMap -> [SimpleConstraint] -> SolveM S
@@ -211,7 +215,13 @@ solveConstraintChoice tyDefns quals cs = do
 
   traceM "------------------------------"
   traceM "Generating constraint graph..."
-  let g = mkConstraintGraph atoms
+
+  -- Some variables might have qualifiers but not participate in any
+  -- equality or subtyping relations (see issue #153); make sure to
+  -- extract them and include them in the constraint graph as isolated
+  -- vertices
+  let vars = S.map (AVar . U) $ M.keysSet (unSM sm)
+  let g = mkConstraintGraph vars atoms
 
   traceShowM g
 
@@ -441,7 +451,16 @@ simplify tyDefns origSM cs
     -- Given a subtyping constraint between two type constructors,
     -- decompose it if the constructors are the same (or fail if they
     -- aren't), taking into account the variance of each argument to
-    -- the constructor.
+    -- the constructor.  Container types are a special case;
+    -- recursively generate a subtyping constraint for their
+    -- constructors as well.
+    simplifyOne' (TyCon c1@(CContainer ctr1) tys1 :<: TyCon (CContainer ctr2) tys2) =
+      ssConstraints %=
+        (( (TyAtom ctr1 :<: TyAtom ctr2)
+         : zipWith3 variance (arity c1) tys1 tys2
+         )
+         ++)
+
     simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
       | c1 /= c2  = throwError NoUnify
       | otherwise =
@@ -526,13 +545,13 @@ simplify tyDefns origSM cs
 --------------------------------------------------
 -- Step 4: Build constraint graph
 
--- | Given a list of atomic subtype constraints (each pair @(a1,a2)@
---   corresponds to the constraint @a1 <: a2@) build the corresponding
---   constraint graph.
-mkConstraintGraph :: [(Atom, Atom)] -> Graph Atom
-mkConstraintGraph cs = G.mkGraph nodes (S.fromList cs)
+-- | Given a list of atoms and atomic subtype constraints (each pair
+--   @(a1,a2)@ corresponds to the constraint @a1 <: a2@) build the
+--   corresponding constraint graph.
+mkConstraintGraph :: Ord a => Set a -> [(a, a)] -> Graph a
+mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
   where
-    nodes = S.fromList $ cs ^.. traverse . each
+    nodes = as `S.union` (S.fromList $ cs ^.. traverse . each)
 
 --------------------------------------------------
 -- Step 5: Check skolems
@@ -595,18 +614,25 @@ checkSkolems tyDefns (SM sm) graph = do
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
 elimCycles :: Map String Type -> Graph UAtom -> Except SolveError (Graph UAtom, S)
-elimCycles tyDefns g
+elimCycles tyDefns = elimCyclesGen uatomToAtom atomToTypeSubst (unifyAtoms tyDefns)
+
+elimCyclesGen
+  :: forall a a' b.
+     (Subst a' a, Subst a' a', Ord a, Ord a')
+  => (a -> a') -> (S' a' -> S' b) -> ([a'] -> Maybe (S' a'))
+  -> Graph a -> Except SolveError (Graph a, S' b)
+elimCyclesGen aToa' genSubst genUnify g
   = maybeError NoUnify
-  $ (G.map fst &&& (atomToTypeSubst . compose . S.map snd . G.nodes)) <$> g'
+  $ (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (UAtom, S' Atom))
+    g' :: Maybe (Graph (a, S' a'))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set UAtom -> Maybe (UAtom, S' Atom)
+    unifySCC :: Set a -> Maybe (a, S' a')
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip substs a &&& id) <$> unifyAtoms tyDefns (map uatomToAtom as)
+      as@(a:_) -> (flip substs a &&& id) <$> genUnify (map aToa' as)
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution

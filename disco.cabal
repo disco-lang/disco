@@ -32,14 +32,28 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-finite-types/input
                      test/arith-numthry/expected
                      test/arith-numthry/input
+                     test/arith-prim/arith-prim.disco
+                     test/arith-prim/expected
+                     test/arith-prim/input
                      test/arith-round/expected
                      test/arith-round/input
+                     test/bag-ops/expected
+                     test/bag-ops/input
+                     test/case-arith/case-arith.disco
+                     test/case-arith/expected
+                     test/case-arith/input
                      test/case-basic/case-basic.disco
                      test/case-basic/expected
                      test/case-basic/input
+                     test/case-let/case-let.disco
+                     test/case-let/expected
+                     test/case-let/input
+                     test/containers-convert/expected
+                     test/containers-convert/input
                      test/interp-fibs/expected
                      test/interp-fibs/fiblist.disco
                      test/interp-fibs/input
+                     test/interp-lazymatch/bomb.disco
                      test/interp-lazymatch/expected
                      test/interp-lazymatch/input
                      test/list-comp/expected
@@ -52,10 +66,19 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/logic-bools/input
                      test/logic-cmp/expected
                      test/logic-cmp/input
+                     test/module-basic/a.disco
+                     test/module-basic/b.disco
+                     test/module-basic/c.disco
+                     test/module-basic/e.disco
+                     test/module-basic/expected
+                     test/module-basic/input
+                     test/module-basic/subdir/d.disco
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/poly-bad/expected
+                     test/poly-bad/input
                      test/poly-infer-sort/expected
                      test/poly-infer-sort/input
                      test/poly-instantiate/expected
@@ -73,6 +96,13 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
+                     test/repl-defn/expected
+                     test/repl-defn/input
+                     test/set-ops/expected
+                     test/set-ops/input
+                     test/solver-issue112/diag-iso-bad.disco
+                     test/solver-issue112/expected
+                     test/solver-issue112/input
                      test/syntax-chain/expected
                      test/syntax-chain/inRange.disco
                      test/syntax-chain/input
@@ -82,11 +112,16 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-comment/expected
                      test/syntax-comment/fib.disco
                      test/syntax-comment/input
+                     test/syntax-containers/expected
+                     test/syntax-containers/input
                      test/syntax-decimals/expected
                      test/syntax-decimals/input
                      test/syntax-doc/expected
                      test/syntax-doc/input
                      test/syntax-doc/syntax-doc.disco
+                     test/syntax-exts/expected
+                     test/syntax-exts/input
+                     test/syntax-exts/syntax-exts.disco
                      test/syntax-juxt-app/expected
                      test/syntax-juxt-app/input
                      test/syntax-juxt-app/juxt-app.disco
@@ -106,20 +141,30 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-patclause/expected
                      test/syntax-patclause/fact.disco
                      test/syntax-patclause/input
+                     test/syntax-prims/expected
+                     test/syntax-prims/input
+                     test/syntax-prims/syntax-prims.disco
                      test/syntax-tuples/expected
                      test/syntax-tuples/input
                      test/syntax-types/expected
                      test/syntax-types/input
                      test/types-bind/expected
                      test/types-bind/input
+                     test/types-char-string/expected
+                     test/types-char-string/input
                      test/types-compare/expected
                      test/types-compare/input
+                     test/types-container/expected
+                     test/types-container/input
                      test/types-ops/expected
                      test/types-ops/input
                      test/types-rational/expected
                      test/types-rational/input
                      test/types-squash/expected
                      test/types-squash/input
+                     test/types-tydefs/expected
+                     test/types-tydefs/input
+                     test/types-tydefs/types-tydefs.disco
                      --- TEST FILES END ---
 
 cabal-version:       1.18

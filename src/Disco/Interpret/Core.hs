@@ -170,7 +170,8 @@ whnfV (VThunk c e) = withEnv e $ whnf c
 whnfV (VDelay imv) = imv >>= whnfV
 
 -- If it is an indirection, call 'whnfIndir' which will look up the
--- value it points to and reduce it.
+-- value it points to, reduce it, and store the result so it won't
+-- have to be re-evaluated the next time loc is referenced.
 whnfV (VIndir loc) = whnfIndir loc
 
 -- Otherwise, the value is already in WHNF (it is a number, a
@@ -192,29 +193,25 @@ whnfIndir loc = do
 
 
 -- | Reduce a Core expression to weak head normal form.  This is where
---   the real work of interpreting happens.
+--   the real work of interpreting happens.  Most rules are
+--   uninteresting except for function application and case.
 whnf :: Core -> Disco IErr Value
+
+------------------------------------------------------------
+-- Boring cases (variables, constants, constructors, lambdas)
 
 -- To reduce a variable, look it up in the environment and reduce the
 -- result.
 whnf (CVar x) = do
   e <- getEnv
-  case (M.lookup (coerce x) e) of
+  case M.lookup (coerce x) e of
     Just v  -> whnfV v
-    Nothing -> error $ "Unbound variable while interpreting! " ++ show x
-      -- We should never encounter an unbound variable at this stage if the program
-      -- already typechecked.
+    Nothing -> error $ "Impossible! Unbound variable while interpreting: " ++ show x
+      -- We should never encounter an unbound variable at this stage
+      -- if the program already typechecked.
 
-whnf (CConst x) = return $ VConst x
-
--- whnf (CPrim PMap ty) =
---   return $ VFun (ValFun (\f -> VFun (ValFun (\s -> VDelay (ValDelay (mapSet f s ty))))))
-
--- -- whnf (CPrim PFoldSet ty) =
--- --   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\s -> VDelay (ValDelay (foldSet f b s ty))))))))
-
--- -- whnf (CPrim PFoldMultiset ty) =
--- --   return $ VFun (ValFun (\f -> VFun (ValFun (\b -> VFun (ValFun (\m -> VDelay (ValDelay (foldMultiset f b m ty))))))))
+-- Function constants don't reduce in and of themselves.
+whnf (CConst x)     = return $ VConst x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
@@ -227,172 +224,31 @@ whnf (CNum d n)     = return $ VNum d n
 -- closure with the current environment.
 whnf (CAbs b)       = VClos b <$> getEnv
 
--- To reduce an application:
-whnf (CApp c cs) = do
+-- Type constants don't reduce.
+whnf (CType ty)     = return $ VType ty
 
-  -- First reduce the function to WHNF
+------------------------------------------------------------
+-- Interesting cases! (application, case)
+
+-- To reduce an application:
+whnf (CApp c cs)    = do
+
+  -- First reduce the function to WHNF...
   v <- whnf c
 
   -- Then either reduce each argument or turn it into a thunk,
   -- depending on the specified strictness.
   vs <- mapM (uncurry whnfArg) cs
 
-  -- Finally, call 'whnfApp' to do the application.
+  -- Finally, call 'whnfApp' to do the actual application.
   whnfApp v vs
 
--- Case expressions have their own function to do reduction.
+-- See 'whnfCase' for case reduction logic.
 whnf (CCase bs)     = whnfCase bs
 
-whnf (CType ty)      = return $ VType ty
-
--- XXX move all this container stuff to a different location in the file
-
--- | Check whether a certain value is present in a list using a linear search.
--- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
--- elemOf _ _ []     = return False
--- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
-
--- | Given a list of disco values, sort and collate them into a list
---   pairing each unique value with its count.  Used to
---   construct/normalize bags and sets.
-countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
-countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
-
--- | Normalize a list of values paired with a count.  The input list
---   could have duplicate values.  This function first uses merge sort
---   to sort the values according to the given comparison function,
---   then adds the counts of multiple instances of the same value.
-sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
-sortNCount _ []  = return []
-sortNCount _ [x] = return [x]
-sortNCount f xs  = do
-  fstSorted <- sortNCount f firstHalf
-  sndSorted <- sortNCount f secondHalf
-  merge (+) f fstSorted sndSorted
-  where
-    (firstHalf, secondHalf) = splitAt n xs
-    n = length xs `div` 2
-
--- | Generic function for merging two sorted, count-annotated lists of
---   type @[(a,Integer)]@ a la merge sort, using the given comparison
---   function, and using the provided count combining function to
---   decide what count to assign to each element of the output.  For
---   example, @(+)@ corresponds to bag union; @min@ corresponds to
---   intersection; and so on.
-merge :: Monad m
-      => (Integer -> Integer -> Integer)   -- ^ Function for combining counts
-      -> (a -> a -> m Ordering)            -- ^ Comparison function
-      -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
-merge g _ [] ys                    = case g 0 1 of
-  1 -> return ys
-  0 -> return []
-  _ -> error "invalid merge counting function"
-merge g _ xs []                    = case g 1 0 of
-  1 -> return xs
-  0 -> return []
-  _ -> error "invalid merge counting function"
-merge g comp ((x,n1):xs) ((y,n2): ys) = do
-  o <- comp x y
-  case o of
-    LT -> mergeCons x n1 0  <$> merge g comp xs ((y,n2):ys)
-    EQ -> mergeCons x n1 n2 <$> merge g comp xs ys
-    GT -> mergeCons y 0 n2  <$> merge g comp ((x,n1):xs) ys
-    where
-      mergeCons a m1 m2 zs = case g m1 m2 of
-        0 -> zs
-        n -> ((a,n):zs)
-
--- foldrValues :: Value -> Value -> [Value] -> Disco IErr Value
--- foldrValues _ b []     = return b
--- foldrValues f b (x:xs) = do
---   fx <- whnfApp f x
---   foldedList <- foldrValues f b xs
---   whnfApp fx foldedList
---
--- foldSet :: Value -> Value -> Value -> Type -> Disco IErr Value
--- foldSet f b s ty = do
---   fcn <- whnfV f
---   vb <- whnfV b
---   VBag xs <- whnfV s
---   sortedXs <- mergeSort xs ty
---   foldrValues fcn vb sortedXs
-
-setToList :: Value -> Disco IErr Value
-setToList s = do
-  VBag xs <- whnfV s
-  return . toDiscoList . map fst $ xs
-
-
-bagToSet :: Value -> Disco IErr Value
-bagToSet b = do
-  VBag xs <- whnfV b
-  return $ VBag (map (\(v,_) -> (v,1)) xs)
-
-bagToList :: Value -> Disco IErr Value
-bagToList b = do
-  VBag xs <- whnfV b
-  return . toDiscoList . concatMap (uncurry (flip (replicate . fromIntegral))) $ xs
-    -- XXX could be more efficient if we add some sharing, so replicated values
-    -- will only be evaluated once
-
--- | Convert a list to a set, sorting the values and removing
---   duplicates.
-listToSet :: Type -> Value -> Disco IErr Value
-listToSet ty v = do
-  vs <- fromDiscoList v
-  vcs <- countValues ty vs
-  return . VBag $ (map . fmap) (const 1) vcs
-
--- | Convert a list to a bag, sorting and counting the values.
-listToBag :: Type -> Value -> Disco IErr Value
-listToBag ty v = do
-  vs <- fromDiscoList v
-  VBag <$> countValues ty vs
-
--- | Map a function over a list.
-primMapList :: Value -> Value -> Disco IErr Value
-primMapList f xs = do
-  f' <- whnfV f
-  vmap (\v -> whnfApp f' [v]) xs
-
--- | Map a function over a bag.  The type argument is the /output/
---   type of the function.
-primMapBag :: Type -> Value -> Value -> Disco IErr Value
-primMapBag ty f xs = do
-  f'       <- whnfV f
-  VBag cts <- whnfV xs
-  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
-  VBag <$> sortNCount (decideOrdFor ty) cts'
-
--- | Map a function over a bag.  The type argument is the /output/
---   type of the function.
-primMapSet :: Type -> Value -> Value -> Disco IErr Value
-primMapSet ty f xs = do
-  f'       <- whnfV f
-  VBag cts <- whnfV xs
-  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
-  (VBag . map (second (const 1))) <$> sortNCount (decideOrdFor ty) cts'
-
--- | Reduce a list according to a given combining function and base
---   case value.
-primReduceList :: Value -> Value -> Value -> Disco IErr Value
-primReduceList f z xs = do
-  f' <- whnfV f
-  vfoldr (\a b -> whnfApp f' [a,b]) z xs
-
--- | Reduce a bag (or set) according to a given combining function and
---   base case value.
-primReduceBag :: Value -> Value -> Value -> Disco IErr Value
-primReduceBag f z b = do
-  f' <- whnfV f
-  VBag cts <- whnfV b
-  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
-  vfoldr (\a r -> whnfApp f' [a,r]) z xs
-
-  -- XXX this is super inefficient! (1) should have some sharing so
-  -- replicated elements of bag aren't recomputed; (2) shouldn't have
-  -- to go via toDiscoList -> vfoldr, just do a monadic fold directly
-  -- in Haskell
+------------------------------------------------------------
+-- Function application
+------------------------------------------------------------
 
 -- | Turn a function argument into a Value according to its given
 --   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
@@ -410,20 +266,28 @@ funArity v           = error $ "Impossible! funArity on " ++ show v
 
 -- | Reduce an application to weak head normal form (WHNF).
 --   Precondition: the head of the application has already been
---   reduced to WHNF (which means it must be a closure, @VFun@, a
---   partial application (@VPAp@), or a constant (@VConst@)).
+--   reduced to WHNF (which means it must be a closure (@VClos@), an
+--   embedded Haskell function (@VFun@), a partial application
+--   (@VPAp@), or a function constant (@VConst@)).
 --
 --   Note, however, that the arguments may or may not be reduced.
 whnfApp :: Value -> [Value] -> Disco IErr Value
+
+-- A partial application is waiting for more arguments, so feed it the
+-- additional arguments and call whnfApp again.
 whnfApp (VPAp f vs1) vs2 = whnfApp f (vs1 ++ vs2)
+
+-- Otherwise, decide what to do based on the arity of f and the number
+-- of arguments supplied:
 whnfApp f vs =
   case compare k (length vs) of
 
-      -- Exactly the right number of arguments.
+      -- Exactly the right number of arguments: call whnfAppExact.
       EQ -> whnfAppExact f vs
 
-      -- More arguments than parameters: peel off the right number of arguments
-      -- to pass, and apply the result to the rest.
+      -- More arguments than parameters: peel off the right number of
+      -- arguments to pass, evaluate the exact application, and then
+      -- apply the result to the remaining arguments.
       LT -> do
         let (vs1, vs2) = splitAt k vs
         f2 <- whnfAppExact f vs1
@@ -435,14 +299,70 @@ whnfApp f vs =
   where
     k = funArity f
 
--- | Apply a function-thing (must be reduced to WHNF) to a list of
---   exactly the right number of arguments.
+-- | Apply a function-thing (must be reduced to WHNF, either VClos,
+--   VFun, or VConst) to a list of exactly the right number of
+--   arguments.
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
 whnfAppExact (VClos b e) vs =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
 whnfAppExact (VConst op) vs = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
+
+------------------------------------------------------------
+-- Case analysis
+------------------------------------------------------------
+
+-- | Reduce a case expression to weak head normal form.
+whnfCase :: [CBranch] -> Disco IErr Value
+whnfCase []     = throwError NonExhaustive
+whnfCase (b:bs) = do
+  lunbind b $ \(gs, t) -> do
+  res <- checkGuards (fromTelescope gs)
+  case res of
+    Nothing -> whnfCase bs
+    Just e' -> extends e' $ whnf t
+
+-- | Check a chain of guards on one branch of a case.  Returns
+--   @Nothing@ if the guards fail to match, or a resulting environment
+--   of bindings if they do match.
+checkGuards :: [(Embed Core, CPattern)] -> Disco IErr (Maybe Env)
+checkGuards [] = ok
+checkGuards ((unembed -> c, p) : gs) = do
+  v <- mkThunk c
+  res <- match v p
+  case res of
+    Nothing -> return Nothing
+    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
+
+-- | Match a value against a pattern, returning an environment of
+--   bindings if the match succeeds.
+match :: Value -> CPattern -> Disco IErr (Maybe Env)
+match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
+match _ CPWild        = ok
+match v (CPCons i xs) = do
+  VCons j vs <- whnfV v
+  case i == j of
+    False -> noMatch
+    True  -> return (Just . M.fromList $ zip xs vs)
+match v (CPNat n)     = do
+  VNum _ m <- whnfV v
+  case m == n % 1 of
+    False -> noMatch
+    True  -> ok
+match v (CPFrac x y) = do
+  VNum _ r <- whnfV v
+  return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
+                               , (y, vnum (denominator r % 1))
+                               ]
+
+-- | Convenience function: successfully match with no bindings.
+ok :: Disco e (Maybe Env)
+ok = return $ Just M.empty
+
+-- | Convenience function: fail to match.
+noMatch :: Disco e (Maybe Env)
+noMatch = return Nothing
 
 ------------------------------------------------------------
 -- Lists
@@ -562,151 +482,163 @@ constdiff (x:xs)
   | otherwise    = constdiff (diff (x:xs))
 
 ------------------------------------------------------------
--- Case analysis
+-- Containers
 ------------------------------------------------------------
 
--- | Reduce a case expression to weak head normal form.
-whnfCase :: [CBranch] -> Disco IErr Value
-whnfCase []     = throwError NonExhaustive
-whnfCase (b:bs) = do
-  lunbind b $ \(gs, t) -> do
-  res <- checkGuards (fromTelescope gs)
-  case res of
-    Nothing -> whnfCase bs
-    Just e' -> extends e' $ whnf t
+--------------------------------------------------
+-- Normalizing bags/sets
 
--- | Check a chain of guards on one branch of a case.  Returns
---   @Nothing@ if the guards fail to match, or a resulting environment
---   of bindings if they do match.
-checkGuards :: [(Embed Core, CPattern)] -> Disco IErr (Maybe Env)
-checkGuards [] = ok
-checkGuards ((unembed -> c, p) : gs) = do
-  v <- mkThunk c
-  res <- match v p
-  case res of
-    Nothing -> return Nothing
-    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
+-- | Given a list of disco values, sort and collate them into a list
+--   pairing each unique value with its count.  Used to
+--   construct/normalize bags and sets.
+countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
+countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
 
--- | Match a value against a pattern, returning an environment of
---   bindings if the match succeeds.
-match :: Value -> CPattern -> Disco IErr (Maybe Env)
-match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
-match _ CPWild        = ok
-match v (CPCons i xs) = do
-  VCons j vs <- whnfV v
-  case i == j of
-    False -> noMatch
-    True  -> return (Just . M.fromList $ zip xs vs)
-match v (CPNat n)     = do
-  VNum _ m <- whnfV v
-  case m == n % 1 of
-    False -> noMatch
-    True  -> ok
-match v (CPFrac x y) = do
-  VNum _ r <- whnfV v
-  return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
-                               , (y, vnum (denominator r % 1))
-                               ]
+-- | Normalize a list of values where each value is paired with a
+--   count, but there could be duplicate values.  This function uses
+--   merge sort to sort the values according to the given comparison
+--   function, adding the counts of multiple instances of the same
+--   value.
+sortNCount :: (Monad m) => (a -> a -> m Ordering) -> [(a,Integer)] -> m [(a, Integer)]
+sortNCount _ []  = return []
+sortNCount _ [x] = return [x]
+sortNCount f xs  = do
+  fstSorted <- sortNCount f firstHalf
+  sndSorted <- sortNCount f secondHalf
+  merge (+) f fstSorted sndSorted
+  where
+    (firstHalf, secondHalf) = splitAt n xs
+    n = length xs `div` 2
 
--- | Convenience function: successfully match with no bindings.
-ok :: Disco e (Maybe Env)
-ok = return $ Just M.empty
+-- | Generic function for merging two sorted, count-annotated lists of
+--   type @[(a,Integer)]@ a la merge sort, using the given comparison
+--   function, and using the provided count combining function to
+--   decide what count to assign to each element of the output.  For
+--   example, @(+)@ corresponds to bag union; @min@ corresponds to
+--   intersection; and so on.
+merge :: Monad m
+      => (Integer -> Integer -> Integer)   -- ^ Function for combining counts
+      -> (a -> a -> m Ordering)            -- ^ Comparison function
+      -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+merge g _ [] ys                    = case g 0 1 of
+  1 -> return ys
+  0 -> return []
+  _ -> error "invalid merge counting function"
+merge g _ xs []                    = case g 1 0 of
+  1 -> return xs
+  0 -> return []
+  _ -> error "invalid merge counting function"
+merge g comp ((x,n1):xs) ((y,n2): ys) = do
+  o <- comp x y
+  case o of
+    LT -> mergeCons x n1 0  <$> merge g comp xs ((y,n2):ys)
+    EQ -> mergeCons x n1 n2 <$> merge g comp xs ys
+    GT -> mergeCons y 0 n2  <$> merge g comp ((x,n1):xs) ys
+    where
+      mergeCons a m1 m2 zs = case g m1 m2 of
+        0 -> zs
+        n -> ((a,n):zs)
 
--- | Convenience function: fail to match.
-noMatch :: Disco e (Maybe Env)
-noMatch = return Nothing
+--------------------------------------------------
+-- Conversion
+
+-- | Convert a set to a (sorted) list.
+setToList :: Value -> Disco IErr Value
+setToList s = do
+  VBag xs <- whnfV s
+  return . toDiscoList . map fst $ xs
+
+-- | Convert a bag to a set, by setting the count of every element
+--   to 1.
+bagToSet :: Value -> Disco IErr Value
+bagToSet b = do
+  VBag xs <- whnfV b
+  return $ VBag (map (\(v,_) -> (v,1)) xs)
+
+-- | Convert a bag to a list, duplicating any elements with a count
+--   greater than 1.
+bagToList :: Value -> Disco IErr Value
+bagToList b = do
+  VBag xs <- whnfV b
+  return . toDiscoList . concatMap (uncurry (flip (replicate . fromIntegral))) $ xs
+    -- XXX could be more efficient if we add some sharing? so
+    -- replicated values will only be evaluated once
+
+-- | Convert a list to a set, sorting the values and removing
+--   duplicates.  Takes the type of the elements as an additional
+--   argument, since it needs to know how to order them.
+listToSet :: Type -> Value -> Disco IErr Value
+listToSet ty v = do
+  vs <- fromDiscoList v
+  vcs <- countValues ty vs
+  return . VBag $ (map . fmap) (const 1) vcs
+
+-- | Convert a list to a bag, sorting and counting the values. Takes
+--   the type of the elements as an additional argument, since it
+--   needs to know how to order them.
+listToBag :: Type -> Value -> Disco IErr Value
+listToBag ty v = do
+  vs <- fromDiscoList v
+  VBag <$> countValues ty vs
+
+--------------------------------------------------
+-- Map
+
+-- | Map a function over a list.
+primMapList :: Value -> Value -> Disco IErr Value
+primMapList f xs = do
+  f' <- whnfV f
+  vmap (\v -> whnfApp f' [v]) xs
+
+-- | Map a function over a bag.  The type argument is the /output/
+--   type of the function.
+primMapBag :: Type -> Value -> Value -> Disco IErr Value
+primMapBag ty f xs = do
+  f'       <- whnfV f
+  VBag cts <- whnfV xs
+  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
+  VBag <$> sortNCount (decideOrdFor ty) cts'
+
+-- | Map a function over a bag.  The type argument is the /output/
+--   type of the function.
+primMapSet :: Type -> Value -> Value -> Disco IErr Value
+primMapSet ty f xs = do
+  f'       <- whnfV f
+  VBag cts <- whnfV xs
+  cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
+  (VBag . map (second (const 1))) <$> sortNCount (decideOrdFor ty) cts'
+
+--------------------------------------------------
+-- Reduce
+
+-- | Reduce a list according to a given combining function and base
+--   case value.
+primReduceList :: Value -> Value -> Value -> Disco IErr Value
+primReduceList f z xs = do
+  f' <- whnfV f
+  vfoldr (\a b -> whnfApp f' [a,b]) z xs
+
+-- | Reduce a bag (or set) according to a given combining function and
+--   base case value.
+primReduceBag :: Value -> Value -> Value -> Disco IErr Value
+primReduceBag f z b = do
+  f' <- whnfV f
+  VBag cts <- whnfV b
+  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
+  vfoldr (\a r -> whnfApp f' [a,r]) z xs
+
+  -- XXX this is super inefficient! (1) should have some sharing so
+  -- replicated elements of bag aren't recomputed; (2) shouldn't have
+  -- to go via toDiscoList -> vfoldr, just do a monadic fold directly
+  -- in Haskell
+
+-- | Check whether a certain value is present in a list using a linear search.
+-- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
+-- elemOf _ _ []     = return False
+-- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
 
 ------------------------------------------------------------
--- Constant evaluation
-------------------------------------------------------------
-
--- | Reduce an operator application to WHNF.
-whnfOp :: Op -> [Value] -> Disco IErr Value
-whnfOp OAdd            = arity2 "+"        $ numOp (+)
-whnfOp ONeg            = arity1 "negate"   $ uNumOp negate
-whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp integerSqrt
-whnfOp OLg             = arity1 "lg"       $ lgOp
-whnfOp OFloor          = arity1 "floor"    $ uNumOp floorOp
-whnfOp OCeil           = arity1 "ceil"     $ uNumOp ceilOp
-whnfOp OAbs            = arity1 "abs"      $ uNumOp abs
-whnfOp OMul            = arity2 "*"        $ numOp (*)
-whnfOp ODiv            = arity2 "/"        $ numOp' divOp
-whnfOp OExp            = arity2 "^"        $ numOp (\m n -> m ^^ numerator n)
-  -- If the program typechecks, n will be an integer.
-whnfOp OMod            = arity2 "mod"      $ numOp' modOp
-whnfOp ODivides        = arity2 "divides"  $ numOp' (\m n -> return (mkEnum $ divides m n))
-whnfOp OBinom          = arity2 "binom"    $ numOp binom
-whnfOp OMultinom       = arity2 "multinom" $ multinomOp
-whnfOp OFact           = arity1 "fact"     $ uNumOp' fact
-whnfOp (OEq ty)        = arity2 "eqOp"     $ eqOp ty
-whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
-whnfOp OEnum           = arity1 "enum"     $ enumOp
-whnfOp OCount          = arity1 "count"    $ countOp
-
--- Modular operations, for finite types
-whnfOp (OMDiv n)       = arity2 "modDiv"   $ modDiv n
-whnfOp (OMExp n)       = arity2 "modExp"   $ modExp n
-whnfOp (OMDivides n)   = arity2 "modDiv"   $ modDivides n
-
--- Set operations
-whnfOp (OSize)         = arity1 "setSize"         $ setSize
-whnfOp (OUnion  ty)    = arity2 "setUnion"        $ setUnion ty
-whnfOp (OInter  ty)    = arity2 "setIntersection" $ setIntersection ty
-whnfOp (ODiff   ty)    = arity2 "setDifference"   $ setDifference ty
-whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
-whnfOp (OSubset ty)    = arity2 "subset"          $ subsetTest ty
-
--- Bag operations
-whnfOp ORep            = arity2 "repBag" $ repBag
-
--- Container conversions
-whnfOp OBagToSet       = arity1 "bagToSet"  $ whnfV >=> bagToSet
-whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
-whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
-whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
-whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
-
-whnfOp OMapList        = (arity2 "mapList"  $ primMapList  ) >=> whnfV
-whnfOp (OMapBag ty)    = (arity2 "mapBag"   $ primMapBag ty) >=> whnfV
-whnfOp (OMapSet ty)    = (arity2 "mapSet"   $ primMapSet ty) >=> whnfV
-
-whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
-whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
-
--- List ellipsis
-whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
-whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
-
--- Number theory primitives
-whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
-whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
-
--- Other primitives
-whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
-
--- Identity
-whnfOp OId             = arity1 "id" $ whnfV
-
--- | Convert an arity-1 function to the right shape to accept a list
---   of arguments; throw an error if the wrong number of arguments are
---   given.
-arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity1 _ f [v]   = f v
-arity1 name _ vs = error $ arityError name vs
-
--- | Convert an arity-2 function to the right shape to accept a list
---   of arguments; throw an error if the wrong number of arguments are
---   given.
-arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity2 _ f [v1,v2] = f v1 v2
-arity2 name _ vs   = error $ arityError name vs
-
-arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity3 _ f [v1,v2,v3] = f v1 v2 v3
-arity3 name _ vs      = error $ arityError name vs
-
-arityError :: String -> [Value] -> String
-arityError name vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+-- Set and bag operations
 
 -- | Compute the size of a set.
 setSize :: Value -> Disco IErr Value
@@ -758,6 +690,134 @@ repBag :: Value -> Value -> Disco IErr Value
 repBag elt rep = do
   VNum _ r <- whnfV rep
   return $ VBag [(elt, numerator r)]
+
+------------------------------------------------------------
+-- Constant evaluation
+------------------------------------------------------------
+
+-- | Reduce an operator application to WHNF.
+whnfOp :: Op -> [Value] -> Disco IErr Value
+
+--------------------------------------------------
+-- Arithmetic
+
+whnfOp OAdd            = arity2 "+"        $ numOp (+)
+whnfOp ONeg            = arity1 "negate"   $ uNumOp negate
+whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp integerSqrt
+whnfOp OLg             = arity1 "lg"       $ lgOp
+whnfOp OFloor          = arity1 "floor"    $ uNumOp floorOp
+whnfOp OCeil           = arity1 "ceil"     $ uNumOp ceilOp
+whnfOp OAbs            = arity1 "abs"      $ uNumOp abs
+whnfOp OMul            = arity2 "*"        $ numOp (*)
+whnfOp ODiv            = arity2 "/"        $ numOp' divOp
+whnfOp OExp            = arity2 "^"        $ numOp (\m n -> m ^^ numerator n)
+whnfOp OMod            = arity2 "mod"      $ numOp' modOp
+whnfOp ODivides        = arity2 "divides"  $ numOp' (\m n -> return (mkEnum $ divides m n))
+
+--------------------------------------------------
+-- Modular arithmetic for finite types
+
+whnfOp (OMDiv n)       = arity2 "modDiv"   $ modDiv n
+whnfOp (OMExp n)       = arity2 "modExp"   $ modExp n
+whnfOp (OMDivides n)   = arity2 "modDiv"   $ modDivides n
+
+--------------------------------------------------
+-- Number theory
+
+whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
+whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
+
+--------------------------------------------------
+-- Combinatorics
+
+whnfOp OBinom          = arity2 "binom"    $ numOp binom
+whnfOp OMultinom       = arity2 "multinom" $ multinomOp
+whnfOp OFact           = arity1 "fact"     $ uNumOp' fact
+whnfOp OEnum           = arity1 "enum"     $ enumOp
+whnfOp OCount          = arity1 "count"    $ countOp
+
+--------------------------------------------------
+-- Comparison
+whnfOp (OEq ty)        = arity2 "eqOp"     $ eqOp ty
+whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
+
+--------------------------------------------------
+-- Set operations
+
+whnfOp (OSize)         = arity1 "setSize"         $ setSize
+whnfOp (OUnion  ty)    = arity2 "setUnion"        $ setUnion ty
+whnfOp (OInter  ty)    = arity2 "setIntersection" $ setIntersection ty
+whnfOp (ODiff   ty)    = arity2 "setDifference"   $ setDifference ty
+whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
+whnfOp (OSubset ty)    = arity2 "subset"          $ subsetTest ty
+
+--------------------------------------------------
+-- Bag operations
+
+whnfOp ORep            = arity2 "repBag" $ repBag
+
+--------------------------------------------------
+-- Container conversions
+
+whnfOp OBagToSet       = arity1 "bagToSet"  $ whnfV >=> bagToSet
+whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
+whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
+whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
+whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
+
+--------------------------------------------------
+-- Map/reduce
+
+whnfOp OMapList        = (arity2 "mapList"  $ primMapList  ) >=> whnfV
+whnfOp (OMapBag ty)    = (arity2 "mapBag"   $ primMapBag ty) >=> whnfV
+whnfOp (OMapSet ty)    = (arity2 "mapSet"   $ primMapSet ty) >=> whnfV
+
+whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
+whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
+
+--------------------------------------------------
+-- Ellipsis
+
+whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
+whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
+
+--------------------------------------------------
+-- Other primitives
+
+whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
+whnfOp OId             = arity1 "id" $ whnfV
+
+--------------------------------------------------
+-- Utility functions
+
+-- | Convert an arity-1 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
+arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity1 _ f [v]   = f v
+arity1 name _ vs = error $ arityError name vs
+
+-- | Convert an arity-2 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
+arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity2 _ f [v1,v2] = f v1 v2
+arity2 name _ vs   = error $ arityError name vs
+
+-- | Convert an arity-3 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
+arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity3 _ f [v1,v2,v3] = f v1 v2 v3
+arity3 name _ vs      = error $ arityError name vs
+
+-- | Construct an error message for reporting an incorrect arity.
+arityError :: String -> [Value] -> String
+arityError name vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+
+------------------------------------------------------------
+-- Arithmetic
+------------------------------------------------------------
 
 -- | Perform a numeric binary operation.
 numOp :: (Rational -> Rational -> Rational) -> Value -> Value -> Disco IErr Value
@@ -900,6 +960,8 @@ divides x y = denominator (y / x) == 1
 binom :: Rational -> Rational -> Rational
 binom (numerator -> n) (numerator -> k) = choose n k % 1
 
+-- | Multinomial coefficient.  The first argument is a number, the
+--   second is a list.
 multinomOp :: Value -> Value -> Disco IErr Value
 multinomOp v1 v2 = do
   VNum _ n <- whnfV v1

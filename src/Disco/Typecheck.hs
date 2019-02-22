@@ -87,7 +87,8 @@ inferTelescope inferOne tel = do
 
 -- | Check all the types and extract all relevant info (docs,
 --   properties, types) from a module, returning a 'ModuleInfo' record
---   on success.
+--   on success.  This function does not handle imports at all; see
+--   'recCheckMod'.
 checkModule :: Module -> TCM ModuleInfo
 checkModule (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m

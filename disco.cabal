@@ -214,6 +214,9 @@ library
                        Disco.Types.Rules
                        Disco.Util
 
+  other-modules:       Paths_disco
+  autogen-modules:     Paths_disco
+
   other-extensions:
                        GADTs
                        RankNTypes
@@ -227,6 +230,8 @@ library
                        UndecidableInstances
 
   build-depends:       base >=4.8 && <4.13,
+                       filepath,
+                       directory,
                        mtl >=2.2 && <2.3,
                        megaparsec >= 6.1.1 && < 7.1,
                        parser-combinators >= 1.0.0 && < 1.1,
@@ -249,8 +254,6 @@ library
 executable disco
   hs-source-dirs:      repl
   main-is:             REPL.hs
-  other-modules:       Paths_disco
-  autogen-modules:     Paths_disco
   build-depends:       base,
                        disco,
                        directory,

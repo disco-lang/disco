@@ -16,8 +16,7 @@
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (filterM, foldM, forM_,
-                                                          when)
+import           Control.Monad                           (forM_, when)
 import           Control.Monad.Except                    (MonadError,
                                                           catchError,
                                                           throwError)
@@ -34,7 +33,6 @@ import           Data.Maybe                              (isJust)
 import qualified Data.Set                                as S
 import qualified Options.Applicative                     as O
 import           System.Console.Haskeline                as H
-import           System.Directory
 import           System.Exit
 import           System.FilePath
 import           Text.Megaparsec                         hiding (runParser)
@@ -57,8 +55,6 @@ import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
-
-import           Paths_disco
 
 ------------------------------------------------------------------------
 -- Parsers for the REPL                                               --
@@ -224,11 +220,12 @@ addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   loadDefs cdefns
   return ()
 
--- | Typechecks a given module by first recursively typechecking it's imported modules,
---   adding the obtained module infos to a map from module names to module infos, and then
---   typechecking the parent module in an environment with access to this map. This is really just a
---   depth-first search.
-recCheckMod :: FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) (Disco IErr) ModuleInfo
+-- | Typechecks a given module by first recursively typechecking its
+--   imported modules, adding the obtained 'ModuleInfo' records to a
+--   map from module names to info records, and then typechecking the
+--   parent module in an environment with access to this map. This is
+--   really just a depth-first search.
+recCheckMod :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
 recCheckMod directory inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
   modMap <- get
@@ -246,31 +243,6 @@ recCheckMod directory inProcess modName  = do
       m' <- combineModuleInfo [imports, m]
       modify (M.insert modName m')
       return m'
-
--- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos are merged by
---   joining their doc, type, type definition, and term contexts. The property context
---   of the new module is the obtained from the second module. If threre are any duplicate
---   type definitions or term definitions, a Typecheck error is thrown.
-combineModuleInfo :: (MonadError IErr m) => [ModuleInfo] -> m ModuleInfo
-combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
-  where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
-        combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
-          case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
-            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2)
-            (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
-            (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
-
--- | Given a directory and a module name, relavent directories are searched for the file
---   containing the provided module name. Currently, Disco searches for the module in
---   the standard library directory (lib), and the directory passed in to resolveModule.
-resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
-resolveModule directory modname = do
-  datadir <- io getDataDir
-  let fps = map (</> replaceExtension modname "disco") [directory, datadir]
-  fexists <- io $ filterM doesFileExist fps
-  case fexists of
-    []     -> throwError $ ModuleNotFound modname
-    (fp:_) -> return fp
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it

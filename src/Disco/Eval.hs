@@ -1,6 +1,7 @@
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE PatternSynonyms  #-}
+{-# LANGUAGE TemplateHaskell  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -62,7 +63,8 @@ module Disco.Eval
 
 import           Control.Lens                            (makeLenses, use, (%=),
                                                           (<+=), (<>=))
-import           Control.Monad.Except                    (catchError,
+import           Control.Monad.Except                    (MonadError,
+                                                          catchError,
                                                           throwError)
 import           Control.Monad.Fail                      (MonadFail)
 import qualified Control.Monad.Fail                      as Fail
@@ -463,19 +465,19 @@ withTopEnv m = do
 
 -- | Utility function: given an 'Either', wrap a 'Left' in the given
 --   function and throw it as a 'Disco' error, or return a 'Right'.
-adaptError :: (e1 -> e2) -> Either e1 a -> Disco e2 a
+adaptError :: MonadError e2 m => (e1 -> e2) -> Either e1 a -> m a
 adaptError f = either (throwError . f) return
 
 -- | Parse a module from a file, re-throwing a parse error if it
 --   fails.
-parseDiscoModule :: FilePath -> Disco IErr Module
+parseDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> m Module
 parseDiscoModule file = do
   str <- io $ readFile file
   adaptError ParseErr $ runParser wholeModule file str
 
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.
-typecheckDisco :: TyCtx -> TyDefCtx -> TCM a -> Disco IErr a
+typecheckDisco :: MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
 typecheckDisco tyctx tydefs tcm =
   adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends tyctx $ tcm)
 

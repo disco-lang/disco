@@ -17,24 +17,22 @@
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (forM_, when)
-import           Control.Monad.Except                    (MonadError,
-                                                          catchError,
-                                                          throwError)
+import           Control.Monad.Except                    (catchError)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Control.Monad.Trans.Class               (MonadTrans (..))
-import           Control.Monad.Trans.State
+import           Control.Monad.Trans.State.Strict
 import           Data.Char                               (isSpace)
 import           Data.Coerce
 import           Data.List                               (find, isPrefixOf)
 import           Data.Map                                ((!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
-
 import qualified Data.Set                                as S
-import qualified Options.Applicative                     as O
-import           System.Console.Haskeline                as H
 import           System.Exit
 import           System.FilePath
+
+import qualified Options.Applicative                     as O
+import           System.Console.Haskeline                as H
 import           Text.Megaparsec                         hiding (runParser)
 import qualified Text.Megaparsec.Char                    as C
 import           Unbound.Generics.LocallyNameless
@@ -197,12 +195,12 @@ fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
 -- | Parses, typechecks, and loads a module by first recursively loading any imported
---   modules by calling recCheckMod. If no errors are thrown, any tests present
+--   modules by calling loadDiscoModule. If no errors are thrown, any tests present
 --   in the parent module are executed.
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
-  modMap <- execStateT (recCheckMod directory S.empty modName) M.empty
+  modMap <- execStateT (loadDiscoModule directory S.empty modName) M.empty
   let m@(ModuleInfo _ props _ _ _) = modMap M.! modName
   addModInfo m
   t <- withTopEnv $ runAllTests props
@@ -219,30 +217,6 @@ addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   topTyDefns .= tyds
   loadDefs cdefns
   return ()
-
--- | Typechecks a given module by first recursively typechecking its
---   imported modules, adding the obtained 'ModuleInfo' records to a
---   map from module names to info records, and then typechecking the
---   parent module in an environment with access to this map. This is
---   really just a depth-first search.
-recCheckMod :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
-recCheckMod directory inProcess modName  = do
-  when (S.member modName inProcess) (throwError $ CyclicImport modName)
-  modMap <- get
-  case M.lookup modName modMap of
-    Just mi -> return mi
-    Nothing -> do
-      file <- resolveModule directory modName
-      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
-
-      -- mis only contains the module info from direct imports.
-      mis <- mapM (recCheckMod directory (S.insert modName inProcess)) mns
-      imports@(ModuleInfo _ _ tyctx tydefns _) <- combineModuleInfo mis
-      m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
-      m' <- combineModuleInfo [imports, m]
-      modify (M.insert modName m')
-      return m'
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it

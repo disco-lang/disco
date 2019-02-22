@@ -57,6 +57,7 @@ module Disco.Eval
          -- ** Top level phases
        , parseDiscoModule
        , typecheckDisco
+       , loadDiscoModule
 
        )
        where
@@ -75,7 +76,9 @@ import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
 import qualified Data.Sequence                           as Seq
+import qualified Data.Set                                as S
 import           Data.Void
+import           System.FilePath                         ((-<.>))
 import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
@@ -86,7 +89,9 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
+import           Disco.Module
 import           Disco.Parser
+import           Disco.Typecheck                         (checkModule)
 import           Disco.Typecheck.Monad
 import           Disco.Types
 
@@ -480,6 +485,31 @@ parseDiscoModule file = do
 typecheckDisco :: MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
 typecheckDisco tyctx tydefs tcm =
   adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends tyctx $ tcm)
+
+-- | Recursively loads a given module by first recursively loading and
+--   typechecking its imported modules, adding the obtained
+--   'ModuleInfo' records to a map from module names to info records,
+--   and then typechecking the parent module in an environment with
+--   access to this map. This is really just a depth-first search.
+loadDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
+loadDiscoModule directory inProcess modName  = do
+  when (S.member modName inProcess) (throwError $ CyclicImport modName)
+  modMap <- get
+  case M.lookup modName modMap of
+    Just mi -> return mi
+    Nothing -> do
+      file <-resolveModule directory modName
+             >>= maybe (throwError $ ModuleNotFound modName) return
+      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
+      cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
+
+      -- mis only contains the module info from direct imports.
+      mis <- mapM (loadDiscoModule directory (S.insert modName inProcess)) mns
+      imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
+      m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
+      m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
+      modify (M.insert modName m')
+      return m'
 
 -------------------------------------
 --Tries

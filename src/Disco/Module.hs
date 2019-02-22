@@ -34,7 +34,6 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
-import           Disco.Eval                       (IErr (..), io)
 import           Disco.Typecheck.Monad            (TCError (..), TyCtx,
                                                    TyDefCtx)
 import           Disco.Types
@@ -79,14 +78,14 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 --   joining their doc, type, type definition, and term contexts. The property context
 --   of the new module is the obtained from the second module. If threre are any duplicate
 --   type definitions or term definitions, a Typecheck error is thrown.
-combineModuleInfo :: (MonadError IErr m) => [ModuleInfo] -> m ModuleInfo
+combineModuleInfo :: (MonadError TCError m) => [ModuleInfo] -> m ModuleInfo
 combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
-  where combineMods :: (MonadError IErr m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
+  where combineMods :: (MonadError TCError m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
         combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
           case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
             ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2)
-            (x:_, _) -> throwError $ TypeCheckErr $ DuplicateTyDefns (coerce x)
-            (_, y:_) -> throwError $ TypeCheckErr $ DuplicateDefns (coerce y)
+            (x:_, _) -> throwError $ DuplicateTyDefns (coerce x)
+            (_, y:_) -> throwError $ DuplicateDefns (coerce y)
 
 ------------------------------------------------------------
 -- Module resolution
@@ -95,11 +94,12 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 -- | Given a directory and a module name, relavent directories are searched for the file
 --   containing the provided module name. Currently, Disco searches for the module in
 --   the standard library directory (lib), and the directory passed in to resolveModule.
-resolveModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m FilePath
+--   Returns Nothing if no module with the given name could be found.
+resolveModule :: MonadIO m => FilePath -> ModName -> m (Maybe FilePath)
 resolveModule directory modname = do
-  datadir <- io getDataDir
+  datadir <- liftIO getDataDir
   let fps = map (</> replaceExtension modname "disco") [directory, datadir]
-  fexists <- io $ filterM doesFileExist fps
+  fexists <- liftIO $ filterM doesFileExist fps
   case fexists of
-    []     -> throwError $ ModuleNotFound modname
-    (fp:_) -> return fp
+    []     -> return Nothing
+    (fp:_) -> return $ Just fp

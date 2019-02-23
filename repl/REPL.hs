@@ -117,10 +117,6 @@ parseLine s =
     Left  e -> Left $ errorBundlePretty e
     Right l -> Right l
 
--- XXX eventually this should switch from using IErr specifically to
--- an umbrella error type in which IErr can be embedded, along with
--- e.g. parse or type errors
-
 handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
 handleCMD s =

@@ -237,17 +237,14 @@ discoGenerator (TyList ty) =
     DiscoGen tyGen tyToValue ->
       DiscoGen (QC.listOf tyGen) (toDiscoList . map tyToValue)
 
--- discoGenerator (TySet ty) =
---   case discoGenerator ty of
---     EmptyGen -> DiscoGen (return ()) (const (VSet []))
---     DiscoGen tyGen tyToValue ->
---       DiscoGen (QC.listOf tyGen) (_ . map tyToValue)
-
 discoGenerator (TyBag _ty) =
   error "discoGenerator is not yet implemented for TyBag"
 
-discoGenerator (TySet _ty) =
-  error "discoGenerator is not yet implemented for TySet"
+discoGenerator (TySet ty) =
+  case discoGenerator ty of
+    EmptyGen -> DiscoGen (return ()) (const $ VBag [])
+    DiscoGen tyGen tyToValue ->
+      DiscoGen (QC.listOf tyGen) (VDelay . valuesToSet ty . map tyToValue)
 
 discoGenerator (TyArr _ty1 _ty2) =
   error "discoGenerator is not yet implemented for TyArr"

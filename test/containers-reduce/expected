@@ -2,6 +2,7 @@ Loading containers-reduce.disco...
 Loading num.disco...
 Running tests...
   dummy: OK
+  setSize: OK
 Loaded.
 reduce : (a → a → a) → a → List a → a
 reduce (λ x y. x + y) : ℕ → List ℕ → ℕ
@@ -14,3 +15,4 @@ true
 6
 7
 true
+6

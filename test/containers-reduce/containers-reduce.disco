@@ -3,3 +3,12 @@ import num
 !!! ∀ x : ℕ. (x > 0) ==> reduce (\x y. x * y) 1 (factor x) == x
 dummy : Unit
 dummy = ()
+
+||| The size (cardinality) of a set.
+!!! setSize {} == 0
+!!! setSize {1} == 1
+!!! setSize {1..10} == 10
+!!! setSize {1,1,1,2,3} == 3
+!!! ∀ s : Set N. setSize s == setSize (s ∪ s)
+setSize : Set a -> N
+setSize = mapReduce (\x.1) (\x y. x + y) 0

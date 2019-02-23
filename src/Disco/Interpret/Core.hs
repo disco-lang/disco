@@ -29,6 +29,9 @@ module Disco.Interpret.Core
          -- ** Weak head reduction
        , whnf, whnfV
 
+         -- * Container utilities
+       , valuesToBag, valuesToSet
+
          -- * Equality testing and enumeration
        , eqOp, primValEq, enumerate
        , decideEqFor, decideEqForRnf, decideEqForClosures
@@ -510,6 +513,14 @@ sortNCount f xs  = do
     (firstHalf, secondHalf) = splitAt n xs
     n = length xs `div` 2
 
+-- | Convert a list of values to a bag.
+valuesToBag :: Type -> [Value] -> Disco IErr Value
+valuesToBag ty = fmap VBag . countValues ty
+
+-- | Convert a list of values to a set.
+valuesToSet :: Type -> [Value] -> Disco IErr Value
+valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
+
 -- | Generic function for merging two sorted, count-annotated lists of
 --   type @[(a,Integer)]@ a la merge sort, using the given comparison
 --   function, and using the provided count combining function to
@@ -631,6 +642,17 @@ primReduceBag f z b = do
   -- replicated elements of bag aren't recomputed; (2) shouldn't have
   -- to go via toDiscoList -> vfoldr, just do a monadic fold directly
   -- in Haskell
+
+-- | Reduce a bag (or set) by mapping a function over the elements and
+--   then combining all the results, WITHOUT normalizing in between.
+primMapReduce :: Value -> Value -> Value -> Value -> Disco IErr Value
+primMapReduce f m z b = do
+  f' <- whnfV f
+  m' <- whnfV m
+  VBag cts <- whnfV b
+  cts' <- mapM (\(x,n) -> (,n) <$> whnfApp f' [x]) cts
+  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts'
+  vfoldr (\a r -> whnfApp m' [a,r]) z xs
 
 -- | Check whether a certain value is present in a list using a linear search.
 -- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
@@ -767,12 +789,14 @@ whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 --------------------------------------------------
 -- Map/reduce
 
-whnfOp OMapList        = (arity2 "mapList"  $ primMapList  ) >=> whnfV
-whnfOp (OMapBag ty)    = (arity2 "mapBag"   $ primMapBag ty) >=> whnfV
-whnfOp (OMapSet ty)    = (arity2 "mapSet"   $ primMapSet ty) >=> whnfV
+whnfOp OMapList        = (arity2 "mapList"    $ primMapList  ) >=> whnfV
+whnfOp (OMapBag ty)    = (arity2 "mapBag"     $ primMapBag ty) >=> whnfV
+whnfOp (OMapSet ty)    = (arity2 "mapSet"     $ primMapSet ty) >=> whnfV
 
 whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
+
+whnfOp OMapReduce      = (arity4 "mapReduce"  $ primMapReduce ) >=> whnfV
 
 --------------------------------------------------
 -- Ellipsis
@@ -809,6 +833,13 @@ arity2 name _ vs   = error $ arityError name vs
 arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity3 _ f [v1,v2,v3] = f v1 v2 v3
 arity3 name _ vs      = error $ arityError name vs
+
+-- | Convert an arity-4 function to the right shape to accept a list
+--   of arguments; throw an error if the wrong number of arguments are
+--   given.
+arity4 :: String -> (Value -> Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
+arity4 _ f [v1,v2,v3,v4] = f v1 v2 v3 v4
+arity4 name _ vs         = error $ arityError name vs
 
 -- | Construct an error message for reporting an incorrect arity.
 arityError :: String -> [Value] -> String

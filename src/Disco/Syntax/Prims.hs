@@ -39,6 +39,7 @@ data Prim where
 
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
+  PrimMapReduce :: Prim    -- ^ Map-reduce operation for containers
 
   PrimIsPrime :: Prim      -- ^ Efficient primality test
   PrimFactor  :: Prim      -- ^ Factorization
@@ -84,20 +85,21 @@ data PrimInfo =
 --   recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-  [ PrimInfo PrimList    "list"    True
-  , PrimInfo PrimBag     "bag"     True
-  , PrimInfo PrimSet     "set"     True
+  [ PrimInfo PrimList      "list"    True
+  , PrimInfo PrimBag       "bag"     True
+  , PrimInfo PrimSet       "set"     True
 
-  , PrimInfo PrimMap     "map"     True
-  , PrimInfo PrimReduce  "reduce"  True
+  , PrimInfo PrimMap       "map"     True
+  , PrimInfo PrimReduce    "reduce"  True
+  , PrimInfo PrimMapReduce "mapReduce" True
 
-  , PrimInfo PrimIsPrime "isPrime" False
-  , PrimInfo PrimFactor  "factor"  False
+  , PrimInfo PrimIsPrime   "isPrime" False
+  , PrimInfo PrimFactor    "factor"  False
 
-  , PrimInfo PrimCrash   "crash"   False
+  , PrimInfo PrimCrash     "crash"   False
 
-  , PrimInfo PrimForever "forever" False
-  , PrimInfo PrimUntil   "until"   False
+  , PrimInfo PrimForever   "forever" False
+  , PrimInfo PrimUntil     "until"   False
   ]
 
 -- | A convenient map from each 'Prim' to its info record.

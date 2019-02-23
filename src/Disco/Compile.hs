@@ -135,13 +135,27 @@ compilePrim ty PrimList = error $ "Impossible! compilePrim PrimList on bad type 
 compilePrim ty PrimBag  = error $ "Impossible! compilePrim PrimBag on bad type " ++ show ty
 compilePrim ty PrimSet  = error $ "Impossible! compilePrim PrimSet on bad type " ++ show ty
 
-compilePrim (_ :->: (TyList _ :->: _))          PrimMap = return $ CConst OMapList
-compilePrim (_ :->: (TyBag _ :->: TyBag outTy)) PrimMap = return $ CConst (OMapBag outTy)
-compilePrim (_ :->: (TySet _ :->: TySet outTy)) PrimMap = return $ CConst (OMapSet outTy)
+compilePrim (_ :->: TyList _ :->: _)          PrimMap = return $ CConst OMapList
+compilePrim (_ :->: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
+compilePrim (_ :->: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
 
-compilePrim (_ :->: (_ :->: (TyList _ :->: _))) PrimReduce = return $ CConst OReduceList
-compilePrim (_ :->: (_ :->: (TyBag  _ :->: _))) PrimReduce = return $ CConst OReduceBag
-compilePrim (_ :->: (_ :->: (TySet  _ :->: _))) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :->: _ :->: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
+
+  -- mapReduce f m z l = reduce m z (map f l)
+compilePrim (_ :->: _ :->: _ :->: TyList _ :->: _) PrimMapReduce
+  = return $
+      CAbs $ bind [f, m, z, l] $
+        CApp (CConst OReduceList) (map (Lazy,) [CVar m, CVar z,
+          CApp (CConst OMapList) (map (Lazy,) [CVar f, CVar l])])
+  where
+    f = string2Name "f"
+    m = string2Name "m"
+    z = string2Name "z"
+    l = string2Name "l"
+compilePrim (_ :->: _ :->: _ :->: TyBag _ :->: _) PrimMapReduce = return $ CConst OMapReduce
+compilePrim (_ :->: _ :->: _ :->: TySet _ :->: _) PrimMapReduce = return $ CConst OMapReduce
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor

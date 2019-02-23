@@ -149,6 +149,9 @@ data Op = OAdd      -- ^ Addition (@+@)
 
         | OReduceList     -- ^ Reduce/fold a list.
         | OReduceBag      -- ^ Reduce/fold a bag (or set).
+        | OMapReduce      -- ^ Map-reduce for a bag/set.  (Map-reduce
+                          --   for lists just compiles to map followed
+                          --   by reduce.)
 
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
@@ -209,6 +212,7 @@ opArity (OMapBag _)    = 2
 opArity (OMapSet _)    = 2
 opArity OReduceList    = 3
 opArity OReduceBag     = 3
+opArity OMapReduce     = 4
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

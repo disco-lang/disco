@@ -400,18 +400,21 @@ typecheck Infer (TPrim PrimMap) = do
   c <- freshAtom
   a <- freshTy
   b <- freshTy
-  return $ ATPrim ((a :->: b) :->: (TyContainer c a :->: TyContainer c b)) PrimMap
-
-    -- The second set of parens around TyContainer c a :->:
-    -- TyContainer c b shouldn't be necessary --- :->: is declared as
-    -- infixr --- but without them the type ends up associated the
-    -- wrong way.  Not sure why.
+  return $ ATPrim ((a :->: b) :->: TyContainer c a :->: TyContainer c b) PrimMap
 
 -- reduce : (a -> a -> a) -> a -> c a -> a
 typecheck Infer (TPrim PrimReduce) = do
   c <- freshAtom
   a <- freshTy
-  return $ ATPrim ((a :->: (a :->: a)) :->: (a :->: (TyContainer c a :->: a))) PrimReduce
+  return $ ATPrim ((a :->: a :->: a) :->: a :->: TyContainer c a :->: a) PrimReduce
+
+-- mapReduce : (a -> b) -> (b -> b -> b) -> b -> c a -> b
+typecheck Infer (TPrim PrimMapReduce) = do
+  c <- freshAtom
+  a <- freshTy
+  b <- freshTy
+  return $ ATPrim ((a :->: b) :->: (b :->: b :->: b) :->: b :->: TyContainer c a :->: b)
+             PrimMapReduce
 
 -- isPrime : N -> Bool
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime

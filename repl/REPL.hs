@@ -279,7 +279,10 @@ prettyCounterexample ctx env
       iputStr =<< (renderDoc . prettyName $ x)
       iputStr (replicate (maxNameLen - length (name2String x)) ' ')
       iputStr " = "
-      prettyValue (ctx ! coerce x) v
+      prettyValue (ctx !? coerce x) v
+    m !? k = case M.lookup k m of
+      Just val -> val
+      Nothing  -> error $ "Failed M.! with key " ++ show k ++ " in map " ++ show m
 
 handleDocs :: Name Term -> Disco IErr ()
 handleDocs x = do

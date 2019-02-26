@@ -1345,23 +1345,29 @@ decideOrdFor (TyList ty) v1 v2 = do
 decideOrdFor (TySet ty) v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
-  setComparison ty xs ys
+  bagComparison ty xs ys
+
+-- Deciding the ordering for two bags is the same.
+decideOrdFor (TyBag ty) v1 v2 = do
+  VBag xs <- whnfV v1
+  VBag ys <- whnfV v2
+  bagComparison ty xs ys
 
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
 
--- Helper function which decides the order for two sets.
-setComparison :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Ordering
-setComparison _ [] [] = return EQ
-setComparison _ _ [] = return GT
-setComparison _ [] _ = return LT
-setComparison ty ((x,_):xs) ((y,_):ys) = do
+-- Helper function which decides the order for two sets or bags.
+bagComparison :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Ordering
+bagComparison _ [] [] = return EQ
+bagComparison _ _ [] = return GT
+bagComparison _ [] _ = return LT
+bagComparison ty ((x,xn):xs) ((y,yn):ys) = do
   o <- decideOrdFor ty x y
-  case o of
-    EQ    -> setComparison ty xs ys
-    other -> return other
-
+  case (o, compare xn yn) of
+    (EQ, EQ)   -> bagComparison ty xs ys
+    (EQ, o2)   -> return o2
+    (other, _) -> return other
 
 -- | Compare two functions lazily.  Functions are ordered
 --   lexicographically, if we think of a function @f : ty1 -> ty2@ as

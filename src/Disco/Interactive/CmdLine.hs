@@ -39,16 +39,14 @@ import           Disco.Eval
 import           Disco.Interactive.Eval
 
 ------------------------------------------------------------
--- XXX
+-- Command-line options parser
 ------------------------------------------------------------
 
-banner :: String
-banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
-
+-- | Command-line options for disco.
 data DiscoOpts = DiscoOpts
-  { evaluate  :: Maybe String
-  , cmdFile   :: Maybe String
-  , checkFile :: Maybe String
+  { evaluate  :: Maybe String  -- ^ A single expression to evaluate
+  , cmdFile   :: Maybe String  -- ^ Execute the commands in a given file
+  , checkFile :: Maybe String  -- ^ Check a file and then exit
   }
 
 discoOpts :: O.Parser DiscoOpts
@@ -83,6 +81,13 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
   , O.header "disco v0.1"
   ]
+
+------------------------------------------------------------
+-- Command-line interface
+------------------------------------------------------------
+
+banner :: String
+banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
 
 discoMain :: IO ()
 discoMain = do

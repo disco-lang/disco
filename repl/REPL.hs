@@ -24,12 +24,11 @@ import           Control.Monad.Trans.State.Strict
 import           Data.Char                               (isSpace)
 import           Data.Coerce
 import           Data.List                               (find, isPrefixOf)
-import           Data.Map                                ((!))
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 import qualified Data.Set                                as S
 import           System.Exit
-import           System.FilePath
+import           System.FilePath                         (splitFileName)
 
 import qualified Options.Applicative                     as O
 import           System.Console.Haskeline                as H
@@ -44,6 +43,7 @@ import           Disco.Compile
 import           Disco.Context
 import           Disco.Desugar
 import           Disco.Eval
+import           Disco.Extensions
 import           Disco.Interpret.Core                    (loadDefs)
 import           Disco.Module
 import           Disco.Parser
@@ -59,7 +59,8 @@ import           Disco.Types
 ------------------------------------------------------------------------
 
 data REPLExpr =
-   Let (Name Term) Term         -- Toplevel let-expression: for the REPL
+   Using Ext                    -- Enable an extension
+ | Let (Name Term) Term         -- Toplevel let-expression: for the REPL
  | TypeCheck Term               -- Typecheck a term
  | Eval Term                    -- Evaluate a term
  | ShowDefn (Name Term)         -- Show a variable's definition
@@ -108,24 +109,27 @@ lineParser :: Parser REPLExpr
 lineParser
   =   commandParser
   <|> try (Nop <$ (sc <* eof))
+  <|> try (Using <$> (reserved "using" *> parseExtName))
   <|> try (Eval <$> term)
   <|> letParser
 
-parseLine :: String -> Either String REPLExpr
-parseLine s =
-  case (runParser lineParser "" s) of
+parseLine :: ExtSet -> String -> Either String REPLExpr
+parseLine exts s =
+  case (runParser (withExts exts lineParser) "" s) of
     Left  e -> Left $ errorBundlePretty e
     Right l -> Right l
 
 handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
-handleCMD s =
-    case (parseLine s) of
+handleCMD s = do
+    exts <- use enabledExts
+    case (parseLine exts s) of
       Left msg -> io $ putStrLn msg
       Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
   where
     handleLine :: REPLExpr -> Disco IErr ()
 
+    handleLine (Using e)     = enabledExts %= addExtension e
     handleLine (Let x t)     = handleLet x t
     handleLine (TypeCheck t) = handleTypeCheck t        >>= iputStrLn
     handleLine (Eval t)      = evalTerm t

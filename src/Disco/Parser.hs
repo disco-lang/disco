@@ -19,8 +19,8 @@
 -----------------------------------------------------------------------------
 
 module Disco.Parser
-       ( -- * Parser type
-         Parser, runParser
+       ( -- * Parser type and utilities
+         Parser, runParser, withExts
 
          -- * Lexer
 
@@ -36,7 +36,7 @@ module Disco.Parser
          -- * Disco parser
 
          -- ** Modules
-       , wholeModule, parseModule, parseTopLevel, parseDecl
+       , wholeModule, parseModule, parseExtName, parseTopLevel, parseDecl
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
@@ -76,6 +76,7 @@ import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.AST.Surface
+import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -290,7 +291,8 @@ wholeModule = between sc eof parseModule
 parseModule :: Parser Module
 parseModule = do
   exts     <- S.fromList <$> many parseExtension
-  withExts exts $ do
+  withExts exts $ do   -- REPLACE any existing extension set with the extensions
+                       -- explicitly specified by the module.
     imports  <- many parseImport
     topLevel <- many parseTopLevel
     let theMod = mkModule exts imports topLevel
@@ -329,7 +331,7 @@ parseExtension = L.nonIndented sc $
 
 -- | Parse the name of a language extension (case-insensitive).
 parseExtName :: Parser Ext
-parseExtName = choice (map parseOneExt allExts) <?> "language extension name"
+parseExtName = choice (map parseOneExt allExtsList) <?> "language extension name"
   where
     parseOneExt ext = ext <$ lexeme (string' (show ext) :: Parser String)
 

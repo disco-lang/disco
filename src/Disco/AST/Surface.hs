@@ -21,7 +21,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Ext(..), allExts, Module(..), TopLevel(..), ModName
+         Module(..), TopLevel(..), ModName
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -112,6 +112,7 @@ import           Data.Void
 
 import           Disco.AST.Generic
 import           Disco.Context
+import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -119,16 +120,6 @@ import           Unbound.Generics.LocallyNameless
 
 -- | The extension descriptor for Surface specific AST types.
 data UD
-
--- | Enumeration of optional language extensions.
-data Ext
-  = Primitives   -- ^ Allow primitives, i.e. @$prim@
-  | Randomness   -- ^ Allow non-deterministic semantics via primitives like @uniform@
-  deriving (Eq, Ord, Show, Read, Enum, Bounded)
-
--- | A list of all possible language extensions, provided for convenience.
-allExts :: [Ext]
-allExts = [minBound .. maxBound]
 
 -- | A module contains all the information from one disco source file.
 data Module = Module

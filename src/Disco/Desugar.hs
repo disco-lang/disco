@@ -47,6 +47,7 @@ import           Disco.AST.Typed
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
+import           Disco.Typecheck                  (containerTy)
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -119,8 +120,8 @@ tif t = AGBool (embed t)
 nil :: Type -> ATerm
 nil ty = ATContainer (TyList ty) ListContainer [] Nothing
 
-tsingleton :: ATerm -> ATerm
-tsingleton t = ATContainer (TyList (getType t)) ListContainer [t] Nothing
+ctrSingleton :: Container -> ATerm -> ATerm
+ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [t] Nothing
 
 ------------------------------------------------------------
 -- Definition desugaring
@@ -265,7 +266,7 @@ desugarTerm (ATBin (TyFin n) op t1 t2)
 -- Desugar normal binomial coefficient (n choose k) to a multinomial
 -- coefficient with a singleton list, (n choose [k]).
 desugarTerm (ATBin ty Choose t1 t2)
-  | getType t2 == TyN = desugarTerm $ ATBin ty Choose t1 (tsingleton t2)
+  | getType t2 == TyN = desugarTerm $ ATBin ty Choose t1 (ctrSingleton ListContainer t2)
 
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 
@@ -275,14 +276,9 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp (TyList eltTy) ListContainer bqt) = do
+desugarTerm (ATContainerComp ty ctr bqt) = do
   (qs, t) <- unbind bqt
-  desugarComp eltTy t qs
-
-desugarTerm (ATContainerComp ty ListContainer _) =
-  error $ "Non-TyList type passed to desugarTerm for a ListContainer" ++ show ty
-
-desugarTerm (ATContainerComp ty _ _) = error $ "desugar ContainerComp unimplemented for " ++ show ty
+  desugarComp ctr (getEltTy ty) t qs
 
 desugarTerm (ATLet _ t) = do
   (bs, t2) <- unbind t
@@ -290,33 +286,40 @@ desugarTerm (ATLet _ t) = do
 
 desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
+getEltTy :: Type -> Type
+getEltTy (TyList e) = e
+getEltTy (TyBag  e) = e
+getEltTy (TySet  e) = e
+getEltTy ty         = error $ "desugarTerm.getEltTy on non-container type " ++ show ty
+
 ------------------------------------------------------------
 -- Desugaring other stuff
 ------------------------------------------------------------
 
--- | Desugar a list comprehension.  First translate it into an
+-- | Desugar a container comprehension.  First translate it into an
 --   expanded ATerm and then recursively desugar that.
-desugarComp :: Type -> ATerm -> Telescope AQual -> DSM DTerm
-desugarComp ty t qs = expandComp ty t qs >>= desugarTerm
+desugarComp :: Container -> Type -> ATerm -> Telescope AQual -> DSM DTerm
+desugarComp ctr eltTy t qs = expandComp ctr eltTy t qs >>= desugarTerm
 
--- | Expand a list comprehension into an equivalent ATerm.
-expandComp :: Type -> ATerm -> Telescope AQual -> DSM ATerm
+-- | Expand a container comprehension into an equivalent ATerm.
+expandComp :: Container -> Type -> ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp _ t TelEmpty = return $ tsingleton t
+expandComp ctr _ t TelEmpty = return $ ctrSingleton ctr t
 
 -- [ t | q, qs ] = ...
-expandComp xTy t (TelCons (unrebind -> (q,qs)))
+expandComp ctr xTy t (TelCons (unrebind -> (q,qs)))
   = case q of
-      -- [ t | x in l, qs ] = concat (map (\x -> [t | qs]) l)
+      -- [ t | x in l, qs ] = join (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do
-        tqs <- expandComp (TyList xTy) t qs
-        let resTy        = TyList (getType t)
-            concatTy     = TyArr (TyList resTy) resTy
-            mapTy        = TyArr (TyArr xTy resTy) (TyArr (TyList xTy) (TyList resTy))
-        return $ ATApp resTy (ATPrim concatTy PrimJoin) $
-          ATApp (TyList resTy)
-            (ATApp (TyArr (TyList xTy) (TyList resTy))
+        tqs <- expandComp ctr xTy t qs
+        let c            = containerTy ctr
+            resTy        = c (getType t)
+            joinTy       = TyArr (c resTy) resTy
+            mapTy        = TyArr (TyArr xTy resTy) (TyArr (c xTy) (c resTy))
+        return $ ATApp resTy (ATPrim joinTy PrimJoin) $
+          ATApp (c resTy)
+            (ATApp (TyArr (c xTy) (c resTy))
               (ATPrim mapTy PrimMap)
               (ATAbs (TyArr xTy resTy) (bind [(x, embed xTy)] tqs))
             )
@@ -324,8 +327,8 @@ expandComp xTy t (TelCons (unrebind -> (q,qs)))
 
       -- [ t | g, qs ] = if g then [ t | qs ] else []
       AQGuard (unembed -> g)    -> do
-        tqs <- expandComp (TyList xTy) t qs
-        return $ ATCase (TyList (getType t))
+        tqs <- expandComp ctr xTy t qs
+        return $ ATCase (containerTy ctr (getType t))
           [ tqs             <==. [tif g]
           , nil (getType t) <==. []
           ]

@@ -395,6 +395,8 @@ typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
     primCtrCon PrimBag  = TyBag
     primCtrCon _        = TySet
 
+-- XXX see https://github.com/disco-lang/disco/issues/160
+
 -- map : (a -> b) -> (c a -> c b)
 typecheck Infer (TPrim PrimMap) = do
   c <- freshAtom

@@ -214,6 +214,9 @@ library
                        Disco.Types
                        Disco.Types.Rules
                        Disco.Util
+                       Disco.Interactive.Eval
+                       Disco.Interactive.Parser
+                       Disco.Interactive.CmdLine
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
@@ -247,7 +250,8 @@ library
                        integer-logarithms >= 1.0 && < 1.1,
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.13,
-                       fgl >= 5.5 && < 5.8
+                       fgl >= 5.5 && < 5.8,
+                       optparse-applicative >= 0.12 && < 0.15
 
   hs-source-dirs:      src
   default-language:    Haskell2010

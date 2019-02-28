@@ -416,6 +416,12 @@ typecheck Infer (TPrim PrimMapReduce) = do
   return $ ATPrim ((a :->: b) :->: (b :->: b :->: b) :->: b :->: TyContainer c a :->: b)
              PrimMapReduce
 
+-- join : c (c a) -> c a
+typecheck Infer (TPrim PrimJoin) = do
+  c <- freshAtom
+  a <- freshTy
+  return $ ATPrim (TyContainer c (TyContainer c a) :->: TyContainer c a) PrimJoin
+
 -- isPrime : N -> Bool
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
 -- factor : N -> Bag N

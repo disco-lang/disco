@@ -152,6 +152,12 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OMapReduce      -- ^ Map-reduce for a bag/set.  (Map-reduce
                           --   for lists just compiles to map followed
                           --   by reduce.)
+        | OConcat         -- ^ List concatenation.  (Perhaps in the
+                          --   future this should get
+                          --   desugared/compiled into more primitive
+                          --   things.)
+        | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
+        | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
@@ -213,6 +219,9 @@ opArity (OMapSet _)    = 2
 opArity OReduceList    = 3
 opArity OReduceBag     = 3
 opArity OMapReduce     = 4
+opArity OConcat        = 1
+opArity (OBagUnions _) = 1
+opArity (OUnions _)    = 1
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

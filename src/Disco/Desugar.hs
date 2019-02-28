@@ -314,10 +314,10 @@ expandComp xTy t (TelCons (unrebind -> (q,qs)))
         let resTy        = TyList (getType t)
             concatTy     = TyArr (TyList resTy) resTy
             mapTy        = TyArr (TyArr xTy resTy) (TyArr (TyList xTy) (TyList resTy))
-        return $ ATApp resTy (ATVar concatTy (string2Name "concat")) $
+        return $ ATApp resTy (ATPrim concatTy PrimJoin) $
           ATApp (TyList resTy)
             (ATApp (TyArr (TyList xTy) (TyList resTy))
-              (ATVar mapTy (string2Name "mapList"))
+              (ATPrim mapTy PrimMap)
               (ATAbs (TyArr xTy resTy) (bind [(x, embed xTy)] tqs))
             )
             lst

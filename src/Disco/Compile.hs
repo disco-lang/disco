@@ -157,6 +157,10 @@ compilePrim (_ :->: _ :->: _ :->: TyList _ :->: _) PrimMapReduce
 compilePrim (_ :->: _ :->: _ :->: TyBag _ :->: _) PrimMapReduce = return $ CConst OMapReduce
 compilePrim (_ :->: _ :->: _ :->: TySet _ :->: _) PrimMapReduce = return $ CConst OMapReduce
 
+compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
+compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
+compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
+
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
 

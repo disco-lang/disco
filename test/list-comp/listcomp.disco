@@ -1,11 +1,5 @@
 import list
 
--- For desugaring list comprehensions ----------------------
-mapList : (a -> b) -> List a -> List b
-mapList _ [] = []
-mapList f (a :: as) = f a :: mapList f as
-------------------------------------------------------------
-
 downfrom : N -> List N
 downfrom 0     = []
 downfrom (n+1) = (n+1) :: downfrom n

@@ -654,10 +654,20 @@ primMapReduce f m z b = do
   let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts'
   vfoldr (\a r -> whnfApp m' [a,r]) z xs
 
--- | Check whether a certain value is present in a list using a linear search.
--- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
--- elemOf _ _ []     = return False
--- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+--------------------------------------------------
+-- Join
+
+primBagUnions :: Type -> Value -> Disco IErr Value
+primBagUnions ty bbs = do
+  VBag cts <- whnfV bbs
+  bs <- mapM (\(b,n) -> (,n) <$> whnfV b) cts
+  VBag <$> sortNCount (decideOrdFor ty) [(x, m*n) | (VBag xs, n) <- bs, (x,m) <- xs]
+
+primUnions :: Type -> Value -> Disco IErr Value
+primUnions ty s = do
+  VBag cts <- whnfV s
+  ss <- mapM whnfV (map fst cts)
+  valuesToSet ty [ x | VBag xs <- ss, (x,_) <- xs ]
 
 ------------------------------------------------------------
 -- Set and bag operations
@@ -712,6 +722,12 @@ repBag :: Value -> Value -> Disco IErr Value
 repBag elt rep = do
   VNum _ r <- whnfV rep
   return $ VBag [(elt, numerator r)]
+
+-- | Check whether a certain value is present in a list using a linear search.
+-- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
+-- elemOf _ _ []     = return False
+-- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+
 
 ------------------------------------------------------------
 -- Constant evaluation
@@ -797,6 +813,13 @@ whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
 
 whnfOp OMapReduce      = (arity4 "mapReduce"  $ primMapReduce ) >=> whnfV
+
+--------------------------------------------------
+-- Join
+
+whnfOp OConcat         = (arity1 "concat"   $ vconcat) >=> whnfV
+whnfOp (OBagUnions ty) = arity1 "bagUnions" $ primBagUnions ty
+whnfOp (OUnions ty)    = arity1 "unions"    $ primUnions ty
 
 --------------------------------------------------
 -- Ellipsis

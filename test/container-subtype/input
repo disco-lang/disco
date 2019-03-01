@@ -1,0 +1,6 @@
+:type let f : Set a -> Set a = \s.s in f [1,2,3]
+:type let f : (List a -> List a) -> List a = \g. g [], q : Set N -> List N = list in f q
+:type let f : (Set a -> Set a) -> Set a = \g. g {}, q : List N -> Set N = set in f q
+:type let f : Set a -> Set a = \s.s in f (1 # 3)
+:type let f : Bag a -> Bag a = \s.s in f [1,2,3]
+:type let f : Set Set a -> Set Set a = \s.s in f [[2,3], [4,5]]

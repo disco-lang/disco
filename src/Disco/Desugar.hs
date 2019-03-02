@@ -345,7 +345,7 @@ desugarLet :: [ABinding] -> ATerm -> DSM DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   DTApp (getType t)
-    <$> (DTLam (TyArr (getType t1) (getType t))
+    <$> (DTLam (getType t1 :->: getType t)
           <$> (bind (coerce x) <$> desugarLet ls t)
         )
     <*> desugarTerm t1
@@ -363,7 +363,7 @@ mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
 mkLambda funty args c = go funty args
   where
     go _ []                    = c
-    go ty@(TyArr _ ty2) (x:xs) = DTLam ty (bind (coerce x) (go ty2 xs))
+    go ty@(_ :->: ty2) (x:xs) = DTLam ty (bind (coerce x) (go ty2 xs))
 
     go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
 

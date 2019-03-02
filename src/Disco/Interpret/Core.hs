@@ -1433,4 +1433,5 @@ decideOrdForClosures ty2 clos1 clos2 = go
 primValOrd :: Value -> Value -> Ordering
 primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
-primValOrd _ _                       = error "primValOrd: impossible!"
+primValOrd v1           v2
+  = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"

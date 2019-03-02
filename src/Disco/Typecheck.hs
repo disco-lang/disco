@@ -1294,9 +1294,14 @@ lub ty1 ty2 = do
 -- Decomposing type constructors
 ------------------------------------------------------------
 
+-- | Do we want to ensure that a given type is headed by a constructor
+--   which is a supertype of subtype of, or equal to a given
+--   constructor?
 data Ensure = SupOf | SubOf | EqTo
   deriving (Eq, Show)
 
+-- | Turn an 'Ensure' value into an actual constraint relating the
+--   first type to the second.
 ensure :: Ensure -> Type -> Type -> Constraint
 ensure SubOf = CSub
 ensure SupOf = flip CSub

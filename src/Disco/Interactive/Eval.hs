@@ -12,11 +12,7 @@
 
 module Disco.Interactive.Eval where
 
-import qualified Options.Applicative                     as O
 import           System.Console.Haskeline                as H
-import           Text.Megaparsec                         hiding (runParser)
-import qualified Text.Megaparsec.Char                    as C
-import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Arrow                           ((&&&))

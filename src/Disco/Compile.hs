@@ -131,17 +131,19 @@ compilePrim (TyList a :->: _) PrimSet  = return $ CConst (OListToSet a)
 compilePrim (TyList a :->: _) PrimBag  = return $ CConst (OListToBag a)
 compilePrim _ p | p `elem` [PrimList, PrimBag, PrimSet] = return $ CConst OId
 
-compilePrim ty PrimList = error $ "Impossible! compilePrim PrimList on bad type " ++ show ty
-compilePrim ty PrimBag  = error $ "Impossible! compilePrim PrimBag on bad type " ++ show ty
-compilePrim ty PrimSet  = error $ "Impossible! compilePrim PrimSet on bad type " ++ show ty
+compilePrim ty PrimList = compilePrimErr PrimList ty
+compilePrim ty PrimBag  = compilePrimErr PrimBag ty
+compilePrim ty PrimSet  = compilePrimErr PrimSet ty
 
 compilePrim (_ :->: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :->: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
 compilePrim (_ :->: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
+compilePrim ty                                PrimMap = compilePrimErr PrimMap ty
 
 compilePrim (_ :->: _ :->: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
 compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim ty                              PrimReduce = compilePrimErr PrimReduce ty
 
   -- mapReduce f m z l = reduce m z (map f l)
 compilePrim (_ :->: _ :->: _ :->: TyList _ :->: _) PrimMapReduce
@@ -156,10 +158,12 @@ compilePrim (_ :->: _ :->: _ :->: TyList _ :->: _) PrimMapReduce
     l = string2Name "l"
 compilePrim (_ :->: _ :->: _ :->: TyBag _ :->: _) PrimMapReduce = return $ CConst OMapReduce
 compilePrim (_ :->: _ :->: _ :->: TySet _ :->: _) PrimMapReduce = return $ CConst OMapReduce
+compilePrim ty PrimMapReduce = compilePrimErr PrimMapReduce ty
 
 compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
+compilePrim ty                PrimJoin = compilePrimErr PrimJoin ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
@@ -168,6 +172,9 @@ compilePrim _ PrimCrash   = return $ CConst OCrash
 
 compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
+
+compilePrimErr :: Prim -> Type -> a
+compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad type " ++ show ty
 
 ------------------------------------------------------------
 -- Case expressions

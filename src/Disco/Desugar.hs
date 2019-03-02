@@ -128,6 +128,7 @@ tapp t1 t2 = ATApp resTy t1 t2
   where
     resTy = case getType t1 of
       (_ :->: r) -> r
+      ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in tapp"
 
 ------------------------------------------------------------
 -- Definition desugaring

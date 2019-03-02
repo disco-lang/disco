@@ -401,6 +401,12 @@ typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
     primCtrCon PrimBag  = TyBag
     primCtrCon _        = TySet
 
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TPrim PrimList) = error "typecheck Infer PrimList should be unreachable"
+typecheck Infer (TPrim PrimBag)  = error "typecheck Infer PrimBag should be unreachable"
+typecheck Infer (TPrim PrimSet)  = error "typecheck Infer PrimSet should be unreachable"
+------------------------------------------------------------
+
 -- XXX see https://github.com/disco-lang/disco/issues/160
 
 -- map : (a -> b) -> (c a -> c b)
@@ -439,6 +445,21 @@ typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimF
 typecheck Infer (TPrim PrimCrash)   = do
   a <- freshTy
   return $ ATPrim (TyList TyC :->: a) PrimCrash
+
+-- Actually 'forever' and 'until' support more types than this, e.g. Q
+-- instead of N, but this is good enough.  These cases are here just
+-- for completeness---in case someone enables primitives and uses them
+-- directly---but typically they are generated only during desugaring
+-- of a container with ellipsis, after typechecking, in which case
+-- they can be assigned a more appropriate type directly.
+
+-- forever : List N -> List N
+typecheck Infer (TPrim PrimForever)
+  = return $ ATPrim (TyList TyN :->: TyList TyN) PrimForever
+
+-- until : N -> List N -> List N
+typecheck Infer (TPrim PrimUntil)
+  = return $ ATPrim (TyN :->: TyList TyN :->: TyList TyN) PrimUntil
 
 --------------------------------------------------
 -- Base types

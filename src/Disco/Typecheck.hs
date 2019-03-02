@@ -28,6 +28,7 @@ import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import           Data.List                               (group, sort)
 import qualified Data.Map                                as M
+import           Data.Maybe                              (isJust)
 import qualified Data.Set                                as S
 import           Prelude                                 hiding (lookup)
 
@@ -895,7 +896,7 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 --------------------------------------------------
 -- Containers
 
--- Literal containers
+-- Literal containers, including ellipses
 typecheck mode t@(TContainer c xs ell)  = do
   eltMode <- ensureConstrMode1 SupOf (containerToCon c) mode (Left t)
   axs  <- mapM (typecheck eltMode) xs
@@ -907,6 +908,8 @@ typecheck mode t@(TContainer c xs ell)  = do
       constraints $ map (flip CSub tyv) tys
       return $ containerTy c tyv
     Check ty -> return ty
+  when (isJust ell) $
+    constraint $ CQual QEnum (getEltTy resTy)
   return $ ATContainer resTy c axs aell
 
   where

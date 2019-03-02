@@ -293,12 +293,6 @@ desugarTerm (ATLet _ t) = do
 
 desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 
-getEltTy :: Type -> Type
-getEltTy (TyList e) = e
-getEltTy (TyBag  e) = e
-getEltTy (TySet  e) = e
-getEltTy ty         = error $ "desugarTerm.getEltTy on non-container type " ++ show ty
-
 ------------------------------------------------------------
 -- Desugaring other stuff
 ------------------------------------------------------------

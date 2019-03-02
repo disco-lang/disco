@@ -74,12 +74,32 @@ arity (CContainer _) = [Co]
 ------------------------------------------------------------
 
 -- | Qualifiers that may appear in the CQual constraint.
-data Qualifier = QNum | QSub | QDiv | QCmp
+data Qualifier
+  = QNum       -- ^ Numeric, i.e. a semiring supporting + and *
+  | QSub       -- ^ Subtractive, i.e. supports -
+  | QDiv       -- ^ Divisive, i.e. supports /
+  | QCmp       -- ^ Comparable, i.e. supports ordering/comparison (see Note [QCmp])
+  | QEnum      -- ^ Enumerable, i.e. supports ellipsis notation [x .. y]
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier
-
 instance Subst Type Qualifier
+
+-- ~~~~ Note [QCmp]
+--
+-- Every type in disco supports (semi-decidable) linear ordering, so
+-- in one sense the QCmp constraint is unnecessary.  However, in order
+-- to do a comparison we need to know the type at runtime.  Currently,
+-- we use QCmp to track which types have comparisons done on them, and
+-- reject any type variables with a QCmp constraint (just as we reject
+-- any other type variables with remaining constraints).  Every type
+-- with comparisons done on it must be statically known at compile
+-- time.
+--
+-- Eventually, one could imagine compiling to something like System F
+-- with explicit type lambdas and applications; then the QCmp
+-- constraints would tell us which type applications need to be kept
+-- and which can be erased.
 
 -- | A helper function that returns the appropriate qualifier for a
 --   binary arithmetic operation.
@@ -172,12 +192,13 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual _ QCmp       = True
-hasQual (Fin _) q    | q `elem` [QNum, QSub] = True
-hasQual (Fin n) QDiv = isPrime n
-hasQual b       QNum = b `elem` [N, Z, F, Q]
-hasQual b       QSub = b `elem` [Z, Q]
-hasQual b       QDiv = b `elem` [F, Q]
+hasQual _ QCmp        = True
+hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
+hasQual (Fin n) QDiv  = isPrime n
+hasQual b       QNum  = b `elem` [N, Z, F, Q]
+hasQual b       QSub  = b `elem` [Z, Q]
+hasQual b       QDiv  = b `elem` [F, Q]
+hasQual b       QEnum = b `elem` [N, Z, F, Q, C]
 
 -- | Check whether a base type has a certain sort.
 hasSort :: BaseTy -> Sort -> Bool
@@ -262,9 +283,10 @@ sortRules c s = do
 -- | Pick a base type that satisfies a given sort.
 pickSortBaseTy :: Sort -> BaseTy
 pickSortBaseTy s
-  | QDiv `S.member` s && QSub `S.member` s = Q
-  | QDiv `S.member` s = F
-  | QSub `S.member` s = Z
-  | QNum `S.member` s = N
-  | QCmp `S.member` s = N
-  | otherwise         = Unit
+  | QDiv  `S.member` s && QSub `S.member` s = Q
+  | QDiv  `S.member` s = F
+  | QSub  `S.member` s = Z
+  | QNum  `S.member` s = N
+  | QCmp  `S.member` s = N
+  | QEnum `S.member` s = N
+  | otherwise          = Unit

@@ -117,11 +117,17 @@ tru = ATBool True
 tif :: ATerm -> AGuard
 tif t = AGBool (embed t)
 
-nil :: Type -> ATerm
-nil ty = ATContainer (TyList ty) ListContainer [] Nothing
+ctrNil :: Container -> Type -> ATerm
+ctrNil ctr ty = ATContainer (containerTy ctr ty) ctr [] Nothing
 
 ctrSingleton :: Container -> ATerm -> ATerm
 ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [t] Nothing
+
+tapp :: ATerm -> ATerm -> ATerm
+tapp t1 t2 = ATApp resTy t1 t2
+  where
+    resTy = case getType t1 of
+      (_ :->: r) -> r
 
 ------------------------------------------------------------
 -- Definition desugaring
@@ -276,9 +282,9 @@ desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
 
 desugarTerm (ATContainer ty c es mell) = desugarContainer ty c es mell
 
-desugarTerm (ATContainerComp ty ctr bqt) = do
+desugarTerm (ATContainerComp _ ctr bqt) = do
   (qs, t) <- unbind bqt
-  desugarComp ctr (getEltTy ty) t qs
+  desugarComp ctr t qs
 
 desugarTerm (ATLet _ t) = do
   (bs, t2) <- unbind t
@@ -298,39 +304,40 @@ getEltTy ty         = error $ "desugarTerm.getEltTy on non-container type " ++ s
 
 -- | Desugar a container comprehension.  First translate it into an
 --   expanded ATerm and then recursively desugar that.
-desugarComp :: Container -> Type -> ATerm -> Telescope AQual -> DSM DTerm
-desugarComp ctr eltTy t qs = expandComp ctr eltTy t qs >>= desugarTerm
+desugarComp :: Container -> ATerm -> Telescope AQual -> DSM DTerm
+desugarComp ctr t qs = expandComp ctr t qs >>= desugarTerm
 
 -- | Expand a container comprehension into an equivalent ATerm.
-expandComp :: Container -> Type -> ATerm -> Telescope AQual -> DSM ATerm
+expandComp :: Container -> ATerm -> Telescope AQual -> DSM ATerm
 
 -- [ t | ] = [ t ]
-expandComp ctr _ t TelEmpty = return $ ctrSingleton ctr t
+expandComp ctr t TelEmpty = return $ ctrSingleton ctr t
 
 -- [ t | q, qs ] = ...
-expandComp ctr xTy t (TelCons (unrebind -> (q,qs)))
+expandComp ctr t (TelCons (unrebind -> (q,qs)))
   = case q of
       -- [ t | x in l, qs ] = join (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do
-        tqs <- expandComp ctr xTy t qs
+        tqs <- expandComp ctr t qs
         let c            = containerTy ctr
-            resTy        = c (getType t)
-            joinTy       = TyArr (c resTy) resTy
-            mapTy        = TyArr (TyArr xTy resTy) (TyArr (c xTy) (c resTy))
-        return $ ATApp resTy (ATPrim joinTy PrimJoin) $
-          ATApp (c resTy)
-            (ATApp (TyArr (c xTy) (c resTy))
+            tTy          = getType t
+            xTy          = getEltTy (getType lst)
+            joinTy       = c (c tTy) :->: c tTy
+            mapTy        = (xTy :->: c tTy) :->: (c xTy :->: c (c tTy))
+        return $ tapp (ATPrim joinTy PrimJoin) $
+          tapp
+            (tapp
               (ATPrim mapTy PrimMap)
-              (ATAbs (TyArr xTy resTy) (bind [(x, embed xTy)] tqs))
+              (ATAbs (xTy :->: c tTy) (bind [(x, embed xTy)] tqs))
             )
             lst
 
       -- [ t | g, qs ] = if g then [ t | qs ] else []
       AQGuard (unembed -> g)    -> do
-        tqs <- expandComp ctr xTy t qs
+        tqs <- expandComp ctr t qs
         return $ ATCase (containerTy ctr (getType t))
-          [ tqs             <==. [tif g]
-          , nil (getType t) <==. []
+          [ tqs                    <==. [tif g]
+          , ctrNil ctr (getType t) <==. []
           ]
 
 -- | Desugar a let into applications of a chain of nested lambdas.

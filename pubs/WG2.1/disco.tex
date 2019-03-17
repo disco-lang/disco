@@ -1,0 +1,431 @@
+%% -*- mode: LaTeX; compile-command: "./build.sh" -*-
+\documentclass[xcolor=svgnames,12pt,aspectratio=169]{beamer}
+
+\usepackage[all]{xy}
+\usepackage{brent}
+\usepackage{xspace}
+\usepackage{fancyvrb}
+\usepackage{ulem}
+
+\usepackage{ucs}
+\usepackage[utf8x]{inputenc}
+\usepackage[backend=pgf,extension=pgf,input,outputdir=diagrams]{diagrams-latex}
+\graphicspath{{images/}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Math typesetting
+
+%% a bit more space for matrices
+\setlength{\arraycolsep}{5pt}
+
+\newcommand{\ty}[3]{{#1} \vdash {#2} : {#3}}
+\newcommand{\nty}[3]{{#1} \nvdash {#2} : {#3}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\etc}{\textit{etc.}}
+\renewcommand{\eg}{\textit{e.g.}\xspace}
+\renewcommand{\ie}{\textit{i.e.}\xspace}
+
+\newcommand{\theschool}{IFIP WG 2.1}
+% \newcommand{\thelocation}{Taiwan}
+\newcommand{\thedate}{March 2019}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setbeamertemplate{items}[circle]
+
+\mode<presentation>
+{
+  \usetheme{default}                          % use a default (plain) theme
+
+  \setbeamertemplate{navigation symbols}{}    % don't show navigation
+                                              % buttons along the
+                                              % bottom
+  \setbeamerfont{normal text}{family=\sffamily}
+
+  % XX remove this before giving actual talk!
+  % \setbeamertemplate{footline}[frame number]
+  % {%
+  %   \begin{beamercolorbox}{section in head/foot}
+  %     \vskip2pt
+  %     \hfill \insertframenumber
+  %     \vskip2pt
+  %   \end{beamercolorbox}
+  % }
+
+  \AtBeginSection[]
+  {
+    \begin{frame}<beamer>
+      \frametitle{}
+
+      \begin{center}
+%        \includegraphics[width=2in]{\sectionimg}
+%        \bigskip
+
+        {\Huge \insertsectionhead}
+      \end{center}
+    \end{frame}
+  }
+}
+
+\defbeamertemplate*{title page}{customized}[1][]
+{
+  \vbox{}
+  \vfill
+  \begin{centering}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{title}
+      \usebeamerfont{title}\inserttitle\par%
+      \ifx\insertsubtitle\@@empty%
+      \else%
+        \vskip0.25em%
+        {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+      \fi%
+    \end{beamercolorbox}%
+    \vskip1em\par
+    {\usebeamercolor[fg]{titlegraphic}\inserttitlegraphic\par}
+    \vskip1em\par
+    \begin{beamercolorbox}[sep=8pt,center,#1]{author}
+      \usebeamerfont{author}\insertauthor
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{institute}
+      \usebeamerfont{institute}\insertinstitute
+    \end{beamercolorbox}
+    \begin{beamercolorbox}[sep=8pt,center,#1]{date}
+      \usebeamerfont{date}\insertdate
+    \end{beamercolorbox}
+  \end{centering}
+  \vfill
+}
+
+\newenvironment{xframe}[1][]
+  {\begin{frame}[fragile,environment=xframe,#1]}
+  {\end{frame}}
+
+% uncomment me to get 4 slides per page for printing
+% \usepackage{pgfpages}
+% \pgfpagesuselayout{4 on 1}[uspaper, border shrink=5mm]
+
+\setbeameroption{show notes}
+
+\renewcommand{\emph}{\textbf}
+
+\title{Disco: A Functional Teaching Language for Discrete Mathematics}
+\date{\theschool \\ \thedate}
+\author{Brent Yorgey}
+% \titlegraphic{\includegraphics[width=1in]{deriv-tree}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+\begin{xframe}{}
+   \titlepage
+\end{xframe}
+
+\begin{xframe}{}
+  XXX collaborators
+\end{xframe}
+
+\begin{xframe}{Context}
+  \begin{itemize}
+  \item<+-> I teach at a small undergraduate institution
+  \item<+-> Want to introduce strongly typed FP to students early
+  \item<+-> Can't use FP for intro programming course
+  \item<+-> Can't add another required course
+  \item<+-> Solution: FP in Discrete Math!
+  \end{itemize}
+\end{xframe}
+
+\begin{xframe}{FP and Discrete Math}
+  \begin{itemize}
+  \item<+-> Already done in many places.
+  \item<+-> \dots but using a general-purpose FP language (Haskell,
+    OCaml, \dots)
+  \item<+-> Seemed like a fun opportunity to design a new language.
+  \end{itemize}
+\end{xframe}
+
+% \begin{xframe}{Goals}
+%   \begin{itemize}
+%   \item Share some interesting language design with you
+%   \item Get some feedback and ideas
+%   \item Find out if there's other related work I'm missing
+%   \end{itemize}
+% \end{xframe}
+
+\section{Design principles}
+
+\note{With this context in mind, let me tell you the core design
+  principles of disco.}
+
+\begin{xframe}
+  \begin{center}
+    {\Large \#1} \bigskip
+
+    {\Large Elegant, strong static type system}
+  \end{center}
+\note{First, the language needs to have a well-designed, strong,
+  static type system.  I want students to see the beauty and utility
+  of thinking with types, and learn general principles that they can
+  transfer to other languages.}
+
+\end{xframe}
+
+\begin{xframe}
+  \begin{center}
+    {\Large \#2} \bigskip
+
+    {\Large Usable by beginning programmers}
+  \end{center}
+  \note{Some of the students taking the course will have taken an
+    introductory programming course, but it shouldn't have programming
+    as a prerequisite.}
+\end{xframe}
+
+\begin{xframe}
+  \begin{center}
+    {\Large \#3} \bigskip
+
+    {\Large Syntax and semantics inspired by mathematical practice}
+  \end{center}
+
+  \note{As much as possible, I want to close the gap between the
+    mathematics the students are learning in the class and the kinds
+    of things they can talk about in the language.  I also want to
+    make it attractive/possible for mathematics faculty to be able to
+    pick it up quickly.}
+\end{xframe}
+
+\section{Types}
+
+\note{OK, so let's talk about some interesting design choices
+  underlying disco's type system. XXX polymorphism.  Let's start with
+  thinking about base types.}
+
+\begin{xframe}{Base types}
+  \Huge
+  \begin{overprint}
+    \onslide<2> \[ \mathbb{N} \]
+    \onslide<3> \[ \mathbb{N} \quad \mathbb{Z} \]
+    \onslide<4> \[ \mathbb{N} \stackrel{\small ?}{\leq} \mathbb{Z} \]
+  \end{overprint}
+  \note{Any language for FP and discrete math obviously has to start
+    with the natural numbers as a built-in base type!  And then we
+    quickly want negative numbers too, so we add an integer type.  But
+  then we immediately run head-on into the issue of subtyping. Do we
+  want N to be a subtype of Z?}
+\end{xframe}
+
+\begin{xframe}{Base types}
+  \Huge
+    \[ \mathbb{N} \leq \mathbb{Z} \]
+  \note{Based on principle \#3, I would argue that yes, we have to!
+    Every student knows that natural numbers ARE integers.  It would
+    be very jarring to be required to apply some sort of explicit
+    conversion function.}
+\end{xframe}
+
+\begin{xframe}{Base types}
+  \Huge
+  \begin{overprint}
+    \onslide<1> \[ \mathbb{R}? \]
+    \onslide<2> \[ \not\mathbb{R} \]
+  \end{overprint}
+  \note{You might think the next base type we want is some sort of
+    floating-point type. But we definitely don't.  Floating point
+    numbers suck, and we don't need them for discrete math!}
+\end{xframe}
+
+\begin{xframe}{Base types}
+  \Huge
+  \[ \mathbb{N} \leq \mathbb{Z} \leq \mathbb{Q} \]
+  \note{Instead, we make rational numbers built-in first-class
+    citizens, so we can have division.  And then after a while of
+    working with this, I had a sudden epiphany that there's a fourth
+    type we want to add.  Does anyone know what I'm going to say?
+    Maybe others have already thought about this?}
+\end{xframe}
+
+\begin{xframe}{Base types}
+  \Large
+  \[ \mathbb{F} = \left\{ \frac{a}{b} \mid a, b \in \mathbb{N}, b \neq 0 \right\} \]
+\end{xframe}
+
+\begin{xframe}{Base types}
+  \begin{center}
+  \begin{diagram}[width=100]
+    dia = mconcat (zipWith moveTo (square 6 # rotateBy (-1/8)) baseTyDias)
+      # connect' opts "N" "Z"
+      # connect' opts "N" "F"
+      # connect' opts "F" "Q"
+      # connect' opts "Z" "Q"
+
+    opts = with & gaps .~ local 1.3 & headLength .~ local 0.6
+
+    baseTys = ["N", "Z", "Q", "F"]
+    mkBaseTyDia ty = mconcat
+      [ text ("$\\mathbb{" ++ ty ++ "}$")
+      , square 1 # lw none
+      ]
+      # named ty
+    baseTyDias = map mkBaseTyDia baseTys
+  \end{diagram}
+  \end{center}
+  \note{Now we get this lovely subtyping lattice.  $\mathbb{N}$
+    supports addition and multiplication.  Moving up and to the right
+    corresponds to having additive inverses; up and left is
+    multiplicative inverses. We can go back down with absolute value
+    or with floor/ceiling.}
+  % XXX if time, add more info to the picture
+\end{xframe}
+
+\begin{xframe}
+  \begin{center}
+    {\Huge Demo!}
+  \end{center}
+  \note{Do a quick demo.  Show basic arithmetic operations and
+    inferring their types.  Show inferring the type of lists containing
+    all naturals, negative, fraction, or both.  Show how this lets us
+    e.g. be precise about the type of exponentiation, $2^5$, $(-2)^5$,
+    $2^{-5}$, $(-2)^{-5}$.}
+\end{xframe}
+
+\begin{xframe}{Quiz}
+  \begin{center}
+    Q: What is the type of $\lambda x. x - 1$?
+  \end{center}
+
+  \onslide<2>
+  A: it can be $\mathbb{Z} \to \mathbb{Z}$ or $\mathbb{Q} \to
+  \mathbb{Q}$, but neither is more general than the other.
+\end{xframe}
+
+\begin{xframe}{Qualified types}
+  \[ \lambda x. x - 1 : \forall \alpha. \text{sub } \alpha \Rightarrow
+    \alpha \to \alpha \]
+
+  \onslide<2-> \dots but we don't want students to see this!
+  \note{Qualifiers are generated and used under the hood but always
+    monomorphized away before showing the user.  Can show demo.}
+\end{xframe}
+
+\begin{xframe}
+    \begin{overprint}
+      \onslide<1>
+      \begin{center}
+        Qualified polymorphism + subtyping $\to$ yikes. \bigskip
+      \end{center}
+    \onslide<2->
+    \begin{center}
+      Qualified polymorphism + \textcolor{red}{structural} subtyping
+      is just barely tractable!
+    \end{center}
+    \end{overprint}
+
+    \onslide<3>
+    \begin{center}
+      Traytel et al. (2011???), extended to handle container
+      subtyping.
+    \end{center}
+\end{xframe}
+
+\section{Containers}
+
+\begin{xframe}{B\"ohm Hierarchy}
+  \[ \texttt{List} \leq \texttt{Bag} \leq \texttt{Set} \]
+\end{xframe}
+
+\begin{xframe}
+  Gibbons $\Rightarrow$ ringad XXX comprehensions.
+\end{xframe}
+
+\begin{xframe}{Primitives}
+  \begin{itemize}
+  \item \texttt{list}, \texttt{bag}, \texttt{set}
+  \item $\texttt{map} : (a \to b) \to C\ a \to C\ b$
+  \item $\texttt{reduce} : (a \to a \to a) \to a \to C\ a \to a$
+  \item $\texttt{mapReduce} : (a \to b) \to (b \to b \to b) \to b \to
+    C\ a \to b$
+  \item $\texttt{countBag} : \texttt{Bag}\ a \to \texttt{Set}\ (a
+    \times \mathbb{N})$
+  \item \texttt{union}, \texttt{intersection}, \texttt{difference}, $\dots$
+  \end{itemize}
+\end{xframe}
+
+\section{Randomness}
+
+\note{It would be nice to be able to have randomness.  But there are
+  several constraints and I haven't yet found a satisfactory way to
+  navigate the tradeoffs.}
+
+\begin{xframe}{Constraints}
+  \begin{itemize}
+  \item<+-> Would like the types to reflect whether randomness is
+    present.  Don't just want to give the whole language
+    nondeterministic semantics.
+  \item<+-> Don't want to make students use a monad!
+  \item<+-> Did I mention the language is lazy?
+  \end{itemize}
+  \begin{center}
+    \onslide<4>{Problem: how to control when sampling happens?}
+  \end{center}
+\end{xframe}
+
+\section{Other fun stuff}
+
+\begin{xframe}{Equirecursive types}
+  \begin{overprint}
+
+    \onslide<1>
+\begin{verbatim}
+type T = Unit + Nat * T * T
+
+foldT : r -> (N -> r -> r -> r) -> T -> r
+foldT x f (left  ())      = x
+foldT x f (right (n,l,r)) = f n (foldT x f l) (foldT x f r)
+
+sumT : T -> N
+sumT = foldT 0 (\x l r. x + l + r)
+\end{verbatim}
+
+    \onslide<2>
+\begin{verbatim}
+type DoubleStream = N * N * DoubleStream
+
+cons : N * DoubleStream -> DoubleStream
+cons x = x
+\end{verbatim}
+  \end{overprint}
+  \note{Ultimately this works because we require top-level type
+    signatures on everything, and only top-level bindings can be
+    recursive.}
+\end{xframe}
+
+\begin{xframe}{Arithmetic patterns}
+\begin{verbatim}
+h : N -> N
+h(0)    = 1
+h(2k+1) = h(k)
+h(2k+2) = h(k+1) + h(k)
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{Ellipses a la Babbage}
+\begin{verbatim}
+Disco> [1 .. 10]
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+Disco> [1, 3 .. 10]
+[1, 3, 5, 7, 9]
+Disco> [1, 3, 6 .. 100]
+[1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91]
+Disco> [1, 4, 9 .. 100]
+[1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
+\end{verbatim}
+\end{xframe}
+
+\end{document}

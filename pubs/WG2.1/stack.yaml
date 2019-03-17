@@ -1,0 +1,14 @@
+resolver: lts-13.10
+packages: []
+
+extra-deps:
+- diagrams-pgf-1.4.1
+- diagrams-rasterific-1.4.1.1
+- texrunner-0.0.1.2
+- diagrams-builder-0.8.0.4
+- haskell-src-exts-simple-1.20.0.0
+
+flags:
+  diagrams-builder:
+    pgf: true
+    rasterific: true

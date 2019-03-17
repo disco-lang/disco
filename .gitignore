@@ -57,3 +57,8 @@ pubs/OBT18/talk/*.pdf
 pubs/OBT18/talk/*.tex
 
 test/*/output
+
+.diagrams_cache
+*.pgf
+pubs/WG2.1/diagrams/*
+pubs/WG2.1/*.pdf

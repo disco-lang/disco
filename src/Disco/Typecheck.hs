@@ -181,8 +181,6 @@ checkDefn (TermDefn x clauses) = do
 
   let defnTy = substs theta ty'
       (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
-
-  -- XXX do coercion insertion on acs AFTER doing substs theta on it.
   return $ substs theta (Defn (coerce x) patTys bodyTy acs)
   where
     numPats = length . fst . unsafeUnbind
@@ -305,13 +303,9 @@ inferTop t = do
       -- Replace them all with List.
       at'' = substs (zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
 
-      -- Finally, do coercion insertion.
-      -- at''' = insertCoercions at''   -- XXX finish me!
-      at''' = at''
-
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return (at''', closeSigma (getType at'''))
+  return (at'', closeSigma (getType at''))
 
 --------------------------------------------------
 -- The typecheck function
@@ -521,7 +515,7 @@ typecheck (Check checkTy) (TAbs lam) = do
     checkArgs ((x, unembed -> mty) : args) ty term = do
 
       -- Ensure that ty is a function type
-      (ty1, ty2) <- ensureConstr2 EqTo CArr ty (Left term)
+      (ty1, ty2) <- ensureConstr2 CArr ty (Left term)
 
       -- Figure out the type of x:
       xTy <- case mty of
@@ -575,7 +569,7 @@ typecheck Infer (TAbs lam)    = do
 typecheck Infer (TApp t t')   = do
   at <- infer t
   let ty = getType at
-  (ty1, ty2) <- ensureConstr2 EqTo CArr ty (Left t)
+  (ty1, ty2) <- ensureConstr2 CArr ty (Left t)
   ATApp ty2 at <$> check t' ty1
 
 --------------------------------------------------
@@ -588,7 +582,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
-      (m,ms)    <- ensureConstrMode2 EqTo CPair mode (Left $ TTup (t:ts))
+      (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return $ (TyPair (getType at) ty, at : ats)
@@ -598,7 +592,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
 
 -- Check/infer the type of an injection into a sum type.
 typecheck mode lt@(TInj s t) = do
-  (mL, mR) <- ensureConstrMode2 EqTo CSum mode (Left lt)
+  (mL, mR) <- ensureConstrMode2 CSum mode (Left lt)
   at <- typecheck (selectSide s mL mR) t
   resTy <- case mode of
     Infer    ->
@@ -613,7 +607,7 @@ typecheck mode lt@(TInj s t) = do
 -- To check a cons, make sure the type is a list type, then
 -- check the two arguments appropriately.
 typecheck (Check ty) t@(TBin Cons x xs) = do
-  tyElt <- ensureConstr1 SubOf CList ty (Left t)
+  tyElt <- ensureConstr1 CList ty (Left t)
   ATBin ty Cons <$> check x tyElt <*> check xs (TyList tyElt)
 
 -- To infer the type of a cons:
@@ -633,7 +627,7 @@ typecheck Infer (TBin Cons t1 t2) = do
     _ -> do
       at2 <- infer t2
         -- ...make sure it is a list, and find the lub of the element types.
-      ty2 <- ensureConstr1 SubOf CList (getType at2) (Left t2)
+      ty2 <- ensureConstr1 CList (getType at2) (Left t2)
       eltTy <- lub (getType at1) ty2
       return $ ATBin (TyList eltTy) Cons at1 at2
 
@@ -850,12 +844,12 @@ typecheck Infer (TBin Choose t1 t2) = do
 
 typecheck Infer (TUn Size t) = do
   at <- infer t
-  _  <- ensureConstr SubOf CSet (getType at) (Left t)
+  _  <- ensureConstr CSet (getType at) (Left t)
   return $ ATUn TyN Size at
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
     | setOp `elem` [Union, Inter, Diff] = do
-  tyElt <- ensureConstr1 SubOf CSet ty (Left t)
+  tyElt <- ensureConstr1 CSet ty (Left t)
   ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
 
 typecheck Infer (TBin setOp t1 t2)
@@ -883,7 +877,7 @@ typecheck Infer (TBin Rep t1 t2) = do
 
 typecheck Infer (TUn PowerSet t) = do
   at <- infer t
-  tyElt <- ensureConstr1 SubOf CSet (getType at) (Left t)
+  tyElt <- ensureConstr1 CSet (getType at) (Left t)
   return $ ATUn (TySet (TySet tyElt)) PowerSet at
 
 ----------------------------------------
@@ -898,7 +892,7 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 
 -- Literal containers, including ellipses
 typecheck mode t@(TContainer c xs ell)  = do
-  eltMode <- ensureConstrMode1 SupOf (containerToCon c) mode (Left t)
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left t)
   axs  <- mapM (typecheck eltMode) xs
   aell <- typecheckEllipsis eltMode ell
   resTy <- case mode of
@@ -920,7 +914,7 @@ typecheck mode t@(TContainer c xs ell)  = do
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do
-  eltMode <- ensureConstrMode1 SupOf (containerToCon c) mode (Left tcc)
+  eltMode <- ensureConstrMode1 (containerToCon c) mode (Left tcc)
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
   extends cx $ do
@@ -1076,17 +1070,17 @@ checkPattern (PTup tup) tupTy = do
       (ctx, apt) <- checkPattern p ty
       return [(ctx, apt)]
     checkTuplePat (p:ps) ty = do
-      (ty1, ty2) <- ensureConstr2 EqTo CPair ty (Right $ PTup (p:ps))
+      (ty1, ty2) <- ensureConstr2 CPair ty (Right $ PTup (p:ps))
       (ctx, apt) <- checkPattern p ty1
       rest <- checkTuplePat ps ty2
       return ((ctx, apt) : rest)
 
 checkPattern p@(PInj L pat) ty       = do
-  (ty1, ty2) <- ensureConstr2 EqTo CSum ty (Right p)
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty1
   return (ctx, APInj (TySum ty1 ty2) L apt)
 checkPattern p@(PInj R pat) ty    = do
-  (ty1, ty2) <- ensureConstr2 EqTo CSum ty (Right p)
+  (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty2
   return (ctx, APInj (TySum ty1 ty2) R apt)
 
@@ -1111,13 +1105,13 @@ checkPattern (PNat n) ty        = do
   return (emptyCtx, APNat ty n)
 
 checkPattern p@(PCons p1 p2) ty = do
-  tyl <- ensureConstr1 SubOf CList ty (Right p)
+  tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
   return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
-  tyl <- ensureConstr1 SubOf CList ty (Right p)
+  tyl <- ensureConstr1 CList ty (Right p)
   listCtxtAps <- mapM (flip checkPattern tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
@@ -1318,19 +1312,6 @@ lub ty1 ty2 = do
 -- Decomposing type constructors
 ------------------------------------------------------------
 
--- | Do we want to ensure that a given type is headed by a constructor
---   which is a supertype of subtype of, or equal to a given
---   constructor?
-data Ensure = SupOf | SubOf | EqTo
-  deriving (Eq, Show)
-
--- | Turn an 'Ensure' value into an actual constraint relating the
---   first type to the second.
-ensure :: Ensure -> Type -> Type -> Constraint
-ensure SubOf = CSub
-ensure SupOf = flip CSub
-ensure EqTo  = CEq
-
 -- | Ensure that a type's outermost constructor matches the provided
 --   constructor, returning the types within the matched constructor
 --   or throwing a type error.  If the type provided is a type
@@ -1338,8 +1319,8 @@ ensure EqTo  = CEq
 --   type variable's outermost constructor matches the provided
 --   constructor, and a list of fresh type variables is returned whose
 --   count matches the arity of the provided constructor.
-ensureConstr :: Ensure -> Con -> Type -> Either Term Pattern -> TCM [Type]
-ensureConstr e c ty targ = matchConTy c ty
+ensureConstr :: Con -> Type -> Either Term Pattern -> TCM [Type]
+ensureConstr c ty targ = matchConTy c ty
   where
     matchConTy :: Con -> Type -> TCM [Type]
     matchConTy c1 (TyCon c2 tys) = do
@@ -1348,21 +1329,22 @@ ensureConstr e c ty targ = matchConTy c ty
 
     matchConTy c1 tyv@(TyAtom (AVar (U _))) = do
       tyvs <- mapM (const freshTy) (arity c1)
-      constraint $ (ensure e) tyv (TyCon c1 tyvs)
+      constraint $ CEq tyv (TyCon c1 tyvs)
       return tyvs
 
     matchConTy _ _ = matchError
 
-    -- | Check whether the constructors match the first, which could
-    --   include unifying container variables if we are matching two
-    --   container types; otherwise, simply ensure that the
-    --   constructors are equal.  Throw a 'matchError' if they do not
-    --   match.
+    -- | Check whether two constructors match, which could include
+    --   unifying container variables if we are matching two container
+    --   types; otherwise, simply ensure that the constructors are
+    --   equal.  Throw a 'matchError' if they do not match.
     matchCon :: Con -> Con -> TCM ()
-    matchCon c1 c2 | c1 == c2 = return ()
-    matchCon (CContainer ctr1) (CContainer ctr2) =
-      constraint $ (ensure e) (TyAtom ctr2) (TyAtom ctr1)
-    matchCon _ _                                 = matchError
+    matchCon c1 c2                            | c1 == c2 = return ()
+    matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
+      constraint $ CEq (TyAtom v) (TyAtom ctr2)
+    matchCon (CContainer ctr1) (CContainer v@(AVar (U _))) =
+      constraint $ CEq (TyAtom ctr1) (TyAtom v)
+    matchCon _ _                              = matchError
 
     matchError :: TCM a
     matchError = case targ of
@@ -1372,9 +1354,9 @@ ensureConstr e c ty targ = matchConTy c ty
 -- | A variant of ensureConstr that expects to get exactly one
 --   argument type out, and throws an error if we get any other
 --   number.
-ensureConstr1 :: Ensure -> Con -> Type -> Either Term Pattern -> TCM Type
-ensureConstr1 e c ty targ = do
-  tys <- ensureConstr e c ty targ
+ensureConstr1 :: Con -> Type -> Either Term Pattern -> TCM Type
+ensureConstr1 c ty targ = do
+  tys <- ensureConstr c ty targ
   case tys of
     [ty1] -> return ty1
     _     -> error $
@@ -1384,9 +1366,9 @@ ensureConstr1 e c ty targ = do
 -- | A variant of ensureConstr that expects to get exactly two
 --   argument types out, and throws an error if we get any other
 --   number.
-ensureConstr2 :: Ensure -> Con -> Type -> Either Term Pattern -> TCM (Type, Type)
-ensureConstr2 e c ty targ  = do
-  tys <- ensureConstr e c ty targ
+ensureConstr2 :: Con -> Type -> Either Term Pattern -> TCM (Type, Type)
+ensureConstr2 c ty targ  = do
+  tys <- ensureConstr c ty targ
   case tys of
     [ty1, ty2] -> return (ty1, ty2)
     _          -> error $
@@ -1398,15 +1380,15 @@ ensureConstr2 e c ty targ  = do
 --   'Type's.  Behaves similarly to 'ensureConstr' if the 'Mode' is
 --   'Check'; otherwise it generates an appropriate number of copies
 --   of 'Infer'.
-ensureConstrMode :: Ensure -> Con -> Mode -> Either Term Pattern -> TCM [Mode]
-ensureConstrMode _ c Infer      _  = return $ map (const Infer) (arity c)
-ensureConstrMode e c (Check ty) tp = map Check <$> ensureConstr e c ty tp
+ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
+ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
+ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
 
 -- | A variant of 'ensureConstrMode' that expects to get a single
 --   'Mode' and throws an error if it encounters any other number.
-ensureConstrMode1 :: Ensure -> Con -> Mode -> Either Term Pattern -> TCM Mode
-ensureConstrMode1 e c m targ = do
-  ms <- ensureConstrMode e c m targ
+ensureConstrMode1 :: Con -> Mode -> Either Term Pattern -> TCM Mode
+ensureConstrMode1 c m targ = do
+  ms <- ensureConstrMode c m targ
   case ms of
     [m1] -> return m1
     _    -> error $
@@ -1415,9 +1397,9 @@ ensureConstrMode1 e c m targ = do
 
 -- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
 --   and throws an error if it encounters any other number.
-ensureConstrMode2 :: Ensure -> Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
-ensureConstrMode2 e c m targ = do
-  ms <- ensureConstrMode e c m targ
+ensureConstrMode2 :: Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
+ensureConstrMode2 c m targ = do
+  ms <- ensureConstrMode c m targ
   case ms of
     [m1, m2] -> return (m1, m2)
     _        -> error $

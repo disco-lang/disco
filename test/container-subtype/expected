@@ -1,6 +1,0 @@
-let f : Set a → Set a = λs. s in f [1, 2, 3] : Set ℕ
-let f : (List a → List a) → List a = λg. g [], q : Set ℕ → List ℕ = list in f q : List ℕ
-Unsolvable NoUnify
-let f : Set a → Set a = λs. s in f (1 # 3) : Set ℕ
-let f : Bag a → Bag a = λs. s in f [1, 2, 3] : Bag ℕ
-let f : Set Set a → Set Set a = λs. s in f [[2, 3], [4, 5]] : Set Set ℕ

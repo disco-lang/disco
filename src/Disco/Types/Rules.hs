@@ -151,16 +151,13 @@ isSubA _ _                   = False
 
 -- | Check whether one base type is a subtype of another.
 isSubB :: BaseTy -> BaseTy -> Bool
-isSubB b1 b2          | b1 == b2 = True
-isSubB N Z            = True
-isSubB N F            = True
-isSubB N Q            = True
-isSubB Z Q            = True
-isSubB F Q            = True
-isSubB CtrList CtrBag = True
-isSubB CtrList CtrSet = True
-isSubB CtrBag  CtrSet = True
-isSubB _ _            = False
+isSubB b1 b2 | b1 == b2 = True
+isSubB N Z   = True
+isSubB N F   = True
+isSubB N Q   = True
+isSubB Z Q   = True
+isSubB F Q   = True
+isSubB _ _   = False
 
 -- | Check whether one base type is a sub- or supertype of another.
 isDirB :: Dir -> BaseTy -> BaseTy -> Bool

@@ -928,13 +928,8 @@ typecheck mode tcc@(TContainerComp c bqt) = do
     inferQual :: Qual -> TCM (AQual, TyCtx)
     inferQual (QBind x (unembed -> t))  = do
       at <- infer t
-      case (c, getType at) of
-        (_, TyList ty)   -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
-        (SetContainer, TySet ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
-        (BagContainer, TyBag ty) -> return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
-        -- XXX need more subtyping above!
-
-        (_, wrongTy)   -> throwError $ NotCon (containerToCon c) t wrongTy
+      ty <- ensureConstr1 (containerToCon c) (getType at) (Left t)
+      return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
 
     inferQual (QGuard (unembed -> t))   = do
       at <- check t TyBool

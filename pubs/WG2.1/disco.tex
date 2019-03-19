@@ -1,5 +1,5 @@
 %% -*- mode: LaTeX; compile-command: "./build.sh" -*-
-\documentclass[xcolor=svgnames,12pt,aspectratio=169]{beamer}
+\documentclass[xcolor=svgnames,12pt]{beamer}
 
 \usepackage[all]{xy}
 \usepackage{brent}
@@ -30,9 +30,9 @@
 \renewcommand{\eg}{\textit{e.g.}\xspace}
 \renewcommand{\ie}{\textit{i.e.}\xspace}
 
-\newcommand{\theschool}{IFIP WG 2.1}
+\newcommand{\theschool}{IFIP WG 2.1 \#78}
 % \newcommand{\thelocation}{Taiwan}
-\newcommand{\thedate}{March 2019}
+\newcommand{\thedate}{Taiwan, March 2019}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -110,7 +110,7 @@
 % \usepackage{pgfpages}
 % \pgfpagesuselayout{4 on 1}[uspaper, border shrink=5mm]
 
-\setbeameroption{show notes}
+% \setbeameroption{show notes}
 
 \renewcommand{\emph}{\textbf}
 
@@ -127,8 +127,14 @@
    \titlepage
 \end{xframe}
 
-\begin{xframe}{}
-  XXX collaborators
+\begin{xframe}{Collaborators}
+  \begin{itemize}
+  \item Harley Eades
+  \item Callahan Hirrel
+  \item Bosco Ndemeye
+  \item Sanjit Kalapatapu
+  \item Jacob Hines
+  \end{itemize}
 \end{xframe}
 
 \begin{xframe}{Context}
@@ -201,40 +207,84 @@
     pick it up quickly.}
 \end{xframe}
 
-\section{Types}
+\section{Type System}
 
 \note{OK, so let's talk about some interesting design choices
-  underlying disco's type system. XXX polymorphism.  Let's start with
-  thinking about base types.}
+  underlying disco's type system.}
+
+\begin{xframe}{Polymorphism}
+  disco has standard parametric polymorphism:
+\begin{verbatim}
+maplist : (a -> b) -> List a -> List b
+maplist _ []        = []
+maplist f (a :: as) = f a :: maplist f as
+\end{verbatim}
+  \note{First, disco has standard parametric polymorphism.  For
+    example, here's an implementation of a standard map function (I
+    didn't call it 'map' because that's a built-in primitive---more on
+    that later).  You can see the syntax is very Haskell-like, except
+    \texttt{:} and \texttt{::} are switched, and we use \texttt{List}
+    instead of square brackets (the pun between value-level and
+    type-level square brackets in Haskell is confusing for students).
+
+    There's not much interesting to say about this; just keep it in
+    mind.}
+\end{xframe}
 
 \begin{xframe}{Base types}
   \Huge
   \begin{overprint}
     \onslide<2> \[ \mathbb{N} \]
-    \onslide<3> \[ \mathbb{N} \quad \mathbb{Z} \]
+    \onslide<3> \[ \mathbb{N} \qquad \mathbb{Z} \]
     \onslide<4> \[ \mathbb{N} \stackrel{\small ?}{\leq} \mathbb{Z} \]
   \end{overprint}
-  \note{Any language for FP and discrete math obviously has to start
-    with the natural numbers as a built-in base type!  And then we
-    quickly want negative numbers too, so we add an integer type.  But
-  then we immediately run head-on into the issue of subtyping. Do we
-  want N to be a subtype of Z?}
+  \note{Now, what base types should we include?  Well, any language
+    for FP and discrete math obviously has to start with the natural
+    numbers as a built-in base type!  And then we quickly want
+    negative numbers too, so we add an integer type.  But then we
+    immediately run head-on into the issue of subtyping. Do we want N
+    to be a subtype of Z?}
 \end{xframe}
 
 \begin{xframe}{Base types}
   \Huge
-    \[ \mathbb{N} \leq \mathbb{Z} \]
-  \note{Based on principle \#3, I would argue that yes, we have to!
-    Every student knows that natural numbers ARE integers.  It would
-    be very jarring to be required to apply some sort of explicit
-    conversion function.}
+  \[ \mathbb{N} \leq \mathbb{Z} \] \note{Based on principle \#3, I
+    would argue that yes, we have to!  Every math student knows that
+    natural numbers are A SUBSET OF the integers.  It would be very
+    jarring to be required to apply some sort of explicit conversion
+    function.
+
+    So we need subtyping in the language.  We'll come back to this.}
 \end{xframe}
 
 \begin{xframe}{Base types}
-  \Huge
   \begin{overprint}
-    \onslide<1> \[ \mathbb{R}? \]
-    \onslide<2> \[ \not\mathbb{R} \]
+    \onslide<1>
+    \begin{center}
+      \begin{diagram}[width=75]
+      dia = mconcat
+        [ mconcat
+          [ circle 2
+          , hrule 4 # rotateBy (1/8)
+          ]
+          # lw none
+        , text "$\\mathbb{R}$?"
+        ]
+      \end{diagram}
+    \end{center}
+    \onslide<2>
+    \begin{center}
+    \begin{diagram}[width=75]
+      dia = mconcat
+        [ mconcat
+          [ circle 2
+          , hrule 4 # rotateBy (1/8)
+          ]
+          # lc red lwL 0.4
+        , text "$\\mathbb{R}$"
+        ]
+    \end{diagram}
+    \end{center}
   \end{overprint}
   \note{You might think the next base type we want is some sort of
     floating-point type. But we definitely don't.  Floating point
@@ -258,14 +308,19 @@
 
 \begin{xframe}{Base types}
   \begin{center}
+    % IFTIME: make this diagram nicer
   \begin{diagram}[width=100]
-    dia = mconcat (zipWith moveTo (square 6 # rotateBy (-1/8)) baseTyDias)
+    baseSquare = square 6 # rotateBy (-1/8)
+
+    lattice = mconcat (zipWith moveTo baseSquare baseTyDias)
       # connect' opts "N" "Z"
       # connect' opts "N" "F"
       # connect' opts "F" "Q"
       # connect' opts "Z" "Q"
 
     opts = with & gaps .~ local 1.3 & headLength .~ local 0.6
+
+    dia = lattice
 
     baseTys = ["N", "Z", "Q", "F"]
     mkBaseTyDia ty = mconcat
@@ -289,32 +344,41 @@
     {\Huge Demo!}
   \end{center}
   \note{Do a quick demo.  Show basic arithmetic operations and
-    inferring their types.  Show inferring the type of lists containing
-    all naturals, negative, fraction, or both.  Show how this lets us
-    e.g. be precise about the type of exponentiation, $2^5$, $(-2)^5$,
-    $2^{-5}$, $(-2)^{-5}$.}
+    inferring their types. Show division and rationals. Show inferring
+    the type of lists containing all naturals, negative, fraction, or
+    both.  Show how this lets us e.g. be precise about the type of
+    exponentiation, $2^5$, $(-2)^5$, $2^{-5}$, $(-2)^{-5}$.}
 \end{xframe}
 
 \begin{xframe}{Quiz}
   \begin{center}
-    Q: What is the type of $\lambda x. x - 1$?
+    Q: What should be the type of $\lambda x. x - 1$?
   \end{center}
 
   \onslide<2>
   A: it can be $\mathbb{Z} \to \mathbb{Z}$ or $\mathbb{Q} \to
-  \mathbb{Q}$, but neither is more general than the other.
+  \mathbb{Q}$, \emph{but} neither is a subtype the other.
+
+  \note{Show what disco does here: it reports $Z \to Z$ but it's also
+    OK with applying it to a rational.  But if we assign it to a
+    variable we now can't apply it to a rational.  What's going on?}
 \end{xframe}
 
 \begin{xframe}{Qualified types}
+
   \[ \lambda x. x - 1 : \forall \alpha. \text{sub } \alpha \Rightarrow
     \alpha \to \alpha \]
 
-  \onslide<2-> \dots but we don't want students to see this!
-  \note{Qualifiers are generated and used under the hood but always
-    monomorphized away before showing the user.  Can show demo.}
+  \onslide<2->
+  \begin{center}
+    \dots but we don't want students to see this!
+  \end{center}
+  \note{Qualifiers are generated and used under the hood.  Similar to
+    type classes in Haskell. But always monomorphized away before
+    showing the user.}
 \end{xframe}
 
-\begin{xframe}
+\begin{xframe}{Yikes}
     \begin{overprint}
       \onslide<1>
       \begin{center}
@@ -329,32 +393,75 @@
 
     \onslide<3>
     \begin{center}
-      Traytel et al. (2011???), extended to handle container
-      subtyping.
+      Traytel et al., \emph{Extending Hindley-Milner Type Inference
+        with Coercive Structural Subtyping} (ASPLOS 2011), extended to
+      handle container subtyping.
     \end{center}
 \end{xframe}
 
-\section{Containers}
+\begin{xframe}{Equirecursive types}
+\begin{verbatim}
+type T = Unit + Nat * T * T
 
-\begin{xframe}{B\"ohm Hierarchy}
-  \[ \texttt{List} \leq \texttt{Bag} \leq \texttt{Set} \]
+foldT : r -> (N -> r -> r -> r) -> T -> r
+foldT x f (left  ())      = x
+foldT x f (right (n,l,r)) = f n (foldT x f l) (foldT x f r)
+
+sumT : T -> N
+sumT = foldT 0 (\x l r. x + l + r)
+\end{verbatim}
+
+  \note{Let me just mention that disco also has equirecursive types.
+    We can get away with this because unlike Haskell, we don't care
+    too much about inference---for both practical and pedagogical
+    reasons, a type signature is required on every top-level
+    binding. (And for now at least, top-level bindings are the only
+    ones allowed to be recursive.) I'm excited about this because I
+    think it will work well pedagogically: you can first spend some
+    time talking about sums and products of types and their
+    corresponding combinatorial interpretations (disco can count and
+    enumerate all members of a given type), and then simply build
+    recursive data types directly out of sums and products, without
+    having to introduce constructors, which in my experience students
+    often find confusing.}
 \end{xframe}
 
-\begin{xframe}
-  Gibbons $\Rightarrow$ ringad XXX comprehensions.
+% \begin{xframe}{List as equirecursive type?}
+% \begin{verbatim}
+% type List a = Unit + a * List a
+
+% maplist : (a -> b) -> List a -> List b
+% maplist _ (left ()) = 
+% \end{verbatim}
+% \end{xframe}
+
+\section{Containers}
+
+\begin{xframe}{Boom Hierarchy}
+  \[ \texttt{List} \leq \texttt{Bag} \leq \texttt{Set} \]
+  \note{A few of you might be familiar with this\dots}
 \end{xframe}
 
 \begin{xframe}{Primitives}
   \begin{itemize}
-  \item \texttt{list}, \texttt{bag}, \texttt{set}
-  \item $\texttt{map} : (a \to b) \to C\ a \to C\ b$
-  \item $\texttt{reduce} : (a \to a \to a) \to a \to C\ a \to a$
-  \item $\texttt{mapReduce} : (a \to b) \to (b \to b \to b) \to b \to
-    C\ a \to b$
-  \item $\texttt{countBag} : \texttt{Bag}\ a \to \texttt{Set}\ (a
+  \item<+-> \texttt{list}, \texttt{bag}, \texttt{set}
+  \item<+-> $\texttt{map} : (a \to b) \to C\ a \to C\ b$
+  \item<+-> $\texttt{reduce} : (a \to a \to a) \to a \to C\ a \to a$
+  \item<+-> $\texttt{filter} : (a \to Bool) \to C\ a \to a$
+  % \item $\texttt{mapReduce} : (a \to b) \to (b \to b \to b) \to b \to
+    % C\ a \to b$
+  \item<+-> $\texttt{bagCounts} : \texttt{Bag}\ a \to \texttt{Set}\ (a
     \times \mathbb{N})$
-  \item \texttt{union}, \texttt{intersection}, \texttt{difference}, $\dots$
+  \item<+-> $\texttt{merge} : (\mathbb{N} \to \mathbb{N} \to
+    \mathbb{N}) \to C\ a \to C\ a \to C\ a$ \\
+    ($C = \texttt{Bag} \text{ or } \texttt{Set}$)
   \end{itemize}
+\end{xframe}
+
+\begin{xframe}{Container comprehensions}
+  \begin{center}
+    Heterogeneous list/bag/set comprehensions, following Gibbons (Comprehending Ringads)
+  \end{center}
 \end{xframe}
 
 \section{Randomness}
@@ -376,35 +483,13 @@
   \end{center}
 \end{xframe}
 
-\section{Other fun stuff}
-
-\begin{xframe}{Equirecursive types}
-  \begin{overprint}
-
-    \onslide<1>
-\begin{verbatim}
-type T = Unit + Nat * T * T
-
-foldT : r -> (N -> r -> r -> r) -> T -> r
-foldT x f (left  ())      = x
-foldT x f (right (n,l,r)) = f n (foldT x f l) (foldT x f r)
-
-sumT : T -> N
-sumT = foldT 0 (\x l r. x + l + r)
-\end{verbatim}
-
-    \onslide<2>
-\begin{verbatim}
-type DoubleStream = N * N * DoubleStream
-
-cons : N * DoubleStream -> DoubleStream
-cons x = x
-\end{verbatim}
-  \end{overprint}
-  \note{Ultimately this works because we require top-level type
-    signatures on everything, and only top-level bindings can be
-    recursive.}
+\begin{xframe}
+  \begin{center}
+    \url{https://github.com/disco-lang/disco}
+  \end{center}
 \end{xframe}
+
+\section{Other fun stuff}
 
 \begin{xframe}{Arithmetic patterns}
 \begin{verbatim}
@@ -415,7 +500,7 @@ h(2k+2) = h(k+1) + h(k)
 \end{verbatim}
 \end{xframe}
 
-\begin{xframe}{Ellipses a la Babbage}
+\begin{xframe}{Ellipses \`a la Babbage}
 \begin{verbatim}
 Disco> [1 .. 10]
 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -425,6 +510,23 @@ Disco> [1, 3, 6 .. 100]
 [1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 66, 78, 91]
 Disco> [1, 4, 9 .. 100]
 [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
+\end{verbatim}
+\end{xframe}
+
+\begin{xframe}{Docs and properties}
+\begin{verbatim}
+||| Append two lists into a single list.
+
+!!!   append [] []           == []
+!!!   append [1,2,3] []      == [1,2,3]
+!!!   append [1,2,3] [4,5,6] == [1,2,3,4,5,6]
+!!!   ∀ xs : List N. append [] xs == xs
+!!!   ∀ xs : List N. append xs [] == xs
+!!!   append
+
+append : List a → List a → List a
+append []      ys = ys
+append (x::xs) ys = x :: append xs ys
 \end{verbatim}
 \end{xframe}
 

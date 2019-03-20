@@ -643,17 +643,6 @@ primReduceBag f z b = do
   -- to go via toDiscoList -> vfoldr, just do a monadic fold directly
   -- in Haskell
 
--- | Reduce a bag (or set) by mapping a function over the elements and
---   then combining all the results, WITHOUT normalizing in between.
-primMapReduce :: Value -> Value -> Value -> Value -> Disco IErr Value
-primMapReduce f m z b = do
-  f' <- whnfV f
-  m' <- whnfV m
-  VBag cts <- whnfV b
-  cts' <- mapM (\(x,n) -> (,n) <$> whnfApp f' [x]) cts
-  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts'
-  vfoldr (\a r -> whnfApp m' [a,r]) z xs
-
 --------------------------------------------------
 -- Join
 
@@ -812,8 +801,6 @@ whnfOp (OMapSet ty)    = (arity2 "mapSet"     $ primMapSet ty) >=> whnfV
 whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
 
-whnfOp OMapReduce      = (arity4 "mapReduce"  $ primMapReduce ) >=> whnfV
-
 --------------------------------------------------
 -- Join
 
@@ -856,13 +843,6 @@ arity2 name _ vs   = error $ arityError name vs
 arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity3 _ f [v1,v2,v3] = f v1 v2 v3
 arity3 name _ vs      = error $ arityError name vs
-
--- | Convert an arity-4 function to the right shape to accept a list
---   of arguments; throw an error if the wrong number of arguments are
---   given.
-arity4 :: String -> (Value -> Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity4 _ f [v1,v2,v3,v4] = f v1 v2 v3 v4
-arity4 name _ vs         = error $ arityError name vs
 
 -- | Construct an error message for reporting an incorrect arity.
 arityError :: String -> [Value] -> String

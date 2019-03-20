@@ -417,14 +417,6 @@ typecheck Infer (TPrim PrimReduce) = do
   a <- freshTy
   return $ ATPrim ((a :->: a :->: a) :->: a :->: TyContainer c a :->: a) PrimReduce
 
--- mapReduce : (a -> b) -> (b -> b -> b) -> b -> c a -> b
-typecheck Infer (TPrim PrimMapReduce) = do
-  c <- freshAtom
-  a <- freshTy
-  b <- freshTy
-  return $ ATPrim ((a :->: b) :->: (b :->: b :->: b) :->: b :->: TyContainer c a :->: b)
-             PrimMapReduce
-
 -- join : c (c a) -> c a
 typecheck Infer (TPrim PrimJoin) = do
   c <- freshAtom

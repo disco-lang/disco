@@ -10,5 +10,5 @@ dummy = ()
 !!! setSize {1..10} == 10
 !!! setSize {1,1,1,2,3} == 3
 !!! ∀ s : Set N. setSize s == setSize (s ∪ s)
-setSize : Set a -> N
-setSize = mapReduce (\x.1) (\x y. x + y) 0
+setSize : Set N -> N
+setSize s = reduce (\x y. x + y) 0 (map (\x.1) (bag s))

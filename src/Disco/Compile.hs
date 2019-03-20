@@ -145,21 +145,6 @@ compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduce
 compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim ty                              PrimReduce = compilePrimErr PrimReduce ty
 
-  -- mapReduce f m z l = reduce m z (map f l)
-compilePrim (_ :->: _ :->: _ :->: TyList _ :->: _) PrimMapReduce
-  = return $
-      CAbs $ bind [f, m, z, l] $
-        CApp (CConst OReduceList) (map (Lazy,) [CVar m, CVar z,
-          CApp (CConst OMapList) (map (Lazy,) [CVar f, CVar l])])
-  where
-    f = string2Name "f"
-    m = string2Name "m"
-    z = string2Name "z"
-    l = string2Name "l"
-compilePrim (_ :->: _ :->: _ :->: TyBag _ :->: _) PrimMapReduce = return $ CConst OMapReduce
-compilePrim (_ :->: _ :->: _ :->: TySet _ :->: _) PrimMapReduce = return $ CConst OMapReduce
-compilePrim ty PrimMapReduce = compilePrimErr PrimMapReduce ty
-
 compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)

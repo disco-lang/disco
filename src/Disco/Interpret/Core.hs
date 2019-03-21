@@ -531,24 +531,36 @@ merge :: Monad m
       => (Integer -> Integer -> Integer)   -- ^ Function for combining counts
       -> (a -> a -> m Ordering)            -- ^ Comparison function
       -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
-merge g _ [] ys                    = case g 0 1 of
-  1 -> return ys
-  0 -> return []
-  _ -> error "invalid merge counting function"
-merge g _ xs []                    = case g 1 0 of
-  1 -> return xs
-  0 -> return []
-  _ -> error "invalid merge counting function"
-merge g comp ((x,n1):xs) ((y,n2): ys) = do
+merge g = mergeM (\x y -> return (g x y))
+
+mergeM :: Monad m
+       => (Integer -> Integer -> m Integer)   -- ^ Function for combining counts
+       -> (a -> a -> m Ordering)              -- ^ Comparison function
+       -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
+mergeM g _ [] ys = do
+  i <- g 0 1
+  case i of
+    1 -> return ys
+    0 -> return []
+    _ -> error "invalid merge counting function"
+mergeM g _ xs [] = do
+  i <- g 1 0
+  case i of
+    1 -> return xs
+    0 -> return []
+    _ -> error "invalid merge counting function"
+mergeM g comp ((x,n1):xs) ((y,n2): ys) = do
   o <- comp x y
   case o of
-    LT -> mergeCons x n1 0  <$> merge g comp xs ((y,n2):ys)
-    EQ -> mergeCons x n1 n2 <$> merge g comp xs ys
-    GT -> mergeCons y 0 n2  <$> merge g comp ((x,n1):xs) ys
+    LT -> mergeCons x n1 0  =<< mergeM g comp xs ((y,n2):ys)
+    EQ -> mergeCons x n1 n2 =<< mergeM g comp xs ys
+    GT -> mergeCons y 0 n2  =<< mergeM g comp ((x,n1):xs) ys
     where
-      mergeCons a m1 m2 zs = case g m1 m2 of
-        0 -> zs
-        n -> ((a,n):zs)
+      mergeCons a m1 m2 zs = do
+        i <- g m1 m2
+        case i of
+          0 -> return zs
+          n -> return ((a,n):zs)
 
 --------------------------------------------------
 -- Conversion
@@ -688,6 +700,21 @@ primUnions ty s = do
   VBag cts <- whnfV s
   ss <- mapM whnfV (map fst cts)
   valuesToSet ty [ x | VBag xs <- ss, (x,_) <- xs ]
+
+--------------------------------------------------
+-- Merge
+
+primMerge :: Type -> Value -> Value -> Value -> Disco IErr Value
+primMerge ty m b1 b2 = do
+  m' <- whnfV m
+  VBag xs <- whnfV b1
+  VBag ys <- whnfV b2
+  VBag <$> mergeM (mkMergeFun m') (decideOrdFor ty) xs ys
+
+  where
+    mkMergeFun m' i j = do
+      VNum _ r <- whnfApp m' [vnum (i%1), vnum (j%1)]
+      return (numerator r)
 
 ------------------------------------------------------------
 -- Set and bag operations
@@ -844,6 +871,11 @@ whnfOp OFilterBag      = (arity2 "filterBag"  $ primFilterBag)  >=> whnfV
 whnfOp OConcat         = (arity1 "concat"   $ vconcat) >=> whnfV
 whnfOp (OBagUnions ty) = arity1 "bagUnions" $ primBagUnions ty
 whnfOp (OUnions ty)    = arity1 "unions"    $ primUnions ty
+
+--------------------------------------------------
+-- Merge
+
+whnfOp (OMerge ty)     = arity3 "merge" $ primMerge ty
 
 --------------------------------------------------
 -- Ellipsis

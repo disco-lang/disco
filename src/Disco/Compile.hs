@@ -155,6 +155,10 @@ compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty                PrimJoin = compilePrimErr PrimJoin ty
 
+compilePrim (_ :->: TyBag a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim (_ :->: TySet a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim ty                             PrimMerge = compilePrimErr PrimMerge ty
+
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
 

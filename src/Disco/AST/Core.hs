@@ -153,6 +153,8 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OFilterList     -- ^ Filter a list.
         | OFilterBag      -- ^ Filter a bag.
 
+        | OMerge Type     -- ^ Merge two bags/sets.
+
         | OConcat         -- ^ List concatenation.  (Perhaps in the
                           --   future this should get
                           --   desugared/compiled into more primitive
@@ -224,6 +226,7 @@ opArity OFilterBag     = 2
 opArity OConcat        = 1
 opArity (OBagUnions _) = 1
 opArity (OUnions _)    = 1
+opArity (OMerge _)     = 3
 opArity OForever       = 1
 opArity OUntil         = 2
 opArity OSetToList     = 1

@@ -429,6 +429,13 @@ typecheck Infer (TPrim PrimJoin) = do
   a <- freshTy
   return $ ATPrim (TyContainer c (TyContainer c a) :->: TyContainer c a) PrimJoin
 
+-- merge : (N -> N -> N) -> c a -> c a -> c a
+typecheck Infer (TPrim PrimMerge) = do
+  c <- freshAtom
+  a <- freshTy
+  let ca = TyContainer c a
+  return $ ATPrim ((TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca) PrimMerge
+
 -- isPrime : N -> Bool
 typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
 -- factor : N -> Bag N

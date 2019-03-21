@@ -49,7 +49,7 @@ module Disco.Interpret.Core
 
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           ((>=>))
+import           Control.Monad                           (filterM, (>=>))
 import           Control.Monad.Except                    (throwError)
 import           Data.Bifunctor                          (second)
 import           Data.Char
@@ -644,6 +644,37 @@ primReduceBag f z b = do
   -- in Haskell
 
 --------------------------------------------------
+-- Filter
+
+-- | Filter a list according to a given predicate.
+primFilterList :: Value -> Value -> Disco IErr Value
+primFilterList p xs = do
+  p' <- whnfV p
+  vfoldr (filterOne p') (VCons 0 []) xs
+
+  where
+    filterOne :: Value -> Value -> Value -> Disco IErr Value
+    filterOne p' a as = do
+      b <- testPredicate p' a
+      case b of
+        False -> return as
+        True  -> return $ VCons 1 [a, as]
+
+-- | Filter a bag (or set) according to a given predicate.
+primFilterBag :: Value -> Value -> Disco IErr Value
+primFilterBag p b = do
+  p' <- whnfV p
+  VBag cs <- whnfV b
+  VBag <$> filterM (testPredicate p' . fst) cs
+
+testPredicate :: Value -> Value -> Disco IErr Bool
+testPredicate p' x = do
+  b <- whnfApp p' [x]
+  case b of
+    VCons 0 [] -> return False
+    _          -> return True
+
+--------------------------------------------------
 -- Join
 
 primBagUnions :: Type -> Value -> Disco IErr Value
@@ -800,6 +831,12 @@ whnfOp (OMapSet ty)    = (arity2 "mapSet"     $ primMapSet ty) >=> whnfV
 
 whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
+
+--------------------------------------------------
+-- Filter
+
+whnfOp OFilterList     = (arity2 "filterList" $ primFilterList) >=> whnfV
+whnfOp OFilterBag      = (arity2 "filterBag"  $ primFilterBag)  >=> whnfV
 
 --------------------------------------------------
 -- Join

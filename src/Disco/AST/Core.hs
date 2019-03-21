@@ -149,6 +149,10 @@ data Op = OAdd      -- ^ Addition (@+@)
 
         | OReduceList     -- ^ Reduce/fold a list.
         | OReduceBag      -- ^ Reduce/fold a bag (or set).
+
+        | OFilterList     -- ^ Filter a list.
+        | OFilterBag      -- ^ Filter a bag.
+
         | OConcat         -- ^ List concatenation.  (Perhaps in the
                           --   future this should get
                           --   desugared/compiled into more primitive
@@ -215,6 +219,8 @@ opArity (OMapBag _)    = 2
 opArity (OMapSet _)    = 2
 opArity OReduceList    = 3
 opArity OReduceBag     = 3
+opArity OFilterList    = 2
+opArity OFilterBag     = 2
 opArity OConcat        = 1
 opArity (OBagUnions _) = 1
 opArity (OUnions _)    = 1

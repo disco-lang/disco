@@ -39,6 +39,7 @@ data Prim where
 
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
+  PrimFilter  :: Prim      -- ^ Filter operation for containers
   PrimJoin    :: Prim      -- ^ Monadic join for containers
 
   PrimIsPrime :: Prim      -- ^ Efficient primality test
@@ -91,6 +92,7 @@ primTable =
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True
+  , PrimInfo PrimFilter    "filter"  True
   , PrimInfo PrimJoin      "join"    False
 
   , PrimInfo PrimIsPrime   "isPrime" False

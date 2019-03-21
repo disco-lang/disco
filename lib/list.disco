@@ -68,9 +68,9 @@ zipWith _ [] _ = []
 zipWith _ _ [] = []
 zipWith f (a::as) (b::bs) = f a b :: zipWith f as bs
 
-filter : (a -> Bool) -> List a -> List a
-filter _ [] = []
-filter p (a :: as) =
-  {? a :: filter p as  if p a
-  ,  filter p as       otherwise
+filterList : (a -> Bool) -> List a -> List a
+filterList _ [] = []
+filterList p (a :: as) =
+  {? a :: filterList p as  if p a
+  ,  filterList p as       otherwise
   ?}

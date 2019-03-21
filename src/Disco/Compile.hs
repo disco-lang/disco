@@ -145,6 +145,11 @@ compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduce
 compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim ty                              PrimReduce = compilePrimErr PrimReduce ty
 
+compilePrim (_ :->: TyList _ :->: _) PrimFilter = return $ CConst OFilterList
+compilePrim (_ :->: TyBag  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim (_ :->: TySet  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim ty                       PrimFilter = compilePrimErr PrimFilter ty
+
 compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)

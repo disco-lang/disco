@@ -402,6 +402,14 @@ typecheck Infer (TPrim PrimBag)  = error "typecheck Infer PrimBag should be unre
 typecheck Infer (TPrim PrimSet)  = error "typecheck Infer PrimSet should be unreachable"
 ------------------------------------------------------------
 
+typecheck Infer (TPrim PrimB2C) = do
+  a <- freshTy
+  return $ ATPrim (TyBag a :->: TySet (TyPair a TyN)) PrimB2C
+
+typecheck Infer (TPrim PrimC2B) = do
+  a <- freshTy
+  return $ ATPrim (TySet (TyPair a TyN) :->: TyBag a) PrimC2B
+
 -- XXX see https://github.com/disco-lang/disco/issues/160
 
 -- map : (a -> b) -> (c a -> c b)

@@ -37,6 +37,9 @@ data Prim where
   PrimBag     :: Prim      -- ^ Container -> bag conversion
   PrimSet     :: Prim      -- ^ Container -> set conversion
 
+  PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
+  PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
+
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
   PrimFilter  :: Prim      -- ^ Filter operation for containers
@@ -90,6 +93,9 @@ primTable =
   [ PrimInfo PrimList      "list"    True
   , PrimInfo PrimBag       "bag"     True
   , PrimInfo PrimSet       "set"     True
+
+  , PrimInfo PrimB2C       "bagCounts" True
+  , PrimInfo PrimC2B       "bagFromCounts" True
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True

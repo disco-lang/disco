@@ -135,6 +135,10 @@ compilePrim ty PrimList = compilePrimErr PrimList ty
 compilePrim ty PrimBag  = compilePrimErr PrimBag ty
 compilePrim ty PrimSet  = compilePrimErr PrimSet ty
 
+compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
+compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
+compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
+
 compilePrim (_ :->: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :->: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
 compilePrim (_ :->: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)

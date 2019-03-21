@@ -537,30 +537,23 @@ mergeM :: Monad m
        => (Integer -> Integer -> m Integer)   -- ^ Function for combining counts
        -> (a -> a -> m Ordering)              -- ^ Comparison function
        -> [(a, Integer)] -> [(a, Integer)] -> m [(a, Integer)]
-mergeM g _ [] ys = do
-  i <- g 0 1
-  case i of
-    1 -> return ys
-    0 -> return []
-    _ -> error "invalid merge counting function"
-mergeM g _ xs [] = do
-  i <- g 1 0
-  case i of
-    1 -> return xs
-    0 -> return []
-    _ -> error "invalid merge counting function"
-mergeM g comp ((x,n1):xs) ((y,n2): ys) = do
-  o <- comp x y
-  case o of
-    LT -> mergeCons x n1 0  =<< mergeM g comp xs ((y,n2):ys)
-    EQ -> mergeCons x n1 n2 =<< mergeM g comp xs ys
-    GT -> mergeCons y 0 n2  =<< mergeM g comp ((x,n1):xs) ys
-    where
-      mergeCons a m1 m2 zs = do
-        i <- g m1 m2
-        case i of
-          0 -> return zs
-          n -> return ((a,n):zs)
+mergeM g cmp = go
+  where
+    go [] []         = return []
+    go [] ((y,n):ys) = mergeCons y 0 n =<< go [] ys
+    go ((x,n):xs) [] = mergeCons x n 0 =<< go xs []
+    go ((x,n1):xs) ((y,n2): ys) = do
+      o <- cmp x y
+      case o of
+        LT -> mergeCons x n1 0  =<< go xs ((y,n2):ys)
+        EQ -> mergeCons x n1 n2 =<< go xs ys
+        GT -> mergeCons y 0 n2  =<< go ((x,n1):xs) ys
+
+    mergeCons a m1 m2 zs = do
+      i <- g m1 m2
+      case i of
+        0 -> return zs
+        n -> return ((a,n):zs)
 
 --------------------------------------------------
 -- Conversion
@@ -603,6 +596,28 @@ listToBag :: Type -> Value -> Disco IErr Value
 listToBag ty v = do
   vs <- fromDiscoList v
   VBag <$> countValues ty vs
+
+-- | Convert a bag to a set of pairs, with each element paired with
+--   its count.
+primBagCounts :: Value -> Disco IErr Value
+primBagCounts b = do
+  VBag cs <- whnfV b
+  return $ VBag (map (\(x,n) -> (VCons 0 [x, vnum (n%1)], 1)) cs)
+
+-- | Take a set of pairs consisting of values paired with a natural
+--   number count, and convert to a bag.  Note the counts need not be
+--   positive, and the elements need not be distinct.
+primBagFromCounts :: Type -> Value -> Disco IErr Value
+primBagFromCounts ty b = do
+  VBag cs <- whnfV b
+  cs' <- mapM getCount cs
+  VBag <$> sortNCount (decideOrdFor ty) cs'
+
+  where
+    getCount (cnt, _) = do
+      VCons 0 [x,nv] <- whnfV cnt
+      VNum _ n <- whnfV nv
+      return (x, numerator n)
 
 --------------------------------------------------
 -- Map
@@ -848,6 +863,9 @@ whnfOp OBagToList      = arity1 "bagToList" $ whnfV >=> bagToList
 whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
 whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
 whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
+
+whnfOp OBagToCounts    = arity1 "bagCounts" $ primBagCounts
+whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
 
 --------------------------------------------------
 -- Map/reduce

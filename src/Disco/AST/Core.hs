@@ -174,6 +174,8 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   Carries the element type.
         | OListToBag Type -- ^ list -> bag conversion (forget order).
                           --   Carries the element type.
+        | OBagToCounts    -- ^ bag -> set of counts
+        | OCountsToBag Type  -- ^ set of counts -> bag
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
@@ -188,56 +190,58 @@ data Op = OAdd      -- ^ Addition (@+@)
 -- | Get the arity (desired number of arguments) of a function
 --   constant.
 opArity :: Op -> Int
-opArity OAdd           = 2
-opArity ONeg           = 1
-opArity OSqrt          = 1
-opArity OLg            = 1
-opArity OFloor         = 1
-opArity OCeil          = 1
-opArity OAbs           = 1
-opArity OMul           = 2
-opArity ODiv           = 2
-opArity OExp           = 2
-opArity OMod           = 2
-opArity ODivides       = 2
-opArity OMultinom      = 2
-opArity OFact          = 1
-opArity (OEq _)        = 2
-opArity (OLt _)        = 2
-opArity OEnum          = 1
-opArity OCount         = 1
-opArity (OMDiv _)      = 2
-opArity (OMExp _)      = 2
-opArity (OMDivides _)  = 2
-opArity OSize          = 1
-opArity (OPowerSet _)  = 1
-opArity (OSubset _)    = 2
-opArity (OUnion _)     = 2
-opArity (OInter _)     = 2
-opArity (ODiff _)      = 2
-opArity ORep           = 2
-opArity OMapList       = 2
-opArity (OMapBag _)    = 2
-opArity (OMapSet _)    = 2
-opArity OReduceList    = 3
-opArity OReduceBag     = 3
-opArity OFilterList    = 2
-opArity OFilterBag     = 2
-opArity OConcat        = 1
-opArity (OBagUnions _) = 1
-opArity (OUnions _)    = 1
-opArity (OMerge _)     = 3
-opArity OForever       = 1
-opArity OUntil         = 2
-opArity OSetToList     = 1
-opArity OBagToSet      = 1
-opArity OBagToList     = 1
-opArity (OListToSet _) = 1
-opArity (OListToBag _) = 1
-opArity OIsPrime       = 1
-opArity OFactor        = 1
-opArity OCrash         = 1
-opArity OId            = 1
+opArity OAdd             = 2
+opArity ONeg             = 1
+opArity OSqrt            = 1
+opArity OLg              = 1
+opArity OFloor           = 1
+opArity OCeil            = 1
+opArity OAbs             = 1
+opArity OMul             = 2
+opArity ODiv             = 2
+opArity OExp             = 2
+opArity OMod             = 2
+opArity ODivides         = 2
+opArity OMultinom        = 2
+opArity OFact            = 1
+opArity (OEq _)          = 2
+opArity (OLt _)          = 2
+opArity OEnum            = 1
+opArity OCount           = 1
+opArity (OMDiv _)        = 2
+opArity (OMExp _)        = 2
+opArity (OMDivides _)    = 2
+opArity OSize            = 1
+opArity (OPowerSet _)    = 1
+opArity (OSubset _)      = 2
+opArity (OUnion _)       = 2
+opArity (OInter _)       = 2
+opArity (ODiff _)        = 2
+opArity ORep             = 2
+opArity OMapList         = 2
+opArity (OMapBag _)      = 2
+opArity (OMapSet _)      = 2
+opArity OReduceList      = 3
+opArity OReduceBag       = 3
+opArity OFilterList      = 2
+opArity OFilterBag       = 2
+opArity OConcat          = 1
+opArity (OBagUnions _)   = 1
+opArity (OUnions _)      = 1
+opArity (OMerge _)       = 3
+opArity OForever         = 1
+opArity OUntil           = 2
+opArity OSetToList       = 1
+opArity OBagToSet        = 1
+opArity OBagToList       = 1
+opArity (OListToSet _)   = 1
+opArity (OListToBag _)   = 1
+opArity OBagToCounts     = 1
+opArity (OCountsToBag _) = 1
+opArity OIsPrime         = 1
+opArity OFactor          = 1
+opArity OCrash           = 1
+opArity OId              = 1
 
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind (Telescope (Embed Core, CPattern)) Core

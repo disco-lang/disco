@@ -1,0 +1,4 @@
+type DoubleStream = N * N * DoubleStream
+
+cons : N * DoubleStream -> DoubleStream
+cons = \x.x

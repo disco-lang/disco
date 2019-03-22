@@ -48,12 +48,23 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/case-let.disco
                      test/case-let/expected
                      test/case-let/input
+                     test/container-comp/expected
+                     test/container-comp/input
+                     test/containers-cmp/expected
+                     test/containers-cmp/input
                      test/containers-convert/expected
                      test/containers-convert/input
                      test/containers-ellipsis/expected
                      test/containers-ellipsis/input
+                     test/containers-filter/containers-filter.disco
+                     test/containers-filter/expected
+                     test/containers-filter/input
+                     test/containers-join/expected
+                     test/containers-join/input
                      test/containers-map/expected
                      test/containers-map/input
+                     test/containers-merge/expected
+                     test/containers-merge/input
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
@@ -169,6 +180,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-ops/input
                      test/types-rational/expected
                      test/types-rational/input
+                     test/types-rec/expected
+                     test/types-rec/types-rec.disco
                      test/types-squash/expected
                      test/types-squash/input
                      test/types-tydefs/expected

@@ -440,13 +440,16 @@ prettySequence out t (x:xs) del = (prettyValueWith out t x) >> out del >> (prett
 
 prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
 prettyBag out _ []         = out "⟅⟆"
-prettyBag out t [(v,n)]    = prettyRepBag out t v n
-prettyBag out t ((v,n):vs) = prettyRepBag out t v n >> out " + " >> prettyBag out t vs
+prettyBag out t vs
+  | all ((==1) . snd) vs   = out "⟅" >> prettySequence out t (map fst vs) ", " >> out "⟆"
+  | otherwise              = out "bagFromCounts {" >> prettyCounts vs >> out "}"
 
--- XXX needs to take precedence into account?
-prettyRepBag :: (String -> Disco IErr ()) -> Type -> Value -> Integer -> Disco IErr ()
-prettyRepBag out t v 1 = out "⟅" >> prettyValueWith out t v >> out "⟆"
-prettyRepBag out t v n = out "(" >> prettyValueWith out t v >> out " # " >> out (show n) >> out ")"
+  where
+    prettyCounts []      = error "Impossible! prettyCounts []"
+    prettyCounts [v]     = prettyCount v
+    prettyCounts (v:vs') = prettyCount v >> out ", " >> prettyCounts vs'
+
+    prettyCount (v,n)    = out "(" >> prettyValueWith out t v >> out (", " ++ show n ++ ")")
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""

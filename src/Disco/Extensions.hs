@@ -23,7 +23,7 @@ type ExtSet = Set Ext
 -- | Enumeration of optional language extensions.
 data Ext
   = Primitives   -- ^ Allow primitives, i.e. @$prim@
-  | Randomness   -- ^ Allow non-deterministic semantics via primitives like @uniform@
+  | Randomness   -- ^ XXX
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | The default set of languag extensions (currently, the empty set).

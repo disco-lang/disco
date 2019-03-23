@@ -303,11 +303,12 @@ desugarBinApp And t1 t2 =
       ]
 
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
-desugarPrimBOp ty And = do
+desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
   x <- fresh (string2Name "arg")
   y <- fresh (string2Name "arg")
-  body <- desugarBinApp And (ATVar TyBool x) (ATVar TyBool y)
+  body <- desugarBinApp op (ATVar ty1 x) (ATVar ty2 y)
   return $ mkLambda ty [x, y] body
+desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
 
 ------------------------------------------------------------
 -- Desugaring other stuff

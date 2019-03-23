@@ -78,7 +78,6 @@ module Disco.Types
        , containerVars
        , countType
        , unpair
-       , getEltTy
        , S
 
        -- * HasType class
@@ -445,12 +444,6 @@ strictness ty
 unpair :: Type -> [Type]
 unpair (TyPair ty1 ty2) = ty1 : unpair ty2
 unpair ty               = [ty]
-
--- | Get the argument (element) type of a container type.  Throws an
---   error if called on a non-container type.
-getEltTy :: Type -> Type
-getEltTy (TyCon (CContainer _) [e]) = e
-getEltTy ty                         = error $ "getEltTy on non-container type " ++ show ty
 
 -- | Define @S@ as a substitution on types (the most common kind)
 --   for convenience.

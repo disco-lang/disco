@@ -252,8 +252,35 @@ checkProperty prop = do
 -- Type checking/inference
 ------------------------------------------------------------
 
+--------------------------------------------------
+-- Operator expansion
+--------------------------------------------------
+
+-- Expand operators into applications of primitives right before
+-- type checking them.
+
+expandUOp :: UOp -> Term -> Term
+expandUOp uop = TApp (TPrim (PrimUOp uop))
+
+expandBOp :: BOp -> Term -> Term -> Term
+expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
+
+expandedUOps :: Set UOp
+expandedUOps = S.fromList
+  [ Fact, Not ]
+
+expandedBOps :: Set BOp
+expandedBOps = S.fromList
+  [ And, Or, Impl
+  , Eq, Neq, Lt, Gt, Leq, Geq
+  ]
+
+--------------------------------------------------
+-- Checking modes
+--------------------------------------------------
+
 -- | Typechecking can be in one of two modes: inference mode means we
---   are trying to generate a valid type for a term; checking mode
+--   are trying to synthesize a valid type for a term; checking mode
 --   means we are trying to show that a term has a given type.
 data Mode = Infer | Check Type
   deriving Show
@@ -490,10 +517,28 @@ typecheck Infer (TPrim (PrimBOp Impl)) = error "typecheck Infer Impl should be u
 typecheck Infer (TPrim (PrimUOp Fact))
   = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
 
-typecheck Infer (TPrim (PrimBOp Lt)) = do
+----------------------------------------
+-- Comparisons
+
+-- Infer the type of a comparison. A comparison always has type Bool,
+-- but we have to make sure the subterms have compatible types.  We
+-- also generate a QCmp qualifier --- even though every type in disco
+-- has semi-decidable equality and ordering, we need to know whether
+-- e.g. a comparison was done at a certain type, so we can decide
+-- whether the type is allowed to be completely polymorphic or not.
+typecheck Infer (TPrim (PrimBOp op)) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
   ty <- freshTy
   constraint $ CQual QCmp ty
-  return $ ATPrim (ty :->: ty :->: TyBool) (PrimBOp Lt)
+  return $ ATPrim (ty :->: ty :->: TyBool) (PrimBOp op)
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TPrim (PrimBOp Eq))  = error "typecheck Infer Eq should be unreachable"
+typecheck Infer (TPrim (PrimBOp Neq)) = error "typecheck Infer Neq should be unreachable"
+typecheck Infer (TPrim (PrimBOp Lt))  = error "typecheck Infer Lt should be unreachable"
+typecheck Infer (TPrim (PrimBOp Gt))  = error "typecheck Infer Gt should be unreachable"
+typecheck Infer (TPrim (PrimBOp Leq)) = error "typecheck Infer Leq should be unreachable"
+typecheck Infer (TPrim (PrimBOp Geq)) = error "typecheck Infer Geq should be unreachable"
+------------------------------------------------------------
 
 --------------------------------------------------
 -- Base types
@@ -792,31 +837,6 @@ typecheck Infer (TBin Exp t1 t2) = do
   return $ ATBin resTy Exp at1 at2
 
 ----------------------------------------
--- Comparisons
-
--- Infer the type of a comparison. A comparison always has type Bool,
--- but we have to make sure the subterms have compatible types.  We
--- also generate a QCmp qualifier --- even though every type in disco
--- has semi-decidable equality and ordering, we need to know whether
--- e.g. a comparison was done at a certain type, so we can decide
--- whether the type is allowed to be completely polymorphic or not.
-typecheck Infer (TBin op t1 t2) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
-  at1 <- infer t1
-  at2 <- infer t2
-  ty <- lub (getType at1) (getType at2)
-  constraint $ CQual QCmp ty
-  return $ ATBin TyBool op at1 at2
-
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TBin Eq  _ _) = error "typecheck Infer Eq should be unreachable"
-typecheck Infer (TBin Neq _ _) = error "typecheck Infer Neq should be unreachable"
-typecheck Infer (TBin Lt  _ _) = error "typecheck Infer Lt should be unreachable"
-typecheck Infer (TBin Gt  _ _) = error "typecheck Infer Gt should be unreachable"
-typecheck Infer (TBin Leq _ _) = error "typecheck Infer Leq should be unreachable"
-typecheck Infer (TBin Geq _ _) = error "typecheck Infer Geq should be unreachable"
-------------------------------------------------------------
-
-----------------------------------------
 -- Comparison chain
 
 typecheck Infer (TChain t ls) =
@@ -934,8 +954,9 @@ typecheck mode t@(TContainer c xs ell)  = do
       constraints $ map (flip CSub tyv) tys
       return $ containerTy c tyv
     Check ty -> return ty
-  when (isJust ell) $
-    constraint $ CQual QEnum (getEltTy resTy)
+  when (isJust ell) $ do
+    eltTy <- getEltTy c resTy
+    constraint $ CQual QEnum eltTy
   return $ ATContainer resTy c axs aell
 
   where
@@ -1336,29 +1357,18 @@ lub ty1 ty2 = do
   return tyLub
 
 ------------------------------------------------------------
--- Operator expansion
-------------------------------------------------------------
-
--- Expand operators into applications of primitives right before
--- type checking them.
-
-expandUOp :: UOp -> Term -> Term
-expandUOp uop = TApp (TPrim (PrimUOp uop))
-
-expandBOp :: BOp -> Term -> Term -> Term
-expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
-
-expandedUOps :: Set UOp
-expandedUOps = S.fromList
-  [ Fact, Not ]
-
-expandedBOps :: Set BOp
-expandedBOps = S.fromList
-  [ And, Or, Impl, Lt ]
-
-------------------------------------------------------------
 -- Decomposing type constructors
 ------------------------------------------------------------
+
+-- | Get the argument (element) type of a (known) container type.  Returns a
+--   fresh variable with a suitable constraint if the given type is
+--   not literally a container type.
+getEltTy :: Container -> Type -> TCM Type
+getEltTy _ (TyContainer _ e) = return e
+getEltTy c ty = do
+  eltTy <- freshTy
+  constraint $ CEq (containerTy c eltTy) ty
+  return eltTy
 
 -- | Ensure that a type's outermost constructor matches the provided
 --   constructor, returning the types within the matched constructor

@@ -47,7 +47,7 @@ import           Disco.AST.Typed
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy)
+import           Disco.Typecheck                  (containerTy, getEltTy)
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -73,9 +73,20 @@ runDSM = flip contFreshM 1
 -- A tiny DSL for building certain ATerms, which is helpful for
 -- writing desugaring rules.
 
+tapp :: ATerm -> ATerm -> ATerm
+tapp t1 t2 = ATApp resTy t1 t2
+  where
+    resTy = case getType t1 of
+      (_ :->: r) -> r
+      ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in tapp"
+
+mkBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
+mkBin resTy bop t1 t2
+  = tapp (tapp (ATPrim (getType t1 :->: getType t2 :->: resTy) (PrimBOp bop)) t1) t2
+
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
-t1 ||. t2 = tapp (tapp (ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp Or)) t1) t2
+(||.) = mkBin TyBool Or
 
 infixl 6 -., +.
 (-.) :: ATerm -> ATerm -> ATerm
@@ -90,17 +101,17 @@ at1 /. at2 = ATBin (getType at1) Div at1 at2
 
 infix 4 <., >=.
 (<.) :: ATerm -> ATerm -> ATerm
-(<.) = ATBin TyBool Lt
+(<.) = mkBin TyBool Lt
 
 (>=.) :: ATerm -> ATerm -> ATerm
-(>=.) = ATBin TyBool Geq
+(>=.) = mkBin TyBool Geq
 
 (|.) :: ATerm -> ATerm -> ATerm
 (|.) = ATBin TyBool Divides
 
 infix 4 ==.
 (==.) :: ATerm -> ATerm -> ATerm
-(==.) = ATBin TyBool Eq
+(==.) = mkBin TyBool Eq
 
 tnot :: ATerm -> ATerm
 tnot = tapp (ATPrim (TyBool :->: TyBool) (PrimUOp Not))
@@ -122,13 +133,6 @@ ctrNil ctr ty = ATContainer (containerTy ctr ty) ctr [] Nothing
 
 ctrSingleton :: Container -> ATerm -> ATerm
 ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [t] Nothing
-
-tapp :: ATerm -> ATerm -> ATerm
-tapp t1 t2 = ATApp resTy t1 t2
-  where
-    resTy = case getType t1 of
-      (_ :->: r) -> r
-      ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in tapp"
 
 ------------------------------------------------------------
 -- Definition desugaring
@@ -219,10 +223,6 @@ desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
       -- typechecker for DTerms we should allow subtraction on TyN!
     ]
 desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $ ATUn ty Floor (ATBin (getType t1) Div t1 t2)
-desugarTerm (ATBin _ Neq t1 t2)   = desugarTerm $ tnot (t1 ==. t2)
-desugarTerm (ATBin _ Gt  t1 t2)   = desugarTerm $ t2 <. t1
-desugarTerm (ATBin _ Leq t1 t2)   = desugarTerm $ tnot (t2 <. t1)
-desugarTerm (ATBin _ Geq t1 t2)   = desugarTerm $ tnot (t1 <. t2)
 
 -- Addition and multiplication on TyFin just desugar to the operation
 -- followed by a call to mod.
@@ -292,7 +292,10 @@ desugarPrimUOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desuga
 -- | Test whether a given binary operator is one that needs to be
 --   desugared.
 bopDesugars :: BOp -> Bool
-bopDesugars bop = bop `elem` [And, Or, Impl]
+bopDesugars bop = bop `elem`
+  [ And, Or, Impl
+  , Neq, Gt, Leq, Geq
+  ]
 
 -- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
@@ -339,6 +342,11 @@ desugarBinApp Or t1 t2 = desugarTerm $
     , t2  <==. []
     ]
 
+desugarBinApp Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
+desugarBinApp Gt  t1 t2 = desugarTerm $ t2 <. t1
+desugarBinApp Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)
+desugarBinApp Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
+
 ------------------------------------------------------------
 -- Desugaring other stuff
 ------------------------------------------------------------
@@ -362,7 +370,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
         tqs <- expandComp ctr t qs
         let c            = containerTy ctr
             tTy          = getType t
-            xTy          = getEltTy (getType lst)
+            xTy          = case getType lst of { TyContainer _ e -> e }
             joinTy       = c (c tTy) :->: c tTy
             mapTy        = (xTy :->: c tTy) :->: (c xTy :->: c (c tTy))
         return $ tapp (ATPrim joinTy PrimJoin) $
@@ -430,13 +438,10 @@ desugarTuples ty ats
 --   For example, @a < b <= c > d@ becomes @a < b and b <= c and c > d@.
 expandChain :: ATerm -> [ALink] -> ATerm
 expandChain _ [] = error "Can't happen! expandChain _ []"
-expandChain t1 [ATLink op t2] = ATBin TyBool op t1 t2
+expandChain t1 [ATLink op t2] = mkBin TyBool op t1 t2
 expandChain t1 (ATLink op t2 : links) =
-  tapp
-    (tapp
-      (ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp And))
-      (ATBin TyBool op t1 t2)
-    )
+  mkBin TyBool And
+    (mkBin TyBool op t1 t2)
     (expandChain t2 links)
 
 -- | Desugar a branch of a case expression.

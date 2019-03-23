@@ -33,6 +33,7 @@ import           Disco.Compile
 import           Disco.Eval
 import           Disco.Interpret.Core
 import           Disco.Syntax.Operators           (BOp (..))
+import           Disco.Syntax.Prims
 import           Disco.Types
 
 --------------------------------------------------
@@ -118,8 +119,8 @@ runTest n aprop
 
 -- | Check whether a term looks like a top-level equality test.
 getEquatands :: ATerm -> Maybe (ATerm, ATerm)
-getEquatands (ATBin _ Eq at1 at2) = Just (at1, at2)
-getEquatands _                    = Nothing
+getEquatands (ATApp _ (ATApp _ (ATPrim _ (PrimBOp Eq)) at1) at2) = Just (at1, at2)
+getEquatands _ = Nothing
 
 -- | @testCases n bindings@ generates at most n environments in which
 --   to conduct tests.

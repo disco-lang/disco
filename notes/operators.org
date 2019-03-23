@@ -114,5 +114,21 @@ passing tests as much as possible.
 - [ ] next thing to try is a compiled operator with a more
   interesting type, such as LT.
 
+  - fixJuxtMul is wreaking havoc with TApp nodes now that we are
+    generating more of them.  Potential solution: add explicit TJuxt
+    constructor for initial parsing.  Then fixJuxtMul resolves TJuxt
+    only (NOT TApp) into TApp or mul.
+
+  - (Holy ****, no WONDER I was running into so many issues before!
+    This incremental approach is really paying off.)
+
+  - OK, parsing is turning out to be a real bear.  Idea: don't change
+    parsing at all, which will still have TUn and TBin.  They are
+    really helpful in dealing with juxtaposed multiplication,
+    fixing precedence, and so on.  Then as a phase right before/during
+    *typechecking*, expand TUn and TBin into (nested) TApp.
+
+    Yes!  This works great!  And it seems much simpler too.
+
 - Then convert other operators...
 

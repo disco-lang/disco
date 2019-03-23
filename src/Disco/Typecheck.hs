@@ -478,6 +478,11 @@ typecheck Infer (TPrim (PrimBOp And))
 typecheck Infer (TPrim (PrimUOp Fact))
   = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
 
+typecheck Infer (TPrim (PrimBOp Lt)) = do
+  ty <- freshTy
+  constraint $ CQual QCmp ty
+  return $ ATPrim (ty :->: ty :->: TyBool) (PrimBOp Lt)
+
 --------------------------------------------------
 -- Base types
 
@@ -716,9 +721,11 @@ typecheck Infer (TUn Neg t) = do
   return $ ATUn negTy Neg at
 
 ----------------------------------------
--- sqrt, lg, floor, ceil, abs, idiv
+-- sqrt, lg, fact, floor, ceil, abs, idiv
 
 typecheck Infer (TUn op t) | op `elem` [Sqrt, Lg]    = ATUn TyN op <$> check t TyN
+
+typecheck Infer (TUn Fact t) = typecheck Infer $ expandUOp Fact t
 
 typecheck Infer (TUn op t) | op `elem` [Floor, Ceil] = do
   at <- infer t
@@ -805,6 +812,8 @@ typecheck Infer (TChain t ls) =
 
 ----------------------------------------
 -- Logic
+
+typecheck mode (TBin And t1 t2) = typecheck mode (expandBOp And t1 t2)
 
 -- &&, ||, and not always have type Bool, and the subterms must have type
 -- Bool as well.
@@ -1322,6 +1331,19 @@ lub ty1 ty2 = do
   tyLub <- freshTy
   constraints $ [CSub ty1 tyLub, CSub ty2 tyLub]
   return tyLub
+
+------------------------------------------------------------
+-- Operator expansion
+------------------------------------------------------------
+
+-- Expand operators into applications of primitives right before
+-- type checking them.
+
+expandUOp :: UOp -> Term -> Term
+expandUOp uop = TApp (TPrim (PrimUOp uop))
+
+expandBOp :: BOp -> Term -> Term -> Term
+expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
 
 ------------------------------------------------------------
 -- Decomposing type constructors

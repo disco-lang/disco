@@ -293,6 +293,16 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- Desugaring operators
 ------------------------------------------------------------
 
+-- | XXX
+desugarPrimBOp :: Type -> BOp -> DSM DTerm
+desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
+  x <- fresh (string2Name "arg")
+  y <- fresh (string2Name "arg")
+  body <- desugarBinApp op (ATVar ty1 x) (ATVar ty2 y)
+  return $ mkLambda ty [x, y] body
+desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
+
+-- | XXX
 desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
 desugarBinApp And t1 t2 =
   -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
@@ -301,14 +311,6 @@ desugarBinApp And t1 t2 =
       [ t2  <==. [tif t1]
       , fls <==. []
       ]
-
-desugarPrimBOp :: Type -> BOp -> DSM DTerm
-desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
-  x <- fresh (string2Name "arg")
-  y <- fresh (string2Name "arg")
-  body <- desugarBinApp op (ATVar ty1 x) (ATVar ty2 y)
-  return $ mkLambda ty [x, y] body
-desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
 
 ------------------------------------------------------------
 -- Desugaring other stuff

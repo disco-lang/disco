@@ -173,7 +173,8 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
-desugarTerm (ATPrim ty (PrimBOp bop)) = desugarPrimBOp ty bop
+desugarTerm (ATPrim ty (PrimBOp bop))
+  | bopDesugars bop = desugarPrimBOp ty bop
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
@@ -295,6 +296,11 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 ------------------------------------------------------------
 -- Desugaring operators
 ------------------------------------------------------------
+
+-- | Test whether a given binary operator is one that needs to be
+--   desugared.
+bopDesugars :: BOp -> Bool
+bopDesugars bop = bop `elem` [And]
 
 -- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> BOp -> DSM DTerm

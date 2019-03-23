@@ -74,15 +74,17 @@ passing tests as much as possible.
   'reservedOp ""' which insists that no operator symbol follows it.
   Yes, that was it, changing to 'string ""' fixed it.  reservedOp was
   unnecessary.
-
 - [X] extend pretty-printer to deal with standalone operators
 - [X] Add typing rule for one standalone operator (e.g. _+_) and get
   it to typecheck
 
   - Actually the type of _+_ is a bit complicated.  Let's pick
     something with an utterly simple type like 'and'.
+- [X] Add desugaring and compilation rules for _and_
 
-- [ ] Add desugaring and compilation rules for _and_
+  Added desugaring, and it works. But it desugars to a lambda
+  containing ATBin And!  Ultimately this is backwards.
+
 - [ ] Switch parsing of normal infix 'and' to produce TApp node
 
 - Then convert other operators...

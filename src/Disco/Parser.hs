@@ -762,7 +762,12 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     mkOpParser (OpInfo (BOpF fx And) syns _)
       = flip map syns $ \syn -> bfxParser fx $ do
           reservedOp syn <?> "operator"
-          return (\t1 t2 -> TApp (TApp (TPrim (PrimBOp And)) t1) t2)
+          return $ TApp . TApp (TPrim (PrimBOp And))
+
+    mkOpParser (OpInfo (UOpF fx Fact) syns _)
+      = flip map syns $ \syn -> ufxParser fx $ do
+          reservedOp syn <?> "operator"
+          return $ TApp (TPrim (PrimUOp Fact))
 
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 

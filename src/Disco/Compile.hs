@@ -124,6 +124,12 @@ compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 --   sometimes the particular constant it turns into may depend on the
 --   type.
 compilePrim :: Type -> Prim -> FreshM Core
+
+compilePrim (argTy :->: _) (PrimUOp uop) = return $ compileUOp argTy uop
+compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
+compilePrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
+compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
+
 compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
 compilePrim (TyBag _ :->: _)  PrimSet  = return $ CConst OBagToSet
 compilePrim (TyBag _ :->: _)  PrimList = return $ CConst OBagToList

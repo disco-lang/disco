@@ -475,6 +475,9 @@ typecheck Infer (TPrim PrimUntil)
 typecheck Infer (TPrim (PrimBOp And))
   = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp And)
 
+typecheck Infer (TPrim (PrimUOp Fact))
+  = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
+
 --------------------------------------------------
 -- Base types
 
@@ -713,11 +716,9 @@ typecheck Infer (TUn Neg t) = do
   return $ ATUn negTy Neg at
 
 ----------------------------------------
--- sqrt, lg, fact, floor, ceil, abs, idiv
+-- sqrt, lg, floor, ceil, abs, idiv
 
 typecheck Infer (TUn op t) | op `elem` [Sqrt, Lg]    = ATUn TyN op <$> check t TyN
-
-typecheck Infer (TUn Fact t) = ATUn TyN Fact <$> check t TyN
 
 typecheck Infer (TUn op t) | op `elem` [Floor, Ceil] = do
   at <- infer t

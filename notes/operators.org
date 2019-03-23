@@ -92,9 +92,24 @@ passing tests as much as possible.
   call desugarBinApp
 - [X] remove ATBin And case from desugarTerm
 - [X] remove ATBin And case from typecheck
-- [ ] Try putting in special case for an operator that doesn't
-  desugar, say, LT.  That will involve changing stuff in compilation
-  instead of desugaring.
+- [X] Try putting in special case for an operator that doesn't desugar
+  and has a simple type, say, factorial.  That will involve changing
+  stuff in compilation instead of desugaring.
+  - [X] typing rule
+  - [X] compilation rule
+  - [X] switch parsing
+  - [X] remove ATUn case from compile and typecheck
+  - [X] special case for compiling fully applied?
+    - not needed since it just compiles to a core function constant
+      anyway, not a lambda.
+
+  - Actually operators that only compile seem easy: I was already
+    simply compiling them to function constants.  It's just that this
+    won't fire for prim operators until they are parsed as
+    applications instead of TBin or TUn nodes.
+
+- [ ] extend pretty-printer to display fully applied operators using
+  pre/post/infix notation
 
 - Then convert other operators...
 

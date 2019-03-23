@@ -23,7 +23,6 @@ import           Control.Applicative              hiding (empty)
 import           Control.Monad.Reader
 import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
-import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -175,10 +174,16 @@ prettyName = text . show
 
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
+prettyTerm (TPrim (PrimUOp uop)) = case M.lookup uop uopMap of
+  Just (OpInfo (UOpF Pre _) (syn:_) _)  -> text syn <> text "~"
+  Just (OpInfo (UOpF Post _) (syn:_) _) -> text "~" <> text syn
+  _ -> error $ "prettyTerm: " ++ show uop ++ " is not in the uopMap!"
+prettyTerm (TPrim (PrimBOp bop)) = text "~" <> prettyBOp bop <> text "~"
 prettyTerm (TPrim p)     =
-  case primMap ! p of
-    PrimInfo _ nm True  -> text nm
-    PrimInfo _ nm False -> text "$" <> text nm
+  case M.lookup p primMap of
+    Just (PrimInfo _ nm True)  -> text nm
+    Just (PrimInfo _ nm False) -> text "$" <> text nm
+    Nothing -> error $ "prettyTerm: Prim " ++ show p ++ " is not in the primMap!"
 prettyTerm (TParens t)   = prettyTerm t
 prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)

@@ -65,7 +65,12 @@ passing tests as much as possible.
     consumed the ~.  Next step: improve it so it consumes ~ first and
     then tries parsing either a postfix thing or an infix thing
     followed by ~.
-- [ ] Add typing rule for one standalone operator (e.g. _+_) and get it to typecheck
+- [X] extend pretty-printer to deal with standalone operators
+- [ ] Add typing rule for one standalone operator (e.g. _+_) and get
+  it to typecheck
+
+  - Actually the type of _+_ is a bit complicated.  Let's pick
+    something with an utterly simple type like 'and'.
 - [ ] Add desugaring and compilation rules for _+_
 - [ ] Switch parsing of normal infix + to produce TApp node
 

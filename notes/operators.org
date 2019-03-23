@@ -133,6 +133,15 @@ passing tests as much as possible.
 - Then convert other operators!
   - [X] logic operators: and, impl, or, not
   - [X] sqrt, lg
+  - [ ] floor, ceil
+    - Note that we totally could give these a type as operators, by
+      making up a fresh type variable for their input and generating
+      constraints via the cInt function. BUT if we do this, we lose
+      the ability to avoid generating constraints when we already
+      statically know the input type.  We should be able to do
+      something a bit more clever.  Perhaps leave in the TBin case
+      mostly as it is now.
+
   - [ ] arithmetic operators
     - We want to keep the checking case for these... which actually
       works out quite nicely since we still have TBin around!  Can

@@ -27,6 +27,28 @@ passing tests as much as possible.
   - For now don't try parsing user-defined operator names; we can add
     that later.
 
+  - OK, actually this really doesn't work well at all.  e.g.
+
+    not_
+
+    parses as an expression, consisting of the application of the
+    operator not to a wildcard.  This is part of the reason that Idris
+    requires spaces around operators!
+
+    Maybe we need a different syntax for argument slots....  maybe
+    tildes?  Don't currently use those for anything...
+
+    not~   ~+~  ~!  etc.  I think I like it.
+
+    OR if we wanted to be really radical we could use ~ as the wildcard
+    pattern, and _ for argument slots...
+
+    For now let's go with ~ for argument slots.  We can always change
+    it later pretty easily; this way we don't have to update all the
+    examples and tests that already use _ as a wildcard.
+
+    Note this means we can also re-allow _ in variable names.
+
 - [ ] Add typing rule for one standalone operator (e.g. _+_) and get it to typecheck
 - [ ] Add desugaring and compilation rules for _+_
 - [ ] Switch parsing of normal infix + to produce TApp node

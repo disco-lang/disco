@@ -219,8 +219,6 @@ desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 -- (t1 implies t2) ==> (not t1 or t2)
 desugarTerm (ATBin _ Impl t1 t2) = desugarTerm $ tnot t1 ||. t2
 
-desugarTerm (ATBin _ And t1 t2)  = desugarBinApp And t1 t2
-
 desugarTerm (ATBin _ Or t1 t2) = do
   -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
   desugarTerm $
@@ -310,6 +308,8 @@ desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desuga
 -- | XXX
 desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
 desugarBinApp And t1 t2 =
+
+  -- XXX and should be turned into a standard library function
   -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
   desugarTerm $
     ATCase TyBool
@@ -410,8 +410,11 @@ expandChain :: ATerm -> [ALink] -> ATerm
 expandChain _ [] = error "Can't happen! expandChain _ []"
 expandChain t1 [ATLink op t2] = ATBin TyBool op t1 t2
 expandChain t1 (ATLink op t2 : links) =
-  ATBin TyBool And
-    (ATBin TyBool op t1 t2)
+  tapp
+    (tapp
+      (ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp And))
+      (ATBin TyBool op t1 t2)
+    )
     (expandChain t2 links)
 
 -- | Desugar a branch of a case expression.

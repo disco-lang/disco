@@ -142,6 +142,13 @@ passing tests as much as possible.
       something a bit more clever.  Perhaps leave in the TBin case
       mostly as it is now.
 
+      We want to avoid duplicating code: we will need to be able to
+      assign a type to standalone versions of these operators too.
+
+      Maybe write functions which check the type of such operators,
+      and takes argument types as parameters; can generate fresh types
+      for the arguments if we need the type of a standalone operator.
+
   - [ ] arithmetic operators
     - We want to keep the checking case for these... which actually
       works out quite nicely since we still have TBin around!  Can

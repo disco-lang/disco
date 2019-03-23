@@ -1,6 +1,6 @@
 ||| A reasonable approximation of pi.
-approx_pi : Rational
-approx_pi = 22/7   -- an OK approximation
+approxPi : Rational
+approxPi = 22/7   -- an OK approximation
 
 ||| Take a natural number as input, and return the natural
 ||| number which is one greater.

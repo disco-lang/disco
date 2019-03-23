@@ -264,7 +264,7 @@ reservedWords =
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many (alphaNumChar <|> char '\'')
     check x = if x `elem` reservedWords
                 then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
                 else return x

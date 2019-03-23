@@ -473,8 +473,17 @@ typecheck Infer (TPrim PrimUntil)
 --------------------------------------------------
 -- Operators
 
-typecheck Infer (TPrim (PrimBOp And))
-  = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp And)
+----------------------------------------
+-- Logic
+
+typecheck Infer (TPrim (PrimBOp op)) | op `elem` [And, Or, Impl]
+  = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp op)
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TPrim (PrimBOp And))  = error "typecheck Infer And should be unreachable"
+typecheck Infer (TPrim (PrimBOp Or))   = error "typecheck Infer Or should be unreachable"
+typecheck Infer (TPrim (PrimBOp Impl)) = error "typecheck Infer Impl should be unreachable"
+------------------------------------------------------------
 
 typecheck Infer (TPrim (PrimUOp Fact))
   = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
@@ -822,17 +831,6 @@ typecheck Infer (TChain t ls) =
 
 ----------------------------------------
 -- Logic
-
--- &&, ||, and not always have type Bool, and the subterms must have type
--- Bool as well.
-typecheck Infer (TBin op t1 t2) | op `elem` [Or, Impl] =
-  ATBin TyBool op <$> check t1 TyBool <*> check t2 TyBool
-
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TBin And  _ _) = error "typecheck Infer And should be unreachable"
-typecheck Infer (TBin Or   _ _) = error "typecheck Infer Or should be unreachable"
-typecheck Infer (TBin Impl _ _) = error "typecheck Infer Impl should be unreachable"
-------------------------------------------------------------
 
 typecheck Infer (TUn Not t) = ATUn TyBool Not <$> check t TyBool
 
@@ -1359,7 +1357,7 @@ expandedUOps = S.fromList
 
 expandedBOps :: Set BOp
 expandedBOps = S.fromList
-  [ And, Lt ]
+  [ And, Or, Impl, Lt ]
 
 ------------------------------------------------------------
 -- Decomposing type constructors

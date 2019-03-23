@@ -75,7 +75,7 @@ runDSM = flip contFreshM 1
 
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
-(||.) = ATBin TyBool Or
+t1 ||. t2 = tapp (tapp (ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp Or)) t1) t2
 
 infixl 6 -., +.
 (-.) :: ATerm -> ATerm -> ATerm
@@ -212,21 +212,6 @@ desugarTerm (ATUn (TyFin n) Neg t) =
 
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 
--- Implies, and, or should all be turned into a standard library
--- definition.  This will require first (1) adding support for
--- modules/a standard library, including (2) the ability to define
--- infix operators.
-
--- (t1 implies t2) ==> (not t1 or t2)
-desugarTerm (ATBin _ Impl t1 t2) = desugarTerm $ tnot t1 ||. t2
-
-desugarTerm (ATBin _ Or t1 t2) = do
-  -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
-  desugarTerm $
-    ATCase TyBool
-      [ tru <==. [tif t1]
-      , t2  <==. []
-      ]
 desugarTerm (ATBin ty Sub t1 t2)  = desugarTerm $ ATBin ty Add t1 (ATUn ty Neg t2)
 desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
   -- t1 -. t2 ==> {? 0 if t1 < t2, t1 - t2 otherwise ?}
@@ -300,7 +285,7 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- | Test whether a given binary operator is one that needs to be
 --   desugared.
 bopDesugars :: BOp -> Bool
-bopDesugars bop = bop `elem` [And]
+bopDesugars bop = bop `elem` [And, Or, Impl]
 
 -- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
@@ -313,15 +298,28 @@ desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desuga
 
 -- | Desugar a saturated application of a binary operator.
 desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
-desugarBinApp And t1 t2 =
 
-  -- XXX and should be turned into a standard library function
-  -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
-  desugarTerm $
-    ATCase TyBool
-      [ t2  <==. [tif t1]
-      , fls <==. []
-      ]
+-- Implies, and, or should all be turned into a standard library
+-- definition.  This will require first (1) adding support for
+-- modules/a standard library, including (2) the ability to define
+-- infix operators.
+
+-- t1 and t2 ==> {? t2 if t1, false otherwise ?}
+desugarBinApp And t1 t2 = desugarTerm $
+  ATCase TyBool
+    [ t2  <==. [tif t1]
+    , fls <==. []
+    ]
+
+-- (t1 implies t2) ==> (not t1 or t2)
+desugarBinApp Impl t1 t2 = desugarTerm $ tnot t1 ||. t2
+
+-- t1 or t2 ==> {? true if t1, t2 otherwise ?})
+desugarBinApp Or t1 t2 = desugarTerm $
+  ATCase TyBool
+    [ tru <==. [tif t1]
+    , t2  <==. []
+    ]
 
 ------------------------------------------------------------
 -- Desugaring other stuff

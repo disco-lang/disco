@@ -29,6 +29,7 @@ import           Data.Coerce
 import           Data.List                               (group, sort)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
+import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 import           Prelude                                 hiding (lookup)
 
@@ -629,6 +630,15 @@ typecheck mode lt@(TInj s t) = do
   return $ ATInj resTy s at
 
 --------------------------------------------------
+-- Binary and unary operators (via expansion)
+
+typecheck mode (TUn uop t)
+  | uop `S.member` expandedUOps = typecheck mode $ expandUOp uop t
+
+typecheck mode (TBin bop t1 t2)
+  | bop `S.member` expandedBOps = typecheck mode $ expandBOp bop t1 t2
+
+--------------------------------------------------
 -- List cons
 
 -- To check a cons, make sure the type is a list type, then
@@ -812,8 +822,6 @@ typecheck Infer (TChain t ls) =
 
 ----------------------------------------
 -- Logic
-
-typecheck mode (TBin And t1 t2) = typecheck mode (expandBOp And t1 t2)
 
 -- &&, ||, and not always have type Bool, and the subterms must have type
 -- Bool as well.
@@ -1344,6 +1352,14 @@ expandUOp uop = TApp (TPrim (PrimUOp uop))
 
 expandBOp :: BOp -> Term -> Term -> Term
 expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
+
+expandedUOps :: Set UOp
+expandedUOps = S.fromList
+  [ Fact ]
+
+expandedBOps :: Set BOp
+expandedBOps = S.fromList
+  [ And, Lt ]
 
 ------------------------------------------------------------
 -- Decomposing type constructors

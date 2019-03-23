@@ -3,4 +3,4 @@ Unsolvable (QualSkolem QNum a)
 Unsolvable NoWeakUnifier
 Unsolvable NoWeakUnifier
 Unsolvable NoUnify
-Unsolvable (QualSkolem QCmp a)
+Unsolvable NoUnify

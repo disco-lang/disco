@@ -111,7 +111,7 @@ passing tests as much as possible.
 - [X] extend pretty-printer to display fully applied operators using
   pre/post/infix notation
 
-- [ ] next thing to try is a compiled operator with a more
+- [X] next thing to try is a compiled operator with a more
   interesting type, such as LT.
 
   - fixJuxtMul is wreaking havoc with TApp nodes now that we are

@@ -49,7 +49,7 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Abs   -- ^ Absolute value (@abs@)
          | Size  -- ^ The size of a set.
          | PowerSet -- ^ The powerset of a given set.
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Binary operators.
 data BOp = Add     -- ^ Addition (@+@)
@@ -77,7 +77,7 @@ data BOp = Add     -- ^ Addition (@+@)
          | Diff    -- ^ Difference between two sets (@\@)
          | Subset  -- ^ Subset test (@⊆@)
          | Rep     -- ^ Replicate to construct a bag (@#@)
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Type operators.
 data TyOp = Enumerate -- ^ List all values of a type

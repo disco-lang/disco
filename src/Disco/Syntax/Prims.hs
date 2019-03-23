@@ -26,13 +26,17 @@ import           Unbound.Generics.LocallyNameless
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
+import           Disco.Syntax.Operators
+
 ------------------------------------------------------------
 -- Prims
 ------------------------------------------------------------
 
--- | Primitives, /i.e./ identifiers which are interpreted specially at
---   runtime.
+-- | Primitives, /i.e./ built-in constants.
 data Prim where
+  PrimUOp     :: UOp -> Prim  -- ^ Unary operator
+  PrimBOp     :: BOp -> Prim  -- ^ Binary operator
+
   PrimList    :: Prim      -- ^ Container -> list conversion
   PrimBag     :: Prim      -- ^ Container -> bag conversion
   PrimSet     :: Prim      -- ^ Container -> set conversion
@@ -53,7 +57,7 @@ data Prim where
 
   PrimForever :: Prim      -- ^ @[x, y, z .. ]@
   PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
-  deriving (Show, Read, Eq, Ord, Generic, Enum, Bounded)
+  deriving (Show, Read, Eq, Ord, Generic)
 
 instance Alpha Prim
 instance Subst t Prim
@@ -86,8 +90,8 @@ data PrimInfo =
     --   prefix.
   }
 
--- | A table containing a 'PrimInfo' record for every 'Prim'
---   recognized by the language.
+-- | A table containing a 'PrimInfo' record for every non-operator
+--   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
   [ PrimInfo PrimList      "list"    True

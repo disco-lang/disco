@@ -447,6 +447,8 @@ typecheck Infer (TPrim PrimMap) = do
   b <- freshTy
   return $ ATPrim ((a :->: b) :->: TyContainer c a :->: TyContainer c b) PrimMap
 
+-- XXX should eventually be (a -> a -> a) -> c a -> a,
+--   with a check that the function has the right properties.
 -- reduce : (a -> a -> a) -> a -> c a -> a
 typecheck Infer (TPrim PrimReduce) = do
   c <- freshAtom
@@ -506,7 +508,8 @@ typecheck Infer (TPrim PrimUntil)
 typecheck Infer (TPrim (PrimBOp op)) | op `elem` [And, Or, Impl]
   = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp op)
 
-typecheck Infer (TPrim (PrimUOp Not)) = return $ ATPrim (TyBool :->: TyBool) (PrimUOp Not)
+typecheck Infer (TPrim (PrimUOp Not))
+  = return $ ATPrim (TyBool :->: TyBool) (PrimUOp Not)
 
 -- See Note [Pattern coverage] -----------------------------
 typecheck Infer (TPrim (PrimBOp And))  = error "typecheck Infer And should be unreachable"

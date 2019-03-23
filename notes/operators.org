@@ -132,4 +132,16 @@ passing tests as much as possible.
 
 - Then convert other operators!
   - [X] logic operators: and, impl, or, not
+  - [X] sqrt, lg
+  - [ ] arithmetic operators
+    - We want to keep the checking case for these... which actually
+      works out quite nicely since we still have TBin around!  Can
+      make special case for checking mode.
 
+- [ ] prefix unary things should just parse as application of prims directly!
+      For example, it's silly to have to say :type not~  instead of
+      just  :type not .
+
+      Would need to change parsing & pretty-printing to match.  We
+      should only need tildes to specify the names of postfix or infix
+      things.

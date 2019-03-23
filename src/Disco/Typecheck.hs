@@ -267,7 +267,7 @@ expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
 
 expandedUOps :: Set UOp
 expandedUOps = S.fromList
-  [ Fact, Not ]
+  [ Fact, Not, Sqrt, Lg ]
 
 expandedBOps :: Set BOp
 expandedBOps = S.fromList
@@ -517,9 +517,6 @@ typecheck Infer (TPrim (PrimBOp Or))   = error "typecheck Infer Or should be unr
 typecheck Infer (TPrim (PrimBOp Impl)) = error "typecheck Infer Impl should be unreachable"
 ------------------------------------------------------------
 
-typecheck Infer (TPrim (PrimUOp Fact))
-  = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
-
 ----------------------------------------
 -- Comparisons
 
@@ -541,6 +538,20 @@ typecheck Infer (TPrim (PrimBOp Lt))  = error "typecheck Infer Lt should be unre
 typecheck Infer (TPrim (PrimBOp Gt))  = error "typecheck Infer Gt should be unreachable"
 typecheck Infer (TPrim (PrimBOp Leq)) = error "typecheck Infer Leq should be unreachable"
 typecheck Infer (TPrim (PrimBOp Geq)) = error "typecheck Infer Geq should be unreachable"
+------------------------------------------------------------
+
+----------------------------------------
+-- sqrt, lg, fact, floor, ceil, abs, idiv
+
+typecheck Infer (TPrim (PrimUOp Fact))
+  = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
+
+typecheck Infer (TPrim (PrimUOp op)) | op `elem` [Sqrt, Lg]
+  = return $ ATPrim (TyN :->: TyN) (PrimUOp op)
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TPrim (PrimUOp Sqrt)) = error "typecheck Infer Sqrt should be unreachable"
+typecheck Infer (TPrim (PrimUOp Lg))   = error "typecheck Infer Lg should be unreachable"
 ------------------------------------------------------------
 
 --------------------------------------------------
@@ -792,8 +803,6 @@ typecheck Infer (TUn Neg t) = do
 ----------------------------------------
 -- sqrt, lg, fact, floor, ceil, abs, idiv
 
-typecheck Infer (TUn op t) | op `elem` [Sqrt, Lg]    = ATUn TyN op <$> check t TyN
-
 typecheck Infer (TUn op t) | op `elem` [Floor, Ceil] = do
   at <- infer t
   let ty = getType at
@@ -814,8 +823,6 @@ typecheck Infer (TBin IDiv t1 t2) = do
   return $ ATBin resTy IDiv at1 at2
 
 -- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TUn Sqrt  _) = error "typecheck Infer Sqrt should be unreachable"
-typecheck Infer (TUn Lg    _) = error "typecheck Infer Lg should be unreachable"
 typecheck Infer (TUn Floor _) = error "typecheck Infer Floor should be unreachable"
 typecheck Infer (TUn Ceil  _) = error "typecheck Infer Ceil should be unreachable"
 ------------------------------------------------------------

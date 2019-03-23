@@ -1,0 +1,28 @@
+Game plan for *incrementally* generalizing operators.  Goals:
+
+- Support writing things like _+_ so operators parse as independent
+  terms, so they can be used as arguments to higher-order functions,
+  partially applied, etc.
+
+- Simplify representation & type checking so we no longer have special
+  TBin and TUn nodes, just application.
+
+- Ultimately I want to do this now (as opposed to waiting until later)
+  because I want to be able to define infix operators like 'union',
+  'intersection', etc. in a library (in terms of the 'merge' prim).
+
+I tried to do it all at once and failed; once I finally got it to
+compile there were tons of errors in the test suite etc. and I was
+completely at a loss as to what was going on.  This time I think I
+will try a more incremental approach, i.e. try to keep it building and
+passing tests as much as possible.
+
+- Leave TBin, TUn intact at first
+- [X] Add operators as prims
+- [ ] Add parsing rules for standalone operators & test parsing
+- [ ] Add typing rule for one standalone operator (e.g. _+_) and get it to typecheck
+- [ ] Add desugaring and compilation rules for _+_
+- [ ] Switch parsing of normal infix + to produce TApp node
+
+- Then convert other operators
+

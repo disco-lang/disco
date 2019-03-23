@@ -296,8 +296,8 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- | XXX
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
 desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
-  x <- fresh (string2Name "arg")
-  y <- fresh (string2Name "arg")
+  x <- fresh (string2Name "arg1")
+  y <- fresh (string2Name "arg2")
   body <- desugarBinApp op (ATVar ty1 x) (ATVar ty2 y)
   return $ mkLambda ty [x, y] body
 desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op

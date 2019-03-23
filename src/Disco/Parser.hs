@@ -436,7 +436,7 @@ parseTerm' = label "expression" $
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = label "expression" $
-       TBool True  <$ (reserved "true" <|> reserved "True")
+      TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))

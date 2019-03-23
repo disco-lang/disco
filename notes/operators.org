@@ -49,6 +49,23 @@ passing tests as much as possible.
 
     Note this means we can also re-allow _ in variable names.
 
+    OK, not~ still isn't parsing.  parseAtom successfully parses it;
+    the problem is that when parseExpr is called, it successfully
+    parses the 'not' as an operator and then tries to parse the ~ as
+    an expression. Maybe just add some 'notFollowedBy' nonsense to
+    operator parsing??  This is getting rather complicated.  But maybe
+    that's just how it is when you have infix operators.
+
+    Actually the fix was very easy: put ~ *back into* opChars, because
+    the only place opChars is used is in reservedOp, to make sure that
+    none of them come after a parsed operator name.
+
+    Prefix ops work now.  But infix don't yet.  Ah, just needed to add
+    some 'try', since it tried parsing ~+~ as some postfix thing and
+    consumed the ~.  Next step: improve it so it consumes ~ first and
+    then tries parsing either a postfix thing or an infix thing
+    followed by ~.
+
 - [ ] Add typing rule for one standalone operator (e.g. _+_) and get it to typecheck
 - [ ] Add desugaring and compilation rules for _+_
 - [ ] Switch parsing of normal infix + to produce TApp node

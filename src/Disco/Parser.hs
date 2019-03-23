@@ -166,7 +166,7 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]
-opChar = "!@#$%^&*~-+=|<>?/\\."
+opChar = "~!@#$%^&*-+=|<>?/\\."
 
 parens, braces, angles, brackets, bagdelims, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
@@ -441,6 +441,7 @@ parseAtom = label "expression" $
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ try parseWild
+  <|> TPrim <$> try parseStandaloneOp
   <|> TVar <$> ident
   <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
@@ -460,6 +461,19 @@ parseAtom = label "expression" $
 parseWild :: Parser ()
 parseWild = (lexeme . try . void) $
   string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'" <|> oneOf opChar)
+
+-- | Parse a standalone operator name with underscores indicating argument slots,
+--   e.g. _+_ for the addition operator.
+parseStandaloneOp :: Parser Prim
+parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat opTable)
+  where
+    mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
+    mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
+      = map (\syn -> PrimUOp uop <$ try (lexeme (string syn >> char '~'))) syns
+    mkStandaloneOpParsers (OpInfo (UOpF Post uop) syns _)
+      = map (\syn -> PrimUOp uop <$ try (lexeme (char '~' >> string syn))) syns
+    mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
+      = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
 
 -- | Parse a primitive name starting with a $.
 parsePrim :: Parser Prim

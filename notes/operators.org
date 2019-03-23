@@ -65,6 +65,16 @@ passing tests as much as possible.
     consumed the ~.  Next step: improve it so it consumes ~ first and
     then tries parsing either a postfix thing or an infix thing
     followed by ~.
+- [X] fix parsing of e.g.   f ~and~
+  Parsing still doesn't completely work.  An application of something
+  to a standalone operator doesn't parse, e.g.  f ~and~ fails on the
+  first ~ and says it was expecting EOF, operator, or type annotation.
+
+  Ah, I think I know why --- the application space is parsed using
+  'reservedOp ""' which insists that no operator symbol follows it.
+  Yes, that was it, changing to 'string ""' fixed it.  reservedOp was
+  unnecessary.
+
 - [X] extend pretty-printer to deal with standalone operators
 - [ ] Add typing rule for one standalone operator (e.g. _+_) and get
   it to typecheck

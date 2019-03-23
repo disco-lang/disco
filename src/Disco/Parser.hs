@@ -751,7 +751,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
         -- function application first; we later go through and turn
         -- some into multiplication (fixing up the precedence
         -- appropriately) based on a syntactic analysis.
-      = [ InfixL (TApp <$ reservedOp "") ]
+      = [ InfixL (TApp <$ string "") ]
 
         -- get all other operators from the opTable
       : (map . concatMap) mkOpParser opTable

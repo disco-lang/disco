@@ -440,7 +440,7 @@ parseAtom = label "expression" $
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
-  <|> TWild <$ symbol "_"
+  <|> TWild <$ try parseWild
   <|> TVar <$> ident
   <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
@@ -454,6 +454,12 @@ parseAtom = label "expression" $
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> (parens (parseTerm `sepBy` comma))
+
+-- | Parse a wildcard, which is an underscore that isn't the start of
+--   an identifier.
+parseWild :: Parser ()
+parseWild = (lexeme . try . void) $
+  string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'" <|> oneOf opChar)
 
 -- | Parse a primitive name starting with a $.
 parsePrim :: Parser Prim

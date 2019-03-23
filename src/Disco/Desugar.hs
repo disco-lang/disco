@@ -214,13 +214,8 @@ desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 -- (t1 implies t2) ==> (not t1 or t2)
 desugarTerm (ATBin _ Impl t1 t2) = desugarTerm $ tnot t1 ||. t2
 
-desugarTerm (ATBin _ And t1 t2)  = do
-  -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
-  desugarTerm $
-    ATCase TyBool
-      [ t2  <==. [tif t1]
-      , fls <==. []
-      ]
+desugarTerm (ATBin _ And t1 t2)  = desugarBinApp And t1 t2
+
 desugarTerm (ATBin _ Or t1 t2) = do
   -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
   desugarTerm $
@@ -298,11 +293,21 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- Desugaring operators
 ------------------------------------------------------------
 
+desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
+desugarBinApp And t1 t2 =
+  -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
+  desugarTerm $
+    ATCase TyBool
+      [ t2  <==. [tif t1]
+      , fls <==. []
+      ]
+
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
 desugarPrimBOp ty And = do
   x <- fresh (string2Name "arg")
   y <- fresh (string2Name "arg")
-  desugarTerm $ ATAbs ty (bind [(x, embed TyBool), (y, embed TyBool)] (ATBin TyBool And (ATVar TyBool x) (ATVar TyBool y)))
+  body <- desugarBinApp And (ATVar TyBool x) (ATVar TyBool y)
+  return $ mkLambda ty [x, y] body
 
 ------------------------------------------------------------
 -- Desugaring other stuff

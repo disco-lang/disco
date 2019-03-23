@@ -475,6 +475,18 @@ parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat 
     mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
       = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
 
+    -- XXX to do: improve the above so it first tries to parse a ~,
+    --   then parses any postfix or infix thing; or else it looks for
+    --   a prefix thing followed by a ~.  This will get rid of the
+    --   need for 'try' and also potentially improve error messages.
+    --   The below may come in useful.
+
+    -- flatOpTable = concat opTable
+
+    -- prefixOps  = [ (uop, syns) | (OpInfo (UOpF Pre uop) syns _)  <- flatOpTable ]
+    -- postfixOps = [ (uop, syns) | (OpInfo (UOpF Post uop) syns _) <- flatOpTable ]
+    -- infixOps   = [ (bop, syns) | (OpInfo (BOpF _ bop) syns _)    <- flatOpTable ]
+
 -- | Parse a primitive name starting with a $.
 parsePrim :: Parser Prim
 parsePrim = do

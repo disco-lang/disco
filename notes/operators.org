@@ -19,11 +19,11 @@ passing tests as much as possible.
 
 - Leave TBin, TUn intact at first
 - [X] Add operators as prims
-- [-] Add parsing rules for standalone operators & test parsing
+- [X] Add parsing rules for standalone operators & test parsing
 
   Have to be very careful here, parsing is tricky!
   - [X] Disallow underscores in normal variable names.
-  - [ ] Try parsing each operator with underscores in the appropriate places
+  - [X] Try parsing each operator with underscores^H^H^H tildes in the appropriate places
   - For now don't try parsing user-defined operator names; we can add
     that later.
 
@@ -65,7 +65,6 @@ passing tests as much as possible.
     consumed the ~.  Next step: improve it so it consumes ~ first and
     then tries parsing either a postfix thing or an infix thing
     followed by ~.
-
 - [ ] Add typing rule for one standalone operator (e.g. _+_) and get it to typecheck
 - [ ] Add desugaring and compilation rules for _+_
 - [ ] Switch parsing of normal infix + to produce TApp node

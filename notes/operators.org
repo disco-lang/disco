@@ -89,7 +89,7 @@ passing tests as much as possible.
   avoid duplicate code while transitioning.
 
 - [X] Switch parsing of normal infix 'and' to produce TApp node
-- [ ] special case for desugaring when and operator is fully applied, just
+- [X] special case for desugaring when and operator is fully applied, just
   call desugarBinApp
 
 - Then convert other operators...

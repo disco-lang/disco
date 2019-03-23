@@ -182,6 +182,11 @@ desugarTerm (ATString cs)        = desugarContainer (TyList TyC) ListContainer (
 desugarTerm (ATAbs ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t
+
+-- XXX special case for fully applied binary operators --- so far only And
+desugarTerm (ATApp _ (ATApp _ (ATPrim _ (PrimBOp And)) t1) t2)
+  = desugarBinApp And t1 t2
+
 desugarTerm (ATApp ty t1 t2)     =
   DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTup ty ts)        = desugarTuples ty ts

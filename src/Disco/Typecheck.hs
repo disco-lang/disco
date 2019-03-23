@@ -479,6 +479,8 @@ typecheck Infer (TPrim PrimUntil)
 typecheck Infer (TPrim (PrimBOp op)) | op `elem` [And, Or, Impl]
   = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp op)
 
+typecheck Infer (TPrim (PrimUOp Not)) = return $ ATPrim (TyBool :->: TyBool) (PrimUOp Not)
+
 -- See Note [Pattern coverage] -----------------------------
 typecheck Infer (TPrim (PrimBOp And))  = error "typecheck Infer And should be unreachable"
 typecheck Infer (TPrim (PrimBOp Or))   = error "typecheck Infer Or should be unreachable"
@@ -828,11 +830,6 @@ typecheck Infer (TChain t ls) =
       _   <- check (TBin op t1 t2) TyBool
       atl <- inferChain t2 links
       return $ ATLink op at2 : atl
-
-----------------------------------------
--- Logic
-
-typecheck Infer (TUn Not t) = ATUn TyBool Not <$> check t TyBool
 
 ----------------------------------------
 -- Mod
@@ -1353,7 +1350,7 @@ expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
 
 expandedUOps :: Set UOp
 expandedUOps = S.fromList
-  [ Fact ]
+  [ Fact, Not ]
 
 expandedBOps :: Set BOp
 expandedBOps = S.fromList

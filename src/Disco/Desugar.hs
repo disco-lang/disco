@@ -296,7 +296,7 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- Desugaring operators
 ------------------------------------------------------------
 
--- | XXX
+-- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
 desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
   x <- fresh (string2Name "arg1")
@@ -305,7 +305,7 @@ desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
   return $ mkLambda ty [x, y] body
 desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
 
--- | XXX
+-- | Desugar a saturated application of a binary operator.
 desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
 desugarBinApp And t1 t2 =
 

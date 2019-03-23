@@ -807,7 +807,7 @@ typecheck Infer (TChain t ls) =
 
 -- &&, ||, and not always have type Bool, and the subterms must have type
 -- Bool as well.
-typecheck Infer (TBin op t1 t2) | op `elem` [And, Or, Impl] =
+typecheck Infer (TBin op t1 t2) | op `elem` [Or, Impl] =
   ATBin TyBool op <$> check t1 TyBool <*> check t2 TyBool
 
 -- See Note [Pattern coverage] -----------------------------

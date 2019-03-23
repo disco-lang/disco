@@ -80,17 +80,21 @@ passing tests as much as possible.
 
   - Actually the type of _+_ is a bit complicated.  Let's pick
     something with an utterly simple type like 'and'.
-- [X] Add desugaring and compilation rules for _and_
+- [X] Add desugaring rules for _and_
 
   Added desugaring, and it works. But it desugars to a lambda
   containing ATBin And!  Ultimately this is backwards.
 
   OK, got it straightened out now.  Pulled out a helper method to
   avoid duplicate code while transitioning.
-
 - [X] Switch parsing of normal infix 'and' to produce TApp node
 - [X] special case for desugaring when and operator is fully applied, just
   call desugarBinApp
+- [X] remove ATBin And case from desugarTerm
+- [X] remove ATBin And case from typecheck
+- [ ] Try putting in special case for an operator that doesn't
+  desugar, say, LT.  That will involve changing stuff in compilation
+  instead of desugaring.
 
 - Then convert other operators...
 

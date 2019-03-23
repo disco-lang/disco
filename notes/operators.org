@@ -17,7 +17,7 @@ completely at a loss as to what was going on.  This time I think I
 will try a more incremental approach, i.e. try to keep it building and
 passing tests as much as possible.
 
-- Leave TBin, TUn intact at first
+- Leave TBin, TUn intact at first.
 - [X] Add operators as prims
 - [X] Add parsing rules for standalone operators & test parsing
 
@@ -108,8 +108,11 @@ passing tests as much as possible.
     won't fire for prim operators until they are parsed as
     applications instead of TBin or TUn nodes.
 
-- [ ] extend pretty-printer to display fully applied operators using
+- [X] extend pretty-printer to display fully applied operators using
   pre/post/infix notation
+
+- [ ] next thing to try is a compiled operator with a more
+  interesting type, such as LT.
 
 - Then convert other operators...
 

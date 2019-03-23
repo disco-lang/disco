@@ -198,6 +198,24 @@ prettyTerm (TAbs bnd)    = mparens initPA $
     prettyArg (x, unembed -> mty) = case mty of
       Nothing -> prettyName x
       Just ty -> text "(" <> prettyName x <+> text ":" <+> prettyTy ty <> text ")"
+
+-- special case for fully applied unary operators
+prettyTerm (TApp (TPrim (PrimUOp uop)) t) =
+  case M.lookup uop uopMap of
+    Just (OpInfo (UOpF Post _) _ _) -> mparens (ugetPA uop) $
+      prettyTerm' (1 + funPrec) InL t <> prettyUOp uop
+    Just (OpInfo (UOpF Pre  _) _ _) -> mparens (ugetPA uop) $
+      prettyUOp uop <> prettyTerm' (1 + funPrec) InR t
+    _ -> error $ "prettyTerm: uopMap doesn't contain " ++ show uop
+
+-- special case for fully applied binary operators
+prettyTerm (TApp (TApp (TPrim (PrimBOp bop)) t1) t2) = mparens (getPA bop) $
+  hsep
+  [ prettyTerm' (bPrec bop) InL t1
+  , prettyBOp bop
+  , prettyTerm' (bPrec bop) InR t2
+  ]
+
 prettyTerm (TApp t1 t2)  = mparens funPA $
   prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
 prettyTerm (TTup ts)     = do
@@ -216,7 +234,6 @@ prettyTerm (TContainerComp c bqst) =
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn Fact t)  = prettyTerm' (1 + funPrec) InL t <> text "!"
 prettyTerm (TUn op t)    = mparens (ugetPA op) $
   prettyUOp op <> prettyTerm' (1 + funPrec) InR t
 prettyTerm (TBin op t1 t2) = mparens (getPA op) $

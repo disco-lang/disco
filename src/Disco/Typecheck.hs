@@ -470,6 +470,12 @@ typecheck Infer (TPrim PrimUntil)
   = return $ ATPrim (TyN :->: TyList TyN :->: TyList TyN) PrimUntil
 
 --------------------------------------------------
+-- Operators
+
+typecheck Infer (TPrim (PrimBOp And))
+  = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp And)
+
+--------------------------------------------------
 -- Base types
 
 -- A few trivial cases for base types.

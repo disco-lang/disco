@@ -794,8 +794,6 @@ typecheck Infer (TUn Neg t) = do
 
 typecheck Infer (TUn op t) | op `elem` [Sqrt, Lg]    = ATUn TyN op <$> check t TyN
 
-typecheck Infer (TUn Fact t) = typecheck Infer $ expandUOp Fact t
-
 typecheck Infer (TUn op t) | op `elem` [Floor, Ceil] = do
   at <- infer t
   let ty = getType at

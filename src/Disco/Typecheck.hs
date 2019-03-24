@@ -387,6 +387,9 @@ typecheck mode (TParens t) = typecheck mode t
 -- To infer the type of a variable, just look it up in the context.
 -- We don't need a checking case; checking the type of a variable will
 -- fall through to this case.
+--
+-- Note this is also where unbound identifiers may possibly be turned
+-- into primitives if the nam matches.
 typecheck Infer (TVar x) = checkVar `catchError` checkPrim
   where
     checkVar = do
@@ -394,7 +397,7 @@ typecheck Infer (TVar x) = checkVar `catchError` checkPrim
       (_, ty)    <- unbind sig
       return $ ATVar ty (coerce x)
 
-    -- If the variable is not bound, check if it is a primitive name.
+    -- If the variable is not bound, check if it is an exposed primitive name.
     checkPrim (Unbound _) =
       case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
         -- If so, infer the type of the prim instead.
@@ -407,166 +410,184 @@ typecheck Infer (TVar x) = checkVar `catchError` checkPrim
 --------------------------------------------------
 -- Primitives
 
--- The 'list', 'bag', and 'set' primitives convert containers into
--- other containers.
-typecheck Infer (TPrim conv) | conv `elem` [PrimList, PrimBag, PrimSet] = do
-  c <- freshAtom   -- make a unification variable for the container type
-  a <- freshTy     -- make a unification variable for the element type
+-- XXX any prims that can't be inferred or need special treatment should go here.
 
-  -- converting to a set or bag requires being able to sort the elements
-  when (conv /= PrimList) $ constraint $ CQual QCmp a
-
-  return $ ATPrim (TyContainer c a :->: primCtrCon conv a) conv
+-- All other prims can be inferred.
+typecheck Infer (TPrim prim) = do
+  ty <- inferPrim prim
+  return $ ATPrim ty prim
 
   where
-    primCtrCon PrimList = TyList
-    primCtrCon PrimBag  = TyBag
-    primCtrCon _        = TySet
+    inferPrim :: Prim -> TCM Type
 
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim PrimList) = error "typecheck Infer PrimList should be unreachable"
-typecheck Infer (TPrim PrimBag)  = error "typecheck Infer PrimBag should be unreachable"
-typecheck Infer (TPrim PrimSet)  = error "typecheck Infer PrimSet should be unreachable"
-------------------------------------------------------------
+    ----------------------------------------
+    -- Logic
 
-typecheck Infer (TPrim PrimB2C) = do
-  a <- freshTy
-  return $ ATPrim (TyBag a :->: TySet (TyPair a TyN)) PrimB2C
+    inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
+      = return $ TyBool :->: TyBool :->: TyBool
 
-typecheck Infer (TPrim PrimC2B) = do
-  a <- freshTy
-  return $ ATPrim (TySet (TyPair a TyN) :->: TyBag a) PrimC2B
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
+    inferPrim (PrimBOp Or)   = error "inferPrim Or should be unreachable"
+    inferPrim (PrimBOp Impl) = error "inferPrim Impl should be unreachable"
+    ------------------------------------------------------------
 
--- XXX see https://github.com/disco-lang/disco/issues/160
+    inferPrim (PrimUOp Not) = return $ TyBool :->: TyBool
 
--- map : (a -> b) -> (c a -> c b)
-typecheck Infer (TPrim PrimMap) = do
-  c <- freshAtom
-  a <- freshTy
-  b <- freshTy
-  return $ ATPrim ((a :->: b) :->: TyContainer c a :->: TyContainer c b) PrimMap
+    ----------------------------------------
+    -- Container conversion
 
--- XXX should eventually be (a -> a -> a) -> c a -> a,
---   with a check that the function has the right properties.
--- reduce : (a -> a -> a) -> a -> c a -> a
-typecheck Infer (TPrim PrimReduce) = do
-  c <- freshAtom
-  a <- freshTy
-  return $ ATPrim ((a :->: a :->: a) :->: a :->: TyContainer c a :->: a) PrimReduce
+    inferPrim conv | conv `elem` [PrimList, PrimBag, PrimSet] = do
+      c <- freshAtom   -- make a unification variable for the container type
+      a <- freshTy     -- make a unification variable for the element type
 
--- filter : (a -> Bool) -> c a -> c a
-typecheck Infer (TPrim PrimFilter) = do
-  c <- freshAtom
-  a <- freshTy
-  return $ ATPrim ((a :->: TyBool) :->: TyContainer c a :->: TyContainer c a) PrimFilter
+      -- converting to a set or bag requires being able to sort the elements
+      when (conv /= PrimList) $ constraint $ CQual QCmp a
 
--- join : c (c a) -> c a
-typecheck Infer (TPrim PrimJoin) = do
-  c <- freshAtom
-  a <- freshTy
-  return $ ATPrim (TyContainer c (TyContainer c a) :->: TyContainer c a) PrimJoin
+      return $ TyContainer c a :->: primCtrCon conv a
 
--- merge : (N -> N -> N) -> c a -> c a -> c a
-typecheck Infer (TPrim PrimMerge) = do
-  c <- freshAtom
-  a <- freshTy
-  let ca = TyContainer c a
-  return $ ATPrim ((TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca) PrimMerge
+      where
+        primCtrCon PrimList = TyList
+        primCtrCon PrimBag  = TyBag
+        primCtrCon _        = TySet
 
--- isPrime : N -> Bool
-typecheck Infer (TPrim PrimIsPrime) = return $ ATPrim (TyN :->: TyBool) PrimIsPrime
--- factor : N -> Bag N
-typecheck Infer (TPrim PrimFactor)  = return $ ATPrim (TyN :->: TyBag TyN) PrimFactor
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim PrimList = error "inferPrim PrimList should be unreachable"
+    inferPrim PrimBag  = error "inferPrim PrimBag should be unreachable"
+    inferPrim PrimSet  = error "inferPrim PrimSet should be unreachable"
+    ------------------------------------------------------------
 
--- crash : String -> a
-typecheck Infer (TPrim PrimCrash)   = do
-  a <- freshTy
-  return $ ATPrim (TyList TyC :->: a) PrimCrash
+    inferPrim PrimB2C = do
+      a <- freshTy
+      return $ TyBag a :->: TySet (TyPair a TyN)
 
--- Actually 'forever' and 'until' support more types than this, e.g. Q
--- instead of N, but this is good enough.  These cases are here just
--- for completeness---in case someone enables primitives and uses them
--- directly---but typically they are generated only during desugaring
--- of a container with ellipsis, after typechecking, in which case
--- they can be assigned a more appropriate type directly.
+    inferPrim PrimC2B = do
+      a <- freshTy
+      return $ TySet (TyPair a TyN) :->: TyBag a
 
--- forever : List N -> List N
-typecheck Infer (TPrim PrimForever)
-  = return $ ATPrim (TyList TyN :->: TyList TyN) PrimForever
+    ----------------------------------------
+    -- Container primitives
 
--- until : N -> List N -> List N
-typecheck Infer (TPrim PrimUntil)
-  = return $ ATPrim (TyN :->: TyList TyN :->: TyList TyN) PrimUntil
+    -- XXX see https://github.com/disco-lang/disco/issues/160
+    -- map : (a -> b) -> (c a -> c b)
+    inferPrim PrimMap = do
+      c <- freshAtom
+      a <- freshTy
+      b <- freshTy
+      return $ (a :->: b) :->: TyContainer c a :->: TyContainer c b
 
---------------------------------------------------
--- Primitive operators
+    -- XXX should eventually be (a -> a -> a) -> c a -> a,
+    --   with a check that the function has the right properties.
+    -- reduce : (a -> a -> a) -> a -> c a -> a
+    inferPrim PrimReduce = do
+      c <- freshAtom
+      a <- freshTy
+      return $ (a :->: a :->: a) :->: a :->: TyContainer c a :->: a
 
-----------------------------------------
--- Logic
+    -- filter : (a -> Bool) -> c a -> c a
+    inferPrim PrimFilter = do
+      c <- freshAtom
+      a <- freshTy
+      return $ (a :->: TyBool) :->: TyContainer c a :->: TyContainer c a
 
-typecheck Infer (TPrim (PrimBOp op)) | op `elem` [And, Or, Impl]
-  = return $ ATPrim (TyBool :->: TyBool :->: TyBool) (PrimBOp op)
+    -- join : c (c a) -> c a
+    inferPrim PrimJoin = do
+      c <- freshAtom
+      a <- freshTy
+      return $ TyContainer c (TyContainer c a) :->: TyContainer c a
 
-typecheck Infer (TPrim (PrimUOp Not))
-  = return $ ATPrim (TyBool :->: TyBool) (PrimUOp Not)
+    -- merge : (N -> N -> N) -> c a -> c a -> c a
+    inferPrim PrimMerge = do
+      c <- freshAtom
+      a <- freshTy
+      let ca = TyContainer c a
+      return $ (TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca
 
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim (PrimBOp And))  = error "typecheck Infer And should be unreachable"
-typecheck Infer (TPrim (PrimBOp Or))   = error "typecheck Infer Or should be unreachable"
-typecheck Infer (TPrim (PrimBOp Impl)) = error "typecheck Infer Impl should be unreachable"
-------------------------------------------------------------
+    ----------------------------------------
+    -- Number theory
 
-----------------------------------------
--- Comparisons
+    inferPrim PrimIsPrime = return $ TyN :->: TyBool
+    inferPrim PrimFactor  = return $ TyN :->: TyBag TyN
 
--- Infer the type of a comparison. A comparison always has type Bool,
--- but we have to make sure the subterms have compatible types.  We
--- also generate a QCmp qualifier --- even though every type in disco
--- has semi-decidable equality and ordering, we need to know whether
--- e.g. a comparison was done at a certain type, so we can decide
--- whether the type is allowed to be completely polymorphic or not.
-typecheck Infer (TPrim (PrimBOp op)) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
-  ty <- freshTy
-  constraint $ CQual QCmp ty
-  return $ ATPrim (ty :->: ty :->: TyBool) (PrimBOp op)
+    ----------------------------------------
+    -- Ellipses
 
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim (PrimBOp Eq))  = error "typecheck Infer Eq should be unreachable"
-typecheck Infer (TPrim (PrimBOp Neq)) = error "typecheck Infer Neq should be unreachable"
-typecheck Infer (TPrim (PrimBOp Lt))  = error "typecheck Infer Lt should be unreachable"
-typecheck Infer (TPrim (PrimBOp Gt))  = error "typecheck Infer Gt should be unreachable"
-typecheck Infer (TPrim (PrimBOp Leq)) = error "typecheck Infer Leq should be unreachable"
-typecheck Infer (TPrim (PrimBOp Geq)) = error "typecheck Infer Geq should be unreachable"
-------------------------------------------------------------
+    -- Actually 'forever' and 'until' support more types than this, e.g. Q
+    -- instead of N, but this is good enough.  These cases are here just
+    -- for completeness---in case someone enables primitives and uses them
+    -- directly---but typically they are generated only during desugaring
+    -- of a container with ellipsis, after typechecking, in which case
+    -- they can be assigned a more appropriate type directly.
 
-----------------------------------------
--- fact, sqrt, lg, floor, ceil, abs
+    inferPrim PrimForever = return $ TyList TyN :->: TyList TyN
+    inferPrim PrimUntil   = return $ TyN :->: TyList TyN :->: TyList TyN
 
-typecheck Infer (TPrim (PrimUOp Fact))
-  = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
+    ----------------------------------------
+    -- Crash
 
-typecheck Infer (TPrim p) | p `elem` [PrimSqrt, PrimLg]
-  = return $ ATPrim (TyN :->: TyN) p
+    inferPrim PrimCrash   = do
+      a <- freshTy
+      return $ TyString :->: a
 
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim PrimSqrt) = error "typecheck Infer Sqrt should be unreachable"
-typecheck Infer (TPrim PrimLg)   = error "typecheck Infer Lg should be unreachable"
-------------------------------------------------------------
+    ----------------------------------------
+    -- Comparisons
 
-typecheck Infer (TPrim p) | p `elem` [PrimFloor, PrimCeil] = do
-  argTy <- freshTy
-  resTy <- cInt argTy
-  return $ ATPrim (argTy :->: resTy) p
+    -- Infer the type of a comparison. A comparison always has type Bool,
+    -- but we have to make sure the subterms have compatible types.  We
+    -- also generate a QCmp qualifier --- even though every type in disco
+    -- has semi-decidable equality and ordering, we need to know whether
+    -- e.g. a comparison was done at a certain type, so we can decide
+    -- whether the type is allowed to be completely polymorphic or not.
+    inferPrim (PrimBOp op) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
+      ty <- freshTy
+      constraint $ CQual QCmp ty
+      return $ ty :->: ty :->: TyBool
 
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim PrimFloor) = error "typecheck Infer Floor should be unreachable"
-typecheck Infer (TPrim PrimCeil)  = error "typecheck Infer Ceil should be unreachable"
-------------------------------------------------------------
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim (PrimBOp Eq)  = error "inferPrim Eq should be unreachable"
+    inferPrim (PrimBOp Neq) = error "inferPrim Neq should be unreachable"
+    inferPrim (PrimBOp Lt)  = error "inferPrim Lt should be unreachable"
+    inferPrim (PrimBOp Gt)  = error "inferPrim Gt should be unreachable"
+    inferPrim (PrimBOp Leq) = error "inferPrim Leq should be unreachable"
+    inferPrim (PrimBOp Geq) = error "inferPrim Geq should be unreachable"
+    ------------------------------------------------------------
 
-typecheck Infer (TPrim PrimAbs) = do
-  argTy <- freshTy
-  resTy <- cPos argTy
-  return $ ATPrim (argTy :->: resTy) PrimAbs
+    ----------------------------------------
+    -- fact, sqrt, lg, floor, ceil, abs
+
+    inferPrim (PrimUOp Fact) = return $ TyN :->: TyN
+    inferPrim p | p `elem` [PrimSqrt, PrimLg] = return $ TyN :->: TyN
+
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim PrimSqrt = error "inferPrim Sqrt should be unreachable"
+    inferPrim PrimLg   = error "inferPrim Lg should be unreachable"
+    ------------------------------------------------------------
+
+    inferPrim p | p `elem` [PrimFloor, PrimCeil] = do
+      argTy <- freshTy
+      resTy <- cInt argTy
+      return $ argTy :->: resTy
+
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim PrimFloor = error "inferPrim Floor should be unreachable"
+    inferPrim PrimCeil  = error "inferPrim Ceil should be unreachable"
+    ------------------------------------------------------------
+
+    inferPrim PrimAbs = do
+      argTy <- freshTy
+      resTy <- cPos argTy
+      return $ argTy :->: resTy
+
+    ----------------------------------------
+    -- set size, power set
+
+    inferPrim PrimSize = do
+      a <- freshTy
+      return $ TySet a :->: TyN
+
+    inferPrim PrimPower = do
+      a <- freshTy
+      return $ TySet a :->: TySet (TySet a)
 
 --------------------------------------------------
 -- Base types
@@ -814,18 +835,12 @@ typecheck Infer (TUn Neg t) = do
   negTy <- cNeg (getType at)
   return $ ATUn negTy Neg at
 
-----------------------------------------
--- idiv
-
 typecheck Infer (TBin IDiv t1 t2) = do
   at1 <- infer t1
   at2 <- infer t2
   tyLub <- lub (getType at1) (getType at2)
   resTy <- cInt tyLub
   return $ ATBin resTy IDiv at1 at2
-
-----------------------------------------
--- exp
 
 typecheck (Check ty) (TBin Exp t1 t2) = do
   at1   <- check t1 ty
@@ -899,10 +914,6 @@ typecheck Infer (TBin Choose t1 t2) = do
 ----------------------------------------
 -- Set & bag operations
 
-typecheck Infer (TPrim PrimSize) = do
-  a <- freshTy
-  return $ ATPrim (TySet a :->: TyN) PrimSize
-
 typecheck (Check ty) t@(TBin setOp t1 t2)
     | setOp `elem` [Union, Inter, Diff] = do
   tyElt <- ensureConstr1 CSet ty (Left t)
@@ -930,10 +941,6 @@ typecheck Infer (TBin Rep t1 t2) = do
   at1 <- infer t1
   at2 <- check t2 TyN
   return $ ATBin (TyBag (getType at1)) Rep at1 at2
-
-typecheck Infer (TPrim PrimPower) = do
-  a <- freshTy
-  return $ ATPrim (TySet a :->: TySet (TySet a)) PrimPower
 
 ----------------------------------------
 -- Type operations
@@ -1106,7 +1113,7 @@ checkPattern (PChar c) ty = do
   return (emptyCtx, APChar c)
 
 checkPattern (PString s) ty = do
-  ensureEq ty (TyList TyC)
+  ensureEq ty TyString
   return (emptyCtx, APString s)
 
 checkPattern (PTup tup) tupTy = do

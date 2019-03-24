@@ -57,6 +57,7 @@ module Disco.Types
        , pattern TyBag
        , pattern TySet
        , pattern TyContainer
+       , pattern TyString
 
        -- ** Quantified types
 
@@ -318,6 +319,9 @@ pattern TySet elTy = TyCon CSet [elTy]
 
 pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
+
+pattern TyString :: Type
+pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,

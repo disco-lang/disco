@@ -131,7 +131,7 @@ passing tests as much as possible.
 - Then convert other operators!
   - [X] logic operators: and, impl, or, not
   - [X] sqrt, lg
-  - [ ] floor, ceil
+  - [X] floor, ceil
     - Note that we totally could give these a type as operators, by
       making up a fresh type variable for their input and generating
       constraints via the cInt function. BUT if we do this, we lose
@@ -147,6 +147,11 @@ passing tests as much as possible.
       and takes argument types as parameters; can generate fresh types
       for the arguments if we need the type of a standalone operator.
 
+      For now I just put in the more generic version for prims,
+      without worrying about optimizing the constraint solving.  Can
+      worry about that later, if it becomes an issue.  And in any case
+      it probably makes more sense to think about optimizing the
+      constraint-solving process more generally.
   - [ ] arithmetic operators
     - We want to keep the checking case for these... which actually
       works out quite nicely since we still have TBin around!  Can

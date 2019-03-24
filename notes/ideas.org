@@ -1,0 +1,38 @@
+- Unrelated thing I realized/noticed: desugaring for chains
+  duplicates things, should add sharing.  That is, e.g.  'a < b < c'
+  desugars to 'a < b and b < c' but this duplicates b.  It ought to be
+  'let x = b in a < x and x < c'.
+
+- Unrelated, possibly crazy idea: go even further with
+  short-circuiting laziness for 'and', 'or'.  If the first thing
+  causes a runtime error, try evaluating the other side anyway.  e.g.
+  '0/0 < 2 and 1 < 0' should evaluate to false.  and should really be
+  commutative, even with respect to effects!
+
+  However, I think this would mean that 'and' can no longer desugar to
+  a case, since the semantics of case are inherently sequential.
+
+  Maybe what fundamentally needs to be added is some kind of built-in
+  'amb' or choice operator.  e.g.  'a amb b' evaluates to a unless a
+  throws a runtime exception, in which case it evaluates to b.  Maybe
+  could even use this to deal with nontermination.  How about this: if
+  both of a and b reduce to a value successfully, then 'a amb b'
+  evaluates to one of them.  If only one does, then it evaluates to
+  that.  Operationally, we could interleave evaluation of a and b and
+  return whichever one first completes successfully.  This would
+  become a lot easier if the interpreter is explicitly recast in an
+  iterative, small-step style.
+
+  Hmm, but if we desugar 'and' in the obvious way, something like 'let
+  x = a, y = b in (x AND y) amb (y AND x)' (where AND denotes a
+  built-in, left-biased and) wouldn't this do twice as much work?  Ah,
+  no, not really, because of the sharing.  But it is a bit bloated
+  since each of those ANDs would desugar to a separate case
+  expression.  But we could refactor it into a single case, like so:
+
+  let x = a, y = b in
+  {? false when (x amb y) is false
+  ,  y if x
+  ,  false otherwise
+  ?}
+

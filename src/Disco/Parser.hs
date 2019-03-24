@@ -247,9 +247,9 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "mod", "choose", "sqrt", "lg", "implies"
-  , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet"
-  , "enumerate", "count", "floor", "ceiling", "divides"
+  , "otherwise", "and", "or", "mod", "choose", "implies"
+  , "union", "U", "∪", "intersect", "∩", "subset"
+  , "enumerate", "count", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "List", "Bag", "Set"
@@ -448,8 +448,8 @@ parseAtom = label "expression" $
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
   <|> parseTypeOp
-  <|> (TUn Floor . TParens) <$> fbrack parseTerm
-  <|> (TUn Ceil . TParens) <$> cbrack parseTerm
+  <|> (TApp (TPrim PrimFloor) . TParens) <$> fbrack parseTerm
+  <|> (TApp (TPrim PrimCeil)  . TParens) <$> cbrack parseTerm
   <|> parseCase
   <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
@@ -462,8 +462,8 @@ parseWild :: Parser ()
 parseWild = (lexeme . try . void) $
   string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'" <|> oneOf opChar)
 
--- | Parse a standalone operator name with underscores indicating argument slots,
---   e.g. _+_ for the addition operator.
+-- | Parse a standalone operator name with tildes indicating argument
+--   slots, e.g. ~+~ for the addition operator.
 parseStandaloneOp :: Parser Prim
 parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat opTable)
   where
@@ -475,7 +475,7 @@ parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat 
     mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
       = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
 
-    -- XXX to do: improve the above so it first tries to parse a ~,
+    -- XXX TODO: improve the above so it first tries to parse a ~,
     --   then parses any postfix or infix thing; or else it looks for
     --   a prefix thing followed by a ~.  This will get rid of the
     --   need for 'try' and also potentially improve error messages.

@@ -152,7 +152,9 @@ passing tests as much as possible.
       works out quite nicely since we still have TBin around!  Can
       make special case for checking mode.
 
-- [ ] prefix unary things should just parse as application of prims directly!
+- [ ] put in special cases for ⌊~⌋ and ⌈~⌉ ?
+
+- [X] prefix unary things should just parse as application of prims directly!
   For example, it's silly to have to say :type not~  instead of
   just  :type not .
 
@@ -173,4 +175,9 @@ passing tests as much as possible.
   - not has two syntaxes: not and ¬  .  Could get rid of ¬ I suppose.
   - negation is only - .
   - others are all prefix function names: sqrt, lg, floor, ceiling,
-    abs, size, powerSet
+    abs, size, powerSet.
+
+  Note, making them all prims instead of operators will mean they no
+  longer have have a precedence level --- they will all have the
+  precedence of function application.  But that's probably better
+  anyway.

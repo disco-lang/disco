@@ -266,8 +266,7 @@ expandBOp :: BOp -> Term -> Term -> Term
 expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
 
 expandedUOps :: Set UOp
-expandedUOps = S.fromList
-  [ Fact, Not, Sqrt, Lg ]
+expandedUOps = S.fromList [ Fact, Not ]
 
 expandedBOps :: Set BOp
 expandedBOps = S.fromList
@@ -500,7 +499,7 @@ typecheck Infer (TPrim PrimUntil)
   = return $ ATPrim (TyN :->: TyList TyN :->: TyList TyN) PrimUntil
 
 --------------------------------------------------
--- Operators
+-- Primitive operators
 
 ----------------------------------------
 -- Logic
@@ -541,18 +540,33 @@ typecheck Infer (TPrim (PrimBOp Geq)) = error "typecheck Infer Geq should be unr
 ------------------------------------------------------------
 
 ----------------------------------------
--- sqrt, lg, fact, floor, ceil, abs, idiv
+-- fact, sqrt, lg, floor, ceil, abs
 
 typecheck Infer (TPrim (PrimUOp Fact))
   = return $ ATPrim (TyN :->: TyN) (PrimUOp Fact)
 
-typecheck Infer (TPrim (PrimUOp op)) | op `elem` [Sqrt, Lg]
-  = return $ ATPrim (TyN :->: TyN) (PrimUOp op)
+typecheck Infer (TPrim p) | p `elem` [PrimSqrt, PrimLg]
+  = return $ ATPrim (TyN :->: TyN) p
 
 -- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TPrim (PrimUOp Sqrt)) = error "typecheck Infer Sqrt should be unreachable"
-typecheck Infer (TPrim (PrimUOp Lg))   = error "typecheck Infer Lg should be unreachable"
+typecheck Infer (TPrim PrimSqrt) = error "typecheck Infer Sqrt should be unreachable"
+typecheck Infer (TPrim PrimLg)   = error "typecheck Infer Lg should be unreachable"
 ------------------------------------------------------------
+
+typecheck Infer (TPrim p) | p `elem` [PrimFloor, PrimCeil] = do
+  argTy <- freshTy
+  resTy <- cInt argTy
+  return $ ATPrim (argTy :->: resTy) p
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck Infer (TPrim PrimFloor) = error "typecheck Infer Floor should be unreachable"
+typecheck Infer (TPrim PrimCeil)  = error "typecheck Infer Ceil should be unreachable"
+------------------------------------------------------------
+
+typecheck Infer (TPrim PrimAbs) = do
+  argTy <- freshTy
+  resTy <- cPos argTy
+  return $ ATPrim (argTy :->: resTy) PrimAbs
 
 --------------------------------------------------
 -- Base types
@@ -801,19 +815,7 @@ typecheck Infer (TUn Neg t) = do
   return $ ATUn negTy Neg at
 
 ----------------------------------------
--- sqrt, lg, fact, floor, ceil, abs, idiv
-
-typecheck Infer (TUn op t) | op `elem` [Floor, Ceil] = do
-  at <- infer t
-  let ty = getType at
-  resTy <- cInt ty
-  return $ ATUn resTy op at
-
-typecheck Infer (TUn Abs t) = do
-  at <- infer t
-  let ty = getType at
-  resTy <- cPos ty
-  return $ ATUn resTy Abs at
+-- idiv
 
 typecheck Infer (TBin IDiv t1 t2) = do
   at1 <- infer t1
@@ -821,11 +823,6 @@ typecheck Infer (TBin IDiv t1 t2) = do
   tyLub <- lub (getType at1) (getType at2)
   resTy <- cInt tyLub
   return $ ATBin resTy IDiv at1 at2
-
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TUn Floor _) = error "typecheck Infer Floor should be unreachable"
-typecheck Infer (TUn Ceil  _) = error "typecheck Infer Ceil should be unreachable"
-------------------------------------------------------------
 
 ----------------------------------------
 -- exp
@@ -902,10 +899,9 @@ typecheck Infer (TBin Choose t1 t2) = do
 ----------------------------------------
 -- Set & bag operations
 
-typecheck Infer (TUn Size t) = do
-  at <- infer t
-  _  <- ensureConstr CSet (getType at) (Left t)
-  return $ ATUn TyN Size at
+typecheck Infer (TPrim PrimSize) = do
+  a <- freshTy
+  return $ ATPrim (TySet a :->: TyN) PrimSize
 
 typecheck (Check ty) t@(TBin setOp t1 t2)
     | setOp `elem` [Union, Inter, Diff] = do
@@ -935,10 +931,9 @@ typecheck Infer (TBin Rep t1 t2) = do
   at2 <- check t2 TyN
   return $ ATBin (TyBag (getType at1)) Rep at1 at2
 
-typecheck Infer (TUn PowerSet t) = do
-  at <- infer t
-  tyElt <- ensureConstr1 CSet (getType at) (Left t)
-  return $ ATUn (TySet (TySet tyElt)) PowerSet at
+typecheck Infer (TPrim PrimPower) = do
+  a <- freshTy
+  return $ ATPrim (TySet a :->: TySet (TySet a)) PrimPower
 
 ----------------------------------------
 -- Type operations

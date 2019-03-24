@@ -42,13 +42,6 @@ import qualified Data.Map                         as M
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
-         | Sqrt  -- ^ Integer square root (@sqrt@)
-         | Lg    -- ^ Floor of base-2 logarithm (@lg@)
-         | Floor -- ^ Floor of fractional type (@floor@)
-         | Ceil  -- ^ Ceiling of fractional type (@ceiling@)
-         | Abs   -- ^ Absolute value (@abs@)
-         | Size  -- ^ The size of a set.
-         | PowerSet -- ^ The powerset of a given set.
   deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Binary operators.
@@ -145,18 +138,6 @@ opTable =
     ]
   , [ uopInfo Pre  Neg     ["-"]
     ]
-  , [ uopInfo Pre  Sqrt    ["sqrt"]
-    ]
-  , [ uopInfo Pre  Lg      ["lg"]
-    ]
-  , [ uopInfo Pre  Floor   ["floor"]
-    , uopInfo Pre  Ceil    ["ceiling"]
-    , uopInfo Pre  Abs     ["abs"]
-    ]
-  , [ uopInfo Pre  Size    ["size"]
-    , uopInfo Pre  PowerSet ["powerSet"]
-    ]
-
   , [ bopInfo In   Choose  ["choose"]
     ]
   , [ bopInfo InL  Rep     ["#"]

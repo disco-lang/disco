@@ -37,6 +37,15 @@ data Prim where
   PrimUOp     :: UOp -> Prim  -- ^ Unary operator
   PrimBOp     :: BOp -> Prim  -- ^ Binary operator
 
+  PrimSqrt    :: Prim      -- ^ Integer square root (@sqrt@)
+  PrimLg      :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
+  PrimFloor   :: Prim      -- ^ Floor of fractional type (@floor@)
+  PrimCeil    :: Prim      -- ^ Ceiling of fractional type (@ceiling@)
+  PrimAbs     :: Prim      -- ^ Absolute value (@abs@)
+
+  PrimSize    :: Prim      -- ^ Size of a set (XXX should be in library)
+  PrimPower   :: Prim      -- ^ Power set (XXX or bag?)
+
   PrimList    :: Prim      -- ^ Container -> list conversion
   PrimBag     :: Prim      -- ^ Container -> bag conversion
   PrimSet     :: Prim      -- ^ Container -> set conversion
@@ -95,6 +104,14 @@ data PrimInfo =
 primTable :: [PrimInfo]
 primTable =
   [ PrimInfo (PrimUOp Not) "not"     True
+  , PrimInfo PrimSqrt      "sqrt"    True
+  , PrimInfo PrimLg        "lg"      True
+  , PrimInfo PrimFloor     "floor"   True
+  , PrimInfo PrimCeil      "ceiling" True
+  , PrimInfo PrimAbs       "abs"     True
+
+  , PrimInfo PrimSize      "size"    True
+  , PrimInfo PrimPower     "powerSet" True
 
   , PrimInfo PrimList      "list"    True
   , PrimInfo PrimBag       "bag"     True

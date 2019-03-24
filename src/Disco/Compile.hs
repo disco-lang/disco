@@ -130,6 +130,16 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 
+compilePrim _ PrimSqrt  = return $ CConst OSqrt
+compilePrim _ PrimLg    = return $ CConst OLg
+compilePrim _ PrimFloor = return $ CConst OFloor
+compilePrim _ PrimCeil  = return $ CConst OCeil
+compilePrim _ PrimAbs   = return $ CConst OAbs
+compilePrim _ PrimSize  = return $ CConst OSize
+
+compilePrim (TySet a :->: _) PrimPower = return $ CConst (OPowerSet a)
+compilePrim ty               PrimPower = compilePrimErr PrimPower ty
+
 compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
 compilePrim (TyBag _ :->: _)  PrimSet  = return $ CConst OBagToSet
 compilePrim (TyBag _ :->: _)  PrimList = return $ CConst OBagToList
@@ -226,19 +236,12 @@ compileUOp
   -> UOp
   -> Core
 
-compileUOp (TySet a) PowerSet = CConst (OPowerSet a)
-
 compileUOp _ op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
     coreUOps = M.fromList $
       [ Neg      ==> ONeg
       , Fact     ==> OFact
-      , Sqrt     ==> OSqrt
-      , Lg       ==> OLg
-      , Floor    ==> OFloor
-      , Ceil     ==> OCeil
-      , Abs      ==> OAbs
       ]
 
 -- | Compile a binary operator.  This function needs to know the types

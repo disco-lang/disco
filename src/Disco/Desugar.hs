@@ -222,7 +222,8 @@ desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
       -- immediately desugar to a DTerm.  When we write a linting
       -- typechecker for DTerms we should allow subtraction on TyN!
     ]
-desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $ ATUn ty Floor (ATBin (getType t1) Div t1 t2)
+desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $
+  ATApp ty (ATPrim (getType t1 :->: ty) PrimFloor) (ATBin (getType t1) Div t1 t2)
 
 -- Addition and multiplication on TyFin just desugar to the operation
 -- followed by a call to mod.

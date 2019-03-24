@@ -247,7 +247,7 @@ reservedWords :: [String]
 reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "not", "mod", "choose", "sqrt", "lg", "implies"
+  , "otherwise", "and", "or", "mod", "choose", "sqrt", "lg", "implies"
   , "size", "union", "U", "∪", "intersect", "∩", "subset", "powerSet"
   , "enumerate", "count", "floor", "ceiling", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"

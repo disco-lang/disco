@@ -137,7 +137,7 @@ data OpInfo =
 opTable :: [[OpInfo]]
 opTable =
   assignPrecLevels $
-  [ [ uopInfo Pre  Not     ["not", "¬"]
+  [ [ uopInfo Pre  Not     ["¬"]
     ]
   , [ uopInfo Post Fact    ["!"]
     ]

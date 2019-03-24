@@ -94,7 +94,9 @@ data PrimInfo =
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-  [ PrimInfo PrimList      "list"    True
+  [ PrimInfo (PrimUOp Not) "not"     True
+
+  , PrimInfo PrimList      "list"    True
   , PrimInfo PrimBag       "bag"     True
   , PrimInfo PrimSet       "set"     True
 

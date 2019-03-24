@@ -107,10 +107,8 @@ passing tests as much as possible.
     simply compiling them to function constants.  It's just that this
     won't fire for prim operators until they are parsed as
     applications instead of TBin or TUn nodes.
-
 - [X] extend pretty-printer to display fully applied operators using
   pre/post/infix notation
-
 - [X] next thing to try is a compiled operator with a more
   interesting type, such as LT.
 
@@ -155,9 +153,24 @@ passing tests as much as possible.
       make special case for checking mode.
 
 - [ ] prefix unary things should just parse as application of prims directly!
-      For example, it's silly to have to say :type not~  instead of
-      just  :type not .
+  For example, it's silly to have to say :type not~  instead of
+  just  :type not .
 
-      Would need to change parsing & pretty-printing to match.  We
-      should only need tildes to specify the names of postfix or infix
-      things.
+  Would need to change parsing & pretty-printing to match.  We
+  should only need tildes to specify the names of postfix or infix
+  things.  Don't add parsing of prefix applications in the
+  expression parser.  Hmm, except what about prefix negation?
+
+  OK, part of the problem here is that some things are treated as
+  'prefix operators' (e.g. not) and some are treated as 'prims'
+  (e.g. list).  Syntactically there should not be a difference,
+  but they are treated differently right now.  e.g. it is possible
+  to say ':type list' but ':type not' is a parse error (but
+  shouldn't be).  How to unify these?  Maybe I should just do away
+  with 'prefix operators' (except, perhaps, for negation) and turn
+  them all into prims.  not, floor, ceiling, etc.
+
+  - not has two syntaxes: not and ¬  .  Could get rid of ¬ I suppose.
+  - negation is only - .
+  - others are all prefix function names: sqrt, lg, floor, ceiling,
+    abs, size, powerSet

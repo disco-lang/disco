@@ -186,3 +186,4 @@ passing tests as much as possible.
   longer have have a precedence level --- they will all have the
   precedence of function application.  But that's probably better
   anyway.
+- [ ] Eventually, should be able to get rid of ATBin, ATUn, DTBin, DTUn.

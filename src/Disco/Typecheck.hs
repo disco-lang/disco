@@ -553,7 +553,7 @@ typecheck Infer (TPrim prim) = do
     ------------------------------------------------------------
 
     ----------------------------------------
-    -- fact, sqrt, lg, floor, ceil, abs
+    -- Special arithmetic functions: fact, sqrt, lg, floor, ceil, abs
 
     inferPrim (PrimUOp Fact) = return $ TyN :->: TyN
     inferPrim p | p `elem` [PrimSqrt, PrimLg] = return $ TyN :->: TyN
@@ -581,10 +581,12 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- set size, power set
 
+    -- XXX set size should move into standard library
     inferPrim PrimSize = do
       a <- freshTy
       return $ TySet a :->: TyN
 
+    -- XXX generalize to sets and bags?
     inferPrim PrimPower = do
       a <- freshTy
       return $ TySet a :->: TySet (TySet a)

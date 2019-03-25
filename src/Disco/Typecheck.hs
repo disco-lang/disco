@@ -272,7 +272,7 @@ expandedBOps :: Set BOp
 expandedBOps = S.fromList
   [ And, Or, Impl
   , Eq, Neq, Lt, Gt, Leq, Geq
-  , IDiv, Mod, Divides
+  , IDiv, Mod, Divides, Choose
   ]
 
 --------------------------------------------------
@@ -527,6 +527,20 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       constraint $ CQual QNum a
       return $ a :->: a :->: TyBool
+
+    ----------------------------------------
+    -- Choose
+
+    -- For now, a simple typing rule for multinomial coefficients that
+    -- requires everything to be Nat.  However, they can be extended to
+    -- handle negative or fractional arguments.
+    inferPrim (PrimBOp Choose) = do
+      b <- freshTy
+
+      -- b can be either Nat (a binomial coefficient)
+      -- or a list of Nat (a multinomial coefficient).
+      constraint $ COr [CEq b TyN, CEq b (TyList TyN)]
+      return $ TyN :->: b :->: TyN
 
     ----------------------------------------
     -- Ellipses
@@ -884,22 +898,6 @@ typecheck Infer (TChain t ls) =
       _   <- check (TBin op t1 t2) TyBool
       atl <- inferChain t2 links
       return $ ATLink op at2 : atl
-
-----------------------------------------
--- Choose
-
--- For now, a simple typing rule for multinomial coefficients that
--- requires everything to be Nat.  However, they can be extended to
--- handle negative or fractional arguments.
-typecheck Infer (TBin Choose t1 t2) = do
-  at1 <- check t1 TyN
-
-  -- t2 can be either a Nat (a binomial coefficient)
-  -- or a list of Nat (a multinomial coefficient).
-  at2 <- infer t2
-  let ty2 = getType at2
-  constraint $ COr [CEq ty2 TyN, CEq ty2 (TyList TyN)]
-  return $ ATBin TyN Choose at1 at2
 
 ----------------------------------------
 -- Set & bag operations

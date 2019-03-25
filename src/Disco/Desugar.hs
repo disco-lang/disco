@@ -179,8 +179,8 @@ desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm (ATPrim ty (PrimUOp uop))
   | uopDesugars uop = desugarPrimUOp ty uop
-desugarTerm (ATPrim ty (PrimBOp bop))
-  | bopDesugars bop = desugarPrimBOp ty bop
+desugarTerm (ATPrim ty@(ty1 :->: ty2 :->: resTy) (PrimBOp bop))
+  | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
@@ -194,7 +194,7 @@ desugarTerm (ATAbs ty lam)       = do
 desugarTerm (ATApp _ (ATPrim _ (PrimUOp uop)) t)
   | uopDesugars uop = desugarUnApp uop t
 desugarTerm (ATApp resTy (ATApp _ (ATPrim _ (PrimBOp bop)) t1) t2)
-  | bopDesugars bop = desugarBinApp resTy bop t1 t2
+  | bopDesugars (getType t1) (getType t2) resTy bop = desugarBinApp resTy bop t1 t2
 
 desugarTerm (ATApp ty t1 t2)     =
   DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
@@ -249,11 +249,6 @@ desugarTerm (ATBin (TyFin n) op t1 t2)
     -- if we add them in Z5 and then coerce to Nat, but 6 if we first
     -- coerce both and then add.
 
--- Desugar normal binomial coefficient (n choose k) to a multinomial
--- coefficient with a singleton list, (n choose [k]).
-desugarTerm (ATBin ty Choose t1 t2)
-  | getType t2 == TyN = desugarTerm $ ATBin ty Choose t1 (ctrSingleton ListContainer t2)
-
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 
 desugarTerm (ATTyOp ty op t)      = return $ DTTyOp ty op t
@@ -289,22 +284,23 @@ desugarPrimUOp ty@(argTy :->: _resTy) op = do
 desugarPrimUOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimUOp for " ++ show op
 
 -- | Test whether a given binary operator is one that needs to be
---   desugared.
-bopDesugars :: BOp -> Bool
-bopDesugars bop = bop `elem`
+--   desugared, given the two types of the arguments and the type of the result.
+bopDesugars :: Type -> Type -> Type -> BOp -> Bool
+bopDesugars _   TyN _ Choose = True
+bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl
   , Neq, Gt, Leq, Geq
   , IDiv
   ]
 
 -- | Desugar a primitive binary operator at the given type.
-desugarPrimBOp :: Type -> BOp -> DSM DTerm
-desugarPrimBOp ty@(ty1 :->: ty2 :->: resTy) op = do
+desugarPrimBOp :: Type -> Type -> Type -> BOp -> DSM DTerm
+desugarPrimBOp ty1 ty2 resTy op = do
   x <- fresh (string2Name "arg1")
   y <- fresh (string2Name "arg2")
   body <- desugarBinApp resTy op (ATVar ty1 x) (ATVar ty2 y)
-  return $ mkLambda ty [x, y] body
-desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
+  return $ mkLambda (ty1 :->: ty2 :->: resTy) [x, y] body
+desugarPrimBOp ty1 ty2 resTy op = error $ "Impossible! Got type " ++ show (ty1 :->: ty2 :->: resTy) ++ " in desugarPrimBOp for " ++ show op
 
 -- | Desugar a saturated application of a unary operator.
 desugarUnApp :: UOp -> ATerm -> DSM DTerm
@@ -352,6 +348,11 @@ desugarBinApp _ Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
 desugarBinApp resTy IDiv t1 t2 = desugarTerm $
   ATApp resTy (ATPrim (getType t1 :->: resTy) PrimFloor) (mkBin (getType t1) Div t1 t2)
 
+-- Desugar normal binomial coefficient (n choose k) to a multinomial
+-- coefficient with a singleton list, (n choose [k]).
+-- Note this will only be called when (getType t2 == TyN); see bopDesugars.
+desugarBinApp _ Choose t1 t2
+  = desugarTerm $ mkBin TyN Choose t1 (ctrSingleton ListContainer t2)
 
 ------------------------------------------------------------
 -- Desugaring other stuff

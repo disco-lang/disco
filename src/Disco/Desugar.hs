@@ -193,8 +193,8 @@ desugarTerm (ATAbs ty lam)       = do
 -- Special cases for fully applied operators
 desugarTerm (ATApp _ (ATPrim _ (PrimUOp uop)) t)
   | uopDesugars uop = desugarUnApp uop t
-desugarTerm (ATApp _ (ATApp _ (ATPrim _ (PrimBOp bop)) t1) t2)
-  | bopDesugars bop = desugarBinApp bop t1 t2
+desugarTerm (ATApp resTy (ATApp _ (ATPrim _ (PrimBOp bop)) t1) t2)
+  | bopDesugars bop = desugarBinApp resTy bop t1 t2
 
 desugarTerm (ATApp ty t1 t2)     =
   DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
@@ -222,8 +222,6 @@ desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
       -- immediately desugar to a DTerm.  When we write a linting
       -- typechecker for DTerms we should allow subtraction on TyN!
     ]
-desugarTerm (ATBin ty IDiv t1 t2) = desugarTerm $
-  ATApp ty (ATPrim (getType t1 :->: ty) PrimFloor) (ATBin (getType t1) Div t1 t2)
 
 -- Addition and multiplication on TyFin just desugar to the operation
 -- followed by a call to mod.
@@ -296,14 +294,15 @@ bopDesugars :: BOp -> Bool
 bopDesugars bop = bop `elem`
   [ And, Or, Impl
   , Neq, Gt, Leq, Geq
+  , IDiv
   ]
 
 -- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> BOp -> DSM DTerm
-desugarPrimBOp ty@(ty1 :->: ty2 :->: _resTy) op = do
+desugarPrimBOp ty@(ty1 :->: ty2 :->: resTy) op = do
   x <- fresh (string2Name "arg1")
   y <- fresh (string2Name "arg2")
-  body <- desugarBinApp op (ATVar ty1 x) (ATVar ty2 y)
+  body <- desugarBinApp resTy op (ATVar ty1 x) (ATVar ty2 y)
   return $ mkLambda ty [x, y] body
 desugarPrimBOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimBOp for " ++ show op
 
@@ -319,7 +318,8 @@ desugarUnApp Not t = desugarTerm $
     ]
 
 -- | Desugar a saturated application of a binary operator.
-desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
+--   The first argument is the type of the result.
+desugarBinApp :: Type -> BOp -> ATerm -> ATerm -> DSM DTerm
 
 -- Implies, and, or should all be turned into a standard library
 -- definition.  This will require first (1) adding support for
@@ -327,26 +327,31 @@ desugarBinApp :: BOp -> ATerm -> ATerm -> DSM DTerm
 -- infix operators.
 
 -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
-desugarBinApp And t1 t2 = desugarTerm $
+desugarBinApp _ And t1 t2 = desugarTerm $
   ATCase TyBool
     [ t2  <==. [tif t1]
     , fls <==. []
     ]
 
 -- (t1 implies t2) ==> (not t1 or t2)
-desugarBinApp Impl t1 t2 = desugarTerm $ tnot t1 ||. t2
+desugarBinApp _ Impl t1 t2 = desugarTerm $ tnot t1 ||. t2
 
 -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
-desugarBinApp Or t1 t2 = desugarTerm $
+desugarBinApp _ Or t1 t2 = desugarTerm $
   ATCase TyBool
     [ tru <==. [tif t1]
     , t2  <==. []
     ]
 
-desugarBinApp Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
-desugarBinApp Gt  t1 t2 = desugarTerm $ t2 <. t1
-desugarBinApp Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)
-desugarBinApp Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
+desugarBinApp _ Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
+desugarBinApp _ Gt  t1 t2 = desugarTerm $ t2 <. t1
+desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)
+desugarBinApp _ Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
+
+-- t1 // t2 ==> floor (t1 / t2)
+desugarBinApp resTy IDiv t1 t2 = desugarTerm $
+  ATApp resTy (ATPrim (getType t1 :->: resTy) PrimFloor) (mkBin (getType t1) Div t1 t2)
+
 
 ------------------------------------------------------------
 -- Desugaring other stuff

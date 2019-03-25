@@ -272,6 +272,7 @@ expandedBOps :: Set BOp
 expandedBOps = S.fromList
   [ And, Or, Impl
   , Eq, Neq, Lt, Gt, Leq, Geq
+  , IDiv
   ]
 
 --------------------------------------------------
@@ -502,6 +503,14 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       let ca = TyContainer c a
       return $ (TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca
+
+    ----------------------------------------
+    -- Arithmetic
+
+    inferPrim (PrimBOp IDiv) = do
+      a <- freshTy
+      resTy <- cInt a
+      return $ a :->: a :->: resTy
 
     ----------------------------------------
     -- Number theory
@@ -836,13 +845,6 @@ typecheck Infer (TUn Neg t) = do
   at <- infer t
   negTy <- cNeg (getType at)
   return $ ATUn negTy Neg at
-
-typecheck Infer (TBin IDiv t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  tyLub <- lub (getType at1) (getType at2)
-  resTy <- cInt tyLub
-  return $ ATBin resTy IDiv at1 at2
 
 typecheck (Check ty) (TBin Exp t1 t2) = do
   at1   <- check t1 ty

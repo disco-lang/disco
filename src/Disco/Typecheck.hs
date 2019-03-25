@@ -272,7 +272,7 @@ expandedBOps :: Set BOp
 expandedBOps = S.fromList
   [ And, Or, Impl
   , Eq, Neq, Lt, Gt, Leq, Geq
-  , IDiv
+  , IDiv, Mod
   ]
 
 --------------------------------------------------
@@ -511,6 +511,11 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       resTy <- cInt a
       return $ a :->: a :->: resTy
+
+    inferPrim (PrimBOp Mod) = do
+      a <- freshTy
+      constraint $ CSub a TyZ
+      return $ a :->: a :->: a
 
     ----------------------------------------
     -- Number theory
@@ -874,18 +879,6 @@ typecheck Infer (TChain t ls) =
       _   <- check (TBin op t1 t2) TyBool
       atl <- inferChain t2 links
       return $ ATLink op at2 : atl
-
-----------------------------------------
--- Mod
-
-typecheck Infer (TBin Mod t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  let ty1 = getType at1
-  let ty2 = getType at2
-  tyLub <- lub ty1 ty2
-  constraint $ CSub tyLub TyZ
-  return $ ATBin tyLub Mod at1 at2
 
 ----------------------------------------
 -- Divisibility

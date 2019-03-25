@@ -153,8 +153,8 @@ passing tests as much as possible.
       it probably makes more sense to think about optimizing the
       constraint-solving process more generally.
 
-  - [ ] idiv (only infer)
-  - [ ] mod
+  - [X] idiv (only infer)
+  - [X] mod
   - [ ] divides
   - [ ] choose
   - [ ] make rep into a lib function (using fromCounts)

@@ -155,7 +155,7 @@ passing tests as much as possible.
 
   - [X] idiv (only infer)
   - [X] mod
-  - [ ] divides
+  - [X] divides
   - [ ] choose
   - [ ] make rep into a lib function (using fromCounts)
   - [ ] cons (need check and infer)
@@ -168,6 +168,8 @@ passing tests as much as possible.
       them
     - make them into lib functions for now, operators later
 
+- [ ] eventually get rid of expandedUOps, expandedBOps & associated
+  check, just expand them all.
 - [ ] put in special cases for ⌊~⌋ and ⌈~⌉ ?
 
 - [X] prefix unary things should just parse as application of prims directly!

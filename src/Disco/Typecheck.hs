@@ -272,7 +272,7 @@ expandedBOps :: Set BOp
 expandedBOps = S.fromList
   [ And, Or, Impl
   , Eq, Neq, Lt, Gt, Leq, Geq
-  , IDiv, Mod
+  , IDiv, Mod, Divides
   ]
 
 --------------------------------------------------
@@ -522,6 +522,11 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimIsPrime = return $ TyN :->: TyBool
     inferPrim PrimFactor  = return $ TyN :->: TyBag TyN
+
+    inferPrim (PrimBOp Divides) = do
+      a <- freshTy
+      constraint $ CQual QNum a
+      return $ a :->: a :->: TyBool
 
     ----------------------------------------
     -- Ellipses
@@ -879,18 +884,6 @@ typecheck Infer (TChain t ls) =
       _   <- check (TBin op t1 t2) TyBool
       atl <- inferChain t2 links
       return $ ATLink op at2 : atl
-
-----------------------------------------
--- Divisibility
-
-typecheck Infer (TBin Divides t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  let ty1 = getType at1
-  let ty2 = getType at2
-  tyLub <- lub ty1 ty2
-  constraint $ CQual QNum tyLub
-  return $ ATBin TyBool Divides at1 at2
 
 ----------------------------------------
 -- Choose

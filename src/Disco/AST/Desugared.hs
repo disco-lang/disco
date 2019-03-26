@@ -32,8 +32,6 @@ module Disco.AST.Desugared
        , pattern DTPair
        , pattern DTInj
        , pattern DTCase
-       , pattern DTUn
-       , pattern DTBin
        , pattern DTTyOp
        , pattern DTNil
 
@@ -155,12 +153,6 @@ pattern DTInj ty side term = TInj_ ty side term
 pattern DTCase :: Type -> [DBranch] -> DTerm
 pattern DTCase ty branch = TCase_ ty branch
 
-pattern DTUn :: Type -> UOp -> DTerm -> DTerm
-pattern DTUn ty uop term = TUn_ ty uop term
-
-pattern DTBin :: Type -> BOp -> DTerm -> DTerm -> DTerm
-pattern DTBin ty bop term1 term2 = TBin_ ty bop term1 term2
-
 pattern DTTyOp :: Type -> TyOp -> Type -> DTerm
 pattern DTTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
@@ -168,7 +160,7 @@ pattern DTNil :: Type -> DTerm
 pattern DTNil ty = XTerm_ (Right (Right ty))
 
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
-             DTLam, DTApp, DTPair, DTInj, DTCase, DTUn, DTBin, DTTyOp,
+             DTLam, DTApp, DTPair, DTInj, DTCase, DTTyOp,
              DTNil #-}
 
 type instance X_TLink DS = Void
@@ -292,22 +284,20 @@ type instance X_QGuard DS = Void
 ------------------------------------------------------------
 
 instance HasType DTerm where
-  getType (DTVar ty _)     = ty
-  getType (DTPrim ty _)    = ty
-  getType DTUnit           = TyUnit
-  getType (DTBool _)       = TyBool
-  getType (DTChar _)       = TyC
-  getType (DTNat ty _)     = ty
-  getType (DTRat _)        = TyF
-  getType (DTLam ty _)     = ty
-  getType (DTApp ty _ _)   = ty
-  getType (DTPair ty _ _)  = ty
-  getType (DTInj ty _ _)   = ty
-  getType (DTCase ty _)    = ty
-  getType (DTUn ty _ _)    = ty
-  getType (DTBin ty _ _ _) = ty
-  getType (DTTyOp ty _ _)  = ty
-  getType (DTNil ty)       = ty
+  getType (DTVar ty _)    = ty
+  getType (DTPrim ty _)   = ty
+  getType DTUnit          = TyUnit
+  getType (DTBool _)      = TyBool
+  getType (DTChar _)      = TyC
+  getType (DTNat ty _)    = ty
+  getType (DTRat _)       = TyF
+  getType (DTLam ty _)    = ty
+  getType (DTApp ty _ _)  = ty
+  getType (DTPair ty _ _) = ty
+  getType (DTInj ty _ _)  = ty
+  getType (DTCase ty _)   = ty
+  getType (DTTyOp ty _ _) = ty
+  getType (DTNil ty)      = ty
 
 instance HasType DPattern where
   getType (DPVar ty _)    = ty

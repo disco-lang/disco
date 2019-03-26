@@ -223,10 +223,6 @@ desugarTerm (ATInj ty s t)       =
 desugarTerm (ATNat ty n)         = return $ DTNat ty n
 desugarTerm (ATRat r)            = return $ DTRat r
 
-desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
-
-desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
-
 desugarTerm (ATTyOp ty op t)      = return $ DTTyOp ty op t
 
 desugarTerm (ATChain _ t1 links)  = desugarTerm $ expandChain t1 links
@@ -603,7 +599,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       g2  <- desugarGuard $ AGBool (embed (ATVar ty (coerce x0) <. ATNat ty 0))
 
       -- when -x0 is p
-      neg <- desugarTerm $ ATUn ty Neg (ATVar ty (coerce x0))
+      neg <- desugarTerm $ mkUn ty Neg (ATVar ty (coerce x0))
       g3  <- desugarMatch neg p
 
       return (g1 ++ g2 ++ g3)

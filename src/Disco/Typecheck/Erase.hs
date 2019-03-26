@@ -41,8 +41,6 @@ erase (ATApp _ t1 t2)       = TApp (erase t1) (erase t2)
 erase (ATTup _ ats)         = TTup (map erase ats)
 erase (ATInj _ s at)        = TInj s (erase at)
 erase (ATCase _ brs)        = TCase (map eraseBranch brs)
-erase (ATUn _ uop at)       = TUn uop (erase at)
-erase (ATBin _ bop at1 at2) = TBin bop (erase at1) (erase at2)
 erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
 erase (ATTyOp _ op ty)      = TTyOp op ty
 erase (ATContainer _ c ats aell)   = TContainer c (map erase ats) ((fmap . fmap) erase aell)
@@ -107,8 +105,6 @@ eraseDTerm (DTApp _ d1 d2)  = TApp (eraseDTerm d1) (eraseDTerm d2)
 eraseDTerm (DTPair _ d1 d2) = TTup [eraseDTerm d1, eraseDTerm d2]
 eraseDTerm (DTInj _ s d)    = TInj s (eraseDTerm d)
 eraseDTerm (DTCase _ bs)    = TCase (map eraseDBranch bs)
-eraseDTerm (DTUn _ op d)    = TUn op (eraseDTerm d)
-eraseDTerm (DTBin _ op d1 d2) = TBin op (eraseDTerm d1) (eraseDTerm d2)
 eraseDTerm (DTTyOp _ op ty) = TTyOp op ty
 eraseDTerm (DTNil _)        = TList [] Nothing
 

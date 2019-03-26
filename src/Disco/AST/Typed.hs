@@ -23,7 +23,6 @@ module Disco.AST.Typed
        ATerm
        , pattern ATVar
        , pattern ATPrim
-       , pattern ATUn
        , pattern ATLet
        , pattern ATUnit
        , pattern ATBool
@@ -36,7 +35,6 @@ module Disco.AST.Typed
        , pattern ATTup
        , pattern ATInj
        , pattern ATCase
-       , pattern ATBin
        , pattern ATChain
        , pattern ATTyOp
        , pattern ATContainer
@@ -145,9 +143,6 @@ pattern ATVar ty name = TVar_ ty name
 pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name
 
-pattern ATUn :: Type -> UOp -> ATerm -> ATerm
-pattern ATUn ty uop term = TUn_ ty uop term
-
 pattern ATLet :: Type -> Bind (Telescope ABinding) ATerm -> ATerm
 pattern ATLet ty bind = TLet_ ty bind
 
@@ -184,9 +179,6 @@ pattern ATInj ty side term = TInj_ ty side term
 pattern ATCase :: Type -> [ABranch] -> ATerm
 pattern ATCase ty branch = TCase_ ty branch
 
-pattern ATBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
-pattern ATBin ty bop term1 term2 = TBin_ ty bop term1 term2
-
 pattern ATChain :: Type -> ATerm -> [ALink] -> ATerm
 pattern ATChain ty term linklist = TChain_ ty term linklist
 
@@ -199,8 +191,8 @@ pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
-{-# COMPLETE ATVar, ATPrim, ATUn, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
-             ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATBin, ATChain, ATTyOp,
+{-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
+             ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATChain, ATTyOp,
              ATContainer, ATContainerComp #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
@@ -375,8 +367,6 @@ instance HasType ATerm where
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
   getType (ATInj ty _ _)           = ty
-  getType (ATUn ty _ _)            = ty
-  getType (ATBin ty _ _ _)         = ty
   getType (ATTyOp ty _ _)          = ty
   getType (ATChain ty _ _)         = ty
   getType (ATContainer ty _ _ _)   = ty
@@ -396,8 +386,6 @@ instance HasType ATerm where
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
   setType ty (ATInj _ x y    )       = ATInj ty x y
-  setType ty (ATUn _ x y     )       = ATUn ty x y
-  setType ty (ATBin _ x y z  )       = ATBin ty x y z
   setType ty (ATTyOp _ x y   )       = ATTyOp ty x y
   setType ty (ATChain _ x y  )       = ATChain ty x y
   setType ty (ATContainer _ x y z)   = ATContainer ty x y z

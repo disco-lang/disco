@@ -152,7 +152,6 @@ passing tests as much as possible.
       worry about that later, if it becomes an issue.  And in any case
       it probably makes more sense to think about optimizing the
       constraint-solving process more generally.
-
   - [X] idiv (only infer)
   - [X] mod
   - [X] divides
@@ -166,14 +165,14 @@ passing tests as much as possible.
     - We want to keep the checking case for these... which actually
       works out quite nicely since we still have TBin around!  Can
       make special case for checking mode.
-
   - [X] neg
   - [X] exp
-  - [ ] set operations --- infer & check
+  - [X] set operations --- infer & check
     - don't care that much about these since we're going to get rid of
       them
     - make them into lib functions for now, operators later
 
+- [X] get rid of ATBin, ATUn, DTBin, DTUn
 - [ ] eventually get rid of expandedUOps, expandedBOps & associated
   check, just expand them all.
 - [ ] put in special cases for ⌊~⌋ and ⌈~⌉ ?

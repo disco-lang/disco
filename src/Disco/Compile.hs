@@ -88,12 +88,6 @@ compileDTerm (DTInj _ s t)
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 
-compileDTerm (DTUn _ op t)
-  = CApp (compileUOp (getType t) op) <$> mapM compileArg [t]
-
-compileDTerm (DTBin ty op t1 t2)
-  = CApp (compileBOp (getType t1) (getType t2) ty op) <$> mapM compileArg [t1, t2]
-
 compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CType ty)]
   where
     tyOps = M.fromList

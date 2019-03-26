@@ -275,6 +275,7 @@ expandedBOps = S.fromList
   , IDiv, Mod, Divides, Choose
   , Rep, Cons
   , Add, Mul, Sub, SSub, Div, Exp
+  , Union, Inter, Diff, Subset
   ]
 
 --------------------------------------------------
@@ -455,6 +456,16 @@ typecheck (Check ty) (TBin Exp t1 t2) = do
       )
       at2
 
+typecheck (Check ty) t@(TBin setOp t1 t2)
+    | setOp `elem` [Union, Inter, Diff] = do
+  tyElt <- ensureConstr1 CSet ty (Left t)
+  ATApp ty
+    <$> (ATApp (ty :->: ty)
+           (ATPrim (ty :->: ty :->: ty) (PrimBOp setOp))
+           <$> check t1 (TySet tyElt)
+        )
+    <*> check t2 (TySet tyElt)
+
 -- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do
   ty <- inferPrim prim
@@ -555,6 +566,18 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Rep) = do
       a <- freshTy
       return $ a :->: TyN :->: TyBag a
+
+    inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
+      tyElt <- freshTy
+      let resTy = case setOp of {Subset -> TyBool; _ -> TySet tyElt}
+      return $ TySet tyElt :->: TySet tyElt :->: resTy
+
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim (PrimBOp Union)  = error "inferPrim Union should be unreachable"
+    inferPrim (PrimBOp Inter)  = error "inferPrim Inter should be unreachable"
+    inferPrim (PrimBOp Diff)   = error "inferPrim Diff should be unreachable"
+    inferPrim (PrimBOp Subset) = error "inferPrim Subset should be unreachable"
+    ------------------------------------------------------------
 
     ----------------------------------------
     -- Arithmetic
@@ -860,32 +883,6 @@ typecheck Infer (TChain t ls) =
       _   <- check (TBin op t1 t2) TyBool
       atl <- inferChain t2 links
       return $ ATLink op at2 : atl
-
-----------------------------------------
--- Set & bag operations
-
-typecheck (Check ty) t@(TBin setOp t1 t2)
-    | setOp `elem` [Union, Inter, Diff] = do
-  tyElt <- ensureConstr1 CSet ty (Left t)
-  ATBin ty setOp <$> check t1 (TySet tyElt) <*> check t2 (TySet tyElt)
-
-typecheck Infer (TBin setOp t1 t2)
-    | setOp `elem` [Union, Inter, Diff, Subset] = do
-  at1 <- infer t1
-  at2 <- infer t2
-  tyelt <- freshTy
-  let ty1 = getType at1
-  let ty2 = getType at2
-  let ty = case setOp of {Subset -> TyBool; _ -> TySet tyelt}
-  constraints [CSub ty1 (TySet tyelt), CSub ty2 (TySet tyelt)]
-  return $ ATBin ty setOp at1 at2
-
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TBin Union  _ _) = error "typecheck Infer Union should be unreachable"
-typecheck Infer (TBin Inter  _ _) = error "typecheck Infer Inter should be unreachable"
-typecheck Infer (TBin Diff   _ _) = error "typecheck Infer Diff should be unreachable"
-typecheck Infer (TBin Subset _ _) = error "typecheck Infer Subset should be unreachable"
-------------------------------------------------------------
 
 ----------------------------------------
 -- Type operations

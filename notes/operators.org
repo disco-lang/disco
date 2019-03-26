@@ -167,7 +167,8 @@ passing tests as much as possible.
       works out quite nicely since we still have TBin around!  Can
       make special case for checking mode.
 
-  - [ ] neg, exp
+  - [X] neg
+  - [ ] exp
   - [ ] set operations --- infer & check
     - don't care that much about these since we're going to get rid of
       them

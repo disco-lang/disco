@@ -196,8 +196,8 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
-desugarTerm (ATPrim ty (PrimUOp uop))
-  | uopDesugars uop = desugarPrimUOp ty uop
+desugarTerm (ATPrim ty@(ty1 :->: resTy) (PrimUOp uop))
+  | uopDesugars ty1 resTy uop = desugarPrimUOp ty uop
 desugarTerm (ATPrim ty@(ty1 :->: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
@@ -210,8 +210,8 @@ desugarTerm (ATAbs ty lam)       = do
   mkLambda ty (map fst args) <$> desugarTerm t
 
 -- Special cases for fully applied operators
-desugarTerm (ATApp _ (ATPrim _ (PrimUOp uop)) t)
-  | uopDesugars uop = desugarUnApp uop t
+desugarTerm (ATApp resTy (ATPrim _ (PrimUOp uop)) t)
+  | uopDesugars (getType t) resTy uop = desugarUnApp resTy uop t
 desugarTerm (ATApp resTy (ATApp _ (ATPrim _ (PrimBOp bop)) t1) t2)
   | bopDesugars (getType t1) (getType t2) resTy bop = desugarBinApp resTy bop t1 t2
 
@@ -222,11 +222,6 @@ desugarTerm (ATInj ty s t)       =
   DTInj ty s <$> desugarTerm t
 desugarTerm (ATNat ty n)         = return $ DTNat ty n
 desugarTerm (ATRat r)            = return $ DTRat r
-
--- Desugar negation on TyFin to a negation on TyZ followed by a mod.
--- See the comments below re: Add and Mul on TyFin.
-desugarTerm (ATUn (TyFin n) Neg t) =
-  desugarTerm $ mkBin (TyFin n) Mod (mkUn TyZ Neg t) (ATNat TyN n)
 
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
 
@@ -253,14 +248,15 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 ------------------------------------------------------------
 
 -- | Test whether a given unary operator is one that needs to be
---   desugared.
-uopDesugars :: UOp -> Bool
-uopDesugars uop = uop `elem` [Not]
+--   desugared, given the type of the argument and result.
+uopDesugars :: Type -> Type -> UOp -> Bool
+uopDesugars _ (TyFin _) Neg = True
+uopDesugars _ _         uop = uop `elem` [Not]
 
 desugarPrimUOp :: Type -> UOp -> DSM DTerm
-desugarPrimUOp ty@(argTy :->: _resTy) op = do
+desugarPrimUOp ty@(argTy :->: resTy) op = do
   x <- fresh (string2Name "arg")
-  body <- desugarUnApp op (ATVar argTy x)
+  body <- desugarUnApp resTy op (ATVar argTy x)
   return $ mkLambda ty [x] body
 desugarPrimUOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimUOp for " ++ show op
 
@@ -286,11 +282,17 @@ desugarPrimBOp ty1 ty2 resTy op = do
 desugarPrimBOp ty1 ty2 resTy op = error $ "Impossible! Got type " ++ show (ty1 :->: ty2 :->: resTy) ++ " in desugarPrimBOp for " ++ show op
 
 -- | Desugar a saturated application of a unary operator.
-desugarUnApp :: UOp -> ATerm -> DSM DTerm
+--   The first argument is the type of the result.
+desugarUnApp :: Type -> UOp -> ATerm -> DSM DTerm
+
+-- Desugar negation on TyFin to a negation on TyZ followed by a mod.
+-- See the comments below re: Add and Mul on TyFin.
+desugarUnApp (TyFin n) Neg t =
+  desugarTerm $ mkBin (TyFin n) Mod (mkUn TyZ Neg t) (ATNat TyN n)
 
 -- XXX This should be turned into a standard library definition.
 -- not t ==> {? false if t, true otherwise ?}
-desugarUnApp Not t = desugarTerm $
+desugarUnApp _ Not t = desugarTerm $
   ATCase TyBool
     [ fls <==. [AGBool (embed t)]
     , tru <==. []

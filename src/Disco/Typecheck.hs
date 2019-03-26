@@ -266,7 +266,7 @@ expandBOp :: BOp -> Term -> Term -> Term
 expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
 
 expandedUOps :: Set UOp
-expandedUOps = S.fromList [ Fact, Not ]
+expandedUOps = S.fromList [ Fact, Not, Neg ]
 
 expandedBOps :: Set BOp
 expandedBOps = S.fromList
@@ -437,6 +437,10 @@ typecheck (Check _) (TBin Div  _ _) = error "typecheck (Check _) Div should be u
 typecheck (Check _) (TBin SSub _ _) = error "typecheck (Check _) SSub should be unreachable"
 ------------------------------------------------------------
 
+typecheck (Check ty) (TUn Neg t) = do
+  constraint $ CQual QSub ty
+  ATApp ty (ATPrim (ty :->: ty) (PrimUOp Neg)) <$> check t ty
+
 -- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do
   ty <- inferPrim prim
@@ -555,6 +559,11 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       constraint $ CQual (bopQual op) a
       return $ a :->: a :->: a
+
+    inferPrim (PrimUOp Neg) = do
+      a <- freshTy
+      constraint $ CQual QSub a
+      return $ a :->: a
 
     ----------------------------------------
     -- Number theory
@@ -825,15 +834,6 @@ typecheck Infer (TBin bop t1 t2)
 
 -- A bunch of inference cases (& a few checking cases) for binary and
 -- unary operators.
-
-typecheck (Check ty) (TUn Neg t) = do
-  constraint $ CQual QSub ty
-  ATUn ty Neg <$> check t ty
-
-typecheck Infer (TUn Neg t) = do
-  at <- infer t
-  negTy <- cNeg (getType at)
-  return $ ATUn negTy Neg at
 
 typecheck (Check ty) (TBin Exp t1 t2) = do
   at1   <- check t1 ty

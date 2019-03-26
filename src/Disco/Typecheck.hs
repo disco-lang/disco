@@ -1246,21 +1246,6 @@ cExp ty1 ty2 = do
     ]
   return resTy
 
-cNeg :: Type -> TCM Type
-cNeg (TyAtom (ABase b)) = (TyAtom . ABase) <$> negBase
-  where
-    negBase = case b of
-      N     -> return Z
-      F     -> return Q
-      Z     -> return Z
-      Q     -> return Q
-      Fin n -> return $ Fin n
-      _     -> throwError $ NoNeg (TyAtom (ABase b))
-cNeg ty = do
-  negTy <- freshTy
-  constraints $ [CSub ty negTy, CQual QSub negTy]
-  return negTy
-
 ------------------------------------------------------------
 -- Subtyping and least upper bounds
 ------------------------------------------------------------

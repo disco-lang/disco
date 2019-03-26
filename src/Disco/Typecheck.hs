@@ -274,7 +274,7 @@ expandedBOps = S.fromList
   , Eq, Neq, Lt, Gt, Leq, Geq
   , IDiv, Mod, Divides, Choose
   , Rep, Cons
-  , Add, Mul, Sub, SSub, Div
+  , Add, Mul, Sub, SSub, Div, Exp
   ]
 
 --------------------------------------------------
@@ -441,6 +441,20 @@ typecheck (Check ty) (TUn Neg t) = do
   constraint $ CQual QSub ty
   ATApp ty (ATPrim (ty :->: ty) (PrimUOp Neg)) <$> check t ty
 
+typecheck (Check ty) (TBin Exp t1 t2) = do
+  at1   <- check t1 ty
+  at2   <- infer t2
+  resTy <- cExp (getType at1) (getType at2)
+
+  constraint $ CSub resTy ty
+  return $
+    ATApp ty
+      (ATApp (getType at2 :->: ty)
+        (ATPrim (getType at1 :->: getType at2 :->: ty) (PrimBOp Exp))
+        at1
+      )
+      at2
+
 -- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do
   ty <- inferPrim prim
@@ -564,6 +578,12 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       constraint $ CQual QSub a
       return $ a :->: a
+
+    inferPrim (PrimBOp Exp) = do
+      a <- freshTy
+      b <- freshTy
+      resTy <- cExp a b
+      return $ a :->: b :->: resTy
 
     ----------------------------------------
     -- Number theory
@@ -825,29 +845,6 @@ typecheck Infer (TUn uop t)
 
 typecheck Infer (TBin bop t1 t2)
   | bop `S.member` expandedBOps = typecheck Infer $ expandBOp bop t1 t2
-
---------------------------------------------------
--- Binary & unary operators
-
-----------------------------------------
--- Arithmetic
-
--- A bunch of inference cases (& a few checking cases) for binary and
--- unary operators.
-
-typecheck (Check ty) (TBin Exp t1 t2) = do
-  at1   <- check t1 ty
-  at2   <- infer t2
-  resTy <- cExp (getType at1) (getType at2)
-
-  constraint $ CSub resTy ty
-  return $ ATBin resTy Exp at1 at2
-
-typecheck Infer (TBin Exp t1 t2) = do
-  at1 <- infer t1
-  at2 <- infer t2
-  resTy <- cExp (getType at1) (getType at2)
-  return $ ATBin resTy Exp at1 at2
 
 ----------------------------------------
 -- Comparison chain

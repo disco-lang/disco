@@ -168,7 +168,7 @@ passing tests as much as possible.
       make special case for checking mode.
 
   - [X] neg
-  - [ ] exp
+  - [X] exp
   - [ ] set operations --- infer & check
     - don't care that much about these since we're going to get rid of
       them

@@ -255,7 +255,7 @@ solveConstraintChoice tyDefns quals cs = do
 
   -- Check that the resulting substitution respects sorts...
   let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort sm x)
-      sortOK (x, TyAtom (AVar (U _))) = True
+      sortOK (_, TyAtom (AVar (U _))) = True
       sortOK p                        = error $ "Impossible! sortOK " ++ show p
   when (not $ all sortOK theta_cyc)
     $ throwError NoUnify

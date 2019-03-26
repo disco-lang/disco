@@ -47,7 +47,7 @@ import           Disco.AST.Typed
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy, getEltTy)
+import           Disco.Typecheck                  (containerTy)
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -196,9 +196,9 @@ desugarDefn (Defn _ patTys bodyTy def) = do
 -- | Desugar a typechecked term.
 desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
-desugarTerm (ATPrim ty@(ty1 :->: resTy) (PrimUOp uop))
-  | uopDesugars ty1 resTy uop = desugarPrimUOp ty uop
-desugarTerm (ATPrim ty@(ty1 :->: ty2 :->: resTy) (PrimBOp bop))
+desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
+  | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
+desugarTerm (ATPrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
@@ -249,12 +249,11 @@ uopDesugars :: Type -> Type -> UOp -> Bool
 uopDesugars _ (TyFin _) Neg = True
 uopDesugars _ _         uop = uop `elem` [Not]
 
-desugarPrimUOp :: Type -> UOp -> DSM DTerm
-desugarPrimUOp ty@(argTy :->: resTy) op = do
+desugarPrimUOp :: Type -> Type -> UOp -> DSM DTerm
+desugarPrimUOp argTy resTy op = do
   x <- fresh (string2Name "arg")
   body <- desugarUnApp resTy op (ATVar argTy x)
-  return $ mkLambda ty [x] body
-desugarPrimUOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desugarPrimUOp for " ++ show op
+  return $ mkLambda (argTy :->: resTy) [x] body
 
 -- | Test whether a given binary operator is one that needs to be
 --   desugared, given the two types of the arguments and the type of the result.
@@ -275,7 +274,6 @@ desugarPrimBOp ty1 ty2 resTy op = do
   y <- fresh (string2Name "arg2")
   body <- desugarBinApp resTy op (ATVar ty1 x) (ATVar ty2 y)
   return $ mkLambda (ty1 :->: ty2 :->: resTy) [x, y] body
-desugarPrimBOp ty1 ty2 resTy op = error $ "Impossible! Got type " ++ show (ty1 :->: ty2 :->: resTy) ++ " in desugarPrimBOp for " ++ show op
 
 -- | Desugar a saturated application of a unary operator.
 --   The first argument is the type of the result.
@@ -293,6 +291,8 @@ desugarUnApp _ Not t = desugarTerm $
     [ fls <==. [AGBool (embed t)]
     , tru <==. []
     ]
+
+desugarUnApp ty uop t = error $ "Impossible! desugarUnApp " ++ show ty ++ " " ++ show uop ++ " " ++ show t
 
 -- | Desugar a saturated application of a binary operator.
 --   The first argument is the type of the result.
@@ -372,6 +372,8 @@ desugarBinApp (TyFin n) op t1 t2
     -- if we add them in Z5 and then coerce to Nat, but 6 if we first
     -- coerce both and then add.
 
+desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarUnApp " ++ show ty ++ " " ++ show bop ++ " " ++ show t1 ++ " " ++ show t2
+
 ------------------------------------------------------------
 -- Desugaring other stuff
 ------------------------------------------------------------
@@ -393,11 +395,13 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
       -- [ t | x in l, qs ] = join (map (\x -> [t | qs]) l)
       AQBind x (unembed -> lst) -> do
         tqs <- expandComp ctr t qs
-        let c            = containerTy ctr
-            tTy          = getType t
-            xTy          = case getType lst of { TyContainer _ e -> e }
-            joinTy       = c (c tTy) :->: c tTy
-            mapTy        = (xTy :->: c tTy) :->: (c xTy :->: c (c tTy))
+        let c      = containerTy ctr
+            tTy    = getType t
+            xTy    = case getType lst of
+                       TyContainer _ e -> e
+                       _ -> error "Impossible! Not a container in expandComp"
+            joinTy = c (c tTy) :->: c tTy
+            mapTy  = (xTy :->: c tTy) :->: (c xTy :->: c (c tTy))
         return $ tapp (ATPrim joinTy PrimJoin) $
           tapp
             (tapp

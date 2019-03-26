@@ -571,6 +571,14 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual (bopQual op) a
       return $ a :->: a :->: a
 
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim (PrimBOp Add ) = error "inferPrim Add should be unreachable"
+    inferPrim (PrimBOp Mul ) = error "inferPrim Mul should be unreachable"
+    inferPrim (PrimBOp Sub ) = error "inferPrim Sub should be unreachable"
+    inferPrim (PrimBOp Div ) = error "inferPrim Div should be unreachable"
+    inferPrim (PrimBOp SSub) = error "inferPrim SSub should be unreachable"
+    ------------------------------------------------------------
+
     inferPrim (PrimUOp Neg) = do
       a <- freshTy
       constraint $ CQual QSub a

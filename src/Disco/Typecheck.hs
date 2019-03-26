@@ -130,7 +130,7 @@ makeTyDefnCtx tydefs = do
 checkCyclicTys :: [TypeDefn] -> TCM ()
 checkCyclicTys = mapM_ unwrap
   where
-    unwrap :: TypeDefn -> TCM (S.Set String)
+    unwrap :: TypeDefn -> TCM (Set String)
     unwrap (TypeDefn x _) = checkCyclicTy (TyDef x) S.empty
 
 -- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
@@ -138,7 +138,7 @@ checkCyclicTys = mapM_ unwrap
 -- 2.) Repeated expansions of the TyDef yield nothing but other TyDefs.
 -- 3.) An expansion of a TyDef yields another TyDef that has been previously encountered.
 -- The function returns the set of TyDefs encountered during expansion if the TyDef is not cyclic.
-checkCyclicTy :: Type -> S.Set String -> TCM (S.Set String)
+checkCyclicTy :: Type -> Set String -> TCM (Set String)
 checkCyclicTy (TyDef name) set = do
   case S.member name set of
     True -> throwError (CyclicTyDef name)

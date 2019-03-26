@@ -173,7 +173,7 @@ passing tests as much as possible.
     - make them into lib functions for now, operators later
 
 - [X] get rid of ATBin, ATUn, DTBin, DTUn
-- [ ] eventually get rid of expandedUOps, expandedBOps & associated
+- [X] eventually get rid of expandedUOps, expandedBOps & associated
   check, just expand them all.
 - [ ] put in special cases for ⌊~⌋ and ⌈~⌉ ?
 

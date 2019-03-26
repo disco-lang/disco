@@ -253,32 +253,6 @@ checkProperty prop = do
 ------------------------------------------------------------
 
 --------------------------------------------------
--- Operator expansion
---------------------------------------------------
-
--- Expand operators into applications of primitives right before
--- type checking them.
-
-expandUOp :: UOp -> Term -> Term
-expandUOp uop = TApp (TPrim (PrimUOp uop))
-
-expandBOp :: BOp -> Term -> Term -> Term
-expandBOp bop = TApp . TApp (TPrim (PrimBOp bop))
-
-expandedUOps :: Set UOp
-expandedUOps = S.fromList [ Fact, Not, Neg ]
-
-expandedBOps :: Set BOp
-expandedBOps = S.fromList
-  [ And, Or, Impl
-  , Eq, Neq, Lt, Gt, Leq, Geq
-  , IDiv, Mod, Divides, Choose
-  , Rep, Cons
-  , Add, Mul, Sub, SSub, Div, Exp
-  , Union, Inter, Diff, Subset
-  ]
-
---------------------------------------------------
 -- Checking modes
 --------------------------------------------------
 
@@ -863,11 +837,18 @@ typecheck mode lt@(TInj s t) = do
 --------------------------------------------------
 -- Binary and unary operators (via expansion)
 
-typecheck Infer (TUn uop t)
-  | uop `S.member` expandedUOps = typecheck Infer $ expandUOp uop t
+-- Expand operators into applications of primitives right before
+-- type checking them.
 
-typecheck Infer (TBin bop t1 t2)
-  | bop `S.member` expandedBOps = typecheck Infer $ expandBOp bop t1 t2
+typecheck Infer (TUn uop t)      = typecheck Infer $ expandedUOp t
+  where
+    expandedUOp :: Term -> Term
+    expandedUOp = TApp (TPrim (PrimUOp uop))
+
+typecheck Infer (TBin bop t1 t2) = typecheck Infer $ expandedBOp t1 t2
+  where
+    expandedBOp :: Term -> Term -> Term
+    expandedBOp = TApp . TApp (TPrim (PrimBOp bop))
 
 ----------------------------------------
 -- Comparison chain

@@ -133,3 +133,9 @@ unifyAtoms tyDefns = fmap convert . equate tyDefns . map TyAtom
     -- Guaranteed that this will get everything in the list, since we
     -- started with all atoms.
     convert s = [(coerce x, a) | (x, TyAtom a) <- s]
+
+unifyUAtoms :: Map String Type -> [UAtom] -> Maybe (S' UAtom)
+unifyUAtoms tyDefns = fmap convert . equate tyDefns . map (TyAtom . uatomToAtom)
+  where
+    convert s = [(coerce x, UB b) | (x, TyAtom (ABase b))    <- s]
+             ++ [(coerce x, UV v) | (x, TyAtom (AVar (U v))) <- s]

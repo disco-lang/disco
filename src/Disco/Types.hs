@@ -26,8 +26,9 @@ module Disco.Types
        -- * Disco language types
        -- ** Atomic types
 
-         BaseTy(..), isCtr, Var(..), Atom(..), UAtom
-       , uatomToAtom, isVar, isBase, isSkolem
+         BaseTy(..), isCtr, Var(..), Atom(..)
+       , isVar, isBase, isSkolem
+       , UAtom(..), uatomToAtom, uisVar, uatomToEither
 
        -- ** Type constructors
 
@@ -92,7 +93,7 @@ import           Unbound.Generics.LocallyNameless
 
 import           Control.Arrow                    ((***))
 import           Control.Lens                     (toListOf)
-import           Data.List                        (nub)
+import           Data.List                        (foldl', nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
@@ -180,18 +181,11 @@ data Atom where
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Atom
-instance Subst Atom Var
+instance Subst Atom Var where
 instance Subst Atom BaseTy
-
 instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
   isvar _            = Nothing
-
-type UAtom = Either BaseTy (Name Type)  -- unifiable atoms, i.e. no skolems
-
-uatomToAtom :: UAtom -> Atom
-uatomToAtom (Left b)  = ABase b
-uatomToAtom (Right x) = AVar (U x)
 
 isVar :: Atom -> Bool
 isVar (AVar _) = True
@@ -203,6 +197,31 @@ isBase = not . isVar
 isSkolem :: Atom -> Bool
 isSkolem (AVar (S _)) = True
 isSkolem _            = False
+
+-- | Unifiable atoms, i.e. no skolems.
+data UAtom where
+  UB :: BaseTy -> UAtom
+  UV :: Name Type -> UAtom
+  deriving (Show, Eq, Ord, Generic)
+
+instance Alpha UAtom
+instance Subst UAtom BaseTy
+instance Subst BaseTy UAtom
+instance Subst UAtom UAtom where
+  isvar (UV x) = Just (SubstName (coerce x))
+  isvar _      = Nothing
+
+uatomToAtom :: UAtom -> Atom
+uatomToAtom (UB b) = ABase b
+uatomToAtom (UV x) = AVar (U x)
+
+uisVar :: UAtom -> Bool
+uisVar (UV _) = True
+uisVar _      = False
+
+uatomToEither :: UAtom -> Either BaseTy (Name Type)
+uatomToEither (UB b) = Left b
+uatomToEither (UV v) = Right v
 
 ----------------------------------------
 -- Type constructors

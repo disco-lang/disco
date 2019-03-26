@@ -34,7 +34,7 @@ import           GHC.Generics                     (Generic)
 import           Control.Arrow                    ((&&&), (***))
 import           Control.Lens
 import           Data.Bifunctor                   (second)
-import           Data.Either                      (isRight, partitionEithers)
+import           Data.Either                      (partitionEithers)
 import           Data.List                        (find, foldl', intersect,
                                                    partition)
 import           Data.Map                         (Map, (!))
@@ -250,14 +250,33 @@ solveConstraintChoice tyDefns quals cs = do
 
   (g'', theta_cyc) <- liftExcept (elimCycles tyDefns g')
 
+  traceShowM g''
+  traceShowM theta_cyc
+
   -- Check that the resulting substitution respects sorts...
-  let sortOK (x,TyAtom (ABase ty)) = hasSort ty (getSort sm x)
-      sortOK p                     = error $ "Impossible! sortOK " ++ show p
+  let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort sm x)
+      sortOK (x, TyAtom (AVar (U _))) = True
+      sortOK p                        = error $ "Impossible! sortOK " ++ show p
   when (not $ all sortOK theta_cyc)
     $ throwError NoUnify
 
-  traceShowM g''
-  traceShowM theta_cyc
+  -- ... and update the sort map if we unified any type variables.
+  -- Just make sure that if theta_cyc maps x |-> y, then y picks up
+  -- the sort of x.
+
+  traceM "Old sort map:"
+  traceShowM sm
+
+  let sm' = SM $ foldr updateSortMap (unSM sm) theta_cyc
+       where
+         updateSortMap (x, TyAtom (AVar (U y))) smm = M.alter updateSort y smm
+           where
+             updateSort Nothing  = M.lookup x smm
+             updateSort (Just s) = Just $ fromMaybe S.empty (M.lookup x smm) `S.union` s
+         updateSortMap _ smm = smm
+
+  traceM "Updated sort map:"
+  traceShowM sm'
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
@@ -267,7 +286,7 @@ solveConstraintChoice tyDefns quals cs = do
   traceM "------------------------------"
   traceM "Solving for type variables..."
 
-  theta_sol       <- solveGraph sm g''
+  theta_sol       <- solveGraph sm' g''
   traceShowM theta_sol
 
   traceM "------------------------------"
@@ -583,8 +602,9 @@ checkSkolems tyDefns (SM sm) graph = do
   unifyWCCs graph idS good
 
   where
-    noSkolems (ABase b)    = Left b
-    noSkolems (AVar (U v)) = Right v
+    noSkolems :: Atom -> UAtom
+    noSkolems (ABase b)    = UB b
+    noSkolems (AVar (U v)) = UV v
     noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
 
     unifyWCCs g s []     = return (G.map noSkolems g, s)
@@ -614,25 +634,24 @@ checkSkolems tyDefns (SM sm) graph = do
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
 elimCycles :: Map String Type -> Graph UAtom -> Except SolveError (Graph UAtom, S)
-elimCycles tyDefns = elimCyclesGen uatomToAtom atomToTypeSubst (unifyAtoms tyDefns)
+elimCycles tyDefns = elimCyclesGen uatomToTypeSubst (unifyUAtoms tyDefns)
 
 elimCyclesGen
-  :: forall a a' b.
-     (Subst a' a, Subst a' a', Ord a, Ord a')
-  => (a -> a') -> (S' a' -> S' b) -> ([a'] -> Maybe (S' a'))
+  :: forall a b. (Subst a a, Ord a)
+  => (S' a -> S' b) -> ([a] -> Maybe (S' a))
   -> Graph a -> Except SolveError (Graph a, S' b)
-elimCyclesGen aToa' genSubst genUnify g
+elimCyclesGen genSubst genUnify g
   = maybeError NoUnify
   $ (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (a, S' a'))
+    g' :: Maybe (Graph (a, S' a))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set a -> Maybe (a, S' a')
+    unifySCC :: Set a -> Maybe (a, S' a)
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip substs a &&& id) <$> genUnify (map aToa' as)
+      as@(a:_) -> (flip substs a &&& id) <$> genUnify as
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution
@@ -733,9 +752,9 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
     unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ (map (coerce *** ABase) s)
       where
         wccVarGroups :: [Set (Name Type)]
-        wccVarGroups  = map (S.map getVar) . filter (all isRight) . substs s $ G.wcc g
-        getVar (Right v) = v
-        getVar (Left b)  = error
+        wccVarGroups  = map (S.map getVar) . filter (all uisVar) . substs s $ G.wcc g
+        getVar (UV v) = v
+        getVar (UB b) = error
           $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
         mkEquateSubst :: Set (Name Type) -> S' Atom
@@ -768,17 +787,18 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
     -- Get the successor and predecessor sets for all the type variables.
     topRelMap :: RelMap
     topRelMap
-      = M.map (uncurry Rels . (S.fromAscList *** S.fromAscList) . partitionEithers . S.toList)
+      = M.map (uncurry Rels . (S.fromAscList *** S.fromAscList)
+               . partitionEithers . map uatomToEither . S.toList)
       $ M.mapKeys (,SuperTy) subMap `M.union` M.mapKeys (,SubTy) superMap
 
     subMap, superMap :: Map (Name Type) (Set UAtom)
     (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
 
     onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
-    onlyVars = M.mapKeys fromRight . M.filterWithKey (\a _ -> isRight a)
+    onlyVars = M.mapKeys fromVar . M.filterWithKey (\a _ -> uisVar a)
       where
-        fromRight (Right n) = n
-        fromRight (Left _)  = error "Impossible! isRight but is Left."
+        fromVar (UV x) = x
+        fromVar _      = error "Impossible! UB but uisVar."
 
     go :: RelMap -> SolveM (S' BaseTy)
     go relMap = case as of

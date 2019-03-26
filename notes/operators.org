@@ -156,13 +156,18 @@ passing tests as much as possible.
   - [X] idiv (only infer)
   - [X] mod
   - [X] divides
-  - [ ] choose
+  - [X] choose
+  - [X] rep
   - [ ] make rep into a lib function (using fromCounts)
-  - [ ] cons (need check and infer)
-  - [ ] arithmetic operators (add, mul, div, sub, ssub, neg, exp)
+  - [X] cons (need check and infer)
+    - just did infer for now, checking would only be relevant in weird
+      situations, better to just leave it out since it's much simpler!
+  - [X] arithmetic operators (add, mul, div, sub, ssub)
     - We want to keep the checking case for these... which actually
       works out quite nicely since we still have TBin around!  Can
       make special case for checking mode.
+
+  - [ ] neg, exp
   - [ ] set operations --- infer & check
     - don't care that much about these since we're going to get rid of
       them

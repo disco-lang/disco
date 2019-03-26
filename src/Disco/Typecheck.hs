@@ -273,6 +273,8 @@ expandedBOps = S.fromList
   [ And, Or, Impl
   , Eq, Neq, Lt, Gt, Leq, Geq
   , IDiv, Mod, Divides, Choose
+  , Rep, Cons
+  , Add, Mul, Sub, SSub, Div
   ]
 
 --------------------------------------------------
@@ -413,6 +415,28 @@ typecheck Infer (TVar x) = checkVar `catchError` checkPrim
 
 -- XXX any prims that can't be inferred or need special treatment should go here.
 
+-- Once upon a time, when we only had types N, Z, Q+, and Q, we could
+-- always infer the type of anything numeric, so we didn't need
+-- checking cases for Add, Mul, etc.  But now we could have e.g.  (a +
+-- b) : Z13, in which case we need to push the checking type (in the
+-- example, Z13) through the operator to check the arguments.
+
+-- Checking arithmetic binary operations involves checking both operands
+-- and then adding a constraint qualifier over binary operation and the desired type.
+typecheck (Check ty) (TBin op t1 t2) | op `elem` [Add, Mul, Div, Sub, SSub] = do
+  constraint $ CQual (bopQual op) ty
+  ATApp ty
+    <$> (ATApp (ty :->: ty) (ATPrim (ty :->: ty :->: ty) (PrimBOp op)) <$> check t1 ty)
+    <*> check t2 ty
+
+-- See Note [Pattern coverage] -----------------------------
+typecheck (Check _) (TBin Add  _ _) = error "typecheck (Check _) Add should be unreachable"
+typecheck (Check _) (TBin Mul  _ _) = error "typecheck (Check _) Mul should be unreachable"
+typecheck (Check _) (TBin Sub  _ _) = error "typecheck (Check _) Sub should be unreachable"
+typecheck (Check _) (TBin Div  _ _) = error "typecheck (Check _) Div should be unreachable"
+typecheck (Check _) (TBin SSub _ _) = error "typecheck (Check _) SSub should be unreachable"
+------------------------------------------------------------
+
 -- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do
   ty <- inferPrim prim
@@ -469,6 +493,10 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Container primitives
 
+    inferPrim (PrimBOp Cons) = do
+      a <- freshTy
+      return $ a :->: TyList a :->: TyList a
+
     -- XXX see https://github.com/disco-lang/disco/issues/160
     -- map : (a -> b) -> (c a -> c b)
     inferPrim PrimMap = do
@@ -504,6 +532,12 @@ typecheck Infer (TPrim prim) = do
       let ca = TyContainer c a
       return $ (TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca
 
+    -- XXX make this a std lib function
+    -- ~#~ : a -> N -> Bag a
+    inferPrim (PrimBOp Rep) = do
+      a <- freshTy
+      return $ a :->: TyN :->: TyBag a
+
     ----------------------------------------
     -- Arithmetic
 
@@ -515,6 +549,11 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Mod) = do
       a <- freshTy
       constraint $ CSub a TyZ
+      return $ a :->: a :->: a
+
+    inferPrim (PrimBOp op) | op `elem` [Add, Mul, Sub, Div, SSub] = do
+      a <- freshTy
+      constraint $ CQual (bopQual op) a
       return $ a :->: a :->: a
 
     ----------------------------------------
@@ -772,41 +811,11 @@ typecheck mode lt@(TInj s t) = do
 --------------------------------------------------
 -- Binary and unary operators (via expansion)
 
-typecheck mode (TUn uop t)
-  | uop `S.member` expandedUOps = typecheck mode $ expandUOp uop t
+typecheck Infer (TUn uop t)
+  | uop `S.member` expandedUOps = typecheck Infer $ expandUOp uop t
 
-typecheck mode (TBin bop t1 t2)
-  | bop `S.member` expandedBOps = typecheck mode $ expandBOp bop t1 t2
-
---------------------------------------------------
--- List cons
-
--- To check a cons, make sure the type is a list type, then
--- check the two arguments appropriately.
-typecheck (Check ty) t@(TBin Cons x xs) = do
-  tyElt <- ensureConstr1 CList ty (Left t)
-  ATBin ty Cons <$> check x tyElt <*> check xs (TyList tyElt)
-
--- To infer the type of a cons:
-typecheck Infer (TBin Cons t1 t2) = do
-
-  -- First, infer the type of the first argument (a list element).
-  at1 <- infer t1
-
-  case t2 of
-    -- If the second argument is the empty list, just assign it the
-    -- type inferred from the first element.
-    TList [] Nothing -> do
-      let ty1 = getType at1
-      return $ ATBin (TyList ty1) Cons at1 (ATList (TyList ty1) [] Nothing)
-
-    -- Otherwise, infer the type of the second argument...
-    _ -> do
-      at2 <- infer t2
-        -- ...make sure it is a list, and find the lub of the element types.
-      ty2 <- ensureConstr1 CList (getType at2) (Left t2)
-      eltTy <- lub (getType at1) ty2
-      return $ ATBin (TyList eltTy) Cons at1 at2
+typecheck Infer (TBin bop t1 t2)
+  | bop `S.member` expandedBOps = typecheck Infer $ expandBOp bop t1 t2
 
 --------------------------------------------------
 -- Binary & unary operators
@@ -816,50 +825,6 @@ typecheck Infer (TBin Cons t1 t2) = do
 
 -- A bunch of inference cases (& a few checking cases) for binary and
 -- unary operators.
-
--- Once upon a time, when we only had types N, Z, Q+, and Q, we could
--- always infer the type of anything numeric, so we didn't need
--- checking cases for Add, Mul, etc.  But now we could have e.g.  (a +
--- b) : Z13, in which case we need to push the checking type (in the
--- example, Z13) through the operator to check the arguments.
-
--- Checking arithmetic binary operations involves checking both operands
--- and then adding a constraint qualifier over binary operation and the desired type.
-typecheck (Check ty) (TBin op t1 t2) | op `elem` [Add, Mul, Div, Sub, SSub] = do
-  constraint $ CQual (bopQual op) ty
-  ATBin ty op <$> check t1 ty <*> check t2 ty
-
--- To infer the type of addition or multiplication, infer the types
--- of the subterms, check that they are numeric, and return their
--- lub.
-typecheck Infer (TBin op t1 t2) | op `elem` [Add, Mul, Sub, Div, SSub] = do
-  at1 <- infer t1
-  at2 <- infer t2
-  let ty1 = getType at1
-      ty2 = getType at2
-  tyv <- freshTy
-
-  -- Note, it looks like we would want to use 'lub' here, but that's
-  -- not quite right because we don't want the *least* upper bound, we
-  -- want the least upper bound which satisfies (bopQual op).  For
-  -- example, 2 - 3 has type Z even though 2 and 3 are both inferred
-  -- to have type N.  In the future we could make a variant of lub
-  -- that takes sorts into account, or we could use lub and then
-  -- another function to handle the sort, etc.
-  constraints $
-    [ CSub ty1 tyv
-    , CSub ty2 tyv
-    , CQual (bopQual op) tyv
-    ]
-  return $ ATBin tyv op at1 at2
-
--- See Note [Pattern coverage] -----------------------------
-typecheck Infer (TBin Add  _ _) = error "typecheck Infer Add should be unreachable"
-typecheck Infer (TBin Mul  _ _) = error "typecheck Infer Mul should be unreachable"
-typecheck Infer (TBin Sub  _ _) = error "typecheck Infer Sub should be unreachable"
-typecheck Infer (TBin Div  _ _) = error "typecheck Infer Div should be unreachable"
-typecheck Infer (TBin SSub _ _) = error "typecheck Infer SSub should be unreachable"
-------------------------------------------------------------
 
 typecheck (Check ty) (TUn Neg t) = do
   constraint $ CQual QSub ty
@@ -924,11 +889,6 @@ typecheck Infer (TBin Inter  _ _) = error "typecheck Infer Inter should be unrea
 typecheck Infer (TBin Diff   _ _) = error "typecheck Infer Diff should be unreachable"
 typecheck Infer (TBin Subset _ _) = error "typecheck Infer Subset should be unreachable"
 ------------------------------------------------------------
-
-typecheck Infer (TBin Rep t1 t2) = do
-  at1 <- infer t1
-  at2 <- check t2 TyN
-  return $ ATBin (TyBag (getType at1)) Rep at1 at2
 
 ----------------------------------------
 -- Type operations

@@ -68,6 +68,11 @@ compileDTerm (DTLam _ l) = do
   c <- compileDTerm body
   return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
 
+-- Special case for Cons, which compiles to a constructor application
+-- rather than a function application.
+compileDTerm (DTApp _ (DTApp _ (DTPrim _ (PrimBOp Cons)) t1) t2)
+  = CCons 1 <$> mapM compileDTerm [t1, t2]
+
 compileDTerm (DTApp _ t1 t2)
   = appChain t1 [t2]
   where
@@ -85,11 +90,6 @@ compileDTerm (DTCase _ bs)
 
 compileDTerm (DTUn _ op t)
   = CApp (compileUOp (getType t) op) <$> mapM compileArg [t]
-
--- Special case for Cons, which compiles to a constructor application
--- rather than a function application.
-compileDTerm (DTBin _ Cons t1 t2)
-  = CCons 1 <$> mapM compileDTerm [t1, t2]
 
 compileDTerm (DTBin ty op t1 t2)
   = CApp (compileBOp (getType t1) (getType t2) ty op) <$> mapM compileArg [t1, t2]
@@ -127,6 +127,15 @@ compilePrim :: Type -> Prim -> FreshM Core
 
 compilePrim (argTy :->: _) (PrimUOp uop) = return $ compileUOp argTy uop
 compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
+
+-- This special case for Cons only triggers if we didn't hit the case
+-- for fully saturated Cons; just fall back to generating a lambda.  Have to
+-- do it here, not in compileBOp, since we need to generate fresh names.
+compilePrim _ (PrimBOp Cons) = do
+  hd <- fresh (string2Name "hd")
+  tl <- fresh (string2Name "tl")
+  return $ CAbs $ bind [hd, tl] $ CCons 1 [CVar hd, CVar tl]
+
 compilePrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 
@@ -279,7 +288,7 @@ compileBOp (TyFin n) _ _ op
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op
-  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
+  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose, Rep]
   = CConst (regularOps ! op)
   where
     regularOps = M.fromList
@@ -290,6 +299,7 @@ compileBOp _ _ _ op
       , Mod     ==> OMod
       , Divides ==> ODivides
       , Choose  ==> OMultinom
+      , Rep     ==> ORep
       ]
 
 -- Eq and Lt need to remember the type of the things being compared so
@@ -314,8 +324,6 @@ compileBOp (TySet ty) _ _ op
       , Diff   ==> ODiff
       , Subset ==> OSubset
       ]
-
-compileBOp _ _ _ Rep = CConst ORep
 
 compileBOp ty1 ty2 resTy op
   = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

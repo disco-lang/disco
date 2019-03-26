@@ -84,20 +84,23 @@ mkBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
 mkBin resTy bop t1 t2
   = tapp (tapp (ATPrim (getType t1 :->: getType t2 :->: resTy) (PrimBOp bop)) t1) t2
 
+mkUn :: Type -> UOp -> ATerm -> ATerm
+mkUn resTy uop t = tapp (ATPrim (getType t :->: resTy) (PrimUOp uop)) t
+
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
 (||.) = mkBin TyBool Or
 
 infixl 6 -., +.
 (-.) :: ATerm -> ATerm -> ATerm
-at1 -. at2 = ATBin (getType at1) Sub at1 at2
+at1 -. at2 = mkBin (getType at1) Sub at1 at2
 
 (+.) :: ATerm -> ATerm -> ATerm
-at1 +. at2 = ATBin (getType at1) Add at1 at2
+at1 +. at2 = mkBin (getType at1) Add at1 at2
 
 infixl 7 /.
 (/.) :: ATerm -> ATerm -> ATerm
-at1 /. at2 = ATBin (getType at1) Div at1 at2
+at1 /. at2 = mkBin (getType at1) Div at1 at2
 
 infix 4 <., >=.
 (<.) :: ATerm -> ATerm -> ATerm
@@ -107,7 +110,7 @@ infix 4 <., >=.
 (>=.) = mkBin TyBool Geq
 
 (|.) :: ATerm -> ATerm -> ATerm
-(|.) = ATBin TyBool Divides
+(|.) = mkBin TyBool Divides
 
 infix 4 ==.
 (==.) :: ATerm -> ATerm -> ATerm
@@ -133,6 +136,22 @@ ctrNil ctr ty = ATContainer (containerTy ctr ty) ctr [] Nothing
 
 ctrSingleton :: Container -> ATerm -> ATerm
 ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [t] Nothing
+
+------------------------------------------------------------
+-- Making DTerms
+------------------------------------------------------------
+
+dtapp :: DTerm -> DTerm -> DTerm
+dtapp t1 t2 = DTApp resTy t1 t2
+  where
+    resTy = case getType t1 of
+      (_ :->: r) -> r
+      ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in dtapp"
+
+mkDTBin :: Type -> BOp -> DTerm -> DTerm -> DTerm
+mkDTBin resTy bop dt1 dt2
+  = dtapp (dtapp (DTPrim (getType dt1 :->: getType dt2 :->: resTy) (PrimBOp bop)) dt1) dt2
+
 
 ------------------------------------------------------------
 -- Definition desugaring
@@ -207,47 +226,9 @@ desugarTerm (ATRat r)            = return $ DTRat r
 -- Desugar negation on TyFin to a negation on TyZ followed by a mod.
 -- See the comments below re: Add and Mul on TyFin.
 desugarTerm (ATUn (TyFin n) Neg t) =
-  desugarTerm $ ATBin (TyFin n) Mod (ATUn TyZ Neg t) (ATNat TyN n)
+  desugarTerm $ mkBin (TyFin n) Mod (mkUn TyZ Neg t) (ATNat TyN n)
 
 desugarTerm (ATUn ty op t)       = DTUn ty op <$> desugarTerm t
-
-desugarTerm (ATBin ty Sub t1 t2)  = desugarTerm $ ATBin ty Add t1 (ATUn ty Neg t2)
-desugarTerm (ATBin ty SSub t1 t2) = desugarTerm $
-  -- t1 -. t2 ==> {? 0 if t1 < t2, t1 - t2 otherwise ?}
-  ATCase ty
-    [ ATNat ty 0         <==. [tif (t1 <. t2)]
-    , ATBin ty Sub t1 t2 <==. []
-      -- NOTE, the above is slightly bogus since the whole point of SSub is
-      -- because we can't subtract naturals.  However, this will
-      -- immediately desugar to a DTerm.  When we write a linting
-      -- typechecker for DTerms we should allow subtraction on TyN!
-    ]
-
--- Addition and multiplication on TyFin just desugar to the operation
--- followed by a call to mod.
-desugarTerm (ATBin (TyFin n) op t1 t2)
-  | op `elem` [Add, Mul]
-  = desugarTerm $
-      ATBin (TyFin n) Mod
-        (ATBin TyN op t1 t2)
-        (ATNat TyN n)
-    -- Note the typing of this is a bit funny: t1 and t2 presumably
-    -- have type (TyFin n), and now we are saying that applying 'op'
-    -- to them results in TyN, then applying 'mod' results in a TyFin
-    -- n again.  Using TyN as the intermediate result is necessary so
-    -- we don't fall into an infinite desugaring loop, and intuitively
-    -- makes sense because the idea is that we first do the operation
-    -- as a normal operation in "natural land" and then do a mod.
-    --
-    -- We will have to think carefully about how the linting
-    -- typechecker for DTerms should treat TyN and TyFin.  Probably
-    -- something like this will work: TyFin is a subtype of TyN, and
-    -- TyN can be turned into TyFin with mod.  (We don't want such
-    -- typing rules in the surface disco language itself because
-    -- implicit coercions from TyFin -> N don't commute with
-    -- operations like addition and multiplication, e.g. 3+3 yields 1
-    -- if we add them in Z5 and then coerce to Nat, but 6 if we first
-    -- coerce both and then add.
 
 desugarTerm (ATBin ty op t1 t2)   = DTBin ty op <$> desugarTerm t1 <*> desugarTerm t2
 
@@ -287,10 +268,12 @@ desugarPrimUOp ty op = error $ "Impossible! Got type " ++ show ty ++ " in desuga
 --   desugared, given the two types of the arguments and the type of the result.
 bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
+bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl
   , Neq, Gt, Leq, Geq
   , IDiv
+  , Sub, SSub
   ]
 
 -- | Desugar a primitive binary operator at the given type.
@@ -353,6 +336,43 @@ desugarBinApp resTy IDiv t1 t2 = desugarTerm $
 -- Note this will only be called when (getType t2 == TyN); see bopDesugars.
 desugarBinApp _ Choose t1 t2
   = desugarTerm $ mkBin TyN Choose t1 (ctrSingleton ListContainer t2)
+
+desugarBinApp ty Sub  t1 t2 = desugarTerm $ mkBin ty Add t1 (mkUn ty Neg t2)
+desugarBinApp ty SSub t1 t2 = desugarTerm $
+  -- t1 -. t2 ==> {? 0 if t1 < t2, t1 - t2 otherwise ?}
+  ATCase ty
+    [ ATNat ty 0         <==. [tif (t1 <. t2)]
+    , mkBin ty Sub t1 t2 <==. []
+      -- NOTE, the above is slightly bogus since the whole point of SSub is
+      -- because we can't subtract naturals.  However, this will
+      -- immediately desugar to a DTerm.  When we write a linting
+      -- typechecker for DTerms we should allow subtraction on TyN!
+    ]
+
+-- Addition and multiplication on TyFin just desugar to the operation
+-- followed by a call to mod.
+desugarBinApp (TyFin n) op t1 t2
+  | op `elem` [Add, Mul] = desugarTerm $
+      mkBin (TyFin n) Mod
+        (mkBin TyN op t1 t2)
+        (ATNat TyN n)
+    -- Note the typing of this is a bit funny: t1 and t2 presumably
+    -- have type (TyFin n), and now we are saying that applying 'op'
+    -- to them results in TyN, then applying 'mod' results in a TyFin
+    -- n again.  Using TyN as the intermediate result is necessary so
+    -- we don't fall into an infinite desugaring loop, and intuitively
+    -- makes sense because the idea is that we first do the operation
+    -- as a normal operation in "natural land" and then do a mod.
+    --
+    -- We will have to think carefully about how the linting
+    -- typechecker for DTerms should treat TyN and TyFin.  Probably
+    -- something like this will work: TyFin is a subtype of TyN, and
+    -- TyN can be turned into TyFin with mod.  (We don't want such
+    -- typing rules in the surface disco language itself because
+    -- implicit coercions from TyFin -> N don't commute with
+    -- operations like addition and multiplication, e.g. 3+3 yields 1
+    -- if we add them in Z5 and then coerce to Nat, but 6 if we first
+    -- coerce both and then add.
 
 ------------------------------------------------------------
 -- Desugaring other stuff
@@ -635,7 +655,7 @@ desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DS
 
 -- Literal list containers desugar to nested applications of cons.
 desugarContainer ty ListContainer es Nothing =
-  foldr (DTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
+  foldr (mkDTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
 
 -- A list container with an ellipsis (@[x, y, z ..]@) desugars to
 -- an application of the primitive 'forever' function...

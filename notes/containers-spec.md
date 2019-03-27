@@ -6,9 +6,9 @@ Syntax
 
 ```
 <container>
-  ::= '['  <container-contents> ']'
-    | '{'  <container-contents> '}'
-    | '{#' <container-contents> '#}'
+  ::= '[' <container-contents> ']'
+    | '{' <container-contents> '}'
+    | '⟅' <container-contents> '⟆'
 
 <container-contents>
   ::= empty | <nonempty-container>
@@ -35,12 +35,12 @@ Syntax examples:
 ```
 { 'x', 'y', 'z' }
 [ 1, 3 .. ]
-{# 5 .. 100 #}
-{# 3, 3, 3 #}
+⟅ 5 .. 100 ⟆
+⟅ 3, 3, 3 ⟆
 ```
 
-Subtyping/conversion
---------------------
+Conversion
+----------
 
 We have the following Galois connections (actually just
 section/retraction pairs):
@@ -51,26 +51,15 @@ List                       Bag                              Set
       <-- sorted order ---     <-- assign card. 1 to all --
 ```
 
-Subtyping goes from left to right; each of the "forgetful" arrows
-corresponds to a subtype relationship, and is a ringad homomorphism.
-For example if a function expects a set, one can perfectly well give
-it a list or a bag.
-
-There are canonical mappings going in the other direction; however,
-these are not ringad homomorphisms (for example, whenever two sets
-share common elements, unioning them and then converting to a bag is
-not the same as converting to bags first and then doing bag (additive)
-union).  Hence these should NOT be subtyping relationships.  Instead,
-they will be given by explicit (primitive functions) `bag`, `list`,
-and `set`, which convert any container into the respective type.
-
 Going left and then right in this diagram is the identity.  Going
 right and then left is not, in general, the identity, but represents
 some sort of (idempotent) canonicalization: `List -> Bag -> List`
 is `sort`; `Bag -> Set -> Bag` drops duplicates; `List ->
 Set -> List` both sorts and drops duplicates.
 
-So *e.g.* `list` can have any of the types
+There are conversion functions `list`, `bag`, and `set` which convert
+any container into the named type according to the above diagram. For
+example, `list` can have any of the types
 
 ```
 list : List a -> List a
@@ -78,13 +67,21 @@ list : Bag a -> List a
 list : Set a -> List a
 ```
 
-And similar for `set` and `bag`.  These will of course have to be
-built-in primitives, since their types cannot be expressed using the
-disco type system.
+And similar for `set` and `bag`.  These are of course built-in
+primitives, since their types cannot be expressed using the disco type
+system.
 
-There should also be one more built-in conversion function,
+There is no subtyping among container types.  Although it would in
+theory make sense to have the subtyping relationships List < Bag < Set
+(converting in this direction gives rise to ringad homomorphisms),
+this is not sound in the presence of conversion functions like
+`list`.  For example, `list ⟅1,1,2⟆ == [1,1,2]`, but `list (set
+⟅1,1,2⟆) == [1,2]`, and with subtyping the latter `set` is allowed to
+be silently inserted.
+
+There is also one more built-in conversion function,
 ```
-countSet : Bag a -> Set (a * N)
+bagCounts : Bag a -> Set (a * N)
 ```
 which turns a bag into the set of its (element, count) pairs.
 
@@ -126,14 +123,6 @@ Standard library functions
 Typechecking
 ------------
 
-XXX
-
-If a function `f` expects a set, you can't call it with a list, `f
-[1,2,3]`, but you could instead say `f (set [1,2,3])`.  It also won't
-be possible to write `{ x | x in [1 .. 10], even x }` because that
-would mix a set and a list; one would have to write `{ x | x in set
-[1..10], even x }` (actually in this case of course one could just
-write `x in {1 .. 10}`).
 
 Dynamic (runtime) semantics
 ---------------------------

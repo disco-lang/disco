@@ -142,7 +142,7 @@ opTable =
     ]
   , [ bopInfo InL  Rep     ["#"]
     ]
-  , [ bopInfo InL  Union   ["union", "∪", "U"]
+  , [ bopInfo InL  Union   ["union", "∪"]
     , bopInfo InL  Inter   ["intersect", "∩"]
     , bopInfo InL  Diff    ["\\"]
     , bopInfo InL  Subset  ["⊆"]

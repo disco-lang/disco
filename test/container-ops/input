@@ -15,3 +15,14 @@ powerSet (powerSet {})
 powerSet (powerSet (powerSet {}))
 :type powerSet (powerSet (powerSet {}))
 powerSet {"hi", "there"}
+bag [] union bag [1,2]
+:type bag [] union bag [1,2]
+:type bag [2,-3] union bag [1/2]
+bag [1,2,2] union bag [2,2,2,3]
+bag [3,4,5] intersect bag [4,2]
+bag [3,4,5] intersect bag [1,6]
+bag [2,2,2,3,2,4,5] intersect bag [2,3,2,5,5,6]
+bag [1,2,3] \ bag [3,2]
+(bag [5,6] ⊆ bag [5,6,7] : B)
+bag [] ⊆ bag [bag [6]]
+bag [bag [6]] ⊆ bag [bag [6]]

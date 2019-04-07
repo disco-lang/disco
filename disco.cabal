@@ -48,8 +48,12 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/case-let.disco
                      test/case-let/expected
                      test/case-let/input
+                     test/compile-cons/expected
+                     test/compile-cons/input
                      test/container-comp/expected
                      test/container-comp/input
+                     test/container-ops/expected
+                     test/container-ops/input
                      test/containers-cmp/expected
                      test/containers-cmp/input
                      test/containers-convert/expected
@@ -118,8 +122,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/input
                      test/repl-defn/expected
                      test/repl-defn/input
-                     test/set-ops/expected
-                     test/set-ops/input
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
@@ -184,6 +186,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-rec/types-rec.disco
                      test/types-squash/expected
                      test/types-squash/input
+                     test/types-standalone-ops/expected
+                     test/types-standalone-ops/input
                      test/types-tydefs/expected
                      test/types-tydefs/input
                      test/types-tydefs/types-tydefs.disco

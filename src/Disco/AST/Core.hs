@@ -135,6 +135,8 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   the element type.
         | OUnion  Type    -- ^ Union of two sets (@union@ /
                           --   @∪@). Carries the element type.
+        | OBagUnion Type  -- ^ Additive union of two bags.  Carries
+                          --   the element type.
         | OInter  Type    -- ^ Intersection of two sets (@intersect@ /
                           --   @∩@). Carries the element type.
         | ODiff   Type    -- ^ Difference of two sets (@\@). Carries
@@ -214,6 +216,7 @@ opArity (OMDivides _)    = 2
 opArity OSize            = 1
 opArity (OPowerSet _)    = 1
 opArity (OSubset _)      = 2
+opArity (OBagUnion _)    = 2
 opArity (OUnion _)       = 2
 opArity (OInter _)       = 2
 opArity (ODiff _)        = 2

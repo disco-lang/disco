@@ -546,9 +546,15 @@ typecheck Infer (TPrim prim) = do
       return $ a :->: TyN :->: TyBag a
 
     inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
-      tyElt <- freshTy
-      let resTy = case setOp of {Subset -> TyBool; _ -> TySet tyElt}
-      return $ TySet tyElt :->: TySet tyElt :->: resTy
+      a <- freshTy
+      c <- freshAtom
+      constraint $ COr
+        [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
+        , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
+        ]
+      let ca = TyContainer c a
+      let resTy = case setOp of {Subset -> TyBool; _ -> ca}
+      return $ ca :->: ca :->: resTy
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp Union)  = error "inferPrim Union should be unreachable"

@@ -734,11 +734,19 @@ primMerge ty m b1 b2 = do
 ------------------------------------------------------------
 -- Set and bag operations
 
--- | Compute the size of a set.
-setSize :: Value -> Disco IErr Value
-setSize v = do
+-- | Compute the size of a set or bag.
+ctrSize :: Value -> Disco IErr Value
+ctrSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
+
+-- | Compute the (additive) union of two bags.
+bagUnion :: Type -> Value -> Value -> Disco IErr Value
+bagUnion ty v1 v2 = do
+  VBag xs <- whnfV v1
+  VBag ys <- whnfV v2
+  zs <- merge (+) (decideOrdFor ty) xs ys
+  return $ VBag zs
 
 -- | Compute the union of two sets.
 setUnion :: Type -> Value -> Value -> Disco IErr Value
@@ -764,13 +772,13 @@ setDifference ty v1 v2 = do
   zs <- merge (\x y -> max 0 (x - y)) (decideOrdFor ty) xs ys
   return $ VBag zs
 
--- | Test whether one set is a subset of another.
+-- | Test whether one set or bag is a subset of another.
 subsetTest :: Type -> Value -> Value -> Disco IErr Value
 subsetTest ty v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
-  ys' <- merge (max) (decideOrdFor ty) xs ys
-  mkEnum <$> setEquality ty ys ys'
+  ys' <- merge max (decideOrdFor ty) xs ys
+  mkEnum <$> bagEquality ty ys ys'
 
 -- | Compute the power set of a set.
 powerSet :: Type -> Value -> Disco IErr Value
@@ -843,7 +851,8 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 --------------------------------------------------
 -- Set operations
 
-whnfOp (OSize)         = arity1 "setSize"         $ setSize
+whnfOp (OSize)         = arity1 "ctrSize"         $ ctrSize
+whnfOp (OBagUnion ty)  = arity2 "bagUnion"        $ bagUnion ty
 whnfOp (OUnion  ty)    = arity2 "setUnion"        $ setUnion ty
 whnfOp (OInter  ty)    = arity2 "setIntersection" $ setIntersection ty
 whnfOp (ODiff   ty)    = arity2 "setDifference"   $ setDifference ty
@@ -1219,23 +1228,27 @@ decideEqFor (TyList elTy) v1 v2 = do
 decideEqFor (TySet ty) v1 v2 = do
   VBag xs <- whnfV v1
   VBag ys <- whnfV v2
-  setEquality ty xs ys
+  bagEquality ty xs ys
 
+decideEqFor (TyBag ty) v1 v2 = do
+  VBag xs <- whnfV v1
+  VBag ys <- whnfV v2
+  bagEquality ty xs ys
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
 
 
-setEquality :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Bool
-setEquality _ [] [] = return True
-setEquality _ [] _ = return False
-setEquality _ _ [] = return False
-setEquality ty ((x,n1):xs) ((y,n2):ys) = do
+bagEquality :: Type -> [(Value, Integer)] -> [(Value, Integer)] -> Disco IErr Bool
+bagEquality _ [] [] = return True
+bagEquality _ [] _ = return False
+bagEquality _ _ [] = return False
+bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
   eq <- (n1 == n2 &&) <$> decideEqFor ty x y
   case eq of
     False -> return False
-    True  -> setEquality ty xs ys
+    True  -> bagEquality ty xs ys
 
 
 -- TODO: can the functions built by 'enumerate' be more efficient if

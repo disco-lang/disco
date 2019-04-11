@@ -740,14 +740,6 @@ ctrSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
 
--- | Test whether one set or bag is a subset of another.
-subsetTest :: Type -> Value -> Value -> Disco IErr Value
-subsetTest ty v1 v2 = do
-  VBag xs <- whnfV v1
-  VBag ys <- whnfV v2
-  ys' <- merge max (decideOrdFor ty) xs ys
-  mkEnum <$> bagEquality ty ys ys'
-
 -- | Compute the power set of a set.
 powerSet :: Type -> Value -> Disco IErr Value
 powerSet ty v = do
@@ -821,7 +813,6 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 
 whnfOp (OSize)         = arity1 "ctrSize"         $ ctrSize
 whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
-whnfOp (OSubset ty)    = arity2 "subset"          $ subsetTest ty
 
 --------------------------------------------------
 -- Bag operations

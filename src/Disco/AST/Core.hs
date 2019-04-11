@@ -131,8 +131,6 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OSize           -- ^ Size of two sets (@size@)
         | OPowerSet Type  -- ^ Power set of a given set
                           --   (@powerSet@). Carries the element type.
-        | OSubset Type    -- ^ Subset test for two sets (@⊆@). Carries
-                          --   the element type.
         | ORep            -- ^ Primitive bag constructor (replicate).
 
         | OMapList        -- ^ Map a function over a list.
@@ -207,7 +205,6 @@ opArity (OMExp _)        = 2
 opArity (OMDivides _)    = 2
 opArity OSize            = 1
 opArity (OPowerSet _)    = 1
-opArity (OSubset _)      = 2
 opArity ORep             = 2
 opArity OMapList         = 2
 opArity (OMapBag _)      = 2

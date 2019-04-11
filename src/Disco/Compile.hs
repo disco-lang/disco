@@ -305,7 +305,5 @@ compileBOp _ _ _ op
 compileBOp ty _ _ Eq = CConst (OEq ty)
 compileBOp ty _ _ Lt = CConst (OLt ty)
 
-compileBOp (TyContainer _ ty) _ _ Subset = CConst (OSubset ty)
-
 compileBOp ty1 ty2 resTy op
   = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

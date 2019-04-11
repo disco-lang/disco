@@ -133,10 +133,6 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   (@powerSet@). Carries the element type.
         | OSubset Type    -- ^ Subset test for two sets (@⊆@). Carries
                           --   the element type.
-        | OUnion  Type    -- ^ Union of two sets (@union@ /
-                          --   @∪@). Carries the element type.
-        | OBagUnion Type  -- ^ Additive union of two bags.  Carries
-                          --   the element type.
         | ORep            -- ^ Primitive bag constructor (replicate).
 
         | OMapList        -- ^ Map a function over a list.
@@ -212,8 +208,6 @@ opArity (OMDivides _)    = 2
 opArity OSize            = 1
 opArity (OPowerSet _)    = 1
 opArity (OSubset _)      = 2
-opArity (OBagUnion _)    = 2
-opArity (OUnion _)       = 2
 opArity ORep             = 2
 opArity OMapList         = 2
 opArity (OMapBag _)      = 2

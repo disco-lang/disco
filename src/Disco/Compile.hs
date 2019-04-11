@@ -305,12 +305,6 @@ compileBOp _ _ _ op
 compileBOp ty _ _ Eq = CConst (OEq ty)
 compileBOp ty _ _ Lt = CConst (OLt ty)
 
--- Operations on sets & bags compile straightforwardly, except that
--- they also need to store the element type so they can compare the
--- elements appropriately.
-compileBOp (TySet ty) _ _ Union = CConst (OUnion ty)
-compileBOp (TyBag ty) _ _ Union = CConst (OBagUnion ty)
-
 compileBOp (TyContainer _ ty) _ _ Subset = CConst (OSubset ty)
 
 compileBOp ty1 ty2 resTy op

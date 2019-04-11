@@ -740,22 +740,6 @@ ctrSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
 
--- | Compute the (additive) union of two bags.
-bagUnion :: Type -> Value -> Value -> Disco IErr Value
-bagUnion ty v1 v2 = do
-  VBag xs <- whnfV v1
-  VBag ys <- whnfV v2
-  zs <- merge (+) (decideOrdFor ty) xs ys
-  return $ VBag zs
-
--- | Compute the union of two sets.
-setUnion :: Type -> Value -> Value -> Disco IErr Value
-setUnion ty v1 v2 = do
-  VBag xs <- whnfV v1
-  VBag ys <- whnfV v2
-  zs <- merge max (decideOrdFor ty) xs ys
-  return $ VBag zs
-
 -- | Test whether one set or bag is a subset of another.
 subsetTest :: Type -> Value -> Value -> Disco IErr Value
 subsetTest ty v1 v2 = do
@@ -836,8 +820,6 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 -- Set operations
 
 whnfOp (OSize)         = arity1 "ctrSize"         $ ctrSize
-whnfOp (OBagUnion ty)  = arity2 "bagUnion"        $ bagUnion ty
-whnfOp (OUnion  ty)    = arity2 "setUnion"        $ setUnion ty
 whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
 whnfOp (OSubset ty)    = arity2 "subset"          $ subsetTest ty
 

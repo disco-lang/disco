@@ -248,6 +248,7 @@ reservedWords =
   [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "mod", "choose", "implies"
+  , "min", "max"
   , "union", "∪", "intersect", "∩", "subset"
   , "enumerate", "count", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"

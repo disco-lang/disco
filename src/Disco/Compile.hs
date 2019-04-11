@@ -311,13 +311,12 @@ compileBOp ty _ _ Lt = CConst (OLt ty)
 compileBOp (TySet ty) _ _ Union = CConst (OUnion ty)
 compileBOp (TyBag ty) _ _ Union = CConst (OBagUnion ty)
 
-compileBOp (TyContainer c ty) _ _ op
-  | op `elem` [Inter, Diff, Subset]
+compileBOp (TyContainer _ ty) _ _ op
+  | op `elem` [Diff, Subset]
   = CConst ((setOps ! op) ty)
   where
     setOps = M.fromList
-      [ Inter  ==> OInter
-      , Diff   ==> ODiff
+      [ Diff   ==> ODiff
       , Subset ==> OSubset
       ]
 

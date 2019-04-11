@@ -80,6 +80,9 @@ tapp t1 t2 = ATApp resTy t1 t2
       (_ :->: r) -> r
       ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in tapp"
 
+tapps :: ATerm -> [ATerm] -> ATerm
+tapps = foldl tapp
+
 mkBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
 mkBin resTy bop t1 t2
   = tapp (tapp (ATPrim (getType t1 :->: getType t2 :->: resTy) (PrimBOp bop)) t1) t2
@@ -262,9 +265,10 @@ bopDesugars _   TyN _ Choose = True
 bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl
-  , Neq, Gt, Leq, Geq
+  , Neq, Gt, Leq, Geq, Min, Max
   , IDiv
   , Sub, SSub
+  , Inter
   ]
 
 -- | Desugar a primitive binary operator at the given type.
@@ -325,6 +329,19 @@ desugarBinApp _ Gt  t1 t2 = desugarTerm $ t2 <. t1
 desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)
 desugarBinApp _ Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
 
+-- XXX sharing!
+desugarBinApp ty Min t1 t2 = desugarTerm $
+  ATCase ty
+    [ t1 <==. [tif (t1 <. t2)]
+    , t2 <==. []
+    ]
+
+desugarBinApp ty Max t1 t2 = desugarTerm $
+  ATCase ty
+    [ t1 <==. [tif (t2 <. t1)]
+    , t2 <==. []
+    ]
+
 -- t1 // t2 ==> floor (t1 / t2)
 desugarBinApp resTy IDiv t1 t2 = desugarTerm $
   ATApp resTy (ATPrim (getType t1 :->: resTy) PrimFloor) (mkBin (getType t1) Div t1 t2)
@@ -372,7 +389,14 @@ desugarBinApp (TyFin n) op t1 t2
     -- if we add them in Z5 and then coerce to Nat, but 6 if we first
     -- coerce both and then add.
 
-desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarUnApp " ++ show ty ++ " " ++ show bop ++ " " ++ show t1 ++ " " ++ show t2
+desugarBinApp ty Inter t1 t2 = desugarTerm $
+  tapps (ATPrim ((TyN :->: TyN :->: TyN) :->: ty :->: ty :->: ty) PrimMerge)
+    [ ATPrim (TyN :->: TyN :->: TyN) (PrimBOp Min)
+    , t1
+    , t2
+    ]
+
+desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarBinApp " ++ show ty ++ " " ++ show bop ++ " " ++ show t1 ++ " " ++ show t2
 
 ------------------------------------------------------------
 -- Desugaring other stuff

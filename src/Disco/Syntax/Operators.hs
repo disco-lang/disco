@@ -58,6 +58,8 @@ data BOp = Add     -- ^ Addition (@+@)
          | Gt      -- ^ Greater than (@>@)
          | Leq     -- ^ Less than or equal (@<=@)
          | Geq     -- ^ Greater than or equal (@>=@)
+         | Min     -- ^ Minimum (@min@)
+         | Max     -- ^ Maximum (@max@)
          | And     -- ^ Logical and (@&&@ / @and@)
          | Or      -- ^ Logical or (@||@ / @or@)
          | Impl    -- ^ Logical implies (@==>@ / @implies@)
@@ -146,6 +148,9 @@ opTable =
     , bopInfo InL  Inter   ["intersect", "∩"]
     , bopInfo InL  Diff    ["\\"]
     , bopInfo InL  Subset  ["⊆"]
+    ]
+  , [ bopInfo InL  Min     ["min"]
+    , bopInfo InL  Max     ["max"]
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]

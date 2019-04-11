@@ -668,6 +668,16 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Geq) = error "inferPrim Geq should be unreachable"
     ------------------------------------------------------------
 
+    inferPrim (PrimBOp op) | op `elem` [Min, Max] = do
+      ty <- freshTy
+      constraint $ CQual QCmp ty
+      return $ ty :->: ty :->: ty
+
+    -- See Note [Pattern coverage] -----------------------------
+    inferPrim (PrimBOp Min) = error "inferPrim Min should be unreachable"
+    inferPrim (PrimBOp Max) = error "inferPrim Max should be unreachable"
+    ------------------------------------------------------------
+
     ----------------------------------------
     -- Special arithmetic functions: fact, sqrt, lg, floor, ceil, abs
 

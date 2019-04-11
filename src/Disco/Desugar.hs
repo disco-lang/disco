@@ -268,7 +268,7 @@ bopDesugars _   _   _ bop = bop `elem`
   , Neq, Gt, Leq, Geq, Min, Max
   , IDiv
   , Sub, SSub
-  , Inter
+  , Inter, Diff
   ]
 
 -- | Desugar a primitive binary operator at the given type.
@@ -389,12 +389,17 @@ desugarBinApp (TyFin n) op t1 t2
     -- if we add them in Z5 and then coerce to Nat, but 6 if we first
     -- coerce both and then add.
 
-desugarBinApp ty Inter t1 t2 = desugarTerm $
-  tapps (ATPrim ((TyN :->: TyN :->: TyN) :->: ty :->: ty :->: ty) PrimMerge)
-    [ ATPrim (TyN :->: TyN :->: TyN) (PrimBOp Min)
-    , t1
-    , t2
-    ]
+desugarBinApp ty op t1 t2
+  | op `elem` [Inter, Diff] = desugarTerm $
+    tapps (ATPrim ((TyN :->: TyN :->: TyN) :->: ty :->: ty :->: ty) PrimMerge)
+      [ ATPrim (TyN :->: TyN :->: TyN) (mergeOp op)
+      , t1
+      , t2
+      ]
+  where
+    mergeOp Inter = PrimBOp Min
+    mergeOp Diff  = PrimBOp SSub
+    mergeOp op    = error $ "Impossible! mergeOp " ++ show op
 
 desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarBinApp " ++ show ty ++ " " ++ show bop ++ " " ++ show t1 ++ " " ++ show t2
 

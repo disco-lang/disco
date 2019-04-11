@@ -311,14 +311,7 @@ compileBOp ty _ _ Lt = CConst (OLt ty)
 compileBOp (TySet ty) _ _ Union = CConst (OUnion ty)
 compileBOp (TyBag ty) _ _ Union = CConst (OBagUnion ty)
 
-compileBOp (TyContainer _ ty) _ _ op
-  | op `elem` [Diff, Subset]
-  = CConst ((setOps ! op) ty)
-  where
-    setOps = M.fromList
-      [ Diff   ==> ODiff
-      , Subset ==> OSubset
-      ]
+compileBOp (TyContainer _ ty) _ _ Subset = CConst (OSubset ty)
 
 compileBOp ty1 ty2 resTy op
   = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

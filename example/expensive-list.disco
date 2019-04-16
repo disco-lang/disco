@@ -13,7 +13,7 @@
 -- expensiveList', it will immediately print out the first 100 numbers
 -- and then slowly progress through the numbers not yet evaluated.
 
--- XXX!!! This seems to no longer be true! What happened?
+import list
 
 expensiveList : List N
 expensiveList = map expensiveId [0 ..]
@@ -21,8 +21,3 @@ expensiveList = map expensiveId [0 ..]
 expensiveId : N -> N
 expensiveId 0     = 0
 expensiveId (n+1) = 1 + expensiveId n
-
-take : N -> List N -> List N
-take 0 _ = []
-take _ [] = []
-take (n+1) (x::xs) = x :: take n xs

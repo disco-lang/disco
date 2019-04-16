@@ -53,7 +53,7 @@ module Disco.Eval
        , runDisco, catchAsMessage, catchAndPrintErrors
 
          -- ** Memory/environment utilities
-       , allocate, delay, mkThunk
+       , allocate, delay, mkValue, mkSimple
 
          -- ** Top level phases
        , parseDiscoModule
@@ -446,8 +446,21 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
 allocate :: Value -> Disco e Loc
 allocate v = do
   loc <- nextLoc <+= 1
+  -- io $ putStrLn $ "allocating " ++ show v ++ " at location " ++ show loc
   memory %= IntMap.insert loc v
   return loc
+
+-- | Turn a value into a "simple" value which takes up a constant
+--   amount of space: some are OK as they are; for others, we turn
+--   them into an indirection and allocate a new memory cell for them.
+mkSimple :: Value -> Disco e Value
+mkSimple v@(VNum {})    = return v
+mkSimple v@(VCons _ []) = return v
+mkSimple v@(VConst _)   = return v
+mkSimple v@(VClos {})   = return v
+mkSimple v@(VType {})   = return v
+mkSimple v@(VIndir {})  = return v
+mkSimple v              = VIndir <$> allocate v
 
 -- | Delay a @Disco e Value@ computation by packaging it into a @VDelay@
 --   constructor.  When it is evaluated later, it will be run with the
@@ -458,12 +471,18 @@ delay imv = do
   e <- getEnv
   return (VDelay $ withEnv e imv)
 
--- | Create a thunk by packaging up a @Core@ expression with the
+-- | Turn a Core expression into a value.  Some kinds of expressions
+--   can be turned into corresponding values directly; for others we
+--   create a thunk by packaging up the @Core@ expression with the
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkThunk :: Core -> Disco e Value
-mkThunk c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
+mkValue :: Core -> Disco e Value
+mkValue (CConst op)  = return $ VConst op
+mkValue (CCons i cs) = VCons i <$> mapM mkValue cs
+mkValue (CNum d r)   = return $ VNum d r
+mkValue (CType ty)   = return $ VType ty
+mkValue c = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
 
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time

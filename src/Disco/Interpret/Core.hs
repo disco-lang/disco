@@ -94,7 +94,7 @@ loadDefs cenv = do
 
   -- Take the environment mapping names to definitions, and turn
   -- each one into an indirection to a thunk stored in memory.
-  env <- traverse mkThunk cenv
+  env <- traverse mkValue cenv
 
   -- Top-level definitions are allowed to be recursive, so each
   -- one of those thunks should actually have the environment
@@ -134,7 +134,7 @@ mkEnum e = VCons (fromEnum e) []
 --   all this function actually does is turn the @Core@ expression
 --   into a thunk and then call 'rnfV'.
 rnf :: Core -> Disco IErr Value
-rnf c = mkThunk c >>= rnfV
+rnf c = mkValue c >>= rnfV
 
 -- | Reduce a value to reduced normal form, i.e. keep reducing under
 --   constructors as much as possible.
@@ -177,6 +177,13 @@ whnfV (VDelay imv) = imv >>= whnfV
 -- have to be re-evaluated the next time loc is referenced.
 whnfV (VIndir loc) = whnfIndir loc
 
+-- If it is a cons, all well and good, it is already in WHNF---but at
+-- the same time make sure that any subparts are either simple
+-- constants or are turned into indirections to new memory cells.
+-- This way, when the subparts are eventually evaluated, the new
+-- memory cells can be updated with their result.
+whnfV (VCons i vs) = VCons i <$> mapM mkSimple vs
+
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
 whnfV v            = return v
@@ -218,7 +225,7 @@ whnf (CConst x)     = return $ VConst x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
-whnf (CCons i cs)   = VCons i <$> (mapM mkThunk cs)
+whnf (CCons i cs)   = VCons i <$> (mapM mkValue cs)
 
 -- A number is in WHNF, just turn it into a VNum.
 whnf (CNum d n)     = return $ VNum d n
@@ -257,7 +264,7 @@ whnf (CCase bs)     = whnfCase bs
 --   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
 whnfArg :: Strictness -> Core -> Disco IErr Value
 whnfArg Strict = whnf
-whnfArg Lazy   = mkThunk
+whnfArg Lazy   = mkValue
 
 -- | Find the arity of a function-like thing.  Note that the input
 --   must already be in WHNF.
@@ -332,7 +339,7 @@ whnfCase (b:bs) = do
 checkGuards :: [(Embed Core, CPattern)] -> Disco IErr (Maybe Env)
 checkGuards [] = ok
 checkGuards ((unembed -> c, p) : gs) = do
-  v <- mkThunk c
+  v <- mkValue c
   res <- match v p
   case res of
     Nothing -> return Nothing
@@ -376,9 +383,12 @@ noMatch = return Nothing
 
 -- | Convert a Haskell list of Values into a Value representing a
 --   disco list.
-toDiscoList :: [Value] -> Value
-toDiscoList []       = VCons 0 []
-toDiscoList (x : xs) = VCons 1 [x, toDiscoList xs]
+toDiscoList :: [Value] -> Disco IErr Value
+toDiscoList []       = return $ VCons 0 []
+toDiscoList (x : xs) = do
+  xv  <- mkSimple x
+  xsv <- mkSimple =<< delay (toDiscoList xs)
+  return $ VCons 1 [xv, xsv]
 
 -- | Convert a Value representing a disco list into a Haskell list of
 --   Values.  Strict in the spine of the list.
@@ -442,7 +452,7 @@ ellipsis ell xs = do
   end <- traverse whnfV ell
   let (ds,rs)   = unzip (map fromVNum vs)
       (d, end') = traverse fromVNum end
-  return . toDiscoList . map (VNum (mconcat ds <> d)) $ enumEllipsis rs end'
+  toDiscoList . map (VNum (mconcat ds <> d)) $ enumEllipsis rs end'
   where
     fromVNum (VNum d r) = (d,r)
     fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
@@ -562,7 +572,7 @@ mergeM g cmp = go
 setToList :: Value -> Disco IErr Value
 setToList s = do
   VBag xs <- whnfV s
-  return . toDiscoList . map fst $ xs
+  toDiscoList . map fst $ xs
 
 -- | Convert a bag to a set, by setting the count of every element
 --   to 1.
@@ -576,7 +586,7 @@ bagToSet b = do
 bagToList :: Value -> Disco IErr Value
 bagToList b = do
   VBag xs <- whnfV b
-  return . toDiscoList . concatMap (uncurry (flip (replicate . fromIntegral))) $ xs
+  toDiscoList . concatMap (uncurry (flip (replicate . fromIntegral))) $ xs
     -- XXX could be more efficient if we add some sharing? so
     -- replicated values will only be evaluated once
 
@@ -662,7 +672,7 @@ primReduceBag :: Value -> Value -> Value -> Disco IErr Value
 primReduceBag f z b = do
   f' <- whnfV f
   VBag cts <- whnfV b
-  let xs = toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
+  xs <- toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
   vfoldr (\a r -> whnfApp f' [a,r]) z xs
 
   -- XXX this is super inefficient! (1) should have some sharing so
@@ -973,7 +983,7 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 -- | Perform an enumeration of the values of a given type.
 enumOp :: Value -> Disco IErr Value
 enumOp (VType ty) = case countType ty of
-  Just _  -> return $ (toDiscoList (enumerate ty))
+  Just _  -> toDiscoList (enumerate ty)
   Nothing -> throwError $ InfiniteTy ty
 enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 

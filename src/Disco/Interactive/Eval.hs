@@ -45,6 +45,23 @@ import           Disco.Types
 
 ------------------------------------------------------------
 
+import qualified Data.IntMap as IM
+import Data.List (intercalate)
+
+showVal :: Int -> Value -> String
+showVal 0 _ = "_"
+showVal _ (VNum _ r)   = show r
+showVal k (VCons i vs) = "K" ++ show i ++ " [" ++ intercalate "," (map (showVal (k-1)) vs) ++ "]"
+showVal _ (VConst op)  = show op
+showVal _ (VClos _ _)  = "<closure>"
+showVal _ (VPAp _ _ )  = "<pap>"
+showVal _ (VThunk _ _) = "<thunk>"
+showVal _ (VIndir l)   = "-> " ++ show l
+showVal _ (VFun _)     = "<fun>"
+showVal _ (VDelay _)   = "<delay>"
+showVal _ (VBag _)     = "<bag>"
+showVal _ (VType _)    = "<type>"
+
 handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
 handleCMD s = do
@@ -52,6 +69,14 @@ handleCMD s = do
     case (parseLine exts s) of
       Left msg -> io $ putStrLn msg
       Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
+
+    -- env <- use topEnv
+    -- mem <- use memory
+
+    -- io $ print env
+
+    -- forM_ (IM.assocs mem) $ \(k,v) ->
+    --   io $ putStrLn $ show k ++ ": " ++ showVal 3 v
   where
     handleLine :: REPLExpr -> Disco IErr ()
 
@@ -84,7 +109,7 @@ handleLet x t = do
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
       let c = compileTerm at
-      thnk <- mkThunk c
+      thnk <- mkValue c
       topCtx   %= M.insert x sig
       topDefns %= M.insert (coerce x) c
       topEnv   %= M.insert (coerce x) thnk
@@ -236,7 +261,7 @@ evalTerm t = do
     Right (at,_) ->
       let ty = getType at
           c  = compileTerm at
-      in (withTopEnv $ mkThunk c) >>= prettyValue ty
+      in (withTopEnv $ mkValue c) >>= prettyValue ty
 
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do

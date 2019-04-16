@@ -49,18 +49,28 @@ import qualified Data.IntMap as IM
 import Data.List (intercalate)
 
 showVal :: Int -> Value -> String
-showVal 0 _ = "_"
+showVal 0 _            = "_"
 showVal _ (VNum _ r)   = show r
-showVal k (VCons i vs) = "K" ++ show i ++ " [" ++ intercalate "," (map (showVal (k-1)) vs) ++ "]"
+showVal k (VCons i vs) = "K" ++ show i ++ " [" ++ intercalate ", " (map (showVal (k-1)) vs) ++ "]"
 showVal _ (VConst op)  = show op
-showVal _ (VClos _ _)  = "<closure>"
-showVal _ (VPAp _ _ )  = "<pap>"
-showVal _ (VThunk _ _) = "<thunk>"
+showVal _ (VClos {})   = "<closure>"
+showVal _ (VPAp {} )   = "<pap>"
+showVal _ (VThunk {})  = "<thunk>"
 showVal _ (VIndir l)   = "-> " ++ show l
-showVal _ (VFun _)     = "<fun>"
-showVal _ (VDelay _)   = "<delay>"
-showVal _ (VBag _)     = "<bag>"
-showVal _ (VType _)    = "<type>"
+showVal _ (VFun_ {})   = "<fun>"
+showVal _ (VDelay_ {}) = "<delay>"
+showVal _ (VBag {})    = "<bag>"
+showVal _ (VType {})   = "<type>"
+
+printMem :: Disco IErr ()
+printMem = do
+  env <- use topEnv
+  mem <- use memory
+
+  io $ print env
+
+  forM_ (IM.assocs mem) $ \(k,v) ->
+    io $ putStrLn $ show k ++ ": " ++ showVal 3 v
 
 handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
@@ -69,14 +79,6 @@ handleCMD s = do
     case (parseLine exts s) of
       Left msg -> io $ putStrLn msg
       Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
-
-    -- env <- use topEnv
-    -- mem <- use memory
-
-    -- io $ print env
-
-    -- forM_ (IM.assocs mem) $ \(k,v) ->
-    --   io $ putStrLn $ show k ++ ": " ++ showVal 3 v
   where
     handleLine :: REPLExpr -> Disco IErr ()
 
@@ -156,6 +158,7 @@ handleLoad fp = catchAndPrintErrors False $ do
   addModInfo m
   t <- withTopEnv $ runAllTests props
   io . putStrLn $ "Loaded."
+  garbageCollect
   return t
 
 -- | Added information from ModuleInfo to the Disco monad. This includes updating the
@@ -261,7 +264,11 @@ evalTerm t = do
     Right (at,_) ->
       let ty = getType at
           c  = compileTerm at
-      in (withTopEnv $ mkValue c) >>= prettyValue ty
+      in do
+        (withTopEnv $ mkValue c) >>= prettyValue ty
+        -- printMem
+        garbageCollect
+        -- printMem
 
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do

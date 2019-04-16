@@ -148,9 +148,9 @@ rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
 -- computation, or an indirection (i.e. a pointer to a value), reduce
 -- it one step using 'whnfV' and then recursively continue reducing
 -- the result.
-rnfV v@(VThunk _ _) = whnfV v >>= rnfV
-rnfV v@(VDelay _)   = whnfV v >>= rnfV
-rnfV v@(VIndir _)   = whnfV v >>= rnfV
+rnfV v@(VThunk {}) = whnfV v >>= rnfV
+rnfV v@(VDelay {}) = whnfV v >>= rnfV
+rnfV v@(VIndir {}) = whnfV v >>= rnfV
 
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
@@ -169,8 +169,8 @@ whnfV :: Value -> Disco IErr Value
 whnfV (VThunk c e) = withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
--- and reduce the result to WHNF.
-whnfV (VDelay imv) = imv >>= whnfV
+-- in its stored environment and reduce the result to WHNF.
+whnfV (VDelay imv _ e) = withEnv e imv >>= whnfV
 
 -- If it is an indirection, call 'whnfIndir' which will look up the
 -- value it points to, reduce it, and store the result so it won't
@@ -406,7 +406,7 @@ fromDiscoList v =
 --   Value@ just results in a 'VDelay'; forcing that @VDelay@ with
 --   'whnf' will then cause the foldr to actually start executing.
 vfoldr :: (Value -> Value -> Disco IErr Value) -> Value -> Value -> Disco IErr Value
-vfoldr f z xs = delay $ do
+vfoldr f z xs = delay' [z,xs] $ do
   xs' <- whnfV xs
   case xs' of
     VCons 0 []      -> return z
@@ -878,7 +878,7 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 --------------------------------------------------
 -- Other primitives
 
-whnfOp OCrash          = arity1 "crash"     $ fmap primCrash . whnfV
+whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
 whnfOp OId             = arity1 "id" $ whnfV
 
 --------------------------------------------------
@@ -1093,8 +1093,8 @@ primFactor _                         = error "impossible! primFactor on non-VNum
 
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.
-primCrash :: Value -> Value
-primCrash v = VDelay $ do
+primCrash :: Value -> Disco IErr Value
+primCrash v = delay $ do
   s <- valueToString v
   throwError (Crash s)
 

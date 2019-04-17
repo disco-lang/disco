@@ -134,7 +134,7 @@ mkEnum e = VCons (fromEnum e) []
 --   all this function actually does is turn the @Core@ expression
 --   into a thunk and then call 'rnfV'.
 rnf :: Core -> Disco IErr Value
-rnf c = mkValue c >>= rnfV
+rnf c = whnf c >>= rnfV
 
 -- | Reduce a value to reduced normal form, i.e. keep reducing under
 --   constructors as much as possible.

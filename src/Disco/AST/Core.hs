@@ -132,6 +132,8 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OPowerSet Type  -- ^ Power set of a given set
                           --   (@powerSet@). Carries the element type.
         | ORep            -- ^ Primitive bag constructor (replicate).
+        | OBagElem Type   -- ^ Set/bag element test.
+        | OListElem Type  -- ^ List element test.
 
         | OMapList        -- ^ Map a function over a list.
         | OMapBag Type    -- ^ Map a function over a bag.  Carries the
@@ -206,6 +208,8 @@ opArity (OMDivides _)    = 2
 opArity OSize            = 1
 opArity (OPowerSet _)    = 1
 opArity ORep             = 2
+opArity (OBagElem _)     = 2
+opArity (OListElem _)    = 2
 opArity OMapList         = 2
 opArity (OMapBag _)      = 2
 opArity (OMapSet _)      = 2

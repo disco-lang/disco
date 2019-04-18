@@ -570,6 +570,14 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Subset) = error "inferPrim Subset should be unreachable"
     ------------------------------------------------------------
 
+    inferPrim (PrimBOp Elem) = do
+      a <- freshTy
+      c <- freshAtom
+
+      constraint $ CQual QCmp a
+
+      return $ a :->: TyContainer c a :->: TyBool
+
     ----------------------------------------
     -- Arithmetic
 

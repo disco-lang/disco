@@ -249,7 +249,7 @@ reservedWords =
   , "if", "when"
   , "otherwise", "and", "or", "mod", "choose", "implies"
   , "min", "max"
-  , "union", "∪", "intersect", "∩", "subset"
+  , "union", "∪", "intersect", "∩", "subset", "⊆", "elem", "∈"
   , "enumerate", "count", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"

@@ -767,11 +767,32 @@ repBag elt rep = do
   VNum _ r <- whnfV rep
   return $ VBag [(elt, numerator r)]
 
--- | Check whether a certain value is present in a list using a linear search.
--- elemOf :: Type -> Value -> [Value] -> Disco IErr Bool
--- elemOf _ _ []     = return False
--- elemOf t x (y:ys) = (||) <$> (decideEqFor t x y) <*> (elemOf t x ys)
+-- | Test whether a given value is an element of a bag or set.
+bagElem :: Type -> Value -> Value -> Disco IErr Value
+bagElem ty x b = do
+  VBag xs <- whnfV b
+  mkEnum <$> elemOf x (map fst xs)
 
+  where
+    elemOf _ [] = return False
+    elemOf x (y:ys) = do
+      eq <- decideEqFor ty x y
+      case eq of
+        False -> elemOf x ys
+        True  -> return True
+
+-- | Test whether a given value is an element of a list.
+listElem :: Type -> Value -> Value -> Disco IErr Value
+listElem ty x xs = do
+  xs' <- whnfV xs
+  case xs' of
+    VCons 0 _      -> return $ mkEnum False
+    VCons 1 [y,ys] -> do
+      eq <- decideEqFor ty x y
+      case eq of
+        False -> listElem ty x ys
+        True  -> return $ mkEnum True
+    v -> error $ "Impossible! Non-list value " ++ show v ++ " in listElem"
 
 ------------------------------------------------------------
 -- Constant evaluation
@@ -823,15 +844,13 @@ whnfOp (OEq ty)        = arity2 "eqOp"     $ eqOp ty
 whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 
 --------------------------------------------------
--- Set operations
+-- Container operations
 
-whnfOp (OSize)         = arity1 "ctrSize"         $ ctrSize
-whnfOp (OPowerSet ty)  = arity1 "powerSet"        $ powerSet ty
-
---------------------------------------------------
--- Bag operations
-
-whnfOp ORep            = arity2 "repBag" $ repBag
+whnfOp (OSize)         = arity1 "ctrSize"  $ ctrSize
+whnfOp (OPowerSet ty)  = arity1 "powerSet" $ powerSet ty
+whnfOp ORep            = arity2 "repBag"   $ repBag
+whnfOp (OBagElem ty)   = arity2 "bagElem"  $ bagElem ty
+whnfOp (OListElem ty)  = arity2 "listElem" $ listElem ty
 
 --------------------------------------------------
 -- Container conversions

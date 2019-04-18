@@ -70,6 +70,7 @@ data BOp = Add     -- ^ Addition (@+@)
          | Union   -- ^ Union of two sets (@union@ / @∪@)
          | Inter   -- ^ Intersection of two sets (@intersect@ / @∩@)
          | Diff    -- ^ Difference between two sets (@\@)
+         | Elem    -- ^ Element test (@∈@)
          | Subset  -- ^ Subset test (@⊆@)
          | Rep     -- ^ Replicate to construct a bag (@#@)
   deriving (Show, Read, Eq, Ord, Generic)
@@ -147,7 +148,6 @@ opTable =
   , [ bopInfo InL  Union   ["union", "∪"]
     , bopInfo InL  Inter   ["intersect", "∩"]
     , bopInfo InL  Diff    ["\\"]
-    , bopInfo InL  Subset  ["⊆"]
     ]
   , [ bopInfo InL  Min     ["min"]
     , bopInfo InL  Max     ["max"]
@@ -171,6 +171,8 @@ opTable =
     , bopInfo InR  Leq     ["≤", "<="]
     , bopInfo InR  Geq     ["≥", ">="]
     , bopInfo InR  Divides ["divides"]
+    , bopInfo InL  Subset  ["⊆"]
+    , bopInfo InL  Elem    ["∈", "elem"]
     ]
   , [ bopInfo InR  And     ["and", "∧", "&&"]
     ]

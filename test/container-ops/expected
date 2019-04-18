@@ -16,6 +16,7 @@ true
 powerSet (powerSet (powerSet {})) : Set Set Set Set a
 {{}, {"hi"}, {"hi", "there"}, {"there"}}
 ⟅1, 2⟆
+⟅1, 2⟆
 bag [] union bag [1, 2] : Bag ℕ
 bag [2, -3] union bag [1 / 2] : Bag ℚ
 bagFromCounts {(1, 1), (2, 5), (3, 1)}

@@ -430,15 +430,22 @@ typecheck (Check ty) (TBin Exp t1 t2) = do
       )
       at2
 
-typecheck (Check ty) t@(TBin setOp t1 t2)
+typecheck (Check ty) (TBin setOp t1 t2)
     | setOp `elem` [Union, Inter, Diff] = do
-  tyElt <- ensureConstr1 CSet ty (Left t)
+
+  a <- freshTy
+  constraint $ COr
+    [ CEq (TyBag a) ty
+    , CEq (TySet a) ty
+    ]
+  constraint $ CQual QCmp a
+
   ATApp ty
     <$> (ATApp (ty :->: ty)
            (ATPrim (ty :->: ty :->: ty) (PrimBOp setOp))
-           <$> check t1 (TySet tyElt)
+           <$> check t1 ty
         )
-    <*> check t2 (TySet tyElt)
+    <*> check t2 ty
 
 -- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do

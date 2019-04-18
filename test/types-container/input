@@ -10,3 +10,4 @@
 :type list
 :type bag
 :type set
+:type {1,2,3} union {4,5} : Set Z3

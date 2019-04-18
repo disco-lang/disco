@@ -31,6 +31,10 @@ module Disco.Eval
        , Env, extendEnv, extendsEnv, getEnv, withEnv, withTopEnv
        , garbageCollect
 
+         -- * Memory cells
+
+       , Cell(..), mkCell
+
          -- * Errors
 
        , IErr(..)
@@ -220,6 +224,16 @@ withEnv :: Env -> Disco e a -> Disco e a
 withEnv = local . const
 
 ------------------------------------------------------------
+-- Memory cells
+------------------------------------------------------------
+
+data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
+  deriving (Show)
+
+mkCell :: Value -> Cell
+mkCell v = Cell v False
+
+------------------------------------------------------------
 -- Errors
 ------------------------------------------------------------
 
@@ -303,10 +317,11 @@ data DiscoState e = DiscoState
   , _topDocs     :: Ctx Term Docs
     -- ^ Top-level documentation.
 
-  , _memory      :: IntMap Value
+  , _memory      :: IntMap Cell
     -- ^ A memory is a mapping from "locations" (uniquely generated
-    --   identifiers) to values.  It also keeps track of the next
-    --   unused location.  We keep track of a memory during
+    --   identifiers) to values, along with a flag saying whether the
+    --   value has been evaluated yet.  It also keeps track of the
+    --   next unused location.  We keep track of a memory during
     --   evaluation, and can create new memory locations to store
     --   things that should only be evaluated once.
 
@@ -456,7 +471,7 @@ allocate :: Value -> Disco e Loc
 allocate v = do
   loc <- nextLoc <+= 1
   -- io $ putStrLn $ "allocating " ++ show v ++ " at location " ++ show loc
-  memory %= IntMap.insert loc v
+  memory %= IntMap.insert loc (mkCell v)
   return loc
 
 -- | Turn a value into a "simple" value which takes up a constant
@@ -560,8 +575,8 @@ reachableLoc l = do
       reachableLocs %= IntSet.insert l
       mem <- use memory
       case IntMap.lookup l mem of
-        Nothing -> return ()
-        Just v  -> reachable v
+        Nothing         -> return ()
+        Just (Cell v _) -> reachable v
 
 ------------------------------------------------------------
 -- High-level disco phases

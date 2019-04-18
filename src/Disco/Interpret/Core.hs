@@ -111,8 +111,8 @@ loadDefs cenv = do
   topEnv .= env
 
   where
-    replaceThunkEnv e (VThunk c _) = VThunk c e
-    replaceThunkEnv _ v            = v
+    replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b
+    replaceThunkEnv _ c                     = c
 
 
 -- | A convenience function for creating a default @VNum@ value with a
@@ -197,9 +197,13 @@ whnfV v            = return v
 whnfIndir :: Loc -> Disco IErr Value
 whnfIndir loc = do
   m <- use memory                   -- Get the memory map
-  v <- whnfV (m ! loc)              -- Look up the given location and reduce it to WHNF
-  memory %= IntMap.insert loc v     -- Update memory with the reduced value
-  return v                          -- Finally, return the value.
+  let c = m ! loc                   -- Look up the given location and reduce it to WHNF
+  case c of
+    Cell v True  -> return v        -- Already evaluated, just return it
+    Cell v False -> do
+      v' <- whnfV v                               -- Needs to be reduced
+      memory %= IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
+      return v'                                   -- Finally, return the value.
 
 
 -- | Reduce a Core expression to weak head normal form.  This is where

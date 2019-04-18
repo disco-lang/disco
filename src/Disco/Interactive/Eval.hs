@@ -69,7 +69,7 @@ printMem = do
 
   io $ print env
 
-  forM_ (IM.assocs mem) $ \(k,v) ->
+  forM_ (IM.assocs mem) $ \(k, Cell v _) ->
     io $ putStrLn $ show k ++ ": " ++ showVal 3 v
 
 handleCMD :: String -> Disco IErr ()

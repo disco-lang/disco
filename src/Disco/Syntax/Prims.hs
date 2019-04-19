@@ -111,7 +111,7 @@ primTable =
   , PrimInfo PrimAbs       "abs"     True
 
   , PrimInfo PrimSize      "size"    True
-  , PrimInfo PrimPower     "powerSet" True
+  , PrimInfo PrimPower     "power"   True
 
   , PrimInfo PrimList      "list"    True
   , PrimInfo PrimBag       "bag"     True

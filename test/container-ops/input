@@ -8,13 +8,13 @@
 ({5,6} ⊆ {5,6,7} : B)
 {} ⊆ {{6}}
 {{6}} ⊆ {{6}}
-powerSet {1,2,3}
-powerSet {}
-powerSet {1,1,1}
-powerSet (powerSet {})
-powerSet (powerSet (powerSet {}))
-:type powerSet (powerSet (powerSet {}))
-powerSet {"hi", "there"}
+power {1,2,3}
+power {}
+power {1,1,1}
+power (power {})
+power (power (power {}))
+:type power (power (power {}))
+power {"hi", "there"}
 bag [] union bag [1,2]
 bag [] union bag [1,2] : Bag N
 :type bag [] union bag [1,2]
@@ -42,4 +42,4 @@ bag [bag [6]] ⊆ bag [bag [6]]
 [1,2] elem {[2,3], [1,2], [4,5]}
 [1,2] elem {[2,3], [2,1], [4,5]}
 {1,2} elem {{2,3}, {2,1}, {4,5}}
-{} elem (powerSet {1,2,3})
+{} elem (power {1,2,3})

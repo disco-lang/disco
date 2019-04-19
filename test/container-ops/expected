@@ -13,7 +13,7 @@ true
 {{}, {1}}
 {{}, {{}}}
 {{}, {{}}, {{}, {{}}}, {{{}}}}
-powerSet (powerSet (powerSet {})) : Set Set Set Set a
+power (power (power {})) : Set Set Set Set a
 {{}, {"hi"}, {"hi", "there"}, {"there"}}
 ⟅1, 2⟆
 ⟅1, 2⟆

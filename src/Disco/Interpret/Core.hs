@@ -779,14 +779,14 @@ repBag elt rep = do
 bagElem :: Type -> Value -> Value -> Disco IErr Value
 bagElem ty x b = do
   VBag xs <- whnfV b
-  mkEnum <$> elemOf x (map fst xs)
+  mkEnum <$> elemOf (map fst xs)
 
   where
-    elemOf _ [] = return False
-    elemOf x (y:ys) = do
+    elemOf [] = return False
+    elemOf (y:ys) = do
       eq <- decideEqFor ty x y
       case eq of
-        False -> elemOf x ys
+        False -> elemOf ys
         True  -> return True
 
 -- | Test whether a given value is an element of a list.

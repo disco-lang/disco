@@ -720,17 +720,24 @@ typecheck Infer (TPrim prim) = do
       return $ argTy :->: resTy
 
     ----------------------------------------
-    -- set size, power set
+    -- set size, power set/bag
 
     -- XXX set size should move into standard library
     inferPrim PrimSize = do
       a <- freshTy
       return $ TySet a :->: TyN
 
-    -- XXX generalize to sets and bags?
     inferPrim PrimPower = do
       a <- freshTy
-      return $ TySet a :->: TySet (TySet a)
+      c <- freshAtom
+
+      constraint $ CQual QCmp a
+      constraint $ COr
+        [ CEq (TyAtom (ABase CtrSet)) (TyAtom c)
+        , CEq (TyAtom (ABase CtrBag)) (TyAtom c)
+        ]
+
+      return $ TyContainer c a :->: TyContainer c (TyContainer c a)
 
 --------------------------------------------------
 -- Base types

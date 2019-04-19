@@ -51,12 +51,12 @@ import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (filterM, (>=>))
 import           Control.Monad.Except                    (throwError)
-import           Data.Bifunctor                          (second)
+import           Data.Bifunctor                          (first, second)
 import           Data.Char
 import           Data.Coerce                             (coerce)
 import           Data.IntMap.Lazy                        ((!))
 import qualified Data.IntMap.Lazy                        as IntMap
-import           Data.List                               (find, subsequences)
+import           Data.List                               (find)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
@@ -754,12 +754,20 @@ ctrSize v = do
   VBag xs <- whnfV v
   return $ vnum (fromIntegral $ sum (map snd xs))
 
--- | Compute the power set of a set.
-powerSet :: Type -> Value -> Disco IErr Value
-powerSet ty v = do
+-- | Compute the power set/bag of a set/bag.
+power :: Type -> Value -> Disco IErr Value
+power ty v = do
   VBag xs <- whnfV v
-  ys <- sortNCount (decideOrdFor (TySet ty)) (map (\x -> (VBag x, 1)) (subsequences xs))
+  ys <- sortNCount (decideOrdFor (TyBag ty)) (map (first VBag) (choices xs))
   return $ VBag ys
+
+  where
+    choices :: [(Value, Integer)] -> [([(Value, Integer)], Integer)]
+    choices [] = [([], 1)]
+    choices ((x, n) : xs) = xs' ++ concatMap (\k -> map (cons n (x,k)) xs') [1 .. n]
+      where
+        xs' = choices xs
+    cons n (x,k) (zs, m) = ((x,k):zs , choose n k * m)
 
 -- | Create a bag having a certain number of copies of a single element.
 repBag :: Value -> Value -> Disco IErr Value
@@ -847,7 +855,7 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 -- Container operations
 
 whnfOp (OSize)         = arity1 "ctrSize"  $ ctrSize
-whnfOp (OPowerSet ty)  = arity1 "powerSet" $ powerSet ty
+whnfOp (OPower ty)     = arity1 "power"    $ power ty
 whnfOp ORep            = arity2 "repBag"   $ repBag
 whnfOp (OBagElem ty)   = arity2 "bagElem"  $ bagElem ty
 whnfOp (OListElem ty)  = arity2 "listElem" $ listElem ty

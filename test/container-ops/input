@@ -27,6 +27,11 @@ bag [1,2,3] \ bag [3,2]
 (bag [5,6] ⊆ bag [5,6,7] : B)
 bag [] ⊆ bag [bag [6]]
 bag [bag [6]] ⊆ bag [bag [6]]
+power (bag [])
+power (bag [1])
+power (bag [1,2])
+power (bag ['a', 'b', 'b'])
+power (bag ['a', 'b', 'a', 'b', 'b'])
 2 elem {1,2,3}
 2 ∈ {1,2,3}
 4 elem {1,2,3}

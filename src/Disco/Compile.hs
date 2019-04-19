@@ -140,7 +140,8 @@ compilePrim _ PrimCeil  = return $ CConst OCeil
 compilePrim _ PrimAbs   = return $ CConst OAbs
 compilePrim _ PrimSize  = return $ CConst OSize
 
-compilePrim (TySet a :->: _) PrimPower = return $ CConst (OPowerSet a)
+compilePrim (TySet a :->: _) PrimPower = return $ CConst (OPower a)
+compilePrim (TyBag a :->: _) PrimPower = return $ CConst (OPower a)
 compilePrim ty               PrimPower = compilePrimErr PrimPower ty
 
 compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList

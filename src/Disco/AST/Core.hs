@@ -131,7 +131,6 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OSize           -- ^ Size of two sets (@size@)
         | OPower Type     -- ^ Power set/bag of a given set/bag
                           --   (@power@). Carries the element type.
-        | ORep            -- ^ Primitive bag constructor (replicate).
         | OBagElem Type   -- ^ Set/bag element test.
         | OListElem Type  -- ^ List element test.
 
@@ -207,7 +206,6 @@ opArity (OMExp _)        = 2
 opArity (OMDivides _)    = 2
 opArity OSize            = 1
 opArity (OPower _)       = 1
-opArity ORep             = 2
 opArity (OBagElem _)     = 2
 opArity (OListElem _)    = 2
 opArity OMapList         = 2

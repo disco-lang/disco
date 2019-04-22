@@ -769,12 +769,6 @@ power ty v = do
         xs' = choices xs
     cons n (x,k) (zs, m) = ((x,k):zs , choose n k * m)
 
--- | Create a bag having a certain number of copies of a single element.
-repBag :: Value -> Value -> Disco IErr Value
-repBag elt rep = do
-  VNum _ r <- whnfV rep
-  return $ VBag [(elt, numerator r)]
-
 -- | Test whether a given value is an element of a bag or set.
 bagElem :: Type -> Value -> Value -> Disco IErr Value
 bagElem ty x b = do
@@ -856,7 +850,6 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 
 whnfOp (OSize)         = arity1 "ctrSize"  $ ctrSize
 whnfOp (OPower ty)     = arity1 "power"    $ power ty
-whnfOp ORep            = arity2 "repBag"   $ repBag
 whnfOp (OBagElem ty)   = arity2 "bagElem"  $ bagElem ty
 whnfOp (OListElem ty)  = arity2 "listElem" $ listElem ty
 

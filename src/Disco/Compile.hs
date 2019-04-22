@@ -283,7 +283,7 @@ compileBOp (TyFin n) _ _ op
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op
-  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose, Rep]
+  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
   = CConst (regularOps ! op)
   where
     regularOps = M.fromList
@@ -294,7 +294,6 @@ compileBOp _ _ _ op
       , Mod     ==> OMod
       , Divides ==> ODivides
       , Choose  ==> OMultinom
-      , Rep     ==> ORep
       ]
 
 -- Eq and Lt need to remember the type of the things being compared so

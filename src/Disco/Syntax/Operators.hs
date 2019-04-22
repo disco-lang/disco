@@ -72,7 +72,6 @@ data BOp = Add     -- ^ Addition (@+@)
          | Diff    -- ^ Difference between two sets (@\@)
          | Elem    -- ^ Element test (@∈@)
          | Subset  -- ^ Subset test (@⊆@)
-         | Rep     -- ^ Replicate to construct a bag (@#@)
   deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Type operators.
@@ -142,8 +141,6 @@ opTable =
   , [ uopInfo Pre  Neg     ["-"]
     ]
   , [ bopInfo In   Choose  ["choose"]
-    ]
-  , [ bopInfo InL  Rep     ["#"]
     ]
   , [ bopInfo InL  Union   ["union", "∪"]
     , bopInfo InL  Inter   ["intersect", "∩"]

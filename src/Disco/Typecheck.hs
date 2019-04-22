@@ -546,12 +546,6 @@ typecheck Infer (TPrim prim) = do
       let ca = TyContainer c a
       return $ (TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca
 
-    -- XXX make this a std lib function
-    -- ~#~ : a -> N -> Bag a
-    inferPrim (PrimBOp Rep) = do
-      a <- freshTy
-      return $ a :->: TyN :->: TyBag a
-
     inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
       a <- freshTy
       c <- freshAtom

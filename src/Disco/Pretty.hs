@@ -222,12 +222,15 @@ prettyTerm (TTup ts)     = do
   ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
   parens (hsep ds)
 prettyTerm (TContainer c ts e)  = do
-  ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
+  ds <- punctuate (text ",") (map prettyCount ts)
   let pe = case e of
              Nothing        -> []
              Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
   containerDelims c (hsep (ds ++ pe))
+  where
+    prettyCount (t, Nothing) = prettyTerm' 0 InL t
+    prettyCount (t, Just n)  = prettyTerm' 0 InL t <+> text "#" <+> prettyTerm' 0 InR n
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
   containerDelims c (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
@@ -464,14 +467,15 @@ prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IE
 prettyBag out _ []         = out "⟅⟆"
 prettyBag out t vs
   | all ((==1) . snd) vs   = out "⟅" >> prettySequence out t (map fst vs) ", " >> out "⟆"
-  | otherwise              = out "bagFromCounts {" >> prettyCounts vs >> out "}"
+  | otherwise              = out "⟅" >> prettyCounts vs >> out "⟆"
 
   where
     prettyCounts []      = error "Impossible! prettyCounts []"
     prettyCounts [v]     = prettyCount v
     prettyCounts (v:vs') = prettyCount v >> out ", " >> prettyCounts vs'
 
-    prettyCount (v,n)    = out "(" >> prettyValueWith out t v >> out (", " ++ show n ++ ")")
+    prettyCount (v,1)    = prettyValueWith out t v
+    prettyCount (v,n)    = prettyValueWith out t v >> out (" # " ++ show n)
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""

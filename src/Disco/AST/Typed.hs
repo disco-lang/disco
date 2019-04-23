@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE TypeFamilies          #-}
 {-# LANGUAGE ViewPatterns          #-}
 
@@ -185,7 +186,7 @@ pattern ATChain ty term linklist = TChain_ ty term linklist
 pattern ATTyOp :: Type -> TyOp -> Type -> ATerm
 pattern ATTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
-pattern ATContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
+pattern ATContainer :: Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellipsis ATerm) -> ATerm
 pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
@@ -196,7 +197,9 @@ pattern ATContainerComp ty c b = TContainerComp_ ty c b
              ATContainer, ATContainerComp #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
-pattern ATList t xs e = ATContainer t ListContainer xs e
+pattern ATList t xs e <- ATContainer t ListContainer (map fst -> xs) e
+  where
+    ATList t xs e = ATContainer t ListContainer (map (,Nothing) xs) e
 
 pattern ATListComp :: Type -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATListComp t b = ATContainerComp t ListContainer b

@@ -1,4 +1,4 @@
 {{1, 2}, {1, 3}, {2, 3}}
 true
-{bagFromCounts {(1, 3)}, bagFromCounts {(2, 5)}}
+{⟅1 # 3⟆, ⟅2 # 5⟆}
 true

@@ -43,7 +43,7 @@ erase (ATInj _ s at)        = TInj s (erase at)
 erase (ATCase _ brs)        = TCase (map eraseBranch brs)
 erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
 erase (ATTyOp _ op ty)      = TTyOp op ty
-erase (ATContainer _ c ats aell)   = TContainer c (map erase ats) ((fmap . fmap) erase aell)
+erase (ATContainer _ c ats aell)   = TContainer c (map (erase *** fmap erase) ats) ((fmap . fmap) erase aell)
 erase (ATContainerComp _ c b)      = TContainerComp c $ bind (mapTelescope eraseQual tel) (erase at)
   where (tel,at) = unsafeUnbind b
 

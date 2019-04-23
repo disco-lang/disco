@@ -628,10 +628,10 @@ primBagFromCounts ty b = do
   VBag <$> sortNCount (decideOrdFor ty) cs'
 
   where
-    getCount (cnt, _) = do
+    getCount (cnt, k) = do
       VCons 0 [x,nv] <- whnfV cnt
       VNum _ n <- whnfV nv
-      return (x, numerator n)
+      return (x, numerator n * k)
 
 --------------------------------------------------
 -- Map

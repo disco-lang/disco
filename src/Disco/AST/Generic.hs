@@ -314,7 +314,7 @@ data Term_ e where
   TTyOp_  :: X_TTyOp e -> TyOp -> Type -> Term_ e
 
   -- | A containter literal (set, bag, or list).
-  TContainer_ :: X_TContainer e -> Container -> [Term_ e] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
+  TContainer_ :: X_TContainer e -> Container -> [(Term_ e, Maybe (Term_ e))] -> Maybe (Ellipsis (Term_ e)) -> Term_ e
 
   -- | A container comprehension.
   TContainerComp_ :: X_TContainerComp e -> Container -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e

@@ -37,6 +37,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
+import Data.Maybe (isJust, fromMaybe)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
@@ -138,7 +139,7 @@ ctrNil :: Container -> Type -> ATerm
 ctrNil ctr ty = ATContainer (containerTy ctr ty) ctr [] Nothing
 
 ctrSingleton :: Container -> ATerm -> ATerm
-ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [t] Nothing
+ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [(t, Nothing)] Nothing
 
 ------------------------------------------------------------
 -- Making DTerms
@@ -203,11 +204,21 @@ desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
   | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
 desugarTerm (ATPrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
+desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
+  c <- fresh (string2Name "c")
+  body <- desugarTerm $
+    tapp (ATPrim (TyBag cts :->: TyBag b) PrimC2B)
+      (tapp (ATPrim (TyList cts :->: TyBag cts) PrimBag)
+        (ATVar (TyList cts) c)
+      )
+  return $ mkLambda ty [c] body
+
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
 desugarTerm (ATBool b)           = return $ DTBool b
 desugarTerm (ATChar c)           = return $ DTChar c
-desugarTerm (ATString cs)        = desugarContainer (TyList TyC) ListContainer (map ATChar cs) Nothing
+desugarTerm (ATString cs)        =
+  desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing
 desugarTerm (ATAbs ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t
@@ -479,7 +490,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
 desugarLet :: [ABinding] -> ATerm -> DSM DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
-  DTApp (getType t)
+  dtapp
     <$> (DTLam (getType t1 :->: getType t)
           <$> (bind (coerce x) <$> desugarLet ls t)
         )
@@ -703,28 +714,42 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       return (g1 ++ g2 ++ g3 ++ g4)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
-desugarContainer :: Type -> Container -> [ATerm] -> Maybe (Ellipsis ATerm) -> DSM DTerm
+desugarContainer :: Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellipsis ATerm) -> DSM DTerm
 
 -- Literal list containers desugar to nested applications of cons.
 desugarContainer ty ListContainer es Nothing =
-  foldr (mkDTBin ty Cons) (DTNil ty) <$> mapM desugarTerm es
+  foldr (mkDTBin ty Cons) (DTNil ty) <$> mapM desugarTerm (map fst es)
 
 -- A list container with an ellipsis (@[x, y, z ..]@) desugars to
 -- an application of the primitive 'forever' function...
 desugarContainer ty ListContainer es (Just Forever) =
-  DTApp ty (DTPrim (ty :->: ty) PrimForever) <$> desugarContainer ty ListContainer es Nothing
+  dtapp (DTPrim (ty :->: ty) PrimForever) <$> desugarContainer ty ListContainer es Nothing
 
 -- ... or @[x, y, z .. e]@ desugars to an application of the primitive
 -- 'until' function.
 desugarContainer ty@(TyList eltTy) ListContainer es (Just (Until t)) =
-  DTApp ty
-    <$> (DTApp (ty :->: ty) (DTPrim (eltTy :->: ty :->: ty) PrimUntil) <$> desugarTerm t)
+  dtapp
+    <$> (dtapp (DTPrim (eltTy :->: ty :->: ty) PrimUntil) <$> desugarTerm t)
     <*> desugarContainer ty ListContainer es Nothing
 
--- Other containers with ellipses desugar to an application of the
--- appropriate container conversion function to the corresponding desugared list.
+-- If desugaring a bag and there are any counts specified, desugar to
+-- an application of bagFromCounts to a bag of pairs (with a literal
+-- value of 1 filled in for missing counts as needed).
+desugarContainer (TyBag eltTy) BagContainer es mell
+  | any isJust (map snd es) =
+    dtapp (DTPrim (TySet (TyPair eltTy TyN) :->: TyBag eltTy) PrimC2B)
+      <$> desugarContainer (TyBag (TyPair eltTy TyN)) BagContainer counts mell
+
+    where
+      -- turn e.g.  x # 3, y   into   (x, 3), (y, 1)
+      counts = [ (ATTup (TyPair eltTy TyN) [t, fromMaybe (ATNat TyN 1) n], Nothing)
+               | (t, n) <- es
+               ]
+
+-- Other containers desugar to an application of the appropriate
+-- container conversion function to the corresponding desugared list.
 desugarContainer ty _ es mell =
-  DTApp ty (DTPrim (TyList eltTy :->: ty) conv)
+  dtapp (DTPrim (TyList eltTy :->: ty) conv)
     <$> desugarContainer (TyList eltTy) ListContainer es mell
   where
     (conv, eltTy) = case ty of

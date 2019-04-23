@@ -3,8 +3,10 @@
 {-# LANGUAGE GADTs                #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TupleSections        #-}
 {-# LANGUAGE TypeFamilies         #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -268,7 +270,7 @@ pattern TChain term linklist = TChain_ () term linklist
 pattern TTyOp :: TyOp -> Type -> Term
 pattern TTyOp tyop ty = TTyOp_ () tyop ty
 
-pattern TContainer :: Container -> [Term] -> Maybe (Ellipsis Term) -> Term
+pattern TContainer :: Container -> [(Term, Maybe Term)] -> Maybe (Ellipsis Term) -> Term
 pattern TContainer c tl mets = TContainer_ () c tl mets
 
 pattern TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
@@ -288,7 +290,9 @@ pattern TWild = XTerm_ ()
              TContainer, TContainerComp, TAscr, TWild #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
-pattern TList ts e = TContainer_ () ListContainer ts e
+pattern TList ts e <- TContainer_ () ListContainer (map fst -> ts) e
+  where
+    TList ts e = TContainer_ () ListContainer (map (,Nothing) ts) e
 
 pattern TListComp :: Bind (Telescope Qual) Term -> Term
 pattern TListComp x = TContainerComp_ () ListContainer x

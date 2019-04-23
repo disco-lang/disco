@@ -498,7 +498,9 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimC2B = do
       a <- freshTy
-      return $ TySet (TyPair a TyN) :->: TyBag a
+      c <- freshAtom
+      constraint $ CQual QCmp a
+      return $ TyContainer c (TyPair a TyN) :->: TyBag a
 
     ----------------------------------------
     -- Container primitives
@@ -922,11 +924,11 @@ typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
 -- Literal containers, including ellipses
 typecheck mode t@(TContainer c xs ell)  = do
   eltMode <- ensureConstrMode1 (containerToCon c) mode (Left t)
-  axs  <- mapM (typecheck eltMode) xs
-  aell <- typecheckEllipsis eltMode ell
+  axns  <- mapM (\(x,n) -> (,) <$> typecheck eltMode x <*> traverse (flip check TyN) n) xs
+  aell  <- typecheckEllipsis eltMode ell
   resTy <- case mode of
     Infer -> do
-      let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map getType) axs
+      let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map (getType . fst)) axns
       tyv  <- freshTy
       constraints $ map (flip CSub tyv) tys
       return $ containerTy c tyv
@@ -934,7 +936,7 @@ typecheck mode t@(TContainer c xs ell)  = do
   when (isJust ell) $ do
     eltTy <- getEltTy c resTy
     constraint $ CQual QEnum eltTy
-  return $ ATContainer resTy c axs aell
+  return $ ATContainer resTy c axns aell
 
   where
     typecheckEllipsis :: Mode -> Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm))

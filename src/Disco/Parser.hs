@@ -177,12 +177,13 @@ bagdelims = between (symbol "⟅") (symbol "⟆")
 fbrack    = between (symbol "⌊") (symbol "⌋")
 cbrack    = between (symbol "⌈") (symbol "⌉")
 
-semi, comma, colon, dot, pipe :: Parser String
+semi, comma, colon, dot, pipe, hash :: Parser String
 semi      = symbol ";"
 comma     = symbol ","
 colon     = symbol ":"
 dot       = symbol "."
 pipe      = symbol "|"
+hash      = symbol "#"
 
 -- | A literal ellipsis of two or more dots, @..@
 ellipsis :: Parser String
@@ -538,27 +539,37 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
     -- remainder just return a singleton container, optionally with an
     -- ellipsis.
     nonEmptyContainer = do
-      t <- parseTerm
+      t <- parseRepTerm
+
       containerRemainder t <|> singletonContainer t
+
+    parseRepTerm = do
+      t <- parseTerm
+      n <- optionMaybe $ do
+        guard (c == BagContainer)
+        void hash
+        parseTerm
+      return (t, n)
 
     singletonContainer t = TContainer c [t] <$> optionMaybe parseEllipsis
 
     -- The remainder of a container after the first term starts with
     -- either a pipe (for a comprehension) or a comma (for a literal
     -- container).
-    containerRemainder :: Term -> Parser Term
-    containerRemainder t = do
+    containerRemainder :: (Term, Maybe Term) -> Parser Term
+    containerRemainder (t,n) = do
       s <- pipe <|> comma
-      case s of
-        "|" -> parseContainerComp c t
-        "," -> do
+      case (s, n) of
+        ("|", Nothing) -> parseContainerComp c t
+        ("|", Just _)  -> fail "no comprehension with bag repetition syntax"
+        (",", _)       -> do
           -- Parse the rest of the terms in a literal container after
           -- the first, then an optional ellipsis, and return
           -- everything together.
-          ts <- parseTerm `sepBy` comma
+          ts <- parseRepTerm `sepBy` comma
           e  <- optionMaybe parseEllipsis
 
-          return $ TContainer c (t:ts) e
+          return $ TContainer c ((t,n):ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
@@ -738,7 +749,7 @@ termToPattern (TBin Div t1 t2)
 termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
 termToPattern (TContainer ListContainer ts Nothing)
-  = PList <$> mapM termToPattern ts
+  = PList <$> mapM termToPattern (map fst ts)
 
 termToPattern _           = Nothing
 

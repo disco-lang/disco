@@ -165,7 +165,7 @@ lkup msg m k = fromMaybe (error errMsg) (M.lookup k m)
 --------------------------------------------------
 -- Top-level solver algorithm
 
-solveConstraint :: M.Map String Type -> Constraint -> SolveM S
+solveConstraint :: TyDefCtx -> Constraint -> SolveM S
 solveConstraint tyDefns c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
@@ -184,7 +184,7 @@ solveConstraint tyDefns c = do
   -- a solution.
   msum (map (uncurry (solveConstraintChoice tyDefns)) qcList)
 
-solveConstraintChoice :: M.Map String Type -> SortMap -> [SimpleConstraint] -> SolveM S
+solveConstraintChoice :: TyDefCtx -> SortMap -> [SimpleConstraint] -> SolveM S
 solveConstraintChoice tyDefns quals cs = do
 
   traceM (show quals)
@@ -319,7 +319,7 @@ decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstra
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q       = checkQual q a
-decomposeQual ty@(TyDef _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
+decomposeQual ty@(TyCon (CDef _) _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
 decomposeQual ty@(TyCon c tys) q
   = case (M.lookup c >=> M.lookup q) qualRules of
       Nothing -> throwError $ Unqual q ty
@@ -354,7 +354,7 @@ type SimplifyM a = StateT SimplifyState (FreshMT (Except SolveError)) a
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
 
-simplify :: M.Map String Type -> SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
+simplify :: TyDefCtx -> SortMap -> [SimpleConstraint] -> Except SolveError (SortMap, [(Atom, Atom)], S)
 simplify tyDefns origSM cs
   = (\(SS sm' cs' s' _) -> (sm', map extractAtoms cs', s'))
   <$> contFreshMT (execStateT simplify' (SS origSM cs idS S.empty)) n
@@ -428,8 +428,8 @@ simplify tyDefns origSM cs
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar {})                 = True
-    simplifiable (TyDef {} :<: _)                        = True
-    simplifiable (_ :<: TyDef {})                        = True
+    simplifiable (TyCon (CDef _) _ :<: _)                = True
+    simplifiable (_ :<: TyCon (CDef _) _)                = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
     simplifiable _                                       = False
@@ -457,15 +457,15 @@ simplify tyDefns origSM cs
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
 
-    simplifyOne' (TyDef t :<: ty2) =
+    simplifyOne' (TyCon (CDef t) ts :<: ty2) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
-        Just ty1 -> ssConstraints %= ((ty1 :<: ty2) :)
+        Just ty1 -> ssConstraints %= undefined -- ((ty1 :<: ty2) :)  -- XXX
 
-    simplifyOne' (ty1 :<: TyDef t) =
+    simplifyOne' (ty1 :<: TyCon (CDef t) ts) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
-        Just ty2 -> ssConstraints %= ((ty1 :<: ty2) :)
+        Just ty2 -> ssConstraints %= undefined -- ((ty1 :<: ty2) :) -- XXX
 
     -- Given a subtyping constraint between two type constructors,
     -- decompose it if the constructors are the same (or fail if they
@@ -581,7 +581,7 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   If there are any WCCs with a single skolem, no base types, and
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
-checkSkolems :: Map String Type -> SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
+checkSkolems :: TyDefCtx -> SortMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
 checkSkolems tyDefns (SM sm) graph = do
   let skolemWCCs :: [Set Atom]
       skolemWCCs = filter (any isSkolem) $ G.wcc graph
@@ -633,7 +633,7 @@ checkSkolems tyDefns (SM sm) graph = do
 --   Of course, this step can fail if the types in a SCC are not
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
-elimCycles :: Map String Type -> Graph UAtom -> Except SolveError (Graph UAtom, S)
+elimCycles :: TyDefCtx -> Graph UAtom -> Except SolveError (Graph UAtom, S)
 elimCycles tyDefns = elimCyclesGen uatomToTypeSubst (unifyUAtoms tyDefns)
 
 elimCyclesGen

@@ -34,8 +34,7 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
-import           Disco.Typecheck.Monad            (TCError (..), TyCtx,
-                                                   TyDefCtx)
+import           Disco.Typecheck.Monad            (TCError (..), TyCtx)
 import           Disco.Types
 
 import           Paths_disco

@@ -81,6 +81,7 @@ module Disco.Types
        , countType
        , unpair
        , S
+       , TyDefCtx
 
        -- * HasType class
        , HasType(..)
@@ -238,6 +239,10 @@ data Con where
   --   could contain any Atom, but it will only ever contain either a
   --   variable or a CtrList, CtrBag, or CtrSet.
   CContainer :: Atom -> Con
+
+  -- | The name of a user defined algebraic datatype.
+  CDef :: String -> Con
+
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Con
@@ -251,7 +256,7 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet #-}
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CDef #-}
 
 ----------------------------------------
 -- Types
@@ -264,11 +269,6 @@ data Type where
 
   -- | Application of a type constructor to type arguments.
   TyCon  :: Con -> [Type] -> Type
-
-  -- | A user defined algrbraic datatype. In order for an ADT to be a valid
-  --   type, the string representing the ADT must appear on the left hand side of
-  --   a ADT declaration.
-  TyDef :: String -> Type
 
   deriving (Show, Eq, Ord, Generic)
 
@@ -343,7 +343,7 @@ pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
-      TyDef, TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
+      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
       TyArr, TyPair, TySum, TyList, TyBag, TySet #-}
 
 instance Subst Type Var
@@ -367,6 +367,9 @@ instance (Ord a, Subst t a) => Subst t (Set a) where
 instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
+
+-- | A map from type names to their corresponding definitions.
+type TyDefCtx = M.Map String (Bind [Name Type] Type)
 
 ----------------------------------------
 -- Sigma types (i.e. quanitified types)

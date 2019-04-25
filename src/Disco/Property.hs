@@ -250,7 +250,7 @@ discoGenerator (TySet ty) =
 discoGenerator (TyArr _ty1 _ty2) =
   error "discoGenerator is not yet implemented for TyArr"
 
-discoGenerator (TyDef _name) =
+discoGenerator (TyCon (CDef _) _) =
   error "discoGenerator is not yet implemented for TyDef"
 
 -- | @genValues n ty@ generates a random sequence of @n@ increasingly

@@ -32,9 +32,6 @@ import           Disco.Types
 -- Contexts
 ------------------------------------------------------------
 
--- | A map from type names to their corresponding definitions.
-type TyDefCtx = M.Map String Type
-
 -- | A typing context is a mapping from term names to types.
 type TyCtx = Ctx Term Sigma
 
@@ -146,12 +143,14 @@ lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error
 --   if it is not found.
-lookupTyDefn :: String -> TCM Type
-lookupTyDefn x = do
+lookupTyDefn :: String -> [Type] -> TCM Type
+lookupTyDefn x args = do
   d <- get
   case M.lookup x d of
     Nothing -> throwError (NotTyDef x)
-    Just ty -> return ty
+    Just tydef -> do
+      (as, body) <- unbind tydef
+      return $ substs (zip as args) body
 
 withTyDefns :: TyDefCtx -> TCM a -> TCM a
 withTyDefns tyDefnCtx m = do

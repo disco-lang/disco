@@ -409,9 +409,13 @@ parseDefn = label "definition" $
 
 -- | Parse the definition of a user-defined algebraic data type.
 parseTyDefn :: Parser TypeDefn
-parseTyDefn = label "type defintion" $
-  TypeDefn
-  <$> (reserved "type" *> (parseTyDef)) <*> ((symbol "=") *> parseType)
+parseTyDefn = label "type defintion" $ do
+  reserved "type"
+  name <- parseTyDef
+  args <- many parseTyVar
+  symbol "="
+  body <- parseType
+  return $ TypeDefn name (bind args body)
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -891,15 +895,7 @@ parseAtomicType = label "type" $
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
-    -- This explicitly allows "List List N" to parse as List (List N).
-    -- Since we don't have arbitrary application of higher-kinded type
-    -- expressions, only application of an explicit set of
-    -- right-associative single-argument type formers (e.g. List, and
-    -- eventually things like Set), this can't cause any ambiguity.
-  <|> TyList <$> (reserved "List" *> parseAtomicType)
-  <|> TyBag  <$> (reserved "Bag"  *> parseAtomicType)
-  <|> TySet  <$> (reserved "Set"  *> parseAtomicType)
-  <|> TyDef  <$> parseTyDef
+  <|> TyCon  <$> parseCon <*> pure []
   <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
@@ -907,11 +903,18 @@ parseTyFin :: Parser Type
 parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
+parseCon :: Parser Con
+parseCon =
+      CList <$  reserved "List"
+  <|> CBag  <$  reserved "Bag"
+  <|> CSet  <$  reserved "Set"
+  <|> CDef  <$> parseTyDef
+
 parseTyDef :: Parser String
 parseTyDef =  identifier upperChar
 
 parseTyVar :: Parser (Name Type)
-parseTyVar = string2Name <$> (identifier lowerChar)
+parseTyVar = string2Name <$> identifier lowerChar
 
 parseSigma :: Parser Sigma
 parseSigma = closeSigma <$> parseType
@@ -920,7 +923,8 @@ parseSigma = closeSigma <$> parseType
 parseType :: Parser Type
 parseType = makeExprParser parseAtomicType table
   where
-    table = [ [ infixR "*" TyPair
+    table = [ [ InfixL (return tyApp) ]
+            , [ infixR "*" TyPair
               , infixR "×" TyPair ]
             , [ infixR "+" TySum
               , infixR "⊎" TySum
@@ -931,6 +935,9 @@ parseType = makeExprParser parseAtomicType table
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
+
+    tyApp (TyCon c args) t = TyCon c (args ++ [t])
+    -- XXX partial
 
 parseTyOp :: Parser TyOp
 parseTyOp =

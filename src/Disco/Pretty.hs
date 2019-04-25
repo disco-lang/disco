@@ -153,7 +153,7 @@ prettyTy (TySet ty)       = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
 prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
   text (show c) <+> prettyTy' 9 InR ty
-prettyTy (TyDef n)        = text n
+prettyTy (TyCon (CDef name) args)        = text name -- XXX and args!
 prettyTy (Skolem n)       = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
@@ -371,7 +371,7 @@ prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettySigma ty
-prettyDecl (DTyDef (TypeDefn x ty)) = text "type" <+> text x <+> text "=" <+> prettyTy ty
+-- XXX fixme prettyDecl (DTyDef (TypeDefn x ty)) = text "type" <+> text x <+> text "=" <+> prettyTy ty
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map prettyClause bs
   where
     prettyClause b
@@ -418,9 +418,9 @@ prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
-prettyWHNF out (TyDef n) v = do
+prettyWHNF out (TyCon (CDef n) args) v = do
   tymap <- use topTyDefns
-  case M.lookup n tymap of
+  case M.lookup n tymap of  --- XXX use args
     Just ty -> prettyWHNF out ty v
     Nothing -> error "Impossible! TyDef name does not exist in TyMap"
 

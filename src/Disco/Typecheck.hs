@@ -131,7 +131,9 @@ checkCyclicTys :: [TypeDefn] -> TCM ()
 checkCyclicTys = mapM_ unwrap
   where
     unwrap :: TypeDefn -> TCM (Set String)
-    unwrap (TypeDefn x _) = checkCyclicTy (TyDef x) S.empty
+    unwrap (TypeDefn x b) = do
+      (args, _) <- unbind b
+      checkCyclicTy (TyCon (CDef x) (map TyVar args)) S.empty
 
 -- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
 -- 1.) 'ty' is a TyDef.
@@ -139,11 +141,11 @@ checkCyclicTys = mapM_ unwrap
 -- 3.) An expansion of a TyDef yields another TyDef that has been previously encountered.
 -- The function returns the set of TyDefs encountered during expansion if the TyDef is not cyclic.
 checkCyclicTy :: Type -> Set String -> TCM (Set String)
-checkCyclicTy (TyDef name) set = do
+checkCyclicTy (TyCon (CDef name) args) set = do
   case S.member name set of
     True -> throwError (CyclicTyDef name)
     False -> do
-      ty <- lookupTyDefn name
+      ty <- lookupTyDefn name args
       checkCyclicTy ty (S.insert name set)
 
 checkCyclicTy _ set = return set
@@ -349,8 +351,8 @@ typecheck :: Mode -> Term -> TCM ATerm
 
 -- To check at a defined type, expand its definition and recurse.
 -- This case has to be first, so in all other cases we know the type
--- will not be a TyDef.
-typecheck (Check (TyDef tyn)) t = lookupTyDefn tyn >>= check t
+-- will not be a CDef.
+typecheck (Check (TyCon (CDef name) args)) t = lookupTyDefn name args >>= check t
 
 --------------------------------------------------
 -- Parens
@@ -1063,7 +1065,7 @@ typecheck (Check ty) t = do
 --   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern)
 
-checkPattern p (TyDef tyn) = lookupTyDefn tyn >>= checkPattern p
+checkPattern p (TyCon (CDef name) args) = lookupTyDefn name args >>= checkPattern p
 
 checkPattern (PVar x) ty = return (singleCtx x (toSigma ty), APVar ty (coerce x))
 

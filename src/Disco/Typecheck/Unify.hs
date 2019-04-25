@@ -12,7 +12,7 @@
 
 module Disco.Typecheck.Unify where
 
-import           Unbound.Generics.LocallyNameless (Name, fv, substs)
+import           Unbound.Generics.LocallyNameless (Bind, Name, fv, substs)
 
 import           Control.Lens                     (anyOf)
 import           Control.Monad.State
@@ -38,7 +38,7 @@ import           Disco.Types
 --
 --   This is not the most efficient way to implement unification but
 --   it is simple.
-unify :: Map String Type -> [(Type, Type)] -> Maybe S
+unify :: TyDefCtx -> [(Type, Type)] -> Maybe S
 unify = unify' (==)
 
 -- | Given a list of equations between types, return a substitution
@@ -47,13 +47,14 @@ unify = unify' (==)
 --   -> Int) does not.  This is used to check whether subtyping
 --   constraints are structurally sound before doing constraint
 --   simplification/solving, to ensure termination.
-weakUnify :: Map String Type -> [(Type, Type)] -> Maybe S
+weakUnify :: TyDefCtx -> [(Type, Type)] -> Maybe S
 weakUnify = unify' (\_ _ -> True)
 
 -- | Given a list of equations between types, return a substitution
 --   which makes all the equations satisfied (or fail if it is not
 --   possible), up to the given comparison on base types.
-unify' :: (BaseTy -> BaseTy -> Bool) -> M.Map String Type -> [(Type, Type)] -> Maybe S
+unify' :: (BaseTy -> BaseTy -> Bool) -> TyDefCtx
+       -> [(Type, Type)] -> Maybe S
 unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
   where
     go :: [(Type, Type)] -> StateT (Set (Type,Type)) Maybe S
@@ -87,23 +88,25 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     unifyOne' (Skolem _, _) = mzero
     unifyOne' (_, Skolem _) = mzero
 
-    unifyOne' p@(TyDef t, ty2) = do
-      modify (S.insert p)
-      case M.lookup t tyDefns of
-        Nothing  -> mzero
-        Just ty1 -> return $ Right [(ty1,ty2)]
-
-    unifyOne' p@(ty1, TyDef t) = do
-      modify (S.insert p)
-      case M.lookup t tyDefns of
-        Nothing  -> mzero
-        Just ty2 -> return $ Right [(ty1,ty2)]
-
     -- Unify two container types: unify the container descriptors as
     -- well as the type arguments
     unifyOne' p@(TyCon (CContainer ctr1) tys1, TyCon (CContainer ctr2) tys2) = do
       modify (S.insert p)
       return $ Right ((TyAtom ctr1, TyAtom ctr2) : zipWith (,) tys1 tys2)
+
+    -- If one of the types to be unified is a user-defined type,
+    -- unfold its definition before continuing the matching
+    unifyOne' p@(TyCon (CDef t) tys1, ty2) = do
+      modify (S.insert p)
+      case M.lookup t tyDefns of
+        Nothing  -> mzero
+        Just ty1 -> undefined -- return $ Right [(ty1,ty2)]  -- XXX apply ty1 to tys1
+
+    unifyOne' p@(ty1, TyCon (CDef t) tys2) = do
+      modify (S.insert p)
+      case M.lookup t tyDefns of
+        Nothing  -> mzero
+        Just ty2 -> undefined -- return $ Right [(ty1,ty2)]  -- XXX apply ty2 to tys2
 
     -- Unify any other pair of type constructor applications: the type
     -- constructors must match exactly
@@ -118,7 +121,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     unifyOne' _ = mzero  -- Atom = Cons
 
 
-equate :: Map String Type -> [Type] -> Maybe S
+equate :: TyDefCtx -> [Type] -> Maybe S
 equate tyDefns tys = unify tyDefns eqns
   where
     eqns = zipWith (,) tys (tail tys)
@@ -127,14 +130,14 @@ occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (==x)
 
 
-unifyAtoms :: Map String Type -> [Atom] -> Maybe (S' Atom)
+unifyAtoms :: TyDefCtx -> [Atom] -> Maybe (S' Atom)
 unifyAtoms tyDefns = fmap convert . equate tyDefns . map TyAtom
   where
     -- Guaranteed that this will get everything in the list, since we
     -- started with all atoms.
     convert s = [(coerce x, a) | (x, TyAtom a) <- s]
 
-unifyUAtoms :: Map String Type -> [UAtom] -> Maybe (S' UAtom)
+unifyUAtoms :: TyDefCtx -> [UAtom] -> Maybe (S' UAtom)
 unifyUAtoms tyDefns = fmap convert . equate tyDefns . map (TyAtom . uatomToAtom)
   where
     convert s = [(coerce x, UB b) | (x, TyAtom (ABase b))    <- s]

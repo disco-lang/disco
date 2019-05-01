@@ -29,7 +29,8 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed, substs)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, substs,
+                                                   unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -40,7 +41,6 @@ import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
-import Disco.Typecheck.Monad (lookupTyDefn)
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -154,7 +154,8 @@ prettyTy (TySet ty)       = mparens (PA 9 InR) $
   text "Set" <+> prettyTy' 9 InR ty
 prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
   text (show c) <+> prettyTy' 9 InR ty
-prettyTy (TyCon (CDef name) args)        = text name -- XXX and args!
+prettyTy (TyUser name args) = mparens (PA 9 InR) $
+  hsep (text name : map (prettyTy' 9 InR) args)
 prettyTy (Skolem n)       = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
@@ -477,8 +478,8 @@ prettyBag out t vs
     prettyCounts [v]     = prettyCount v
     prettyCounts (v:vs') = prettyCount v >> out ", " >> prettyCounts vs'
 
-    prettyCount (v,1)    = prettyValueWith out t v
-    prettyCount (v,n)    = prettyValueWith out t v >> out (" # " ++ show n)
+    prettyCount (v,1) = prettyValueWith out t v
+    prettyCount (v,n) = prettyValueWith out t v >> out (" # " ++ show n)
 
 prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
 prettyString out str = out "\"" >> go str >> out "\""

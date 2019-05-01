@@ -24,7 +24,7 @@ append (x::xs) ys = x :: append xs ys
 
 !!!   concat [[1,2],[3],[],[4,5,6]] == [1,2,3,4,5,6]
 
-concat : List List a → List a
+concat : List (List a) → List a
 concat []      = []
 concat (l::ls) = append l (concat ls)
 

@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -58,6 +59,8 @@ data TCError
   | NotTyDef String        -- ^ An undefined type name was used.
   | NoTWild                -- ^ Wildcards are not allowed in terms.
   | CantInferPrim Prim     -- ^ Can't infer the type of some prims
+  | NotEnoughArgs Con      -- ^ Not enough arguments provided to type constructor.
+  | TooManyArgs Con        -- ^ Too many arguments provided to type constructor.
   | Failure String         -- ^ Generic failure.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.

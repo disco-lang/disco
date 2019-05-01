@@ -29,7 +29,7 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed, substs)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -40,6 +40,7 @@ import           Disco.Interpret.Core             (whnfV)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
+import Disco.Typecheck.Monad (lookupTyDefn)
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -418,10 +419,12 @@ prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
-prettyWHNF out (TyCon (CDef n) args) v = do
+prettyWHNF out (TyUser nm args) v = do
   tymap <- use topTyDefns
-  case M.lookup n tymap of  --- XXX use args
-    Just ty -> prettyWHNF out ty v
+  case M.lookup nm tymap of
+    Just tydef -> do
+      lunbind tydef $ \(as, body) ->
+        prettyWHNF out (substs (zip as args) body) v
     Nothing -> error "Impossible! TyDef name does not exist in TyMap"
 
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"

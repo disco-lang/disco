@@ -94,18 +94,19 @@ inferTelescope inferOne tel = do
 checkModule :: Module -> TCM ModuleInfo
 checkModule (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
-  tyCtx <- makeTyCtx typeDecls
   tyDefnCtx <- makeTyDefnCtx tydefs
-  withTyDefns tyDefnCtx $ extends tyCtx $ do
-    checkCyclicTys tydefs
-    adefns <- mapM checkDefn defns
-    let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
-    let dups = filterDups . map getDefnName $ adefns
-    case dups of
-      (x:_) -> throwError $ DuplicateDefns (coerce x)
-      [] -> do
-        aprops <- checkProperties docs
-        return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
+  withTyDefns tyDefnCtx $ do
+    tyCtx     <- makeTyCtx typeDecls
+    extends tyCtx $ do
+      checkCyclicTys tydefs
+      adefns <- mapM checkDefn defns
+      let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
+      let dups = filterDups . map getDefnName $ adefns
+      case dups of
+        (x:_) -> throwError $ DuplicateDefns (coerce x)
+        [] -> do
+          aprops <- checkProperties docs
+          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -155,19 +156,22 @@ filterDups = map head . filter ((>1) . length) . group . sort
 --------------------------------------------------
 -- Type declarations
 
--- | Run a type checking computation in the context of some type
---   declarations. First check that there are no duplicate type
---   declarations; then run the computation in a context extended with
---   the declared types.
-
+-- | Given a list of type declarations, first check that there are no
+--   duplicate type declarations, and that the types are well-formed;
+--   then create a type context containing the given declarations.
 makeTyCtx :: [TypeDecl] -> TCM TyCtx
 makeTyCtx decls = do
   let dups = filterDups . map (\(TypeDecl x _) -> x) $ decls
   case dups of
     (x:_) -> throwError (DuplicateDecls x)
-    []    -> return declCtx
+    []    -> do
+      checkCtx declCtx
+      return declCtx
   where
     declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
+
+checkCtx :: TyCtx -> TCM ()
+checkCtx = mapM_ checkSigmaValid . M.elems
 
 --------------------------------------------------
 -- Top-level definitions
@@ -253,6 +257,42 @@ checkProperty prop = do
 ------------------------------------------------------------
 -- Type checking/inference
 ------------------------------------------------------------
+
+--------------------------------------------------
+-- Checking types/kinds
+--------------------------------------------------
+
+-- XXX have to call this from more places!
+
+checkSigmaValid :: Sigma -> TCM ()
+checkSigmaValid (Forall b) = do
+  let (_, ty) = unsafeUnbind b
+  checkTypeValid ty
+
+-- | Disco doesn't need kinds per se, since all types must be fully
+--   applied.  But we do need to check that every type is applied to
+--   the correct number of arguments.
+checkTypeValid :: Type -> TCM ()
+checkTypeValid (TyAtom _)    = return ()
+checkTypeValid (TyCon c tys) = do
+  k <- conArity c
+  case () of
+    _ | k < n     -> throwError (NotEnoughArgs c)
+      | k > n     -> throwError (TooManyArgs c)
+      | otherwise -> mapM_ checkTypeValid tys
+  where
+    n = length tys
+
+conArity :: Con -> TCM Int
+conArity (CContainer _) = return 1
+conArity (CDef name)    = do
+  d <- get
+  case M.lookup name d of
+    Nothing -> throwError (NotTyDef name)
+    Just tydef -> do
+      (as, _) <- unbind tydef
+      return (length as)
+conArity _              = return 2  -- (->, *, +)
 
 --------------------------------------------------
 -- Checking modes
@@ -1043,7 +1083,7 @@ typecheck mode (TCase bs) = do
 
 -- Ascriptions are what let us flip from inference mode into
 -- checking mode.
-typecheck Infer (TAscr t ty) = checkSigma t ty
+typecheck Infer (TAscr t ty) = checkSigmaValid ty >> checkSigma t ty
 
 --------------------------------------------------
 -- Inference fallback

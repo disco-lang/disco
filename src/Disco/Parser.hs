@@ -411,11 +411,12 @@ parseDefn = label "definition" $
 parseTyDefn :: Parser TypeDefn
 parseTyDefn = label "type defintion" $ do
   reserved "type"
-  name <- parseTyDef
-  args <- many parseTyVar
-  symbol "="
-  body <- parseType
-  return $ TypeDefn name (bind args body)
+  indented $ do
+    name <- parseTyDef
+    args <- many parseTyVar
+    _ <- symbol "="
+    body <- parseType
+    return $ TypeDefn name (bind args body)
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).

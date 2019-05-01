@@ -58,6 +58,7 @@ module Disco.Types
        , pattern TyBag
        , pattern TySet
        , pattern TyContainer
+       , pattern TyUser
        , pattern TyString
 
        -- ** Quantified types
@@ -339,12 +340,15 @@ pattern TySet elTy = TyCon CSet [elTy]
 pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
+pattern TyUser :: String -> [Type] -> Type
+pattern TyUser nm args = TyCon (CDef nm) args
+
 pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      TyArr, TyPair, TySum, TyList, TyBag, TySet #-}
+      TyArr, TyPair, TySum, TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy

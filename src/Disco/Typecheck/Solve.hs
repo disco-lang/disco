@@ -21,35 +21,34 @@
 
 module Disco.Typecheck.Solve where
 
-import           Prelude                                 hiding (lookup)
-import qualified Prelude                                 as P
+import           Prelude                          hiding (lookup)
+import qualified Prelude                          as P
 
 import           Unbound.Generics.LocallyNameless
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Coerce
-import           GHC.Generics                            (Generic)
+import           GHC.Generics                     (Generic)
 
-import           Control.Arrow                           ((&&&), (***))
+import           Control.Arrow                    ((&&&), (***))
 import           Control.Lens
-import           Data.Bifunctor                          (second)
-import           Data.Either                             (partitionEithers)
-import           Data.List                               (find, foldl',
-                                                          intersect, partition)
-import           Data.Map                                (Map, (!))
-import qualified Data.Map                                as M
-import           Data.Maybe                              (catMaybes, fromJust,
-                                                          fromMaybe)
-import           Data.Set                                (Set)
-import qualified Data.Set                                as S
+import           Data.Bifunctor                   (second)
+import           Data.Either                      (partitionEithers)
+import           Data.List                        (find, foldl', intersect,
+                                                   partition)
+import           Data.Map                         (Map, (!))
+import qualified Data.Map                         as M
+import           Data.Maybe                       (catMaybes, fromJust,
+                                                   fromMaybe)
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Data.Tuple
 
 import           Disco.Subst
 import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Graph                   (Graph)
-import qualified Disco.Typecheck.Graph                   as G
+import           Disco.Typecheck.Graph            (Graph)
+import qualified Disco.Typecheck.Graph            as G
 import           Disco.Typecheck.Unify
 import           Disco.Types
 import           Disco.Types.Rules
@@ -461,14 +460,14 @@ simplify tyDefns origSM cs
     simplifyOne' (TyCon (CDef t) ts :<: ty2) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
-        Just ty1 -> case unsafeUnbind ty1 of    -- XXX OK?
-          (as, body) -> ssConstraints %= ((substs (zip as ts) body :<: ty2) :)
+        Just (TyDefBody _ body) ->
+          ssConstraints %= ((body ts :<: ty2) :)
 
     simplifyOne' (ty1 :<: TyCon (CDef t) ts) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
-        Just ty2 -> case unsafeUnbind ty2 of   -- XXX ?
-          (as, body) -> ssConstraints %= ((ty1 :<: substs (zip as ts) body) :)
+        Just (TyDefBody _ body) ->
+          ssConstraints %= ((ty1 :<: body ts) :)
 
     -- Given a subtyping constraint between two type constructors,
     -- decompose it if the constructors are the same (or fail if they

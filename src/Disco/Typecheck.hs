@@ -98,7 +98,7 @@ checkModule (Module _ _ m docs) = do
   withTyDefns tyDefnCtx $ do
     tyCtx     <- makeTyCtx typeDecls
     extends tyCtx $ do
-      checkCyclicTys tydefs
+      mapM_ checkTyDefn tydefs
       adefns <- mapM checkDefn defns
       let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
       let dups = filterDups . map getDefnName $ adefns
@@ -113,43 +113,80 @@ checkModule (Module _ _ m docs) = do
 --------------------------------------------------
 -- Type definitions
 
--- | Turn a list of type definitions (which *must* all consist of
---   'DTyDef', /i.e./ @type name = ...@) into a 'TyDefCtx', checking
+-- | Turn a list of type definitions into a 'TyDefCtx', checking
 --   for duplicate names among the definitions and also any type
 --   definitions already in the context.
 makeTyDefnCtx :: [TypeDefn] -> TCM TyDefCtx
 makeTyDefnCtx tydefs = do
   oldTyDefs <- get
   let oldNames = M.keys oldTyDefs
-      newNames = map (\(TypeDefn x _) -> x) tydefs
+      newNames = map (\(TypeDefn x _ _) -> x) tydefs
       dups = filterDups $ newNames ++ oldNames
+
+  let convert (TypeDefn x args body)
+        = (x, TyDefBody args (flip substs body . zip (map string2Name args)))
+
   case dups of
     (x:_) -> throwError (DuplicateTyDefns x)
-    []    -> return $ M.fromList (map (\(TypeDefn x ty) -> (x,ty)) tydefs)
+    []    -> return . M.fromList $ map convert tydefs
 
--- | Make sure there are no directly cyclic type definitions.
-checkCyclicTys :: [TypeDefn] -> TCM ()
-checkCyclicTys = mapM_ unwrap
-  where
-    unwrap :: TypeDefn -> TCM (Set String)
-    unwrap (TypeDefn x b) = do
-      (args, _) <- unbind b
-      checkCyclicTy (TyCon (CDef x) (map TyVar args)) S.empty
+-- | Check the validity of a type definition: make sure it is not
+--   directly cyclic (i.e. ensure it is a "productive" definition),
+--   and also make sure it does not use any polymorphic recursion
+--   (polymorphic recursion isn't allowed at the moment since it can
+--   make the subtyping checker diverge), nor any unbound type variables.
+checkTyDefn :: TypeDefn -> TCM ()
+checkTyDefn defn@(TypeDefn x args _) = do
+  _ <- checkCyclicTy (TyUser x (map (TyVar . string2Name) args)) S.empty
+  checkUnboundVars defn
+  checkPolyRec defn
 
--- | Checks if a given type is cyclic. A type 'ty' is cyclic if:
--- 1.) 'ty' is a TyDef.
--- 2.) Repeated expansions of the TyDef yield nothing but other TyDefs.
--- 3.) An expansion of a TyDef yields another TyDef that has been previously encountered.
--- The function returns the set of TyDefs encountered during expansion if the TyDef is not cyclic.
+-- | Check if a given type is cyclic. A type 'ty' is cyclic if:
+--
+--   1. 'ty' is the name of a user-defined type.
+--   2. Repeated expansions of the type yield nothing but other user-defined types.
+--   3. An expansion of one of those types yields another type that has
+--      been previously encountered.
+--
+--   In other words, repeatedly expanding the definition can get us
+--   back to exactly where we started.
+--
+--   The function returns the set of TyDefs encountered during
+--   expansion if the TyDef is not cyclic.
 checkCyclicTy :: Type -> Set String -> TCM (Set String)
-checkCyclicTy (TyCon (CDef name) args) set = do
+checkCyclicTy (TyUser name args) set = do
   case S.member name set of
-    True -> throwError (CyclicTyDef name)
+    True -> throwError $ CyclicTyDef name
     False -> do
       ty <- lookupTyDefn name args
       checkCyclicTy ty (S.insert name set)
 
 checkCyclicTy _ set = return set
+
+-- | Ensure that a type definition does not use any unbound type
+--   variables.
+checkUnboundVars :: TypeDefn -> TCM ()
+checkUnboundVars (TypeDefn _ args body) = go body
+  where
+    go (TyAtom (AVar (U x)))
+      | name2String x `elem` args = return ()
+      | otherwise                 = throwError $ UnboundTyVar x
+    go (TyAtom _)    = return ()
+    go (TyCon _ tys) = mapM_ go tys
+
+-- | Check for polymorphic recursion: starting from a user-defined
+--   type, keep expanding its definition recursively, ensuring that
+--   any recursive references to the defined type have only type variables
+--   as arguments.
+checkPolyRec :: TypeDefn -> TCM ()
+checkPolyRec (TypeDefn name args body) = go body
+  where
+    go (TyCon (CDef x) tys)
+      | x == name && not (all isTyVar tys) =
+        throwError $ NoPolyRec name args tys
+      | otherwise = return ()
+    go (TyCon _ tys) = mapM_ go tys
+    go _             = return ()
 
 filterDups :: Ord a => [a] -> [a]
 filterDups = map head . filter ((>1) . length) . group . sort
@@ -262,8 +299,7 @@ checkProperty prop = do
 -- Checking types/kinds
 --------------------------------------------------
 
--- XXX have to call this from more places!
-
+-- | Check that a sigma type is a valid type.  See 'checkTypeValid'.
 checkSigmaValid :: Sigma -> TCM ()
 checkSigmaValid (Forall b) = do
   let (_, ty) = unsafeUnbind b
@@ -277,8 +313,8 @@ checkTypeValid (TyAtom _)    = return ()
 checkTypeValid (TyCon c tys) = do
   k <- conArity c
   case () of
-    _ | k < n     -> throwError (NotEnoughArgs c)
-      | k > n     -> throwError (TooManyArgs c)
+    _ | n < k     -> throwError (NotEnoughArgs c)
+      | n > k     -> throwError (TooManyArgs c)
       | otherwise -> mapM_ checkTypeValid tys
   where
     n = length tys
@@ -288,10 +324,8 @@ conArity (CContainer _) = return 1
 conArity (CDef name)    = do
   d <- get
   case M.lookup name d of
-    Nothing -> throwError (NotTyDef name)
-    Just tydef -> do
-      (as, _) <- unbind tydef
-      return (length as)
+    Nothing               -> throwError (NotTyDef name)
+    Just (TyDefBody as _) -> return (length as)
 conArity _              = return 2  -- (->, *, +)
 
 --------------------------------------------------
@@ -389,10 +423,10 @@ typecheck :: Mode -> Term -> TCM ATerm
 --------------------------------------------------
 -- Defined types
 
--- To check at a defined type, expand its definition and recurse.
+-- To check at a user-defined type, expand its definition and recurse.
 -- This case has to be first, so in all other cases we know the type
 -- will not be a CDef.
-typecheck (Check (TyCon (CDef name) args)) t = lookupTyDefn name args >>= check t
+typecheck (Check (TyUser name args)) t = lookupTyDefn name args >>= check t
 
 --------------------------------------------------
 -- Parens
@@ -956,9 +990,13 @@ typecheck Infer (TChain t ls) =
 ----------------------------------------
 -- Type operations
 
-typecheck Infer (TTyOp Enumerate t) = return $ ATTyOp (TyList t) Enumerate t
+typecheck Infer (TTyOp Enumerate t) = do
+  checkTypeValid t
+  return $ ATTyOp (TyList t) Enumerate t
 
-typecheck Infer (TTyOp Count t)     = return $ ATTyOp (TySum TyUnit TyN) Count t
+typecheck Infer (TTyOp Count t)     = do
+  checkTypeValid t
+  return $ ATTyOp (TySum TyUnit TyN) Count t
 
 --------------------------------------------------
 -- Containers
@@ -1105,7 +1143,7 @@ typecheck (Check ty) t = do
 --   pattern variables bound in the pattern along with their types.
 checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern)
 
-checkPattern p (TyCon (CDef name) args) = lookupTyDefn name args >>= checkPattern p
+checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
 checkPattern (PVar x) ty = return (singleCtx x (toSigma ty), APVar ty (coerce x))
 

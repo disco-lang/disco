@@ -413,10 +413,10 @@ parseTyDefn = label "type defintion" $ do
   reserved "type"
   indented $ do
     name <- parseTyDef
-    args <- many parseTyVar
+    args <- many parseTyVarName
     _ <- symbol "="
     body <- parseType
-    return $ TypeDefn name (bind args body)
+    return $ TypeDefn name args body
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -914,8 +914,11 @@ parseCon =
 parseTyDef :: Parser String
 parseTyDef =  identifier upperChar
 
+parseTyVarName :: Parser String
+parseTyVarName = identifier lowerChar
+
 parseTyVar :: Parser (Name Type)
-parseTyVar = string2Name <$> identifier lowerChar
+parseTyVar = string2Name <$> parseTyVarName
 
 parseSigma :: Parser Sigma
 parseSigma = closeSigma <$> parseType
@@ -937,8 +940,10 @@ parseType = makeExprParser parseAtomicType table
 
     infixR name fun = InfixR (reservedOp name >> return fun)
 
-    tyApp (TyCon c args) t = TyCon c (args ++ [t])
-    -- XXX partial
+    tyApp (TyCon c args) t2 = TyCon c (args ++ [t2])
+    tyApp t1 t2             = error $ show t1 ++ " can't be applied to " ++ show t2
+      -- XXX make this a proper error!!
+      -- Might need to rethink AST design.
 
 parseTyOp :: Parser TyOp
 parseTyOp =

@@ -29,8 +29,7 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind, substs,
-                                                   unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -373,7 +372,8 @@ prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
 
 prettyDecl :: Decl -> Doc
 prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettySigma ty
--- XXX fixme prettyDecl (DTyDef (TypeDefn x ty)) = text "type" <+> text x <+> text "=" <+> prettyTy ty
+prettyDecl (DTyDef (TypeDefn x args body))
+  = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map prettyClause bs
   where
     prettyClause b
@@ -423,11 +423,8 @@ prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyWHNF out (TyUser nm args) v = do
   tymap <- use topTyDefns
   case M.lookup nm tymap of
-    Just tydef -> do
-      lunbind tydef $ \(as, body) ->
-        prettyWHNF out (substs (zip as args) body) v
-    Nothing -> error "Impossible! TyDef name does not exist in TyMap"
-
+    Just (TyDefBody _ body) -> prettyWHNF out (body args) v
+    Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))

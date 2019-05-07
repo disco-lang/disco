@@ -164,7 +164,9 @@ data TypeDecl = TypeDecl (Name Term) Sigma
 data TermDefn = TermDefn (Name Term) [Bind [Pattern] Term]
 
 -- | A user-defined type (potentially recursive).
-data TypeDefn = TypeDefn String (Bind [Name Type] Type)
+--
+--   @type T arg1 arg2 ... = body
+data TypeDefn = TypeDefn String [String] Type
   deriving Show
 
 -- | A declaration is either a type declaration, a term definition, or

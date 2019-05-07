@@ -12,17 +12,14 @@
 
 module Disco.Typecheck.Unify where
 
-import           Unbound.Generics.LocallyNameless        (Bind, Name, fv,
-                                                          substs)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import           Unbound.Generics.LocallyNameless (Name, fv, substs)
 
-import           Control.Lens                            (anyOf)
+import           Control.Lens                     (anyOf)
 import           Control.Monad.State
 import           Data.Coerce
-import           Data.Map                                (Map)
-import qualified Data.Map                                as M
-import           Data.Set                                (Set)
-import qualified Data.Set                                as S
+import qualified Data.Map                         as M
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 
 import           Disco.Subst
 import           Disco.Types
@@ -101,16 +98,14 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     unifyOne' p@(TyCon (CDef t) tys1, ty2) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
-        Nothing  -> mzero
-        Just ty1 -> case unsafeUnbind ty1 of   -- XXX OK?
-          (as, body) -> return $ Right [(substs (zip as tys1) body, ty2)]
+        Nothing                 -> mzero
+        Just (TyDefBody _ body) -> return $ Right [(body tys1, ty2)]
 
     unifyOne' p@(ty1, TyCon (CDef t) tys2) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
-        Nothing  -> mzero
-        Just ty2 -> case unsafeUnbind ty2 of
-          (as, body) -> return $ Right [(ty1, substs (zip as tys2) body)]
+        Nothing                 -> mzero
+        Just (TyDefBody _ body) -> return $ Right [(ty1, body tys2)]
 
     -- Unify any other pair of type constructor applications: the type
     -- constructors must match exactly

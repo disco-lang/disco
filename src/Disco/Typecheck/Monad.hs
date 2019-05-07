@@ -61,6 +61,8 @@ data TCError
   | CantInferPrim Prim     -- ^ Can't infer the type of some prims
   | NotEnoughArgs Con      -- ^ Not enough arguments provided to type constructor.
   | TooManyArgs Con        -- ^ Too many arguments provided to type constructor.
+  | UnboundTyVar (Name Type) -- ^ Unbound type variable
+  | NoPolyRec String [String] [Type] -- ^ Polymorphic recursion is not allowed
   | Failure String         -- ^ Generic failure.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
@@ -150,10 +152,8 @@ lookupTyDefn :: String -> [Type] -> TCM Type
 lookupTyDefn x args = do
   d <- get
   case M.lookup x d of
-    Nothing -> throwError (NotTyDef x)
-    Just tydef -> do
-      (as, body) <- unbind tydef
-      return $ substs (zip as args) body
+    Nothing                 -> throwError (NotTyDef x)
+    Just (TyDefBody _ body) -> return $ body args
 
 withTyDefns :: TyDefCtx -> TCM a -> TCM a
 withTyDefns tyDefnCtx m = do

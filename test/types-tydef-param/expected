@@ -1,0 +1,6 @@
+Loading types-tydef-param.disco...
+Loaded.
+right (5, right (2, left (), left ()), right (7, right (1, left (), left ()), left ()))
+15
+right (3, right (true, right (5, right (false, right (7, left ())))))
+15

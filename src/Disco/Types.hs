@@ -78,10 +78,12 @@ module Disco.Types
        , Strictness(..), strictness
 
        -- * Utilities
+       , isTyVar
        , containerVars
        , countType
        , unpair
        , S
+       , TyDefBody(..)
        , TyDefCtx
 
        -- * HasType class
@@ -364,6 +366,10 @@ instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
   isvar _                     = Nothing
 
+isTyVar :: Type -> Bool
+isTyVar (TyAtom (AVar _)) = True
+isTyVar _                 = False
+
 -- orphans
 instance (Ord a, Subst t a) => Subst t (Set a) where
   subst x t = S.map (subst x t)
@@ -372,8 +378,11 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
 
+-- | The definition
+data TyDefBody = TyDefBody [String] ([Type] -> Type)
+
 -- | A map from type names to their corresponding definitions.
-type TyDefCtx = M.Map String (Bind [Name Type] Type)
+type TyDefCtx = M.Map String TyDefBody
 
 ----------------------------------------
 -- Sigma types (i.e. quanitified types)

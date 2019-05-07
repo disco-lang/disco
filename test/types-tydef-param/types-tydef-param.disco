@@ -1,0 +1,37 @@
+type Maybe a = Unit + a
+
+maybe : b -> (a -> b) -> Maybe a -> b
+maybe b _ (left ()) = b
+maybe _ f (right a) = f a
+
+m1 : Maybe N
+m1 = left ()
+
+m2 : Maybe N
+m2 = right 3
+
+
+type Tree a = Unit + a * Tree a * Tree a
+
+foldTree : r -> (a -> r -> r -> r) -> Tree a -> r
+foldTree z f (left ()) = z
+foldTree z f (right (a,l,r)) = f a (foldTree z f l) (foldTree z f r)
+
+sumTree : Tree N -> N
+sumTree = foldTree 0 (\a l r. a+l+r)
+
+t : Tree N
+t = right (5, right (2, left (), left ()), right (7, right (1, left (), left ()), left ()))
+
+
+type AltList a b = Unit + a * AltList b a
+
+alt1 : AltList N B
+alt1 = right (3, right (true, right (5, right (false, right (7, left ())))))
+
+foldAltList : r -> (a -> r -> r) -> (b -> r -> r) -> AltList a b -> r
+foldAltList z _ _ (left ()) = z
+foldAltList z f g (right (a, l)) = f a (foldAltList z g f l)
+
+sumAltList : AltList N B -> N
+sumAltList = foldAltList 0 ~+~ (\b r. r)

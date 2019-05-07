@@ -142,7 +142,7 @@ rnfV :: Value -> Disco IErr Value
 
 -- The value is a constructor: keep the constructor and recursively
 -- reduce all its contents.
-rnfV (VCons i vs)   = VCons i <$> mapM rnfV vs
+rnfV (VCons i vs)  = VCons i <$> mapM rnfV vs
 
 -- If the value is a thunk (i.e. unevaluated expression), a delayed
 -- computation, or an indirection (i.e. a pointer to a value), reduce
@@ -154,7 +154,7 @@ rnfV v@(VIndir {}) = whnfV v >>= rnfV
 
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
-rnfV v              = return v
+rnfV v             = return v
 
 --------------------------------------------------
 -- Weak head normal form (WHNF)
@@ -166,7 +166,7 @@ whnfV :: Value -> Disco IErr Value
 
 -- If the value is a thunk, use its stored environment and evaluate
 -- the expression to WHNF.
-whnfV (VThunk c e) = withEnv e $ whnf c
+whnfV (VThunk c e)     = withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
 -- in its stored environment and reduce the result to WHNF.
@@ -175,18 +175,18 @@ whnfV (VDelay imv _ e) = withEnv e imv >>= whnfV
 -- If it is an indirection, call 'whnfIndir' which will look up the
 -- value it points to, reduce it, and store the result so it won't
 -- have to be re-evaluated the next time loc is referenced.
-whnfV (VIndir loc) = whnfIndir loc
+whnfV (VIndir loc)     = whnfIndir loc
 
 -- If it is a cons, all well and good, it is already in WHNF---but at
 -- the same time make sure that any subparts are either simple
 -- constants or are turned into indirections to new memory cells.
 -- This way, when the subparts are eventually evaluated, the new
 -- memory cells can be updated with their result.
-whnfV (VCons i vs) = VCons i <$> mapM mkSimple vs
+whnfV (VCons i vs)     = VCons i <$> mapM mkSimple vs
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
-whnfV v            = return v
+whnfV v                = return v
 
 
 -- | Reduce the value stored at the given location to WHNF.  We need a

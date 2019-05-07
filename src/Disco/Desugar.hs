@@ -37,7 +37,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import Data.Maybe (isJust, fromMaybe)
+import           Data.Maybe                       (fromMaybe, isJust)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless

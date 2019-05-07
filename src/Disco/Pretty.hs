@@ -134,7 +134,7 @@ prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy TyC              = text "Char"
-prettyTy (TyArr ty1 ty2)  = mparens arrPA $
+prettyTy (ty1 :->: ty2)   = mparens arrPA $
   prettyTy' 1 InL ty1 <+> text "→" <+> prettyTy' 1 InR ty2
 prettyTy (TyPair ty1 ty2) = mparens (PA 7 InR) $
   prettyTy' 7 InL ty1 <+> text "×" <+> prettyTy' 7 InR ty2

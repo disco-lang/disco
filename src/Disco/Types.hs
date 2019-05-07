@@ -50,7 +50,6 @@ module Disco.Types
        , pattern TyQ
        , pattern TyC
        , pattern TyFin
-       , pattern TyArr   -- XXX todo: get rid of TyArr in favor of :->:
        , pattern (:->:)
        , pattern TyPair
        , pattern TySum
@@ -316,9 +315,6 @@ pattern TyC = TyAtom (ABase C)
 pattern TyFin :: Integer -> Type
 pattern TyFin n = TyAtom (ABase (Fin n))
 
-pattern TyArr :: Type -> Type -> Type
-pattern TyArr ty1 ty2 = TyCon CArr [ty1, ty2]
-
 infixr 5 :->:
 
 pattern (:->:) :: Type -> Type -> Type
@@ -350,7 +346,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      TyArr, TyPair, TySum, TyList, TyBag, TySet, TyUser #-}
+      (:->:), TyPair, TySum, TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
@@ -420,7 +416,7 @@ countType (TyPair ty1 ty2)
   | isEmptyTy ty1 = Just 0
   | isEmptyTy ty2 = Just 0
   | otherwise     = (*) <$> countType ty1 <*> countType ty2
-countType (TyArr  ty1 ty2)
+countType (ty1 :->: ty2)
   | isEmptyTy ty1 = Just 1
   | isEmptyTy ty2 = Just 0
   | otherwise     = (^) <$> countType ty2 <*> countType ty1

@@ -184,7 +184,7 @@ desugarDefn (Defn _ patTys bodyTy def) = do
   -- deal with arithmetic patterns.
   let branches = zipWith (mkBranch (zip args patTys)) bodies pats
   dcase <- desugarTerm $ ATCase bodyTy branches
-  return $ mkLambda (foldr TyArr bodyTy patTys) (coerce args) dcase
+  return $ mkLambda (foldr (:->:) bodyTy patTys) (coerce args) dcase
 
   where
     mkBranch :: [(Name ATerm, Type)] -> ATerm -> [APattern] -> ABranch

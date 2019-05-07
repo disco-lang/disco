@@ -247,11 +247,11 @@ discoGenerator (TySet ty) =
     DiscoGen tyGen tyToValue ->
       DiscoGen (QC.listOf tyGen) (valuesToSet ty <=< mapM tyToValue)
 
-discoGenerator (TyArr _ty1 _ty2) =
-  error "discoGenerator is not yet implemented for TyArr"
+discoGenerator (_ty1 :->: _ty2) =
+  error "discoGenerator is not yet implemented for function types"
 
-discoGenerator (TyCon (CDef _) _) =
-  error "discoGenerator is not yet implemented for TyDef"
+discoGenerator (TyUser _ _) =
+  error "discoGenerator is not yet implemented for user-defined types"
 
 -- | @genValues n ty@ generates a random sequence of @n@ increasingly
 --   complex values of type @ty@, using the 'DiscoGen' for @ty@.

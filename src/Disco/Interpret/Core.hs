@@ -1177,7 +1177,7 @@ decideEqFor (TySum ty1 ty2) v1 v2 = do
     True  -> decideEqFor ([ty1, ty2] !! i1) v1' v2'
 
 -- To decide equality at an arrow type, (ty1 -> ty2):
-decideEqFor (TyArr ty1 ty2) v1 v2 = do
+decideEqFor (ty1 :->: ty2) v1 v2 = do
 
   -- Reduce both values to WHNF, which should produce closures (or
   -- @VFun@s).
@@ -1242,7 +1242,7 @@ bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
 
 -- TODO: can the functions built by 'enumerate' be more efficient if
 -- enumerate builds *both* a list and a bijection to a prefix of the
--- naturals?  Currently, the functions output by (enumerate (TyArr _ _))
+-- naturals?  Currently, the functions output by (enumerate (_ :->: _))
 -- take linear time in the size of the input to evaluate since they
 -- have to do a lookup in an association list.  Does this even matter?
 
@@ -1274,7 +1274,7 @@ enumerate (TySum ty1 ty2)  =
 -- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
 -- values from the enumeration of @ty2@, and make a function by
 -- zipping each one together with the values of @ty1@.
-enumerate (TyArr ty1 ty2)
+enumerate (ty1 :->: ty2)
   | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
   | isEmptyTy ty2 = []
   | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
@@ -1315,7 +1315,7 @@ decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
 decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
-decideEqForRnf (TyArr ty1 ty2) (VFun f1) (VFun f2)
+decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
@@ -1401,7 +1401,7 @@ decideOrdFor (TySum ty1 ty2) v1 v2 = do
     o  -> return o
 
 -- To decide the ordering for two functions:
-decideOrdFor (TyArr ty1 ty2) v1 v2 = do
+decideOrdFor (ty1 :->: ty2) v1 v2 = do
 
   -- Reduce both to WHNF
   clos1 <- whnfV v1

@@ -933,8 +933,8 @@ parseType = makeExprParser parseAtomicType table
             , [ infixR "+" TySum
               , infixR "⊎" TySum
               ]
-            , [ infixR "->" TyArr
-              , infixR "→"  TyArr
+            , [ infixR "->" (:->:)
+              , infixR "→"  (:->:)
               ]
             ]
 

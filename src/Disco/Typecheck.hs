@@ -248,14 +248,14 @@ checkDefn (TermDefn x clauses) = do
     go [] ty body = do
      at <- check body ty
      return ([], at)
-    go (p:ps) (TyArr ty1 ty2) body = do
+    go (p:ps) (ty1 :->: ty2) body = do
       (ctx, apt) <- checkPattern p ty1
       (apts, at) <- extends ctx $ go ps ty2 body
       return (apt:apts, at)
     go _ _ _ = throwError NumPatterns   -- XXX include more info
 
     decomposeDefnTy 0 ty = ([], ty)
-    decomposeDefnTy n (TyArr ty1 ty2) = first (ty1:) (decomposeDefnTy (n-1) ty2)
+    decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) (decomposeDefnTy (n-1) ty2)
     decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
 
 --------------------------------------------------
@@ -913,7 +913,7 @@ typecheck Infer (TAbs lam)    = do
   where
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
-    mkFunTy tys out = foldr TyArr out tys
+    mkFunTy tys out = foldr (:->:) out tys
 
 --------------------------------------------------
 -- Application

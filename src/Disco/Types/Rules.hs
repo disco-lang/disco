@@ -68,6 +68,9 @@ arity CArr           = [Contra, Co]
 arity CPair          = [Co, Co]
 arity CSum           = [Co, Co]
 arity (CContainer _) = [Co]
+arity (CDef _)       = error "Impossible! arity CDef"
+  -- CDefs should always be replaced by their definitions before arity
+  -- is called.
 
 ------------------------------------------------------------
 -- Qualifiers

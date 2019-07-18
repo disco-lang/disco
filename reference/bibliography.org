@@ -187,3 +187,6 @@ repository.
    that handling type classes / qualified types requires a unification
    algorithm that can correctly handle type variables annotated with
    sorts (sort = intersection of finitely many type classes).
+* Errors
+
+  - https://www.tandfonline.com/doi/full/10.1080/08993408.2016.1225464

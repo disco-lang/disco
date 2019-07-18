@@ -220,6 +220,7 @@ library
                        Disco.Compile
                        Disco.Eval
                        Disco.Interpret.Core
+                       Disco.Interpret.Util
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints
@@ -253,6 +254,7 @@ library
   build-depends:       base >=4.8 && <4.13,
                        filepath,
                        directory,
+                       random,
                        mtl >=2.2 && <2.3,
                        megaparsec >= 6.1.1 && < 7.1,
                        parser-combinators >= 1.0.0 && < 1.1,
@@ -263,6 +265,7 @@ library
                        unbound-generics >= 0.3 && < 0.5,
                        lens >= 4.14 && < 4.18,
                        exact-combinatorics >= 0.2 && < 0.3,
+                       simple-enumeration >= 0.1 && < 0.2,
                        arithmoi >= 0.6 && < 0.9,
                        integer-logarithms >= 1.0 && < 1.1,
                        haskeline >=0.7 && <0.8,

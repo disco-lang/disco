@@ -1,6 +1,8 @@
+{-# LANGUAGE GADTs                    #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections            #-}
+{-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
@@ -20,8 +22,6 @@ module Disco.Interpret.Core
        (
          -- * Evaluation
          loadDefs
-       , vnum
-       , mkEnum
 
          -- ** Full reduction
        , rnf, rnfV
@@ -32,23 +32,29 @@ module Disco.Interpret.Core
          -- * Container utilities
        , valuesToBag, valuesToSet
 
-         -- * Equality testing and enumeration
-       , eqOp, primValEq, enumerate
-       , decideEqFor, decideEqForRnf, decideEqForClosures
+         -- * Enumeration
+
+       , discoEnumeration
+       , enumerateType
+       , Struct, evalStruct
+
+         -- * Equality testing
+       , eqOp, primValEq
+       , decideEqFor, decideEqForClosures
 
          -- * Comparison testing
        , ltOp, primValOrd, decideOrdFor, decideOrdForClosures
 
          -- * Lists
 
-       , toDiscoList
        , vfoldr, vappend, vconcat, vmap
 
        )
        where
 
-import           Control.Arrow                           ((***))
-import           Control.Lens                            (use, (%=), (.=))
+import           Control.Applicative                     (empty, (<|>))
+import           Control.Arrow                           ((&&&), (***))
+import           Control.Lens                            (use, (%=), (.=), _1)
 import           Control.Monad                           (filterM, (>=>))
 import           Control.Monad.Except                    (throwError)
 import           Data.Bifunctor                          (first, second)
@@ -56,7 +62,6 @@ import           Data.Char
 import           Data.Coerce                             (coerce)
 import           Data.IntMap.Lazy                        ((!))
 import qualified Data.IntMap.Lazy                        as IntMap
-import           Data.List                               (find)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
@@ -66,10 +71,13 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Math.Combinatorics.Exact.Binomial       (choose)
 import           Math.Combinatorics.Exact.Factorial      (factorial)
 
+import qualified Data.Enumeration                        as E
+import           Data.Enumeration.Invertible
 import           Math.NumberTheory.Logarithms            (integerLog2)
 import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
                                                           invertSomeMod, modulo,
                                                           powSomeMod)
+import           Math.NumberTheory.Powers.Squares        (integerSquareRoot)
 import           Math.NumberTheory.Primes.Factorisation  (factorise)
 import           Math.NumberTheory.Primes.Testing        (isPrime)
 
@@ -78,6 +86,7 @@ import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
 import           Disco.Context
 import           Disco.Eval
+import           Disco.Interpret.Util                    (mkEnum, vnum)
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -113,17 +122,6 @@ loadDefs cenv = do
   where
     replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b
     replaceThunkEnv _ c                     = c
-
-
--- | A convenience function for creating a default @VNum@ value with a
---   default (@Fractional@) flag.
-vnum :: Rational -> Value
-vnum = VNum mempty
-
--- | Turn any instance of @Enum@ into a @Value@, by creating a
---   constructor with an index corresponding to the enum value.
-mkEnum :: Enum e => e -> Value
-mkEnum e = VCons (fromEnum e) []
 
 --------------------------------------------------
 -- Reduced normal form
@@ -276,6 +274,7 @@ funArity :: Value -> Int
 funArity (VClos b _) = length (fst (unsafeUnbind b))
 funArity (VPAp f vs) = funArity f - length vs
 funArity (VConst op) = opArity op
+funArity (VFun _)    = 1
 funArity v           = error $ "Impossible! funArity on " ++ show v
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -319,8 +318,8 @@ whnfApp f vs =
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
 whnfAppExact (VClos b e) vs =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
-whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
-whnfAppExact (VConst op) vs = whnfOp op vs
+whnfAppExact (VFun f)    [v] = rnfV v >>= f >>= whnfV
+whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
 
 ------------------------------------------------------------
@@ -392,6 +391,14 @@ toDiscoList []       = return $ VCons 0 []
 toDiscoList (x : xs) = do
   xv  <- mkSimple x
   xsv <- mkSimple =<< delay (toDiscoList xs)
+  return $ VCons 1 [xv, xsv]
+
+-- | XXX
+toDiscoList' :: [Disco IErr Value] -> Disco IErr Value
+toDiscoList' [] = return $ VCons 0 []
+toDiscoList' (x : xs) = do
+  xv  <- mkSimple =<< delay x
+  xsv <- mkSimple =<< delay (toDiscoList' xs)
   return $ VCons 1 [xv, xsv]
 
 -- | Convert a Value representing a disco list into a Haskell list of
@@ -808,7 +815,7 @@ whnfOp :: Op -> [Value] -> Disco IErr Value
 
 whnfOp OAdd            = arity2 "+"        $ numOp (+)
 whnfOp ONeg            = arity1 "negate"   $ uNumOp negate
-whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp integerSqrt
+whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp sqrtOp
 whnfOp OLg             = arity1 "lg"       $ lgOp
 whnfOp OFloor          = arity1 "floor"    $ uNumOp floorOp
 whnfOp OCeil           = arity1 "ceil"     $ uNumOp ceilOp
@@ -1006,33 +1013,13 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: Value -> Disco IErr Value
-enumOp (VType ty) = case countType ty of
-  Just _  -> toDiscoList (enumerate ty)
-  Nothing -> throwError $ InfiniteTy ty
-enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
+enumOp (VType ty) = toDiscoList' (enumerateType ty)
+enumOp v          = error "enumOp on non-type argument"
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals
-integerSqrt :: Rational -> Rational
-integerSqrt n = integerSqrt' (fromIntegral (numerator n)) % 1
-
--- | implementation of `integerSqrt'` taken from the Haskell wiki:
---   https://wiki.haskell.org/Generic_number_type#squareRoot
-integerSqrt' :: Integer -> Integer
-integerSqrt' 0 = 0
-integerSqrt' 1 = 1
-integerSqrt' n =
-  let twopows = iterate (^!2) 2
-      (lowerRoot, lowerN) =
-        last $ takeWhile ((n>=) . snd) $ zip (1:twopows) twopows
-      newtonStep x = div (x + div n x) 2
-      iters = iterate newtonStep (integerSqrt' (div n lowerN ) * lowerRoot)
-      isRoot r = r^!2 <= n && n < (r+1)^!2
-  in  head $ dropWhile (not . isRoot) iters
-
--- this operator is used for `integerSqrt'`
-(^!) :: Num a => a -> Int -> a
-(^!) x n = x^n
+sqrtOp :: Rational -> Rational
+sqrtOp n = integerSquareRoot (numerator n) % 1
 
 floorOp :: Rational -> Rational
 floorOp n = (floor n) % 1
@@ -1132,6 +1119,204 @@ valueToString = fmap toString . rnfV
     toString _ = "Impossible: valueToString.toString, non-list"
 
 ------------------------------------------------------------
+-- Enumeration
+------------------------------------------------------------
+
+------------------------------------------------------------
+-- Enumerations for disco types
+
+-- XXX This stinks, I can't figure out how to make this work.
+--
+--   - We need invertible enumerations to enumerate functions.
+--   - But we can't invert if we are enumerating Disco IErr Value computations
+--     instead of plain Values.
+--   - Maybe we should just forget about invertible enumerations and forget about
+--     enumerating functions?  But then we give up equality on functions.
+--   - Maybe I should just go back to how I was enumerating things
+--     before?  i.e. no indexing, just lists.
+
+--   - Bags seem to be one of the main sticking points.
+
+-- Try making invertible enumerations for a little DSL of structures?
+
+data Struct where
+  SCons :: Int -> [Struct] -> Struct
+  SNum  :: Rational -> Struct
+  SList :: [Struct] -> Struct
+  SSet  :: [Struct] -> Struct
+  SBag  :: [(Struct, Integer)] -> Struct
+  SFun  :: Type -> (Integer -> Struct) -> Struct
+
+instance Show Struct where
+  show (SCons i ss) = "SCons " ++ show i ++ " " ++ show ss
+  show (SNum r)     = "SNum " ++ show r
+  show (SList ss)   = "SList " ++ show ss
+  show (SSet ss)    = "SSet " ++ show ss
+  show (SBag ss)    = "SBag " ++ show ss
+  show (SFun _ _)   = "<SFun>"
+
+evalStruct :: Struct -> Disco IErr Value
+evalStruct (SCons i ss) = VCons i <$> mapM evalStruct ss
+evalStruct (SNum r)     = return $ vnum r
+evalStruct (SList ss)   = mapM evalStruct ss >>= toDiscoList
+evalStruct (SSet ss)    = VBag <$> mapM (fmap (,1) . evalStruct) ss
+evalStruct (SBag ss)    = VBag <$> mapM (_1 evalStruct) ss
+evalStruct (SFun ty f)  = return $ VFun (evalStruct . f . locate e . reconstruct ty)
+  where
+    e = discoEnumeration ty
+
+reconstruct :: Type -> Value -> Struct
+reconstruct (TyList ty) v = SList $ go v
+  where
+    go (VCons 0 _)     = []
+    go (VCons 1 [h,t]) = reconstruct ty h : go t
+reconstruct (TySum ty _) (VCons 0 [v]) = SCons 0 [reconstruct ty v]
+reconstruct (TySum _ ty) (VCons 1 [v]) = SCons 1 [reconstruct ty v]
+reconstruct (TyPair ty1 ty2) (VCons 0 [v1,v2]) = SCons 0 [reconstruct ty1 v1, reconstruct ty2 v2]
+reconstruct _            (VCons i [])  = SCons i []
+reconstruct _ (VNum _ r) = SNum r
+reconstruct (TySet ty) (VBag cs) = SSet (map (reconstruct ty . fst) cs)
+reconstruct (TyBag ty) (VBag cs) = SBag (map (first (reconstruct ty)) cs)
+reconstruct (ty1 :->: ty2) f = error "reconstruct for functions unimplemented"
+reconstruct ty v = error $ "Unexpected arguments to reconstruct: " ++ show ty ++ ", " ++ show v
+
+fromEnumS :: Enum e => e -> Struct
+fromEnumS e = SCons (fromEnum e) []
+
+toEnumS :: Enum e => Struct -> e
+toEnumS (SCons i []) = toEnum i
+toEnumS s            = error $ "toEnumS on non-SCons: " ++ show s
+
+fromSNum :: Struct -> Integer
+fromSNum (SNum n) = numerator n
+fromSNum s        = error $ "fromSNum on non-SNum: " ++ show s
+
+discoEnumeration :: Type -> IEnumeration Struct
+discoEnumeration TyVoid = void
+discoEnumeration TyUnit = mapE (const $ SCons 0 []) (const ()) unit
+discoEnumeration TyBool = mapE fromEnumS toEnumS (boundedEnum @Bool)
+discoEnumeration TyN    = mapE (SNum . (%1)) fromSNum nat
+discoEnumeration TyZ    = mapE (SNum . (%1)) fromSNum int
+discoEnumeration TyF    = mapE (SNum . either (%1) id) toF (singleton 0 <+> cw)
+  where
+    toF (SNum 0) = Left 0
+    toF (SNum r) = Right r
+    toF s        = error $ "discoEnumeration(TyF).toF on non-SNum: " ++ show s
+discoEnumeration TyQ    = mapE SNum toR rat
+  where
+    toR (SNum r) = r
+    toR s        = error $ "discoEnumeration(TyQ).toR on non-SNum: " ++ show s
+discoEnumeration TyC    = mapE (SNum . (%1) . fromIntegral . ord) toC (boundedEnum @Char)
+  where
+    toC (SNum r) = chr . fromIntegral . numerator $ r
+    toC s        = error $ "discoEnumeration(TyC).toC on non-SNum: " ++ show s
+discoEnumeration (TyFin n) = mapE (SNum . (%1)) fromSNum (finite n)
+discoEnumeration (TySum ty1 ty2)
+  = mapE fromEitherS toEitherS (discoEnumeration ty1 <+> discoEnumeration ty2)
+  where
+    fromEitherS :: Either Struct Struct -> Struct
+    fromEitherS = either (SCons 0 . (:[])) (SCons 1 . (:[]))
+    toEitherS :: Struct -> Either Struct Struct
+    toEitherS (SCons 0 [s]) = Left s
+    toEitherS (SCons 1 [s]) = Right s
+    toEitherS s             = error $ "toEitherS on wrong shape: " ++ show s
+discoEnumeration (TyPair ty1 ty2)
+  = mapE fromPairS toPairS (discoEnumeration ty1 >< discoEnumeration ty2)
+  where
+    fromPairS :: (Struct, Struct) -> Struct
+    fromPairS (s1, s2) = SCons 0 [s1, s2]
+    toPairS :: Struct -> (Struct, Struct)
+    toPairS (SCons 0 [s1, s2]) = (s1, s2)
+    toPairS s                  = error $ "toPairS on wrong shape: " ++ show s
+discoEnumeration (TyList ty)
+  = mapE fromListS toListS (listOf (discoEnumeration ty))
+  where
+    fromListS :: [Struct] -> Struct
+    fromListS = SList
+    toListS :: Struct -> [Struct]
+    toListS (SList ss) = ss
+    toListS s          = error $ "toListS on wrong shape: " ++ show s
+
+discoEnumeration (TyBag ty) = mapE fromBagS toBagS counts
+  where
+    -- Lists of naturals whose last element (if it exists) is not zero.
+    -- These are the element counts; each count is for the element
+    -- with the corresponding index.
+    counts = mapE toCounts fromCounts (unit <+> (listOf nat >< dropE 1 nat))
+      where
+        toCounts (Left ())       = []
+        toCounts (Right (ns, n)) = ns ++ [n]
+
+        fromCounts [] = Left ()
+        fromCounts cs = Right $ (init &&& last) cs
+
+    e = discoEnumeration ty
+
+    fromBagS :: [Integer] -> Struct
+    fromBagS = SBag . map (first (select e)) . filter ((/=0) . snd) . zip [0 ..]
+
+    toBagS :: Struct -> [Integer]
+    toBagS (SBag ss) = map (\i -> M.findWithDefault 0 i countMap) [0 .. fst (M.findMax countMap)]
+      where
+        countMap = M.fromList . map (first (locate e)) $ ss
+    toBagS s         = error $ "toBagS on wrong shape: " ++ show s
+
+discoEnumeration (TySet ty) = mapE fromSetS toSetS (finiteSubsetOf (discoEnumeration ty))
+  where
+    fromSetS :: [Struct] -> Struct
+    fromSetS = SSet
+    toSetS :: Struct -> [Struct]
+    toSetS (SSet ss) = ss
+    toSetS s         = error $ "toSetS on wrong shape: " ++ show s
+
+discoEnumeration (ty1 :->: ty2)
+  | isEmptyTy ty1 = singleton (SFun ty1 (\_ -> error "void!!"))
+  | isEmptyTy ty2 = void
+  | otherwise = case countType ty1 of
+      Nothing -> error "infinite domain!  XXX Turn this into a normal error not a crash"
+      Just n  -> mapE toSFun (fromSFun n) (finiteEnumerationOf (fromIntegral n) (discoEnumeration ty2))
+      where
+        toSFun :: E.Enumeration Struct -> Struct
+        toSFun e = SFun ty1 (E.select e)
+        fromSFun n (SFun _ f) = E.mkEnumeration (E.Finite n) f
+        fromSFun _ s          = error $ "fromSFun on wrong shape: " ++ show s
+
+-- -- To enumerate an arrow type @ty1 -> ty2@, enumerate all values of
+-- -- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
+-- -- values from the enumeration of @ty2@, and make a function by
+-- -- zipping each one together with the values of @ty1@.
+-- enumerate (ty1 :->: ty2)
+--   | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
+--   | isEmptyTy ty2 = []
+--   | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
+--   where
+--     vs1 = enumerate ty1
+--     vs2 = enumerate ty2
+
+--     -- The actual function works by looking up the input value in an
+--     -- association list.
+--     mkFun :: [Value] -> Value
+--     mkFun outs
+--       = VFun $ \case
+--           { [v] -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
+--           ; vs  -> error $ "Impossible! Got " ++ show vs ++ " in enumerate.mkFun"
+--           }
+
+--     -- A custom version of fromJust' so we get a better error message
+--     -- just in case it ever happens
+--     fromJust' _ (Just x) = x
+--     fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
+
+
+-- | Enumerate all the values of a given type.  XXX
+enumerateType :: Type -> [Disco IErr Value]
+enumerateType = map evalStruct . enumerateTypeStructs
+
+-- | XXX
+enumerateTypeStructs :: Type -> [Struct]
+enumerateTypeStructs = enumerate . discoEnumeration
+
+------------------------------------------------------------
 -- Equality testing
 ------------------------------------------------------------
 
@@ -1185,7 +1370,7 @@ decideEqFor (ty1 :->: ty2) v1 v2 = do
   clos2 <- whnfV v2
 
   --  all the values of type ty1.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
 
   -- Try evaluating the functions on each value and check whether they
   -- agree.
@@ -1239,90 +1424,22 @@ bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
     False -> return False
     True  -> bagEquality ty xs ys
 
-
--- TODO: can the functions built by 'enumerate' be more efficient if
--- enumerate builds *both* a list and a bijection to a prefix of the
--- naturals?  Currently, the functions output by (enumerate (_ :->: _))
--- take linear time in the size of the input to evaluate since they
--- have to do a lookup in an association list.  Does this even matter?
-
--- | Enumerate all the values of a given (finite) type.  If the type
---   has a linear order then the values are output in sorted order,
---   that is, @v@ comes before @w@ in the list output by @enumerate@
---   if and only if @v < w@.  This function will never be called on an
---   infinite type, since type checking ensures that equality or
---   comparison testing will only be done in cases where a finite
---   enumeration is required.
-enumerate :: Type -> [Value]
-
--- There are zero, one, and two values of types Void, Unit, and Bool respectively.
-enumerate TyVoid           = []
-enumerate TyUnit           = [VCons 0 []]
-enumerate TyBool           = [VCons 0 [], VCons 1 []]
-
-enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
-
--- To enumerate a pair type, take the Cartesian product of enumerations.
-enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
-
--- To enumerate a sum type, enumerate all the lefts followed by all the rights.
-enumerate (TySum ty1 ty2)  =
-  map (VCons 0 . (:[])) (enumerate ty1) ++
-  map (VCons 1 . (:[])) (enumerate ty2)
-
--- To enumerate an arrow type @ty1 -> ty2@, enumerate all values of
--- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
--- values from the enumeration of @ty2@, and make a function by
--- zipping each one together with the values of @ty1@.
-enumerate (ty1 :->: ty2)
-  | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
-  | isEmptyTy ty2 = []
-  | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
-  where
-    vs1 = enumerate ty1
-    vs2 = enumerate ty2
-
-    -- The actual function works by looking up the input value in an
-    -- association list.
-    mkFun :: [Value] -> Value
-    mkFun outs
-      = VFun $ \case
-          { [v] -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
-          ; vs  -> error $ "Impossible! Got " ++ show vs ++ " in enumerate.mkFun"
-          }
-
-    -- A custom version of fromJust' so we get a better error message
-    -- just in case it ever happens
-    fromJust' _ (Just x) = x
-    fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
-
-enumerate (TyList _ty) = [VCons 0 []]
-  -- Right now, the only way for this to typecheck is if @ty@ is
-  -- empty.  Perhaps in the future we'll allow 'enumerate' to work on
-  -- countably infinite types, in which case we would need to change
-  -- this.
-
-enumerate _ = []   -- The only way other cases can happen at the
-                   -- moment is in evaluating something like enumerate
-                   -- (Nat * Void), in which case it doesn't matter if
-                   -- we give back an empty list for Nat.
-
--- | Decide equality for two values at a given type, when we already
---   know the values are in RNF.  This means the result doesn't need
---   to be in the @Disco@ monad, because no evaluation needs to happen.
-decideEqForRnf :: Type -> Value -> Value -> Bool
-decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
-  = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
-decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
-  = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
-decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
-decideEqForRnf _ v1 v2 = primValEq v1 v2
+-- -- | Decide equality for two values at a given type, when we already
+-- --   know the values are in RNF.  This means the result doesn't need
+-- --   to be in the @Disco@ monad, because no evaluation needs to happen.
+-- decideEqForRnf :: Type -> Value -> Value -> Bool
+-- decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+--   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
+-- decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
+--   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
+-- decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
+--   = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
+-- decideEqForRnf _ v1 v2 = primValEq v1 v2
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
 --   functions @f1@ and @f2@ produce the same output (of type @ty@) on
 --   all inputs in @vs@.
-decideEqForClosures :: Type -> Value -> Value -> [Value] -> Disco IErr Bool
+decideEqForClosures :: Type -> Value -> Value -> [Disco IErr Value] -> Disco IErr Bool
 decideEqForClosures ty2 clos1 clos2 = go
   where
 
@@ -1333,8 +1450,9 @@ decideEqForClosures ty2 clos1 clos2 = go
     go (v:vs) = do
 
       -- Apply the closures to v
-      r1 <- whnfApp clos1 [v]
-      r2 <- whnfApp clos2 [v]
+      vv <- v
+      r1 <- whnfApp clos1 [vv]
+      r2 <- whnfApp clos2 [vv]
 
       -- Decide whether the results are equal
       b  <- decideEqFor ty2 r1 r2
@@ -1411,7 +1529,7 @@ decideOrdFor (ty1 :->: ty2) v1 v2 = do
   -- functions by applying them both to each value in the enumeration
   -- in turn, returning the ordering on the first value where the
   -- functions differ.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
   decideOrdForClosures ty2 clos1 clos2 ty1s
 
 -- To decide the ordering for two lists:
@@ -1473,7 +1591,7 @@ bagComparison ty ((x,xn):xs) ((y,yn):ys) = do
 --   differ; the ordering of those outputs is immediately returned
 --   without evaluating the functions on any further values in @vs@.
 --   Returns @EQ@ if the functions are equal on all values in @vs@.
-decideOrdForClosures :: Type -> Value -> Value -> [Value] -> Disco IErr Ordering
+decideOrdForClosures :: Type -> Value -> Value -> [Disco IErr Value] -> Disco IErr Ordering
 decideOrdForClosures ty2 clos1 clos2 = go
   where
 
@@ -1483,8 +1601,9 @@ decideOrdForClosures ty2 clos1 clos2 = go
     go (v:vs) = do
 
       -- Apply both functions to the value v.
-      r1 <- whnfApp clos1 [v]
-      r2 <- whnfApp clos2 [v]
+      vv <- v
+      r1 <- whnfApp clos1 [vv]
+      r2 <- whnfApp clos2 [vv]
 
       -- Check the ordering of the results at the output type.
       o  <- decideOrdFor ty2 r1 r2

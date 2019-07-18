@@ -67,7 +67,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isSubtractive, isEmptyTy
+       , isNumTy, isSubtractive, isEmptyTy, isFiniteTy
 
        -- * Type substitutions
 
@@ -99,6 +99,7 @@ import           Control.Lens                     (toListOf)
 import           Data.List                        (nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Maybe                       (isNothing)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
@@ -454,6 +455,10 @@ isEmptyTy (TyFin 0)        = True
 isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy _                = False
+
+-- | Decide whether a type has finite cardinality.
+isFiniteTy :: Type -> Bool
+isFiniteTy = not . isNothing . countType
 
 --------------------------------------------------
 -- Strictness

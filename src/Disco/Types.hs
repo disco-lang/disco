@@ -485,10 +485,10 @@ unpair ty               = [ty]
 type S = S' Type
 
 atomToTypeSubst :: S' Atom -> S' Type
-atomToTypeSubst = map (coerce *** TyAtom)
+atomToTypeSubst = fmap TyAtom
 
 uatomToTypeSubst :: S' UAtom -> S' Type
-uatomToTypeSubst = atomToTypeSubst . map (coerce *** uatomToAtom)
+uatomToTypeSubst = atomToTypeSubst . fmap uatomToAtom
 
 -- | Return a set of all the free container variables in a type.
 containerVars :: Type -> Set (Name Type)

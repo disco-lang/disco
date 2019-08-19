@@ -12,7 +12,7 @@
 
 module Disco.Typecheck.Unify where
 
-import           Unbound.Generics.LocallyNameless (Name, fv, substs)
+import           Unbound.Generics.LocallyNameless (Name, fv)
 
 import           Control.Lens                     (anyOf)
 import           Control.Monad.State
@@ -61,7 +61,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     go (e:es) = do
       u <- unifyOne e
       case u of
-        Left sub    -> (@@ sub) <$> go (substs sub es)
+        Left sub    -> (@@ sub) <$> go (applySubst sub es)
         Right newEs -> go (newEs ++ es)
 
     unifyOne :: (Type, Type) -> StateT (Set (Type,Type)) Maybe (Either S [(Type, Type)])
@@ -130,14 +130,14 @@ occurs x = anyOf fv (==x)
 
 
 unifyAtoms :: TyDefCtx -> [Atom] -> Maybe (S' Atom)
-unifyAtoms tyDefns = fmap convert . equate tyDefns . map TyAtom
+unifyAtoms tyDefns = fmap (fmap fromTyAtom) . equate tyDefns . map TyAtom
   where
-    -- Guaranteed that this will get everything in the list, since we
-    -- started with all atoms.
-    convert s = [(coerce x, a) | (x, TyAtom a) <- s]
+    fromTyAtom (TyAtom a) = a
+    fromTyAtom _          = error "fromTyAtom on non-TyAtom!"
 
 unifyUAtoms :: TyDefCtx -> [UAtom] -> Maybe (S' UAtom)
-unifyUAtoms tyDefns = fmap convert . equate tyDefns . map (TyAtom . uatomToAtom)
+unifyUAtoms tyDefns = fmap (fmap fromTyAtom) . equate tyDefns . map (TyAtom . uatomToAtom)
   where
-    convert s = [(coerce x, UB b) | (x, TyAtom (ABase b))    <- s]
-             ++ [(coerce x, UV v) | (x, TyAtom (AVar (U v))) <- s]
+    fromTyAtom (TyAtom (ABase b))    = UB b
+    fromTyAtom (TyAtom (AVar (U v))) = UV v
+    fromTyAtom _                     = error "fromTyAtom on wrong thing!"

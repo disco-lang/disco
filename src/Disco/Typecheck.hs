@@ -41,6 +41,8 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Module
+import           Disco.Subst                             (applySubst)
+import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
@@ -223,9 +225,9 @@ checkDefn (TermDefn x clauses) = do
     aclauses <- forAll nms $ mapM (checkClause ty) clauses
     return (aclauses, ty)
 
-  let defnTy = substs theta ty'
+  let defnTy = applySubst theta ty'
       (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
-  return $ substs theta (Defn (coerce x) patTys bodyTy acs)
+  return $ applySubst theta (Defn (coerce x) patTys bodyTy acs)
   where
     numPats = length . fst . unsafeUnbind
 
@@ -289,7 +291,7 @@ checkProperty prop = do
 
   -- Finally, apply the resulting substitution and fix up the types of
   -- the variables.
-  return (bind (binds & traverse . _1 %~ coerce) (substs theta at))
+  return (bind (binds & traverse . _1 %~ coerce) (applySubst theta at))
 
 ------------------------------------------------------------
 -- Type checking/inference
@@ -376,13 +378,13 @@ inferTop t = do
   traceShowM at
 
       -- Apply the resulting substitution.
-  let at' = substs theta at
+  let at' = applySubst theta at
 
       -- Find any remaining container variables.
       cvs = containerVars (getType at')
 
       -- Replace them all with List.
-      at'' = substs (zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+      at'' = applySubst (Subst.fromList $ zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.

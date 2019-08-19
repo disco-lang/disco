@@ -46,6 +46,7 @@ import qualified Data.Set                         as S
 import           Data.Tuple
 
 import           Disco.Subst
+import qualified Disco.Subst                      as Subst
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Graph            (Graph)
 import qualified Disco.Typecheck.Graph            as G
@@ -257,7 +258,7 @@ solveConstraintChoice tyDefns quals cs = do
   let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort sm x)
       sortOK (_, TyAtom (AVar (U _))) = True
       sortOK p                        = error $ "Impossible! sortOK " ++ show p
-  when (not $ all sortOK theta_cyc)
+  when (not $ all sortOK (Subst.toList theta_cyc))
     $ throwError NoUnify
 
   -- ... and update the sort map if we unified any type variables.
@@ -267,7 +268,7 @@ solveConstraintChoice tyDefns quals cs = do
   traceM "Old sort map:"
   traceShowM sm
 
-  let sm' = SM $ foldr updateSortMap (unSM sm) theta_cyc
+  let sm' = SM $ foldr updateSortMap (unSM sm) (Subst.toList theta_cyc)
        where
          updateSortMap (x, TyAtom (AVar (U y))) smm = M.alter updateSort y smm
            where
@@ -517,7 +518,7 @@ simplify tyDefns origSM cs
     extendSubst :: S -> SimplifyM ()
     extendSubst s' = do
       ssSubst %= (s'@@)
-      ssConstraints %= substs s'
+      ssConstraints %= applySubst s'
       substSortMap s'
 
     substSortMap :: S -> SimplifyM ()
@@ -528,7 +529,7 @@ simplify tyDefns origSM cs
       -- the types being substituted for those vars.
 
       let tySorts :: [(Type, Sort)]
-          tySorts = catMaybes . map (traverse (flip M.lookup sm) . swap) $ s'
+          tySorts = catMaybes . map (traverse (flip M.lookup sm) . swap) $ Subst.toList s'
 
           tyQualList :: [(Type, Qualifier)]
           tyQualList = concatMap (sequenceA . second S.toList) $ tySorts
@@ -540,7 +541,7 @@ simplify tyDefns origSM cs
       -- 3. delete domain of s' from sm and merge in decomposed quals.
       --    Be sure to keep quals from before, via 'unionWith'!
 
-      ssSortMap .= SM (M.unionWith S.union sm' (foldl' (flip M.delete) sm (map fst s')))
+      ssSortMap .= SM (M.unionWith S.union sm' (foldl' (flip M.delete) sm (dom s')))
 
       -- The above works even when unifying two variables.  Say we have
       -- the SortMap
@@ -653,7 +654,7 @@ elimCyclesGen genSubst genUnify g
     unifySCC :: Set a -> Maybe (a, S' a)
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip substs a &&& id) <$> genUnify as
+      as@(a:_) -> (flip applySubst a &&& id) <$> genUnify as
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution
@@ -751,10 +752,10 @@ solveGraph :: SortMap -> Graph UAtom -> SolveM S
 solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
   where
     unifyWCC :: S' BaseTy -> S' Atom
-    unifyWCC s = concatMap mkEquateSubst wccVarGroups @@ (map (coerce *** ABase) s)
+    unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
       where
         wccVarGroups :: [Set (Name Type)]
-        wccVarGroups  = map (S.map getVar) . filter (all uisVar) . substs s $ G.wcc g
+        wccVarGroups  = map (S.map getVar) . filter (all uisVar) . applySubst s $ G.wcc g
         getVar (UV v) = v
         getVar (UB b) = error
           $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
@@ -762,7 +763,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         mkEquateSubst :: Set (Name Type) -> S' Atom
         mkEquateSubst = mkEquations . S.toList
 
-        mkEquations (a:as) = map (\v -> (coerce v, AVar (U a))) as
+        mkEquations (a:as) = Subst.fromList . map (\v -> (coerce v, AVar (U a))) $ as
         mkEquations []     = error "Impossible! Empty set of names in mkEquateSubst"
 
             -- After picking concrete base types for all the type
@@ -828,7 +829,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
           -- empty sort), so it doesn't matter if old variables hang
           -- around in it.
           Just s ->
-            (@@ s) <$> go (substRel a (fromJust $ P.lookup (coerce a) s) $ relMap)
+            (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) $ relMap)
 
       where
         -- NOTE we can't solve a bunch in parallel!  Might end up

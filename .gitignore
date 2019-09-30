@@ -18,6 +18,7 @@ TAGS
 cabal.sandbox.config
 
 .stack-work
+stack.yaml.lock
 
 *.aux
 *.log
@@ -62,3 +63,5 @@ test/*/output
 *.pgf
 pubs/WG2.1/diagrams/*
 pubs/WG2.1/*.pdf
+
+tmp/

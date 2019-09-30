@@ -113,7 +113,8 @@ handleLet x t = do
       let c = compileTerm at
       thnk <- mkValue c
       topCtx   %= M.insert x sig
-      topDefns %= M.insert (coerce x) c
+        -- XXX ability to define more complex things at REPL prompt, with patterns etc.
+      topDefns %= M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
       topEnv   %= M.insert (coerce x) thnk
 
 handleShowDefn :: Name Term -> Disco IErr String
@@ -121,7 +122,7 @@ handleShowDefn x = do
   defns   <- use topDefns
   tyDefns <- use topTyDefns
   case M.lookup (coerce x) defns of
-    Just d  -> return $ show d
+    Just d  -> renderDoc $ prettyDefn d
     Nothing -> case M.lookup name tyDefns of
       Just t  -> renderDoc $ prettyTyDef name t
       Nothing -> return $ "No definition for " ++ show x
@@ -171,9 +172,10 @@ handleLoad fp = catchAndPrintErrors False $ do
 addModInfo :: ModuleInfo -> Disco IErr ()
 addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
-  topDocs  .= docs
-  topCtx   .= tys
+  topDocs    .= docs
+  topCtx     .= tys
   topTyDefns .= tyds
+  topDefns   .= tmds
   loadDefs cdefns
   return ()
 

@@ -85,7 +85,7 @@ import           Disco.Types
 ------------------------------------------------------------
 
 -- | Load a top-level environment of (potentially recursive)
---   definitions into memory.
+--   core language definitions into memory.
 loadDefs :: Ctx Core Core -> Disco e ()
 loadDefs cenv = do
 

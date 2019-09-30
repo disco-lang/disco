@@ -43,16 +43,24 @@ import           Paths_disco
 -- ModuleInfo and related types
 ------------------------------------------------------------
 
--- | A definition is a group of clauses, each having a list of
---   patterns that bind names in a term, without the name of the
---   function being defined.  For example, given the concrete syntax
---   @f n (x,y) = n*x + y@, the corresponding 'Defn' would be
---   something like @[n, (x,y)] (n*x + y)@.
+-- | A definition consists of a name being defined, the types of any
+--   pattern arguments (each clause must have the same number of
+--   patterns), the type of the body of each clause, and a list of
+--   clauses.  For example,
+--
+--   @
+--   f x (0,z) = 3*x + z > 5
+--   f x (y,z) = z == 9
+--   @
+--
+--   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
 data Defn  = Defn (Name ATerm) [Type] Type [Clause]
   deriving (Show, Generic)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
---   of the =) and a term (the RHS).
+--   of the =) and a term (the RHS).  For example, given the concrete
+--   syntax @f n (x,y) = n*x + y@, the corresponding 'Clause' would be
+--   something like @[n, (x,y)] (n*x + y)@.
 type Clause = Bind [APattern] ATerm
 
 instance Subst Type Defn

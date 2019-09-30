@@ -29,8 +29,8 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind, string2Name,
-                                                   unembed)
+import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
+                                                   string2Name, unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -38,8 +38,10 @@ import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (whnfV)
+import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
+import           Disco.Typecheck.Erase            (eraseClause)
 import           Disco.Types
 
 --------------------------------------------------
@@ -176,7 +178,7 @@ mparens pa doc = do
   parentPA <- ask
   (if (pa < parentPA) then parens else id) doc
 
-prettyName :: (Show a) => Name a -> Doc
+prettyName :: Name a -> Doc
 prettyName = text . show
 
 prettyTerm :: Term -> Doc
@@ -380,11 +382,12 @@ prettyDecl :: Decl -> Doc
 prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettySigma ty
 prettyDecl (DTyDef (TypeDefn x args body))
   = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
-prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map prettyClause bs
-  where
-    prettyClause b
-      = lunbind b $ \(ps, t) ->
-        (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
+
+prettyClause :: Name a -> Bind [Pattern] Term -> Doc
+prettyClause x b
+  = lunbind b $ \(ps, t) ->
+      (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 prettyProperty :: Property -> Doc
 prettyProperty prop =
@@ -392,11 +395,11 @@ prettyProperty prop =
   case vars of
     [] -> prettyTerm t
     _  -> do
-      dvars <- punctuate (text ",") (map prettyTyBind vars)
+      dvars <- punctuate (text ",") (map (uncurry prettyTyDecl) vars)
       text "∀" <+> hsep dvars <> text "." <+> prettyTerm t
-  where
-    prettyTyBind (x,ty) = hsep [prettyName x, text ":", prettyTy ty]
 
+prettyTyDecl :: Name t -> Type -> Doc
+prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 
 ------------------------------------------------------------
 
@@ -578,3 +581,11 @@ digitalExpansion b n d = digits
     longDivStep (_, r) = ((b*r) `divMod` d)
     res       = tail $ iterate longDivStep (0,n)
     digits    = first (map fst) (findRep res)
+
+------------------------------------------------------------
+
+prettyDefn :: Defn -> Doc
+prettyDefn (Defn x patTys ty clauses) = vcat $
+  (prettyTyDecl x (foldr (:->:) ty patTys))
+  :
+  map (prettyClause x . eraseClause) clauses

@@ -3,3 +3,6 @@ t
 sumTree t
 alt1
 sumAltList alt1
+:def Maybe
+:def Tree
+:def AltList

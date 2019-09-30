@@ -29,7 +29,8 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Name, lunbind, unembed)
+import           Unbound.Generics.LocallyNameless (Name, lunbind, string2Name,
+                                                   unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -163,6 +164,11 @@ prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 prettySigma :: Sigma -> Doc
 prettySigma (Forall bnd) = lunbind bnd $
   \(_, body) -> prettyTy body
+
+prettyTyDef :: String -> TyDefBody -> Doc
+prettyTyDef tyName (TyDefBody ps body)
+  = text tyName <+> hsep (map text ps) <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
+
 --------------------------------------------------
 
 mparens :: PA -> Doc -> Doc

@@ -45,8 +45,8 @@ import           Disco.Types
 
 ------------------------------------------------------------
 
-import qualified Data.IntMap as IM
-import Data.List (intercalate)
+import qualified Data.IntMap                             as IM
+import           Data.List                               (intercalate)
 
 showVal :: Int -> Value -> String
 showVal 0 _            = "_"
@@ -118,10 +118,15 @@ handleLet x t = do
 
 handleShowDefn :: Name Term -> Disco IErr String
 handleShowDefn x = do
-  defns <- use topDefns
+  defns   <- use topDefns
+  tyDefns <- use topTyDefns
   case M.lookup (coerce x) defns of
-    Nothing -> return $ "No definition for " ++ show x
     Just d  -> return $ show d
+    Nothing -> case M.lookup name tyDefns of
+      Just t  -> renderDoc $ prettyTyDef name t
+      Nothing -> return $ "No definition for " ++ show x
+  where
+    name = name2String x
 
 handleAnn :: Term -> Disco IErr String
 handleAnn t = do

@@ -297,7 +297,7 @@ data Con where
   CContainer :: Atom -> Con
 
   -- | The name of a user defined algebraic datatype.
-  CDef :: String -> Con
+  CUser :: String -> Con
 
   deriving (Show, Eq, Ord, Generic)
 
@@ -318,7 +318,7 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CDef #-}
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CUser #-}
 
 ----------------------------------------
 -- Types
@@ -415,7 +415,7 @@ pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
 pattern TyUser :: String -> [Type] -> Type
-pattern TyUser nm args = TyCon (CDef nm) args
+pattern TyUser nm args = TyCon (CUser nm) args
 
 pattern TyString :: Type
 pattern TyString = TyList TyC

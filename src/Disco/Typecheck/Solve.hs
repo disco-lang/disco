@@ -316,8 +316,8 @@ decomposeConstraint (CAll ty)    = do
 decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstraint cs)
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
-decomposeQual (TyAtom a) q       = checkQual q a
-decomposeQual ty@(TyCon (CDef _) _) q     = throwError $ Unqual q ty   -- XXX FOR NOW!
+decomposeQual (TyAtom a) q             = checkQual q a
+decomposeQual ty@(TyCon (CUser _) _) q = throwError $ Unqual q ty   -- XXX FOR NOW!
 decomposeQual ty@(TyCon c tys) q
   = case (M.lookup c >=> M.lookup q) qualRules of
       Nothing -> throwError $ Unqual q ty
@@ -426,8 +426,8 @@ simplify tyDefns origSM cs
     simplifiable (TyCon {} :<: TyCon {})                 = True
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar {})                 = True
-    simplifiable (TyCon (CDef _) _ :<: _)                = True
-    simplifiable (_ :<: TyCon (CDef _) _)                = True
+    simplifiable (TyCon (CUser _) _ :<: _)               = True
+    simplifiable (_ :<: TyCon (CUser _) _)               = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
     simplifiable _                                       = False
@@ -455,13 +455,13 @@ simplify tyDefns origSM cs
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
 
-    simplifyOne' (TyCon (CDef t) ts :<: ty2) =
+    simplifyOne' (TyCon (CUser t) ts :<: ty2) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
         Just (TyDefBody _ body) ->
           ssConstraints %= ((body ts :<: ty2) :)
 
-    simplifyOne' (ty1 :<: TyCon (CDef t) ts) =
+    simplifyOne' (ty1 :<: TyCon (CUser t) ts) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
         Just (TyDefBody _ body) ->

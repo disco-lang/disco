@@ -909,7 +909,7 @@ parseCon =
       CList <$  reserved "List"
   <|> CBag  <$  reserved "Bag"
   <|> CSet  <$  reserved "Set"
-  <|> CDef  <$> parseTyDef
+  <|> CUser <$> parseTyDef
 
 parseTyDef :: Parser String
 parseTyDef =  identifier upperChar

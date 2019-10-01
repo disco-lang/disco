@@ -94,13 +94,13 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
 
     -- If one of the types to be unified is a user-defined type,
     -- unfold its definition before continuing the matching
-    unifyOne' p@(TyCon (CDef t) tys1, ty2) = do
+    unifyOne' p@(TyCon (CUser t) tys1, ty2) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
         Nothing                 -> mzero
         Just (TyDefBody _ body) -> return $ Right [(body tys1, ty2)]
 
-    unifyOne' p@(ty1, TyCon (CDef t) tys2) = do
+    unifyOne' p@(ty1, TyCon (CUser t) tys2) = do
       modify (S.insert p)
       case M.lookup t tyDefns of
         Nothing                 -> mzero

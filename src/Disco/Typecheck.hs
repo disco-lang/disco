@@ -183,7 +183,7 @@ checkUnboundVars (TypeDefn _ args body) = go body
 checkPolyRec :: TypeDefn -> TCM ()
 checkPolyRec (TypeDefn name args body) = go body
   where
-    go (TyCon (CDef x) tys)
+    go (TyCon (CUser x) tys)
       | x == name && not (all isTyVar tys) =
         throwError $ NoPolyRec name args tys
       | otherwise = return ()
@@ -323,7 +323,7 @@ checkTypeValid (TyCon c tys) = do
 
 conArity :: Con -> TCM Int
 conArity (CContainer _) = return 1
-conArity (CDef name)    = do
+conArity (CUser name)    = do
   d <- get
   case M.lookup name d of
     Nothing               -> throwError (NotTyDef name)
@@ -427,7 +427,7 @@ typecheck :: Mode -> Term -> TCM ATerm
 
 -- To check at a user-defined type, expand its definition and recurse.
 -- This case has to be first, so in all other cases we know the type
--- will not be a CDef.
+-- will not be a CUser.
 typecheck (Check (TyUser name args)) t = lookupTyDefn name args >>= check t
 
 --------------------------------------------------

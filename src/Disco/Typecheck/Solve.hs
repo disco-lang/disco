@@ -21,9 +21,6 @@
 
 module Disco.Typecheck.Solve where
 
-import           Prelude                          hiding (lookup)
-import qualified Prelude                          as P
-
 import           Unbound.Generics.LocallyNameless
 
 import           Control.Monad.Except
@@ -641,17 +638,17 @@ elimCycles tyDefns = elimCyclesGen uatomToTypeSubst (unifyUAtoms tyDefns)
 
 elimCyclesGen
   :: forall a b. (Subst a a, Ord a)
-  => (S' a -> S' b) -> ([a] -> Maybe (S' a))
-  -> Graph a -> Except SolveError (Graph a, S' b)
+  => (Substitution a -> Substitution b) -> ([a] -> Maybe (Substitution a))
+  -> Graph a -> Except SolveError (Graph a, Substitution b)
 elimCyclesGen genSubst genUnify g
   = maybeError NoUnify
   $ (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
   where
 
-    g' :: Maybe (Graph (a, S' a))
+    g' :: Maybe (Graph (a, Substitution a))
     g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    unifySCC :: Set a -> Maybe (a, S' a)
+    unifySCC :: Set a -> Maybe (a, Substitution a)
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
       as@(a:_) -> (flip applySubst a &&& id) <$> genUnify as
@@ -751,7 +748,7 @@ glbBySort sm rm = limBySort sm rm SubTy
 solveGraph :: SortMap -> Graph UAtom -> SolveM S
 solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
   where
-    unifyWCC :: S' BaseTy -> S' Atom
+    unifyWCC :: Substitution BaseTy -> Substitution Atom
     unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
       where
         wccVarGroups :: [Set (Name Type)]
@@ -760,7 +757,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         getVar (UB b) = error
           $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
-        mkEquateSubst :: Set (Name Type) -> S' Atom
+        mkEquateSubst :: Set (Name Type) -> Substitution Atom
         mkEquateSubst = mkEquations . S.toList
 
         mkEquations (a:as) = Subst.fromList . map (\v -> (coerce v, AVar (U a))) $ as
@@ -803,7 +800,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         fromVar (UV x) = x
         fromVar _      = error "Impossible! UB but uisVar."
 
-    go :: RelMap -> SolveM (S' BaseTy)
+    go :: RelMap -> SolveM (Substitution BaseTy)
     go relMap = case as of
 
       -- No variables left that have base type constraints.
@@ -873,7 +870,7 @@ solveGraph sm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
 
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.
-        solveVar :: Name Type -> Maybe (S' BaseTy)
+        solveVar :: Name Type -> Maybe (Substitution BaseTy)
         solveVar v =
           case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . (lkup "solveGraph.solveVar" relMap)) of
             -- No sub- or supertypes; the only way this can happen is

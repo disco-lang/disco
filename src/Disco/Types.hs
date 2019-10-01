@@ -71,7 +71,7 @@ module Disco.Types
 
        -- * Type substitutions
 
-       , S', atomToTypeSubst, uatomToTypeSubst
+       , Substitution, atomToTypeSubst, uatomToTypeSubst
 
        -- * Strictness
        , Strictness(..), strictness
@@ -103,7 +103,7 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
 
-import           Disco.Subst                      (S')
+import           Disco.Subst                      (Substitution)
 
 --------------------------------------------------
 -- Disco types
@@ -482,12 +482,12 @@ unpair ty               = [ty]
 
 -- | Define @S@ as a substitution on types (the most common kind)
 --   for convenience.
-type S = S' Type
+type S = Substitution Type
 
-atomToTypeSubst :: S' Atom -> S' Type
+atomToTypeSubst :: Substitution Atom -> Substitution Type
 atomToTypeSubst = fmap TyAtom
 
-uatomToTypeSubst :: S' UAtom -> S' Type
+uatomToTypeSubst :: Substitution UAtom -> Substitution Type
 uatomToTypeSubst = atomToTypeSubst . fmap uatomToAtom
 
 -- | Return a set of all the free container variables in a type.

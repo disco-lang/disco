@@ -129,13 +129,13 @@ occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (==x)
 
 
-unifyAtoms :: TyDefCtx -> [Atom] -> Maybe (S' Atom)
+unifyAtoms :: TyDefCtx -> [Atom] -> Maybe (Substitution Atom)
 unifyAtoms tyDefns = fmap (fmap fromTyAtom) . equate tyDefns . map TyAtom
   where
     fromTyAtom (TyAtom a) = a
     fromTyAtom _          = error "fromTyAtom on non-TyAtom!"
 
-unifyUAtoms :: TyDefCtx -> [UAtom] -> Maybe (S' UAtom)
+unifyUAtoms :: TyDefCtx -> [UAtom] -> Maybe (Substitution UAtom)
 unifyUAtoms tyDefns = fmap (fmap fromTyAtom) . equate tyDefns . map (TyAtom . uatomToAtom)
   where
     fromTyAtom (TyAtom (ABase b))    = UB b

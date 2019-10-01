@@ -414,6 +414,7 @@ pattern TySet elTy = TyCon CSet [elTy]
 pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
+-- | An application of a user-defined type.
 pattern TyUser :: String -> [Type] -> Type
 pattern TyUser nm args = TyCon (CUser nm) args
 
@@ -438,6 +439,7 @@ instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
   isvar _                     = Nothing
 
+-- | Is this a type variable?
 isTyVar :: Type -> Bool
 isTyVar (TyAtom (AVar _)) = True
 isTyVar _                 = False
@@ -450,10 +452,23 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s  = M.map (substs s)
 
--- | The definition
+-- | The definition of a user-defined type contains:
+--
+--   * The actual names of the type variable arguments used in the
+--     definition (we keep these around only to help with
+--     pretty-printing)
+--   * A function representing the body of the definition.  It takes a
+--     list of type arguments and returns the body of the definition
+--     with the type arguments substituted.
+--
+--   We represent type definitions this way (using a function, as
+--   opposed to a chunk of abstract syntax) because it makes some
+--   things simpler, and we don't particularly need to do anything
+--   more complicated.
 data TyDefBody = TyDefBody [String] ([Type] -> Type)
 
--- | A map from type names to their corresponding definitions.
+-- | A 'TyDefCtx' is a mapping from type names to their corresponding
+--   definitions.
 type TyDefCtx = M.Map String TyDefBody
 
 ---------------------------------

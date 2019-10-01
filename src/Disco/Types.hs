@@ -15,11 +15,12 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
--- Disco language types.
+-- The "Disco.Types" module defines the set of types used in the disco
+-- language type system, along with various utility functions.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Types
        (
@@ -28,14 +29,14 @@ module Disco.Types
 
          BaseTy(..), isCtr, Var(..), Atom(..)
        , isVar, isBase, isSkolem
-       , UAtom(..), uatomToAtom, uisVar, uatomToEither
+       , UAtom(..), uisVar, uatomToAtom, uatomToEither
 
        -- ** Type constructors
 
        , Con(..)
        , pattern CList, pattern CBag, pattern CSet
 
-       -- ** Type AST
+       -- ** Types
 
        , Type(..)
 
@@ -112,6 +113,8 @@ import           Disco.Subst                      (Substitution)
 ----------------------------------------
 -- Base types
 
+-- | Base types are the built-in types which form the basis of the
+--   disco type system, out of which more complex types can be built.
 data BaseTy where
 
   -- | The void type, with no inhabitants.
@@ -142,10 +145,11 @@ data BaseTy where
   --   the exact number of inhabitants.
   Fin  :: Integer -> BaseTy
 
-  -- | Set container type.  It's somewhat odd putting these here since
+  -- | Set container type.  It's a bit odd putting these here since
   --   they have kind * -> * and all the other base types have kind *;
-  --   but this allows us to reuse all the existing constraint solving
-  --   machinery for container subtyping.
+  --   but there's nothing fundamentally wrong with it and in
+  --   particular this allows us to reuse all the existing constraint
+  --   solving machinery for container subtyping.
   CtrSet :: BaseTy
 
   -- | Bag container type.
@@ -166,6 +170,27 @@ isCtr = (`elem` [CtrSet, CtrBag, CtrList])
 ----------------------------------------
 -- Type variables
 
+-- | 'Var' represents /type variables/, that is, variables which stand
+--   for some type. There are two kinds of type variables:
+--
+--   * /Unification variables/ stand for an unknown type, about which
+--     we might learn additional information during the typechecking
+--     process.  For example, given a function of type @List a -> List
+--     a@, if we typecheck an application of the function to the list
+--     @[1,2,3]@, we would learn that @List a@ has to be @List N@, and
+--     hence that @a@ has to be @N@.
+--
+--   * /Skolem variables/ stand for a fixed generic type, and are used
+--     to typecheck universally quantified type signatures (/i.e./
+--     type signatures which contain type variables).  For example, if
+--     a function has the declared type @List a -> N@, it amounts to a
+--     claim that the function will work no matter what type is
+--     substituted for @a@. We check this by making up a new skolem
+--     variable for @a@.  Skolem variables are equal to themselves,
+--     but nothing else.  In contrast to a unification variable,
+--     "learning something" about a skolem variable is an error: it
+--     means that the function will only work for certain types, in
+--     contradiction to its claim to work for any type at all.
 data Var where
   -- | Unification variable
   U :: Name Type -> Var
@@ -178,6 +203,14 @@ instance Alpha Var
 ----------------------------------------
 -- Atomic types
 
+-- | An /atomic type/ is either a base type or a type variable.  The
+--   alternative is a /compound type/ which is built out of type
+--   constructors.  The reason we split out the concept of atomic
+--   types into its own data type 'Atom' is because constraints
+--   involving compound types can always be simplified/translated into
+--   constraints involving only atomic types.  After that
+--   simplification step, we want to be able to work with collections
+--   of constraints that are guaranteed to contain only atomic types.
 data Atom where
   AVar  :: Var -> Atom
   ABase :: BaseTy -> Atom
@@ -190,20 +223,33 @@ instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
   isvar _            = Nothing
 
+-- | Is this atomic type a variable?
 isVar :: Atom -> Bool
 isVar (AVar _) = True
 isVar _        = False
 
+-- | Is this atomic type a base type?
 isBase :: Atom -> Bool
 isBase = not . isVar
 
+-- | Is this atomic type a skolem variable?
 isSkolem :: Atom -> Bool
 isSkolem (AVar (S _)) = True
 isSkolem _            = False
 
--- | Unifiable atoms, i.e. no skolems.
+-- | /Unifiable/ atomic types are the same as atomic types but without
+--   skolem variables.  Hence, a unifiable atomic type is either a base
+--   type or a unification variable.
+--
+--   Again, the reason this has its own type is that at some stage of
+--   the typechecking/constraint solving process, these should be the
+--   only things around; we can get rid of skolem variables because
+--   either they impose no constraints, or result in an error if they
+--   are related to something other than themselves.  After checking
+--   these things, we can just focus on base types and unification
+--   variables.
 data UAtom where
-  UB :: BaseTy -> UAtom
+  UB :: BaseTy    -> UAtom
   UV :: Name Type -> UAtom
   deriving (Show, Eq, Ord, Generic)
 
@@ -214,14 +260,17 @@ instance Subst UAtom UAtom where
   isvar (UV x) = Just (SubstName (coerce x))
   isvar _      = Nothing
 
-uatomToAtom :: UAtom -> Atom
-uatomToAtom (UB b) = ABase b
-uatomToAtom (UV x) = AVar (U x)
-
+-- | Is this unifiable atomic type a (unification) variable?
 uisVar :: UAtom -> Bool
 uisVar (UV _) = True
 uisVar _      = False
 
+-- | Convert a unifiable atomic type into a regular atomic type.
+uatomToAtom :: UAtom -> Atom
+uatomToAtom (UB b) = ABase b
+uatomToAtom (UV x) = AVar (U x)
+
+-- | Convert a unifiable atomic type to an explicit @Either@ type.
 uatomToEither :: UAtom -> Either BaseTy (Name Type)
 uatomToEither (UB b) = Left b
 uatomToEither (UV v) = Right v
@@ -229,17 +278,23 @@ uatomToEither (UV v) = Right v
 ----------------------------------------
 -- Type constructors
 
+-- | /Compound types/, such as functions, product types, and sum
+--   types, are an application of a /type constructor/ to one or more
+--   argument types.
 data Con where
-  -- | Function type, T1 -> T2
+  -- | Function type constructor, @T1 -> T2@.
   CArr  :: Con
-  -- | Pair type, T1 * T2
+  -- | Pair type constructor, @T1 * T2@.
   CPair :: Con
-  -- | Sum type, T1 + T2
+  -- | Sum type constructor, @T1 + T2@.
   CSum  :: Con
 
-  -- | Container type (list, bag, or set).  Note this looks like it
-  --   could contain any Atom, but it will only ever contain either a
-  --   variable or a CtrList, CtrBag, or CtrSet.
+  -- | Container type (list, bag, or set) constructor.  Note this
+  --   looks like it could contain any 'Atom', but it will only ever
+  --   contain either a type variable or a 'CtrList', 'CtrBag', or
+  --   'CtrSet'.
+  --
+  --   See also 'CList', 'CBag', and 'CSet'.
   CContainer :: Atom -> Con
 
   -- | The name of a user defined algebraic datatype.
@@ -249,12 +304,18 @@ data Con where
 
 instance Alpha Con
 
+-- | 'CList' is provided for convenience; it represents a list type
+--   constructor (/i.e./ @List a@).
 pattern CList :: Con
 pattern CList = CContainer (ABase CtrList)
 
+-- | 'CBag' is provided for convenience; it represents a bag type
+--   constructor (/i.e./ @Bag a@).
 pattern CBag :: Con
 pattern CBag = CContainer (ABase CtrBag)
 
+-- | 'CSet' is provided for convenience; it represents a set type
+--   constructor (/i.e./ @Set a@).
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
@@ -263,13 +324,29 @@ pattern CSet = CContainer (ABase CtrSet)
 ----------------------------------------
 -- Types
 
--- | Types.
+-- | The main data type for representing types in the disco language.
+--   A type can be either an atomic type, or the application of a type
+--   constructor to one or more type arguments.
+--
+--   @Type@s are broken down into two cases (@TyAtom@ and @TyCon@) for
+--   ease of implementation: there are many situations where all atoms
+--   can be handled generically in one way and all type constructors
+--   can be handled generically in another.  However, using this
+--   representation to write down specific types is tedious; for
+--   example, to represent the type @N -> a@ one must write something
+--   like @TyCon CArr [TyAtom (ABase N), TyAtom (AVar (U a))]@.  For
+--   this reason, pattern synonyms such as ':->:', 'TyN', and
+--   'TyVar' are provided so that one can use them to construct and
+--   pattern-match on types when convenient.  For example, using these
+--   synonyms the foregoing example can be written @TyN :->: TyVar a@.
 data Type where
 
-  -- | Atomic types (variables and base types).
+  -- | Atomic types (variables and base types), /e.g./ @N@, @Bool@, /etc./
   TyAtom :: Atom -> Type
 
-  -- | Application of a type constructor to type arguments.
+  -- | Application of a type constructor to type arguments, /e.g./ @N
+  --   -> Bool@ is the application of the arrow type constructor to the
+  --   arguments @N@ and @Bool@.
   TyCon  :: Con -> [Type] -> Type
 
   deriving (Show, Eq, Ord, Generic)

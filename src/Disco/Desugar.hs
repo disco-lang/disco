@@ -516,7 +516,7 @@ mkLambda funty args c = go funty args
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm
 desugarTuples _ [t]                    = desugarTerm t
-desugarTuples ty@(TyPair _ ty2) (t:ts) = DTPair ty <$> desugarTerm t <*> desugarTuples ty2 ts
+desugarTuples ty@(_ :*: ty2) (t:ts) = DTPair ty <$> desugarTerm t <*> desugarTuples ty2 ts
 desugarTuples ty ats
   = error $ "Impossible! desugarTuples " ++ show ty ++ " " ++ show ats
 
@@ -598,7 +598,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         desugarTuplePats :: Type -> DTerm -> [APattern] -> DSM [DGuard]
         desugarTuplePats _ _  [] = error "Impossible! desugarTuplePats []"
         desugarTuplePats _ t [p] = desugarMatch t p
-        desugarTuplePats ty@(TyPair _ ty2) t (p:ps) = do
+        desugarTuplePats ty@(_ :*: ty2) t (p:ps) = do
           (x1,gs1) <- varForPat p
           (x2,gs2) <- case ps of
             [APVar _ px2] -> return (coerce px2, [])
@@ -737,12 +737,12 @@ desugarContainer ty@(TyList eltTy) ListContainer es (Just (Until t)) =
 -- value of 1 filled in for missing counts as needed).
 desugarContainer (TyBag eltTy) BagContainer es mell
   | any isJust (map snd es) =
-    dtapp (DTPrim (TySet (TyPair eltTy TyN) :->: TyBag eltTy) PrimC2B)
-      <$> desugarContainer (TyBag (TyPair eltTy TyN)) BagContainer counts mell
+    dtapp (DTPrim (TySet (eltTy :*: TyN) :->: TyBag eltTy) PrimC2B)
+      <$> desugarContainer (TyBag (eltTy :*: TyN)) BagContainer counts mell
 
     where
       -- turn e.g.  x # 3, y   into   (x, 3), (y, 1)
-      counts = [ (ATTup (TyPair eltTy TyN) [t, fromMaybe (ATNat TyN 1) n], Nothing)
+      counts = [ (ATTup (eltTy :*: TyN) [t, fromMaybe (ATNat TyN 1) n], Nothing)
                | (t, n) <- es
                ]
 

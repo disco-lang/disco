@@ -52,7 +52,7 @@ module Disco.Types
        , pattern TyC
        , pattern TyFin
        , pattern (:->:)
-       , pattern TyPair
+       , pattern (:*:)
        , pattern TySum
        , pattern TyList
        , pattern TyBag
@@ -397,8 +397,8 @@ infixr 5 :->:
 pattern (:->:) :: Type -> Type -> Type
 pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
 
-pattern TyPair :: Type -> Type -> Type
-pattern TyPair ty1 ty2 = TyCon CPair [ty1, ty2]
+pattern (:*:) :: Type -> Type -> Type
+pattern (:*:) ty1 ty2 = TyCon CPair [ty1, ty2]
 
 pattern TySum :: Type -> Type -> Type
 pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
@@ -423,7 +423,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      (:->:), TyPair, TySum, TyList, TyBag, TySet, TyUser #-}
+      (:->:), (:*:), TySum, TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
@@ -489,7 +489,7 @@ countType TyUnit            = Just 1
 countType TyBool            = Just 2
 countType (TyFin n)         = Just n
 countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
-countType (TyPair ty1 ty2)
+countType (ty1 :*: ty2)
   | isEmptyTy ty1 = Just 0
   | isEmptyTy ty2 = Just 0
   | otherwise     = (*) <$> countType ty1 <*> countType ty2
@@ -526,11 +526,11 @@ isSubtractive _         = False
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
-isEmptyTy TyVoid           = True
-isEmptyTy (TyFin 0)        = True
-isEmptyTy (TyPair ty1 ty2) = isEmptyTy ty1 || isEmptyTy ty2
-isEmptyTy (TySum ty1 ty2)  = isEmptyTy ty1 && isEmptyTy ty2
-isEmptyTy _                = False
+isEmptyTy TyVoid          = True
+isEmptyTy (TyFin 0)       = True
+isEmptyTy (ty1 :*: ty2)   = isEmptyTy ty1 || isEmptyTy ty2
+isEmptyTy (TySum ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy _               = False
 
 --------------------------------------------------
 -- Strictness
@@ -554,8 +554,8 @@ strictness ty
 
 -- | Decompose T1 * (T2 * ( ... )) into a list of types.
 unpair :: Type -> [Type]
-unpair (TyPair ty1 ty2) = ty1 : unpair ty2
-unpair ty               = [ty]
+unpair (ty1 :*: ty2) = ty1 : unpair ty2
+unpair ty            = [ty]
 
 -- | Define @S@ as a substitution on types (the most common kind)
 --   for convenience.

@@ -139,7 +139,7 @@ prettyTy TyBool           = text "Bool"
 prettyTy TyC              = text "Char"
 prettyTy (ty1 :->: ty2)   = mparens arrPA $
   prettyTy' 1 InL ty1 <+> text "→" <+> prettyTy' 1 InR ty2
-prettyTy (TyPair ty1 ty2) = mparens (PA 7 InR) $
+prettyTy (ty1 :*: ty2) = mparens (PA 7 InR) $
   prettyTy' 7 InL ty1 <+> text "×" <+> prettyTy' 7 InR ty2
 prettyTy (TySum  ty1 ty2) = mparens (PA 6 InR) $
   prettyTy' 6 InL ty1 <+> text "+" <+> prettyTy' 6 InR ty2
@@ -439,7 +439,7 @@ prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i 
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
 prettyWHNF out (TyList TyC)    v            = prettyString out v
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
-prettyWHNF out ty@(TyPair _ _) v            = out "(" >> prettyTuple out ty v >> out ")"
+prettyWHNF out ty@(_ :*: _) v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (TySum ty1 ty2) (VCons i [v])
   = case i of
       0 -> out "left "  >> prettyValueWith out ty1 v
@@ -522,7 +522,7 @@ prettyList out ty v = out "[" >> go v
     go v' = error $ "Impossible! Value that's not a list (or not in WHNF) in prettyList: " ++ show v'
 
 prettyTuple :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
-prettyTuple out (TyPair ty1 ty2) (VCons 0 [v1, v2]) = do
+prettyTuple out (ty1 :*: ty2) (VCons 0 [v1, v2]) = do
   prettyValueWith out ty1 v1
   out ", "
   whnfV v2 >>= prettyTuple out ty2

@@ -928,8 +928,8 @@ parseType :: Parser Type
 parseType = makeExprParser parseAtomicType table
   where
     table = [ [ InfixL (return tyApp) ]
-            , [ infixR "*" TyPair
-              , infixR "×" TyPair ]
+            , [ infixR "*" (:*:)
+              , infixR "×" (:*:) ]
             , [ infixR "+" TySum
               , infixR "⊎" TySum
               ]

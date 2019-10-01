@@ -1143,7 +1143,7 @@ eqOp ty v1 v2 = mkEnum <$> decideEqFor ty v1 v2
 decideEqFor :: Type -> Value -> Value -> Disco IErr Bool
 
 -- To decide equality at a pair type:
-decideEqFor (TyPair ty1 ty2) v1 v2 = do
+decideEqFor (ty1 :*: ty2) v1 v2 = do
 
   -- First, reduce both values to WHNF, which will produce pairs.
   VCons 0 [v11, v12] <- whnfV v1
@@ -1263,7 +1263,7 @@ enumerate TyBool           = [VCons 0 [], VCons 1 []]
 enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
 
 -- To enumerate a pair type, take the Cartesian product of enumerations.
-enumerate (TyPair ty1 ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
+enumerate (ty1 :*: ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
 
 -- To enumerate a sum type, enumerate all the lefts followed by all the rights.
 enumerate (TySum ty1 ty2)  =
@@ -1311,7 +1311,7 @@ enumerate _ = []   -- The only way other cases can happen at the
 --   know the values are in RNF.  This means the result doesn't need
 --   to be in the @Disco@ monad, because no evaluation needs to happen.
 decideEqForRnf :: Type -> Value -> Value -> Bool
-decideEqForRnf (TyPair ty1 ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
 decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
@@ -1367,7 +1367,7 @@ ltOp ty v1 v2 = (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
 decideOrdFor :: Type -> Value -> Value -> Disco IErr Ordering
 
 -- To decide the ordering of two pairs:
-decideOrdFor (TyPair ty1 ty2) v1 v2 = do
+decideOrdFor (ty1 :*: ty2) v1 v2 = do
 
   -- Reduce both pairs to WHNF
   VCons 0 [v11, v12] <- whnfV v1

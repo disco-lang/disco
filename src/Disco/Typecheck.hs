@@ -572,13 +572,13 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimB2C = do
       a <- freshTy
-      return $ TyBag a :->: TySet (TyPair a TyN)
+      return $ TyBag a :->: TySet (a :*: TyN)
 
     inferPrim PrimC2B = do
       a <- freshTy
       c <- freshAtom
       constraint $ CQual QCmp a
-      return $ TyContainer c (TyPair a TyN) :->: TyBag a
+      return $ TyContainer c (a :*: TyN) :->: TyBag a
 
     ----------------------------------------
     -- Container primitives
@@ -942,7 +942,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
       (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
-      return $ (TyPair (getType at) ty, at : ats)
+      return $ (getType at :*: ty, at : ats)
 
 --------------------------------------------------
 -- Sum types
@@ -1170,7 +1170,7 @@ checkPattern (PString s) ty = do
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy
   let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APTup (foldr1 TyPair (map getType aps)) aps)
+  return (joinCtxs ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
 
   where
     checkTuplePat :: [Pattern] -> Type -> TCM ([(TyCtx, APattern)])

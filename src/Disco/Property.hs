@@ -223,7 +223,7 @@ discoGenerator (TySum ty1 ty2) =
     vLeft  v = VCons 0 [v]
     vRight v = VCons 1 [v]
 
-discoGenerator (TyPair ty1 ty2) =
+discoGenerator (ty1 :*: ty2) =
   case (discoGenerator ty1, discoGenerator ty2) of
     (EmptyGen, _) -> EmptyGen
     (_, EmptyGen) -> EmptyGen

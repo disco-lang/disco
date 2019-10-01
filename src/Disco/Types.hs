@@ -95,7 +95,6 @@ import           Data.Coerce
 import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
-import           Control.Arrow                    ((***))
 import           Control.Lens                     (toListOf)
 import           Data.List                        (nub)
 import           Data.Map                         (Map)

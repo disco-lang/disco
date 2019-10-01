@@ -16,7 +16,6 @@ import           Unbound.Generics.LocallyNameless (Name, fv)
 
 import           Control.Lens                     (anyOf)
 import           Control.Monad.State
-import           Data.Coerce
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S

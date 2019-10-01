@@ -53,7 +53,7 @@ module Disco.Types
        , pattern TyFin
        , pattern (:->:)
        , pattern (:*:)
-       , pattern TySum
+       , pattern (:+:)
        , pattern TyList
        , pattern TyBag
        , pattern TySet
@@ -400,8 +400,8 @@ pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
 pattern (:*:) :: Type -> Type -> Type
 pattern (:*:) ty1 ty2 = TyCon CPair [ty1, ty2]
 
-pattern TySum :: Type -> Type -> Type
-pattern TySum ty1 ty2 = TyCon CSum [ty1, ty2]
+pattern (:+:) :: Type -> Type -> Type
+pattern (:+:) ty1 ty2 = TyCon CSum [ty1, ty2]
 
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
@@ -423,7 +423,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
-      (:->:), (:*:), TySum, TyList, TyBag, TySet, TyUser #-}
+      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var
 instance Subst Type BaseTy
@@ -488,7 +488,7 @@ countType TyVoid            = Just 0
 countType TyUnit            = Just 1
 countType TyBool            = Just 2
 countType (TyFin n)         = Just n
-countType (TySum  ty1 ty2)  = (+) <$> countType ty1 <*> countType ty2
+countType (ty1 :+: ty2)     = (+) <$> countType ty1 <*> countType ty2
 countType (ty1 :*: ty2)
   | isEmptyTy ty1 = Just 0
   | isEmptyTy ty2 = Just 0
@@ -526,11 +526,11 @@ isSubtractive _         = False
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
-isEmptyTy TyVoid          = True
-isEmptyTy (TyFin 0)       = True
-isEmptyTy (ty1 :*: ty2)   = isEmptyTy ty1 || isEmptyTy ty2
-isEmptyTy (TySum ty1 ty2) = isEmptyTy ty1 && isEmptyTy ty2
-isEmptyTy _               = False
+isEmptyTy TyVoid        = True
+isEmptyTy (TyFin 0)     = True
+isEmptyTy (ty1 :*: ty2) = isEmptyTy ty1 || isEmptyTy ty2
+isEmptyTy (ty1 :+: ty2) = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy _             = False
 
 --------------------------------------------------
 -- Strictness

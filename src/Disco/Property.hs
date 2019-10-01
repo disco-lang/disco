@@ -210,7 +210,7 @@ discoGenerator TyVoid       = emptyGenerator
 discoGenerator TyUnit       = DiscoGen (return ()) (return . const (VCons 0 []))
 discoGenerator TyBool       = DiscoGen (QC.elements [False, True]) (return . mkEnum)
 
-discoGenerator (TySum ty1 ty2) =
+discoGenerator (ty1 :+: ty2) =
   case (discoGenerator ty1, discoGenerator ty2) of
     (g1, EmptyGen) -> mapDiscoGen vLeft  g1
     (EmptyGen, g2) -> mapDiscoGen vRight g2

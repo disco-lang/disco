@@ -1161,7 +1161,7 @@ decideEqFor (ty1 :*: ty2) v1 v2 = do
     True  -> decideEqFor ty2 v12 v22
 
 -- To decide equality at a sum type:
-decideEqFor (TySum ty1 ty2) v1 v2 = do
+decideEqFor (ty1 :+: ty2) v1 v2 = do
 
   -- Reduce both values to WHNF, which will produce constructors
   -- (either inl or inr) with one argument.
@@ -1266,7 +1266,7 @@ enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
 enumerate (ty1 :*: ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
 
 -- To enumerate a sum type, enumerate all the lefts followed by all the rights.
-enumerate (TySum ty1 ty2)  =
+enumerate (ty1 :+: ty2)  =
   map (VCons 0 . (:[])) (enumerate ty1) ++
   map (VCons 1 . (:[])) (enumerate ty2)
 
@@ -1313,7 +1313,7 @@ enumerate _ = []   -- The only way other cases can happen at the
 decideEqForRnf :: Type -> Value -> Value -> Bool
 decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
-decideEqForRnf (TySum ty1 ty2) (VCons i1 [v1']) (VCons i2 [v2'])
+decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
@@ -1386,7 +1386,7 @@ decideOrdFor (ty1 :*: ty2) v1 v2 = do
     _  -> return o1
 
 -- To decide the ordering for two sum injections:
-decideOrdFor (TySum ty1 ty2) v1 v2 = do
+decideOrdFor (ty1 :+: ty2) v1 v2 = do
 
   -- Reduce to WHNF
   VCons i1 [v1'] <- whnfV v1

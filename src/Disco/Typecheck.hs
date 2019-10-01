@@ -953,8 +953,8 @@ typecheck mode lt@(TInj s t) = do
   at <- typecheck (selectSide s mL mR) t
   resTy <- case mode of
     Infer    ->
-      selectSide s (TySum <$> pure (getType at) <*> freshTy          )
-                   (TySum <$> freshTy           <*> pure (getType at))
+      selectSide s ((:+:) <$> pure (getType at) <*> freshTy          )
+                   ((:+:) <$> freshTy           <*> pure (getType at))
     Check ty -> return ty
   return $ ATInj resTy s at
 
@@ -998,7 +998,7 @@ typecheck Infer (TTyOp Enumerate t) = do
 
 typecheck Infer (TTyOp Count t)     = do
   checkTypeValid t
-  return $ ATTyOp (TySum TyUnit TyN) Count t
+  return $ ATTyOp (TyUnit :+: TyN) Count t
 
 --------------------------------------------------
 -- Containers
@@ -1187,11 +1187,11 @@ checkPattern (PTup tup) tupTy = do
 checkPattern p@(PInj L pat) ty       = do
   (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty1
-  return (ctx, APInj (TySum ty1 ty2) L apt)
+  return (ctx, APInj (ty1 :+: ty2) L apt)
 checkPattern p@(PInj R pat) ty    = do
   (ty1, ty2) <- ensureConstr2 CSum ty (Right p)
   (ctx, apt) <- checkPattern pat ty2
-  return (ctx, APInj (TySum ty1 ty2) R apt)
+  return (ctx, APInj (ty1 :+: ty2) R apt)
 
 -- we can match any supertype of TyN against a Nat pattern, OR
 -- any TyFin.

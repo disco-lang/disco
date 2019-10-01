@@ -930,8 +930,8 @@ parseType = makeExprParser parseAtomicType table
     table = [ [ InfixL (return tyApp) ]
             , [ infixR "*" (:*:)
               , infixR "×" (:*:) ]
-            , [ infixR "+" TySum
-              , infixR "⊎" TySum
+            , [ infixR "+" (:+:)
+              , infixR "⊎" (:+:)
               ]
             , [ infixR "->" (:->:)
               , infixR "→"  (:->:)

@@ -75,6 +75,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/interp-fibs/expected
                      test/interp-fibs/fiblist.disco
                      test/interp-fibs/input
+                     test/interp-gc/expected
+                     test/interp-gc/input
                      test/interp-lazymatch/bomb.disco
                      test/interp-lazymatch/expected
                      test/interp-lazymatch/input
@@ -188,6 +190,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-squash/input
                      test/types-standalone-ops/expected
                      test/types-standalone-ops/input
+                     test/types-tydef-param/expected
+                     test/types-tydef-param/input
+                     test/types-tydef-param/types-tydef-param.disco
                      test/types-tydefs/expected
                      test/types-tydefs/input
                      test/types-tydefs/types-tydefs.disco

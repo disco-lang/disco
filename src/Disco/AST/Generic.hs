@@ -320,7 +320,7 @@ data Term_ e where
   TContainerComp_ :: X_TContainerComp e -> Container -> Bind (Telescope (Qual_ e)) (Term_ e) -> Term_ e
 
   -- | Type ascription, @(Term_ e : type)@.
-  TAscr_  :: X_TAscr e -> Term_ e -> Sigma -> Term_ e
+  TAscr_  :: X_TAscr e -> Term_ e -> PolyType -> Term_ e
 
   -- | A data constructor with an extension descriptor that a "concrete"
   --   implementation of a generic AST may use to carry extra information.
@@ -420,7 +420,7 @@ instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
 ------------------------------------------------------------
 
 -- | A binding is a name along with its definition.
-data Binding_ e = Binding_ (Maybe (Embed Sigma)) (Name (Term_ e)) (Embed (Term_ e))
+data Binding_ e = Binding_ (Maybe (Embed PolyType)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
 deriving instance ForallTerm Show  e => Show (Binding_ e)

@@ -156,7 +156,7 @@ deriving instance ForallTerm Show  UD => Show DocThing
 type Property = Property_ UD
 
 -- | A type declaration, @name : type@.
-data TypeDecl = TypeDecl (Name Term) Sigma
+data TypeDecl = TypeDecl (Name Term) PolyType
 
 -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
 --   patterns bind variables in the term. For example, @f n (x,y) =
@@ -278,7 +278,7 @@ pattern TContainer c tl mets = TContainer_ () c tl mets
 pattern TContainerComp :: Container -> Bind (Telescope Qual) Term -> Term
 pattern TContainerComp c b = TContainerComp_ () c b
 
-pattern TAscr :: Term -> Sigma -> Term
+pattern TAscr :: Term -> PolyType -> Term
 pattern TAscr term ty = TAscr_ () term ty
 
 -- Since we parse patterns by first parsing a term and then ensuring
@@ -323,7 +323,7 @@ pattern QGuard embedt = QGuard_ () embedt
 
 type Binding = Binding_ UD
 
-pattern Binding :: Maybe (Embed Sigma) -> Name Term -> Embed Term -> Binding
+pattern Binding :: Maybe (Embed PolyType) -> Name Term -> Embed Term -> Binding
 pattern Binding m b n = Binding_ m b n
 
 {-# COMPLETE Binding #-}

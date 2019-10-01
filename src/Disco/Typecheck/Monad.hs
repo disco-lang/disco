@@ -34,7 +34,7 @@ import           Disco.Types
 ------------------------------------------------------------
 
 -- | A typing context is a mapping from term names to types.
-type TyCtx = Ctx Term Sigma
+type TyCtx = Ctx Term PolyType
 
 ------------------------------------------------------------
 -- Errors
@@ -143,7 +143,7 @@ solve m = do
 
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
-lookupTy :: Name Term -> TCM Sigma
+lookupTy :: Name Term -> TCM PolyType
 lookupTy x = lookup x >>= maybe (throwError (Unbound x)) return
 
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error

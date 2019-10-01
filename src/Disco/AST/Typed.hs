@@ -230,7 +230,7 @@ pattern AQGuard embedt = QGuard_ () embedt
 
 type ABinding = Binding_ TY
 
-pattern ABinding :: Maybe (Embed Sigma) -> Name ATerm -> Embed ATerm -> ABinding
+pattern ABinding :: Maybe (Embed PolyType) -> Name ATerm -> Embed ATerm -> ABinding
 pattern ABinding m b n = Binding_ m b n
 
 {-# COMPLETE ABinding #-}

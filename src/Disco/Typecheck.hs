@@ -210,7 +210,7 @@ makeTyCtx decls = do
     declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
 
 checkCtx :: TyCtx -> TCM ()
-checkCtx = mapM_ checkSigmaValid . M.elems
+checkCtx = mapM_ checkPolyTyValid . M.elems
 
 --------------------------------------------------
 -- Top-level definitions
@@ -282,7 +282,7 @@ checkProperty prop = do
     (bs, t) <- unbind prop
 
     -- Extend the context with (x1:ty1) ... (xn:tyn) ...
-    extends (M.fromList $ map (second toSigma) bs) $ do
+    extends (M.fromList $ map (second toPolyType) bs) $ do
 
     -- ... check that the term has type Bool ...
     a <- check t TyBool
@@ -302,8 +302,8 @@ checkProperty prop = do
 --------------------------------------------------
 
 -- | Check that a sigma type is a valid type.  See 'checkTypeValid'.
-checkSigmaValid :: Sigma -> TCM ()
-checkSigmaValid (Forall b) = do
+checkPolyTyValid :: PolyType -> TCM ()
+checkPolyTyValid (Forall b) = do
   let (_, ty) = unsafeUnbind b
   checkTypeValid ty
 
@@ -349,8 +349,8 @@ check :: Term -> Type -> TCM ATerm
 check t ty = typecheck (Check ty) t
 
 -- | Check that a term has the given polymorphic type.
-checkSigma :: Term -> Sigma -> TCM ATerm
-checkSigma t (Forall sig) = do
+checkPolyTy :: Term -> PolyType -> TCM ATerm
+checkPolyTy t (Forall sig) = do
   (as, tau) <- unbind sig
   (at, cst) <- withConstraint $ check t tau
   case as of
@@ -369,7 +369,7 @@ infer t = typecheck Infer t
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
-inferTop :: Term -> TCM (ATerm, Sigma)
+inferTop :: Term -> TCM (ATerm, PolyType)
 inferTop t = do
 
   -- Run inference on the term and try to solve the resulting
@@ -388,7 +388,7 @@ inferTop t = do
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return (at'', closeSigma (getType at''))
+  return (at'', closeType (getType at''))
 
 --------------------------------------------------
 -- The typecheck function
@@ -892,7 +892,7 @@ typecheck (Check checkTy) (TAbs lam) = do
 
       -- Pass the result type through, and add x with its type to the
       -- generated context.
-      return (singleCtx x (toSigma xTy) `joinCtx` ctx, (x, embed xTy) : typedArgs, resTy)
+      return (singleCtx x (toPolyType xTy) `joinCtx` ctx, (x, embed xTy) : typedArgs, resTy)
 
 -- To infer a lambda abstraction:
 typecheck Infer (TAbs lam)    = do
@@ -904,7 +904,7 @@ typecheck Infer (TAbs lam)    = do
   -- Replace any missing type annotations with fresh type variables,
   -- and make a map from variable names to types.
   tys <- mapM (maybe freshTy return) (map unembed mtys)
-  let tymap = M.fromList $ zip xs (map toSigma tys)
+  let tymap = M.fromList $ zip xs (map toPolyType tys)
 
   -- Infer the type of the body under an extended context, and
   -- construct an ATAbs with the appropriate function type.
@@ -1043,7 +1043,7 @@ typecheck mode tcc@(TContainerComp c bqt) = do
     inferQual (QBind x (unembed -> t))  = do
       at <- infer t
       ty <- ensureConstr1 (containerToCon c) (getType at) (Left t)
-      return (AQBind (coerce x) (embed at), singleCtx x (toSigma ty))
+      return (AQBind (coerce x) (embed at), singleCtx x (toPolyType ty))
 
     inferQual (QGuard (unembed -> t))   = do
       at <- check t TyBool
@@ -1074,9 +1074,9 @@ typecheck mode (TLet l) = do
     inferBinding :: Binding -> TCM (ABinding, TyCtx)
     inferBinding (Binding mty x (unembed -> t)) = do
       at <- case mty of
-        Just (unembed -> ty) -> checkSigma t ty
+        Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return $ (ABinding mty (coerce x) (embed at), singleCtx x (toSigma $ getType at))
+      return $ (ABinding mty (coerce x) (embed at), singleCtx x (toPolyType $ getType at))
 
 --------------------------------------------------
 -- Case
@@ -1114,16 +1114,16 @@ typecheck mode (TCase bs) = do
       return (AGPat (embed at) apt, ctx)
     inferGuard (GLet (Binding mty x (unembed -> t))) = do
       at <- case mty of
-        Just (unembed -> ty) -> checkSigma t ty
+        Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toSigma (getType at)))
+      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toPolyType (getType at)))
 
 --------------------------------------------------
 -- Type ascription
 
 -- Ascriptions are what let us flip from inference mode into
 -- checking mode.
-typecheck Infer (TAscr t ty) = checkSigmaValid ty >> checkSigma t ty
+typecheck Infer (TAscr t ty) = checkPolyTyValid ty >> checkPolyTy t ty
 
 --------------------------------------------------
 -- Inference fallback
@@ -1147,7 +1147,7 @@ checkPattern :: Pattern -> Type -> TCM (TyCtx, APattern)
 
 checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
-checkPattern (PVar x) ty = return (singleCtx x (toSigma ty), APVar ty (coerce x))
+checkPattern (PVar x) ty = return (singleCtx x (toPolyType ty), APVar ty (coerce x))
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
 

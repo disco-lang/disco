@@ -167,7 +167,7 @@ type instance X_TLink DS = Void
 
 type DBinding = Binding_ DS
 
-pattern DBinding :: Maybe (Embed Sigma) -> Name DTerm -> Embed DTerm -> DBinding
+pattern DBinding :: Maybe (Embed PolyType) -> Name DTerm -> Embed DTerm -> DBinding
 pattern DBinding m b n = Binding_ m b n
 
 {-# COMPLETE DBinding #-}

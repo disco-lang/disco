@@ -163,8 +163,8 @@ prettyTy (Skolem n)       = text "%" <> prettyName n
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
-prettySigma :: Sigma -> Doc
-prettySigma (Forall bnd) = lunbind bnd $
+prettyPolyTy :: PolyType -> Doc
+prettyPolyTy (Forall bnd) = lunbind bnd $
   \(_, body) -> prettyTy body
 
 prettyTyDef :: String -> TyDefBody -> Doc
@@ -274,7 +274,7 @@ prettyTerm (TLet bnd) = mparens initPA $
 
 prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
   -- XXX FIX ME: what is the precedence of ascription?
-prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettySigma ty)
+prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyPolyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
 prettyTerm (TTyOp op ty)  = mparens funPA $
     prettyTyOp op <+> prettyTy' funPrec InR ty
@@ -334,7 +334,7 @@ prettyBinding :: Binding -> Doc
 prettyBinding (Binding Nothing x (unembed -> t))
   = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
 prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
-  = hsep [prettyName x, text ":", prettySigma ty, text "=", prettyTerm' 0 InL t]
+  = hsep [prettyName x, text ":", prettyPolyTy ty, text "=", prettyTerm' 0 InL t]
 
 prettyQuals :: Telescope Qual -> Doc
 prettyQuals (fromTelescope -> qs) = do
@@ -379,7 +379,7 @@ prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
 prettyDecl :: Decl -> Doc
-prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettySigma ty
+prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettyPolyTy ty
 prettyDecl (DTyDef (TypeDefn x args body))
   = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs

@@ -49,7 +49,7 @@ module Disco.Parser
 
          -- ** Types
        , parseType, parseAtomicType
-       , parseSigma
+       , parsePolyTy
        )
        where
 
@@ -398,7 +398,7 @@ parseDecl = try (DType <$> parseTyDecl) <|> DDefn <$> parseDefn <|> DTyDef <$> p
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser TypeDecl
 parseTyDecl = label "type declaration" $
-  TypeDecl <$> ident <*> (indented $ colon *> parseSigma)
+  TypeDecl <$> ident <*> (indented $ colon *> parsePolyTy)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser TermDefn
@@ -427,7 +427,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parseSigma))
+  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parsePolyTy))
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -645,7 +645,7 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parseSigma)
+  mty <- optionMaybe (colon *> parsePolyTy)
   t   <- symbol "=" *> (embed <$> parseTerm)
   return $ Binding (embed <$> mty) x t
 
@@ -920,8 +920,8 @@ parseTyVarName = identifier lowerChar
 parseTyVar :: Parser (Name Type)
 parseTyVar = string2Name <$> parseTyVarName
 
-parseSigma :: Parser Sigma
-parseSigma = closeSigma <$> parseType
+parsePolyTy :: Parser PolyType
+parsePolyTy = closeType <$> parseType
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

@@ -256,7 +256,7 @@ handleDocs x = do
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
-      p  <- renderDoc . hsep $ [prettyName x, text ":", prettySigma ty]
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
       io . putStrLn $ p
       case M.lookup x docs of
         Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
@@ -283,5 +283,5 @@ handleTypeCheck t = do
   tymap <- use topTyDefns
   case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e        -> return.show $ e    -- XXX pretty-print
-    Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettySigma sig
+    Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
 

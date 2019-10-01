@@ -63,8 +63,8 @@ module Disco.Types
 
        -- ** Quantified types
 
-       , Sigma(..)
-       , toSigma, closeSigma
+       , PolyType(..)
+       , toPolyType, closeType
 
        -- * Type predicates
 
@@ -456,25 +456,27 @@ data TyDefBody = TyDefBody [String] ([Type] -> Type)
 -- | A map from type names to their corresponding definitions.
 type TyDefCtx = M.Map String TyDefBody
 
-----------------------------------------
--- Sigma types (i.e. quanitified types)
+---------------------------------
+--  Universally quantified types
 
--- | @Sigma@ represents a polymorphic type of the form
+-- | a polymorphic type of the form
 --   @forall a1 a2 ... an. ty@  (n may be 0).
-newtype Sigma = Forall (Bind [Name Type] Type)
+newtype PolyType = Forall (Bind [Name Type] Type)
   deriving (Show, Generic)
 
-instance Alpha Sigma
-instance Subst Type Sigma
+instance Alpha PolyType
+instance Subst Type PolyType
 
--- | Convert a monotype into a (trivially) quantified type.
-toSigma :: Type -> Sigma
-toSigma ty = Forall (bind [] ty)
+-- | Convert a monotype into a trivial polytype that does not quantify
+--   over any type variables.  If the type can contain free type
+--   variables, use 'closeType' instead.
+toPolyType :: Type -> PolyType
+toPolyType ty = Forall (bind [] ty)
 
 -- | Convert a monotype into a polytype by quantifying over all its
 --   free type variables.
-closeSigma :: Type -> Sigma
-closeSigma ty = Forall (bind (nub $ toListOf fv ty) ty)
+closeType :: Type -> PolyType
+closeType ty = Forall (bind (nub $ toListOf fv ty) ty)
 
 --------------------------------------------------
 -- Counting inhabitants

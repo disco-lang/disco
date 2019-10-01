@@ -301,7 +301,7 @@ type Loc = Int
 -- | The various pieces of state tracked by the 'Disco' monad.
 data DiscoState e = DiscoState
   {
-    _topCtx        :: Ctx Term Sigma
+    _topCtx        :: Ctx Term PolyType
     -- ^ Top-level type environment.
 
   , _topDefns      :: Ctx ATerm Defn

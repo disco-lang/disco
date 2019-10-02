@@ -445,7 +445,7 @@ typecheck mode (TParens t) = typecheck mode t
 -- fall through to this case.
 --
 -- Note this is also where unbound identifiers may possibly be turned
--- into primitives if the nam matches.
+-- into primitives if the name matches.
 typecheck Infer (TVar x) = checkVar `catchError` checkPrim
   where
     checkVar = do
@@ -532,6 +532,19 @@ typecheck Infer (TPrim prim) = do
 
   where
     inferPrim :: Prim -> TCM Type
+
+    ----------------------------------------
+    -- Left/right
+
+    inferPrim PrimLeft = do
+      a <- freshTy
+      b <- freshTy
+      return $ a :->: (a :+: b)
+
+    inferPrim PrimRight = do
+      a <- freshTy
+      b <- freshTy
+      return $ b :->: (a :+: b)
 
     ----------------------------------------
     -- Logic

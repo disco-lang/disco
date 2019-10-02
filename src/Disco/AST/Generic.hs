@@ -23,11 +23,14 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
 -- Abstract syntax trees representing the generic syntax of the Disco
 -- language. Concrete AST instances may use this module as a template.
+--
+-- XXX For the approach used here, see XXX trees that grow.
+-- XXX give a basic explanation
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.AST.Generic
        ( -- * Telescopes
@@ -159,16 +162,17 @@ data Telescope b where
 instance Alpha b => Alpha (Telescope b)
 instance Subst t b => Subst t (Telescope b)
 
+-- | Add a new item to the beginning of a 'Telescope'.
 telCons :: Alpha b => b -> Telescope b -> Telescope b
 telCons b tb = TelCons (rebind b tb)
 
--- | Fold a telescope given a combining function and a value for the
---   empty telescope.
+-- | Fold a telescope given a combining function and a value to use
+--   for the empty telescope.  Analogous to 'foldr' for lists.
 foldTelescope :: Alpha b => (b -> r -> r) -> r -> Telescope b -> r
 foldTelescope _ z TelEmpty                       = z
 foldTelescope f z (TelCons (unrebind -> (b,bs))) = f b (foldTelescope f z bs)
 
--- | Map over a telescope.
+-- | Apply a function to every item in a telescope.
 mapTelescope :: (Alpha a, Alpha b) => (a -> b) -> Telescope a -> Telescope b
 mapTelescope f = toTelescope . map f . fromTelescope
 
@@ -197,11 +201,14 @@ data Side = L | R
 instance Alpha Side
 instance Subst t Side
 
+-- | Use a 'Side' to select one of two arguments (the first argument
+--   for 'L', and the second for 'R').
 selectSide :: Side -> a -> a -> a
 selectSide L a _ = a
 selectSide R _ b = b
 
--- | A container is a wrapper for sets and lists.
+-- | An enumeration of the different kinds of containers in disco:
+--   lists, bags, and sets.
 data Container where
   ListContainer :: Container
   BagContainer  :: Container
@@ -211,10 +218,13 @@ data Container where
 instance Alpha Container
 instance Subst t Container
 
--- | An ellipsis is an "omitted" part of a literal container (such as a list or set), of the form
---   @..@ or @.. t@.
+-- | An ellipsis is an "omitted" part of a literal container (such as
+--   a list or set), of the form @..@ or @.. t@.
 data Ellipsis t where
-  Forever ::      Ellipsis t   -- @..@
+  -- | 'Forever' represents an open-ended ellipsis, as in @[3 ..]@.
+  Forever ::      Ellipsis t
+
+  -- | 'Until' represents an ellipsis with a given endpoint, as in @[3 .. 20]@.
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)
 

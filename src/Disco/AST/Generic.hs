@@ -26,8 +26,24 @@
 -- Abstract syntax trees representing the generic syntax of the Disco
 -- language. Concrete AST instances may use this module as a template.
 --
--- XXX For the approach used here, see XXX trees that grow.
--- XXX give a basic explanation
+-- For more detail on the approach used here, see
+--
+-- Najd and Peyton Jones, "Trees that Grow". Journal of Universal
+-- Computer Science, vol. 23 no. 1 (2017), 42-62.
+-- https://www.microsoft.com/en-us/research/uploads/prod/2016/11/trees-that-grow.pdf
+--
+-- Essentially, we define a basic generic 'Term_' type, with a type
+-- index to indicate what kind of term it is, i.e. what phase the term
+-- belongs to.  Each constructor has a type family used to define any
+-- extra data that should go in the constructor for a particular
+-- phase; there is also one additional constructor which can be used
+-- to store arbitrary additional information, again governed by a type
+-- family.  Together with the use of pattern synonyms, the result is
+-- that it looks like we have a different type for each phase, each
+-- with its own set of constructors, but in fact all use the same
+-- underlying type.  Particular instantiations of the generic
+-- framework here can be found in "Disco.AST.Surface",
+-- "Disco.AST.Typed", and "Disco.AST.Desugared".
 -----------------------------------------------------------------------------
 
 -- SPDX-License-Identifier: BSD-3-Clause
@@ -260,51 +276,62 @@ type family X_TAscr e
 type family X_Term e
 
 -- | The base generic AST representing terms in the disco language.
+--   @e@ is a type index indicating the kind of term, i.e. the phase
+--   (for example, surface, typed, or desugared).  Type families like
+--   'X_TVar' and so on use the phase index to determine what extra
+--   information (if any) should be stored in each constructor.  For
+--   example, in the typed phase many constructors store an extra
+--   type, giving the type of the term.
 data Term_ e where
 
-  -- | A variable.
+  -- | A term variable.
   TVar_   :: X_TVar e -> Name (Term_ e) -> Term_ e
 
-  -- | A primitive, i.e. an identifier which is interpreted specially
-  --   at runtime.
+  -- | A primitive, /i.e./ a constant  which is interpreted specially
+  --   at runtime.  See "Disco.Syntax.Prims".
   TPrim_  :: X_TPrim e -> Prim -> Term_ e
 
   -- | A (non-recursive) let expression, @let x1 = t1, x2 = t2, ... in t@.
   TLet_   :: X_TLet e -> Bind (Telescope (Binding_ e)) (Term_ e) -> Term_ e
 
-  -- | Explicit parentheses.  We need to keep track of these in order
-  --   to syntactically distinguish multiplication and function
-  --   application.
+  -- | Explicit parentheses.  We need to keep track of these in the
+  --   surface syntax in order to syntactically distinguish
+  --   multiplication and function application.  However, note that
+  --   these disappear after the surface syntax phase.
   TParens_ :: X_TParens e -> Term_ e -> Term_ e
 
   -- | The unit value, (), of type Unit.
   TUnit_  :: X_TUnit e -> Term_ e
 
-  -- | True or false.
+  -- | A boolean value.
   TBool_  :: X_TBool e -> Bool -> Term_ e
 
   -- | A natural number.
   TNat_   :: X_TNat e -> Integer -> Term_ e
 
-  -- | A nonnegative rational number, parsed as a decimal.
+  -- | A nonnegative rational number, parsed as a decimal.  (Note
+  --   syntax like @3/5@ does not parse as a rational, but rather as
+  --   the application of a division operator to two natural numbers.)
   TRat_   :: X_TRat e -> Rational -> Term_ e
 
-  -- | A unicode character.
+  -- | A literal unicode character, /e.g./ @'d'@.
   TChar_  :: X_TChar e -> Char -> Term_ e
 
-  -- | A string of characters.
+  -- | A string literal, /e.g./ @"disco"@.
   TString_ :: X_TString e -> [Char] -> Term_ e
 
-  -- | An anonymous function.
+  -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
+  --   multiple arguments, and each argument may be annotated with a
+  --   type.
   TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
 
-  -- | Function application.
+  -- | Function application, @t1 t2@.
   TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
 
   -- | An n-tuple, @(t1, ..., tn)@.
   TTup_   :: X_TTup e -> [Term_ e] -> Term_ e
 
-  -- | An injection into a sum type.
+  -- | An injection into a sum type, @left x@ or @right x@.
   TInj_   :: X_TInj e -> Side -> Term_ e -> Term_ e
 
   -- | A case expression.

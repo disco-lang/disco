@@ -478,8 +478,9 @@ type TyDefCtx = M.Map String TyDefBody
 ---------------------------------
 --  Universally quantified types
 
--- | a polymorphic type of the form
---   @forall a1 a2 ... an. ty@  (n may be 0).
+-- | 'PolyType' represents a polymorphic type of the form @forall a1
+--   a2 ... an. ty@ (note, however, that n may be 0, that is, we can
+--   have a "trivial" polytype which quantifies zero variables).
 newtype PolyType = Forall (Bind [Name Type] Type)
   deriving (Show, Generic)
 
@@ -558,13 +559,14 @@ isEmptyTy _              = False
 -- Strictness
 --------------------------------------------------
 
--- | Strictness of a function application or let-expression.
+-- | @Strictness@ represents the strictness (either strict or lazy) of
+--   a function application or let-expression.
 data Strictness = Strict | Lazy
   deriving (Eq, Show, Generic)
 
 instance Alpha Strictness
 
--- | Numeric types are strict, others are lazy.
+-- | Numeric types are strict; others are lazy.
 strictness :: Type -> Strictness
 strictness ty
   | isNumTy ty = Strict
@@ -574,7 +576,8 @@ strictness ty
 -- Utilities
 --------------------------------------------------
 
--- | Decompose T1 * (T2 * ( ... )) into a list of types.
+-- | Decompose a nested product @T1 * (T2 * ( ... ))@ into a list of
+--   types.
 unpair :: Type -> [Type]
 unpair (ty1 :*: ty2) = ty1 : unpair ty2
 unpair ty            = [ty]
@@ -583,9 +586,12 @@ unpair ty            = [ty]
 --   for convenience.
 type S = Substitution Type
 
+-- | Convert a substitution on atoms into a substitution on types.
 atomToTypeSubst :: Substitution Atom -> Substitution Type
 atomToTypeSubst = fmap TyAtom
 
+-- | Convert a substitution on unifiable atoms into a substitution on
+--   types.
 uatomToTypeSubst :: Substitution UAtom -> Substitution Type
 uatomToTypeSubst = atomToTypeSubst . fmap uatomToAtom
 
@@ -600,8 +606,13 @@ containerVars _ = S.empty
 -- HasType class
 ------------------------------------------------------------
 
+-- | A type class for things whose type can be extracted or set.
 class HasType t where
+
+  -- | Get the type of a thing.
   getType :: t -> Type
 
+  -- | Set the type of a thing, when that is possible; the default
+  --   implementation is for 'setType' to do nothing.
   setType :: Type -> t -> t
   setType _ = id

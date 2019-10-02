@@ -6,12 +6,13 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
--- Contexts manage mappings from names to other things (such as types
--- or values).
+-- A *context* is a mapping from names to other things (such as types
+-- or values).  This module defines a generic type of contexts which
+-- is used in many different places throughout the disco codebase.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Context
        (
@@ -27,10 +28,11 @@ import qualified Data.Map                         as M
 
 import           Unbound.Generics.LocallyNameless
 
--- | A context maps names to things.
+-- | A context maps names to things.  In particular a @Ctx a b@ maps
+--   names for @a@s to values of type @b@.
 type Ctx a b = M.Map (Name a) b
 
--- | Return a list of the names bound in the context.
+-- | Return a list of the names defined by the context.
 names :: Ctx a b -> [Name a]
 names = M.keys
 
@@ -42,7 +44,9 @@ emptyCtx = M.empty
 singleCtx :: Name a -> b -> Ctx a b
 singleCtx = M.singleton
 
--- | Join two contexts (left-biased).
+-- | Join two contexts (left-biased, /i.e./ if the same name exists in
+--   both contexts, the result will use the value from the first
+--   context, and throw away the value from the second.).
 joinCtx :: Ctx a b -> Ctx a b -> Ctx a b
 joinCtx = M.union
 

@@ -38,3 +38,4 @@ count (Bag Unit)
 count (Set Void)
 count (Set Unit)
 count (Set Bool)
+count C

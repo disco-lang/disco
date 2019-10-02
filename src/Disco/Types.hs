@@ -504,29 +504,30 @@ closeType ty = Forall (bind (nub $ toListOf fv ty) ty)
 -- | Compute the number of inhabitants of a type.  @Nothing@ means the
 --   type is countably infinite.
 countType :: Type -> Maybe Integer
-countType TyVoid            = Just 0
-countType TyUnit            = Just 1
-countType TyBool            = Just 2
-countType (TyFin n)         = Just n
-countType (ty1 :+: ty2)     = (+) <$> countType ty1 <*> countType ty2
+countType TyVoid        = Just 0
+countType TyUnit        = Just 1
+countType TyBool        = Just 2
+countType (TyFin n)     = Just n
+countType TyC           = Just (17 * 2^(16 :: Integer))
+countType (ty1 :+: ty2) = (+) <$> countType ty1 <*> countType ty2
 countType (ty1 :*: ty2)
-  | isEmptyTy ty1 = Just 0
-  | isEmptyTy ty2 = Just 0
-  | otherwise     = (*) <$> countType ty1 <*> countType ty2
+  | isEmptyTy ty1       = Just 0
+  | isEmptyTy ty2       = Just 0
+  | otherwise           = (*) <$> countType ty1 <*> countType ty2
 countType (ty1 :->: ty2)
-  | isEmptyTy ty1 = Just 1
-  | isEmptyTy ty2 = Just 0
-  | otherwise     = (^) <$> countType ty2 <*> countType ty1
+  | isEmptyTy ty1       = Just 1
+  | isEmptyTy ty2       = Just 0
+  | otherwise           = (^) <$> countType ty2 <*> countType ty1
 countType (TyList ty)
-  | isEmptyTy ty  = Just 1
-  | otherwise     = Nothing
+  | isEmptyTy ty        = Just 1
+  | otherwise           = Nothing
 countType (TyBag ty)
-  | isEmptyTy ty  = Just 1
-  | otherwise     = Nothing
-countType (TySet ty)        = (2^) <$> countType ty
+  | isEmptyTy ty        = Just 1
+  | otherwise           = Nothing
+countType (TySet ty)    = (2^) <$> countType ty
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
-countType _                 = Nothing
+countType _             = Nothing
 
 --------------------------------------------------
 -- Type predicates

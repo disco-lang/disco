@@ -396,8 +396,12 @@ infixr 5 :->:
 pattern (:->:) :: Type -> Type -> Type
 pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
 
+infixr 7 :*:
+
 pattern (:*:) :: Type -> Type -> Type
 pattern (:*:) ty1 ty2 = TyCon CPair [ty1, ty2]
+
+infixr 6 :+:
 
 pattern (:+:) :: Type -> Type -> Type
 pattern (:+:) ty1 ty2 = TyCon CSum [ty1, ty2]

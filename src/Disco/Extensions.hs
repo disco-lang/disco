@@ -4,11 +4,11 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
--- Optional disco language extensions.
+-- Optional extensions to the disco language.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Extensions
   ( Ext(..), ExtSet, defaultExts, allExts, allExtsList, addExtension
@@ -23,10 +23,10 @@ type ExtSet = Set Ext
 -- | Enumeration of optional language extensions.
 data Ext
   = Primitives   -- ^ Allow primitives, i.e. @$prim@
-  | Randomness   -- ^ XXX
+  | Randomness   -- ^ Allow randomness.  This is not implemented yet.
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
--- | The default set of languag extensions (currently, the empty set).
+-- | The default set of language extensions (currently, the empty set).
 defaultExts :: ExtSet
 defaultExts = S.empty
 

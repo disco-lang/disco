@@ -6,11 +6,12 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
--- Rules about arity, subtyping, and sorts for disco base types.
+-- "Disco.Types.Rules" defines some generic rules about arity,
+-- subtyping, and sorts for disco base types.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Types.Rules
   ( -- * Arity
@@ -56,6 +57,8 @@ import           Disco.Types
 -- Arity
 ------------------------------------------------------------
 
+-- | A particular type argument can be either co- or contravariant
+--   with respect to subtyping.
 data Variance = Co | Contra
   deriving (Show, Read, Eq, Ord)
 
@@ -63,6 +66,11 @@ data Variance = Co | Contra
 --   expressing both how many type arguments the constructor takes,
 --   and the variance of each argument.  This is used to decompose
 --   subtyping constraints.
+--
+--   For example, @arity CArr = [Contra, Co]@ since function arrow is
+--   contravariant in its first argument and covariant in its second.
+--   That is, @S1 -> T1 <: S2 -> T2@ (@<:@ means "is a subtype of") if
+--   and only if @S2 <: S1@ and @T1 <: T2@.
 arity :: Con -> [Variance]
 arity CArr           = [Contra, Co]
 arity CPair          = [Co, Co]
@@ -76,7 +84,20 @@ arity (CUser _)      = error "Impossible! arity CUser"
 -- Qualifiers
 ------------------------------------------------------------
 
--- | Qualifiers that may appear in the CQual constraint.
+-- | A "qualifier" is kind of like a type class in Haskell; but unlike
+--   Haskell, disco users cannot define their own.  Rather, there is a
+--   finite fixed list of qualifiers supported by disco.  For example,
+--   @QSub@ denotes types which support a subtraction operation.  Each
+--   qualifier corresponds to a set of types which satisfy it (see
+--   'hasQual' and 'qualRules').
+--
+--   These qualifiers generally arise from uses of various operations.
+--   For example, the expression @\\x y. x - y@ would be inferred to
+--   have a type @∀ a. QSub a => a -> a -> a@, that is, a function of type
+--   @a -> a -> a@ where @a@ is any type that supports subtraction.
+--
+--   These qualifiers can appear in a 'CQual' constraint; see
+--   "Disco.Typecheck.Constraint".
 data Qualifier
   = QNum       -- ^ Numeric, i.e. a semiring supporting + and *
   | QSub       -- ^ Subtractive, i.e. supports -
@@ -123,7 +144,7 @@ bopQual _    = error "No qualifier for binary operation"
 --   corresponding to the qualifiers).
 type Sort = Set Qualifier
 
--- | The special sort "top" which includes all types.
+-- | The special sort \(\top\) which includes all types.
 topSort :: Sort
 topSort = S.empty
 
@@ -144,9 +165,9 @@ other SuperTy = SubTy
 --------------------------------------------------
 -- Subtype checks
 
--- | Check whether one atomic type is a subtype of the other. True if
---   either they are equal, or if they are base types and 'isSubB'
---   returns true.
+-- | Check whether one atomic type is a subtype of the other. Returns
+--   @True@ if either they are equal, or if they are base types and
+--   'isSubB' returns true.
 isSubA :: Atom -> Atom -> Bool
 isSubA a1 a2                 | a1 == a2 = True
 isSubA (ABase t1) (ABase t2) = isSubB t1 t2
@@ -200,15 +221,18 @@ hasQual b       QSub  = b `elem` [Z, Q]
 hasQual b       QDiv  = b `elem` [F, Q]
 hasQual b       QEnum = b `elem` [N, Z, F, Q, C]
 
--- | Check whether a base type has a certain sort.
+-- | Check whether a base type has a certain sort, which simply
+--   amounts to whether it satisfies every qualifier in the sort.
 hasSort :: BaseTy -> Sort -> Bool
 hasSort = all . hasQual
 
--- | qualRules encodes the rules by which applications of type constructors can satisfy
---   various qualifiers.
+-- | 'qualRules' encodes the rules by which applications of type
+--   constructors can satisfy various qualifiers.
 --
---   @(c, (q, qs))@ means that  @q (TyCon c t1 t2 ... tn)@ if and only if
---   @q1 t1 /\ q2 t2 /\ ... /\ qn tn@.
+--   Each constructor maps to a set of rules.  Each rule is a mapping
+--   from a qualifier to the list of qualifiers needed on the type
+--   constructor's arguments for the bigger type to satisfy the
+--   qualifier.
 --
 --   Note in Disco we can get away with any given qualifier requiring
 --   /at most one/ qualifier on each type argument.  Then we can
@@ -243,8 +267,8 @@ qualRules = M.fromList
 
   -- Eventually we can easily imagine adding an opt-in mode where
   -- numeric operations can be used on pairs and functions, then the
-  -- qualRules would become dependent on what mode was chosen.  For
-  -- example we could have rules like
+  -- qualRules would become dependent on what language extension/mode
+  -- was chosen.  For example we could have rules like
   --
   -- [ CArr ==> M.fromList
   --   [ QNum ==> [Nothing, Just QNum]  -- (a -> b) can be +, * iff b can

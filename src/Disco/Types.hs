@@ -534,7 +534,7 @@ countType _             = Nothing
 -- Type predicates
 --------------------------------------------------
 
--- | Check whether a type is a numeric type (N, Z, F, Q, or Zn).
+-- | Check whether a type is a numeric type (@N@, @Z@, @F@, @Q@, or @Zn@).
 isNumTy :: Type -> Bool
 isNumTy (TyFin _) = True
 isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]

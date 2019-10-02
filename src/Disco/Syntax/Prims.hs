@@ -9,11 +9,12 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
--- Concrete syntax for the prims supported by the language.
+-- Concrete syntax for the prims (i.e. built-in constants) supported
+-- by the language.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Syntax.Prims
        ( Prim(..)

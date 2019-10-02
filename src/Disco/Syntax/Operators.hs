@@ -8,12 +8,12 @@
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- SPDX-License-Identifier: BSD-3-Clause
---
 -- Unary and binary operators along with information like precedence,
 -- fixity, and concrete syntax.
 --
 -----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Syntax.Operators
        ( -- * Operators
@@ -97,7 +97,8 @@ data UFixity
   | Post    -- ^ Unary postfix.
   deriving (Eq, Ord, Enum, Bounded, Show, Generic)
 
--- | Fixity of infix binary operators (either left, right, or non-associative).
+-- | Fixity/associativity of infix binary operators (either left,
+--   right, or non-associative).
 data BFixity
   = InL   -- ^ Left-associative infix.
   | InR   -- ^ Right-associative infix.
@@ -112,7 +113,7 @@ data OpFixity =
 
 -- | An @OpInfo@ record contains information about an operator, such
 --   as the operator itself, its fixity, a list of concrete syntax
---   representations of the operator, and a numeric precedence level.
+--   representations, and a numeric precedence level.
 data OpInfo =
   OpInfo
   { opFixity :: OpFixity

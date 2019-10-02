@@ -547,11 +547,12 @@ isSubtractive _         = False
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
-isEmptyTy TyVoid        = True
-isEmptyTy (TyFin 0)     = True
-isEmptyTy (ty1 :*: ty2) = isEmptyTy ty1 || isEmptyTy ty2
-isEmptyTy (ty1 :+: ty2) = isEmptyTy ty1 && isEmptyTy ty2
-isEmptyTy _             = False
+isEmptyTy TyVoid         = True
+isEmptyTy (TyFin 0)      = True
+isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
+isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
+isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
+isEmptyTy _              = False
 
 --------------------------------------------------
 -- Strictness

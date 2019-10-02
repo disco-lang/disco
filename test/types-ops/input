@@ -39,3 +39,5 @@ count (Set Void)
 count (Set Unit)
 count (Set Bool)
 count C
+count ((N -> Void) -> N)
+count (N -> (N -> Void))

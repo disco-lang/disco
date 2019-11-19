@@ -30,7 +30,7 @@
 --
 -- Najd and Peyton Jones, "Trees that Grow". Journal of Universal
 -- Computer Science, vol. 23 no. 1 (2017), 42-62.
--- https://www.microsoft.com/en-us/research/uploads/prod/2016/11/trees-that-grow.pdf
+-- <https://arxiv.org/abs/1610.04799>
 --
 -- Essentially, we define a basic generic 'Term_' type, with a type
 -- index to indicate what kind of term it is, i.e. what phase the term
@@ -343,8 +343,9 @@ data Term_ e where
   -- | An application of a binary operator.
   TBin_   :: X_TBin e -> BOp -> Term_ e -> Term_ e -> Term_ e
 
-  -- | A chained comparison.  Should contain only comparison
-  --   operators.
+  -- | A chained comparison, consisting of a term followed by one or
+  --   more "links", where each link is a comparison operator and
+  --   another term.
   TChain_ :: X_TChain e -> Term_ e -> [Link_ e] -> Term_ e
 
   -- | An application of a type operator.
@@ -412,7 +413,13 @@ instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
 
 type family X_TLink e
 
+-- | A "link" is a comparison operator and a term; a single term
+--   followed by a sequence of links makes up a comparison chain, such
+--   as @2 < x < y < 10@.
 data Link_ e where
+
+  -- | Note that although the type of 'TLink_' says it can hold any
+  --   'BOp', it should really only hold comparison operators.
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
   deriving Generic
 
@@ -432,12 +439,15 @@ instance (Typeable e, Show (Link_ e), ForallLink Alpha e) => Alpha (Link_ e)
 type family X_QBind e
 type family X_QGuard e
 
+-- | A container comprehension consists of a head term and then a list
+--   of qualifiers. Each qualifier either binds a variable to some
+--   collection or consists of a boolean guard.
 data Qual_ e where
 
-  -- | A binding qualifier (i.e. @x <- t@)
+  -- | A binding qualifier (i.e. @x in t@).
   QBind_   :: X_QBind e -> Name (Term_ e) -> Embed (Term_ e) -> Qual_ e
 
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  -- | A boolean guard qualfier (i.e. @x + y > 4@).
   QGuard_  :: X_QGuard e -> Embed (Term_ e) -> Qual_ e
 
   deriving Generic
@@ -456,7 +466,8 @@ instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
 -- Binding
 ------------------------------------------------------------
 
--- | A binding is a name along with its definition.
+-- | A binding is a name along with its definition, and optionally its
+--   type.
 data Binding_ e = Binding_ (Maybe (Embed PolyType)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
@@ -482,6 +493,7 @@ type family X_GBool e
 type family X_GPat e
 type family X_GLet e
 
+-- | Guards in case expressions.
 data Guard_ e where
 
   -- | Boolean guard (@if <test>@)
@@ -615,6 +627,10 @@ instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Patter
 -- Property
 ------------------------------------------------------------
 
+-- | A property is a list of forall-bound variables with their types,
+--   followed by a (boolean) term.
+--
+--   This should probably move somewhere else?
 type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
 
 ------------------------------------------------------------

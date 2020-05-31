@@ -198,10 +198,10 @@ discoGenerator TyC = DiscoGen
   (QC.arbitrary :: QC.Gen Char)
   (return . vnum . (%1) . toInteger . ord)
 
-discoGenerator (TyFin 0) = emptyGenerator
-discoGenerator (TyFin n) = DiscoGen
-  (QC.choose (0,n-1) :: QC.Gen Integer)
-  (return . vnum . (%1))
+-- discoGenerator (TyFin 0) = emptyGenerator
+-- discoGenerator (TyFin n) = DiscoGen
+--   (QC.choose (0,n-1) :: QC.Gen Integer)
+--   (return . vnum . (%1))
 
 discoGenerator ty@(TyVar _)  = error $ "discoGenerator " ++ show ty
 discoGenerator ty@(Skolem _) = error $ "discoGenerator " ++ show ty

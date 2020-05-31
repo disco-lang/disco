@@ -147,7 +147,7 @@ prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
 prettyTy TyF              = text "𝔽"
-prettyTy (TyFin n)        = text "ℤ" <> (integer n)
+-- prettyTy (TyFin n)        = text "ℤ" <> (integer n)
 prettyTy (TyList ty)      = mparens (PA 9 InR) $
   text "List" <+> prettyTy' 9 InR ty
 prettyTy (TyBag ty)       = mparens (PA 9 InR) $

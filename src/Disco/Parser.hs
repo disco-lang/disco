@@ -891,7 +891,7 @@ parseAtomicType = label "type" $
   <|> TyUnit <$ reserved "Unit"
   <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
   <|> TyC    <$ (reserved "Char" <|> reserved "C")
-  <|> try parseTyFin
+  -- <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
@@ -900,9 +900,9 @@ parseAtomicType = label "type" $
   <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
-parseTyFin :: Parser Type
-parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
-         <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
+-- parseTyFin :: Parser Type
+-- parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
+--          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
 parseCon :: Parser Con
 parseCon =

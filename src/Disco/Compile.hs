@@ -60,7 +60,7 @@ compileDTerm (DTPrim ty x) = compilePrim ty x
 compileDTerm DTUnit        = return $ CCons 0 []
 compileDTerm (DTBool b)    = return $ CCons (fromEnum b) []
 compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
-compileDTerm (DTNat ty n)  = compileNat ty n
+compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
 compileDTerm (DTLam _ l) = do
@@ -102,9 +102,9 @@ compileDTerm (DTNil _)        = return $ CCons 0 []
 -- | Compile a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
-compileNat :: Type -> Integer -> FreshM Core
-compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
-compileNat _         x = return $ CNum Fraction (x % 1)
+-- compileNat :: Type -> Integer -> FreshM Core
+-- compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
+-- compileNat _         x = return $ CNum Fraction (x % 1)
 
 ------------------------------------------------------------
 
@@ -271,15 +271,15 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 --
 -- We match on the type of arg1 because that is the only one which
 -- will consistently be TyFin in the case of Div, Exp, and Divides.
-compileBOp (TyFin n) _ _ op
-  | op `elem` [Div, Exp, Divides]
-  = CConst ((omOps ! op) n)
-  where
-    omOps = M.fromList
-      [ Div     ==> OMDiv
-      , Exp     ==> OMExp
-      , Divides ==> OMDivides
-      ]
+-- compileBOp (TyFin n) _ _ op
+--   | op `elem` [Div, Exp, Divides]
+--   = CConst ((omOps ! op) n)
+--   where
+--     omOps = M.fromList
+--       [ Div     ==> OMDiv
+--       , Exp     ==> OMExp
+--       , Divides ==> OMDivides
+--       ]
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

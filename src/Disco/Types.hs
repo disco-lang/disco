@@ -50,7 +50,7 @@ module Disco.Types
        , pattern TyF
        , pattern TyQ
        , pattern TyC
-       , pattern TyFin
+       -- , pattern TyFin
        , pattern (:->:)
        , pattern (:*:)
        , pattern (:+:)
@@ -68,7 +68,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isSubtractive, isEmptyTy
+       , isNumTy, isEmptyTy
 
        -- * Type substitutions
 
@@ -388,8 +388,8 @@ pattern TyQ = TyAtom (ABase Q)
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
 
-pattern TyFin :: Integer -> Type
-pattern TyFin n = TyAtom (ABase (Fin n))
+-- pattern TyFin :: Integer -> Type
+-- pattern TyFin n = TyAtom (ABase (Fin n))
 
 infixr 5 :->:
 
@@ -426,7 +426,7 @@ pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
-      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC, TyFin,
+      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC,
       (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var
@@ -508,7 +508,7 @@ countType :: Type -> Maybe Integer
 countType TyVoid        = Just 0
 countType TyUnit        = Just 1
 countType TyBool        = Just 2
-countType (TyFin n)     = Just n
+-- countType (TyFin n)     = Just n
 countType TyC           = Just (17 * 2^(16 :: Integer))
 countType (ty1 :+: ty2) = (+) <$> countType ty1 <*> countType ty2
 countType (ty1 :*: ty2)
@@ -536,20 +536,13 @@ countType _             = Nothing
 
 -- | Check whether a type is a numeric type (@N@, @Z@, @F@, @Q@, or @Zn@).
 isNumTy :: Type -> Bool
-isNumTy (TyFin _) = True
+-- isNumTy (TyFin _) = True
 isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]
-
--- | Decide whether a type supports subtraction.
-isSubtractive :: Type -> Bool
-isSubtractive TyZ       = True
-isSubtractive TyQ       = True
-isSubtractive (TyFin _) = True
-isSubtractive _         = False
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
 isEmptyTy TyVoid         = True
-isEmptyTy (TyFin 0)      = True
+-- isEmptyTy (TyFin 0)      = True
 isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2

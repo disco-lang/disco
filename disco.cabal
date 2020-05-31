@@ -28,8 +28,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-basic-un/input
                      test/arith-count/expected
                      test/arith-count/input
-                     test/arith-finite-types/expected
-                     test/arith-finite-types/input
                      test/arith-numthry/expected
                      test/arith-numthry/input
                      test/arith-prim/arith-prim.disco

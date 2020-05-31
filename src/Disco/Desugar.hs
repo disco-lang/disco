@@ -260,7 +260,7 @@ desugarTerm (ATCase ty bs) = DTCase ty <$> mapM desugarBranch bs
 -- | Test whether a given unary operator is one that needs to be
 --   desugared, given the type of the argument and result.
 uopDesugars :: Type -> Type -> UOp -> Bool
-uopDesugars _ (TyFin _) Neg = True
+-- uopDesugars _ (TyFin _) Neg = True
 uopDesugars _ _         uop = uop `elem` [Not]
 
 desugarPrimUOp :: Type -> Type -> UOp -> DSM DTerm
@@ -273,7 +273,7 @@ desugarPrimUOp argTy resTy op = do
 --   desugared, given the two types of the arguments and the type of the result.
 bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
-bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
+-- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl
   , Neq, Gt, Leq, Geq, Min, Max
@@ -297,8 +297,8 @@ desugarUnApp :: Type -> UOp -> ATerm -> DSM DTerm
 
 -- Desugar negation on TyFin to a negation on TyZ followed by a mod.
 -- See the comments below re: Add and Mul on TyFin.
-desugarUnApp (TyFin n) Neg t =
-  desugarTerm $ mkBin (TyFin n) Mod (mkUn TyZ Neg t) (ATNat TyN n)
+-- desugarUnApp (TyFin n) Neg t =
+--   desugarTerm $ mkBin (TyFin n) Mod (mkUn TyZ Neg t) (ATNat TyN n)
 
 -- XXX This should be turned into a standard library definition.
 -- not t ==> {? false if t, true otherwise ?}
@@ -378,11 +378,11 @@ desugarBinApp ty SSub t1 t2 = desugarTerm $
 
 -- Addition and multiplication on TyFin just desugar to the operation
 -- followed by a call to mod.
-desugarBinApp (TyFin n) op t1 t2
-  | op `elem` [Add, Mul] = desugarTerm $
-      mkBin (TyFin n) Mod
-        (mkBin TyN op t1 t2)
-        (ATNat TyN n)
+-- desugarBinApp (TyFin n) op t1 t2
+--   | op `elem` [Add, Mul] = desugarTerm $
+--       mkBin (TyFin n) Mod
+--         (mkBin TyN op t1 t2)
+--         (ATNat TyN n)
     -- Note the typing of this is a bit funny: t1 and t2 presumably
     -- have type (TyFin n), and now we are saying that applying 'op'
     -- to them results in TyN, then applying 'mod' results in a TyFin

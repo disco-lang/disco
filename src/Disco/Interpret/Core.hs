@@ -1260,7 +1260,7 @@ enumerate TyVoid           = []
 enumerate TyUnit           = [VCons 0 []]
 enumerate TyBool           = [VCons 0 [], VCons 1 []]
 
-enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
+-- enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
 
 -- To enumerate a pair type, take the Cartesian product of enumerations.
 enumerate (ty1 :*: ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]

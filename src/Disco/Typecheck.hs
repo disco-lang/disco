@@ -821,7 +821,7 @@ typecheck Infer             TUnit        = return ATUnit
 typecheck Infer             (TBool b)    = return $ ATBool b
 typecheck Infer             (TChar c)    = return $ ATChar c
 typecheck Infer             (TString cs) = return $ ATString cs
-typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
+-- typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
 typecheck Infer             (TNat n)     = return $ ATNat TyN n
 typecheck Infer             (TRat r)     = return $ ATRat r
 
@@ -1208,7 +1208,7 @@ checkPattern p@(PInj R pat) ty    = do
 --   > (\(x : Z5). {? true when x is 3, false otherwise ?}) (2 : Z5)
 --   false
 
-checkPattern (PNat n) (TyFin m) = return (emptyCtx, APNat (TyFin m) n)
+-- checkPattern (PNat n) (TyFin m) = return (emptyCtx, APNat (TyFin m) n)
 checkPattern (PNat n) ty        = do
   constraint $ CSub TyN ty
   return (emptyCtx, APNat ty n)

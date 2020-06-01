@@ -1,3 +1,8 @@
+-- XXX TODO change over foldr and append.  However I think there is
+-- something special going on with comprehension desugaring, I forget
+-- how that works.  If we change the type of foldr to be uncurried,
+-- this module by itself loads but other things break.
+
 ||| A right fold for lists.
 |||   foldr f z [a,b,c] = f a (f b (f c z)
 
@@ -31,46 +36,46 @@ concat (l::ls) = append l (concat ls)
 ||| Apply a function to each element of a list, returning a new list
 ||| of the results.  Note, this is here just for illustration
 ||| purposes; it is much more efficient to use the builtin primitive
-||| 'map' function (which also works on bags and sets).a
+||| 'map' function (which also works on bags and sets).
 
-!!!   maplist (\x.x+1) [] == []
-!!!   maplist (\x.2)   "hello" == [2,2,2,2,2]
-!!!   maplist (\x. 5x) [2,4,1,7] == [10,20,5,35]
+!!!   maplist(\x.x+1, []       ) == []
+!!!   maplist(\x.2,   "hello"  ) == [2,2,2,2,2]
+!!!   maplist(\x. 5x, [2,4,1,7]) == [10,20,5,35]
 
-maplist : (a → b) → List a → List b
-maplist f []      = []
-maplist f (x::xs) = f x :: maplist f xs
+maplist : (a → b) × List a → List b
+maplist(f, [])    = []
+maplist(f, x::xs) = f(x) :: maplist(f, xs)
 
 ||| Take the first n elements of a list.
-!!!   take 1 [true, false, true] == [true]
-!!!   take 3 [true, false] == [true, false]
-!!!   take 0 [true, false] == ([] : List Bool)
+!!!   take(1, [true, false, true]) == [true]
+!!!   take(3, [true, false]) == [true, false]
+!!!   take(0, [true, false]) == ([] : List Bool)
 
-take : ℕ → List a → List a
-take 0 _  = []
-take _ [] = []
-take (n+1) (x :: xs) = x :: take n xs
+take : ℕ × List a → List a
+take(0, _)         = []
+take(_, [])        = []
+take(n+1, x :: xs) = x :: take(n, xs)
 
 ||| Repeat the given element infinitely.
-!!!   take 3 (repeat true) == [true, true, true]
+!!!   take(3, repeat true) == [true, true, true]
 repeat : a → List a
 repeat x = x :: repeat x
 
 ||| The length of a list.
 !!!   length [true, false, true] == 3
-!!!   length (take 20 (repeat true)) == 20
+!!!   length(take(20, repeat true)) == 20
 length : List a → ℕ
 length [] = 0
 length (_::l) = 1 + length l
 
-zipWith : (a -> b -> c) -> List a -> List b -> List c
-zipWith _ [] _ = []
-zipWith _ _ [] = []
-zipWith f (a::as) (b::bs) = f a b :: zipWith f as bs
+zipWith : (a × b → c) × List a × List b -> List c
+zipWith(_, [], _) = []
+zipWith(_, _, []) = []
+zipWith(f, a::as, b::bs) = f(a, b) :: zipWith(f, as, bs)
 
-filterList : (a -> Bool) -> List a -> List a
-filterList _ [] = []
-filterList p (a :: as) =
-  {? a :: filterList p as  if p a
-  ,  filterList p as       otherwise
+filterList : (a -> Bool) × List a -> List a
+filterList(_, []) = []
+filterList(p, a :: as) =
+  {? a :: filterList(p, as)  if p a
+  ,  filterList(p, as)       otherwise
   ?}

@@ -1,2 +1,2 @@
 :load test/interp-fibs/fiblist.disco
-sum (take 50 fibs)
+sum(take(50, fibs))

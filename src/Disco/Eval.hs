@@ -73,7 +73,6 @@ import           Control.Lens                            (makeLenses, use, (%=),
 import           Control.Monad.Except                    (MonadError,
                                                           catchError,
                                                           throwError)
-import           Control.Monad.Fail                      (MonadFail)
 import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except

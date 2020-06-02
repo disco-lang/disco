@@ -70,7 +70,7 @@ import           Math.NumberTheory.Logarithms            (integerLog2)
 import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
                                                           invertSomeMod, modulo,
                                                           powSomeMod)
-import           Math.NumberTheory.Primes.Factorisation  (factorise)
+import           Math.NumberTheory.Primes                (factorise, unPrime)
 import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 import           Disco.AST.Core
@@ -1112,7 +1112,7 @@ primFactor :: Value -> Disco IErr Value
 primFactor (VNum d (numerator -> n)) =
   case n of
     0 -> throwError (Crash "0 has no prime factorization!")
-    _ -> return . VBag $ map ((VNum d . (%1)) *** fromIntegral) (factorise n)
+    _ -> return . VBag $ map ((VNum d . (%1) . unPrime) *** fromIntegral) (factorise n)
 primFactor _                         = error "impossible! primFactor on non-VNum"
 
 -- | Semantics of the @$crash@ prim, which crashes with a

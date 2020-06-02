@@ -56,7 +56,6 @@ module Disco.Parser
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
                                                    fvAny, string2Name)
 
-import           Control.Monad.Combinators        (many, (<|>))
 import           Control.Monad.Combinators.Expr
 import           Text.Megaparsec                  hiding (runParser)
 import qualified Text.Megaparsec                  as MP

@@ -119,7 +119,7 @@ runTest n aprop
 
 -- | Check whether a term looks like a top-level equality test.
 getEquatands :: ATerm -> Maybe (ATerm, ATerm)
-getEquatands (ATApp _ (ATApp _ (ATPrim _ (PrimBOp Eq)) at1) at2) = Just (at1, at2)
+getEquatands (ATApp _ (ATPrim _ (PrimBOp Eq)) (ATTup _ [at1, at2])) = Just (at1, at2)
 getEquatands _ = Nothing
 
 -- | @testCases n bindings@ generates at most n environments in which

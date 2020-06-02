@@ -1,3 +1,4 @@
+import num
 import list
 
 -- Implementation of RSA encryption algorithm.
@@ -10,7 +11,7 @@ import list
 -- numbers.
 
 encrypt : N * N -> List N -> List N
-encrypt key = map (encrypt1 key)
+encrypt key xs = map (encrypt1 key, xs)
 
 decrypt : N * N -> List N -> List N
 decrypt = encrypt
@@ -70,16 +71,3 @@ modPower n p m =
    , (modPower (n^2) (p//2) m) % m         if (even p)
    , (n * (modPower (n^2) (p//2) m)) % m   if (p>2) && (odd p)
   ?}
-
-
--- These functions (`even`, `odd`, and `map`) would be
--- nice in some Disco standard library
-even : Z -> B
-even x = 2 divides x
-
-odd : Z -> B
-odd x = ¬(2 divides x)
-
--- Features that would be helpful:
---  even, odd, and isPrime functions (as part of some standard library)
---  some sort of `random` module with several different functions

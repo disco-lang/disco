@@ -34,4 +34,4 @@ foldAltList z _ _ (left ()) = z
 foldAltList z f g (right (a, l)) = f a (foldAltList z g f l)
 
 sumAltList : AltList N B -> N
-sumAltList = foldAltList 0 ~+~ (\b r. r)
+sumAltList = foldAltList 0 (\x y. x+y) (\b r. r)

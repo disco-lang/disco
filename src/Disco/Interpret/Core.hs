@@ -668,7 +668,7 @@ primMapSet ty f xs = do
 primReduceList :: Value -> Value -> Value -> Disco IErr Value
 primReduceList f z xs = do
   f' <- whnfV f
-  vfoldr (\a b -> whnfApp f' [a,b]) z xs
+  vfoldr (\a b -> whnfApp f' [VCons 0 [a,b]]) z xs
 
 -- | Reduce a bag (or set) according to a given combining function and
 --   base case value.
@@ -677,7 +677,7 @@ primReduceBag f z b = do
   f' <- whnfV f
   VBag cts <- whnfV b
   xs <- toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
-  vfoldr (\a r -> whnfApp f' [a,r]) z xs
+  vfoldr (\a r -> whnfApp f' [VCons 0 [a,r]]) z xs
 
   -- XXX this is super inefficient! (1) should have some sharing so
   -- replicated elements of bag aren't recomputed; (2) shouldn't have
@@ -742,7 +742,7 @@ primMerge ty m b1 b2 = do
 
   where
     mkMergeFun m' i j = do
-      VNum _ r <- whnfApp m' [vnum (i%1), vnum (j%1)]
+      VNum _ r <- whnfApp m' [VCons 0 [vnum (i%1), vnum (j%1)]]
       return (numerator r)
 
 ------------------------------------------------------------
@@ -915,23 +915,23 @@ arity1 :: String -> (Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
 arity1 _ f [v]   = f v
 arity1 name _ vs = error $ arityError name vs
 
--- | Convert an arity-2 function to the right shape to accept a list
+-- | Convert an arity-2 function to the right shape to accept a tuple
 --   of arguments; throw an error if the wrong number of arguments are
 --   given.
 arity2 :: String -> (Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity2 _ f [v1,v2] = f v1 v2
-arity2 name _ vs   = error $ arityError name vs
+arity2 _ f [VCons 0 [v1,v2]] = f v1 v2
+arity2 name _ vs             = error $ arityError name vs
 
--- | Convert an arity-3 function to the right shape to accept a list
+-- | Convert an arity-3 function to the right shape to accept a tuple
 --   of arguments; throw an error if the wrong number of arguments are
 --   given.
 arity3 :: String -> (Value -> Value -> Value -> Disco IErr Value) -> ([Value] -> Disco IErr Value)
-arity3 _ f [v1,v2,v3] = f v1 v2 v3
-arity3 name _ vs      = error $ arityError name vs
+arity3 _ f [VCons 0 [v1, VCons 0 [v2,v3]]] = f v1 v2 v3
+arity3 name _ vs                           = error $ arityError name vs
 
 -- | Construct an error message for reporting an incorrect arity.
 arityError :: String -> [Value] -> String
-arityError name vs = error $ "Impossible! Wrong arity (" ++ show (length vs) ++ ") in " ++ name
+arityError name vs = error $ "Impossible! Wrong arity (" ++ show vs ++ ") in " ++ name
 
 ------------------------------------------------------------
 -- Arithmetic

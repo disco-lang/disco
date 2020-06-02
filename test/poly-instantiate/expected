@@ -8,5 +8,5 @@ foldr (λ x y. y + 1) : ℕ → List a → ℕ
 foldr (λ x y. y + 1) 1 : List a → ℕ
 foldr (λ x y. y + 1) (-1) : List a → ℤ
 foldr (λ x y. x) false : List Bool → Bool
-foldr (λ x y. x + 1) (1 / 2) : List 𝔽 → 𝔽
-foldr (λ x y. x - 1) (1 / 2) : List ℚ → ℚ
+foldr (λ x y. x + 1) (1 / 2) : List ℕ → 𝔽
+foldr (λ x y. x - 1) (1 / 2) : List ℤ → ℚ

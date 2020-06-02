@@ -81,15 +81,21 @@ tapp t1 t2 = ATApp resTy t1 t2
       (_ :->: r) -> r
       ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in tapp"
 
-tapps :: ATerm -> [ATerm] -> ATerm
-tapps = foldl tapp
-
 mkBin :: Type -> BOp -> ATerm -> ATerm -> ATerm
 mkBin resTy bop t1 t2
-  = tapp (tapp (ATPrim (getType t1 :->: getType t2 :->: resTy) (PrimBOp bop)) t1) t2
+  = tapp (ATPrim (getType t1 :*: getType t2 :->: resTy) (PrimBOp bop)) (mkPair t1 t2)
 
 mkUn :: Type -> UOp -> ATerm -> ATerm
 mkUn resTy uop t = tapp (ATPrim (getType t :->: resTy) (PrimUOp uop)) t
+
+mkPair :: ATerm -> ATerm -> ATerm
+mkPair t1 t2 = mkTup [t1,t2]
+
+mkTup :: [ATerm] -> ATerm
+mkTup ts = ATTup (foldr1 (:*:) (map getType ts)) ts
+
+tapps :: ATerm -> [ATerm] -> ATerm
+tapps t ts = tapp t (mkTup ts)
 
 infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
@@ -152,10 +158,12 @@ dtapp t1 t2 = DTApp resTy t1 t2
       (_ :->: r) -> r
       ty         -> error $ "Impossible! Got non-function type " ++ show ty ++ " in dtapp"
 
-mkDTBin :: Type -> BOp -> DTerm -> DTerm -> DTerm
-mkDTBin resTy bop dt1 dt2
-  = dtapp (dtapp (DTPrim (getType dt1 :->: getType dt2 :->: resTy) (PrimBOp bop)) dt1) dt2
+dtbin :: Type -> Prim -> DTerm -> DTerm -> DTerm
+dtbin resTy p dt1 dt2
+  = dtapp (DTPrim (getType dt1 :*: getType dt2 :->: resTy) p) (mkDTPair dt1 dt2)
 
+mkDTPair :: DTerm -> DTerm -> DTerm
+mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 
 ------------------------------------------------------------
 -- Definition desugaring
@@ -202,7 +210,7 @@ desugarTerm :: ATerm -> DSM DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
   | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
-desugarTerm (ATPrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop))
+desugarTerm (ATPrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
 desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
   c <- fresh (string2Name "c")
@@ -226,7 +234,7 @@ desugarTerm (ATAbs ty lam)       = do
 -- Special cases for fully applied operators
 desugarTerm (ATApp resTy (ATPrim _ (PrimUOp uop)) t)
   | uopDesugars (getType t) resTy uop = desugarUnApp resTy uop t
-desugarTerm (ATApp resTy (ATApp _ (ATPrim _ (PrimBOp bop)) t1) t2)
+desugarTerm (ATApp resTy (ATPrim _ (PrimBOp bop)) (ATTup _ [t1,t2]))
   | bopDesugars (getType t1) (getType t2) resTy bop = desugarBinApp resTy bop t1 t2
 
 desugarTerm (ATApp ty t1 t2)     =
@@ -286,10 +294,17 @@ bopDesugars _   _   _ bop = bop `elem`
 -- | Desugar a primitive binary operator at the given type.
 desugarPrimBOp :: Type -> Type -> Type -> BOp -> DSM DTerm
 desugarPrimBOp ty1 ty2 resTy op = do
+  p <- fresh (string2Name "pair1")
   x <- fresh (string2Name "arg1")
   y <- fresh (string2Name "arg2")
+  let argsTy = ty1 :*: ty2
   body <- desugarBinApp resTy op (ATVar ty1 x) (ATVar ty2 y)
-  return $ mkLambda (ty1 :->: ty2 :->: resTy) [x, y] body
+  return $ mkLambda (argsTy :->: resTy) [p] $
+    DTCase resTy
+    [ bind
+        (toTelescope [DGPat (embed (DTVar argsTy (coerce p))) (DPPair argsTy (coerce x) (coerce y))])
+        body
+    ]
 
 -- | Desugar a saturated application of a unary operator.
 --   The first argument is the type of the result.
@@ -405,8 +420,8 @@ desugarBinApp ty SSub t1 t2 = desugarTerm $
 -- of 'merge' with an appropriate combining operation.
 desugarBinApp ty op t1 t2
   | op `elem` [Inter, Diff, Union] = desugarTerm $
-    tapps (ATPrim ((TyN :->: TyN :->: TyN) :->: ty :->: ty :->: ty) PrimMerge)
-      [ ATPrim (TyN :->: TyN :->: TyN) (mergeOp ty op)
+    tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
+      [ ATPrim (TyN :*: TyN :->: TyN) (mergeOp ty op)
       , t1
       , t2
       ]
@@ -422,9 +437,9 @@ desugarBinApp ty op t1 t2
 --   Note it is NOT union, since this doesn't work for bags.
 --   e.g.  bag [1] union bag [1,2] =  bag [1,1,2] /= bag [1,2].
 desugarBinApp _ Subset t1 t2 = desugarTerm $
-  tapps (ATPrim (ty :->: ty :->: TyBool) (PrimBOp Eq))
-  [ tapps (ATPrim ((TyN :->: TyN :->: TyN) :->: ty :->: ty :->: ty) PrimMerge)
-    [ ATPrim (TyN :->: TyN :->: TyN) (PrimBOp Max)
+  tapps (ATPrim (ty :*: ty :->: TyBool) (PrimBOp Eq))
+  [ tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
+    [ ATPrim (TyN :*: TyN :->: TyN) (PrimBOp Max)
     , t1
     , t2
     ]
@@ -462,14 +477,14 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
                        TyContainer _ e -> e
                        _ -> error "Impossible! Not a container in expandComp"
             joinTy = c (c tTy) :->: c tTy
-            mapTy  = (xTy :->: c tTy) :->: (c xTy :->: c (c tTy))
+            mapTy  = (xTy :->: c tTy) :*: c xTy :->: c (c tTy)
         return $ tapp (ATPrim joinTy PrimJoin) $
           tapp
-            (tapp
-              (ATPrim mapTy PrimMap)
+            (ATPrim mapTy PrimMap)
+            (mkPair
               (ATAbs (xTy :->: c tTy) (bind [(x, embed xTy)] tqs))
+              lst
             )
-            lst
 
       -- [ t | g, qs ] = if g then [ t | qs ] else []
       AQGuard (unembed -> g)    -> do
@@ -718,7 +733,7 @@ desugarContainer :: Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellips
 
 -- Literal list containers desugar to nested applications of cons.
 desugarContainer ty ListContainer es Nothing =
-  foldr (mkDTBin ty Cons) (DTNil ty) <$> mapM desugarTerm (map fst es)
+  foldr (dtbin ty (PrimBOp Cons)) (DTNil ty) <$> mapM desugarTerm (map fst es)
 
 -- A list container with an ellipsis (@[x, y, z ..]@) desugars to
 -- an application of the primitive 'forever' function...
@@ -727,9 +742,9 @@ desugarContainer ty ListContainer es (Just Forever) =
 
 -- ... or @[x, y, z .. e]@ desugars to an application of the primitive
 -- 'until' function.
-desugarContainer ty@(TyList eltTy) ListContainer es (Just (Until t)) =
-  dtapp
-    <$> (dtapp (DTPrim (eltTy :->: ty :->: ty) PrimUntil) <$> desugarTerm t)
+desugarContainer ty@(TyList _) ListContainer es (Just (Until t)) =
+  dtbin ty PrimUntil
+    <$> desugarTerm t
     <*> desugarContainer ty ListContainer es Nothing
 
 -- If desugaring a bag and there are any counts specified, desugar to

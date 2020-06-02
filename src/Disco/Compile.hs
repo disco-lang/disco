@@ -70,7 +70,7 @@ compileDTerm (DTLam _ l) = do
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
-compileDTerm (DTApp _ (DTApp _ (DTPrim _ (PrimBOp Cons)) t1) t2)
+compileDTerm (DTApp _ (DTPrim _ (PrimBOp Cons)) (DTPair _ t1 t2))
   = CCons 1 <$> mapM compileDTerm [t1, t2]
 
 compileDTerm (DTApp _ t1 t2)
@@ -130,7 +130,7 @@ compilePrim _ (PrimBOp Cons) = do
   tl <- fresh (string2Name "tl")
   return $ CAbs $ bind [hd, tl] $ CCons 1 [CVar hd, CVar tl]
 
-compilePrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
+compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 
 compilePrim _ PrimSqrt  = return $ CConst OSqrt
@@ -159,29 +159,29 @@ compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
 compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
-compilePrim (_ :->: TyList _ :->: _)          PrimMap = return $ CConst OMapList
-compilePrim (_ :->: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
-compilePrim (_ :->: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
-compilePrim ty                                PrimMap = compilePrimErr PrimMap ty
+compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
+compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
+compilePrim (_ :*: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
+compilePrim ty                               PrimMap = compilePrimErr PrimMap ty
 
-compilePrim (_ :->: _ :->: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
-compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
-compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
-compilePrim ty                              PrimReduce = compilePrimErr PrimReduce ty
+compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :*: _ :*: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :*: _ :*: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim ty                            PrimReduce = compilePrimErr PrimReduce ty
 
-compilePrim (_ :->: TyList _ :->: _) PrimFilter = return $ CConst OFilterList
-compilePrim (_ :->: TyBag  _ :->: _) PrimFilter = return $ CConst OFilterBag
-compilePrim (_ :->: TySet  _ :->: _) PrimFilter = return $ CConst OFilterBag
-compilePrim ty                       PrimFilter = compilePrimErr PrimFilter ty
+compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $ CConst OFilterList
+compilePrim (_ :*: TyBag  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim (_ :*: TySet  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim ty                      PrimFilter = compilePrimErr PrimFilter ty
 
 compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty                PrimJoin = compilePrimErr PrimJoin ty
 
-compilePrim (_ :->: TyBag a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim (_ :->: TySet a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim ty                             PrimMerge = compilePrimErr PrimMerge ty
+compilePrim (_ :*: TyBag a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim (_ :*: TySet a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor

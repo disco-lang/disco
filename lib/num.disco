@@ -12,3 +12,9 @@ isPrime = $isPrime
 ||| Compute the prime factorization of the given natural number.
 factor : N -> Bag N
 factor = $factor
+
+even : Z -> B
+even x = 2 divides x
+
+odd : Z -> B
+odd x = ¬(2 divides x)

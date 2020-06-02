@@ -427,7 +427,7 @@ typecheck :: Mode -> Term -> TCM ATerm
 
 -- To check at a user-defined type, expand its definition and recurse.
 -- This case has to be first, so in all other cases we know the type
--- will not be a CUser.
+-- will not be a TyUser.
 typecheck (Check (TyUser name args)) t = lookupTyDefn name args >>= check t
 
 --------------------------------------------------
@@ -445,7 +445,7 @@ typecheck mode (TParens t) = typecheck mode t
 -- fall through to this case.
 --
 -- Note this is also where unbound identifiers may possibly be turned
--- into primitives if the nam matches.
+-- into primitives if the name matches.
 typecheck Infer (TVar x) = checkVar `catchError` checkPrim
   where
     checkVar = do
@@ -466,66 +466,6 @@ typecheck Infer (TVar x) = checkVar `catchError` checkPrim
 --------------------------------------------------
 -- Primitives
 
--- XXX any prims that can't be inferred or need special treatment should go here.
-
--- Once upon a time, when we only had types N, Z, Q+, and Q, we could
--- always infer the type of anything numeric, so we didn't need
--- checking cases for Add, Mul, etc.  But now we could have e.g.  (a +
--- b) : Z13, in which case we need to push the checking type (in the
--- example, Z13) through the operator to check the arguments.
-
--- Checking arithmetic binary operations involves checking both operands
--- and then adding a constraint qualifier over binary operation and the desired type.
-typecheck (Check ty) (TBin op t1 t2) | op `elem` [Add, Mul, Div, Sub, SSub] = do
-  constraint $ CQual (bopQual op) ty
-  ATApp ty
-    <$> (ATApp (ty :->: ty) (ATPrim (ty :->: ty :->: ty) (PrimBOp op)) <$> check t1 ty)
-    <*> check t2 ty
-
--- See Note [Pattern coverage] -----------------------------
-typecheck (Check _) (TBin Add  _ _) = error "typecheck (Check _) Add should be unreachable"
-typecheck (Check _) (TBin Mul  _ _) = error "typecheck (Check _) Mul should be unreachable"
-typecheck (Check _) (TBin Sub  _ _) = error "typecheck (Check _) Sub should be unreachable"
-typecheck (Check _) (TBin Div  _ _) = error "typecheck (Check _) Div should be unreachable"
-typecheck (Check _) (TBin SSub _ _) = error "typecheck (Check _) SSub should be unreachable"
-------------------------------------------------------------
-
-typecheck (Check ty) (TUn Neg t) = do
-  constraint $ CQual QSub ty
-  ATApp ty (ATPrim (ty :->: ty) (PrimUOp Neg)) <$> check t ty
-
-typecheck (Check ty) (TBin Exp t1 t2) = do
-  at1   <- check t1 ty
-  at2   <- infer t2
-  resTy <- cExp (getType at1) (getType at2)
-
-  constraint $ CSub resTy ty
-  return $
-    ATApp ty
-      (ATApp (getType at2 :->: ty)
-        (ATPrim (getType at1 :->: getType at2 :->: ty) (PrimBOp Exp))
-        at1
-      )
-      at2
-
-typecheck (Check ty) (TBin setOp t1 t2)
-    | setOp `elem` [Union, Inter, Diff] = do
-
-  a <- freshTy
-  constraint $ COr
-    [ CEq (TyBag a) ty
-    , CEq (TySet a) ty
-    ]
-  constraint $ CQual QCmp a
-
-  ATApp ty
-    <$> (ATApp (ty :->: ty)
-           (ATPrim (ty :->: ty :->: ty) (PrimBOp setOp))
-           <$> check t1 ty
-        )
-    <*> check t2 ty
-
--- All other prims can be inferred.
 typecheck Infer (TPrim prim) = do
   ty <- inferPrim prim
   return $ ATPrim ty prim
@@ -537,7 +477,7 @@ typecheck Infer (TPrim prim) = do
     -- Logic
 
     inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
-      = return $ TyBool :->: TyBool :->: TyBool
+      = return $ TyBool :*: TyBool :->: TyBool
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
@@ -585,7 +525,7 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim (PrimBOp Cons) = do
       a <- freshTy
-      return $ a :->: TyList a :->: TyList a
+      return $ a :*: TyList a :->: TyList a
 
     -- XXX see https://github.com/disco-lang/disco/issues/160
     -- map : (a -> b) -> (c a -> c b)
@@ -593,7 +533,7 @@ typecheck Infer (TPrim prim) = do
       c <- freshAtom
       a <- freshTy
       b <- freshTy
-      return $ (a :->: b) :->: TyContainer c a :->: TyContainer c b
+      return $ (a :->: b) :*: TyContainer c a :->: TyContainer c b
 
     -- XXX should eventually be (a -> a -> a) -> c a -> a,
     --   with a check that the function has the right properties.
@@ -601,13 +541,13 @@ typecheck Infer (TPrim prim) = do
     inferPrim PrimReduce = do
       c <- freshAtom
       a <- freshTy
-      return $ (a :->: a :->: a) :->: a :->: TyContainer c a :->: a
+      return $ (a :*: a :->: a) :*: a :*: TyContainer c a :->: a
 
     -- filter : (a -> Bool) -> c a -> c a
     inferPrim PrimFilter = do
       c <- freshAtom
       a <- freshTy
-      return $ (a :->: TyBool) :->: TyContainer c a :->: TyContainer c a
+      return $ (a :->: TyBool) :*: TyContainer c a :->: TyContainer c a
 
     -- join : c (c a) -> c a
     inferPrim PrimJoin = do
@@ -624,7 +564,7 @@ typecheck Infer (TPrim prim) = do
         , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         ]
       let ca = TyContainer c a
-      return $ (TyN :->: TyN :->: TyN) :->: ca :->: ca :->: ca
+      return $ (TyN :*: TyN :->: TyN) :*: ca :*: ca :->: ca
 
     inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
       a <- freshTy
@@ -635,7 +575,7 @@ typecheck Infer (TPrim prim) = do
         ]
       let ca = TyContainer c a
       let resTy = case setOp of {Subset -> TyBool; _ -> ca}
-      return $ ca :->: ca :->: resTy
+      return $ ca :*: ca :->: resTy
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp Union)  = error "inferPrim Union should be unreachable"
@@ -650,7 +590,7 @@ typecheck Infer (TPrim prim) = do
 
       constraint $ CQual QCmp a
 
-      return $ a :->: TyContainer c a :->: TyBool
+      return $ a :*: TyContainer c a :->: TyBool
 
     ----------------------------------------
     -- Arithmetic
@@ -658,17 +598,17 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp IDiv) = do
       a <- freshTy
       resTy <- cInt a
-      return $ a :->: a :->: resTy
+      return $ a :*: a :->: resTy
 
     inferPrim (PrimBOp Mod) = do
       a <- freshTy
       constraint $ CSub a TyZ
-      return $ a :->: a :->: a
+      return $ a :*: a :->: a
 
     inferPrim (PrimBOp op) | op `elem` [Add, Mul, Sub, Div, SSub] = do
       a <- freshTy
       constraint $ CQual (bopQual op) a
-      return $ a :->: a :->: a
+      return $ a :*: a :->: a
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp Add ) = error "inferPrim Add should be unreachable"
@@ -687,7 +627,7 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       b <- freshTy
       resTy <- cExp a b
-      return $ a :->: b :->: resTy
+      return $ a :*: b :->: resTy
 
     ----------------------------------------
     -- Number theory
@@ -698,7 +638,7 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Divides) = do
       a <- freshTy
       constraint $ CQual QNum a
-      return $ a :->: a :->: TyBool
+      return $ a :*: a :->: TyBool
 
     ----------------------------------------
     -- Choose
@@ -712,7 +652,7 @@ typecheck Infer (TPrim prim) = do
       -- b can be either Nat (a binomial coefficient)
       -- or a list of Nat (a multinomial coefficient).
       constraint $ COr [CEq b TyN, CEq b (TyList TyN)]
-      return $ TyN :->: b :->: TyN
+      return $ TyN :*: b :->: TyN
 
     ----------------------------------------
     -- Ellipses
@@ -725,7 +665,7 @@ typecheck Infer (TPrim prim) = do
     -- they can be assigned a more appropriate type directly.
 
     inferPrim PrimForever = return $ TyList TyN :->: TyList TyN
-    inferPrim PrimUntil   = return $ TyN :->: TyList TyN :->: TyList TyN
+    inferPrim PrimUntil   = return $ TyN :*: TyList TyN :->: TyList TyN
 
     ----------------------------------------
     -- Crash
@@ -746,7 +686,7 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp op) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
       ty <- freshTy
       constraint $ CQual QCmp ty
-      return $ ty :->: ty :->: TyBool
+      return $ ty :*: ty :->: TyBool
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp Eq)  = error "inferPrim Eq should be unreachable"
@@ -760,7 +700,7 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp op) | op `elem` [Min, Max] = do
       ty <- freshTy
       constraint $ CQual QCmp ty
-      return $ ty :->: ty :->: ty
+      return $ ty :*: ty :->: ty
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp Min) = error "inferPrim Min should be unreachable"
@@ -972,7 +912,7 @@ typecheck Infer (TUn uop t)      = typecheck Infer $ expandedUOp t
 typecheck Infer (TBin bop t1 t2) = typecheck Infer $ expandedBOp t1 t2
   where
     expandedBOp :: Term -> Term -> Term
-    expandedBOp = TApp . TApp (TPrim (PrimBOp bop))
+    expandedBOp t1 t2 = TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])
 
 ----------------------------------------
 -- Comparison chain

@@ -1,5 +1,4 @@
 :type ~and~
-:type ~and~ False
-:type ~and~ False True
-:type \x. ~and~ x True
-:type let f : (Bool -> Bool -> Bool) -> Bool = \g. g True False in f ~and~
+:type ~and~ (False, True)
+:type \x. ~and~ (x, True)
+:type let f : (Bool * Bool -> Bool) -> Bool = \g. g (True, False) in f ~and~

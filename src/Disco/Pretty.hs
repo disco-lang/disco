@@ -218,7 +218,7 @@ prettyTerm (TApp (TPrim (PrimUOp uop)) t) =
     _ -> error $ "prettyTerm: uopMap doesn't contain " ++ show uop
 
 -- special case for fully applied binary operators
-prettyTerm (TApp (TApp (TPrim (PrimBOp bop)) t1) t2) = mparens (getPA bop) $
+prettyTerm (TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])) = mparens (getPA bop) $
   hsep
   [ prettyTerm' (bPrec bop) InL t1
   , prettyBOp bop

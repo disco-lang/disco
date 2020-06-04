@@ -758,7 +758,7 @@ typecheck Infer (TPrim prim) = do
 
 -- A few trivial cases for base types.
 typecheck Infer             TUnit        = return ATUnit
-typecheck Infer             (TBool b)    = return $ ATBool b
+typecheck Infer             (TBool b)    = return $ ATBool TyBool b
 typecheck Infer             (TChar c)    = return $ ATChar c
 typecheck Infer             (TString cs) = return $ ATString cs
 -- typecheck (Check (TyFin n)) (TNat x)     = return $ ATNat (TyFin n) x
@@ -904,15 +904,15 @@ typecheck mode lt@(TInj s t) = do
 -- Expand operators into applications of primitives right before
 -- type checking them.
 
-typecheck Infer (TUn uop t)      = typecheck Infer $ expandedUOp t
+typecheck Infer (TUn uop t)      = typecheck Infer expandedUOp
   where
-    expandedUOp :: Term -> Term
-    expandedUOp = TApp (TPrim (PrimUOp uop))
+    expandedUOp :: Term
+    expandedUOp = TApp (TPrim (PrimUOp uop)) t
 
-typecheck Infer (TBin bop t1 t2) = typecheck Infer $ expandedBOp t1 t2
+typecheck Infer (TBin bop t1 t2) = typecheck Infer expandedBOp
   where
-    expandedBOp :: Term -> Term -> Term
-    expandedBOp t1 t2 = TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])
+    expandedBOp :: Term
+    expandedBOp = TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])
 
 ----------------------------------------
 -- Comparison chain

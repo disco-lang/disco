@@ -83,7 +83,7 @@ type instance X_TVar DS           = Type
 type instance X_TPrim DS          = Type
 type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
-type instance X_TBool DS          = ()
+type instance X_TBool DS          = Type
 type instance X_TChar DS          = ()
 type instance X_TString DS        = Void
 type instance X_TNat DS           = Type
@@ -126,8 +126,8 @@ pattern DTPrim ty name = TPrim_ ty name
 pattern DTUnit :: DTerm
 pattern DTUnit = TUnit_ ()
 
-pattern DTBool :: Bool -> DTerm
-pattern DTBool bool = TBool_ () bool
+pattern DTBool :: Type -> Bool -> DTerm
+pattern DTBool ty bool = TBool_ ty bool
 
 pattern DTNat  :: Type -> Integer -> DTerm
 pattern DTNat ty int = TNat_ ty int
@@ -287,7 +287,7 @@ instance HasType DTerm where
   getType (DTVar ty _)    = ty
   getType (DTPrim ty _)   = ty
   getType DTUnit          = TyUnit
-  getType (DTBool _)      = TyBool
+  getType (DTBool ty _)   = ty
   getType (DTChar _)      = TyC
   getType (DTNat ty _)    = ty
   getType (DTRat _)       = TyF

@@ -104,6 +104,7 @@ data Qualifier
   | QDiv       -- ^ Divisive, i.e. supports /
   | QCmp       -- ^ Comparable, i.e. supports ordering/comparison (see Note [QCmp])
   | QEnum      -- ^ Enumerable, i.e. supports ellipsis notation [x .. y]
+  | QBool      -- ^ Boolean, i.e. supports and, or, not
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier
@@ -181,6 +182,7 @@ isSubB N F   = True
 isSubB N Q   = True
 isSubB Z Q   = True
 isSubB F Q   = True
+isSubB B P   = True
 isSubB _ _   = False
 
 -- | Check whether one base type is a sub- or supertype of another.
@@ -193,6 +195,7 @@ supertypes :: BaseTy -> [BaseTy]
 supertypes N  = [N, Z, F, Q]
 supertypes Z  = [Z, Q]
 supertypes F  = [F, Q]
+supertypes B  = [B, P]
 supertypes ty = [ty]
 
 -- | List all the subtypes of a given base type.
@@ -200,6 +203,7 @@ subtypes :: BaseTy -> [BaseTy]
 subtypes Q  = [Q, F, Z, N]
 subtypes F  = [F, N]
 subtypes Z  = [Z, N]
+subtypes P  = [P, B]
 subtypes ty = [ty]
 
 -- | List all the sub- or supertypes of a given base type.
@@ -220,6 +224,7 @@ hasQual b       QNum  = b `elem` [N, Z, F, Q]
 hasQual b       QSub  = b `elem` [Z, Q]
 hasQual b       QDiv  = b `elem` [F, Q]
 hasQual b       QEnum = b `elem` [N, Z, F, Q, C]
+hasQual b       QBool = b `elem` [B, P]
 
 -- | Check whether a base type has a certain sort, which simply
 --   amounts to whether it satisfies every qualifier in the sort.
@@ -304,7 +309,7 @@ sortRules c s = do
   -- We zip them together to produce a list of sorts.
   return $ foldl' (zipWith (\srt -> maybe srt (`S.insert` srt))) (repeat topSort) needQuals
 
--- | Pick a base type that satisfies a given sort.
+-- | Pick a base type (generally the "simplest") that satisfies a given sort.
 pickSortBaseTy :: Sort -> BaseTy
 pickSortBaseTy s
   | QDiv  `S.member` s && QSub `S.member` s = Q
@@ -313,4 +318,5 @@ pickSortBaseTy s
   | QNum  `S.member` s = N
   | QCmp  `S.member` s = N
   | QEnum `S.member` s = N
+  | QBool `S.member` s = B
   | otherwise          = Unit

@@ -45,6 +45,7 @@ module Disco.Types
        , pattern TyVoid
        , pattern TyUnit
        , pattern TyBool
+       , pattern TyProp
        , pattern TyN
        , pattern TyZ
        , pattern TyF
@@ -124,6 +125,9 @@ data BaseTy where
 
   -- | Booleans.
   B    :: BaseTy
+
+  -- | Propositions.
+  P    :: BaseTy
 
   -- | Natural numbers.
   N    :: BaseTy
@@ -373,6 +377,9 @@ pattern TyUnit = TyAtom (ABase Unit)
 pattern TyBool :: Type
 pattern TyBool = TyAtom (ABase B)
 
+pattern TyProp :: Type
+pattern TyProp = TyAtom (ABase P)
+
 pattern TyN :: Type
 pattern TyN = TyAtom (ABase N)
 
@@ -426,7 +433,7 @@ pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
-      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyN, TyZ, TyF, TyQ, TyC,
+      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
       (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var

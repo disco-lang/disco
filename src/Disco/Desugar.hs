@@ -133,10 +133,10 @@ tnot = tapp (ATPrim (TyBool :->: TyBool) (PrimUOp Not))
 t <==. gs = bind (toTelescope gs) t
 
 fls :: ATerm
-fls = ATBool False
+fls = ATBool TyBool False
 
 tru :: ATerm
-tru = ATBool True
+tru = ATBool TyBool True
 
 tif :: ATerm -> AGuard
 tif t = AGBool (embed t)
@@ -223,7 +223,7 @@ desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
 
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return $ DTUnit
-desugarTerm (ATBool b)           = return $ DTBool b
+desugarTerm (ATBool ty b)        = return $ DTBool ty b
 desugarTerm (ATChar c)           = return $ DTChar c
 desugarTerm (ATString cs)        =
   desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing

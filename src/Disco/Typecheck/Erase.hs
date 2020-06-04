@@ -31,7 +31,7 @@ erase (ATPrim _ x)          = TPrim x
 erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)
   where (tel,at) = unsafeUnbind bs
 erase ATUnit                = TUnit
-erase (ATBool b)            = TBool b
+erase (ATBool _ b)          = TBool b
 erase (ATChar c)            = TChar c
 erase (ATString s)          = TString s
 erase (ATNat _ i)           = TNat i
@@ -100,7 +100,7 @@ eraseDTerm :: DTerm -> Term
 eraseDTerm (DTVar _ x)      = TVar (coerce x)
 eraseDTerm (DTPrim _ x)     = TPrim x
 eraseDTerm DTUnit           = TUnit
-eraseDTerm (DTBool b)       = TBool b
+eraseDTerm (DTBool _ b)     = TBool b
 eraseDTerm (DTChar c)       = TChar c
 eraseDTerm (DTNat _ n)      = TNat n
 eraseDTerm (DTRat r)        = TRat r

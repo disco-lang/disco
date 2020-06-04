@@ -115,7 +115,7 @@ type instance X_TVar            TY = Type
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
-type instance X_TBool           TY = ()
+type instance X_TBool           TY = Type
 type instance X_TNat            TY = Type
 type instance X_TRat            TY = ()
 type instance X_TChar           TY = ()
@@ -150,8 +150,8 @@ pattern ATLet ty bind = TLet_ ty bind
 pattern ATUnit :: ATerm
 pattern ATUnit = TUnit_ ()
 
-pattern ATBool :: Bool -> ATerm
-pattern ATBool bool = TBool_ () bool
+pattern ATBool :: Type -> Bool -> ATerm
+pattern ATBool ty bool = TBool_ ty bool
 
 pattern ATNat  :: Type -> Integer -> ATerm
 pattern ATNat ty int = TNat_ ty int
@@ -361,7 +361,7 @@ instance HasType ATerm where
   getType (ATVar ty _)             = ty
   getType (ATPrim ty _)            = ty
   getType ATUnit                   = TyUnit
-  getType (ATBool _)               = TyBool
+  getType (ATBool ty _)            = ty
   getType (ATNat ty _)             = ty
   getType (ATRat _)                = TyF
   getType (ATChar _)               = TyC
@@ -380,7 +380,7 @@ instance HasType ATerm where
   setType ty (ATVar _ x      )       = ATVar ty x
   setType ty (ATPrim _ x     )       = ATPrim ty x
   setType _  ATUnit                  = ATUnit
-  setType _  (ATBool b)              = ATBool b
+  setType ty (ATBool _ b)            = ATBool ty b
   setType ty (ATNat _ x      )       = ATNat ty x
   setType _  (ATRat r)               = ATRat r
   setType _ (ATChar c)               = ATChar c

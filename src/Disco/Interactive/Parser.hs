@@ -26,7 +26,7 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Parser
-import           Disco.Syntax.Operators
+-- import           Disco.Syntax.Operators  -- needed for #185
 
 ------------------------------------------------------------
 -- REPL expression type

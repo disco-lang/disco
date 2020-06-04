@@ -26,6 +26,7 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Parser
+import           Disco.Syntax.Operators
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -82,10 +83,22 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
 
 parseTypeTarget :: Parser Term
 parseTypeTarget =
-      (term <?> "expression")
-  <|> (undefined <?> "naked operator?")
-     -- XXX get all operators from table, parse each one as a naked expression,
-     -- turn into a Prim thingy
+      (try term <?> "expression")
+
+-- Can't do this until we get rid of TUn and TBin, represent operator
+-- applications as just normal function application.
+
+--   <|> (parseNakedOp <?> "naked operator?")
+
+-- parseNakedOp :: Parser Term
+-- parseNakedOp = oneOf (map mkOpParser (concat opTable))
+--   where
+--     mkOpParser :: OpInfo -> Parser Term
+--     mkOpParser (OpInfo (UOpF _ op) syns _) = oneOf (map ((_ op <$) . reservedOp) syns)
+--     mkOpParser (OpInfo (BOpF _ op) syns _) = oneOf (map ((_ op <$) . reservedOp) syns)
+
+--     oneOf :: [Parser a] -> Parser a
+--     oneOf = foldr (<|>) empty
 
 fileParser :: Parser FilePath
 fileParser = many C.spaceChar *> many (satisfy (not . isSpace))

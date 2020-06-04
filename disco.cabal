@@ -120,6 +120,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/input
                      test/repl-defn/expected
                      test/repl-defn/input
+                     test/repl-import/expected
+                     test/repl-import/input
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input

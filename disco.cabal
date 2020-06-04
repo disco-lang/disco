@@ -58,7 +58,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-convert/input
                      test/containers-ellipsis/expected
                      test/containers-ellipsis/input
-                     test/containers-filter/containers-filter.disco
                      test/containers-filter/expected
                      test/containers-filter/input
                      test/containers-join/expected

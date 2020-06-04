@@ -1,9 +1,9 @@
 using primitives
 $merge(~+~, bag [1,1,2,2,2], bag [2,2,3,3])
 $merge(~.-~, bag [1,1,2,2,2], bag [2,2,3,3])
-$merge(\p. {? x min y when p is (x,y) ?}, bag [1,1,2,2,2], bag [2,2,3,3])
-$merge(\p. {? x max y when p is (x,y) ?}, bag [1,1,2,2,2], bag [2,2,3,3])
-$merge(\p. {? x max y when p is (x,y) ?}, {1,2,3}, {2,4})
-$merge(\p. {? x min y when p is (x,y) ?}, {1,2,3}, {2,4})
+$merge(~min~, bag [1,1,2,2,2], bag [2,2,3,3])
+$merge(~max~, bag [1,1,2,2,2], bag [2,2,3,3])
+$merge(~min~, {1,2,3}, {2,4})
+$merge(~max~, {1,2,3}, {2,4})
 $merge(~.-~, {1,2,3}, {2,4})
 $merge(\p. {? (x + y) mod 2 when p is (x,y) ?}, {1,2,3}, {2,4})

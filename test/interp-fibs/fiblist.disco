@@ -4,8 +4,7 @@ tail : List N -> List N
 tail (_::xs) = xs
 
 fibs : List N
-fibs = 0 :: 1 :: zipWith(\p. {? x+y when p is (x,y) ?}, fibs, tail fibs)
-  --- XXX fix above when we have the name 'plus' available
+fibs = 0 :: 1 :: zipWith(~+~, fibs, tail fibs)
 
 sum : List N -> N
 sum [] = 0

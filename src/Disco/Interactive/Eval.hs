@@ -18,10 +18,8 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad.Except
-import           Control.Monad.Trans.State.Strict
 import           Data.Coerce
 import qualified Data.Map                                as M
-import qualified Data.Set                                as S
 import           System.FilePath                         (splitFileName)
 
 import           Unbound.Generics.LocallyNameless
@@ -92,6 +90,7 @@ handleCMD s = do
     handleLine (Ann t)       = handleAnn t              >>= iputStrLn
     handleLine (Desugar t)   = handleDesugar t          >>= iputStrLn
     handleLine (Compile t)   = handleCompile t          >>= iputStrLn
+    handleLine (Import m)    = handleImport m
     handleLine (Load file)   = handleLoad file >> lastFile .= Just file >>return ()
     handleLine (Reload)      = do
       file <- use lastFile
@@ -147,6 +146,11 @@ handleCompile t = do
     Left e       -> return.show $ e
     Right (at,_) -> return.show.compileTerm $ at
 
+handleImport :: ModName -> Disco IErr ()
+handleImport modName = catchAndPrintErrors () $ do
+  mi <- loadDiscoModule "" modName
+  addModule mi
+
 loadFile :: FilePath -> Disco IErr (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
 
@@ -159,18 +163,24 @@ fileNotFound file _ = putStrLn $ "File not found: " ++ file
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
-  modMap <- execStateT (loadDiscoModule directory S.empty modName) M.empty
-  let m@(ModuleInfo _ props _ _ _) = modMap M.! modName
-  addModInfo m
+  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule directory modName
+  setLoadedModule m
   t <- withTopEnv $ runAllTests props
   io . putStrLn $ "Loaded."
   garbageCollect
   return t
 
--- | Added information from ModuleInfo to the Disco monad. This includes updating the
+-- | Add information from ModuleInfo to the Disco monad. This includes updating the
 --   Disco monad with new term definitions, documentation, types, and type definitions.
-addModInfo :: ModuleInfo -> Disco IErr ()
-addModInfo (ModuleInfo docs _ tys tyds tmds) = do
+--   Replaces any previously loaded module.
+setLoadedModule :: ModuleInfo -> Disco IErr ()
+setLoadedModule mi = do
+  topModInfo .= mi
+  populateCurrentModuleInfo
+
+populateCurrentModuleInfo :: Disco IErr ()
+populateCurrentModuleInfo = do
+  ModuleInfo docs _ tys tyds tmds <- use topModInfo
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   topDocs    .= docs
   topCtx     .= tys
@@ -178,6 +188,13 @@ addModInfo (ModuleInfo docs _ tys tyds tmds) = do
   topDefns   .= tmds
   loadDefs cdefns
   return ()
+
+addModule :: ModuleInfo -> Disco IErr ()
+addModule mi = do
+  curMI <- use topModInfo
+  mi' <- adaptError TypeCheckErr $ combineModuleInfo [curMI, mi]
+  topModInfo .= mi'
+  populateCurrentModuleInfo
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it

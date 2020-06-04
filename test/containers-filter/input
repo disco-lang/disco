@@ -1,4 +1,4 @@
-:load test/containers-filter/containers-filter.disco
+import list
 filter(\x.x > 3, [1 .. 10])
 filter(\x.x > 3, ⟅1 .. 10⟆)
 filter(\x.x > 3, {1 .. 10})

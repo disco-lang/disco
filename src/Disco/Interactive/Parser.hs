@@ -42,6 +42,7 @@ data REPLExpr =
  | Ann Term                     -- Show type-annotated typechecked term
  | Desugar Term                 -- Show a desugared term
  | Compile Term                 -- Show a compiled term
+ | Import String                -- Import a library module.
  | Load FilePath                -- Load a file.
  | Reload                       -- Reloads the most recently loaded file.
  | Doc (Name Term)              -- Show documentation.
@@ -66,7 +67,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
   where
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     parsers =
-      [ ("type",    TypeCheck <$> term)
+      [ ("type",    TypeCheck <$> parseTypeTarget)
       , ("defn",    ShowDefn  <$> (sc *> ident))
       , ("parse",   Parse     <$> term)
       , ("pretty",  Pretty    <$> term)
@@ -79,6 +80,13 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       , ("help",    return Help)
       ]
 
+parseTypeTarget :: Parser Term
+parseTypeTarget =
+      (term <?> "expression")
+  <|> (undefined <?> "naked operator?")
+     -- XXX get all operators from table, parse each one as a naked expression,
+     -- turn into a Prim thingy
+
 fileParser :: Parser FilePath
 fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 
@@ -87,6 +95,7 @@ lineParser
   =   commandParser
   <|> try (Nop <$ (sc <* eof))
   <|> try (Using <$> (reserved "using" *> parseExtName))
+  <|> try (Import <$> parseImport)
   <|> try (Eval <$> term)
   <|> letParser
 

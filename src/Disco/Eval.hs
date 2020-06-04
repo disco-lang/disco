@@ -45,7 +45,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topCtx, topDefns, topTyDefns, topDocs, topEnv
+       , topModInfo, topCtx, topDefns, topTyDefns, topDocs, topEnv
        , memory, nextLoc, lastFile, enabledExts
 
          -- * Disco monad
@@ -61,6 +61,7 @@ module Disco.Eval
        , allocate, delay, delay', mkValue, mkSimple
 
          -- ** Top level phases
+       , adaptError
        , parseDiscoModule
        , typecheckDisco
        , loadDiscoModule
@@ -299,8 +300,12 @@ type Loc = Int
 
 -- | The various pieces of state tracked by the 'Disco' monad.
 data DiscoState e = DiscoState
-  {
-    _topCtx        :: Ctx Term PolyType
+  { _topModInfo    :: ModuleInfo
+    -- ^ Info about the top-level currently loaded module.  Due to
+    --   import statements this may actually be a combination of info
+    --   about multiple physical modules.
+
+  , _topCtx        :: Ctx Term PolyType
     -- ^ Top-level type environment.
 
   , _topDefns      :: Ctx ATerm Defn
@@ -349,7 +354,8 @@ data DiscoState e = DiscoState
 -- | The initial state for the @Disco@ monad.
 initDiscoState :: DiscoState e
 initDiscoState = DiscoState
-  { _topCtx        = emptyCtx
+  { _topModInfo    = emptyModuleInfo
+  , _topCtx        = emptyCtx
   , _topDefns      = emptyCtx
   , _topTyDefns    = M.empty
   , _topDocs       = emptyCtx
@@ -606,20 +612,23 @@ typecheckDisco tyctx tydefs tcm =
 --   'ModuleInfo' records to a map from module names to info records,
 --   and then typechecking the parent module in an environment with
 --   access to this map. This is really just a depth-first search.
-loadDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
-loadDiscoModule directory inProcess modName  = do
+loadDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m ModuleInfo
+loadDiscoModule dir m = evalStateT (loadDiscoModule' dir S.empty m) M.empty
+
+loadDiscoModule' :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
+loadDiscoModule' directory inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
   modMap <- get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
-      file <-resolveModule directory modName
+      file <- resolveModule directory modName
              >>= maybe (throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
-      mis <- mapM (loadDiscoModule directory (S.insert modName inProcess)) mns
+      mis <- mapM (loadDiscoModule' directory (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
       m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
       m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]

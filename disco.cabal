@@ -83,7 +83,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/list-comp/listcomp.disco
                      test/list-poly/expected
                      test/list-poly/input
-                     test/list-poly/take.disco
                      test/logic-bools/expected
                      test/logic-bools/input
                      test/logic-cmp/expected

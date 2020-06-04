@@ -1,4 +1,4 @@
-:load test/list-poly/take.disco
+import list
 [1 .. 5]
 [5 .. 1]
 [1 ........ 5]

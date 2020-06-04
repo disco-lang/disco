@@ -37,6 +37,7 @@ module Disco.Parser
 
          -- ** Modules
        , wholeModule, parseModule, parseExtName, parseTopLevel, parseDecl
+       , parseImport, parseModuleName
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
@@ -339,10 +340,12 @@ parseExtName = choice (map parseOneExt allExtsList) <?> "language extension name
 -- | Parse an import, of the form @import <modulename>@.
 parseImport :: Parser ModName
 parseImport = L.nonIndented sc $
-  reserved "import" *> moduleName
-  where
-    moduleName = lexeme $
-      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
+  reserved "import" *> parseModuleName
+
+-- | Parse the name of a module.
+parseModuleName :: Parser ModName
+parseModuleName = lexeme $
+  intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.

@@ -289,7 +289,12 @@ evalTerm t = do
       let ty = getType at
           c  = compileTerm at
       in do
-        withTopEnv $ (mkValue c >>= prettyValue ty)
+        v <- withTopEnv $ do
+          cv <- mkValue c
+          prettyValue ty cv
+          return cv
+        topCtx %= M.insert (string2Name "it") (toPolyType ty)
+        topEnv %= M.insert (string2Name "it") v
         garbageCollect
 
 handleTypeCheck :: Term -> Disco IErr String

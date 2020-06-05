@@ -67,6 +67,8 @@ data Prim where
 
   PrimForever :: Prim      -- ^ @[x, y, z .. ]@
   PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+
+  PrimHolds   :: Prim      -- ^ Test whether a proposition holds
   deriving (Show, Read, Eq, Ord, Generic)
 
 instance Alpha Prim
@@ -134,6 +136,8 @@ primTable =
 
   , PrimInfo PrimForever   "forever" False
   , PrimInfo PrimUntil     "until"   False
+
+  , PrimInfo PrimHolds     "holds"   False
   ]
 
 -- | A convenient map from each 'Prim' to its info record.

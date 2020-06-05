@@ -891,7 +891,7 @@ whnfOp (OUnions ty)    = arity1 "unions"    $ primUnions ty
 --------------------------------------------------
 -- Merge
 
-whnfOp (OMerge ty)     = arity3 "merge" $ primMerge ty
+whnfOp (OMerge ty)     = arity3 "merge"     $ primMerge ty
 
 --------------------------------------------------
 -- Ellipsis
@@ -900,10 +900,15 @@ whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
 whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 
 --------------------------------------------------
+-- Propositions
+
+whnfOp OHolds          = arity1 "holds"     $ whnfV >=> primHolds
+
+--------------------------------------------------
 -- Other primitives
 
 whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
-whnfOp OId             = arity1 "id" $ whnfV
+whnfOp OId             = arity1 "id"        $ whnfV
 
 --------------------------------------------------
 -- Utility functions
@@ -1130,6 +1135,14 @@ valueToString = fmap toString . rnfV
     toString (VCons 0 _)              = ""
     toString (VCons 1 [VNum _ c, cs]) = chr (fromIntegral $ numerator c) : toString cs
     toString _ = "Impossible: valueToString.toString, non-list"
+
+------------------------------------------------------------
+-- Propositions
+------------------------------------------------------------
+
+primHolds :: Value -> Disco IErr Value
+primHolds v@(VCons _ _) = return v
+primHolds v             = error $ "holds for " ++ show v ++ " unimplemented"
 
 ------------------------------------------------------------
 -- Equality testing

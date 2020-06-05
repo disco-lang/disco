@@ -174,6 +174,9 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
 
+        -- Propositions
+        | OHolds          -- ^ Convert Prop -> Bool
+
         -- Other primitives
         | OCrash          -- ^ Crash with a user-supplied message
         | OId             -- ^ No-op/identity function

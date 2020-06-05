@@ -680,6 +680,12 @@ typecheck Infer (TPrim prim) = do
       return $ TyString :->: a
 
     ----------------------------------------
+    -- Propositions
+
+    -- 'holds' converts a Prop into a Bool (but might not terminate).
+    inferPrim PrimHolds = return $ TyProp :->: TyBool
+
+    ----------------------------------------
     -- Comparisons
 
     -- Infer the type of a comparison. A comparison always has type Bool,

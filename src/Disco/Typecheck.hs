@@ -476,8 +476,10 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Logic
 
-    inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
-      = return $ TyBool :*: TyBool :->: TyBool
+    inferPrim (PrimBOp op) | op `elem` [And, Or, Impl] = do
+      a <- freshTy
+      constraint $ CQual (bopQual op) a
+      return $ a :*: a :->: a
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
@@ -485,7 +487,10 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp Impl) = error "inferPrim Impl should be unreachable"
     ------------------------------------------------------------
 
-    inferPrim (PrimUOp Not) = return $ TyBool :->: TyBool
+    inferPrim (PrimUOp Not) = do
+      a <- freshTy
+      constraint $ CQual QBool a
+      return $ a :->: a
 
     ----------------------------------------
     -- Container conversion

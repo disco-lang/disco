@@ -436,11 +436,12 @@ prettyWHNF out (TyUser nm args) v = do
     Just (TyDefBody _ body) -> prettyWHNF out (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
 prettyWHNF out TyUnit          (VCons 0 []) = out "()"
+prettyWHNF out TyProp          _            = prettyPlaceholder out TyProp
 prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
 prettyWHNF out (TyList TyC)    v            = prettyString out v
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
-prettyWHNF out ty@(_ :*: _) v            = out "(" >> prettyTuple out ty v >> out ")"
+prettyWHNF out ty@(_ :*: _)    v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (ty1 :+: ty2) (VCons i [v])
   = case i of
       0 -> out "left "  >> prettyValueWith out ty1 v
@@ -452,7 +453,7 @@ prettyWHNF out _ (VNum d r)
       Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
       Decimal  -> out $ prettyDecimal r
 
-prettyWHNF out ty@(_ :->: _) _ = prettyFun out ty
+prettyWHNF out ty@(_ :->: _) _ = prettyPlaceholder out ty
 
 prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
@@ -461,8 +462,8 @@ prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
-prettyFun :: (String -> Disco IErr ()) -> Type -> Disco IErr ()
-prettyFun out ty = do
+prettyPlaceholder :: (String -> Disco IErr ()) -> Type -> Disco IErr ()
+prettyPlaceholder out ty = do
   out "<"
   tyStr <- renderDoc (prettyTy ty)
   out tyStr

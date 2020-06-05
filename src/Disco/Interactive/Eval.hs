@@ -110,7 +110,7 @@ handleLet x t = do
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
       let c = compileTerm at
-      thnk <- mkValue c
+      thnk <- withTopEnv (mkValue c)
       topCtx   %= M.insert x sig
         -- XXX ability to define more complex things at REPL prompt, with patterns etc.
       topDefns %= M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
@@ -289,10 +289,8 @@ evalTerm t = do
       let ty = getType at
           c  = compileTerm at
       in do
-        (withTopEnv $ mkValue c) >>= prettyValue ty
-        -- printMem
+        withTopEnv $ (mkValue c >>= prettyValue ty)
         garbageCollect
-        -- printMem
 
 handleTypeCheck :: Term -> Disco IErr String
 handleTypeCheck t = do

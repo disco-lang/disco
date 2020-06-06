@@ -72,6 +72,7 @@ import           Disco.Types
 data DS
 
 type DProperty = Property_ DS
+type instance BinderType DS = Type
 
 -- | A @DTerm@ is a term which has been typechecked and desugared, so
 --   it has fewer constructors and complex features than 'ATerm', but

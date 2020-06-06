@@ -227,7 +227,7 @@ desugarTerm (ATBool ty b)        = return $ DTBool ty b
 desugarTerm (ATChar c)           = return $ DTChar c
 desugarTerm (ATString cs)        =
   desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing
-desugarTerm (ATAbs ty lam)       = do
+desugarTerm (ATAbs Lam ty lam)       = do
   (args, t) <- unbind lam
   mkLambda ty (map fst args) <$> desugarTerm t
 
@@ -482,7 +482,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
           tapp
             (ATPrim mapTy PrimMap)
             (mkPair
-              (ATAbs (xTy :->: c tTy) (bind [(x, embed xTy)] tqs))
+              (ATAbs Lam (xTy :->: c tTy) (bind [(x, embed xTy)] tqs))
               lst
             )
 

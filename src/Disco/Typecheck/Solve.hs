@@ -317,9 +317,11 @@ decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstra
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap
 decomposeQual (TyAtom a) q             = checkQual q a
-decomposeQual ty@(TyCon (CUser _) _) q = throwError $ Unqual q ty   -- XXX FOR NOW!
+  -- XXX Really we should be able to check by induction whether a
+  -- user-defined type has a certain sort.
+decomposeQual ty@(TyCon (CUser _) _) q = throwError $ Unqual q ty
 decomposeQual ty@(TyCon c tys) q
-  = case (M.lookup c >=> M.lookup q) qualRules of
+  = case qualRules c q of
       Nothing -> throwError $ Unqual q ty
       Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual) tys qs
 

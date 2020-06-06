@@ -23,7 +23,7 @@ module Disco.Typecheck where
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
-import           Control.Monad.RWS
+import           Control.Monad.RWS                       (get)
 import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import           Data.List                               (group, sort)
@@ -533,22 +533,22 @@ typecheck Infer (TPrim prim) = do
       return $ a :*: TyList a :->: TyList a
 
     -- XXX see https://github.com/disco-lang/disco/issues/160
-    -- map : (a -> b) -> (c a -> c b)
+    -- map : (a -> b) × c a -> c b
     inferPrim PrimMap = do
       c <- freshAtom
       a <- freshTy
       b <- freshTy
       return $ (a :->: b) :*: TyContainer c a :->: TyContainer c b
 
-    -- XXX should eventually be (a -> a -> a) -> c a -> a,
-    --   with a check that the function has the right properties.
-    -- reduce : (a -> a -> a) -> a -> c a -> a
+    -- XXX should eventually be (a × a -> a) × c a -> a,
+    --   with a check that the function has the right properties?
+    -- reduce : (a × a -> a) × a × c a -> a
     inferPrim PrimReduce = do
       c <- freshAtom
       a <- freshTy
       return $ (a :*: a :->: a) :*: a :*: TyContainer c a :->: a
 
-    -- filter : (a -> Bool) -> c a -> c a
+    -- filter : (a -> Bool) × c a -> c a
     inferPrim PrimFilter = do
       c <- freshAtom
       a <- freshTy
@@ -560,7 +560,7 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       return $ TyContainer c (TyContainer c a) :->: TyContainer c a
 
-    -- merge : (N -> N -> N) -> c a -> c a -> c a   (c = bag or set)
+    -- merge : (N × N -> N) × c a × c a -> c a   (c = bag or set)
     inferPrim PrimMerge = do
       c <- freshAtom
       a <- freshTy
@@ -688,12 +688,13 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Comparisons
 
-    -- Infer the type of a comparison. A comparison always has type Bool,
-    -- but we have to make sure the subterms have compatible types.  We
-    -- also generate a QCmp qualifier --- even though every type in disco
-    -- has semi-decidable equality and ordering, we need to know whether
-    -- e.g. a comparison was done at a certain type, so we can decide
-    -- whether the type is allowed to be completely polymorphic or not.
+    -- Infer the type of a comparison. A comparison always has type
+    -- Bool, but we have to make sure the subterms have compatible
+    -- types.  We also generate a QCmp qualifier, for two reasons:
+    -- one, we need to know whether e.g. a comparison was done at a
+    -- certain type, so we can decide whether the type is allowed to
+    -- be completely polymorphic or not.  Also, comparison of Props is
+    -- not allowed.
     inferPrim (PrimBOp op) | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq] = do
       ty <- freshTy
       constraint $ CQual QCmp ty
@@ -779,22 +780,41 @@ typecheck Infer             (TRat r)     = return $ ATRat r
 typecheck _                 TWild        = throwError $ NoTWild
 
 --------------------------------------------------
--- Lambdas
+-- Abstractions (lambdas and quantifiers)
 
--- To check a lambda abstraction:
-typecheck (Check checkTy) (TAbs lam) = do
-  (args, t) <- unbind lam
+-- Lambdas and quantifiers are similar enough that we can share a
+-- bunch of the code, but their typing rules are a bit different.  In
+-- particular a lambda
+--
+--   \(x1:ty1) (x2:ty2) ... . body
+--
+-- is going to have a type like ty1 -> ty2 -> ... -> resTy, whereas a
+-- quantifier like
+--
+--   ∃(x1:ty1) (x2:ty2) ... . body
+--
+-- is just going to have the type Prop.  The similarity is that in
+-- both cases we have to generate unification variables for any
+-- binders with omitted type annotations, and typecheck the body under
+-- an extended context.
+
+-- It's only helpful to do lambdas in checking mode, since the
+-- provided function type can provide information about the types of
+-- the arguments.  For other quantifiers we can just fall back to
+-- inference mode.
+typecheck (Check checkTy) tm@(TAbs Lam body) = do
+  (args, t) <- unbind body
 
   -- First check that the given type is of the form ty1 -> ty2 ->
   -- ... -> resTy, where the types ty1, ty2 ... match up with any
   -- types declared for the arguments to the lambda (e.g.  (x:tyA)
   -- (y:tyB) -> ...).
-  (ctx, typedArgs, resTy) <- checkArgs args checkTy (TAbs lam)
+  (ctx, typedArgs, resTy) <- checkArgs args checkTy tm
 
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
   extends ctx $
-    ATAbs checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
+    ATAbs Lam checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
 
   where
 
@@ -825,17 +845,11 @@ typecheck (Check checkTy) (TAbs lam) = do
       -- Ensure that ty is a function type
       (ty1, ty2) <- ensureConstr2 CArr ty (Left term)
 
-      -- Figure out the type of x:
-      xTy <- case mty of
-
-        -- If it has no annotation, just take the input type ty1.
-        Nothing    -> return ty1
-
-        -- If it does have an annotation, make sure the input type is a
-        -- subtype of it.
-        Just annTy -> do
-          constraint $ CSub ty1 annTy
-          return ty1
+      -- If x has an annotation, make sure the input type is a
+      -- subtype of it.
+      case mty of
+        Nothing    -> return ()
+        Just annTy -> constraint $ CSub ty1 annTy
 
       -- Check the rest of the arguments under the type ty2, returning a
       -- context with the rest of the arguments and the final result type.
@@ -843,10 +857,10 @@ typecheck (Check checkTy) (TAbs lam) = do
 
       -- Pass the result type through, and add x with its type to the
       -- generated context.
-      return (singleCtx x (toPolyType xTy) `joinCtx` ctx, (x, embed xTy) : typedArgs, resTy)
+      return (singleCtx x (toPolyType ty1) `joinCtx` ctx, (x, embed ty1) : typedArgs, resTy)
 
--- To infer a lambda abstraction:
-typecheck Infer (TAbs lam)    = do
+-- In inference mode, we handle lambdas as well as quantifiers (∀, ∃).
+typecheck Infer (TAbs q lam)    = do
 
   -- Open it and get the variables with any type annotations.
   (args, t) <- unbind lam
@@ -857,12 +871,29 @@ typecheck Infer (TAbs lam)    = do
   tys <- mapM (maybe freshTy return) (map unembed mtys)
   let tymap = M.fromList $ zip xs (map toPolyType tys)
 
-  -- Infer the type of the body under an extended context, and
-  -- construct an ATAbs with the appropriate function type.
+  -- In the case of ∀, ∃, have to ensure that none of the arguments
+  -- are themselves of type Prop, or involve anything of type Prop.
+  when (q `elem` [All, Ex]) $
+    forM_ tys $ constraint . CQual QBasic
+
+  -- Extend the context with the given arguments, and then do
+  -- something appropriate depending on the quantifier.
   extends tymap $ do
-    at <- infer t
-    return $ ATAbs (mkFunTy tys (getType at))
-                   (bind (zip (map coerce xs) (map embed tys)) at)
+
+    case q of
+      -- For lambdas, infer the type of the body, and return an appropriate
+      -- function type.
+      Lam -> do
+        at <- infer t
+        return $ ATAbs Lam
+          (mkFunTy tys (getType at))
+          (bind (zip (map coerce xs) (map embed tys)) at)
+
+      -- For other quantifiers, check that the body has type Prop,
+      -- and return Prop.
+      _   -> do  -- ∀, ∃
+        at <- check t TyProp
+        return $ ATAbs q TyProp (bind (zip (map coerce xs) (map embed tys)) at)
   where
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type

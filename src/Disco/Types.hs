@@ -146,7 +146,7 @@ data BaseTy where
 
   -- | Finite types. The single argument is a natural number defining
   --   the exact number of inhabitants.
-  Fin  :: Integer -> BaseTy
+  -- Fin  :: Integer -> BaseTy
 
   -- | Set container type.  It's a bit odd putting these here since
   --   they have kind * -> * and all the other base types have kind *;

@@ -142,6 +142,12 @@ module Disco.AST.Generic
        , X_Pattern
        , ForallPattern
 
+       -- * Quantifiers
+
+       , Quantifier(..)
+       , Binder_
+       , BinderType
+
        -- * Property
 
        , Property_
@@ -320,13 +326,17 @@ data Term_ e where
   -- | A string literal, /e.g./ @"disco"@.
   TString_ :: X_TString e -> [Char] -> Term_ e
 
-  -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
-  --   multiple arguments, and each argument may be annotated with a
-  --   type.
-  TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
+  -- | A binding abstraction, of the form @Q vars. expr@ where @Q@ is
+  --   a quantifier and @vars@ is a list of bound variables and
+  --   optional type annotations.  In particular, this could be a
+  --   lambda abstraction, /i.e./ an anonymous function (/e.g./ @\x
+  --   (y:N). 2x + y@), a universal quantifier (@forall x (y:N). x^2 +
+  --   y > 0@), or an existential quantifier (@exists x (y:N). x^2 + y
+  --   == 0@).
+  TAbs_   :: Quantifier -> X_TAbs e -> Binder_ e (Term_ e) -> Term_ e
 
   -- | Function application, @t1 t2@.
-  TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
+  TApp_   :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
 
   -- | An n-tuple, @(t1, ..., tn)@.
   TTup_   :: X_TTup e -> [Term_ e] -> Term_ e
@@ -391,6 +401,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TContainerComp e)
     , a (X_TAscr e)
     , a (X_Term e)
+    , a (BinderType e)
     , a (Qual_ e)
     , a (Guard_ e)
     , a (Link_ e)
@@ -622,6 +633,25 @@ type ForallPattern (a :: * -> Constraint) e
 deriving instance ForallPattern Show         e => Show       (Pattern_ e)
 instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
 instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
+
+------------------------------------------------------------
+-- Quantifiers and binders
+------------------------------------------------------------
+
+-- A binder represents a sequence of variable binders with optional types,
+-- found in either a lambda, ∀, or ∃, as in (x y : N) (y : F).
+type Binder_ e a = Bind [(Name (Term_ e), Embed (BinderType e))] a
+
+-- Structure to hold types of binders in a particular phase (typically
+-- either Maybe Type or Type).
+type family BinderType e :: *
+
+-- A quantifier: λ, ∀, or ∃
+data Quantifier = Lam | Ex | All
+  deriving (Generic, Eq, Ord, Show)
+
+instance Subst Type Quantifier
+instance Alpha Quantifier
 
 ------------------------------------------------------------
 -- Property

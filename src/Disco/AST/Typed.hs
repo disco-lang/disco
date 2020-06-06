@@ -111,6 +111,8 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
+type instance BinderType TY = Type   -- require type annotations on binders
+
 type instance X_TVar            TY = Type
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
@@ -120,8 +122,7 @@ type instance X_TNat            TY = Type
 type instance X_TRat            TY = ()
 type instance X_TChar           TY = ()
 type instance X_TString         TY = ()
-type instance X_TAbs            TY = Void -- Replace TAbs with a version that
-                                          -- definitely has all type annotations
+type instance X_TAbs            TY = Type
 type instance X_TApp            TY = Type
 type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
@@ -135,8 +136,7 @@ type instance X_TAscr           TY = Void -- No more type ascriptions in typeche
 type instance X_TTup            TY = Type
 type instance X_TParens         TY = Void -- No more explicit parens
 
-type instance X_Term TY
-  = (Type, Bind [(Name ATerm, Embed Type)] ATerm)   -- ATAbs
+type instance X_Term TY = Void
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -165,8 +165,8 @@ pattern ATChar c = TChar_ () c
 pattern ATString :: String -> ATerm
 pattern ATString s = TString_ () s
 
-pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
-pattern ATAbs ty bind = XTerm_ (ty, bind)
+pattern ATAbs :: Quantifier -> Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
+pattern ATAbs q ty bind = TAbs_ q ty bind
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
 pattern ATApp ty term1 term2 = TApp_ ty term1 term2
@@ -366,7 +366,7 @@ instance HasType ATerm where
   getType (ATRat _)                = TyF
   getType (ATChar _)               = TyC
   getType (ATString _)             = TyList TyC
-  getType (ATAbs ty _)             = ty
+  getType (ATAbs _ ty _)           = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
   getType (ATInj ty _ _)           = ty
@@ -385,7 +385,7 @@ instance HasType ATerm where
   setType _  (ATRat r)               = ATRat r
   setType _ (ATChar c)               = ATChar c
   setType _ (ATString cs)            = ATString cs
-  setType ty (ATAbs _ x      )       = ATAbs ty x
+  setType ty (ATAbs q _ x    )       = ATAbs q ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
   setType ty (ATInj _ x y    )       = ATInj ty x y

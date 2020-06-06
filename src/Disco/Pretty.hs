@@ -199,12 +199,15 @@ prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
-prettyTerm (TAbs bnd)    = mparens initPA $
+prettyTerm (TAbs q bnd)  = mparens initPA $
   lunbind bnd $ \(args, body) ->
-  text "λ" <> (if length args > 1 then text " " else empty)
-           <> hsep (map prettyArg args) <> text "."
-           <+> prettyTerm' 0 InL body
+  prettyQ q <> (if length args > 1 then text " " else empty)
+            <> hsep (map prettyArg args) <> text "."
+            <+> prettyTerm' 0 InL body
   where
+    prettyQ Lam = text "λ"
+    prettyQ All = text "∀"
+    prettyQ Ex  = text "∃"
     prettyArg (x, unembed -> mty) = case mty of
       Nothing -> prettyName x
       Just ty -> text "(" <> prettyName x <+> text ":" <+> prettyTy ty <> text ")"

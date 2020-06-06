@@ -194,6 +194,12 @@ ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
+forall :: Parser ()
+forall = () <$ symbol "∀" <|> reserved "forall"
+
+exists :: Parser ()
+exists = () <$ symbol "∃" <|> reserved "exists"
+
 -- | Parse a natural number.
 natural :: Parser Integer
 natural = lexeme L.decimal <?> "natural number"
@@ -256,7 +262,7 @@ reservedWords =
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "List", "Bag", "Set"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
-  , "forall", "type"
+  , "∀", "forall", "∃", "exists", "type"
   , "import", "using"
   ]
 
@@ -388,7 +394,7 @@ parseProperty = label "property" $ L.nonIndented sc $ do
       <*> parseTerm
   where
     parseUniversal =
-         (() <$ symbol "∀" <|> reserved "forall")
+         forall
       *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
       <* dot
 
@@ -437,7 +443,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' = label "expression" $
-      parseLambda
+      parseQuantified
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
@@ -623,16 +629,31 @@ parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
 -- | Parse an anonymous function.
-parseLambda :: Parser Term
-parseLambda =
-  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
+parseQuantified :: Parser Term
+parseQuantified =
+  TAbs <$> parseQuantifier
+       <*> (bind <$> (concat <$> some parseQuantifierBindings) <*> (dot *> parseTerm'))
+
+-- | Parse a quantifier symbol (lambda, forall, or exists).
+parseQuantifier :: Parser Quantifier
+parseQuantifier =
+      Lam <$ lambda
+  <|> All <$ forall
+  <|> Ex  <$ exists
 
 -- | Parse an argument to a lambda, either a variable or a binding of
 --   the form @(x:ty)@.
-parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
-parseLambdaArg =
-      parens ((,) <$> ident <*> (symbol ":" *> ((embed . Just) <$> parseType)))
-  <|> (, embed Nothing) <$> ident
+parseQuantifierBindings :: Parser [(Name Term, Embed (Maybe Type))]
+parseQuantifierBindings =
+      parseMultiBinding
+  <|> (\x -> [(x, embed Nothing)]) <$> ident
+
+  where
+    parseMultiBinding = parens $ do
+      xs <- some ident
+      _ <- symbol ":"
+      ty <- parseType
+      return $ map (, embed (Just ty)) xs
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term

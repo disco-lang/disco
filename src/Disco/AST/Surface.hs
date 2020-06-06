@@ -59,6 +59,8 @@ module Disco.AST.Surface
        , pattern TList
        , pattern TListComp
 
+       , Quantifier(..)
+
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
          -- ** Expressions
@@ -191,6 +193,9 @@ partitionDecls []                   = ([], [], [])
 ------------------------------------------------------------
 type Term = Term_ UD
 
+type Binder a = Binder_ UD a
+type instance BinderType UD = Maybe Type
+
 type instance X_TVar            UD = ()
 type instance X_TPrim           UD = ()
 type instance X_TLet            UD = ()
@@ -248,8 +253,8 @@ pattern TChar c = TChar_ () c
 pattern TString :: String -> Term
 pattern TString s = TString_ () s
 
-pattern TAbs :: Bind [(Name Term, Embed (Maybe Type))] Term -> Term
-pattern TAbs bind = TAbs_ () bind
+pattern TAbs :: Quantifier -> Binder Term -> Term
+pattern TAbs q bind = TAbs_ q () bind
 
 pattern TApp  :: Term -> Term -> Term
 pattern TApp term1 term2 = TApp_ () term1 term2
@@ -417,3 +422,4 @@ pattern PFrac p1 p2 = PFrac_ () p1 p2
 
 {-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
              PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}
+

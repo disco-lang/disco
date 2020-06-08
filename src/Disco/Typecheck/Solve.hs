@@ -49,6 +49,7 @@ import           Disco.Typecheck.Graph            (Graph)
 import qualified Disco.Typecheck.Graph            as G
 import           Disco.Typecheck.Unify
 import           Disco.Types
+import           Disco.Types.Qualifiers
 import           Disco.Types.Rules
 
 -- import qualified Debug.Trace                      as Debug
@@ -109,7 +110,7 @@ filterExcept ms = do
     (_, as)     -> return as
 
 --------------------------------------------------
--- Simple constraints and qualifier maps
+-- Simple constraints
 
 data SimpleConstraint where
   (:<:) :: Type -> Type -> SimpleConstraint
@@ -119,19 +120,6 @@ data SimpleConstraint where
 instance Alpha SimpleConstraint
 
 instance Subst Type SimpleConstraint
-
-newtype SortMap = SM { unSM :: Map (Name Type) Sort }
-  deriving (Show)
-
-instance Semigroup SortMap where
-  SM sm1 <> SM sm2 = SM (M.unionWith (<>) sm1 sm2)
-
-instance Monoid SortMap where
-  mempty  = SM M.empty
-  mappend = (<>)
-
-getSort :: SortMap -> Name Type -> Sort
-getSort (SM sm) v = fromMaybe topSort (M.lookup v sm)
 
 --------------------------------------------------
 -- Simplifier types

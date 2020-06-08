@@ -62,6 +62,10 @@ module Disco.Types
        , pattern TyUser
        , pattern TyString
 
+       -- ** Qualifiers
+
+       , SortMap(..), getSort
+
        -- ** Quantified types
 
        , PolyType(..)
@@ -100,11 +104,13 @@ import           Control.Lens                     (toListOf)
 import           Data.List                        (nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Maybe                       (fromMaybe)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.Subst                      (Substitution)
+import           Disco.Types.Qualifiers
 
 --------------------------------------------------
 -- Disco types
@@ -355,6 +361,7 @@ data Type where
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Type
+instance Subst Type Qualifier
 instance Subst Type Rational where
   subst _ _ = id
   substs _  = id
@@ -481,6 +488,22 @@ data TyDefBody = TyDefBody [String] ([Type] -> Type)
 -- | A 'TyDefCtx' is a mapping from type names to their corresponding
 --   definitions.
 type TyDefCtx = M.Map String TyDefBody
+
+---------------------------------
+-- Qualifier maps
+
+newtype SortMap = SM { unSM :: Map (Name Type) Sort }
+  deriving (Show)
+
+instance Semigroup SortMap where
+  SM sm1 <> SM sm2 = SM (M.unionWith (<>) sm1 sm2)
+
+instance Monoid SortMap where
+  mempty  = SM M.empty
+  mappend = (<>)
+
+getSort :: SortMap -> Name Type -> Sort
+getSort (SM sm) v = fromMaybe topSort (M.lookup v sm)
 
 ---------------------------------
 --  Universally quantified types

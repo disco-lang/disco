@@ -242,6 +242,7 @@ library
                        Disco.Typecheck.Solve
                        Disco.Typecheck.Unify
                        Disco.Types
+                       Disco.Types.Qualifiers
                        Disco.Types.Rules
                        Disco.Util
                        Disco.Interactive.Eval

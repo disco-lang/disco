@@ -112,12 +112,22 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-type/input
                      test/pretty-whnf/expected
                      test/pretty-whnf/input
+                     test/prop-basic/prop-basic.disco
+                     test/prop-cmp/expected
+                     test/prop-cmp/input
+                     test/prop-impredicative/expected
+                     test/prop-impredicative/input
+                     test/prop-impredicative/prop-impredicative.disco
                      test/props-basic/expected
                      test/props-basic/input
                      test/props-basic/props-basic.disco
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
+                     test/quantifiers-parse/expected
+                     test/quantifiers-parse/input
+                     test/quantifiers-type/expected
+                     test/quantifiers-type/input
                      test/repl-defn/expected
                      test/repl-defn/input
                      test/repl-import/expected

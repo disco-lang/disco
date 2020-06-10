@@ -314,4 +314,3 @@ handleTypeCheck t = do
   case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
-

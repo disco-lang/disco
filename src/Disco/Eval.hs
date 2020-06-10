@@ -1,8 +1,8 @@
+{-# LANGUAGE CPP              #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE PatternSynonyms  #-}
 {-# LANGUAGE TemplateHaskell  #-}
-{-# LANGUAGE CPP              #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.

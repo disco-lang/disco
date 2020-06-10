@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP              #-}
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interactive.Eval
@@ -15,14 +15,14 @@ module Disco.Interactive.Eval where
 
 import           System.Console.Haskeline                as H
 #if MIN_VERSION_haskeline(0,8,0)
-import qualified  Control.Monad.Catch                    as H
+import qualified Control.Monad.Catch                     as H
 #endif
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))
 #if MIN_VERSION_haskeline(0,8,0)
-import           Control.Exception.Base                  (handle, IOException)
+import           Control.Exception.Base                  (IOException, handle)
 import           Control.Monad                           (forM_)
 #endif
 import           Control.Monad.Except

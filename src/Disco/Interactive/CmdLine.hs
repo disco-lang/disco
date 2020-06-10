@@ -37,8 +37,8 @@ import           System.Exit               (exitFailure, exitSuccess)
 import qualified Options.Applicative       as O
 import           System.Console.Haskeline  as H
 #if MIN_VERSION_haskeline(0,8,0)
-import qualified  Control.Monad.Catch      as H
-import            Control.Exception.Base (SomeException(..))
+import           Control.Exception.Base    (SomeException (..))
+import qualified Control.Monad.Catch       as H
 #endif
 
 import           Disco.Eval

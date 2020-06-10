@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP              #-}
+{-# LANGUAGE FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interactive.CmdLine
@@ -34,6 +36,10 @@ import           System.Exit               (exitFailure, exitSuccess)
 
 import qualified Options.Applicative       as O
 import           System.Console.Haskeline  as H
+#if MIN_VERSION_haskeline(0,8,0)
+import qualified  Control.Monad.Catch      as H
+import            Control.Exception.Base (SomeException(..))
+#endif
 
 import           Disco.Eval
 import           Disco.Interactive.Eval

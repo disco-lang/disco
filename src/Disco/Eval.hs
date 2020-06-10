@@ -2,6 +2,7 @@
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE PatternSynonyms  #-}
 {-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE CPP              #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -91,7 +92,11 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
+#if MIN_VERSION_haskeline(0,8,0)
+import           Control.Monad.Catch
+#else
 import           System.Console.Haskeline.MonadException
+#endif
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -391,14 +396,19 @@ type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
 
 -- Orphan instance, since it doesn't really seem sensible for either
 -- unbound-generics or haskeline to depend on the other.
+
+#if !MIN_VERSION_haskeline(0,8,0)
 instance MonadException m => MonadException (LFreshMT m) where
   controlIO f = LFreshMT $ controlIO $ \(RunIO run) -> let
                   run' = RunIO (fmap LFreshMT . run . unLFreshMT)
                   in unLFreshMT <$> f run'
+#endif
 
--- This should eventually move into unbound-generics.
+-- This should eventually move into unbound-generics
+#if !MIN_VERSION_unbound_generics(0,4,1)
 instance MonadFail m => MonadFail (LFreshMT m) where
   fail = LFreshMT . Fail.fail
+#endif
 
 -- We need this orphan instance too.  It would seem to make sense for
 -- haskeline to provide an instance for ExceptT, but see:
@@ -408,10 +418,12 @@ instance MonadFail m => MonadFail (LFreshMT m) where
 -- Idris does the same thing,
 --   https://github.com/idris-lang/Idris-dev/blob/5d7388bb3c71fe56b7c09c0b31a94d44bf9f4f25/src/Idris/Output.hs#L38
 
+#if !MIN_VERSION_haskeline(0,8,0)
 instance MonadException m => MonadException (ExceptT e m) where
   controlIO f = ExceptT $ controlIO $ \(RunIO run) -> let
                   run' = RunIO (fmap ExceptT . run . runExceptT)
                   in runExceptT <$> f run'
+#endif
 
 ------------------------------------------------------------
 -- Lenses for state

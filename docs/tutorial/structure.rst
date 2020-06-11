@@ -109,9 +109,7 @@ their own, but often play an important role in describing other types.
         Disco> :type ()
         () : Unit
 
-    It is isomorphic to the type ``Z1``.
-
-* The type ``Void`` has *no* values.  It is also isomorphic to ``Z0``.
+* The type ``Void`` has *no* values.
 
 Counting and enumerating types
 ==============================
@@ -123,13 +121,12 @@ tutorial).
 
 ::
 
-    Disco> count ((Z2 * Z4) + Bool)
+    Disco> count ((Bool * (Bool + Bool)) + Bool)
     right 10
-    Disco> enumerate ((Z2 * Z4) + Bool)
-    [left (0, 0), left (0, 1), left (0, 2), left (0, 3),
-     left (1, 0), left (1, 1), left (1, 2), left (1, 3),
-     right false, right true]
+    Disco> enumerate ((Bool * (Bool + Bool)) + Bool)
+    [left (false, left false), left (false, left true), left (false, right false),
+     left (false, right true), left (true, left false), left (true, left true),
+     left (true, right false), left (true, right true), right false, right true]
     Disco> enumerate (Bool * Bool * Bool)
     [(false, false, false), (false, false, true), (false, true, false), (false, true, true),
      (true, false, false), (true, false, true), (true, true, false), (true, true, true)]
-

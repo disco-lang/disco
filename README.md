@@ -22,6 +22,11 @@ some code if you like---collaborators are most welcome.  However, note
 that no guarantees are made about anything in particular at the
 moment.
 
+Community
+---------
+
+Check out the disco IRC channel, `#disco-lang` on Freenode.
+
 Documentation
 -------------
 

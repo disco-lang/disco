@@ -80,6 +80,8 @@ import           Disco.Context
 import           Disco.Eval
 import           Disco.Types
 
+import           Math.OEIS                                (catalogNums, extendSequence, lookupSequence)
+
 ------------------------------------------------------------
 -- Evaluation
 ------------------------------------------------------------
@@ -905,6 +907,9 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
 whnfOp OId             = arity1 "id" $ whnfV
 
+whnfOp OExtendSeq      = arity1 "extendSequence" $ whnfV >=> oeisExtend
+whnfOp OLookupSeq      = arity1 "lookupSequence" $ whnfV >=> oeisLookup
+
 --------------------------------------------------
 -- Utility functions
 
@@ -1504,3 +1509,37 @@ primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
 primValOrd v1           v2
   = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"
+
+
+------------------------------------------------------------
+-- OEIS
+------------------------------------------------------------
+
+oeisLookup :: Value -> Disco IErr Value
+oeisLookup v = do
+    vs  <- fromDiscoList v
+    let hvs = map fromVNum vs    
+    case lookupSequence hvs of
+      Just result -> parseResult result
+      Nothing -> return leftUnit
+  where
+    parseResult r = do
+          let sequence = getCatalogNum $ catalogNums r
+          l <- toDiscoList $ toVal ("https://oeis.org/" ++ sequence)          
+          return $ VCons 1 [l] -- right "https://oeis.org/foo"
+    fromVNum (VNum _ x) = fromIntegral $ numerator x
+    fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
+    getCatalogNum [] = error "No catalog info"
+    getCatalogNum (n:_) = n
+    toVal = map (\c -> vnum (toInteger (ord c) % 1))
+    leftUnit = VCons 0 [VCons 0 []]
+
+oeisExtend :: Value -> Disco IErr Value
+oeisExtend v = do
+    vs  <- fromDiscoList v
+    let xs = map fromVNum vs
+    let newseq = extendSequence xs
+    toDiscoList $ map (\i -> vnum (i % 1)) newseq
+  where
+    fromVNum (VNum _ c) = fromIntegral $ numerator c
+    fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v

@@ -1,0 +1,6 @@
+:load lib/oeis.disco
+lookupSequence [1,1,2,3,5]
+lookupSequence []
+
+extendSequence [1,3,5,7]
+extendSequence []

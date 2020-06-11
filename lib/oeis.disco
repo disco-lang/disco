@@ -1,0 +1,7 @@
+using Primitives
+
+lookupSequence : List N -> Unit + List Char
+lookupSequence = $lookupSequence
+
+extendSequence : List N -> List N
+extendSequence = $extendSequence

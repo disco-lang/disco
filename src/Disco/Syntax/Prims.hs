@@ -67,6 +67,8 @@ data Prim where
 
   PrimForever :: Prim      -- ^ @[x, y, z .. ]@
   PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+  PrimLookupSeq :: Prim    -- ^ Lookup OEIS sequence
+  PrimExtendSeq :: Prim    -- ^ Extend OEIS sequence
   deriving (Show, Read, Eq, Ord, Generic)
 
 instance Alpha Prim
@@ -134,6 +136,8 @@ primTable =
 
   , PrimInfo PrimForever   "forever" False
   , PrimInfo PrimUntil     "until"   False
+  , PrimInfo PrimLookupSeq "lookupSequence" False
+  , PrimInfo PrimExtendSeq "extendSequence" False
   ]
 
 -- | A convenient map from each 'Prim' to its info record.

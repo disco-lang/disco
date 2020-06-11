@@ -11,24 +11,25 @@ Product types
 =============
 
 The product of two types, written using an asterisk ``*`` or Unicode
-times symbol ``×``, is a type whose values are ordered pairs of values
-of the component types.  Pairs are written using standard ordered pair
-notation.
+times symbol ``×`` (``U+00d7 MULTIPLICATION SIGN``), is a type whose
+values are ordered pairs of values of the component types.  Pairs are
+written using standard ordered pair notation.
 
 .. literalinclude:: example/pair.disco
    :language: idris
+   :caption:
 
 ``pair1`` in the example above has type ``N * Q``, that is, the type
 of pairs of a natural number and a rational number; it is defined to
-be the pair containing ``3`` and ``-5/6``.  ``pair2`` has type ``Z5 ×
+be the pair containing ``3`` and ``-5/6``.  ``pair2`` has type ``Z ×
 Bool`` (using the alternate syntax ``×`` in place of ``*``), and
-contains two values: :math:`(17 + 22) \pmod{5}`, and the result of
+contains two values: :math:`17 + 22`, and the result of
 asking whether :math:`(3,5) < (4,2)`.
 
 ::
 
     Disco> pair2
-    (4, true)
+    (39, true)
 
 Pairs are compared lexicographically, which intuitively means that the
 first component is most important, the second component breaks ties in
@@ -45,7 +46,7 @@ in fact we can check that ``pair3`` and ``pair4`` are equal!
 
 ::
 
-    Disco> pair3 = pair4
+    Disco> pair3 == pair4
     true
 
 Really, ``pair4`` is just syntax sugar for ``pair3``.  In general:
@@ -67,14 +68,15 @@ Sum types
 =========
 
 If ``X`` and ``Y`` are types, their *sum*, written ``X + Y`` (or ``X ⊎
-Y``), is the disjoint union of ``X`` and ``Y``.  That is, values of
-type ``X + Y`` are either values of ``X`` or values of ``Y``, along
-with a "tag" so that we know which it is.  The possible tags are
-``left`` and ``right`` (to indicate the type on the left or right of
-the ``+``).  For example:
+Y``, using ``U+228e MULTISET UNION``), is the disjoint union of ``X``
+and ``Y``.  That is, values of type ``X + Y`` are either values of
+``X`` or values of ``Y``, along with a "tag" so that we know which it
+is.  The possible tags are ``left`` and ``right`` (to indicate the
+type on the left or right of the ``+``).  For example:
 
 .. literalinclude:: example/sum.disco
    :language: idris
+   :caption:
 
 ``sum1`` and ``sum2`` have the same type, namely, ``N + Bool``; values
 of this type consist of either a natural number or a boolean.

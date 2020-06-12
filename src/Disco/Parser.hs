@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,6 +57,7 @@ module Disco.Parser
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
                                                    fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
 import           Text.Megaparsec                  hiding (runParser)
@@ -625,14 +627,7 @@ parseInj =
 -- | Parse an anonymous function.
 parseLambda :: Parser Term
 parseLambda =
-  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
-
--- | Parse an argument to a lambda, either a variable or a binding of
---   the form @(x:ty)@.
-parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
-parseLambdaArg =
-      parens ((,) <$> ident <*> (symbol ":" *> ((embed . Just) <$> parseType)))
-  <|> (, embed Nothing) <$> ident
+  TAbs <$> (bind <$> (lambda *> some parseAtomicPattern) <*> (dot *> parseTerm'))
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term
@@ -704,6 +699,10 @@ termToPattern (TChar c)   = Just $ PChar c
 termToPattern (TString s) = Just $ PString s
 termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
 termToPattern (TInj s t)  = PInj s <$> termToPattern t
+
+termToPattern (TAscr t s) = case s of
+  Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'
+  _                                 -> Nothing
 
 termToPattern (TBin Cons t1 t2)
   = PCons <$> termToPattern t1 <*> termToPattern t2

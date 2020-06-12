@@ -787,72 +787,65 @@ typecheck (Check checkTy) (TAbs lam) = do
 
   where
 
-    -- Given the variables and their optional type annotations in the
+    -- Given the patterns and their optional type annotations in the
     -- head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the
-    -- type at which we are checking the lambda, ensure that the type
-    -- is of the form @ty1 -> ty2 -> ... -> resTy@, and that there are
-    -- enough @ty1@, @ty2@, ... to match all the arguments.  Also
-    -- check that each binding with a type annotation matches the
-    -- corresponding ty_i component from the checking type: in
-    -- particular, the ty_i must be a subtype of the type annotation.
+    -- type at which we are checking the lambda, ensure that:
+    --
+    --   - The type is of the form @ty1 -> ty2 -> ... -> resTy@ and
+    --     there are enough @ty1@, @ty2@, ... to match all the arguments.
+    --   - Each pattern successfully checks at its corresponding type.
+    --
     -- If it succeeds, return a context binding variables to their
-    -- types (taken either from their annotation or from the type to
-    -- be checked, as appropriate) which we can use to extend when
-    -- checking the body, along with the result type of the function.
+    -- types (as determined by the patterns and the input types) which
+    -- we can use to extend when checking the body, a list of the typed
+    -- patterns, and the result type of the function.
     checkArgs
-      :: [(Name Term, Embed (Maybe Type))] -> Type -> Term
-      ->  TCM (TyCtx, [(Name Term, Embed Type)], Type)
+      :: [Pattern] -> Type -> Term ->  TCM (TyCtx, [APattern], Type)
 
     -- If we're all out of arguments, the remaining checking type is the
     -- result, and there are no variables to bind in the context.
     checkArgs [] ty _ = return (emptyCtx, [], ty)
 
-    -- Take the next variable and its annotation; the checking type must
+    -- Take the next pattern and its annotation; the checking type must
     -- be a function type ty1 -> ty2.
-    checkArgs ((x, unembed -> mty) : args) ty term = do
+    checkArgs (p : args) ty term = do
 
       -- Ensure that ty is a function type
       (ty1, ty2) <- ensureConstr2 CArr ty (Left term)
 
-      -- Figure out the type of x:
-      xTy <- case mty of
-
-        -- If it has no annotation, just take the input type ty1.
-        Nothing    -> return ty1
-
-        -- If it does have an annotation, make sure the input type is a
-        -- subtype of it.
-        Just annTy -> do
-          constraint $ CSub ty1 annTy
-          return ty1
+      -- Check the argument pattern against the function domain.
+      (pCtx, pTyped) <- checkPattern p ty1
 
       -- Check the rest of the arguments under the type ty2, returning a
       -- context with the rest of the arguments and the final result type.
       (ctx, typedArgs, resTy) <- checkArgs args ty2 term
 
-      -- Pass the result type through, and add x with its type to the
-      -- generated context.
-      return (singleCtx x (toPolyType xTy) `joinCtx` ctx, (x, embed xTy) : typedArgs, resTy)
+      -- Pass the result type through, and put the pattern-bound variables
+      -- in the returned context.
+      return (pCtx `joinCtx` ctx, pTyped : typedArgs, resTy)
 
 -- To infer a lambda abstraction:
 typecheck Infer (TAbs lam)    = do
 
-  -- Open it and get the variables with any type annotations.
+  -- Open it and get the argument patterns with any type annotations.
   (args, t) <- unbind lam
-  let (xs, mtys) = unzip args
 
   -- Replace any missing type annotations with fresh type variables,
-  -- and make a map from variable names to types.
-  tys <- mapM (maybe freshTy return) (map unembed mtys)
-  let tymap = M.fromList $ zip xs (map toPolyType tys)
+  -- and check each pattern at that variable to refine them, collecting
+  -- the types of each pattern's bound variables in a context.
+  tys <- mapM getAscrOrFresh args
+  (pCtxs, typedPats) <- unzip <$> sequence (zipWith checkPattern args tys)
 
   -- Infer the type of the body under an extended context, and
   -- construct an ATAbs with the appropriate function type.
-  extends tymap $ do
+  extends (joinCtxs pCtxs) $ do
     at <- infer t
-    return $ ATAbs (mkFunTy tys (getType at))
-                   (bind (zip (map coerce xs) (map embed tys)) at)
+    return $ ATAbs (mkFunTy tys (getType at)) (bind typedPats at)
   where
+    getAscrOrFresh :: Pattern -> TCM Type
+    getAscrOrFresh (PAscr _ ty) = pure ty
+    getAscrOrFresh _            = freshTy
+
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))
     mkFunTy :: [Type] -> Type -> Type
     mkFunTy tys out = foldr (:->:) out tys
@@ -1090,6 +1083,14 @@ checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 checkPattern (PVar x) ty = return (singleCtx x (toPolyType ty), APVar ty (coerce x))
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
+
+checkPattern (PAscr p ty1) ty2 = do
+  -- We have a pattern that promises to match ty1 and someone is asking
+  -- us if it can also match ty2. So we just have to ensure what we're
+  -- being asked for is a subtype of what we can promise to cover...
+  constraint $ CSub ty2 ty1
+  -- ... and then make sure the pattern can actually match what it promised to.
+  checkPattern p ty1
 
 checkPattern PUnit ty = do
   ensureEq ty TyUnit

@@ -168,10 +168,10 @@ might not find built in to other languages.
 
         Disco> sqrt (299^2 + 1)
         299
-        Disco> sqrt (299^2 - 1)
+        Disco> sqrt (299^2 .- 1)
         298
         Disco> lg (2^35 + 7)
         35
-        Disco> lg (2^35 - 1)
+        Disco> lg (2^35 .- 1)
         34
 

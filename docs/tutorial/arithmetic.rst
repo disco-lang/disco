@@ -174,4 +174,3 @@ might not find built in to other languages.
         35
         Disco> lg (2^35 .- 1)
         34
-

@@ -202,6 +202,7 @@ type instance X_TRat            UD = ()
 type instance X_TChar           UD = ()
 type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
+type instance X_TAbsBind        UD = [(Name (Term_ UD), Embed (Maybe Type))]
 type instance X_TApp            UD = ()
 type instance X_TTup            UD = ()
 type instance X_TInj            UD = ()

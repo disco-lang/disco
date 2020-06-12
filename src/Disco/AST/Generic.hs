@@ -77,6 +77,7 @@ module Disco.AST.Generic
        , X_TChar
        , X_TString
        , X_TAbs
+       , X_TAbsBind
        , X_TApp
        , X_TTup
        , X_TInj
@@ -262,6 +263,7 @@ type family X_TRat e
 type family X_TChar e
 type family X_TString e
 type family X_TAbs e
+type family X_TAbsBind e
 type family X_TApp e
 type family X_TTup e
 type family X_TInj e
@@ -323,7 +325,7 @@ data Term_ e where
   -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
   --   multiple arguments, and each argument may be annotated with a
   --   type.
-  TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
+  TAbs_   :: X_TAbs e -> Bind (X_TAbsBind e) (Term_ e) -> Term_ e
 
   -- | Function application, @t1 t2@.
   TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
@@ -379,6 +381,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TChar e)
     , a (X_TString e)
     , a (X_TAbs e)
+    , a (X_TAbsBind e)
     , a (X_TApp e)
     , a (X_TInj e)
     , a (X_TCase e)

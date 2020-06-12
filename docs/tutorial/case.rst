@@ -50,12 +50,12 @@ entire case expression.  In the example above, this means that first
 value of the entire case expression (and the rest of the branches are
 ignored).  Otherwise, ``0 <= x < 10`` is evaluated; and so on.
 
-Every *guard* starts with the word ``if`` or ``when`` (the two words
-are interchangeable).  There are three types of guards:
+There are three types of guards:
 
-* A *boolean guard* is simply an expression of type ``Bool``.  It
-  succeeds if the expression evaluates to ``true``.
-* A *pattern guard* has the form ``<expr> is <pattern>``.  It succeeds
+* A *boolean guard* has the form ``if <expr>``, where ``<expr>`` is an
+  expression of type ``Bool``.  It succeeds if the expression
+  evaluates to ``true``.
+* A *pattern guard* has the form ``when <expr> is <pattern>``.  It succeeds
   if the expression ``<expr>`` matches the pattern ``<pattern>``.
 * The special guard ``otherwise`` always succeeds.
 
@@ -89,17 +89,12 @@ expression becomes the value of ``x + y``; for example, ``g(16,15) =
 
 .. warning::
 
-   Be careful not to get a Boolean guard using ``=`` confused with a
-   pattern guard using ``is``. (This is probably something that will
-   confuse students learning the language; ideas on how to make it
-   less confusing are welcome.  As I am writing this, I realize that
-   it might be a good idea to require ``when`` with pattern guards and
-   ``if`` with boolean guards, rather than allowing them to be mixed
-   and matched.)  The difference is in how variables are handled:
-   boolean guards can only use existing variables; pattern guards
-   create new variables.  For example, ``... when p is (x,y)`` matches
-   a tuple ``p`` and gives the names ``x`` and ``y`` to the
-   components.  On the other hand, ``... if p = (x,y)`` will probably
+   Be careful not to get a Boolean guard using ``==`` confused with a
+   pattern guard using ``is``. The difference is in how variables are
+   handled: boolean guards can only use existing variables; pattern
+   guards create new variables.  For example, ``... when p is (x,y)``
+   matches a tuple ``p`` and gives the names ``x`` and ``y`` to the
+   components.  On the other hand, ``... if p == (x,y)`` will probably
    complain that ``x`` and ``y`` are undefined---unless ``x`` and
    ``y`` are already defined elsewhere, in which case this will simply
    check that ``p`` is exactly equal to the value ``(x,y)``.  Use a

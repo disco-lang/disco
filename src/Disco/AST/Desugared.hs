@@ -186,6 +186,7 @@ type DPattern = Pattern_ DS
 
 type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
+type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()
 type instance X_PChar    DS = ()

@@ -105,7 +105,7 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 resolveModule :: MonadIO m => FilePath -> ModName -> m (Maybe FilePath)
 resolveModule directory modname = do
   datadir <- liftIO getDataDir
-  let fps = map (</> replaceExtension modname "disco") [directory, datadir]
+  let fps = map (</> replaceExtension modname "disco") [datadir, directory]
   fexists <- liftIO $ filterM doesFileExist fps
   case fexists of
     []     -> return Nothing

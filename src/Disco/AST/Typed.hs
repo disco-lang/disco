@@ -121,7 +121,7 @@ type instance X_TRat            TY = ()
 type instance X_TChar           TY = ()
 type instance X_TString         TY = ()
 type instance X_TAbs            TY = Type
-type instance X_TAbsBind        TY = [(Name ATerm, Embed Type)]
+type instance X_TAbsBind        TY = [APattern]
 type instance X_TApp            TY = Type
 type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
@@ -164,7 +164,7 @@ pattern ATChar c = TChar_ () c
 pattern ATString :: String -> ATerm
 pattern ATString s = TString_ () s
 
-pattern ATAbs :: Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
+pattern ATAbs :: Type -> Bind [APattern] ATerm -> ATerm
 pattern ATAbs ty bind = TAbs_ ty bind
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
@@ -260,6 +260,7 @@ type APattern = Pattern_ TY
 
 type instance X_PVar     TY = Embed Type
 type instance X_PWild    TY = Embed Type
+type instance X_PAscr    TY = Void -- No more ascriptions in typechecked patterns.
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
 type instance X_PChar    TY = ()

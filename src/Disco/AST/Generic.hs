@@ -126,6 +126,7 @@ module Disco.AST.Generic
        , Pattern_ (..)
        , X_PVar
        , X_PWild
+       , X_PAscr
        , X_PUnit
        , X_PBool
        , X_PTup
@@ -529,6 +530,7 @@ instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
 
 type family X_PVar e
 type family X_PWild e
+type family X_PAscr e
 type family X_PUnit e
 type family X_PBool e
 type family X_PTup e
@@ -553,6 +555,9 @@ data Pattern_ e where
 
   -- | Wildcard pattern @_@: matches anything.
   PWild_ :: X_PWild e -> Pattern_ e
+
+  -- | Type ascription pattern @pat : ty@.
+  PAscr_ :: X_PAscr e -> Pattern_ e -> Type -> Pattern_ e
 
   -- | Unit pattern @()@: matches @()@.
   PUnit_ :: X_PUnit e -> Pattern_ e
@@ -604,6 +609,7 @@ data Pattern_ e where
 type ForallPattern (a :: * -> Constraint) e
       = ( a (X_PVar e)
         , a (X_PWild e)
+        , a (X_PAscr e)
         , a (X_PUnit e)
         , a (X_PBool e)
         , a (X_PNat e)

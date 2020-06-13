@@ -37,7 +37,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import           Data.Maybe                       (fromMaybe, isJust)
+import           Data.Maybe                              (fromMaybe, isJust)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
@@ -49,7 +49,7 @@ import           Disco.AST.Typed
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy)
+import           Disco.Typecheck                         (containerTy)
 import           Disco.Types
 
 ------------------------------------------------------------

@@ -1,0 +1,12 @@
+h : N -> N
+h(0)    = 1              -- matches 0
+h(2k+1) = h(k)           -- matches any natural of the form 2k+1 for a natural number k
+h(2k+2) = h(k+1) + h(k)  -- matches any natural of the form 2k+2
+
+isHalf : Q -> Bool
+isHalf(s) = {? true when s is _ / 2,  -- matches fractions with denominator 2
+               false otherwise ?}
+
+z : N -> N
+z(2^15 - 1) = 0
+z(n)        = n

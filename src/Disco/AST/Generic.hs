@@ -77,6 +77,7 @@ module Disco.AST.Generic
        , X_TChar
        , X_TString
        , X_TAbs
+       , X_TAbsBind
        , X_TApp
        , X_TTup
        , X_TInj
@@ -125,6 +126,7 @@ module Disco.AST.Generic
        , Pattern_ (..)
        , X_PVar
        , X_PWild
+       , X_PAscr
        , X_PUnit
        , X_PBool
        , X_PTup
@@ -262,6 +264,7 @@ type family X_TRat e
 type family X_TChar e
 type family X_TString e
 type family X_TAbs e
+type family X_TAbsBind e
 type family X_TApp e
 type family X_TTup e
 type family X_TInj e
@@ -323,7 +326,7 @@ data Term_ e where
   -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
   --   multiple arguments, and each argument may be annotated with a
   --   type.
-  TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
+  TAbs_   :: X_TAbs e -> Bind (X_TAbsBind e) (Term_ e) -> Term_ e
 
   -- | Function application, @t1 t2@.
   TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
@@ -379,6 +382,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TChar e)
     , a (X_TString e)
     , a (X_TAbs e)
+    , a (X_TAbsBind e)
     , a (X_TApp e)
     , a (X_TInj e)
     , a (X_TCase e)
@@ -526,6 +530,7 @@ instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
 
 type family X_PVar e
 type family X_PWild e
+type family X_PAscr e
 type family X_PUnit e
 type family X_PBool e
 type family X_PTup e
@@ -550,6 +555,9 @@ data Pattern_ e where
 
   -- | Wildcard pattern @_@: matches anything.
   PWild_ :: X_PWild e -> Pattern_ e
+
+  -- | Type ascription pattern @pat : ty@.
+  PAscr_ :: X_PAscr e -> Pattern_ e -> Type -> Pattern_ e
 
   -- | Unit pattern @()@: matches @()@.
   PUnit_ :: X_PUnit e -> Pattern_ e
@@ -601,6 +609,7 @@ data Pattern_ e where
 type ForallPattern (a :: * -> Constraint) e
       = ( a (X_PVar e)
         , a (X_PWild e)
+        , a (X_PAscr e)
         , a (X_PUnit e)
         , a (X_PBool e)
         , a (X_PNat e)

@@ -91,6 +91,7 @@ module Disco.AST.Surface
        , Pattern
        , pattern PVar
        , pattern PWild
+       , pattern PAscr
        , pattern PUnit
        , pattern PBool
        , pattern PChar
@@ -193,8 +194,7 @@ partitionDecls []                   = ([], [], [])
 ------------------------------------------------------------
 type Term = Term_ UD
 
-type Binder a = Binder_ UD a
-type instance BinderType UD = Maybe Type
+type instance X_Binder          UD = [Pattern]
 
 type instance X_TVar            UD = ()
 type instance X_TPrim           UD = ()
@@ -253,7 +253,7 @@ pattern TChar c = TChar_ () c
 pattern TString :: String -> Term
 pattern TString s = TString_ () s
 
-pattern TAbs :: Quantifier -> Binder Term -> Term
+pattern TAbs :: Quantifier -> Bind [Pattern] Term -> Term
 pattern TAbs q bind = TAbs_ q () bind
 
 pattern TApp  :: Term -> Term -> Term
@@ -356,6 +356,7 @@ type Pattern = Pattern_ UD
 
 type instance X_PVar UD    = ()
 type instance X_PWild UD   = ()
+type instance X_PAscr UD   = ()
 type instance X_PUnit UD   = ()
 type instance X_PBool UD   = ()
 type instance X_PTup UD    = ()
@@ -377,6 +378,11 @@ pattern PVar name = PVar_ () name
 
 pattern PWild :: Pattern
 pattern PWild = PWild_ ()
+
+ -- (?) TAscr uses a PolyType, but without higher rank types
+ -- I think we can't possibly need that here.
+pattern PAscr :: Pattern -> Type -> Pattern
+pattern PAscr p ty = PAscr_ () p ty
 
 pattern PUnit :: Pattern
 pattern PUnit = PUnit_ ()
@@ -420,6 +426,6 @@ pattern PNeg p = PNeg_ () p
 pattern PFrac :: Pattern -> Pattern -> Pattern
 pattern PFrac p1 p2 = PFrac_ () p1 p2
 
-{-# COMPLETE PVar, PWild, PUnit, PBool, PTup, PInj, PNat,
+{-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
              PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}
 

@@ -79,7 +79,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/interp-lazymatch/input
                      test/list-comp/expected
                      test/list-comp/input
-                     test/list-comp/listcomp.disco
                      test/list-poly/expected
                      test/list-poly/input
                      test/logic-bools/expected

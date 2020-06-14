@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/disco-lang/disco.svg?branch=master)](https://travis-ci.org/disco-lang/disco)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Prototype implementation of a small functional teaching language
 for use in a discrete mathematics course.
@@ -21,6 +22,11 @@ Feel free to look around, ask questions, etc.  You can even contribute
 some code if you like---collaborators are most welcome.  However, note
 that no guarantees are made about anything in particular at the
 moment.
+
+Community
+---------
+
+Check out the disco IRC channel, `#disco-lang` on Freenode.
 
 Documentation
 -------------

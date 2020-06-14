@@ -63,7 +63,7 @@ compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
-compileDTerm (DTLam _ l) = do
+compileDTerm (DTLam Lam _ l) = do
   (x,body) <- unbind l
   c <- compileDTerm body
   return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?

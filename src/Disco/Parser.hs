@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -56,6 +57,7 @@ module Disco.Parser
 
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
                                                    fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
 import           Text.Megaparsec                  hiding (runParser)
@@ -632,7 +634,7 @@ parseInj =
 parseQuantified :: Parser Term
 parseQuantified =
   TAbs <$> parseQuantifier
-       <*> (bind <$> (concat <$> some parseQuantifierBindings) <*> (dot *> parseTerm'))
+       <*> (bind <$> some parseAtomicPattern <*> (dot *> parseTerm'))
 
 -- | Parse a quantifier symbol (lambda, forall, or exists).
 parseQuantifier :: Parser Quantifier
@@ -640,6 +642,10 @@ parseQuantifier =
       Lam <$ lambda
   <|> All <$ forall
   <|> Ex  <$ exists
+
+-- XXX Not using quantifier bindings for now because it isn't clear that
+-- multi-bindings (x y : N) make sense in a world that lets binders be
+-- patterns.
 
 -- | Parse an argument to a lambda, either a variable or a binding of
 --   the form @(x:ty)@.
@@ -725,6 +731,10 @@ termToPattern (TChar c)   = Just $ PChar c
 termToPattern (TString s) = Just $ PString s
 termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
 termToPattern (TInj s t)  = PInj s <$> termToPattern t
+
+termToPattern (TAscr t s) = case s of
+  Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'
+  _                                 -> Nothing
 
 termToPattern (TBin Cons t1 t2)
   = PCons <$> termToPattern t1 <*> termToPattern t2

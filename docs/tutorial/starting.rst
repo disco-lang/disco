@@ -27,7 +27,7 @@ the root directory of the disco repository, and execute
 ::
 
     stack setup
-    stack build
+    stack build --fast
 
 (This may take quite a while the first time, while ``stack`` downloads
 and builds all the dependencies of ``disco``.)
@@ -40,3 +40,12 @@ You should see a disco prompt that looks like this:
 
     Disco>
 
+To run the test suite, you can execute
+
+::
+
+   stack test --fast
+
+See the ``build`` script in the root of the repository for an example of
+additional arguments you may wish to pass to ``stack build`` for a tight
+edit-compile-test loop while working on the code.

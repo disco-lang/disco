@@ -2,4 +2,4 @@ approx_pi : Rational
 approx_pi = 22/7
 
 increment : N -> N
-increment n = n + 1
+increment(n) = n + 1

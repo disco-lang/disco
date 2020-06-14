@@ -64,9 +64,18 @@ compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
 compileDTerm (DTLam Lam _ l) = do
-  (x,body) <- unbind l
+  ((x, _), body) <- unbind l
   c <- compileDTerm body
   return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
+
+compileDTerm (DTLam q _ l) = do
+  ((x, ty), body) <- unbind l
+  c <- compileDTerm body
+  let tag = case q of
+              All -> 2
+              Ex  -> 3
+              Lam -> error "impossible compileDTerm: lambda as quantifier"
+  return $ CCons tag [CType ty, CAbs (bind [coerce x] c)]
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.

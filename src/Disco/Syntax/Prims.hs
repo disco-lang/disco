@@ -137,7 +137,7 @@ primTable =
   , PrimInfo PrimForever   "forever" False
   , PrimInfo PrimUntil     "until"   False
 
-  , PrimInfo PrimHolds     "holds"   False
+  , PrimInfo PrimHolds     "holds"   True
   ]
 
 -- | A convenient map from each 'Prim' to its info record.

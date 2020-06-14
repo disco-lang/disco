@@ -182,7 +182,7 @@ mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 --     n -> p -> { n*x + y  when p = (x,y)
 --   @
 desugarDefn :: Defn -> DSM DTerm
-desugarDefn (Defn _ patTys bodyTy def) = desugarAbs patTys bodyTy def
+desugarDefn (Defn _ patTys bodyTy def) = desugarAbs Lam patTys bodyTy def
 
 ------------------------------------------------------------
 -- Abstraction desugaring
@@ -193,10 +193,13 @@ desugarDefn (Defn _ patTys bodyTy def) = desugarAbs patTys bodyTy def
 --   (which happen to be named), and source-level lambdas are also
 --   abstractions (which happen to have only one clause).
 
-desugarAbs :: [Type] -> Type -> [Clause] -> DSM DTerm
-desugarAbs patTys bodyTy body = do
+desugarAbs :: Quantifier -> [Type] -> Type -> [Clause] -> DSM DTerm
+desugarAbs quant patTys bodyTy body = do
   clausePairs <- mapM unbind body
   let (pats, bodies) = unzip clausePairs
+  let overallTy = case quant of
+                    Lam -> foldr (:->:) bodyTy patTys
+                    _   -> bodyTy
 
   -- generate dummy variables for lambdas
   args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
@@ -205,7 +208,7 @@ desugarAbs patTys bodyTy body = do
   -- deal with arithmetic patterns.
   let branches = zipWith (mkBranch (zip args patTys)) bodies pats
   dcase <- desugarTerm $ ATCase bodyTy branches
-  return $ mkLambda (foldr (:->:) bodyTy patTys) (coerce args) dcase
+  return $ mkAbs quant overallTy patTys (coerce args) dcase
 
   where
     mkBranch :: [(Name ATerm, Type)] -> ATerm -> [APattern] -> ABranch
@@ -240,8 +243,8 @@ desugarTerm (ATBool ty b)        = return $ DTBool ty b
 desugarTerm (ATChar c)           = return $ DTChar c
 desugarTerm (ATString cs)        =
   desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing
-desugarTerm (ATAbs Lam ty lam)       =
-  desugarAbs (map getType . fst . unsafeUnbind $ lam) ty [lam]
+desugarTerm (ATAbs q ty lam)   =
+  desugarAbs q (map getType . fst . unsafeUnbind $ lam) ty [lam]
 
 -- Special cases for fully applied operators
 desugarTerm (ATApp resTy (ATPrim _ (PrimUOp uop)) t)
@@ -519,7 +522,7 @@ desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   dtapp
     <$> (DTLam Lam (getType t1 :->: getType t)
-          <$> (bind (coerce x) <$> desugarLet ls t)
+          <$> (bind (coerce x, getType t1) <$> desugarLet ls t)
         )
     <*> desugarTerm t1
 
@@ -536,9 +539,15 @@ mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
 mkLambda funty args c = go funty args
   where
     go _ []                    = c
-    go ty@(_ :->: ty2) (x:xs) = DTLam Lam ty (bind (coerce x) (go ty2 xs))
+    go ty@(ty1 :->: ty2) (x:xs) = DTLam Lam ty (bind (coerce x, ty1) (go ty2 xs))
 
     go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
+
+mkAbs :: Quantifier -> Type -> [Type] -> [Name ATerm] -> DTerm -> DTerm
+mkAbs Lam funty argtys args c = mkLambda funty args c
+mkAbs q ty argtys args c = foldr quantify c (zip args argtys)
+  where
+    quantify (arg, argty) body = DTLam q ty (bind (coerce arg, argty) body)
 
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm

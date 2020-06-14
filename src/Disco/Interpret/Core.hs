@@ -1141,8 +1141,55 @@ valueToString = fmap toString . rnfV
 ------------------------------------------------------------
 
 primHolds :: Value -> Disco IErr Value
-primHolds v@(VCons _ _) = return v
+-- Do quantifier search and throw away the evidence.
+primHolds v@(VCons _ _) = do
+  v' <- searchQuantifiers v
+  case v' of
+    VCons 0 _ -> return $ VCons 0 []
+    VCons 1 _ -> return $ VCons 1 []
+    _         -> error "impossible primHolds: non-prop value"
 primHolds v             = error $ "holds for " ++ show v ++ " unimplemented"
+
+-- | Search for a counterexample or a satisfying assignment
+--   for a prop value. A @Right ex@ result is a success with
+--   a witness; a @Left cx@ result is a failure with a
+--   counterexample.
+searchQuantifiers :: Value -> Disco IErr Value
+-- No quantifiers:
+searchQuantifiers v@(VCons 0 _)     = return v
+searchQuantifiers v@(VCons 1 _)     = return v
+-- A forall quantifier:
+searchQuantifiers (VCons 2 [VType ty, c]) = do
+  counterexample <- searchPropTag 0 ty c
+  case counterexample of
+    Just cx -> return cx
+    Nothing -> return $ VCons 1 []
+-- An exists quantifier:
+searchQuantifiers (VCons 3 [VType ty, c]) = do
+  example <- searchPropTag 1 ty c
+  case example of
+    Just ex -> return ex
+    Nothing -> return $ VCons 0 []
+
+searchPropTag :: Int -> Type -> Value -> Disco IErr (Maybe Value)
+searchPropTag tag ty c = do
+  let candidates = enumerate ty
+  searchFor candidates $ \x -> do
+    cv <- whnfV c
+    v <- searchQuantifiers =<< whnfAppExact cv [x]
+    case v of
+      VCons t cx
+        | t == tag  -> return . Just $ VCons t (x:cx)
+        | otherwise -> return Nothing
+      _             -> error $ "impossible searchPropTag: not a prop"
+
+searchFor :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
+searchFor [] p = return Nothing
+searchFor (x:xs) p = do
+  ok <- p x
+  case ok of
+    Just y -> return (Just y)
+    Nothing -> searchFor xs p
 
 ------------------------------------------------------------
 -- Equality testing

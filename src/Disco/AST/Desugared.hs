@@ -73,7 +73,9 @@ data DS
 
 type DProperty = Property_ DS
 
-type instance X_Binder DS = Name DTerm
+-- The type in this binder is redundant for functions, but not for
+-- forall and exists quantifiers.
+type instance X_Binder DS = (Name DTerm, Type)
 
 -- | A @DTerm@ is a term which has been typechecked and desugared, so
 --   it has fewer constructors and complex features than 'ATerm', but
@@ -137,7 +139,7 @@ pattern DTChar :: Char -> DTerm
 pattern DTChar c = TChar_ () c
 
 -- XXX Do we want to call it an Abs if it might not be a lambda?
-pattern DTLam :: Quantifier -> Type -> Bind (Name DTerm) DTerm -> DTerm
+pattern DTLam :: Quantifier -> Type -> Bind (Name DTerm, Type) DTerm -> DTerm
 pattern DTLam q ty lam = TAbs_ q ty lam
 
 pattern DTApp  :: Type -> DTerm -> DTerm -> DTerm

@@ -191,7 +191,7 @@ compilePrim _ PrimCrash   = return $ CConst OCrash
 compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
 
-compilePrim _ PrimLookupSeq   = return $ CConst OLookupSeq 
+compilePrim _ PrimLookupSeq   = return $ CConst OLookupSeq
 compilePrim _ PrimExtendSeq   = return $ CConst OExtendSeq
 
 compilePrimErr :: Prim -> Type -> a

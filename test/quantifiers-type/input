@@ -1,6 +1,6 @@
 :type ∃ x. x > 3
 :type ∃ (x:Q). x > 3
-:type ∃ (x y : N). x > y
+:type ∃ (x :N) (y : N). x > y
 :type ∃ (x:N). ∃ (y:N). x > y
 :type ∀ (x:N) (y:N) (z:N). (x + y) + z == x + (y + z)
 :type ∃ (x:N). ∀ (y:N). x <= y

@@ -178,12 +178,12 @@ data Value where
 -- | A @ValFun@ is just a Haskell function @[Value] -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValFun = ValFun ([Value] -> Value)
+newtype ValFun = ValFun (Value -> Value)
 
 instance Show ValFun where
   show _ = "<fun>"
 
-pattern VFun :: ([Value] -> Value) -> Value
+pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
 
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a

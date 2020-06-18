@@ -41,3 +41,4 @@ count (Set Bool)
 count C
 count ((N -> Void) -> N)
 count (N -> (N -> Void))
+enumerate (Unit -> Unit) == [\_ . ()]

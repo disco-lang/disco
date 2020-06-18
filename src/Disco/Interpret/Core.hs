@@ -276,6 +276,7 @@ funArity :: Value -> Int
 funArity (VClos b _) = length (fst (unsafeUnbind b))
 funArity (VPAp f vs) = funArity f - length vs
 funArity (VConst op) = opArity op
+funArity (VFun _)    = 1
 funArity v           = error $ "Impossible! funArity on " ++ show v
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -317,10 +318,12 @@ whnfApp f vs =
 --   VFun, or VConst) to a list of exactly the right number of
 --   arguments.
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
-whnfAppExact (VClos b e) vs =
+whnfAppExact (VClos b e) vs  =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
-whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
-whnfAppExact (VConst op) vs = whnfOp op vs
+whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
+whnfAppExact (VFun f)    vs  =
+  error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
+whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
 
 ------------------------------------------------------------
@@ -1346,10 +1349,7 @@ enumerate (ty1 :->: ty2)
     -- association list.
     mkFun :: [Value] -> Value
     mkFun outs
-      = VFun $ \case
-          { [v] -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
-          ; vs  -> error $ "Impossible! Got " ++ show vs ++ " in enumerate.mkFun"
-          }
+      = VFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
 
     -- A custom version of fromJust' so we get a better error message
     -- just in case it ever happens
@@ -1376,7 +1376,7 @@ decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
 decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given

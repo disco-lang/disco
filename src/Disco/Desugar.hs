@@ -521,8 +521,8 @@ desugarLet :: [ABinding] -> ATerm -> DSM DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   dtapp
-    <$> (DTLam Lam (getType t1 :->: getType t)
-          <$> (bind (coerce x, getType t1) <$> desugarLet ls t)
+    <$> (DTAbs Lam (getType t1 :->: getType t)
+          <$> (bind (coerce x) <$> desugarLet ls t)
         )
     <*> desugarTerm t1
 
@@ -539,15 +539,17 @@ mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
 mkLambda funty args c = go funty args
   where
     go _ []                    = c
-    go ty@(ty1 :->: ty2) (x:xs) = DTLam Lam ty (bind (coerce x, ty1) (go ty2 xs))
-
+    go ty@(ty1 :->: ty2) (x:xs) = DTAbs Lam ty (bind (coerce x) (go ty2 xs))
     go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
+
+mkQuant :: Quantifier -> [Type] -> [Name ATerm] -> DTerm -> DTerm
+mkQuant q argtys args c = foldr quantify c (zip args argtys)
+ where
+   quantify (x, ty) body = DTAbs q ty (bind (coerce x) body)
 
 mkAbs :: Quantifier -> Type -> [Type] -> [Name ATerm] -> DTerm -> DTerm
 mkAbs Lam funty argtys args c = mkLambda funty args c
-mkAbs q ty argtys args c = foldr quantify c (zip args argtys)
-  where
-    quantify (arg, argty) body = DTLam q ty (bind (coerce arg, argty) body)
+mkAbs q ty argtys args c = mkQuant q argtys args c
 
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm

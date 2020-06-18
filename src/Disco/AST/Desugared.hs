@@ -27,7 +27,7 @@ module Disco.AST.Desugared
        , pattern DTChar
        , pattern DTNat
        , pattern DTRat
-       , pattern DTLam
+       , pattern DTAbs
        , pattern DTApp
        , pattern DTPair
        , pattern DTInj
@@ -75,7 +75,7 @@ type DProperty = Property_ DS
 
 -- The type in this binder is redundant for functions, but not for
 -- forall and exists quantifiers.
-type instance X_Binder DS = (Name DTerm, Type)
+type instance X_Binder DS = Name DTerm
 
 -- | A @DTerm@ is a term which has been typechecked and desugared, so
 --   it has fewer constructors and complex features than 'ATerm', but
@@ -92,7 +92,8 @@ type instance X_TChar DS          = ()
 type instance X_TString DS        = Void
 type instance X_TNat DS           = Type
 type instance X_TRat DS           = ()
-type instance X_TAbs DS           = Type
+type instance X_TAbs DS           = Type -- For lambas this is the function type but
+                                         -- for forall/exists it's the argument type
 type instance X_TApp DS           = Type
 type instance X_TInj DS           = Type
 type instance X_TCase DS          = Type
@@ -138,9 +139,8 @@ pattern DTRat rat = TRat_ () rat
 pattern DTChar :: Char -> DTerm
 pattern DTChar c = TChar_ () c
 
--- XXX Do we want to call it an Abs if it might not be a lambda?
-pattern DTLam :: Quantifier -> Type -> Bind (Name DTerm, Type) DTerm -> DTerm
-pattern DTLam q ty lam = TAbs_ q ty lam
+pattern DTAbs :: Quantifier -> Type -> Bind (Name DTerm) DTerm -> DTerm
+pattern DTAbs q ty lam = TAbs_ q ty lam
 
 pattern DTApp  :: Type -> DTerm -> DTerm -> DTerm
 pattern DTApp ty term1 term2 = TApp_ ty term1 term2
@@ -161,7 +161,7 @@ pattern DTNil :: Type -> DTerm
 pattern DTNil ty = XTerm_ (Right ty)
 
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
-             DTLam, DTApp, DTPair, DTInj, DTCase, DTTyOp,
+             DTAbs, DTApp, DTPair, DTInj, DTCase, DTTyOp,
              DTNil #-}
 
 type instance X_TLink DS = Void
@@ -293,7 +293,8 @@ instance HasType DTerm where
   getType (DTChar _)      = TyC
   getType (DTNat ty _)    = ty
   getType (DTRat _)       = TyF
-  getType (DTLam q ty _)  = ty
+  getType (DTAbs Lam ty _) = ty
+  getType (DTAbs _ _ _)   = TyProp
   getType (DTApp ty _ _)  = ty
   getType (DTPair ty _ _) = ty
   getType (DTInj ty _ _)  = ty

@@ -33,7 +33,7 @@ module Disco.Interpret.Core
        , valuesToBag, valuesToSet
 
          -- * Equality testing and enumeration
-       , eqOp, primValEq, enumerate
+       , eqOp, primValEq, enumerate, enumerateInf
        , decideEqFor, decideEqForRnf, decideEqForClosures
 
          -- * Comparison testing
@@ -1175,16 +1175,17 @@ searchQuantifiers (VCons 3 [VType ty, c]) = do
     Nothing -> return $ VCons 0 []
 
 searchPropTag :: Int -> Type -> Value -> Disco IErr (Maybe Value)
-searchPropTag tag ty c = do
-  let candidates = enumerate ty
-  searchFor candidates $ \x -> do
-    cv <- whnfV c
-    v <- searchQuantifiers =<< whnfAppExact cv [x]
-    case v of
-      VCons t cx
-        | t == tag  -> return . Just $ VCons t (x:cx)
-        | otherwise -> return Nothing
-      _             -> error $ "impossible searchPropTag: not a prop"
+searchPropTag tag ty c
+  | Nothing         <- enumerateInf ty = throwError $ InfiniteTy ty
+  | Just candidates <- enumerateInf ty = do
+    searchFor candidates $ \x -> do
+      cv <- whnfV c
+      v <- searchQuantifiers =<< whnfAppExact cv [x]
+      case v of
+        VCons t cx
+          | t == tag  -> return . Just $ VCons t (x:cx)
+          | otherwise -> return Nothing
+        _             -> error $ "impossible searchPropTag: not a prop"
 
 searchFor :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
 searchFor [] p = return Nothing
@@ -1366,6 +1367,44 @@ enumerate _ = []   -- The only way other cases can happen at the
                    -- moment is in evaluating something like enumerate
                    -- (Nat * Void), in which case it doesn't matter if
                    -- we give back an empty list for Nat.
+
+-- | Like @enumerate@, but works on some subset of infinite types
+--   as well. If the type is "too" infinite, returns @Nothing@.
+--   The results aren't guaranteed to be in sorted order because on
+--   many infinite types the usual order isn't a well-ordering --
+--   which is what we need to guarantee that for any possible value
+--   we reach it in finite time.
+enumerateInf :: Type -> Maybe [Value]
+enumerateInf ty
+  | Just _ <- countType ty = Just $ enumerate ty
+enumerateInf TyN           = Just $ map vnum $ [0..]
+enumerateInf TyZ           = Just $ map vnum $ 0 : ([1..] >>= \x -> [x, -x])
+enumerateInf TyF           = Just $ map (\(n, d) -> vnum (n / d)) pairs
+  where pairs = fairProduct [0..] [1..]
+enumerateInf TyQ           = Just $ map (\(s, (n, d)) -> vnum (s * n / d)) triples
+  where triples = fairProduct [-1, 1] $ fairProduct [0..] [1..]
+enumerateInf (ty1 :*: ty2) = do
+  vs1 <- enumerateInf ty1
+  vs2 <- enumerateInf ty2
+  return $ map (\(x, y) -> VCons 0 [x, y]) $ fairProduct vs1 vs2
+enumerateInf (ty1 :+: ty2) = do
+  vs1 <- enumerateInf ty1
+  vs2 <- enumerateInf ty2
+  let lefts  = map (VCons 0 . (:[])) vs1
+  let rights = map (VCons 1 . (:[])) vs2
+  return $ fairMerge lefts rights
+enumerateInf _ = Nothing
+
+fairProduct :: [a] -> [b] -> [(a, b)]
+fairProduct xs ys = go [] [map (x,) ys | x <- xs]
+  where
+    go [] [] = []
+    go as bs = concatMap (take 1) as ++
+               go (filter (not . null) (take 1 bs ++ map (drop 1) as)) (drop 1 bs)
+
+fairMerge :: [a] -> [a] -> [a]
+fairMerge (x:xs) ys = x : fairMerge ys xs
+fairMerge []     ys = ys
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need

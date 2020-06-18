@@ -42,3 +42,5 @@ count C
 count ((N -> Void) -> N)
 count (N -> (N -> Void))
 enumerate (Unit -> Unit) == [\_ . ()]
+enumerate (Unit -> Bool) == [\_ . false, \_ . true]
+enumerate (Bool -> Bool) == [\x. false]

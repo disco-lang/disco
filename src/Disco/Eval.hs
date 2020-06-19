@@ -175,7 +175,7 @@ data Value where
   VType :: Type -> Value
   deriving Show
 
--- | A @ValFun@ is just a Haskell function @[Value] -> Value@.  It is a
+-- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
 newtype ValFun = ValFun (Value -> Value)

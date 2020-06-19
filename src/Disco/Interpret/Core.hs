@@ -1553,4 +1553,3 @@ toHaskellList xs = map fromVNum xs
                    where
                       fromVNum (VNum _ x) = fromIntegral $ numerator x
                       fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
-

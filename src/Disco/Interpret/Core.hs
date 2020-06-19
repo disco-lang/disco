@@ -325,7 +325,7 @@ whnfAppExact :: Value -> [Value] -> Disco IErr Value
 whnfAppExact (VClos b e) vs  =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
-whnfAppExact (VFun f)    vs  =
+whnfAppExact (VFun _)    vs  =
   error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
 whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
@@ -1530,8 +1530,8 @@ oeisLookup v = do
       Nothing     -> return leftUnit
   where
     parseResult r = do
-          let sequence = getCatalogNum $ catalogNums r
-          l <- toDiscoList $ toVal ("https://oeis.org/" ++ sequence)
+          let seqNum = getCatalogNum $ catalogNums r
+          l <- toDiscoList $ toVal ("https://oeis.org/" ++ seqNum)
           return $ VCons 1 [l] -- right "https://oeis.org/foo"
     getCatalogNum []    = error "No catalog info"
     getCatalogNum (n:_) = n
@@ -1548,6 +1548,7 @@ oeisExtend v = do
     toDiscoList $ map (vnum . (%1)) newseq
 
 -- | Convert a Disco integer list to a Haskell list
+toHaskellList :: [Value] -> [Integer]
 toHaskellList [] = []
 toHaskellList xs = map fromVNum xs
                    where

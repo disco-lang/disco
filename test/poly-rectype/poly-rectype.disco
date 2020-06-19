@@ -1,0 +1,10 @@
+type X = Unit + X
+
+lst : List X
+lst = [left (), right (left ())]
+
+f : List a -> N
+f(_) = 3
+
+n : N
+n = f(lst)

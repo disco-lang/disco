@@ -139,8 +139,11 @@ getSort (SM sm) v = fromMaybe topSort (M.lookup v sm)
 -- Uses TH to generate lenses so it has to go here before other stuff.
 
 -- The simplification stage maintains a mutable state consisting of
--- the current qualifier map (containing wanted qualifiers for type variables),
--- the list of remaining SimpleConstraints, and the current substitution.
+-- the current qualifier map (containing wanted qualifiers for type
+-- variables), the list of remaining SimpleConstraints, and the
+-- current substitution.  It also keeps track of seen constraints, so
+-- expansion of recursive types can stop when encountering a
+-- previously seen constraint.
 data SimplifyState = SS
   { _ssSortMap     :: SortMap
   , _ssConstraints :: [SimpleConstraint]
@@ -427,12 +430,15 @@ simplify tyDefns origSM cs
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar {})                 = True
     simplifiable (TyCon (CUser _) _ :<: _)               = True
+    simplifiable (TyCon (CUser _) _ :<: _)               = True
     simplifiable (_ :<: TyCon (CUser _) _)               = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
     simplifiable _                                       = False
 
-    -- Simplify the given simplifiable constraint.  XXX say something about recursion
+    -- Simplify the given simplifiable constraint.  If the constraint
+    -- has already been seen before (due to expansion of a recursive
+    -- type), just throw it away and stop.
     simplifyOne :: SimpleConstraint -> SimplifyM ()
     simplifyOne c = do
       seen <- use ssSeen
@@ -449,17 +455,29 @@ simplify tyDefns origSM cs
     -- resulting substitution is applied to the remaining constraints
     -- as well as prepended to the current substitution.
 
-    -- XXX need to expand TyDef here!
     simplifyOne' (ty1 :=: ty2) =
       case unify tyDefns [(ty1, ty2)] of
         Nothing -> throwError NoUnify
         Just s' -> extendSubst s'
 
+    -- If we see a constraint of the form (T <: a), where T is a
+    -- user-defined type and a is a type variable, then just turn it
+    -- into an equality (T = a).  This is sound but probably not
+    -- complete.  The alternative seems quite complicated, possibly
+    -- even undecidable.  See https://github.com/disco-lang/disco/issues/207 .
+    simplifyOne' (ty1@(TyCon (CUser _) _) :<: ty2@TyVar{})
+      = simplifyOne' (ty1 :=: ty2)
+
+    -- Otherwise, expand the user-defined type and continue.
     simplifyOne' (TyCon (CUser t) ts :<: ty2) =
       case M.lookup t tyDefns of
         Nothing  -> throwError $ Unknown
         Just (TyDefBody _ body) ->
           ssConstraints %= ((body ts :<: ty2) :)
+
+    -- Turn  a <: T  into  a = T.  See comment above.
+    simplifyOne' (ty1@TyVar{} :<: ty2@(TyCon (CUser _) _))
+      = simplifyOne' (ty1 :=: ty2)
 
     simplifyOne' (ty1 :<: TyCon (CUser t) ts) =
       case M.lookup t tyDefns of

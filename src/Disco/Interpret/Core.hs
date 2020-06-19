@@ -80,6 +80,10 @@ import           Disco.Context
 import           Disco.Eval
 import           Disco.Types
 
+import           Math.OEIS                               (catalogNums,
+                                                          extendSequence,
+                                                          lookupSequence)
+
 ------------------------------------------------------------
 -- Evaluation
 ------------------------------------------------------------
@@ -396,6 +400,7 @@ toDiscoList (x : xs) = do
   xv  <- mkSimple x
   xsv <- mkSimple =<< delay (toDiscoList xs)
   return $ VCons 1 [xv, xsv]
+
 
 -- | Convert a Value representing a disco list into a Haskell list of
 --   Values.  Strict in the spine of the list.
@@ -907,6 +912,9 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 
 whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
 whnfOp OId             = arity1 "id" $ whnfV
+
+whnfOp OExtendSeq      = arity1 "extendSequence" $ oeisExtend
+whnfOp OLookupSeq      = arity1 "lookupSequence" $ oeisLookup
 
 --------------------------------------------------
 -- Utility functions
@@ -1504,3 +1512,44 @@ primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
 primValOrd v1           v2
   = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"
+
+
+------------------------------------------------------------
+-- OEIS
+------------------------------------------------------------
+
+-- | Looks up a sequence of integers in OEIS.
+--   Returns 'left()' if the sequence is unknown in OEIS,
+--   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
+oeisLookup :: Value -> Disco IErr Value
+oeisLookup v = do
+    vs <- fromDiscoList v
+    let hvs = toHaskellList vs
+    case lookupSequence hvs of
+      Just result -> parseResult result
+      Nothing     -> return leftUnit
+  where
+    parseResult r = do
+          let sequence = getCatalogNum $ catalogNums r
+          l <- toDiscoList $ toVal ("https://oeis.org/" ++ sequence)
+          return $ VCons 1 [l] -- right "https://oeis.org/foo"
+    getCatalogNum []    = error "No catalog info"
+    getCatalogNum (n:_) = n
+    toVal = map (\c -> vnum (toInteger (ord c) % 1))
+    leftUnit = VCons 0 [VCons 0 []]
+
+-- | Extends a Disco integer list with data from a known OEIS sequence.
+--   Returns a list of integers upon success, otherwise the original list (unmodified).
+oeisExtend :: Value -> Disco IErr Value
+oeisExtend v = do
+    vs <- fromDiscoList v
+    let xs = toHaskellList vs
+    let newseq = extendSequence xs
+    toDiscoList $ map (vnum . (%1)) newseq
+
+-- | Convert a Disco integer list to a Haskell list
+toHaskellList [] = []
+toHaskellList xs = map fromVNum xs
+                   where
+                      fromVNum (VNum _ x) = fromIntegral $ numerator x
+                      fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v

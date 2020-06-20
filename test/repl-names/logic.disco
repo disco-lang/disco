@@ -1,0 +1,22 @@
+-- copied from example/logic.disco as it might change, but this file shouldn't
+
+-- Basic logical operators 
+
+lnot1 : B -> B
+lnot1 true  = false
+lnot1 false = true
+
+lnot2 : B -> B
+lnot2 x =
+  {? false if x,
+     true  otherwise
+  ?}
+
+implication : B -> B -> B
+implication x y =
+  {? false   if x and not y,
+     true    otherwise
+  ?}
+
+exor : B -> B -> B
+exor x y = (x && not y) || (not x && y)

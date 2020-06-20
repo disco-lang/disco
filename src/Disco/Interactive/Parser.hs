@@ -49,6 +49,7 @@ data REPLExpr =
  | Doc (Name Term)              -- Show documentation.
  | Nop                          -- No-op, e.g. if the user just enters a comment
  | Help
+ | Names
  deriving Show
 
 ------------------------------------------------------------
@@ -79,6 +80,7 @@ parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parser
       , ("reload",  return Reload)
       , ("doc",     Doc       <$> (sc *> ident))
       , ("help",    return Help)
+      , ("names",  return Names)
       ]
 
 parseTypeTarget :: Parser Term

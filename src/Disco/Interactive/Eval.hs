@@ -317,4 +317,3 @@ handleNames = do
       showFn (x, ty) = do
         p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
         io . putStrLn $ p
-

@@ -2,22 +2,22 @@
 -- really want to say something like  (Cmp a, Cmp b) => (a -> b) -> Prop.
 
 injective : (ℕ → ℕ) → Prop
-injective(f) = ∀ x y. (f(x) == f(y)) ==> (x == y)
+injective(f) = ∀ (x :N) (y :N). (f(x) == f(y)) ==> (x == y)
 
 surjective : (ℕ → ℕ) → Prop
-surjective(f) = ∀ y. ∃ x. f x == y
+surjective(f) = ∀ (y : N). ∃ (x : N). f x == y
 
 bijective : (ℕ → ℕ) → Prop
 bijective(f) = injective(f) and surjective(f)
 
 idempotent : (ℕ → ℕ) → Prop
-idempotent(f) = ∀ x. f(f(x)) == f(x)
+idempotent(f) = ∀ (x : N). f(f(x)) == f(x)
 
 commutative : (ℕ×ℕ → ℕ) → Prop
-commutative(f) = ∀ x y. f(x,y) == f(y,x)
+commutative(f) = ∀ (x : N) (y : N). f(x,y) == f(y,x)
 
 associative : (ℕ×ℕ → ℕ) → Prop
-associative(f) = ∀ x y z. f(x, f(y,z)) == f(f(x,y), z)
+associative(f) = ∀ (x : N, y : N, z : N). f(x, f(y,z)) == f(f(x,y), z)
 
 identityFor : ℕ × (ℕ×ℕ → ℕ) → Prop
-identityFor(e,f) = ∀ x. f(x,e) == x and f(e,x) == x
+identityFor(e,f) = ∀ (x : N). f(x,e) == x and f(e,x) == x

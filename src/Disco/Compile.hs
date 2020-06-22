@@ -63,14 +63,23 @@ compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
-compileDTerm (DTAbs q ty l) = do
-  (x, body) <- unbind l
+compileDTerm term@(DTAbs q _ _) = do
+  (xs, tys, body) <- unbindDeep q term
   c <- compileDTerm body
-  let abs = CAbs (bind [coerce x] c)   -- XXX collect up nested DTAbs into a single CAbs?
+  let abs = CAbs (bind (map coerce xs) c)
   case q of
     Lam -> return abs
-    All -> return $ CCons 2 [CType ty, abs]
-    Ex  -> return $ CCons 3 [CType ty, abs]
+    All -> return $ CCons 2 (abs : map CType tys)
+    Ex  -> return $ CCons 3 (abs : map CType tys)
+  where
+    -- Gather nested abstractions with the same quantifier.
+    unbindDeep :: Quantifier -> DTerm -> FreshM ([Name DTerm], [Type], DTerm)
+    unbindDeep q (DTAbs q' ty l) | q == q' = do
+      (name, inner) <- unbind l
+      (names, tys, body) <- unbindDeep q inner
+      return (name:names, ty:tys, body)
+    unbindDeep _ t                         = return ([], [], t)
+
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.

@@ -1,0 +1,3 @@
+holds (forall (a : Q) (b : Q). abs a < 4 or abs b < 4)
+holds (exists (a: N) (b : N) (c : N). (0 < a < b < c) and (a^2 + b^2 == c^2))
+holds (exists (a : N, b : N, c : N).  (0 < a < b < c) and (a^2 + b^2 == c^2))

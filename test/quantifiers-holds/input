@@ -1,5 +1,0 @@
-holds (forall x. x or not x)
-holds (exists x. x)
-holds (exists (f : B + B -> B + B). forall a. (f (left a) == right a) and (f (right a) == left a))
-holds (exists (f : B -> B). f /= (\x. f (f (f x))))
-holds (forall (a:N, b:N, c:N). a^2 + b^2 == c^2)

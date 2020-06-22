@@ -73,7 +73,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isEmptyTy
+       , isNumTy, isEmptyTy, isSearchable
 
        -- * Type substitutions
 
@@ -577,6 +577,19 @@ isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
 isEmptyTy _              = False
+
+-- | Decide whether a type is searchable, i.e. effectively enumerable.
+--   This is a conservative approximation that matches what our evaluator
+--   is currently able to enumerate. In particular, it leaves out infinite
+--   function spaces right now.
+isSearchable :: Type -> Bool
+isSearchable TyProp         = False
+isSearchable ty
+  | isNumTy ty              = True
+  | Just _ <- countType ty  = True
+isSearchable (ty1 :+: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :*: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable _              = False
 
 --------------------------------------------------
 -- Strictness

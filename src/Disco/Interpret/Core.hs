@@ -1162,28 +1162,34 @@ searchQuantifiers :: Value -> Disco IErr Value
 searchQuantifiers v@(VCons 0 _)     = return v
 searchQuantifiers v@(VCons 1 _)     = return v
 -- A forall quantifier:
-searchQuantifiers (VCons 2 [VType ty, c]) = do
-  counterexample <- searchPropTag 0 ty c
+searchQuantifiers (VCons 2 (c : vtys)) = do
+  tys <- mapM ensureType vtys
+  counterexample <- searchPropTag 0 tys c
   case counterexample of
-    Just cx -> return cx
+    Just cx -> return $ VCons 0 cx
     Nothing -> return $ VCons 1 []
 -- An exists quantifier:
-searchQuantifiers (VCons 3 [VType ty, c]) = do
-  example <- searchPropTag 1 ty c
+searchQuantifiers (VCons 3 (c : vtys)) = do
+  tys <- mapM ensureType vtys
+  example <- searchPropTag 1 tys c
   case example of
-    Just ex -> return ex
+    Just ex -> return $ VCons 1 ex
     Nothing -> return $ VCons 0 []
 
-searchPropTag :: Int -> Type -> Value -> Disco IErr (Maybe Value)
-searchPropTag tag ty c
-  | Nothing         <- enumerateInf ty = throwError $ InfiniteTy ty
-  | Just candidates <- enumerateInf ty = do
-    searchFor candidates $ \x -> do
+ensureType :: Value -> Disco IErr Type
+ensureType (VType t) = return t
+ensureType v         = error $ "expected type value, got " ++ show v
+
+searchPropTag :: Int -> [Type] -> Value -> Disco IErr (Maybe [Value])
+searchPropTag tag tys c
+  | Nothing         <- enumerateTypes tys = error $ "not searchable: " ++ show tys
+  | Just candidates <- enumerateTypes tys = do
+    searchFor candidates $ \xs -> do
       cv <- whnfV c
-      v <- searchQuantifiers =<< whnfAppExact cv [x]
+      v <- searchQuantifiers =<< whnfAppExact cv xs
       case v of
         VCons t cx
-          | t == tag  -> return . Just $ VCons t (x:cx)
+          | t == tag  -> return $ Just xs
           | otherwise -> return Nothing
         _             -> error $ "impossible searchPropTag: not a prop"
 
@@ -1395,12 +1401,19 @@ enumerateInf (ty1 :+: ty2) = do
   return $ fairMerge lefts rights
 enumerateInf _ = Nothing
 
+enumerateTypes :: [Type] -> Maybe [[Value]]
+enumerateTypes tys = fairTranspose <$> mapM enumerateInf tys
+
 fairProduct :: [a] -> [b] -> [(a, b)]
 fairProduct xs ys = go [] [map (x,) ys | x <- xs]
   where
     go [] [] = []
     go as bs = concatMap (take 1) as ++
                go (filter (not . null) (take 1 bs ++ map (drop 1) as)) (drop 1 bs)
+
+fairTranspose :: [[a]] -> [[a]]
+fairTranspose []     = [[]]
+fairTranspose (x:xs) = map (uncurry (:)) (fairProduct x (fairTranspose xs))
 
 fairMerge :: [a] -> [a] -> [a]
 fairMerge (x:xs) ys = x : fairMerge ys xs

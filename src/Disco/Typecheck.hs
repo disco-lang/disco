@@ -868,10 +868,15 @@ typecheck Infer (TAbs q lam)    = do
   (pCtxs, typedPats) <- unzip <$> sequence (zipWith checkPattern args tys)
   let tymap = joinCtxs pCtxs
 
-  -- In the case of ∀, ∃, have to ensure that none of the arguments
-  -- are themselves of type Prop, or involve anything of type Prop.
+  -- In the case of ∀, ∃, have to ensure that the argument types are
+  -- searchable.
   when (q `elem` [All, Ex]) $
-    forM_ tys $ constraint . CQual QBasic
+    -- What's the difference between this and `tys`? Nothing, after
+    -- the solver runs, but right now the patterns might have a
+    -- concrete type from annotations inside tuples.
+    forM_ (map getType typedPats) $ \ty ->
+      when (not $ isSearchable ty) $
+        throwError $ NoSearch ty
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.

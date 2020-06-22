@@ -1,0 +1,16 @@
+Commands available from the Disco prompt:
+
+   :ann       Show type-annotated typechecked term
+   :compile   Show a compiled term
+   :defn      Show a variable's definition
+   :desugar   Show a desugared term
+   :doc       Show documentation for a function
+   :help      This command, shows REPL commands
+   :load      Load a file
+   :names     Show all names currently bound
+   :parse     Show the parsed AST
+   :pretty    Pretty-print a term
+   :reload    Reloads the most recently loaded file
+   :type      Typecheck a term
+
+

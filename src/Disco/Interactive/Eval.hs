@@ -99,7 +99,7 @@ handleCMD s = do
         Just f  -> handleLoad f >> return()
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
-    handleLine Help          = iputStrLn "Help!"
+    handleLine Help          = handleHelp
     handleLine Names         = handleNames
 
 handleLet :: Name Term -> Term -> Disco IErr ()
@@ -317,3 +317,22 @@ handleNames = do
       showFn (x, ty) = do
         p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
         io . putStrLn $ p
+
+-- | show in-repl help
+handleHelp :: Disco IErr ()
+handleHelp = do
+              io . putStrLn $ helpStr
+              where helpStr =
+                      "Commands available from the Disco prompt:\n\n\
+                      \   :ann       Show type-annotated typechecked term\n\
+                      \   :compile   Show a compiled term\n\
+                      \   :defn      Show a variable's definition\n\
+                      \   :desugar   Show a desugared term\n\
+                      \   :doc       Show documentation for a function\n\
+                      \   :help      This command, shows REPL commands\n\
+                      \   :load      Load a file\n\
+                      \   :names     Show all names currently bound\n\
+                      \   :parse     Show the parsed AST\n\
+                      \   :pretty    Pretty-print a term\n\
+                      \   :reload    Reloads the most recently loaded file\n\
+                      \   :type      Typecheck a term\n\n"

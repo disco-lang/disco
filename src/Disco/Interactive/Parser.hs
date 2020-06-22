@@ -43,13 +43,13 @@ data REPLExpr =
  | Ann Term                     -- Show type-annotated typechecked term
  | Desugar Term                 -- Show a desugared term
  | Compile Term                 -- Show a compiled term
- | Import String                -- Import a library module.
- | Load FilePath                -- Load a file.
- | Reload                       -- Reloads the most recently loaded file.
- | Doc (Name Term)              -- Show documentation.
+ | Import String                -- Import a library module
+ | Load FilePath                -- Load a file
+ | Reload                       -- Reloads the most recently loaded file
+ | Doc (Name Term)              -- Show documentation
  | Nop                          -- No-op, e.g. if the user just enters a comment
- | Help
- | Names
+ | Help                         -- Show repl help
+ | Names                        -- Show all names currently bound
  deriving Show
 
 ------------------------------------------------------------

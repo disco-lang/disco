@@ -1,5 +1,5 @@
 -- copied from example/logic.disco as it might change, but this file shouldn't
--- Basic logical operators 
+-- Basic logical operators
 
 lnot1 : B -> B
 lnot1 true  = false

@@ -12,5 +12,3 @@ Commands available from the Disco prompt:
    :pretty    Pretty-print a term
    :reload    Reloads the most recently loaded file
    :type      Typecheck a term
-
-

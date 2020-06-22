@@ -100,6 +100,7 @@ handleCMD s = do
     handleLine (Doc x)       = handleDocs x
     handleLine Nop           = return ()
     handleLine Help          = iputStrLn "Help!"
+    handleLine Names         = handleNames
 
 handleLet :: Name Term -> Term -> Disco IErr ()
 handleLet x t = do
@@ -307,3 +308,12 @@ handleTypeCheck t = do
     Left e        -> return.show $ e    -- XXX pretty-print
     Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
 
+-- | show names and types for each item in 'topCtx'
+handleNames :: Disco IErr ()
+handleNames = do
+  ctx  <- use topCtx
+  mapM_ showFn $ M.toList ctx
+  where
+      showFn (x, ty) = do
+        p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+        io . putStrLn $ p

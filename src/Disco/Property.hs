@@ -269,4 +269,3 @@ genValues n ty = case discoGenerator ty of
 --   configurable, and it lives in the @Disco@ monad.
 generate :: Int -> QC.Gen a -> Disco e [a]
 generate n gen = io . QC.generate $ sequence [QC.resize m gen | m <- [0 .. n]]
-

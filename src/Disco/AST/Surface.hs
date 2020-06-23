@@ -428,4 +428,3 @@ pattern PFrac p1 p2 = PFrac_ () p1 p2
 
 {-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
              PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}
-

@@ -85,4 +85,3 @@ type Sort = Set Qualifier
 -- | The special sort \(\top\) which includes all types.
 topSort :: Sort
 topSort = S.empty
-

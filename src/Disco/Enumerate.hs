@@ -1,5 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,8 +42,8 @@ module Disco.Enumerate
        where
 
 import qualified Data.Enumeration.Invertible as E
-import Disco.Eval
-import Disco.Types
+import           Disco.Eval
+import           Disco.Types
 
 type ValueEnumeration = E.IEnumeration Value
 

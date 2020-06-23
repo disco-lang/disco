@@ -55,26 +55,27 @@ module Disco.Parser
        )
        where
 
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless        (Embed, Name, bind,
+                                                          embed, fvAny,
+                                                          string2Name)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec                  as MP
+import           Text.Megaparsec                         hiding (runParser)
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer       as L
+import qualified Text.Megaparsec.Char.Lexer              as L
 
-import           Control.Lens                     (makeLenses, toListOf, use,
-                                                   (.=))
+import           Control.Lens                            (makeLenses, toListOf,
+                                                          use, (.=))
 import           Control.Monad.State
-import           Data.Char                        (isDigit)
-import           Data.List                        (find, intercalate)
-import qualified Data.Map                         as M
-import           Data.Maybe                       (catMaybes)
+import           Data.Char                               (isDigit)
+import           Data.List                               (find, intercalate)
+import qualified Data.Map                                as M
+import           Data.Maybe                              (catMaybes)
 import           Data.Ratio
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import           Data.Set                                (Set)
+import qualified Data.Set                                as S
 import           Data.Void
 
 import           Disco.AST.Surface

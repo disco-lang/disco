@@ -37,7 +37,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import           Data.Maybe                       (fromMaybe, isJust)
+import           Data.Maybe                              (fromMaybe, isJust)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
@@ -49,7 +49,7 @@ import           Disco.AST.Typed
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy)
+import           Disco.Typecheck                         (containerTy)
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -549,7 +549,7 @@ mkQuant q argtys args c = foldr quantify c (zip args argtys)
 
 mkAbs :: Quantifier -> Type -> [Type] -> [Name ATerm] -> DTerm -> DTerm
 mkAbs Lam funty argtys args c = mkLambda funty args c
-mkAbs q ty argtys args c = mkQuant q argtys args c
+mkAbs q ty argtys args c      = mkQuant q argtys args c
 
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm

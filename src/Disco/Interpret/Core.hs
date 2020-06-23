@@ -60,7 +60,7 @@ import           Data.List                               (find)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
-import qualified Data.Enumeration.Invertible as E
+import qualified Data.Enumeration.Invertible             as E
 
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -1199,7 +1199,7 @@ searchFor [] p = return Nothing
 searchFor (x:xs) p = do
   ok <- p x
   case ok of
-    Just y -> return (Just y)
+    Just y  -> return (Just y)
     Nothing -> searchFor xs p
 
 ------------------------------------------------------------

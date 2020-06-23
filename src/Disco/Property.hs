@@ -30,6 +30,7 @@ import           Data.Traversable                 (for)
 import           Disco.AST.Core
 import           Disco.AST.Typed
 import           Disco.Compile
+import           Disco.Enumerate
 import           Disco.Eval
 import           Disco.Interpret.Core
 import           Disco.Syntax.Operators           (BOp (..))
@@ -143,7 +144,7 @@ testCases _ []    = return (True, [M.empty])
 testCases n binds
   | Just m <- fmap product . sequence . map countType $ tys
   , m <= (fromIntegral n)
-  = return $ (True, map (M.fromList . zip ys) $ mapM enumerate tys)
+  = return $ (True, map (M.fromList . zip ys) $ mapM enumerateType tys)
     -- The above mapM is in the list monad!
 
   | otherwise = do

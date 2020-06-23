@@ -242,6 +242,7 @@ library
                        Disco.Property
                        Disco.Desugar
                        Disco.Compile
+                       Disco.Enumerate
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst
@@ -290,6 +291,7 @@ library
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.11,
                        integer-logarithms >= 1.0 && < 1.1,
+                       simple-enumeration >= 0.2 && < 0.3,
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.14,
                        fgl >= 5.5 && < 5.8,

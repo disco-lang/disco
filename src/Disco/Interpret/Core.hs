@@ -33,7 +33,7 @@ module Disco.Interpret.Core
        , valuesToBag, valuesToSet
 
          -- * Equality testing and enumeration
-       , eqOp, primValEq, enumerate, enumerateInf
+       , eqOp, primValEq
        , decideEqFor, decideEqForRnf, decideEqForClosures
 
          -- * Comparison testing
@@ -60,6 +60,8 @@ import           Data.List                               (find)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
+import qualified Data.Enumeration.Invertible as E
+
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -77,6 +79,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
 import           Disco.Context
+import           Disco.Enumerate
 import           Disco.Eval
 import           Disco.Types
 
@@ -1014,9 +1017,9 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: Value -> Disco IErr Value
-enumOp (VType ty) = case countType ty of
-  Just _  -> toDiscoList (enumerate ty)
-  Nothing -> throwError $ InfiniteTy ty
+enumOp (VType ty)
+  | isFiniteTy ty = toDiscoList (enumerateType ty)
+  | otherwise     = throwError $ InfiniteTy ty
 enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,
@@ -1181,17 +1184,15 @@ ensureType (VType t) = return t
 ensureType v         = error $ "expected type value, got " ++ show v
 
 searchPropTag :: Int -> [Type] -> Value -> Disco IErr (Maybe [Value])
-searchPropTag tag tys c
-  | Nothing         <- enumerateTypes tys = error $ "not searchable: " ++ show tys
-  | Just candidates <- enumerateTypes tys = do
-    searchFor candidates $ \xs -> do
-      cv <- whnfV c
-      v <- searchQuantifiers =<< whnfAppExact cv xs
-      case v of
-        VCons t cx
-          | t == tag  -> return $ Just xs
-          | otherwise -> return Nothing
-        _             -> error $ "impossible searchPropTag: not a prop"
+searchPropTag tag tys c =
+  searchFor (enumerateTypes tys) $ \xs -> do
+    cv <- whnfV c
+    v <- searchQuantifiers =<< whnfAppExact cv xs
+    case v of
+      VCons t cx
+        | t == tag  -> return $ Just xs
+        | otherwise -> return Nothing
+      _             -> error $ "impossible searchPropTag: not a prop"
 
 searchFor :: Monad m => [a] -> (a -> m (Maybe b)) -> m (Maybe b)
 searchFor [] p = return Nothing
@@ -1255,7 +1256,7 @@ decideEqFor (ty1 :->: ty2) v1 v2 = do
   clos2 <- whnfV v2
 
   --  all the values of type ty1.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
 
   -- Try evaluating the functions on each value and check whether they
   -- agree.
@@ -1309,116 +1310,6 @@ bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
     False -> return False
     True  -> bagEquality ty xs ys
 
-
--- TODO: can the functions built by 'enumerate' be more efficient if
--- enumerate builds *both* a list and a bijection to a prefix of the
--- naturals?  Currently, the functions output by (enumerate (_ :->: _))
--- take linear time in the size of the input to evaluate since they
--- have to do a lookup in an association list.  Does this even matter?
-
--- | Enumerate all the values of a given (finite) type.  If the type
---   has a linear order then the values are output in sorted order,
---   that is, @v@ comes before @w@ in the list output by @enumerate@
---   if and only if @v < w@.  This function will never be called on an
---   infinite type, since type checking ensures that equality or
---   comparison testing will only be done in cases where a finite
---   enumeration is required.
-enumerate :: Type -> [Value]
-
--- There are zero, one, and two values of types Void, Unit, and Bool respectively.
-enumerate TyVoid           = []
-enumerate TyUnit           = [VCons 0 []]
-enumerate TyBool           = [VCons 0 [], VCons 1 []]
-
--- enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
-
--- To enumerate a pair type, take the Cartesian product of enumerations.
-enumerate (ty1 :*: ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
-
--- To enumerate a sum type, enumerate all the lefts followed by all the rights.
-enumerate (ty1 :+: ty2)  =
-  map (VCons 0 . (:[])) (enumerate ty1) ++
-  map (VCons 1 . (:[])) (enumerate ty2)
-
--- To enumerate an arrow type @ty1 -> ty2@, enumerate all values of
--- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
--- values from the enumeration of @ty2@, and make a function by
--- zipping each one together with the values of @ty1@.
-enumerate (ty1 :->: ty2)
-  | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
-  | isEmptyTy ty2 = []
-  | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
-  where
-    vs1 = enumerate ty1
-    vs2 = enumerate ty2
-
-    -- The actual function works by looking up the input value in an
-    -- association list.
-    mkFun :: [Value] -> Value
-    mkFun outs
-      = VFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
-
-    -- A custom version of fromJust' so we get a better error message
-    -- just in case it ever happens
-    fromJust' _ (Just x) = x
-    fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
-
-enumerate (TyList _ty) = [VCons 0 []]
-  -- Right now, the only way for this to typecheck is if @ty@ is
-  -- empty.  Perhaps in the future we'll allow 'enumerate' to work on
-  -- countably infinite types, in which case we would need to change
-  -- this.
-
-enumerate _ = []   -- The only way other cases can happen at the
-                   -- moment is in evaluating something like enumerate
-                   -- (Nat * Void), in which case it doesn't matter if
-                   -- we give back an empty list for Nat.
-
--- | Like @enumerate@, but works on some subset of infinite types
---   as well. If the type is "too" infinite, returns @Nothing@.
---   The results aren't guaranteed to be in sorted order because on
---   many infinite types the usual order isn't a well-ordering --
---   which is what we need to guarantee that for any possible value
---   we reach it in finite time.
-enumerateInf :: Type -> Maybe [Value]
-enumerateInf ty
-  | Just _ <- countType ty = Just $ enumerate ty
-enumerateInf TyN           = Just $ map vnum $ [0..]
-enumerateInf TyZ           = Just $ map vnum $ 0 : ([1..] >>= \x -> [x, -x])
-enumerateInf TyF           = Just $ map (\(n, d) -> vnum (n / d)) pairs
-  where pairs = fairProduct [0..] [1..]
-enumerateInf TyQ           = Just $ map (\(s, (n, d)) -> vnum (s * n / d)) triples
-  where triples = fairProduct [-1, 1] $ fairProduct [0..] [1..]
-enumerateInf (ty1 :*: ty2) = do
-  vs1 <- enumerateInf ty1
-  vs2 <- enumerateInf ty2
-  return $ map (\(x, y) -> VCons 0 [x, y]) $ fairProduct vs1 vs2
-enumerateInf (ty1 :+: ty2) = do
-  vs1 <- enumerateInf ty1
-  vs2 <- enumerateInf ty2
-  let lefts  = map (VCons 0 . (:[])) vs1
-  let rights = map (VCons 1 . (:[])) vs2
-  return $ fairMerge lefts rights
-enumerateInf _ = Nothing
-
-enumerateTypes :: [Type] -> Maybe [[Value]]
-enumerateTypes tys = fairTranspose <$> mapM enumerateInf tys
-
-fairProduct :: [a] -> [b] -> [(a, b)]
-fairProduct xs ys = go [] [map (x,) ys | x <- xs]
-  where
-    go [] [] = []
-    go as bs = concatMap (take 1) as ++
-               go (filter (not . null) (take 1 bs ++ map (drop 1) as)) (drop 1 bs)
-
-fairTranspose :: [[a]] -> [[a]]
-fairTranspose []     = [[]]
-fairTranspose (x:xs) = map (uncurry (:)) (fairProduct x (fairTranspose xs))
-
-fairMerge :: [a] -> [a] -> [a]
-fairMerge (x:xs) ys = x : fairMerge ys xs
-fairMerge []     ys = ys
-
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need
 --   to be in the @Disco@ monad, because no evaluation needs to happen.
@@ -1428,7 +1319,7 @@ decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
 decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerateType ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
@@ -1523,7 +1414,7 @@ decideOrdFor (ty1 :->: ty2) v1 v2 = do
   -- functions by applying them both to each value in the enumeration
   -- in turn, returning the ordering on the first value where the
   -- functions differ.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
   decideOrdForClosures ty2 clos1 clos2 ty1s
 
 -- To decide the ordering for two lists:

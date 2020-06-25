@@ -13,7 +13,7 @@
 
 module Disco.Interactive.Parser
   ( REPLExpr(..)
-  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine
+  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine, parseTypeTarget,
   ) where
 
 import           Data.Char                        (isSpace)
@@ -26,6 +26,8 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Parser
+import           Disco.Interactive.Commands (discoCommands)
+
 -- import           Disco.Syntax.Operators  -- needed for #185
 
 ------------------------------------------------------------
@@ -52,6 +54,7 @@ data REPLExpr =
  | Names                        -- Show all names currently bound
  deriving Show
 
+
 ------------------------------------------------------------
 -- Parser
 ------------------------------------------------------------
@@ -63,25 +66,26 @@ letParser = Let
 
 commandParser :: Parser REPLExpr
 commandParser = (symbol ":" *> many C.lowerChar) >>= parseCommandArgs
-
+    
 parseCommandArgs :: String -> Parser REPLExpr
 parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
   where
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
-    parsers =
-      [ ("type",    TypeCheck <$> parseTypeTarget)
-      , ("defn",    ShowDefn  <$> (sc *> ident))
-      , ("parse",   Parse     <$> term)
-      , ("pretty",  Pretty    <$> term)
-      , ("ann",     Ann       <$> term)
-      , ("desugar", Desugar   <$> term)
-      , ("compile", Compile   <$> term)
-      , ("load",    Load      <$> fileParser)
-      , ("reload",  return Reload)
-      , ("doc",     Doc       <$> (sc *> ident))
-      , ("help",    return Help)
-      , ("names",  return Names)
-      ]
+    parsers = map (\rc -> (name rc, cmdParser rc)) discoCommands
+      
+      -- [ (name commandType,    cmdParser commandType)
+      -- , ("defn",    ShowDefn  <$> (sc *> ident))
+      -- , ("parse",   Parse     <$> term)
+      -- , ("pretty",  Pretty    <$> term)
+      -- , ("ann",     Ann       <$> term)
+      -- , ("desugar", Desugar   <$> term)
+      -- , ("compile", Compile   <$> term)
+      -- , ("load",    Load      <$> fileParser)
+      -- , ("reload",  return Reload)
+      -- , ("doc",     Doc       <$> (sc *> ident))
+      -- , ("help",    return Help)
+      -- , (name commandNames,   cmdParser commandNames)
+      -- ]
 
 parseTypeTarget :: Parser Term
 parseTypeTarget =

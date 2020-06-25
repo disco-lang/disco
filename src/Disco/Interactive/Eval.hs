@@ -131,7 +131,9 @@ handleShowDefn x = do
 
 handleAnn :: Term -> Disco IErr String
 handleAnn t = do
-  case evalTCM (inferTop t) of
+  ctx <- use topCtx
+  tymap <- use topTyDefns
+  case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of    
     Left e       -> return . show $ e
     Right (at,_) -> return . show $ at
 

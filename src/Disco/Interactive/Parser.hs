@@ -25,8 +25,8 @@ import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
 import           Disco.Extensions
+import           Disco.Interactive.Commands       (discoCommands)
 import           Disco.Parser
-import           Disco.Interactive.Commands (discoCommands)
 
 -- import           Disco.Syntax.Operators  -- needed for #185
 
@@ -66,13 +66,13 @@ letParser = Let
 
 commandParser :: Parser REPLExpr
 commandParser = (symbol ":" *> many C.lowerChar) >>= parseCommandArgs
-    
+
 parseCommandArgs :: String -> Parser REPLExpr
 parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
   where
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     parsers = map (\rc -> (name rc, cmdParser rc)) discoCommands
-      
+
       -- [ (name commandType,    cmdParser commandType)
       -- , ("defn",    ShowDefn  <$> (sc *> ident))
       -- , ("parse",   Parse     <$> term)

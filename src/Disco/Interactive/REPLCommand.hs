@@ -13,7 +13,7 @@
 
 module Disco.Interactive.REPLCommand where
 
-import Disco.Interactive.Parser (Parser, REPLExpr)
+import           Disco.Interactive.Parser (Parser, REPLExpr)
 
 data ReplCommandType =
     User
@@ -24,10 +24,10 @@ data ReplCommandType =
 -- Commands
 ------------------------------------------------------------
 data ReplCommand = ReplCommand
-  { name  :: String 
+  { name      :: String
   , shortHelp :: String
-  , longHelp :: String
-  , cmdType :: ReplCommandType
+  , longHelp  :: String
+  , cmdType   :: ReplCommandType
   , cmdAction :: String -- REPLExpr -> Disco IErr ()
   , cmdParser :: Parser REPLExpr
   }

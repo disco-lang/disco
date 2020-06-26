@@ -9,14 +9,14 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Interactive.Commands (discoCommands) where 
+module Disco.Interactive.Commands (discoCommands) where
 
-import Disco.Interactive.Parser (REPLExpr, parseTypeTarget)
-import           Disco.Parser (sc, ident)
-import Disco.Interactive.REPLCommand (ReplCommand)
+import           Disco.Interactive.Parser      (REPLExpr, parseTypeTarget)
+import           Disco.Interactive.REPLCommand (ReplCommand)
+import           Disco.Parser                  (ident, sc)
 
 discoCommands :: [ReplCommand]
-discoCommands = 
+discoCommands =
   [
   ReplCommand {
       name = "help",

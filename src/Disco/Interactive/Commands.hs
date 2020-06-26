@@ -6,31 +6,14 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Evaluation for things entered at an interactive disco prompt.
 --
 -----------------------------------------------------------------------------
 
-module Disco.Interactive.Commands (discoCommands) where
+module Disco.Interactive.Commands (discoCommands) where 
 
-import Disco.Interactive.Parser (REPLExpr)
+import Disco.Interactive.Parser (REPLExpr, parseTypeTarget)
 import           Disco.Parser (sc, ident)
-
-data ReplCommandType =
-    User
-  | Dev
-  | Advanced
-  deriving Show
-------------------------------------------------------------
--- Commands
-------------------------------------------------------------
-data ReplCommand = ReplCommand
-  { name  :: String 
-  , shortHelp :: String
-  , longHelp :: String
-  , cmdType :: ReplCommandType
-  , cmdAction :: String -- REPLExpr -> Disco IErr ()
-  , cmdParser :: Parser REPLExpr
-  }
+import Disco.Interactive.REPLCommand (ReplCommand)
 
 discoCommands :: [ReplCommand]
 discoCommands = 

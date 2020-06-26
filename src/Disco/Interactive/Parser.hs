@@ -13,7 +13,7 @@
 
 module Disco.Interactive.Parser
   ( REPLExpr(..)
-  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine, parseTypeTarget,
+  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine, parseTypeTarget
   ) where
 
 import           Data.Char                        (isSpace)

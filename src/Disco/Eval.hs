@@ -33,7 +33,7 @@ module Disco.Eval
 
          -- * Memory cells
 
-       , Cell(..), mkCell
+       , Cell(..), mkCell, showMemory
 
          -- * Errors
 
@@ -68,6 +68,8 @@ module Disco.Eval
 
        )
        where
+
+import           Text.Printf
 
 import           Control.Lens                            (makeLenses, use, (%=),
                                                           (<+=), (<>=))
@@ -584,6 +586,12 @@ reachableLoc l = do
       case IntMap.lookup l mem of
         Nothing         -> return ()
         Just (Cell v _) -> reachable v
+
+showMemory :: Disco e ()
+showMemory = use memory >>= (mapM_ showCell . IntMap.assocs)
+  where
+    showCell :: (Int, Cell) -> Disco e ()
+    showCell (i, Cell v b) = liftIO $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
 
 ------------------------------------------------------------
 -- High-level disco phases

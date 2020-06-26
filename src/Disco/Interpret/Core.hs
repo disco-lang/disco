@@ -910,8 +910,8 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 --------------------------------------------------
 -- Other primitives
 
-whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
-whnfOp OId             = arity1 "id" $ whnfV
+whnfOp OCrash          = arity1 "crash"     $ primCrash
+whnfOp OId             = arity1 "id"        $ whnfV
 
 whnfOp OExtendSeq      = arity1 "extendSequence" $ oeisExtend
 whnfOp OLookupSeq      = arity1 "lookupSequence" $ oeisLookup
@@ -1129,7 +1129,7 @@ primFactor _                         = error "impossible! primFactor on non-VNum
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.
 primCrash :: Value -> Disco IErr Value
-primCrash v = delay $ do
+primCrash v = do
   s <- valueToString v
   throwError (Crash s)
 

@@ -153,7 +153,7 @@ handleCompile t = do
 
 handleImport :: ModName -> Disco IErr ()
 handleImport modName = catchAndPrintErrors () $ do
-  mi <- loadDiscoModule Nothing modName
+  mi <- loadDiscoModule FromCwdOrStdlib modName
   addModule mi
 
 loadFile :: FilePath -> Disco IErr (Maybe String)
@@ -168,7 +168,7 @@ fileNotFound file _ = putStrLn $ "File not found: " ++ file
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (Just directory) modName
+  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- withTopEnv $ runAllTests props
   io . putStrLn $ "Loaded."

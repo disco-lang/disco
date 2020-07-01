@@ -624,26 +624,26 @@ typecheckDisco tyctx tydefs tcm =
 --   If the given directory is Just, it will only load a module from
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
-loadDiscoModule :: (MonadError IErr m, MonadIO m) => Maybe FilePath -> ModName -> m ModuleInfo
-loadDiscoModule dir m = evalStateT (loadDiscoModule' dir S.empty m) M.empty
+loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
+loadDiscoModule resolver m = evalStateT (loadDiscoModule' resolver S.empty m) M.empty
 
 loadDiscoModule' ::
   (MonadError IErr m, MonadIO m) =>
-  Maybe FilePath -> S.Set ModName -> ModName ->
+  Resolver -> S.Set ModName -> ModName ->
   StateT (M.Map ModName ModuleInfo) m ModuleInfo
-loadDiscoModule' mdir inProcess modName  = do
+loadDiscoModule' resolver inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
   modMap <- get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
-      file <- resolveModule mdir modName
+      file <- resolveModule resolver modName
              >>= maybe (throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
-      mis <- mapM (loadDiscoModule' mdir (S.insert modName inProcess)) mns
+      mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
       m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
       m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]

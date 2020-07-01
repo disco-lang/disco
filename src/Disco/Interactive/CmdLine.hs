@@ -37,6 +37,7 @@ import           System.Console.Haskeline  as H
 
 import           Disco.Eval
 import           Disco.Interactive.Eval
+import           Disco.Interactive.Commands (handleLoad, loadFile)
 
 ------------------------------------------------------------
 -- Command-line options parser

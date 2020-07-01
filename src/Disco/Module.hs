@@ -98,14 +98,22 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 -- Module resolution
 ------------------------------------------------------------
 
--- | Given a directory and a module name, relavent directories are searched for the file
---   containing the provided module name. Currently, Disco searches for the module in
---   the standard library directory (lib), and the directory passed in to resolveModule.
---   Returns Nothing if no module with the given name could be found.
-resolveModule :: MonadIO m => FilePath -> ModName -> m (Maybe FilePath)
-resolveModule directory modname = do
+-- | Given (possibly) a directory and a module name, relavent
+--   directories are searched for the file containing the provided
+--   module name. If a directory is provided, look only in the
+--   specific given directory.  If the directory is @Nothing@, then
+--   Disco searches for the module first in the standard library
+--   directory (lib), and then in the directory passed in to
+--   resolveModule.  Returns Nothing if no module with the given name
+--   could be found.
+resolveModule :: MonadIO m => Maybe FilePath -> ModName -> m (Maybe FilePath)
+resolveModule mdir modname = do
   datadir <- liftIO getDataDir
-  let fps = map (</> replaceExtension modname "disco") [datadir, directory]
+  let searchPath =
+        case mdir of
+          Just directory -> [directory]
+          Nothing        -> [datadir, "."]
+  let fps = map (</> replaceExtension modname "disco") searchPath
   fexists <- liftIO $ filterM doesFileExist fps
   case fexists of
     []     -> return Nothing

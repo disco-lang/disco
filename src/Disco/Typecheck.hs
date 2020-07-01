@@ -535,9 +535,9 @@ typecheck Infer (TPrim prim) = do
       b <- freshTy
       return $ (a :->: b) :*: TyContainer c a :->: TyContainer c b
 
-    -- XXX should eventually be (a -> a -> a) -> c a -> a,
+    -- XXX should eventually be (a * a -> a) * c a -> a,
     --   with a check that the function has the right properties.
-    -- reduce : (a -> a -> a) -> a -> c a -> a
+    -- reduce : (a * a -> a) * a * c a -> a
     inferPrim PrimReduce = do
       c <- freshAtom
       a <- freshTy

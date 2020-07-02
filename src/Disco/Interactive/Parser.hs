@@ -17,17 +17,17 @@ module Disco.Interactive.Parser
     parseTypeTarget
   ) where
 
-import           Data.Char                        (isSpace)
-import           Data.List                        (find, isPrefixOf)
+import           Data.Char               (isSpace)
+import           Data.List               (find, isPrefixOf)
 
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec.Char             as C
+import           Text.Megaparsec         hiding (runParser)
+import qualified Text.Megaparsec.Char    as C
 
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Parser
 -- import           Disco.Syntax.Operators  -- needed for #185
-import Disco.Interactive.Types
+import           Disco.Interactive.Types
 
 ------------------------------------------------------------
 -- Parser

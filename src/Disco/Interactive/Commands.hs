@@ -19,7 +19,7 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           Disco.Parser   (sc, ident, term)
+import           Disco.Parser                            (ident, sc, term)
 
 
 import           System.Console.Haskeline                as H
@@ -33,8 +33,6 @@ import           Data.List                               (find, sortBy)
 import qualified Data.Map                                as M
 import           System.FilePath                         (splitFileName)
 
-import           Unbound.Generics.LocallyNameless
-import           Text.Megaparsec                  hiding (runParser)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
@@ -46,13 +44,16 @@ import           Disco.Interactive.Parser
 import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
-import           Disco.Parser                           (parseImport, parseExtName, reserved)
+import           Disco.Parser                            (parseExtName,
+                                                          parseImport, reserved)
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
+import           Text.Megaparsec                         hiding (runParser)
+import           Unbound.Generics.LocallyNameless
 
 -- | Allow getting an action from a REPLCommand outside of this module
 getAction :: REPLCommand -> REPLExpr -> Disco IErr ()
@@ -95,8 +96,8 @@ discoCommands =
   ]
 
 
--- | Turns a REPLExpr into a single string as a way 
---   to exec REPLCommand actions dynamically 
+-- | Turns a REPLExpr into a single string as a way
+--   to exec REPLCommand actions dynamically
 toTag :: REPLExpr -> String
 toTag (TypeCheck _) = name typeCheckCmd
 toTag (Let _ _    ) = name letCmd
@@ -424,11 +425,11 @@ handleNop _ = return ()
 
 handleParse :: REPLExpr -> Disco IErr ()
 handleParse (Parse t) = iprint $ t
-handleParse _ = return ()
+handleParse _         = return ()
 
 handlePretty :: REPLExpr -> Disco IErr ()
 handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= iputStrLn
-handlePretty _ = return ()
+handlePretty _          = return ()
 
 handleReload :: REPLExpr -> Disco IErr ()
 handleReload _ = do
@@ -468,7 +469,7 @@ handleTypeCheck _ = return ()
 
 handleUsing :: REPLExpr -> Disco IErr ()
 handleUsing (Using e) = enabledExts %= addExtension e
-handleUsing _ = return ()
+handleUsing _         = return ()
 
 -- | show names and types for each item in 'topCtx'
 handleNames :: REPLExpr -> Disco IErr ()
@@ -609,7 +610,7 @@ handleLet _ = return ()
 
 handleEval :: REPLExpr -> Disco IErr ()
 handleEval (Eval e) = evalTerm e
-handleEval _ = return ()
+handleEval _        = return ()
 
 evalTerm :: Term -> Disco IErr ()
 evalTerm t = do
@@ -628,4 +629,3 @@ evalTerm t = do
         topCtx %= M.insert (string2Name "it") (toPolyType ty)
         topEnv %= M.insert (string2Name "it") v
         garbageCollect
-

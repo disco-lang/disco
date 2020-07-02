@@ -71,4 +71,3 @@ data REPLCommand = REPLCommand
   , action    :: REPLExpr -> Disco IErr ()
   , parser    :: Parser REPLExpr
   }
-

@@ -12,15 +12,15 @@
 
 module Disco.Interactive.Eval where
 
-import           Control.Lens                            (use)
+import           Control.Lens               (use)
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Interactive.Parser
 ------------------------------------------------------------
 
-import qualified Data.IntMap                             as IM
-import           Data.List                               (intercalate)
+import qualified Data.IntMap                as IM
+import           Data.List                  (intercalate)
 
 showVal :: Int -> Value -> String
 showVal 0 _            = "_"
@@ -56,6 +56,5 @@ handleCMD s = do
   where
     handleLine :: REPLExpr -> Disco IErr ()
     handleLine r = case getCommand r allCommands of
-                    Just c -> getAction c r
+                    Just c  -> getAction c r
                     Nothing -> return ()
-

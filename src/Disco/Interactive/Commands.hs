@@ -629,4 +629,3 @@ evalTerm t = do
         topCtx %= M.insert (string2Name "it") (toPolyType ty)
         topEnv %= M.insert (string2Name "it") v
         garbageCollect
-

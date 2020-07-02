@@ -58,4 +58,3 @@ handleCMD s = do
     handleLine r = case getCommand r allCommands of
                     Just c  -> getAction c r
                     Nothing -> return ()
-

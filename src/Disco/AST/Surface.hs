@@ -36,6 +36,7 @@ module Disco.AST.Surface
        , pattern TVar
        , pattern TPrim
        , pattern TUn
+       , pattern TBin
        , pattern TLet
        , pattern TParens
        , pattern TUnit
@@ -49,7 +50,6 @@ module Disco.AST.Surface
        , pattern TTup
        , pattern TInj
        , pattern TCase
-       , pattern TBin
        , pattern TChain
        , pattern TTyOp
        , pattern TContainerComp
@@ -208,8 +208,6 @@ type instance X_TApp            UD = ()
 type instance X_TTup            UD = ()
 type instance X_TInj            UD = ()
 type instance X_TCase           UD = ()
-type instance X_TUn             UD = ()
-type instance X_TBin            UD = ()
 type instance X_TChain          UD = ()
 type instance X_TTyOp           UD = ()
 type instance X_TContainer      UD = ()
@@ -224,7 +222,10 @@ pattern TPrim :: Prim -> Term
 pattern TPrim name = TPrim_ () name
 
 pattern TUn :: UOp -> Term -> Term
-pattern TUn uop term = TUn_ () uop term
+pattern TUn uop term = TApp_ () (TPrim_ () (PrimUOp uop)) term
+
+pattern TBin :: BOp -> Term -> Term -> Term
+pattern TBin bop term1 term2 = TApp_ () (TPrim_ () (PrimBOp bop)) (TTup_ () [term1, term2])
 
 pattern TLet :: Bind (Telescope Binding) Term -> Term
 pattern TLet bind = TLet_ () bind
@@ -265,9 +266,6 @@ pattern TInj side term = TInj_ () side term
 pattern TCase :: [Branch] -> Term
 pattern TCase branch = TCase_ () branch
 
-pattern TBin :: BOp -> Term -> Term -> Term
-pattern TBin bop term1 term2 = TBin_ () bop term1 term2
-
 pattern TChain :: Term -> [Link] -> Term
 pattern TChain term linklist = TChain_ () term linklist
 
@@ -289,8 +287,8 @@ pattern TAscr term ty = TAscr_ () term ty
 pattern TWild :: Term
 pattern TWild = XTerm_ ()
 
-{-# COMPLETE TVar, TPrim, TUn, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
-             TString, TAbs, TApp, TTup, TInj, TCase, TBin, TChain, TTyOp,
+{-# COMPLETE TVar, TPrim, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
+             TString, TAbs, TApp, TTup, TInj, TCase, TChain, TTyOp,
              TContainer, TContainerComp, TAscr, TWild #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term

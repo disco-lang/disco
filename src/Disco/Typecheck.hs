@@ -894,22 +894,6 @@ typecheck mode lt@(TInj s t) = do
     Check ty -> return ty
   return $ ATInj resTy s at
 
---------------------------------------------------
--- Binary and unary operators (via expansion)
-
--- Expand operators into applications of primitives right before
--- type checking them.
-
-typecheck Infer (TUn uop t)      = typecheck Infer expandedUOp
-  where
-    expandedUOp :: Term
-    expandedUOp = TApp (TPrim (PrimUOp uop)) t
-
-typecheck Infer (TBin bop t1 t2) = typecheck Infer expandedBOp
-  where
-    expandedBOp :: Term
-    expandedBOp = TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])
-
 ----------------------------------------
 -- Comparison chain
 

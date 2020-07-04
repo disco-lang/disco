@@ -52,9 +52,4 @@ handleCMD s = do
     exts <- use enabledExts
     case (parseLine discoCommands exts s) of
       Left msg -> io $ putStrLn msg
-      Right l -> handleLine l `catchError` (io . print  {- XXX pretty-print error -})
-  where
-    handleLine :: REPLExpr -> Disco IErr ()
-    handleLine r = case getCommand r allCommands of
-                    Just c  -> getAction c r
-                    Nothing -> return ()
+      Right l -> dispatch discoCommands l `catchError` (io . print  {- XXX pretty-print error -})

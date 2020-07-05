@@ -11,6 +11,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DataKinds #-}
+
 module Disco.Interactive.Parser
   ( REPLExpr(..)
   , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine,
@@ -33,23 +35,22 @@ import           Disco.Interactive.Types
 -- Parser
 ------------------------------------------------------------
 
-letParser :: Parser REPLExpr
+letParser :: Parser (REPLExpr 'CLet)
 letParser = Let
   <$> ident
   <*> (symbol "=" *> term)
 
-commandParser :: [REPLCommand] -> Parser REPLExpr
+commandParser :: [SomeREPLCommand] -> Parser SomeREPLExpr
 commandParser allCommands = (symbol ":" *> many C.lowerChar) >>= (parseCommandArgs allCommands)
 
-parseCommandArgs ::  [REPLCommand] -> String -> Parser REPLExpr
+parseCommandArgs ::  [SomeREPLCommand] -> String -> Parser SomeREPLExpr
 parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
   where
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
-    parsers = map (\rc -> (name rc, parser rc)) allCommands
+    parsers = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) allCommands
 
 parseTypeTarget :: Parser Term
-parseTypeTarget =
-      (try term <?> "expression")
+parseTypeTarget = (try term <?> "expression")
 
 -- Can't do this until we get rid of TUn and TBin, represent operator
 -- applications as just normal function application.
@@ -69,16 +70,16 @@ parseTypeTarget =
 fileParser :: Parser FilePath
 fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 
-lineParser :: [REPLCommand] -> Parser REPLExpr
+lineParser :: [SomeREPLCommand] -> Parser SomeREPLExpr
 lineParser allCommands
   =   (commandParser allCommands)
-  <|> try (Nop <$ (sc <* eof))
-  <|> try (Using <$> (reserved "using" *> parseExtName))
-  <|> try (Import <$> parseImport)
-  <|> try (Eval <$> term)
-  <|> letParser
+  <|> try (SomeREPL Nop <$ (sc <* eof))
+  <|> try ((SomeREPL . Using) <$> (reserved "using" *> parseExtName))
+  <|> try ((SomeREPL . Import) <$> parseImport)
+  <|> try ((SomeREPL . Eval) <$> term)
+  <|> (SomeREPL <$> letParser)
 
-parseLine :: [REPLCommand] -> ExtSet -> String -> Either String REPLExpr
+parseLine :: [SomeREPLCommand] -> ExtSet -> String -> Either String SomeREPLExpr
 parseLine allCommands exts s =
   case (runParser (withExts exts (lineParser allCommands)) "" s) of
     Left  e -> Left $ errorBundlePretty e

@@ -404,7 +404,7 @@ typecheck :: Mode -> Term -> TCM ATerm
 -- ~~~~ Note [Pattern coverage]
 -- In several places we have clauses like
 --
---   typecheck Infer (TBin op t1 t2) | op `elem` [ ... ]
+--   inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
 --
 -- since the typing rules for all the given operators are the same.
 -- The only problem is that the pattern coverage checker (sensibly)

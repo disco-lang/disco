@@ -223,7 +223,7 @@ handleHelp Help = do
   mapM_ (\(SomeCmd c) -> iputStrLn $ showCmd c maxlen) $  sortedList discoCommands
   iputStrLn ""
   where
-    sortedList cmds = 
+    sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
     filteredCommands cmds = filter (\(SomeCmd c) -> category c == User) cmds
@@ -231,7 +231,7 @@ handleHelp Help = do
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = s ++ (concat padding)
               where paddingLen = maxsize - length s
-                    padding = take paddingLen $ repeat " " 
+                    padding = take paddingLen $ repeat " "
 
 importCmd :: REPLCommand 'CImport
 importCmd =
@@ -293,7 +293,7 @@ loadCmd =
 
 -- | Parses, typechecks, and loads a module by first recursively loading any imported
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
---   in the parent module are executed. 
+--   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper :: REPLExpr 'CLoad -> Disco IErr ()
 handleLoadWrapper (Load fp) =  handleLoad fp >> return ()
@@ -342,7 +342,7 @@ nopCmd =
       cmdtype = BuiltIn,
       action = handleNop,
       parser = Nop <$ (sc <* eof)
-    } 
+    }
 
 handleNop :: REPLExpr 'CNop -> Disco IErr ()
 handleNop Nop = return ()

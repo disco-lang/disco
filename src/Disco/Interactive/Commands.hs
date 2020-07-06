@@ -218,7 +218,7 @@ nopCmd =
       cmdtype = BuiltIn,
       action = handleNop,
       parser = Nop <$ (sc <* eof)
-    } 
+    }
 
 parseCmd :: REPLCommand 'CParse
 parseCmd =
@@ -386,7 +386,7 @@ handleLet (Let x t) = do
 
 -- | Parses, typechecks, and loads a module by first recursively loading any imported
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
---   in the parent module are executed. 
+--   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper :: REPLExpr 'CLoad -> Disco IErr ()
 handleLoadWrapper (Load fp) =  handleLoad fp >> return ()

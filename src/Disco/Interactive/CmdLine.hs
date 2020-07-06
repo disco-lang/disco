@@ -36,6 +36,7 @@ import qualified Options.Applicative       as O
 import           System.Console.Haskeline  as H
 
 import           Disco.Eval
+import           Disco.Interactive.Commands (handleLoad, loadFile)
 import           Disco.Interactive.Eval
 
 ------------------------------------------------------------

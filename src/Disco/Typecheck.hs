@@ -404,7 +404,7 @@ typecheck :: Mode -> Term -> TCM ATerm
 -- ~~~~ Note [Pattern coverage]
 -- In several places we have clauses like
 --
---   typecheck Infer (TBin op t1 t2) | op `elem` [ ... ]
+--   inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
 --
 -- since the typing rules for all the given operators are the same.
 -- The only problem is that the pattern coverage checker (sensibly)
@@ -893,22 +893,6 @@ typecheck mode lt@(TInj s t) = do
                    ((:+:) <$> freshTy           <*> pure (getType at))
     Check ty -> return ty
   return $ ATInj resTy s at
-
---------------------------------------------------
--- Binary and unary operators (via expansion)
-
--- Expand operators into applications of primitives right before
--- type checking them.
-
-typecheck Infer (TUn uop t)      = typecheck Infer expandedUOp
-  where
-    expandedUOp :: Term
-    expandedUOp = TApp (TPrim (PrimUOp uop)) t
-
-typecheck Infer (TBin bop t1 t2) = typecheck Infer expandedBOp
-  where
-    expandedBOp :: Term
-    expandedBOp = TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])
 
 ----------------------------------------
 -- Comparison chain

@@ -827,7 +827,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- like a multiplicative term.  However, we must be sure to
     -- *first* recursively fix the subterms (particularly the
     -- left-hand one) *before* doing this analysis.  See
-    -- https://github.com/disco-lang/disco/issues/71 .
+    -- <https://github.com/disco-lang/disco/issues/71> .
     fixJuxtMul (TApp t1 t2)
       | isMultiplicativeTerm t1' = fixPrec $ TBin Mul t1' t2'
       | otherwise                = fixPrec $ TApp     t1' t2'
@@ -876,12 +876,6 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- e.g. x^2y --> x^(2@y) --> x^(2*y) --> (x^2) * y
     fixPrec (TBin bop1 t1 (TBin bop2 t2 t3))
       | bPrec bop2 < bPrec bop1 = TBin bop2 (fixPrec $ TBin bop1 t1 t2) t3
-
-    fixPrec (TApp (TBin bop t1 t2) t3)
-      | bPrec bop < funPrec = TBin bop t1 (fixPrec $ TApp t2 t3)
-
-    fixPrec (TApp t1 (TBin bop t2 t3))
-      | bPrec bop < funPrec = TBin bop (fixPrec $ TApp t1 t2) t3
 
     fixPrec t = t
 

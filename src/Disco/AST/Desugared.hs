@@ -93,8 +93,6 @@ type instance X_TAbsBind DS       = Name DTerm
 type instance X_TApp DS           = Type
 type instance X_TInj DS           = Type
 type instance X_TCase DS          = Type
-type instance X_TUn DS            = Type
-type instance X_TBin DS           = Type
 type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
                                          -- binary comparisons
 type instance X_TTyOp DS          = Type

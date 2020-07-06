@@ -82,8 +82,6 @@ module Disco.AST.Generic
        , X_TTup
        , X_TInj
        , X_TCase
-       , X_TUn
-       , X_TBin
        , X_TChain
        , X_TTyOp
        , X_TContainer
@@ -269,8 +267,6 @@ type family X_TApp e
 type family X_TTup e
 type family X_TInj e
 type family X_TCase e
-type family X_TUn e
-type family X_TBin e
 type family X_TChain e
 type family X_TTyOp e
 type family X_TContainer e
@@ -340,12 +336,6 @@ data Term_ e where
   -- | A case expression.
   TCase_  :: X_TCase e -> [Branch_ e] -> Term_ e
 
-  -- | An application of a unary operator.
-  TUn_    :: X_TUn e -> UOp -> Term_ e -> Term_ e
-
-  -- | An application of a binary operator.
-  TBin_   :: X_TBin e -> BOp -> Term_ e -> Term_ e -> Term_ e
-
   -- | A chained comparison, consisting of a term followed by one or
   --   more "links", where each link is a comparison operator and
   --   another term.
@@ -387,8 +377,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TInj e)
     , a (X_TCase e)
     , a (X_TTup e)
-    , a (X_TUn e)
-    , a (X_TBin e)
     , a (X_TChain e)
     , a (X_TTyOp e)
     , a (X_TContainer e)

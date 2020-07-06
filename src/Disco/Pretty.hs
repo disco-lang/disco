@@ -243,14 +243,6 @@ prettyTerm (TContainerComp c bqst) =
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn op t)    = mparens (ugetPA op) $
-  prettyUOp op <> prettyTerm' (1 + funPrec) InR t
-prettyTerm (TBin op t1 t2) = mparens (getPA op) $
-  hsep
-  [ prettyTerm' (bPrec op) InL t1
-  , prettyBOp op
-  , prettyTerm' (bPrec op) InR t2
-  ]
 prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
     prettyTerm' (bPrec Eq) InL t
     : concatMap prettyLink lks

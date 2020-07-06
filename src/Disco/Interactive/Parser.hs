@@ -15,8 +15,7 @@
 
 module Disco.Interactive.Parser
   ( REPLExpr(..)
-  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine,
-    parseTypeTarget
+  , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine
   ) where
 
 import           Data.Char               (isSpace)
@@ -51,8 +50,6 @@ parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) .
     -- filter out commands that don't start with ':' (ex: "let" vs ":load")
     parsers = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) $ withoutBuiltins allCommands
     
-parseTypeTarget :: Parser Term
-parseTypeTarget = (try term <?> "expression")
 
 -- Can't do this until we get rid of TUn and TBin, represent operator
 -- applications as just normal function application.

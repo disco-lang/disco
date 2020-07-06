@@ -78,8 +78,8 @@ data REPLCommandType =
 
 data REPLCommand (c :: CmdTag) = REPLCommand
   { name      :: String
+  , helpcmd   :: String
   , shortHelp :: String
-  , longHelp  :: String
   , category  :: REPLCommandCategory
   , cmdtype   :: REPLCommandType
   , action    :: REPLExpr c -> Disco IErr ()

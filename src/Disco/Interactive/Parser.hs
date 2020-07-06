@@ -49,7 +49,7 @@ parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) .
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
     -- filter out commands that don't start with ':' (ex: "let" vs ":load")
     parsers = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) $ withoutBuiltins allCommands
-    
+
 
 -- Can't do this until we get rid of TUn and TBin, represent operator
 -- applications as just normal function application.

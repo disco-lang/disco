@@ -244,6 +244,8 @@ library
                        Disco.Interactive.Eval
                        Disco.Interactive.Parser
                        Disco.Interactive.CmdLine
+                       Disco.Interactive.Types
+                       Disco.Interactive.Commands
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco

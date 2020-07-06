@@ -11,81 +11,45 @@
 --
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DataKinds #-}
+
 module Disco.Interactive.Parser
   ( REPLExpr(..)
   , letParser, commandParser, parseCommandArgs, fileParser, lineParser, parseLine
   ) where
 
-import           Data.Char                        (isSpace)
-import           Data.List                        (find, isPrefixOf)
+import           Data.Char               (isSpace)
+import           Data.List               (find, isPrefixOf)
 
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec.Char             as C
-import           Unbound.Generics.LocallyNameless
+import           Text.Megaparsec         hiding (runParser)
+import qualified Text.Megaparsec.Char    as C
 
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Parser
 -- import           Disco.Syntax.Operators  -- needed for #185
+import           Disco.Interactive.Types
 
-------------------------------------------------------------
--- REPL expression type
-------------------------------------------------------------
-
-data REPLExpr =
-   Using Ext                    -- Enable an extension
- | Let (Name Term) Term         -- Toplevel let-expression: for the REPL
- | TypeCheck Term               -- Typecheck a term
- | Eval Term                    -- Evaluate a term
- | ShowDefn (Name Term)         -- Show a variable's definition
- | Parse Term                   -- Show the parsed AST
- | Pretty Term                  -- Pretty-print a term
- | Ann Term                     -- Show type-annotated typechecked term
- | Desugar Term                 -- Show a desugared term
- | Compile Term                 -- Show a compiled term
- | Import String                -- Import a library module.
- | Load FilePath                -- Load a file.
- | Reload                       -- Reloads the most recently loaded file.
- | Doc (Name Term)              -- Show documentation.
- | Nop                          -- No-op, e.g. if the user just enters a comment
- | Help
- | Names
- deriving Show
 
 ------------------------------------------------------------
 -- Parser
 ------------------------------------------------------------
 
-letParser :: Parser REPLExpr
+letParser :: Parser (REPLExpr 'CLet)
 letParser = Let
   <$> ident
   <*> (symbol "=" *> term)
 
-commandParser :: Parser REPLExpr
-commandParser = (symbol ":" *> many C.lowerChar) >>= parseCommandArgs
+commandParser :: [SomeREPLCommand] -> Parser SomeREPLExpr
+commandParser allCommands = (symbol ":" *> many C.lowerChar) >>= (parseCommandArgs allCommands)
 
-parseCommandArgs :: String -> Parser REPLExpr
-parseCommandArgs cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
+parseCommandArgs ::  [SomeREPLCommand] -> String -> Parser SomeREPLExpr
+parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
   where
     badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
-    parsers =
-      [ ("type",    TypeCheck <$> parseTypeTarget)
-      , ("defn",    ShowDefn  <$> (sc *> ident))
-      , ("parse",   Parse     <$> term)
-      , ("pretty",  Pretty    <$> term)
-      , ("ann",     Ann       <$> term)
-      , ("desugar", Desugar   <$> term)
-      , ("compile", Compile   <$> term)
-      , ("load",    Load      <$> fileParser)
-      , ("reload",  return Reload)
-      , ("doc",     Doc       <$> (sc *> ident))
-      , ("help",    return Help)
-      , ("names",  return Names)
-      ]
-
-parseTypeTarget :: Parser Term
-parseTypeTarget =
-      (try term <?> "expression")
+    -- filter out commands that don't start with ':' (ex: "let" vs ":load")
+    parsers = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) $ withoutBuiltins allCommands
+    
 
 -- Can't do this until we get rid of TUn and TBin, represent operator
 -- applications as just normal function application.
@@ -105,17 +69,17 @@ parseTypeTarget =
 fileParser :: Parser FilePath
 fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 
-lineParser :: Parser REPLExpr
-lineParser
-  =   commandParser
-  <|> try (Nop <$ (sc <* eof))
-  <|> try (Using <$> (reserved "using" *> parseExtName))
-  <|> try (Import <$> parseImport)
-  <|> try (Eval <$> term)
-  <|> letParser
+lineParser :: [SomeREPLCommand] -> Parser SomeREPLExpr
+lineParser allCommands
+  =   (commandParser allCommands)
+  <|> try (SomeREPL Nop <$ (sc <* eof))
+  <|> try ((SomeREPL . Using) <$> (reserved "using" *> parseExtName))
+  <|> try ((SomeREPL . Import) <$> parseImport)
+  <|> try ((SomeREPL . Eval) <$> term)
+  <|> (SomeREPL <$> letParser)
 
-parseLine :: ExtSet -> String -> Either String REPLExpr
-parseLine exts s =
-  case (runParser (withExts exts lineParser) "" s) of
+parseLine :: [SomeREPLCommand] -> ExtSet -> String -> Either String SomeREPLExpr
+parseLine allCommands exts s =
+  case (runParser (withExts exts (lineParser allCommands)) "" s) of
     Left  e -> Left $ errorBundlePretty e
     Right l -> Right l

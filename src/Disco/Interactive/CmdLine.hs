@@ -25,17 +25,18 @@ module Disco.Interactive.CmdLine
 
   ) where
 
-import           Control.Monad             (when)
-import           Control.Monad.IO.Class    (MonadIO (..))
-import           Control.Monad.Trans.Class (MonadTrans (..))
-import           Data.List                 (isPrefixOf)
-import           Data.Maybe                (isJust)
-import           System.Exit               (exitFailure, exitSuccess)
+import           Control.Monad              (when)
+import           Control.Monad.IO.Class     (MonadIO (..))
+import           Control.Monad.Trans.Class  (MonadTrans (..))
+import           Data.List                  (isPrefixOf)
+import           Data.Maybe                 (isJust)
+import           System.Exit                (exitFailure, exitSuccess)
 
-import qualified Options.Applicative       as O
-import           System.Console.Haskeline  as H
+import qualified Options.Applicative        as O
+import           System.Console.Haskeline   as H
 
 import           Disco.Eval
+import           Disco.Interactive.Commands (handleLoad, loadFile)
 import           Disco.Interactive.Eval
 
 ------------------------------------------------------------

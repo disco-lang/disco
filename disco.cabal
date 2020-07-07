@@ -105,6 +105,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/poly-instantiate/expected
                      test/poly-instantiate/input
                      test/poly-instantiate/poly-instantiate.disco
+                     test/poly-rectype/expected
+                     test/poly-rectype/input
+                     test/poly-rectype/poly-rectype.disco
                      test/pretty-functions/expected
                      test/pretty-functions/input
                      test/pretty-lazy/expected
@@ -119,6 +122,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
+                     test/repl-ann/expected
+                     test/repl-ann/input
                      test/repl-compile/expected
                      test/repl-compile/input
                      test/repl-defn/expected
@@ -127,8 +132,13 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-defns/input
                      test/repl-desugar/expected
                      test/repl-desugar/input
+                     test/repl-help/expected
+                     test/repl-help/input
                      test/repl-import/expected
                      test/repl-import/input
+                     test/repl-names/expected
+                     test/repl-names/input
+                     test/repl-names/logic.disco
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
@@ -157,6 +167,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-juxt-mul/expected
                      test/syntax-juxt-mul/input
                      test/syntax-juxt-mul/juxt-mul.disco
+                     test/syntax-lambda-pat/expected
+                     test/syntax-lambda-pat/input
                      test/syntax-lambda/expected
                      test/syntax-lambda/input
                      test/syntax-let/expected

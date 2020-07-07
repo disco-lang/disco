@@ -229,9 +229,7 @@ handleHelp Help = do
     filteredCommands cmds = filter (\(SomeCmd c) -> category c == User) cmds
     showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ (shortHelp c)
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
-    padRight s maxsize = s ++ (concat padding)
-              where paddingLen = maxsize - length s
-                    padding = take paddingLen $ repeat " "
+    padRight s maxsize = take maxsize (s ++ repeat ' ')
 
 importCmd :: REPLCommand 'CImport
 importCmd =

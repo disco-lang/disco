@@ -45,5 +45,5 @@ jobs:
       with:
         channel: "#disco-lang"
         nickname: disco-bot
-        message: "CI \x0304failed\x03: https://github.com/disco-lang/disco/runs/${{ github.run_id }}"
+        message: "CI \x0304failed\x03: https://github.com/disco-lang/disco/actions/runs/${{ github.run_id }}"
         notice: true

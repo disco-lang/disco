@@ -12,8 +12,7 @@ jobs:
           channel: "#disco-lang"
           nickname: disco-bot
           message: |
-            \x0306%{branch}\x03 \x0314%{commit}\x03 %{build_url} %{message}
-            ${{ github.actor }} pushed to \x0306${{ github.event.ref }}\x03 ${{ github.event.compare }}
+            ${{ github.actor }} pushed to ${{ github.event.ref }} ${{ github.event.compare }}
             ${{ join(github.event.commits.*.message, '\n') }}
           notice: true
       - name: irc pull request

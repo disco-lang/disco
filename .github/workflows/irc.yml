@@ -2,7 +2,7 @@ name: "Push Notification"
 on: [push, pull_request, create]
 
 jobs:
-  test:
+  irc:
     runs-on: ubuntu-latest
     steps:
       - name: irc push
@@ -10,9 +10,10 @@ jobs:
         if: github.event_name == 'push'
         with:
           channel: "#disco-lang"
-          nickname: disco-github-bot
+          nickname: disco-bot
           message: |
-            ${{ github.actor }} pushed ${{ github.event.ref }} ${{ github.event.compare }}
+            \x0306%{branch}\x03 \x0314%{commit}\x03 %{build_url} %{message}
+            ${{ github.actor }} pushed to \x0306${{ github.event.ref }}\x03 ${{ github.event.compare }}
             ${{ join(github.event.commits.*.message, '\n') }}
           notice: true
       - name: irc pull request
@@ -20,16 +21,7 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           channel: "#disco-lang"
-          nickname: disco-github-bot
+          nickname: disco-bot
           message: |
             ${{ github.actor }} opened PR ${{ github.event.html_url }}
-          notice: true
-      - name: irc tag created
-        uses: rectalogic/notify-irc@v1
-        if: github.event_name == 'create' && github.event.ref_type == 'tag'
-        with:
-          channel: "#disco-lang"
-          nickname: disco-github-bot
-          message: |
-            ${{ github.actor }} tagged ${{ github.repository }} ${{ github.event.ref }}
           notice: true

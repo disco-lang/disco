@@ -63,3 +63,4 @@ stack build --fast --file-watch --ghc-options='-Wall'
 which will turn on warnings, turn off optimizations for a faster
 edit-compile-test cycle, and automatically recompile every time a
 source file changes.
+

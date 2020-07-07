@@ -253,8 +253,8 @@ letCmd :: REPLCommand 'CLet
 letCmd =
     REPLCommand {
       name = "let",
-      helpcmd = "let <variable> = <expression>",
-      shortHelp = "Toplevel let-expression: for the REPL",
+      helpcmd = "<variable> = <expression>",
+      shortHelp = "Temporarily define a variable (until the next :load)",
       category = User,
       cmdtype = BuiltIn,
       action = handleLet,

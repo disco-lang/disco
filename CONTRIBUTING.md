@@ -101,32 +101,42 @@ bug report.  Just describe your idea in as much detail as you can.
 
 ### Improving Documentation
 
-Two types of documentation:
+Disco has two main types of documentation:
 
-1. Haddock documentation in code.  One valuable way to contribute is
-   by reading and trying to understand the code, and adding additional
-   comments to document your understanding in places where XXX.
+1. Documentation [hosted on
+   `readthedocs.io`](https://disco-lang.readthedocs.io/en/latest/),
+   aimed at users of Disco (students, teachers, *etc.*).  The source
+   for this documentation can be found in the [`docs/`
+   directory](https://github.com/disco-lang/disco/tree/master/docs).
+   Right now there is only a tutorial for experienced functional
+   programmers, but more documents are planned, such as a language
+   reference and a tutorial for beginning programmers; you may have
+   ideas for other sorts of helpful documents!  You can contribute to
+   an existing document or even start a new one.  For more information
+   about the technical details of contributing to the documentation,
+   see [docs/README.md](docs/README.md).
 
-2. Disco documentation [hosted on
-   `readthedocs.io`](https://disco-lang.readthedocs.io/en/latest/)
-   lives in the `docs/` directory.  Right now there is only a tutorial
-   for experienced functional programs, but more documents are
-   planned, such as a language reference and a tutorial for beginning
-   programmers; you may have ideas for other sorts of helpful
-   documents!  You can contribute to an existing document or even
-   start a new one.  For more information about the technical details
-   of contributing to the documentation, see [docs/README.md](docs/README.md).
+2. [Haddock](https://www.haskell.org/haddock/) documentation in the
+   code, which is aimed at developers and those trying to understand
+   the implementation of Disco.  One valuable way to contribute is by
+   reading and trying to understand the code, and adding additional
+   comments to document your understanding in places where the
+   comments are inadequate.
 
-### Your First Code Contribution
+### Your First Contribution
 
 Unsure where to begin contributing to Disco? You can start by looking
-through XXX
-
-* [Low-hanging fruit][low-hanging] - XXX
+through [issues tagged "Low-hanging
+fruit"][https://github.com/disco-lang/disco/issues?q=is%3Aissue+is%3Aopen+label%3A%22C-Low+Hanging+Fruit%22]
+in the issue tracker.  These are bugs and features which should be
+appropriate for someone just getting started to tackle.  If you want
+help understanding or getting started on a particular issue, feel free
+to leave a comment on the issue, or ask in the [`#disco-lang` IRC
+channel](https://webchat.freenode.net/#disco-lang).
 
 ### Development Workflow
 
-XXX forks, github 
+
 
 ### Pull Requests
 

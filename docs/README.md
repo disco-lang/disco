@@ -20,4 +20,11 @@ Now point your browser at `docs/_build/html/index.html` to view.
 
 When contributing to the documentation, you are highly encouraged to
 build it locally to make sure it looks good before pushing/opening a
-pull request/etc.  However, it's not 
+pull request/etc.  However, if you are unable to, it's not absolutely
+necessary.
+
+Documentation is written using
+[reStructuredText](https://docutils.sourceforge.io/rst.html). See the
+linked documentation for information, including tutorials and
+reference material; or just look at some existing Disco documentation
+and copy the syntax!

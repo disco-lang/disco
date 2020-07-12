@@ -47,6 +47,25 @@ unacceptable behavior to [byorgey@gmail.com](mailto:byorgey@gmail.com).
 
 ## How can I contribute?
 
+There are lots of ways to contribute to Disco---regardless of your
+background knowledge or level of mathematical or programming skill,
+there is probably a way you can help.  For general advice on
+contributing to open source projects like Disco, see [How to
+Contribute to Open
+Source](https://opensource.guide/how-to-contribute/), or [Your first
+open source contribution: a step-by-step technical
+guide](https://medium.com/@jenweber/your-first-open-source-contribution-a-step-by-step-technical-guide-d3aca55cc5a6).
+The rest of this section walks through specific ways you can
+contribute and instructions for how to do so.
+
+### What do I need to know to be able to help? ###
+
+<!-- If you are interested in making a code contribution and would like to learn more about the technologies that we use, check out the list below. -->
+
+<!--     Include bulleted list of -->
+<!--     resources (tutorials, videos, books) that new contributors -->
+<!--     can use to learn what they need to know to contribute to your project -->
+
 ### Reporting Bugs
 
 Even if you're not at the point where you would feel comfortable
@@ -118,15 +137,34 @@ Disco has two main types of documentation:
 
 2. [Haddock](https://www.haskell.org/haddock/) documentation in the
    code, which is aimed at developers and those trying to understand
-   the implementation of Disco.  One valuable way to contribute is by
-   reading and trying to understand the code, and adding additional
-   comments to document your understanding in places where the
-   comments are inadequate.
+   the implementation of Disco.  If you know Haskell, one valuable way
+   to contribute is by reading and trying to understand the code (feel
+   free to ask questions in the [`#disco-lang` IRC
+   channel]([`#disco-lang` IRC channel on
+   `freenode.net`](https://webchat.freenode.net/#disco-lang) along the
+   way!), and adding comments to document what you learn, especially
+   in places where the comments are inadequate.
 
-### Your First Contribution
+Specific documentation that needs fixing, or specific documentation
+that needs to be written, can be found [on the issue tracker under the
+"Documentation"
+label](https://github.com/disco-lang/disco/labels/Z-Documentation)
+(though as explained above, the issues on the issue tracker are by no
+means an exhaustive list of documentation improvements that would be
+helpful).
 
-Unsure where to begin contributing to Disco? You can start by looking
-through [issues tagged "Low-hanging
+### Making a Code Contribution
+
+Disco is written in [Haskell](http://haskell.org).  The level of
+Haskell skill needed to understand and contribute to the Disco
+codebase varies widely, but generally speaking you will probably need
+to be comfortable with standard monads (`Except`, `Reader`, `State`,
+`Maybe`) and with standard container types like `Data.Set` and
+`Data.Map`.  If you'd like to learn enough Haskell to contribute to
+Disco, we recommend XXX.
+
+If you'd like to contribute some code but are unsure where to begin,
+you can start by looking through [issues tagged "Low-hanging
 fruit"][https://github.com/disco-lang/disco/issues?q=is%3Aissue+is%3Aopen+label%3A%22C-Low+Hanging+Fruit%22]
 in the issue tracker.  These are bugs and features which should be
 appropriate for someone just getting started to tackle.  If you want
@@ -136,6 +174,23 @@ channel](https://webchat.freenode.net/#disco-lang).
 
 ### Development Workflow
 
+Never made an open source contribution before? Wondering how
+contributions work in the in our project? Here's a quick rundown!
+
+    <!-- Find an issue that you are interested in addressing or a feature that you would like to add. -->
+    <!-- Fork the repository associated with the issue to your local GitHub organization. This means that you will have a copy of the repository under your-GitHub-username/repository-name. -->
+    <!-- Clone the repository to your local machine using git clone https://github.com/github-username/repository-name.git. -->
+    <!-- Create a new branch for your fix using git checkout -b branch-name-here. -->
+    <!-- Make the appropriate changes for the issue you are trying to address or the feature that you want to add. -->
+    <!-- Use git add insert-paths-of-changed-files-here to add the file contents of the changed files to the "snapshot" git uses to manage the state of the project, also known as the index. -->
+    <!-- Use git commit -m "Insert a short message of the changes made here" to store the contents of the index with a descriptive message. -->
+    <!-- Push the changes to the remote repository using git push origin branch-name-here. -->
+    <!-- Submit a pull request to the upstream repository. -->
+    <!-- Title the pull request with a short description of the changes made and the issue or bug number associated with your change. For example, you can title an issue like so "Added more log outputting to resolve #4352". -->
+    <!-- In the description of the pull request, explain the changes that you made, any issues you think exist with the pull request you made, and any questions you have for the maintainer. It's OK if your pull request is not perfect (no pull request is), the reviewer will be able to help you fix any problems and improve it! -->
+    <!-- Wait for the pull request to be reviewed by a maintainer. -->
+    <!-- Make changes to the pull request if the reviewing maintainer recommends them. -->
+    <!-- Celebrate your success after your pull request is merged! -->
 
 
 ### Pull Requests

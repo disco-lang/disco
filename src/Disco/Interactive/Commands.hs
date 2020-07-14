@@ -18,9 +18,6 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           Disco.Parser                            (ident, sc, term)
-
-
 import           System.Console.Haskeline                as H
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -44,10 +41,14 @@ import           Disco.Interactive.Parser
 import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
-import           Disco.Parser                            (parseExtName,
-                                                          parseImport, reserved)
+import           Disco.Parser                            (Parser, ident,
+                                                          parseExtName,
+                                                          parseImport, reserved,
+                                                          reservedOp, sc, term)
 import           Disco.Pretty
 import           Disco.Property
+import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims                      (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
@@ -433,9 +434,8 @@ typeCheckCmd =
         category = Dev,
         cmdtype = ShellCmd,
         action = handleTypeCheck,
-        parser = TypeCheck <$> (try term <?> "expression")
+        parser = parseTypeCheck
         }
-
 
 handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco IErr ()
 handleTypeCheck (TypeCheck t) = do
@@ -445,6 +445,23 @@ handleTypeCheck (TypeCheck t) = do
         Left e        -> return.show $ e    -- XXX pretty-print
         Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
   iputStrLn s
+
+parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
+parseTypeCheck = TypeCheck <$>
+  (   (try term <?> "expression")
+  <|> (parseNakedOp <?> "operator")
+  )
+
+-- In a :type command, allow naked operators, as in :type + , even
+-- though + by itself is not a syntactically valid term.  However,
+-- this seems like it may be a common thing for a student to ask and
+-- there is no reason we can't have this as a special case.
+parseNakedOp :: Parser Term
+parseNakedOp = sc *> choice (map mkOpParser (concat opTable))
+  where
+    mkOpParser :: OpInfo -> Parser Term
+    mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((TPrim (PrimUOp op) <$) . reservedOp) syns)
+    mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((TPrim (PrimBOp op) <$) . reservedOp) syns)
 
 usingCmd :: REPLCommand 'CUsing
 usingCmd =

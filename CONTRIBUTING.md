@@ -158,7 +158,7 @@ materials](https://www.cis.upenn.edu/~cis194/spring13/).
 
 If you'd like to contribute some code but are unsure where to begin,
 you can start by looking through [issues tagged "Low-Hanging
-Fruit"][https://github.com/disco-lang/disco/labels/C-Low%20Hanging%20Fruit]
+Fruit"](https://github.com/disco-lang/disco/labels/C-Low%20Hanging%20Fruit)
 in the issue tracker.  These are bugs and features which should be
 appropriate for someone just getting started to tackle.  If you want
 help understanding or getting started on a particular issue, feel free
@@ -183,7 +183,7 @@ contributions work in the in our project? Here's a quick rundown!
    https://github.com/your-GitHub-username/disco.git`.  You should now
    have a subdirectory named `disco` containing an up-to-date copy of
    the repository.
-1. Create a new branch for your fix using `git checkout -b
+1. Create a new *branch* for your fix using `git checkout -b
    BRANCH-NAME` (replace `BRANCH-NAME` by some appropriate name based on
    the feature or fix you plan to make).
 1. Make the appropriate changes for the issue you are trying to
@@ -209,8 +209,27 @@ contributions work in the in our project? Here's a quick rundown!
    will be able to help you fix any problems and improve it!
 1. Wait for the pull request to be reviewed by a maintainer.
 1. Make changes to the pull request if the reviewing maintainer
-   recommends them.
+   recommends them.  You can simply make additional changes, `add` and
+   `commit` them, and then `push` to the same branch.  Any additional
+   commits added to the same branch will automatically be included in
+   the pull request.
 1. Celebrate your success after your pull request is merged!
+1. After your first pull request is merged, it is very likely that you
+   will be granted push access to the `disco-lang/disco` repository.  This means
+   that from now on you can create branches directly within the
+   `disco` repository rather than working in your own fork.  For more
+   information, see [I have push access to the Disco repository, now what?](#i-have-push-access-to-the-disco-repository-now-what).
+
+## I have push access to the Disco repository, now what?
+
+Inspired by [Edward
+Kmett](https://www.reddit.com/r/haskell/comments/5n61uh/an_interview_with_haskell_developer_edward_kmett/dc92hcc/?context=8&depth=9),
+Disco uses [The Pull Request
+Hack](https://felixge.de/2013/03/11/the-pull-request-hack.html):
+anyone who submits a pull request to Disco is likely to be granted
+push access in short order.
+
+
 
 ### Pull Requests
 
@@ -245,5 +264,4 @@ contributions work in the in our project? Here's a quick rundown!
 
 ### Haskell
 
-## I have push access to the Disco repository, now what?
 

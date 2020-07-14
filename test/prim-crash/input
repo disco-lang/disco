@@ -1,0 +1,11 @@
+import prim
+crash "nope"
+let x : N = crash "nope" in 3 + 4
+let x : List N = crash "nope" in 3 + 4
+:type let x : N = crash "nope" in 3 + x
+let x : N = crash "nope" in 3 + x
+:type crash
+(\(x: List N). 1) (crash "nope")
+(\(x:N). 1) (crash "nope")
+:type (\(x:N). 1) (crash "nope")
+(\(x:N). 1) (1 + crash "nope")

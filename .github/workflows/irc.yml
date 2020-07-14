@@ -26,5 +26,14 @@ jobs:
           channel: "#disco-lang"
           nickname: disco-bot
           message: |
-            ${{ github.actor }} opened PR ${{ github.event.html_url }}
+            ${{ github.actor }} opened PR ${{ github.event.pull_request.html_url }}
           notice: true
+      - name: irc comment
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'issue_comment'
+        with:
+          channel: "#disco-lang"
+          nickname: disco-bot
+          message: |
+            ${{ github.actor }} commented on ${{ github.event.issue.html_url }}
+            ${{ github.event.comment.body }}

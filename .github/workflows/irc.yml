@@ -37,3 +37,4 @@ jobs:
           message: |
             ${{ github.actor }} commented on ${{ github.event.issue.html_url }}
             ${{ github.event.comment.body }}
+          notice: true

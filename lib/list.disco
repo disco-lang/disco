@@ -1,29 +1,24 @@
--- XXX TODO change over foldr and append.  However I think there is
--- something special going on with comprehension desugaring, I forget
--- how that works.  If we change the type of foldr to be uncurried,
--- this module by itself loads but other things break.
-
 ||| A right fold for lists.
-|||   foldr f z [a,b,c] = f a (f b (f c z)
+|||   foldr(f, z, [a,b,c]) = f(a, f(b, f(c, z)))
 
-!!!   foldr (\x y. x + y) 0 [1,2,3] == 6
-!!!   foldr (\x y. x + y) 0 []      == 0
+!!!   foldr(~+~, 0, [1,2,3]) == 6
+!!!   foldr(~+~, 0, [])      == 0
 
-foldr : (a → b → b) → b → List a → b
-foldr f z []      = z
-foldr f z (x::xs) = f x (foldr f z xs)
+foldr : (a × b → b) × b × List a → b
+foldr(f, z, []   ) = z
+foldr(f, z, x::xs) = f(x, foldr(f, z, xs))
 
 ||| Append two lists into a single list.
 
-!!!   append [] []           == []
-!!!   append [1,2,3] []      == [1,2,3]
-!!!   append [1,2,3] [4,5,6] == [1,2,3,4,5,6]
-!!!   ∀      xs : List N. append [] xs == xs
-!!!   forall xs : List N. append xs [] == xs
+!!!   append([], [])           == []
+!!!   append([1,2,3], [])      == [1,2,3]
+!!!   append([1,2,3], [4,5,6]) == [1,2,3,4,5,6]
+!!!   ∀      xs : List N. append([], xs) == xs
+!!!   forall xs : List N. append(xs, []) == xs
 
-append : List a → List a → List a
-append []      ys = ys
-append (x::xs) ys = x :: append xs ys
+append : List a × List a → List a
+append([],    ys) = ys
+append(x::xs, ys) = x :: append(xs, ys)
 
 ||| Flatten a list of lists into a single list.
 
@@ -31,7 +26,7 @@ append (x::xs) ys = x :: append xs ys
 
 concat : List (List a) → List a
 concat []      = []
-concat (l::ls) = append l (concat ls)
+concat (l::ls) = append(l, concat ls)
 
 ||| Apply a function to each element of a list, returning a new list
 ||| of the results.  Note, this is here just for illustration

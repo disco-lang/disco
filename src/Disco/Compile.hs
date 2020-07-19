@@ -63,7 +63,7 @@ compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
-compileDTerm (DTLam _ l) = do
+compileDTerm (DTLam _ _ l) = do
   (x,body) <- unbind l
   c <- compileDTerm body
   return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
@@ -192,6 +192,9 @@ compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
 
 compilePrim _ PrimHolds   = return $ CConst OHolds
+
+compilePrim _ PrimLookupSeq   = return $ CConst OLookupSeq
+compilePrim _ PrimExtendSeq   = return $ CConst OExtendSeq
 
 compilePrimErr :: Prim -> Type -> a
 compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad type " ++ show ty

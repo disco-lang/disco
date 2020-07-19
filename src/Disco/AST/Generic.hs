@@ -81,8 +81,6 @@ module Disco.AST.Generic
        , X_TTup
        , X_TInj
        , X_TCase
-       , X_TUn
-       , X_TBin
        , X_TChain
        , X_TTyOp
        , X_TContainer
@@ -125,6 +123,7 @@ module Disco.AST.Generic
        , Pattern_ (..)
        , X_PVar
        , X_PWild
+       , X_PAscr
        , X_PUnit
        , X_PBool
        , X_PTup
@@ -146,7 +145,7 @@ module Disco.AST.Generic
 
        , Quantifier(..)
        , Binder_
-       , BinderType
+       , X_Binder
 
        -- * Property
 
@@ -272,8 +271,6 @@ type family X_TApp e
 type family X_TTup e
 type family X_TInj e
 type family X_TCase e
-type family X_TUn e
-type family X_TBin e
 type family X_TChain e
 type family X_TTyOp e
 type family X_TContainer e
@@ -347,12 +344,6 @@ data Term_ e where
   -- | A case expression.
   TCase_  :: X_TCase e -> [Branch_ e] -> Term_ e
 
-  -- | An application of a unary operator.
-  TUn_    :: X_TUn e -> UOp -> Term_ e -> Term_ e
-
-  -- | An application of a binary operator.
-  TBin_   :: X_TBin e -> BOp -> Term_ e -> Term_ e -> Term_ e
-
   -- | A chained comparison, consisting of a term followed by one or
   --   more "links", where each link is a comparison operator and
   --   another term.
@@ -393,20 +384,18 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TInj e)
     , a (X_TCase e)
     , a (X_TTup e)
-    , a (X_TUn e)
-    , a (X_TBin e)
     , a (X_TChain e)
     , a (X_TTyOp e)
     , a (X_TContainer e)
     , a (X_TContainerComp e)
     , a (X_TAscr e)
     , a (X_Term e)
-    , a (BinderType e)
     , a (Qual_ e)
     , a (Guard_ e)
     , a (Link_ e)
     , a (Binding_ e)
     , a (Pattern_ e)
+    , a (Binder_ e (Term_ e))
     )
 
 deriving instance ForallTerm Show e => Show (Term_ e)
@@ -537,6 +526,7 @@ instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
 
 type family X_PVar e
 type family X_PWild e
+type family X_PAscr e
 type family X_PUnit e
 type family X_PBool e
 type family X_PTup e
@@ -561,6 +551,9 @@ data Pattern_ e where
 
   -- | Wildcard pattern @_@: matches anything.
   PWild_ :: X_PWild e -> Pattern_ e
+
+  -- | Type ascription pattern @pat : ty@.
+  PAscr_ :: X_PAscr e -> Pattern_ e -> Type -> Pattern_ e
 
   -- | Unit pattern @()@: matches @()@.
   PUnit_ :: X_PUnit e -> Pattern_ e
@@ -612,6 +605,7 @@ data Pattern_ e where
 type ForallPattern (a :: * -> Constraint) e
       = ( a (X_PVar e)
         , a (X_PWild e)
+        , a (X_PAscr e)
         , a (X_PUnit e)
         , a (X_PBool e)
         , a (X_PNat e)
@@ -638,15 +632,16 @@ instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Patter
 -- Quantifiers and binders
 ------------------------------------------------------------
 
--- A binder represents a sequence of variable binders with optional types,
--- found in either a lambda, ∀, or ∃, as in (x y : N) (y : F).
-type Binder_ e a = Bind [(Name (Term_ e), Embed (BinderType e))] a
+-- | A type family specifying what the binder in an abstraction can be.
+--   Should have at least variables in it, but how many variables and
+--   what other information is carried along may vary.
+type family X_Binder e
 
--- Structure to hold types of binders in a particular phase (typically
--- either Maybe Type or Type).
-type family BinderType e :: *
+-- | A binder represents the stuff between the quantifier and the body
+--   of a lambda, ∀, or ∃ abstraction, as in (x y : N) (y : F).
+type Binder_ e a = Bind (X_Binder e) a
 
--- A quantifier: λ, ∀, or ∃
+-- | A quantifier: λ, ∀, or ∃
 data Quantifier = Lam | Ex | All
   deriving (Generic, Eq, Ord, Show)
 

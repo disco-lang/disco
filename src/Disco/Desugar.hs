@@ -41,6 +41,7 @@ import           Data.Maybe                       (fromMaybe, isJust)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
@@ -181,8 +182,20 @@ mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 --     n -> p -> { n*x + y  when p = (x,y)
 --   @
 desugarDefn :: Defn -> DSM DTerm
-desugarDefn (Defn _ patTys bodyTy def) = do
-  clausePairs <- mapM unbind def
+desugarDefn (Defn _ patTys bodyTy def) = desugarAbs patTys bodyTy def
+
+------------------------------------------------------------
+-- Abstraction desugaring
+------------------------------------------------------------
+
+-- | Desugar an abstraction -- that is, a collection of clauses
+--   with their corresponding patterns. Definitions are abstractions
+--   (which happen to be named), and source-level lambdas are also
+--   abstractions (which happen to have only one clause).
+
+desugarAbs :: [Type] -> Type -> [Clause] -> DSM DTerm
+desugarAbs patTys bodyTy body = do
+  clausePairs <- mapM unbind body
   let (pats, bodies) = unzip clausePairs
 
   -- generate dummy variables for lambdas
@@ -227,9 +240,8 @@ desugarTerm (ATBool ty b)        = return $ DTBool ty b
 desugarTerm (ATChar c)           = return $ DTChar c
 desugarTerm (ATString cs)        =
   desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing
-desugarTerm (ATAbs Lam ty lam)       = do
-  (args, t) <- unbind lam
-  mkLambda ty (map fst args) <$> desugarTerm t
+desugarTerm (ATAbs Lam ty lam)       =
+  desugarAbs (map getType . fst . unsafeUnbind $ lam) ty [lam]
 
 -- Special cases for fully applied operators
 desugarTerm (ATApp resTy (ATPrim _ (PrimUOp uop)) t)
@@ -482,7 +494,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
           tapp
             (ATPrim mapTy PrimMap)
             (mkPair
-              (ATAbs Lam (xTy :->: c tTy) (bind [(x, embed xTy)] tqs))
+              (ATAbs Lam (xTy :->: c tTy) (bind [APVar xTy x] tqs))
               lst
             )
 
@@ -506,7 +518,7 @@ desugarLet :: [ABinding] -> ATerm -> DSM DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   dtapp
-    <$> (DTLam (getType t1 :->: getType t)
+    <$> (DTLam Lam (getType t1 :->: getType t)
           <$> (bind (coerce x) <$> desugarLet ls t)
         )
     <*> desugarTerm t1
@@ -524,7 +536,7 @@ mkLambda :: Type -> [Name ATerm] -> DTerm -> DTerm
 mkLambda funty args c = go funty args
   where
     go _ []                    = c
-    go ty@(_ :->: ty2) (x:xs) = DTLam ty (bind (coerce x) (go ty2 xs))
+    go ty@(_ :->: ty2) (x:xs) = DTLam Lam ty (bind (coerce x) (go ty2 xs))
 
     go ty as = error $ "Impossible! mkLambda.go " ++ show ty ++ " " ++ show as
 

@@ -1,19 +1,22 @@
-type Triplet = (Nat * Nat * Nat)
+type Triplet = (N * N * N)
 
 sumTripletList : List (N * N * N) -> N
 sumTripletList [] = 0
 sumTripletList ((n1, n2, n3) :: rest) = (n1 + n2 + n3 + (sumTripletList rest))
 
-type Tree = Nat + (Nat * Tree * Tree)
+type Tree = Unit + (N * Tree * Tree)
 
-sumTree : Tree -> Nat
-sumTree (left n) = n
-sumTree (right (n, l, r)) = n + (sumTree l) + (sumTree r)
+sumTree : Tree -> N
+sumTree (left _) = 0
+sumTree (right (n, l, r)) = n + sumTree(l) + sumTree(r)
 
 type Stream = N * N * Stream
 
 unconsStream : Stream -> N * Stream
 unconsStream s = s
+  -- Just the identity function, because there's no way to tell the difference
+  -- between a Stream and an N * Stream !
+
 
 streamy : N * N * N * Stream -> N * N * Stream
 streamy s = s

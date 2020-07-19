@@ -180,6 +180,8 @@ data Op = OAdd      -- ^ Addition (@+@)
         -- Other primitives
         | OCrash          -- ^ Crash with a user-supplied message
         | OId             -- ^ No-op/identity function
+        | OLookupSeq      -- ^ Lookup OEIS sequence
+        | OExtendSeq      -- ^ Extend a List via OEIS
 
   deriving (Show, Generic)
 

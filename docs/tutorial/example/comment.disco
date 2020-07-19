@@ -6,4 +6,4 @@ approx_pi = 22/7   -- an OK approximation
 -- and took about three weeks to write.
 -- Don't laugh.
 increment : N -> N
-increment n = n + 1 -- one more than the input
+increment(n) = n + 1 -- one more than the input

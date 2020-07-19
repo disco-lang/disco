@@ -9,7 +9,7 @@
 :parse \ (x:N) (y:F). x > y
 :parse \ x (y:F). x > y
 (\x y. x + y) 3 5
-(\(x y : N). x + y) 3 5
+(\(x:N) (y:N). x + y) 3 5
 (\(x:N) (y:N). x + y) 3 5
 (\(x:N). \(y:N). x + y) 3 5
 :parse exists x. x > 3
@@ -32,4 +32,4 @@
 :parse ∀ (x:N) y. x > y
 :parse ∀ (x:N) (y:F). x > y
 :parse ∀ x (y:F). x > y
-:parse ∀ (x y z: N). (x == y) and (y == z) ==> x == z
+:parse ∀ (x:N) (y:N) (z:N). (x == y) and (y == z) ==> x == z

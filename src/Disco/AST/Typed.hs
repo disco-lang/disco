@@ -111,7 +111,7 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
-type instance BinderType TY = Type   -- require type annotations on binders
+type instance X_Binder          TY = [APattern]
 
 type instance X_TVar            TY = Type
 type instance X_TPrim           TY = Type
@@ -126,8 +126,6 @@ type instance X_TAbs            TY = Type
 type instance X_TApp            TY = Type
 type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
-type instance X_TUn             TY = Type
-type instance X_TBin            TY = Type
 type instance X_TChain          TY = Type
 type instance X_TTyOp           TY = Type
 type instance X_TContainer      TY = Type
@@ -165,7 +163,7 @@ pattern ATChar c = TChar_ () c
 pattern ATString :: String -> ATerm
 pattern ATString s = TString_ () s
 
-pattern ATAbs :: Quantifier -> Type -> Bind [(Name ATerm, Embed Type)] ATerm -> ATerm
+pattern ATAbs :: Quantifier -> Type -> Bind [APattern] ATerm -> ATerm
 pattern ATAbs q ty bind = TAbs_ q ty bind
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
@@ -261,6 +259,7 @@ type APattern = Pattern_ TY
 
 type instance X_PVar     TY = Embed Type
 type instance X_PWild    TY = Embed Type
+type instance X_PAscr    TY = Void -- No more ascriptions in typechecked patterns.
 type instance X_PUnit    TY = ()
 type instance X_PBool    TY = ()
 type instance X_PChar    TY = ()

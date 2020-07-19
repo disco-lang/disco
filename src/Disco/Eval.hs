@@ -33,7 +33,7 @@ module Disco.Eval
 
          -- * Memory cells
 
-       , Cell(..), mkCell
+       , Cell(..), mkCell, showMemory
 
          -- * Errors
 
@@ -68,6 +68,8 @@ module Disco.Eval
 
        )
        where
+
+import           Text.Printf
 
 import           Control.Lens                            (makeLenses, use, (%=),
                                                           (<+=), (<>=))
@@ -175,15 +177,15 @@ data Value where
   VType :: Type -> Value
   deriving Show
 
--- | A @ValFun@ is just a Haskell function @[Value] -> Value@.  It is a
+-- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValFun = ValFun ([Value] -> Value)
+newtype ValFun = ValFun (Value -> Value)
 
 instance Show ValFun where
   show _ = "<fun>"
 
-pattern VFun :: ([Value] -> Value) -> Value
+pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
 
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
@@ -585,6 +587,12 @@ reachableLoc l = do
         Nothing         -> return ()
         Just (Cell v _) -> reachable v
 
+showMemory :: Disco e ()
+showMemory = use memory >>= (mapM_ showCell . IntMap.assocs)
+  where
+    showCell :: (Int, Cell) -> Disco e ()
+    showCell (i, Cell v b) = liftIO $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
+
 ------------------------------------------------------------
 -- High-level disco phases
 ------------------------------------------------------------
@@ -612,23 +620,30 @@ typecheckDisco tyctx tydefs tcm =
 --   'ModuleInfo' records to a map from module names to info records,
 --   and then typechecking the parent module in an environment with
 --   access to this map. This is really just a depth-first search.
-loadDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> ModName -> m ModuleInfo
-loadDiscoModule dir m = evalStateT (loadDiscoModule' dir S.empty m) M.empty
+--
+--   If the given directory is Just, it will only load a module from
+--   the specific given directory.  If it is Nothing, then it will look for
+--   the module in the current directory or the standard library.
+loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
+loadDiscoModule resolver m = evalStateT (loadDiscoModule' resolver S.empty m) M.empty
 
-loadDiscoModule' :: (MonadError IErr m, MonadIO m) => FilePath -> S.Set ModName -> ModName -> StateT (M.Map ModName ModuleInfo) m ModuleInfo
-loadDiscoModule' directory inProcess modName  = do
+loadDiscoModule' ::
+  (MonadError IErr m, MonadIO m) =>
+  Resolver -> S.Set ModName -> ModName ->
+  StateT (M.Map ModName ModuleInfo) m ModuleInfo
+loadDiscoModule' resolver inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
   modMap <- get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
-      file <- resolveModule directory modName
+      file <- resolveModule resolver modName
              >>= maybe (throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
-      mis <- mapM (loadDiscoModule' directory (S.insert modName inProcess)) mns
+      mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
       m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
       m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]

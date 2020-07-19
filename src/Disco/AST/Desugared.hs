@@ -72,13 +72,14 @@ import           Disco.Types
 data DS
 
 type DProperty = Property_ DS
-type instance BinderType DS = Type
 
 -- | A @DTerm@ is a term which has been typechecked and desugared, so
 --   it has fewer constructors and complex features than 'ATerm', but
 --   still retains typing information.
 
 type DTerm = Term_ DS
+
+type instance X_Binder DS         = Name DTerm
 
 type instance X_TVar DS           = Type
 type instance X_TPrim DS          = Type
@@ -89,13 +90,10 @@ type instance X_TChar DS          = ()
 type instance X_TString DS        = Void
 type instance X_TNat DS           = Type
 type instance X_TRat DS           = ()
-type instance X_TAbs DS           = Void -- TAbs represents lambdas with multiple args;
-                                         -- see TLam
+type instance X_TAbs DS           = Type
 type instance X_TApp DS           = Type
 type instance X_TInj DS           = Type
 type instance X_TCase DS          = Type
-type instance X_TUn DS            = Type
-type instance X_TBin DS           = Type
 type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
                                          -- binary comparisons
 type instance X_TTyOp DS          = Type
@@ -112,11 +110,8 @@ type instance X_TParens DS        = Void -- No explicit parens
 -- Extra constructors
 type instance X_Term DS =
   Either
-    (Type, DTerm, DTerm)               -- DTPair
-    (Either
-      (Type, Bind (Name DTerm) DTerm)  -- DTLam
-      Type                             -- DTCons
-    )
+    (Type, DTerm, DTerm)                 -- DTPair
+    Type                                 -- DTCons
 
 pattern DTVar :: Type -> Name DTerm -> DTerm
 pattern DTVar ty name = TVar_ ty name
@@ -139,8 +134,8 @@ pattern DTRat rat = TRat_ () rat
 pattern DTChar :: Char -> DTerm
 pattern DTChar c = TChar_ () c
 
-pattern DTLam :: Type -> Bind (Name DTerm) DTerm -> DTerm
-pattern DTLam ty lam = XTerm_ (Right (Left (ty, lam)))
+pattern DTLam :: Quantifier -> Type -> Bind (Name DTerm) DTerm -> DTerm
+pattern DTLam q ty lam = TAbs_ q ty lam
 
 pattern DTApp  :: Type -> DTerm -> DTerm -> DTerm
 pattern DTApp ty term1 term2 = TApp_ ty term1 term2
@@ -158,7 +153,7 @@ pattern DTTyOp :: Type -> TyOp -> Type -> DTerm
 pattern DTTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
 pattern DTNil :: Type -> DTerm
-pattern DTNil ty = XTerm_ (Right (Right ty))
+pattern DTNil ty = XTerm_ (Right ty)
 
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
              DTLam, DTApp, DTPair, DTInj, DTCase, DTTyOp,
@@ -190,6 +185,7 @@ type DPattern = Pattern_ DS
 
 type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
+type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()
 type instance X_PChar    DS = ()
@@ -292,7 +288,7 @@ instance HasType DTerm where
   getType (DTChar _)      = TyC
   getType (DTNat ty _)    = ty
   getType (DTRat _)       = TyF
-  getType (DTLam ty _)    = ty
+  getType (DTLam _ ty _)  = ty
   getType (DTApp ty _ _)  = ty
   getType (DTPair ty _ _) = ty
   getType (DTInj ty _ _)  = ty

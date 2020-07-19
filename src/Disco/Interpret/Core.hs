@@ -80,6 +80,10 @@ import           Disco.Context
 import           Disco.Eval
 import           Disco.Types
 
+import           Math.OEIS                               (catalogNums,
+                                                          extendSequence,
+                                                          lookupSequence)
+
 ------------------------------------------------------------
 -- Evaluation
 ------------------------------------------------------------
@@ -276,6 +280,7 @@ funArity :: Value -> Int
 funArity (VClos b _) = length (fst (unsafeUnbind b))
 funArity (VPAp f vs) = funArity f - length vs
 funArity (VConst op) = opArity op
+funArity (VFun _)    = 1
 funArity v           = error $ "Impossible! funArity on " ++ show v
 
 -- | Reduce an application to weak head normal form (WHNF).
@@ -317,10 +322,12 @@ whnfApp f vs =
 --   VFun, or VConst) to a list of exactly the right number of
 --   arguments.
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
-whnfAppExact (VClos b e) vs =
+whnfAppExact (VClos b e) vs  =
   lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
-whnfAppExact (VFun f)    vs = mapM rnfV vs >>= \vs' -> whnfV (f vs')
-whnfAppExact (VConst op) vs = whnfOp op vs
+whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
+whnfAppExact (VFun _)    vs  =
+  error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
+whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
 
 ------------------------------------------------------------
@@ -393,6 +400,7 @@ toDiscoList (x : xs) = do
   xv  <- mkSimple x
   xsv <- mkSimple =<< delay (toDiscoList xs)
   return $ VCons 1 [xv, xsv]
+
 
 -- | Convert a Value representing a disco list into a Haskell list of
 --   Values.  Strict in the spine of the list.
@@ -902,8 +910,11 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 --------------------------------------------------
 -- Other primitives
 
-whnfOp OCrash          = arity1 "crash"     $ whnfV >=> primCrash
-whnfOp OId             = arity1 "id" $ whnfV
+whnfOp OCrash          = arity1 "crash"     $ primCrash
+whnfOp OId             = arity1 "id"        $ whnfV
+
+whnfOp OExtendSeq      = arity1 "extendSequence" $ oeisExtend
+whnfOp OLookupSeq      = arity1 "lookupSequence" $ oeisLookup
 
 --------------------------------------------------
 -- Utility functions
@@ -1118,7 +1129,7 @@ primFactor _                         = error "impossible! primFactor on non-VNum
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.
 primCrash :: Value -> Disco IErr Value
-primCrash v = delay $ do
+primCrash v = do
   s <- valueToString v
   throwError (Crash s)
 
@@ -1286,10 +1297,7 @@ enumerate (ty1 :->: ty2)
     -- association list.
     mkFun :: [Value] -> Value
     mkFun outs
-      = VFun $ \case
-          { [v] -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
-          ; vs  -> error $ "Impossible! Got " ++ show vs ++ " in enumerate.mkFun"
-          }
+      = VFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
 
     -- A custom version of fromJust' so we get a better error message
     -- just in case it ever happens
@@ -1316,7 +1324,7 @@ decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
 decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 [v]) (f2 [v])) (enumerate ty1)
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
@@ -1504,3 +1512,45 @@ primValOrd (VCons i []) (VCons j []) = compare i j
 primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
 primValOrd v1           v2
   = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"
+
+
+------------------------------------------------------------
+-- OEIS
+------------------------------------------------------------
+
+-- | Looks up a sequence of integers in OEIS.
+--   Returns 'left()' if the sequence is unknown in OEIS,
+--   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
+oeisLookup :: Value -> Disco IErr Value
+oeisLookup v = do
+    vs <- fromDiscoList v
+    let hvs = toHaskellList vs
+    case lookupSequence hvs of
+      Just result -> parseResult result
+      Nothing     -> return leftUnit
+  where
+    parseResult r = do
+          let seqNum = getCatalogNum $ catalogNums r
+          l <- toDiscoList $ toVal ("https://oeis.org/" ++ seqNum)
+          return $ VCons 1 [l] -- right "https://oeis.org/foo"
+    getCatalogNum []    = error "No catalog info"
+    getCatalogNum (n:_) = n
+    toVal = map (\c -> vnum (toInteger (ord c) % 1))
+    leftUnit = VCons 0 [VCons 0 []]
+
+-- | Extends a Disco integer list with data from a known OEIS sequence.
+--   Returns a list of integers upon success, otherwise the original list (unmodified).
+oeisExtend :: Value -> Disco IErr Value
+oeisExtend v = do
+    vs <- fromDiscoList v
+    let xs = toHaskellList vs
+    let newseq = extendSequence xs
+    toDiscoList $ map (vnum . (%1)) newseq
+
+-- | Convert a Disco integer list to a Haskell list
+toHaskellList :: [Value] -> [Integer]
+toHaskellList [] = []
+toHaskellList xs = map fromVNum xs
+                   where
+                      fromVNum (VNum _ x) = fromIntegral $ numerator x
+                      fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v

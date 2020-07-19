@@ -77,6 +77,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/interp-lazymatch/bomb.disco
                      test/interp-lazymatch/expected
                      test/interp-lazymatch/input
+                     test/lib-oeis/expected
+                     test/lib-oeis/input
                      test/list-comp/expected
                      test/list-comp/input
                      test/list-poly/expected
@@ -103,6 +105,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/poly-instantiate/expected
                      test/poly-instantiate/input
                      test/poly-instantiate/poly-instantiate.disco
+                     test/poly-rectype/expected
+                     test/poly-rectype/input
+                     test/poly-rectype/poly-rectype.disco
                      test/pretty-functions/expected
                      test/pretty-functions/input
                      test/pretty-lazy/expected
@@ -117,10 +122,23 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
+                     test/repl-ann/expected
+                     test/repl-ann/input
+                     test/repl-compile/expected
+                     test/repl-compile/input
                      test/repl-defn/expected
                      test/repl-defn/input
+                     test/repl-defns/expected
+                     test/repl-defns/input
+                     test/repl-desugar/expected
+                     test/repl-desugar/input
+                     test/repl-help/expected
+                     test/repl-help/input
                      test/repl-import/expected
                      test/repl-import/input
+                     test/repl-names/expected
+                     test/repl-names/input
+                     test/repl-names/logic.disco
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
@@ -149,6 +167,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-juxt-mul/expected
                      test/syntax-juxt-mul/input
                      test/syntax-juxt-mul/juxt-mul.disco
+                     test/syntax-lambda-pat/expected
+                     test/syntax-lambda-pat/input
                      test/syntax-lambda/expected
                      test/syntax-lambda/input
                      test/syntax-let/expected
@@ -236,6 +256,8 @@ library
                        Disco.Interactive.Eval
                        Disco.Interactive.Parser
                        Disco.Interactive.CmdLine
+                       Disco.Interactive.Types
+                       Disco.Interactive.Commands
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
@@ -270,7 +292,8 @@ library
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.14,
                        fgl >= 5.5 && < 5.8,
-                       optparse-applicative >= 0.12 && < 0.16
+                       optparse-applicative >= 0.12 && < 0.16,
+                       oeis >= 0.3.10
 
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -289,7 +312,8 @@ executable disco
                        containers >= 0.5 && < 0.7,
                        unbound-generics >= 0.3 && < 0.5,
                        lens >= 4.14 && < 4.19,
-                       optparse-applicative >= 0.12 && < 0.16
+                       optparse-applicative >= 0.12 && < 0.16,
+                       oeis >= 0.3.10
 
   default-language:    Haskell2010
 

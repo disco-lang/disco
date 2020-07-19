@@ -1,0 +1,6 @@
+:pretty ¬true
+:pretty 5!
+:pretty 6 + 3
+:pretty 6+5*2
+:pretty 6+(5*2)
+:pretty (6+5)*2

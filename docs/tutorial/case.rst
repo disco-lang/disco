@@ -50,12 +50,12 @@ entire case expression.  In the example above, this means that first
 value of the entire case expression (and the rest of the branches are
 ignored).  Otherwise, ``0 <= x < 10`` is evaluated; and so on.
 
-Every *guard* starts with the word ``if`` or ``when`` (the two words
-are interchangeable).  There are three types of guards:
+There are three types of guards:
 
-* A *boolean guard* is simply an expression of type ``Bool``.  It
-  succeeds if the expression evaluates to ``true``.
-* A *pattern guard* has the form ``<expr> is <pattern>``.  It succeeds
+* A *boolean guard* has the form ``if <expr>``, where ``<expr>`` is an
+  expression of type ``Bool``.  It succeeds if the expression
+  evaluates to ``true``.
+* A *pattern guard* has the form ``when <expr> is <pattern>``.  It succeeds
   if the expression ``<expr>`` matches the pattern ``<pattern>``.
 * The special guard ``otherwise`` always succeeds.
 
@@ -89,17 +89,12 @@ expression becomes the value of ``x + y``; for example, ``g(16,15) =
 
 .. warning::
 
-   Be careful not to get a Boolean guard using ``=`` confused with a
-   pattern guard using ``is``. (This is probably something that will
-   confuse students learning the language; ideas on how to make it
-   less confusing are welcome.  As I am writing this, I realize that
-   it might be a good idea to require ``when`` with pattern guards and
-   ``if`` with boolean guards, rather than allowing them to be mixed
-   and matched.)  The difference is in how variables are handled:
-   boolean guards can only use existing variables; pattern guards
-   create new variables.  For example, ``... when p is (x,y)`` matches
-   a tuple ``p`` and gives the names ``x`` and ``y`` to the
-   components.  On the other hand, ``... if p = (x,y)`` will probably
+   Be careful not to get a Boolean guard using ``==`` confused with a
+   pattern guard using ``is``. The difference is in how variables are
+   handled: boolean guards can only use existing variables; pattern
+   guards create new variables.  For example, ``... when p is (x,y)``
+   matches a tuple ``p`` and gives the names ``x`` and ``y`` to the
+   components.  On the other hand, ``... if p == (x,y)`` will probably
    complain that ``x`` and ``y`` are undefined---unless ``x`` and
    ``y`` are already defined elsewhere, in which case this will simply
    check that ``p`` is exactly equal to the value ``(x,y)``.  Use a
@@ -118,3 +113,61 @@ shown below actually desugars to something like ``gcd2``:
 .. literalinclude:: example/function-desugar.disco
    :language: idris
    :caption:
+
+Arithmetic patterns
+===================
+
+Disco supports `arithmetic patterns`, in which arithmetic expressions
+involving numeric constants, variables, and arithmetic operations can
+be used as patterns.  A few examples are shown below.
+
+.. literalinclude:: example/arith-pattern.disco
+   :language: idris
+   :caption:
+
+::
+
+   Disco> :load example/arith-pattern.disco
+   Loading arith-pattern.disco...
+   Loaded.
+   Disco> map(h, [0 .. 10])
+   [1, 1, 2, 1, 3, 2, 3, 1, 4, 3, 5]
+   Disco> isHalf(3/2)
+   true
+   Disco> isHalf(4/2)
+   false
+   Disco> isHalf(17)
+   false
+   Disco> isHalf(5/(-2))
+   true
+
+In short, an arithmetic pattern can contain:
+
+* variables
+* natural number constants
+* unary negation
+* addition, subtraction, multiplication, and division
+
+In most cases, an arithmetic pattern may contain at most one variable;
+for example, using ``x + y`` as an arithmetic pattern is an error,
+since the resulting values of ``x`` and ``y`` would be ambiguous.  The
+one exception is when matching on an expression containing a division
+operator, in which case the two patterns are used to separately match
+on the numerator and denominator of the value being matched.
+
+The behavior of arithmetic patterns depends on the type being matched.
+Generally speaking, matching will succeed if there is a unique value
+of the same type that can be assigned to the variable such that the
+pattern is equal to the value being matched.  For example, when
+matching on natural numbers, the pattern ``2k+3`` will match only odd
+numbers greater than or equal to 3, since those are the only numbers
+which result from assigning a natural number value to ``k``.  Matching
+``2k+3`` against an integer will match all odd integers; matching it
+against a rational number will always match.
+
+An arithmetic pattern need not contain any variables, in which case it
+is the same as just matching on a particular constant.
+
+At the moment, arithmetic patterns do not support exponentiation,
+though that could be a nice thing to add (but surely contains many
+pitfalls).

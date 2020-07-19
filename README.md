@@ -1,4 +1,5 @@
 [![Build Status](https://travis-ci.org/disco-lang/disco.svg?branch=master)](https://travis-ci.org/disco-lang/disco)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Prototype implementation of a small functional teaching language
 for use in a discrete mathematics course.
@@ -62,3 +63,4 @@ stack build --fast --file-watch --ghc-options='-Wall'
 which will turn on warnings, turn off optimizations for a faster
 edit-compile-test cycle, and automatically recompile every time a
 source file changes.
+

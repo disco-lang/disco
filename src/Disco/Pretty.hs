@@ -202,12 +202,8 @@ prettyTerm (TString cs)  = doubleQuotes $ text cs
 prettyTerm (TAbs bnd)    = mparens initPA $
   lunbind bnd $ \(args, body) ->
   text "λ" <> (if length args > 1 then text " " else empty)
-           <> hsep (map prettyArg args) <> text "."
+           <> hsep (map prettyPattern args) <> text "."
            <+> prettyTerm' 0 InL body
-  where
-    prettyArg (x, unembed -> mty) = case mty of
-      Nothing -> prettyName x
-      Just ty -> text "(" <> prettyName x <+> text ":" <+> prettyTy ty <> text ")"
 
 -- special case for fully applied unary operators
 prettyTerm (TApp (TPrim (PrimUOp uop)) t) =
@@ -247,14 +243,6 @@ prettyTerm (TContainerComp c bqst) =
 prettyTerm (TInj side t) = mparens funPA $
   prettySide side <+> prettyTerm' funPrec InR t
 prettyTerm (TNat n)      = integer n
-prettyTerm (TUn op t)    = mparens (ugetPA op) $
-  prettyUOp op <> prettyTerm' (1 + funPrec) InR t
-prettyTerm (TBin op t1 t2) = mparens (getPA op) $
-  hsep
-  [ prettyTerm' (bPrec op) InL t1
-  , prettyBOp op
-  , prettyTerm' (bPrec op) InR t2
-  ]
 prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
     prettyTerm' (bPrec Eq) InL t
     : concatMap prettyLink lks
@@ -353,6 +341,7 @@ prettyQual (QGuard (unembed -> t))
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x) = prettyName x
 prettyPattern PWild = text "_"
+prettyPattern (PAscr p ty) = parens (prettyPattern p <+> text ":" <+> prettyTy ty)
 prettyPattern PUnit = text "()"
 prettyPattern (PBool b) = text $ map toLower $ show b
 prettyPattern (PChar c) = text (show c)

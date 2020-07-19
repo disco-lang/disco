@@ -4,7 +4,7 @@ import           Control.Monad              (filterM)
 import qualified Data.ByteString            as BS
 import           Data.Function              (on)
 import           Data.List                  (groupBy, sort)
-import           System.Directory           (doesDirectoryExist,
+import           System.Directory           (doesFileExist,
                                              getDirectoryContents)
 import           System.FilePath            (isPathSeparator, (</>))
 import           System.IO                  (hGetContents)
@@ -18,7 +18,8 @@ import           Test.Tasty.Golden.Advanced
 
 main :: IO ()
 main = do
-  testDirs <- getDirectoryContents "test" >>= filterM (doesDirectoryExist . ("test"</>))
+  testDirs <- getDirectoryContents "test"
+    >>= filterM (doesFileExist . (\d -> ("test" </> d </> "input")))
   let testDirs'
         = groupBy ((==) `on` extractGroup)
         . sort

@@ -92,8 +92,6 @@ to ``thrice``:
     Disco> thrice(\(z:Nat). z^2 + 2z + 1)(7)
     17859076
 
-TODO example of using multi-argument anonymous function
-
 Comparing functions
 ===================
 

@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -54,25 +55,26 @@ module Disco.Parser
        )
        where
 
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
+                                                          fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec                  as MP
+import           Text.Megaparsec                         hiding (runParser)
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer       as L
+import qualified Text.Megaparsec.Char.Lexer              as L
 
-import           Control.Lens                     (makeLenses, toListOf, use,
-                                                   (.=))
+import           Control.Lens                            (makeLenses, toListOf,
+                                                          use, (.=))
 import           Control.Monad.State
-import           Data.Char                        (isDigit)
-import           Data.List                        (find, intercalate)
-import qualified Data.Map                         as M
-import           Data.Maybe                       (catMaybes)
+import           Data.Char                               (isDigit)
+import           Data.List                               (find, intercalate)
+import qualified Data.Map                                as M
+import           Data.Maybe                              (catMaybes)
 import           Data.Ratio
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import           Data.Set                                (Set)
+import qualified Data.Set                                as S
 import           Data.Void
 
 import           Disco.AST.Surface
@@ -625,14 +627,7 @@ parseInj =
 -- | Parse an anonymous function.
 parseLambda :: Parser Term
 parseLambda =
-  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
-
--- | Parse an argument to a lambda, either a variable or a binding of
---   the form @(x:ty)@.
-parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
-parseLambdaArg =
-      parens ((,) <$> ident <*> (symbol ":" *> ((embed . Just) <$> parseType)))
-  <|> (, embed Nothing) <$> ident
+  TAbs <$> (bind <$> (lambda *> some parseAtomicPattern) <*> (dot *> parseTerm'))
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term
@@ -704,6 +699,10 @@ termToPattern (TChar c)   = Just $ PChar c
 termToPattern (TString s) = Just $ PString s
 termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
 termToPattern (TInj s t)  = PInj s <$> termToPattern t
+
+termToPattern (TAscr t s) = case s of
+  Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'
+  _                                 -> Nothing
 
 termToPattern (TBin Cons t1 t2)
   = PCons <$> termToPattern t1 <*> termToPattern t2
@@ -828,7 +827,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- like a multiplicative term.  However, we must be sure to
     -- *first* recursively fix the subterms (particularly the
     -- left-hand one) *before* doing this analysis.  See
-    -- https://github.com/disco-lang/disco/issues/71 .
+    -- <https://github.com/disco-lang/disco/issues/71> .
     fixJuxtMul (TApp t1 t2)
       | isMultiplicativeTerm t1' = fixPrec $ TBin Mul t1' t2'
       | otherwise                = fixPrec $ TApp     t1' t2'
@@ -877,12 +876,6 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- e.g. x^2y --> x^(2@y) --> x^(2*y) --> (x^2) * y
     fixPrec (TBin bop1 t1 (TBin bop2 t2 t3))
       | bPrec bop2 < bPrec bop1 = TBin bop2 (fixPrec $ TBin bop1 t1 t2) t3
-
-    fixPrec (TApp (TBin bop t1 t2) t3)
-      | bPrec bop < funPrec = TBin bop t1 (fixPrec $ TApp t2 t3)
-
-    fixPrec (TApp t1 (TBin bop t2 t3))
-      | bPrec bop < funPrec = TBin bop (fixPrec $ TApp t1 t2) t3
 
     fixPrec t = t
 

@@ -1,7 +1,9 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE PatternSynonyms  #-}
-{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE GADTs             #-}
+{-# LANGUAGE PatternSynonyms   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -25,6 +27,11 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
+
+         -- * Props & testing
+       , ValProp(..), TestResult(..), TestReason_(..), TestReason
+       , SearchType(..), SearchMotive(.., SMExists, SMForall)
+       , TestVars, TestEnv, getTestEnv, extendPropEnv, extendResultEnv
 
          -- * Environments
 
@@ -160,6 +167,9 @@ data Value where
   --   passed to the function.
   VFun_   :: ValFun -> Value
 
+  -- | A proposition.
+  VProp   :: ValProp -> Value
+
   -- | A @Disco Value@ computation which can be run later, along with
   --   the environment in which it should run, and a set of referenced
   --   memory locations that should not be garbage collected.
@@ -198,6 +208,86 @@ instance Show ValDelay where
 
 pattern VDelay :: Disco IErr Value -> IntSet -> Env -> Value
 pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
+
+------------------------------------------------------------
+-- Propositions
+------------------------------------------------------------
+
+data SearchType
+  = Exhaustive
+    -- ^ All possibilities were checked.
+  | Randomized Integer Integer
+    -- ^ A number of small cases were checked exhaustively and
+    --   then a number of additional cases were checked at random.
+  deriving Show
+
+-- | The answer (success or failure) we're searching for, and
+--   the result (success or failure) we return when we find it.
+--   The motive @(False, False)@ corresponds to a "forall" quantifier
+--   (look for a counterexample, fail if you find it) and the motive
+--   @(True, True)@ corresponds to "exists". The other values
+--   arise from negations.
+newtype SearchMotive = SearchMotive (Bool, Bool)
+  deriving Show
+
+pattern SMForall :: SearchMotive
+pattern SMForall = SearchMotive (False, False)
+
+pattern SMExists :: SearchMotive
+pattern SMExists = SearchMotive (True, True)
+
+-- | A collection of variables that might need to be reported for
+--   a test, along with their types and user-legible names.
+type TestVars = [(String, Type, Name Core)]
+
+-- | A variable assignment found during a test.
+type TestEnv = [(String, Type, Value)]
+
+getTestEnv :: TestVars -> Disco IErr TestEnv
+getTestEnv = mapM $ \(s, ty, name) -> do
+  value <- M.lookup name <$> getEnv
+  case value of
+    Just v -> return (s, ty, v)
+    Nothing -> throwError (UnboundError name)
+
+-- | The possible outcomes of a property test, parametrized over
+--   the type of values. A @TestReason@ explains why a proposition
+--   succeeded or failed.
+data TestReason_ a
+  = TestBool
+    -- ^ The prop evaluated to a boolean.
+  | TestEqual Type a a
+    -- ^ The test was an equality test. Records the values being
+    --   compared and also their type (which is needed for printing).
+  | TestNotFound SearchType
+    -- ^ The search didn't find any examples/counterexamples.
+  | TestFound TestResult
+    -- ^ The search found an example/counterexample.
+  | TestRuntimeError IErr
+    -- ^ The prop failed at runtime. This is always a failure, no
+    --   matter which quantifiers or negations it's under.
+  deriving (Show, Functor, Foldable, Traversable)
+
+type TestReason = TestReason_ Value
+
+-- | The possible outcomes of a proposition.
+data TestResult = TestResult Bool TestReason TestEnv
+  deriving Show
+
+-- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
+data ValProp
+  = VPDone TestResult
+    -- ^ A prop that has already either succeeded or failed.
+  | VPSearch SearchMotive [Type] Value TestEnv
+    -- ^ A pending search.
+  deriving Show
+
+extendPropEnv :: TestEnv -> ValProp -> ValProp
+extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g ++ e))
+extendPropEnv g (VPSearch sm tys v e) = VPSearch sm tys v (g ++ e)
+
+extendResultEnv :: TestEnv -> TestResult -> TestResult
+extendResultEnv g (TestResult b r e) = TestResult b r (g ++ e)
 
 ------------------------------------------------------------
 -- Environments
@@ -447,7 +537,6 @@ err     = emitMessage Error
 panic   = emitMessage Panic
 debug   = emitMessage Debug
 
-
 -- | Run a computation in the @Disco@ monad, starting in the empty
 --   environment.
 runDisco :: Disco e a -> IO (Either e a)
@@ -566,7 +655,17 @@ reachable (VThunk _ e)    = reachableEnv e
 reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
+reachable (VProp p)       = reachableProp p
 reachable _               = return ()
+
+-- | Mark the memory locations reachable from a prop.
+reachableProp :: ValProp -> Disco e ()
+reachableProp (VPDone (TestResult _ r vs)) = mapM_ reachable r >> reachableTestEnv vs
+reachableProp (VPSearch _ _ v vs)   = reachable v >> reachableTestEnv vs
+
+-- | Mark the memory locations reachable from a @TestEnv@.
+reachableTestEnv :: TestEnv -> Disco e ()
+reachableTestEnv = mapM_ $ \(_, _, v) -> reachable v
 
 -- | Mark the memory locations reachable from a set of values.
 reachables :: [Value] -> Disco e ()

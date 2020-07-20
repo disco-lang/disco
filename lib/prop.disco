@@ -6,7 +6,10 @@ using Primitives
 ||| trying to check all natural numbers to see if they are all
 ||| nonnegative.
 |||
-||| XXX what to do if you want to do randomized testing instead.
+||| If you want to use random sampling to check whether a proposition
+||| *probably* holds, the `:test` command at the REPL will give you a
+||| best-effort answer. For instance, `:test (forall x:N. x >= 0)` will
+||| happily report that every natural number it tried was nonnegative.
 
 !!! holds (true : Prop) == true
 holds : Prop -> Bool

@@ -98,6 +98,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/parse-quantifiers/expected
+                     test/parse-quantifiers/input
                      test/poly-bad/expected
                      test/poly-bad/input
                      test/poly-infer-sort/expected
@@ -116,24 +118,24 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-type/input
                      test/pretty-whnf/expected
                      test/pretty-whnf/input
+                     test/prop-basic/expected
+                     test/prop-basic/input
                      test/prop-basic/prop-basic.disco
                      test/prop-cmp/expected
                      test/prop-cmp/input
+                     test/prop-holds/expected
+                     test/prop-holds/input
                      test/prop-impredicative/expected
                      test/prop-impredicative/input
                      test/prop-impredicative/prop-impredicative.disco
+                     test/prop-type/expected
+                     test/prop-type/input
                      test/props-basic/expected
                      test/props-basic/input
                      test/props-basic/props-basic.disco
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
-                     test/quantifiers-parse/expected
-                     test/quantifiers-parse/input
-                     test/quantifiers-type/expected
-                     test/quantifiers-type/input
-                     test/repl-ann/expected
-                     test/repl-ann/input
                      test/repl-compile/expected
                      test/repl-compile/input
                      test/repl-defn/expected
@@ -250,6 +252,7 @@ library
                        Disco.Property
                        Disco.Desugar
                        Disco.Compile
+                       Disco.Enumerate
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst
@@ -300,6 +303,7 @@ library
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.11,
                        integer-logarithms >= 1.0 && < 1.1,
+                       simple-enumeration >= 0.2 && < 0.3,
                        haskeline >=0.7 && <0.8,
                        QuickCheck >= 2.9 && < 2.14,
                        fgl >= 5.5 && < 5.8,

@@ -21,10 +21,9 @@
 module Disco.Typecheck where
 
 import           Control.Arrow                           ((&&&))
-import           Control.Lens                            ((%~), (&), _1)
 import           Control.Monad.Except
 import           Control.Monad.RWS                       (get)
-import           Data.Bifunctor                          (first, second)
+import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, sort)
 import qualified Data.Map                                as M
@@ -276,22 +275,9 @@ checkProperties docs =
 -- | Check the types of the terms embedded in a property.
 checkProperty :: Property -> TCM AProperty
 checkProperty prop = do
-
-  ((binds, at), theta) <- solve $ do
-    -- A property looks like  forall (x1:ty1) ... (xn:tyn). term.
-    (bs, t) <- unbind prop
-
-    -- Extend the context with (x1:ty1) ... (xn:tyn) ...
-    extends (M.fromList $ map (second toPolyType) bs) $ do
-
-    -- ... check that the term has type Bool ...
-    a <- check t TyBool
-
-    return (bs,a)
-
-  -- Finally, apply the resulting substitution and fix up the types of
-  -- the variables.
-  return (bind (binds & traverse . _1 %~ coerce) (applySubst theta at))
+  (at, theta) <- solve $ check prop TyProp
+  -- XXX do we need to default container variables here?
+  return $ applySubst theta at
 
 ------------------------------------------------------------
 -- Type checking/inference
@@ -685,6 +671,13 @@ typecheck Infer (TPrim prim) = do
     -- 'holds' converts a Prop into a Bool (but might not terminate).
     inferPrim PrimHolds = return $ TyProp :->: TyBool
 
+    -- An equality assertion =!= is just like a comparison ==, except
+    -- the result is a Prop.
+    inferPrim (PrimBOp ShouldEq) = do
+      ty <- freshTy
+      constraint $ CQual QCmp ty
+      return $ ty :*: ty :->: TyProp
+
     ----------------------------------------
     -- Comparisons
 
@@ -789,12 +782,12 @@ typecheck _                 TWild        = throwError $ NoTWild
 -- bunch of the code, but their typing rules are a bit different.  In
 -- particular a lambda
 --
---   \(x1:ty1) (x2:ty2) ... . body
+--   \(x1:ty1), (x2:ty2) ... . body
 --
 -- is going to have a type like ty1 -> ty2 -> ... -> resTy, whereas a
 -- quantifier like
 --
---   ∃(x1:ty1) (x2:ty2) ... . body
+--   ∃(x1:ty1), (x2:ty2) ... . body
 --
 -- is just going to have the type Prop.  The similarity is that in
 -- both cases we have to generate unification variables for any
@@ -870,10 +863,15 @@ typecheck Infer (TAbs q lam)    = do
   tys <- mapM getAscrOrFresh args
   (pCtxs, typedPats) <- unzip <$> sequence (zipWith checkPattern args tys)
 
-  -- In the case of ∀, ∃, have to ensure that none of the arguments
-  -- are themselves of type Prop, or involve anything of type Prop.
+  -- In the case of ∀, ∃, have to ensure that the argument types are
+  -- searchable.
   when (q `elem` [All, Ex]) $
-    forM_ tys $ constraint . CQual QBasic
+    -- What's the difference between this and `tys`? Nothing, after
+    -- the solver runs, but right now the patterns might have a
+    -- concrete type from annotations inside tuples.
+    forM_ (map getType typedPats) $ \ty ->
+      when (not $ isSearchable ty) $
+        throwError $ NoSearch ty
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.

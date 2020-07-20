@@ -140,7 +140,7 @@ primTable =
   , PrimInfo PrimForever   "forever" False
   , PrimInfo PrimUntil     "until"   False
 
-  , PrimInfo PrimHolds     "holds"   False
+  , PrimInfo PrimHolds     "holds"   True
 
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False

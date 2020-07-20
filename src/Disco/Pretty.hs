@@ -200,9 +200,10 @@ prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
 prettyTerm (TAbs q bnd)  = mparens initPA $
-  lunbind bnd $ \(args, body) ->
+  lunbind bnd $ \(args, body) -> do
   prettyQ q <> (if length args > 1 then text " " else empty)
-            <> hsep (map prettyPattern args) <> text "."
+            <> (hsep =<< punctuate (text ",") (map prettyPattern args))
+            <> text "."
             <+> prettyTerm' 0 InL body
   where
     prettyQ Lam = text "λ"
@@ -384,13 +385,7 @@ prettyClause x b
       (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 prettyProperty :: Property -> Doc
-prettyProperty prop =
-  lunbind prop $ \(vars, t) ->
-  case vars of
-    [] -> prettyTerm t
-    _  -> do
-      dvars <- punctuate (text ",") (map (uncurry prettyTyDecl) vars)
-      text "∀" <+> hsep dvars <> text "." <+> prettyTerm t
+prettyProperty = prettyTerm
 
 prettyTyDecl :: Name t -> Type -> Doc
 prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]

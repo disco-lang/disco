@@ -9,6 +9,7 @@ TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () 
 TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 TAbs_ Lam () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 8
+Unsolvable NoWeakUnifier
 8
 8
 8
@@ -32,4 +33,4 @@ TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () 
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 TAbs_ All () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase N)),PAscr_ () (PVar_ () z) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Impl)) (TTup_ () [TApp_ () (TPrim_ () (PrimBOp And)) (TTup_ () [TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1])),TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@1,TVar_ () 0@2]))]),TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@2])]))
+TAbs_ All () (<[PTup_ () [PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase N)),PAscr_ () (PVar_ () z) (TyAtom (ABase N))]]> TApp_ () (TPrim_ () (PrimBOp Impl)) (TTup_ () [TApp_ () (TPrim_ () (PrimBOp And)) (TTup_ () [TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1])),TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@1,TVar_ () 0@2]))]),TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@2])]))

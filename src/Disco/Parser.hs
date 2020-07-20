@@ -387,18 +387,10 @@ parseDocString = label "documentation" $ L.nonIndented sc $
 --   @!!! forall x1 : ty1, ..., xn : tyn. term@.
 --
 --   The forall is optional.
-parseProperty :: Parser Property
+parseProperty :: Parser Term
 parseProperty = label "property" $ L.nonIndented sc $ do
   _ <- symbol "!!!"
-  indented $ do
-    bind
-      <$> (parseUniversal <|> return [])
-      <*> parseTerm
-  where
-    parseUniversal =
-         forall
-      *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
-      <* dot
+  indented parseTerm
 
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
@@ -634,7 +626,7 @@ parseInj =
 parseQuantified :: Parser Term
 parseQuantified =
   TAbs <$> parseQuantifier
-       <*> (bind <$> some parseAtomicPattern <*> (dot *> parseTerm'))
+       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm'))
 
 -- | Parse a quantifier symbol (lambda, forall, or exists).
 parseQuantifier :: Parser Quantifier

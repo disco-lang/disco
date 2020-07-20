@@ -73,7 +73,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isEmptyTy
+       , isNumTy, isEmptyTy, isFiniteTy, isSearchable
 
        -- * Type substitutions
 
@@ -150,8 +150,8 @@ data BaseTy where
   -- | Unicode characters.
   C    :: BaseTy
 
-  -- | Finite types. The single argument is a natural number defining
-  --   the exact number of inhabitants.
+  -- Finite types. The single argument is a natural number defining
+  -- the exact number of inhabitants.
   -- Fin  :: Integer -> BaseTy
 
   -- | Set container type.  It's a bit odd putting these here since
@@ -545,10 +545,12 @@ countType (ty1 :*: ty2)
   | isEmptyTy ty1       = Just 0
   | isEmptyTy ty2       = Just 0
   | otherwise           = (*) <$> countType ty1 <*> countType ty2
-countType (ty1 :->: ty2)
-  | isEmptyTy ty1       = Just 1
-  | isEmptyTy ty2       = Just 0
-  | otherwise           = (^) <$> countType ty2 <*> countType ty1
+countType (ty1 :->: ty2) =
+  case (countType ty1, countType ty2) of
+    (Just 0, _) -> Just 1
+    (_, Just 0) -> Just 0
+    (_, Just 1) -> Just 1
+    (c1, c2)    -> (^) <$> c2 <*> c1
 countType (TyList ty)
   | isEmptyTy ty        = Just 1
   | otherwise           = Nothing
@@ -577,6 +579,24 @@ isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
 isEmptyTy _              = False
+
+-- | Decide whether a type is finite.
+isFiniteTy :: Type -> Bool
+isFiniteTy ty | Just _ <- countType ty = True
+              | otherwise              = False
+
+-- | Decide whether a type is searchable, i.e. effectively enumerable.
+isSearchable :: Type -> Bool
+isSearchable TyProp         = False
+isSearchable ty
+  | isNumTy ty              = True
+  | isFiniteTy ty           = True
+isSearchable (TyList ty)    = isSearchable ty
+isSearchable (TySet ty)     = isSearchable ty
+isSearchable (ty1 :+: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :*: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :->: ty2) = isFiniteTy ty1 && isSearchable ty2
+isSearchable _              = False
 
 --------------------------------------------------
 -- Strictness

@@ -12,7 +12,10 @@
 
 module Disco.Interactive.Eval where
 
-import           Control.Lens               (use)
+import           System.Console.Haskeline                as H
+
+import           Control.Arrow                           ((&&&))
+import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands
@@ -37,6 +40,7 @@ showVal _ (VFun_ {})   = "<fun>"
 showVal _ (VDelay_ {}) = "<delay>"
 showVal _ (VBag {})    = "<bag>"
 showVal _ (VType {})   = "<type>"
+showVal _ (VProp {})   = "<prop>"
 
 printMem :: Disco IErr ()
 printMem = do

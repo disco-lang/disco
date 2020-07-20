@@ -326,9 +326,9 @@ data Term_ e where
   -- | A binding abstraction, of the form @Q vars. expr@ where @Q@ is
   --   a quantifier and @vars@ is a list of bound variables and
   --   optional type annotations.  In particular, this could be a
-  --   lambda abstraction, /i.e./ an anonymous function (/e.g./ @\x
-  --   (y:N). 2x + y@), a universal quantifier (@forall x (y:N). x^2 +
-  --   y > 0@), or an existential quantifier (@exists x (y:N). x^2 + y
+  --   lambda abstraction, /i.e./ an anonymous function (/e.g./ @\x,
+  --   (y:N). 2x + y@), a universal quantifier (@forall x, (y:N). x^2 +
+  --   y > 0@), or an existential quantifier (@exists x, (y:N). x^2 + y
   --   == 0@).
   TAbs_   :: Quantifier -> X_TAbs e -> Binder_ e (Term_ e) -> Term_ e
 
@@ -638,7 +638,7 @@ instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Patter
 type family X_Binder e
 
 -- | A binder represents the stuff between the quantifier and the body
---   of a lambda, ∀, or ∃ abstraction, as in (x y : N) (y : F).
+--   of a lambda, ∀, or ∃ abstraction, as in @x : N, r : F@.
 type Binder_ e a = Bind (X_Binder e) a
 
 -- | A quantifier: λ, ∀, or ∃
@@ -652,11 +652,8 @@ instance Alpha Quantifier
 -- Property
 ------------------------------------------------------------
 
--- | A property is a list of forall-bound variables with their types,
---   followed by a (boolean) term.
---
---   This should probably move somewhere else?
-type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
+-- | A property is just a term (of type Prop).
+type Property_ e = Term_ e
 
 ------------------------------------------------------------
 -- Orphan instances

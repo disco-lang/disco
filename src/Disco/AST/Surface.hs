@@ -194,6 +194,10 @@ partitionDecls []                   = ([], [], [])
 ------------------------------------------------------------
 type Term = Term_ UD
 
+-- In the surface language, abstractions bind variables using a
+-- (nonempty) list of patterns. Each pattern might contain any
+-- number of variables, and might have type annotations on some
+-- of its components.
 type instance X_Binder          UD = [Pattern]
 
 type instance X_TVar            UD = ()

@@ -201,10 +201,11 @@ natural :: Parser Integer
 natural = lexeme L.decimal <?> "natural number"
 
 -- | Parse a nonnegative decimal of the form @xxx.yyyy[zzz]@, where
---   the @y@s and bracketed @z@s are optional.  For example, this
---   parser accepts all of the following:
+--   the @y@s and bracketed @z@s are both optional as long as the
+--   other is present.  (In other words, there must be something after
+--   the period.) For example, this parser accepts all of the
+--   following:
 --
---   > 2.
 --   > 2.0
 --   > 2.333
 --   > 2.33[45]
@@ -213,24 +214,30 @@ natural = lexeme L.decimal <?> "natural number"
 --   The idea is that brackets surround an infinitely repeating
 --   sequence of digits.
 --
---   We are careful to only parse a decimal terminated by a period if
---   there is not another period immediately following.  This way
---   something like @[1..]@ parses properly as the number 1 with an
---   ellipsis.
+--   We used to accept @2.@ with no trailing digits, but no longer do.
+--   See https://github.com/disco-lang/disco/issues/245 and Note
+--   [Trailing period].
 decimal :: Parser Rational
-decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char '.')
-                              <*> many digit
-                              <*> optionMaybe (brackets (some digit))
+decimal = lexeme (readDecimal <$> some digit <* char '.'
+                              <*> fractionalPart
                  )
   where
     digit = satisfy isDigit
-    readDecimal a b mrep = read a % 1   -- integer part
+    fractionalPart =
+          -- either some digits optionally followed by bracketed digits...
+          (,) <$> some digit <*> optionMaybe (brackets (some digit))
+          -- ...or just bracketed digits.
+      <|> (,) <$> pure []    <*> (Just <$> brackets (some digit))
 
-                           -- next part is just b/10^n
-                         + (if null b then 0 else read b) % (10^(length b))
+    readDecimal a (b, mrep)
+      = read a % 1   -- integer part
 
-                           -- repeating part
-                         + readRep (length b) mrep
+        -- next part is just b/10^n
+        + (if null b then 0 else read b) % (10^(length b))
+
+        -- repeating part
+        + readRep (length b) mrep
+
     readRep _      Nothing    = 0
     readRep offset (Just rep) = read rep % (10^offset * (10^(length rep) - 1))
       -- If s = 0.[rep] then 10^(length rep) * s = rep.[rep], so
@@ -240,6 +247,27 @@ decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char 
       --
       -- We also have to divide by 10^(length b) to shift it over
       -- past any non-repeating prefix.
+
+-- ~~~~ Note [Trailing period]
+--
+-- We used to accept numbers with nothing after the trailing period,
+-- such as @2.@. However, this caused some problems with parsing:
+--
+--   - First, https://github.com/disco-lang/disco/issues/99 which we
+--     solved by making sure there was not another period after the
+--     trailing period.
+--   - Next, https://github.com/disco-lang/disco/issues/245.
+--
+-- I first tried solving #245 by disallowing *any* operator character
+-- after the trailing period, but then some tests in the test suite
+-- started failing, where we had written things like @1./(10^5)@.  The
+-- problem is that when a period is followed by another operator
+-- symbol, sometimes we might want them to be parsed as an operator
+-- (as in @2.-4@, #245), and sometimes we might not (as in
+-- @1./(10^5)@).  So in the end it seems simpler and cleaner to
+-- require at least a 0 digit after the period --- just like pretty
+-- much every other programming language and just like standard
+-- mathematical practice.
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()

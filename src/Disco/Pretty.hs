@@ -533,7 +533,7 @@ prettyDecimal r = printedDecimal
        | length first102 > 101 || length first102 == 101 && (last first102 /= 0)
          = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
        | rep == [0]
-         = show n ++ "." ++ concatMap show pre
+         = show n ++ "." ++ (if null pre then "0" else concatMap show pre)
        | otherwise
          = show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
        where

@@ -87,6 +87,11 @@ data Core where
   -- | A case expression.
   CCase :: [CBranch] -> Core
 
+  -- | A "test frame" under which a test case is run. Records the
+  --   types and legible names of the variables that should
+  --   be reported to the user if the test fails.
+  CTest :: [(String, Type, Name Core)] -> Core -> Core
+
   -- | A type.
   CType :: Type -> Core
 
@@ -173,6 +178,15 @@ data Op = OAdd      -- ^ Addition (@+@)
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
+
+        -- Propositions
+        | OForall [Type]  -- ^ Universal quantification. Applied to a closure
+                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+        | OExists [Type]  -- ^ Existential quantification. Applied to a closure
+                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+        | OHolds          -- ^ Convert Prop -> Bool via exhaustive search.
+        | ONotProp        -- ^ Flip success and failure for a prop.
+        | OShouldEq Type  -- ^ Equality assertion, @=!=@
 
         -- Other primitives
         | OCrash          -- ^ Crash with a user-supplied message

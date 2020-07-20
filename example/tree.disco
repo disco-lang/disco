@@ -14,10 +14,10 @@ treeFold x f (left  ())      = x
 treeFold x f (right (n,l,r)) = f n (treeFold x f l) (treeFold x f r)
 
 treeSum : Tree -> N
-treeSum = treeFold 0 (\x l r. x + l + r)
+treeSum = treeFold 0 (\x, l, r. x + l + r)
 
 treeSize : Tree -> N
-treeSize = treeFold 0 (\x l r. 1 + l + r)
+treeSize = treeFold 0 (\x, l, r. 1 + l + r)
 
 treeHeight : Tree -> N
-treeHeight = treeFold 0 (\x l r. 1 + l max r)
+treeHeight = treeFold 0 (\x, l, r. 1 + l max r)

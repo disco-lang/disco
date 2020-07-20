@@ -67,6 +67,9 @@ data Prim where
 
   PrimForever :: Prim      -- ^ @[x, y, z .. ]@
   PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+
+  PrimHolds   :: Prim      -- ^ Test whether a proposition holds
+
   PrimLookupSeq :: Prim    -- ^ Lookup OEIS sequence
   PrimExtendSeq :: Prim    -- ^ Extend OEIS sequence
   deriving (Show, Read, Eq, Ord, Generic)
@@ -136,6 +139,9 @@ primTable =
 
   , PrimInfo PrimForever   "forever" False
   , PrimInfo PrimUntil     "until"   False
+
+  , PrimInfo PrimHolds     "holds"   True
+
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False
   ]

@@ -62,6 +62,10 @@ module Disco.Types
        , pattern TyUser
        , pattern TyString
 
+       -- ** Qualifiers
+
+       , SortMap(..), getSort
+
        -- ** Quantified types
 
        , PolyType(..)
@@ -69,7 +73,7 @@ module Disco.Types
 
        -- * Type predicates
 
-       , isNumTy, isEmptyTy
+       , isNumTy, isEmptyTy, isFiniteTy, isSearchable
 
        -- * Type substitutions
 
@@ -100,11 +104,13 @@ import           Control.Lens                     (toListOf)
 import           Data.List                        (nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Maybe                       (fromMaybe)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.Subst                      (Substitution)
+import           Disco.Types.Qualifiers
 
 --------------------------------------------------
 -- Disco types
@@ -144,9 +150,9 @@ data BaseTy where
   -- | Unicode characters.
   C    :: BaseTy
 
-  -- | Finite types. The single argument is a natural number defining
-  --   the exact number of inhabitants.
-  Fin  :: Integer -> BaseTy
+  -- Finite types. The single argument is a natural number defining
+  -- the exact number of inhabitants.
+  -- Fin  :: Integer -> BaseTy
 
   -- | Set container type.  It's a bit odd putting these here since
   --   they have kind * -> * and all the other base types have kind *;
@@ -355,6 +361,7 @@ data Type where
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Type
+instance Subst Type Qualifier
 instance Subst Type Rational where
   subst _ _ = id
   substs _  = id
@@ -483,6 +490,22 @@ data TyDefBody = TyDefBody [String] ([Type] -> Type)
 type TyDefCtx = M.Map String TyDefBody
 
 ---------------------------------
+-- Qualifier maps
+
+newtype SortMap = SM { unSM :: Map (Name Type) Sort }
+  deriving (Show)
+
+instance Semigroup SortMap where
+  SM sm1 <> SM sm2 = SM (M.unionWith (<>) sm1 sm2)
+
+instance Monoid SortMap where
+  mempty  = SM M.empty
+  mappend = (<>)
+
+getSort :: SortMap -> Name Type -> Sort
+getSort (SM sm) v = fromMaybe topSort (M.lookup v sm)
+
+---------------------------------
 --  Universally quantified types
 
 -- | 'PolyType' represents a polymorphic type of the form @forall a1
@@ -522,10 +545,12 @@ countType (ty1 :*: ty2)
   | isEmptyTy ty1       = Just 0
   | isEmptyTy ty2       = Just 0
   | otherwise           = (*) <$> countType ty1 <*> countType ty2
-countType (ty1 :->: ty2)
-  | isEmptyTy ty1       = Just 1
-  | isEmptyTy ty2       = Just 0
-  | otherwise           = (^) <$> countType ty2 <*> countType ty1
+countType (ty1 :->: ty2) =
+  case (countType ty1, countType ty2) of
+    (Just 0, _) -> Just 1
+    (_, Just 0) -> Just 0
+    (_, Just 1) -> Just 1
+    (c1, c2)    -> (^) <$> c2 <*> c1
 countType (TyList ty)
   | isEmptyTy ty        = Just 1
   | otherwise           = Nothing
@@ -554,6 +579,24 @@ isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
 isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
 isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
 isEmptyTy _              = False
+
+-- | Decide whether a type is finite.
+isFiniteTy :: Type -> Bool
+isFiniteTy ty | Just _ <- countType ty = True
+              | otherwise              = False
+
+-- | Decide whether a type is searchable, i.e. effectively enumerable.
+isSearchable :: Type -> Bool
+isSearchable TyProp         = False
+isSearchable ty
+  | isNumTy ty              = True
+  | isFiniteTy ty           = True
+isSearchable (TyList ty)    = isSearchable ty
+isSearchable (TySet ty)     = isSearchable ty
+isSearchable (ty1 :+: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :*: ty2)  = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :->: ty2) = isFiniteTy ty1 && isSearchable ty2
+isSearchable _              = False
 
 --------------------------------------------------
 -- Strictness

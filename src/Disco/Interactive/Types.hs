@@ -38,6 +38,7 @@ data REPLExpr :: CmdTag -> * where
   Let       :: Name Term -> Term -> REPLExpr 'CLet -- Toplevel let-expression: for the REPL
   TypeCheck :: Term -> REPLExpr 'CTypeCheck        -- Typecheck a term
   Eval      :: Term -> REPLExpr 'CEval             -- Evaluate a term
+  TestProp  :: Term -> REPLExpr 'CTestProp         -- Run a property test
   ShowDefn  :: Name Term -> REPLExpr 'CShowDefn    -- Show a variable's definition
   Parse     :: Term -> REPLExpr 'CParse            -- Show the parsed AST
   Pretty    :: Term -> REPLExpr 'CPretty           -- Pretty-print a term
@@ -52,6 +53,7 @@ data REPLExpr :: CmdTag -> * where
                                                    -- just enters a comment
   Help      :: REPLExpr 'CHelp
   Names     :: REPLExpr 'CNames
+
 
 deriving instance Show (REPLExpr c)
 
@@ -88,7 +90,7 @@ data REPLCommand (c :: CmdTag) = REPLCommand
 
 data CmdTag = CUsing | CLet | CTypeCheck | CEval | CShowDefn
   | CParse | CPretty | CAnn | CDesugar | CCompile | CImport | CLoad
-  | CReload | CDoc | CNop | CHelp | CNames
+  | CReload | CDoc | CNop | CHelp | CNames | CTestProp
   deriving (Show, Eq, Typeable)
 
 data SomeREPLCommand where

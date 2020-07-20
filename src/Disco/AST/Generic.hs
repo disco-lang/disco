@@ -77,7 +77,6 @@ module Disco.AST.Generic
        , X_TChar
        , X_TString
        , X_TAbs
-       , X_TAbsBind
        , X_TApp
        , X_TTup
        , X_TInj
@@ -141,6 +140,12 @@ module Disco.AST.Generic
        , X_PFrac
        , X_Pattern
        , ForallPattern
+
+       -- * Quantifiers
+
+       , Quantifier(..)
+       , Binder_
+       , X_Binder
 
        -- * Property
 
@@ -262,7 +267,6 @@ type family X_TRat e
 type family X_TChar e
 type family X_TString e
 type family X_TAbs e
-type family X_TAbsBind e
 type family X_TApp e
 type family X_TTup e
 type family X_TInj e
@@ -319,13 +323,17 @@ data Term_ e where
   -- | A string literal, /e.g./ @"disco"@.
   TString_ :: X_TString e -> [Char] -> Term_ e
 
-  -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
-  --   multiple arguments, and each argument may be annotated with a
-  --   type.
-  TAbs_   :: X_TAbs e -> Bind (X_TAbsBind e) (Term_ e) -> Term_ e
+  -- | A binding abstraction, of the form @Q vars. expr@ where @Q@ is
+  --   a quantifier and @vars@ is a list of bound variables and
+  --   optional type annotations.  In particular, this could be a
+  --   lambda abstraction, /i.e./ an anonymous function (/e.g./ @\x,
+  --   (y:N). 2x + y@), a universal quantifier (@forall x, (y:N). x^2 +
+  --   y > 0@), or an existential quantifier (@exists x, (y:N). x^2 + y
+  --   == 0@).
+  TAbs_   :: Quantifier -> X_TAbs e -> Binder_ e (Term_ e) -> Term_ e
 
   -- | Function application, @t1 t2@.
-  TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
+  TApp_   :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
 
   -- | An n-tuple, @(t1, ..., tn)@.
   TTup_   :: X_TTup e -> [Term_ e] -> Term_ e
@@ -372,7 +380,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TChar e)
     , a (X_TString e)
     , a (X_TAbs e)
-    , a (X_TAbsBind e)
     , a (X_TApp e)
     , a (X_TInj e)
     , a (X_TCase e)
@@ -388,6 +395,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (Link_ e)
     , a (Binding_ e)
     , a (Pattern_ e)
+    , a (Binder_ e (Term_ e))
     )
 
 deriving instance ForallTerm Show e => Show (Term_ e)
@@ -621,14 +629,31 @@ instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
 instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
 
 ------------------------------------------------------------
+-- Quantifiers and binders
+------------------------------------------------------------
+
+-- | A type family specifying what the binder in an abstraction can be.
+--   Should have at least variables in it, but how many variables and
+--   what other information is carried along may vary.
+type family X_Binder e
+
+-- | A binder represents the stuff between the quantifier and the body
+--   of a lambda, ∀, or ∃ abstraction, as in @x : N, r : F@.
+type Binder_ e a = Bind (X_Binder e) a
+
+-- | A quantifier: λ, ∀, or ∃
+data Quantifier = Lam | Ex | All
+  deriving (Generic, Eq, Ord, Show)
+
+instance Subst Type Quantifier
+instance Alpha Quantifier
+
+------------------------------------------------------------
 -- Property
 ------------------------------------------------------------
 
--- | A property is a list of forall-bound variables with their types,
---   followed by a (boolean) term.
---
---   This should probably move somewhere else?
-type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
+-- | A property is just a term (of type Prop).
+type Property_ e = Term_ e
 
 ------------------------------------------------------------
 -- Orphan instances

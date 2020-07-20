@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections            #-}
@@ -32,8 +33,11 @@ module Disco.Interpret.Core
          -- * Container utilities
        , valuesToBag, valuesToSet
 
+         -- * Property testing
+       , testProperty
+
          -- * Equality testing and enumeration
-       , eqOp, primValEq, enumerate
+       , eqOp, primValEq
        , decideEqFor, decideEqForRnf, decideEqForClosures
 
          -- * Comparison testing
@@ -50,13 +54,13 @@ module Disco.Interpret.Core
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (filterM, (>=>))
-import           Control.Monad.Except                    (throwError)
+import           Control.Monad.Except                    (catchError,
+                                                          throwError)
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
 import           Data.Coerce                             (coerce)
 import           Data.IntMap.Lazy                        ((!))
 import qualified Data.IntMap.Lazy                        as IntMap
-import           Data.List                               (find)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
@@ -77,7 +81,9 @@ import           Disco.AST.Core
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
 import           Disco.Context
+import           Disco.Enumerate
 import           Disco.Eval
+import           Disco.Property
 import           Disco.Types
 
 import           Math.OEIS                               (catalogNums,
@@ -263,6 +269,9 @@ whnf (CApp c cs)    = do
 
 -- See 'whnfCase' for case reduction logic.
 whnf (CCase bs)     = whnfCase bs
+
+-- Reduce under a test frame.
+whnf (CTest vars c) = whnfTest vars c
 
 ------------------------------------------------------------
 -- Function application
@@ -899,13 +908,22 @@ whnfOp (OUnions ty)    = arity1 "unions"    $ primUnions ty
 --------------------------------------------------
 -- Merge
 
-whnfOp (OMerge ty)     = arity3 "merge" $ primMerge ty
+whnfOp (OMerge ty)     = arity3 "merge"     $ primMerge ty
 
 --------------------------------------------------
 -- Ellipsis
 
 whnfOp OForever        = arity1 "forever"   $ ellipsis Forever
 whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
+
+--------------------------------------------------
+-- Propositions
+
+whnfOp (OExists tys)   = arity1 "exists"    $ whnfV >=> primExists tys
+whnfOp (OForall tys)   = arity1 "forall"    $ whnfV >=> primForall tys
+whnfOp OHolds          = arity1 "holds"     $ whnfV >=> primHolds
+whnfOp ONotProp        = arity1 "notProp"   $ whnfV >=> primNotProp
+whnfOp (OShouldEq ty)  = arity2 "shouldEq"  $ shouldEqOp ty
 
 --------------------------------------------------
 -- Other primitives
@@ -1017,9 +1035,9 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: Value -> Disco IErr Value
-enumOp (VType ty) = case countType ty of
-  Just _  -> toDiscoList (enumerate ty)
-  Nothing -> throwError $ InfiniteTy ty
+enumOp (VType ty)
+  | isFiniteTy ty = toDiscoList (enumerateType ty)
+  | otherwise     = throwError $ InfiniteTy ty
 enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,
@@ -1143,6 +1161,111 @@ valueToString = fmap toString . rnfV
     toString _ = "Impossible: valueToString.toString, non-list"
 
 ------------------------------------------------------------
+-- Propositions
+------------------------------------------------------------
+
+-- ~~~~ Note [Counterexample reporting & test frames]
+--
+-- When a property test fails underneath a forall quantifier (or
+-- succeeds under an exists), we may need to report the values of
+-- the quantified variables to the user, via the `TestEnv` on the
+-- `TestResult` of the proposition.
+--
+-- The regular evaluator environment doesn't have what we need,
+-- which is (1) which variables should be reported, (2) their
+-- types (without which we can't hope to print their values), and
+-- (3) their original names as written by the user, before any
+-- alpha renaming that the compiler may have done.
+--
+-- It would be a pain to keep track of this and make it available
+-- at every program point where a prop might fail (including via
+-- throwing an exception), so we don't. Instead every TestResult
+-- initially has an empty TestEnv, and information on reportable
+-- variables is added as that result bubbles up through enclosing
+-- CTest expressions.
+--
+-- The compilation pipeline maintains the invariant that every
+-- quantifier body will contain a CTest naming its pattern-bound
+-- variables, directly inside the various lambdas and cases that
+-- actually bind them. So we never have to worry about attaching
+-- counterexample information except in `whnfTest`. We also don't
+-- have to worry about a reportable variable being shadowed or
+-- not yet bound at the site of an error or test failure, as long
+-- as things are alright at the CTest frame that encloses it.
+
+-- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
+ensureProp :: Value -> Disco IErr ValProp
+ensureProp (VProp p)    = return p
+ensureProp (VCons 0 []) = return $ VPDone (TestResult False TestBool [])
+ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool [])
+ensureProp _            = error "ensureProp: non-prop value"
+
+failTestOnError :: Disco IErr ValProp -> Disco IErr ValProp
+failTestOnError m = catchError m $ \e ->
+  return $ VPDone (TestResult False (TestRuntimeError e) [])
+
+-- | Normalize under a test frame, augmenting the reported prop
+--   with the frame's variables.
+whnfTest :: TestVars -> Core -> Disco IErr Value
+whnfTest vs c = do
+  result <- failTestOnError (ensureProp =<< whnf c)
+  e' <- getTestEnv vs
+  return . VProp $ extendPropEnv e' result
+
+primExists :: [Type] -> Value -> Disco IErr Value
+primExists tys v = return $ VProp (VPSearch SMExists tys v [])
+
+primForall :: [Type] -> Value -> Disco IErr Value
+primForall tys v = return $ VProp (VPSearch SMForall tys v [])
+
+-- | Assert the equality of two values.
+shouldEqOp :: Type -> Value -> Value -> Disco IErr Value
+shouldEqOp t x y = toProp <$> decideEqFor t x y
+  where
+    toProp b = VProp (VPDone (TestResult b (TestEqual t x y) []))
+
+-- | Convert a prop to a boolean by dropping its evidence.
+primHolds :: Value -> Disco IErr Value
+primHolds v = resultToBool =<< testProperty Exhaustive v
+  where
+    resultToBool :: TestResult -> Disco IErr Value
+    resultToBool (TestResult _ (TestRuntimeError e) _) = throwError e
+    resultToBool (TestResult b _ _) = return $ VCons (fromEnum b) []
+
+-- | Invert a prop, keeping its evidence or its suspended search.
+primNotProp :: Value -> Disco IErr Value
+primNotProp v = ensureProp v >>= \case
+  VPDone r            -> return $ VProp $ VPDone $ invertPropResult r
+  VPSearch sm tys p e -> return $ VProp $ VPSearch (invertMotive sm) tys p e
+
+-- | Test whether a property holds on generated examples.
+testProperty :: SearchType -> Value -> Disco IErr TestResult
+testProperty initialSt v = whnfV v >>= ensureProp >>= checkProp
+  where
+    checkProp :: ValProp -> Disco IErr TestResult
+    checkProp (VPDone r)            = return r
+    checkProp (VPSearch sm tys f e) =
+      extendResultEnv e <$> (generateSamples initialSt vals >>= go)
+      where
+        vals = enumTypes tys
+        (SearchMotive (whenFound, wantsSuccess)) = sm
+
+        go :: ([[Value]], SearchType) -> Disco IErr TestResult
+        go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) []
+        go (x:xs, st) = do
+          prop <- ensureProp =<< whnfApp f x
+          case prop of
+            VPDone r    -> continue st xs r
+            VPSearch {} -> checkProp prop >>= continue st xs
+
+        continue :: SearchType -> [[Value]] -> TestResult -> Disco IErr TestResult
+        continue st xs r@(TestResult _ _ e')
+          | testIsError r              = return r
+          | testIsOk r == wantsSuccess =
+            return $ TestResult whenFound (TestFound r) e'
+          | otherwise                  = go (xs, st)
+
+------------------------------------------------------------
 -- Equality testing
 ------------------------------------------------------------
 
@@ -1196,7 +1319,7 @@ decideEqFor (ty1 :->: ty2) v1 v2 = do
   clos2 <- whnfV v2
 
   --  all the values of type ty1.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
 
   -- Try evaluating the functions on each value and check whether they
   -- agree.
@@ -1250,71 +1373,6 @@ bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
     False -> return False
     True  -> bagEquality ty xs ys
 
-
--- TODO: can the functions built by 'enumerate' be more efficient if
--- enumerate builds *both* a list and a bijection to a prefix of the
--- naturals?  Currently, the functions output by (enumerate (_ :->: _))
--- take linear time in the size of the input to evaluate since they
--- have to do a lookup in an association list.  Does this even matter?
-
--- | Enumerate all the values of a given (finite) type.  If the type
---   has a linear order then the values are output in sorted order,
---   that is, @v@ comes before @w@ in the list output by @enumerate@
---   if and only if @v < w@.  This function will never be called on an
---   infinite type, since type checking ensures that equality or
---   comparison testing will only be done in cases where a finite
---   enumeration is required.
-enumerate :: Type -> [Value]
-
--- There are zero, one, and two values of types Void, Unit, and Bool respectively.
-enumerate TyVoid           = []
-enumerate TyUnit           = [VCons 0 []]
-enumerate TyBool           = [VCons 0 [], VCons 1 []]
-
--- enumerate (TyFin n)        = map (vnum . (%1)) [0..(n-1)]
-
--- To enumerate a pair type, take the Cartesian product of enumerations.
-enumerate (ty1 :*: ty2) = [VCons 0 [x, y] | x <- enumerate ty1, y <- enumerate ty2]
-
--- To enumerate a sum type, enumerate all the lefts followed by all the rights.
-enumerate (ty1 :+: ty2)  =
-  map (VCons 0 . (:[])) (enumerate ty1) ++
-  map (VCons 1 . (:[])) (enumerate ty2)
-
--- To enumerate an arrow type @ty1 -> ty2@, enumerate all values of
--- @ty1@ and @ty2@, then create all possible @|ty1|@-length lists of
--- values from the enumeration of @ty2@, and make a function by
--- zipping each one together with the values of @ty1@.
-enumerate (ty1 :->: ty2)
-  | isEmptyTy ty1 = [VFun $ \_ -> error "void!!"]
-  | isEmptyTy ty2 = []
-  | otherwise     =  map mkFun (sequence (vs2 <$ vs1))
-  where
-    vs1 = enumerate ty1
-    vs2 = enumerate ty2
-
-    -- The actual function works by looking up the input value in an
-    -- association list.
-    mkFun :: [Value] -> Value
-    mkFun outs
-      = VFun $ \v -> snd . fromJust' v . find (decideEqForRnf ty1 v . fst) $ zip vs1 outs
-
-    -- A custom version of fromJust' so we get a better error message
-    -- just in case it ever happens
-    fromJust' _ (Just x) = x
-    fromJust' v Nothing  = error $ "Impossible! fromJust in enumerate: " ++ show v
-
-enumerate (TyList _ty) = [VCons 0 []]
-  -- Right now, the only way for this to typecheck is if @ty@ is
-  -- empty.  Perhaps in the future we'll allow 'enumerate' to work on
-  -- countably infinite types, in which case we would need to change
-  -- this.
-
-enumerate _ = []   -- The only way other cases can happen at the
-                   -- moment is in evaluating something like enumerate
-                   -- (Nat * Void), in which case it doesn't matter if
-                   -- we give back an empty list for Nat.
-
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need
 --   to be in the @Disco@ monad, because no evaluation needs to happen.
@@ -1324,7 +1382,7 @@ decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
 decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
   = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
-  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerate ty1)
+  = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerateType ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
@@ -1419,7 +1477,7 @@ decideOrdFor (ty1 :->: ty2) v1 v2 = do
   -- functions by applying them both to each value in the enumeration
   -- in turn, returning the ordering on the first value where the
   -- functions differ.
-  let ty1s = enumerate ty1
+  let ty1s = enumerateType ty1
   decideOrdForClosures ty2 clos1 clos2 ty1s
 
 -- To decide the ordering for two lists:

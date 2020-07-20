@@ -18,17 +18,16 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           System.Console.Haskeline                as H
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import           System.Console.Haskeline         (IOException, handle)
 
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (use, (%=), (.=))
+import           Control.Arrow                    ((&&&))
+import           Control.Lens                     (use, (%=), (.=))
 import           Control.Monad.Except
 import           Data.Coerce
-import           Data.List                               (sortBy)
-import qualified Data.Map                                as M
+import           Data.List                        (sortBy)
+import qualified Data.Map                         as M
 import           Data.Typeable
-import           System.FilePath                         (splitFileName)
+import           System.FilePath                  (splitFileName)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -41,19 +40,18 @@ import           Disco.Interactive.Parser
 import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
-import           Disco.Parser                            (Parser, ident,
-                                                          parseExtName,
-                                                          parseImport, reserved,
-                                                          reservedOp, sc, term)
+import           Disco.Parser                     (Parser, ident, parseExtName,
+                                                   parseImport, reserved,
+                                                   reservedOp, sc, term)
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims                      (Prim (PrimBOp, PrimUOp))
+import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
-import           Text.Megaparsec                         hiding (runParser)
+import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
 dispatch :: [SomeREPLCommand] -> SomeREPLExpr -> Disco IErr ()
@@ -62,6 +60,9 @@ dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
   Just e' -> action c e'
   Nothing -> dispatch cs r
 
+-- Resolution of REPL commands searches this list _in order_, which means
+-- ambiguous command prefixes (e.g. :t for :type) are resolved to the first
+-- matching command.
 discoCommands :: [SomeREPLCommand]
 discoCommands =
   [
@@ -81,6 +82,7 @@ discoCommands =
     SomeCmd reloadCmd,
     SomeCmd showDefnCmd,
     SomeCmd typeCheckCmd,
+    SomeCmd testPropCmd,
     SomeCmd usingCmd
   ]
 
@@ -425,6 +427,31 @@ handleShowDefn (ShowDefn x) = do
     name2s = name2String x
 
 
+testPropCmd :: REPLCommand 'CTestProp
+testPropCmd =
+    REPLCommand {
+      name = "test",
+      helpcmd = ":test <property>",
+      shortHelp = "Test a property using random examples",
+      category = User,
+      cmdtype = ShellCmd,
+      action = handleTest,
+      parser = TestProp <$> term
+    }
+
+handleTest :: REPLExpr 'CTestProp -> Disco IErr ()
+handleTest (TestProp t) = do
+  ctx   <- use topCtx
+  tymap <- use topTyDefns
+  case evalTCM (extends ctx $ withTyDefns tymap $ checkProperty t) of
+    Left e   -> iprint e    -- XXX pretty-print
+    Right at -> do
+      withTopEnv $ do
+        r <- runTest 100 at   -- XXX make configurable
+        prettyTestResult at r
+      garbageCollect
+
+
 typeCheckCmd :: REPLCommand 'CTypeCheck
 typeCheckCmd =
     REPLCommand {
@@ -506,47 +533,78 @@ populateCurrentModuleInfo = do
   loadDefs cdefns
   return ()
 
--- XXX comment, move somewhere else
-prettyCounterexample :: Ctx ATerm Type -> Env -> Disco IErr ()
-prettyCounterexample ctx env
-  | M.null env = return ()
-  | otherwise  = do
-      iputStrLn "    Counterexample:"
-      let maxNameLen = maximum . map (length . name2String) $ M.keys env
-      mapM_ (prettyBind maxNameLen) $ M.assocs env
-  where
-    prettyBind maxNameLen (x,v) = do
-      iputStr "      "
-      iputStr =<< (renderDoc . prettyName $ x)
-      iputStr (replicate (maxNameLen - length (name2String x)) ' ')
-      iputStr " = "
-      prettyValue (ctx !? coerce x) v
-    m !? k = case M.lookup k m of
-      Just val -> val
-      Nothing  -> error $ "Failed M.! with key " ++ show k ++ " in map " ++ show m
-
 -- XXX redo with message framework, with proper support for indentation etc.
--- XXX also move it to Property or Pretty or somewhere like that
+-- XXX move it to Pretty or Property or something
 prettyTestFailure :: AProperty -> TestResult -> Disco IErr ()
-prettyTestFailure _ (TestOK {}) = return ()
-prettyTestFailure prop (TestFalse env) = do
+prettyTestFailure _    (TestResult True _ _)    = return ()
+prettyTestFailure prop (TestResult False r env) = do
+  prettyFailureReason prop r
+  prettyTestEnv "    Counterexample:" env
+
+prettyTestResult :: AProperty -> TestResult -> Disco IErr ()
+prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
+prettyTestResult prop (TestResult _ r _)   = do
+    dp <- renderDoc $ prettyProperty (eraseProperty prop)
+    iputStr       "  - Test passed: " >> iputStrLn dp
+    prettySuccessReason r
+
+prettySuccessReason :: TestReason -> Disco IErr ()
+prettySuccessReason (TestFound (TestResult _ _ vs)) = do
+  prettyTestEnv "    Found example:" vs
+prettySuccessReason (TestNotFound Exhaustive) = do
+  iputStrLn     "    No counterexamples exist."
+prettySuccessReason (TestNotFound (Randomized n m)) = do
+  iputStr       "    Checked "
+  iputStr (show (n + m))
+  iputStrLn " possibilities without finding a counterexample."
+prettySuccessReason _ = return ()
+
+prettyFailureReason :: AProperty -> TestReason -> Disco IErr ()
+prettyFailureReason prop (TestBool) = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStr "  - Test is false: " >> iputStrLn dp
-  let qTys = M.fromList . fst . unsafeUnbind $ prop
-  prettyCounterexample qTys env
-prettyTestFailure prop (TestEqualityFailure ty v1 v2 env) = do
+  iputStr     "  - Test is false: " >> iputStrLn dp
+prettyFailureReason prop (TestEqual ty v1 v2) = do
   iputStr     "  - Test result mismatch for: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
-  iputStr     "    - Expected: " >> prettyValue ty v2
-  iputStr     "    - But got:  " >> prettyValue ty v1
-  let qTys = M.fromList . fst . unsafeUnbind $ prop
-  prettyCounterexample qTys env
-prettyTestFailure prop (TestRuntimeFailure e) = do
+  iputStr     "    - Left side:  " >> prettyValue ty v2
+  iputStr     "    - Right side: " >> prettyValue ty v1
+prettyFailureReason prop (TestRuntimeError e) = do
   iputStr     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStrLn dp
   iputStr     "    " >> iprint e
+prettyFailureReason prop (TestFound (TestResult _ r _)) = do
+  prettyFailureReason prop r
+prettyFailureReason prop (TestNotFound Exhaustive) = do
+  iputStr     "  - No example exists: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  iputStrLn dp
+  iputStrLn   "    All possible values were checked."
+prettyFailureReason prop (TestNotFound (Randomized n m)) = do
+  iputStr     "  - No example was found: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  iputStrLn dp
+  iputStr     "    Checked " >> iputStr (show (n + m)) >> iputStrLn " possibilities."
+
+prettyTestEnv :: String -> TestEnv -> Disco IErr ()
+prettyTestEnv _ [] = return ()
+prettyTestEnv s vs = do
+  iputStrLn s
+  mapM_ prettyBind vs
+  where
+    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
+    prettyBind (x, ty, v) = do
+      iputStr "      "
+      iputStr x
+      iputStr (replicate (maxNameLen - length x) ' ')
+      iputStr " = "
+      prettyValue ty v
+
+runTest :: Int -> AProperty -> Disco IErr TestResult
+runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
+  where
+    n' = fromIntegral (n `div` 2)
 
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
@@ -568,7 +626,7 @@ runAllTests aprops
     runTests n props = do
       iputStr ("  " ++ name2String n ++ ":")
       results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples) props
-      let failures = filter (not . testIsOK . snd) results
+      let failures = filter (not . testIsOk . snd) results
       case null failures of
         True  -> iputStrLn " OK"
         False -> do

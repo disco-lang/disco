@@ -1,0 +1,4 @@
+:test not false
+:test {1, 2} =!= {2, 1}
+:test exists a : B, b : B. (a and b) =!= (a or b)
+:test forall a : B, b : B. (a and b) =!= (a or b)

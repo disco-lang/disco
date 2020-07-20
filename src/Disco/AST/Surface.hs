@@ -59,6 +59,8 @@ module Disco.AST.Surface
        , pattern TList
        , pattern TListComp
 
+       , Quantifier(..)
+
          -- ** Telescopes
        , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
          -- ** Expressions
@@ -192,6 +194,12 @@ partitionDecls []                   = ([], [], [])
 ------------------------------------------------------------
 type Term = Term_ UD
 
+-- In the surface language, abstractions bind variables using a
+-- (nonempty) list of patterns. Each pattern might contain any
+-- number of variables, and might have type annotations on some
+-- of its components.
+type instance X_Binder          UD = [Pattern]
+
 type instance X_TVar            UD = ()
 type instance X_TPrim           UD = ()
 type instance X_TLet            UD = ()
@@ -203,7 +211,6 @@ type instance X_TRat            UD = ()
 type instance X_TChar           UD = ()
 type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
-type instance X_TAbsBind        UD = [Pattern]
 type instance X_TApp            UD = ()
 type instance X_TTup            UD = ()
 type instance X_TInj            UD = ()
@@ -251,8 +258,8 @@ pattern TChar c = TChar_ () c
 pattern TString :: String -> Term
 pattern TString s = TString_ () s
 
-pattern TAbs :: Bind [Pattern] Term -> Term
-pattern TAbs bind = TAbs_ () bind
+pattern TAbs :: Quantifier -> Bind [Pattern] Term -> Term
+pattern TAbs q bind = TAbs_ q () bind
 
 pattern TApp  :: Term -> Term -> Term
 pattern TApp term1 term2 = TApp_ () term1 term2

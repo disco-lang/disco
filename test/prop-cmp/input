@@ -1,0 +1,3 @@
+:type \(x:Prop). x == x
+:type (forall (x:N). x >= 0) == (forall (y:N). y >= 0)
+:type (exists (x:N). x > 0) < (forall (x:N). x > 0)

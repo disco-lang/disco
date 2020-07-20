@@ -1,0 +1,16 @@
+using Primitives
+
+||| Decide whether a proposition holds, *i.e.* convert it to a boolean.
+||| Note, however, that for some propositions this may run forever.
+||| For example, `holds (forall (x:N). x >= 0)` will run forever
+||| trying to check all natural numbers to see if they are all
+||| nonnegative.
+|||
+||| If you want to use random sampling to check whether a proposition
+||| *probably* holds, the `:test` command at the REPL will give you a
+||| best-effort answer. For instance, `:test (forall x:N. x >= 0)` will
+||| happily report that every natural number it tried was nonnegative.
+
+!!! holds (true : Prop) == true
+holds : Prop -> Bool
+holds = $holds

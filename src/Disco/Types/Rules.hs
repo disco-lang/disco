@@ -39,19 +39,14 @@ module Disco.Types.Rules
   )
   where
 
-import           GHC.Generics
-import           Unbound.Generics.LocallyNameless
+import           Control.Monad          ((>=>))
+import           Data.List              (foldl')
+import           Data.Map               (Map)
+import qualified Data.Map               as M
+import qualified Data.Set               as S
 
-import           Math.NumberTheory.Primes.Testing (isPrime)
-
-import           Data.List                        (foldl')
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
-
-import           Disco.Syntax.Operators
 import           Disco.Types
+import           Disco.Types.Qualifiers
 
 ------------------------------------------------------------
 -- Arity
@@ -79,75 +74,6 @@ arity (CContainer _) = [Co]
 arity (CUser _)      = error "Impossible! arity CUser"
   -- CUsers should always be replaced by their definitions before arity
   -- is called.
-
-------------------------------------------------------------
--- Qualifiers
-------------------------------------------------------------
-
--- | A "qualifier" is kind of like a type class in Haskell; but unlike
---   Haskell, disco users cannot define their own.  Rather, there is a
---   finite fixed list of qualifiers supported by disco.  For example,
---   @QSub@ denotes types which support a subtraction operation.  Each
---   qualifier corresponds to a set of types which satisfy it (see
---   'hasQual' and 'qualRules').
---
---   These qualifiers generally arise from uses of various operations.
---   For example, the expression @\\x y. x - y@ would be inferred to
---   have a type @∀ a. QSub a => a -> a -> a@, that is, a function of type
---   @a -> a -> a@ where @a@ is any type that supports subtraction.
---
---   These qualifiers can appear in a 'CQual' constraint; see
---   "Disco.Typecheck.Constraint".
-data Qualifier
-  = QNum       -- ^ Numeric, i.e. a semiring supporting + and *
-  | QSub       -- ^ Subtractive, i.e. supports -
-  | QDiv       -- ^ Divisive, i.e. supports /
-  | QCmp       -- ^ Comparable, i.e. supports ordering/comparison (see Note [QCmp])
-  | QEnum      -- ^ Enumerable, i.e. supports ellipsis notation [x .. y]
-  | QBool      -- ^ Boolean, i.e. supports and, or, not
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha Qualifier
-instance Subst Type Qualifier
-
--- ~~~~ Note [QCmp]
---
--- Every type in disco supports (semi-decidable) linear ordering, so
--- in one sense the QCmp constraint is unnecessary.  However, in order
--- to do a comparison we need to know the type at runtime.  Currently,
--- we use QCmp to track which types have comparisons done on them, and
--- reject any type variables with a QCmp constraint (just as we reject
--- any other type variables with remaining constraints).  Every type
--- with comparisons done on it must be statically known at compile
--- time.
---
--- Eventually, one could imagine compiling to something like System F
--- with explicit type lambdas and applications; then the QCmp
--- constraints would tell us which type applications need to be kept
--- and which can be erased.
-
--- | A helper function that returns the appropriate qualifier for a
---   binary arithmetic operation.
-bopQual :: BOp -> Qualifier
-bopQual Add  = QNum
-bopQual Mul  = QNum
-bopQual Div  = QDiv
-bopQual Sub  = QSub
-bopQual SSub = QNum
-bopQual _    = error "No qualifier for binary operation"
-
-------------------------------------------------------------
--- Sorts
-------------------------------------------------------------
-
--- | A 'Sort' represents a set of qualifiers, and also represents a
---   set of types (in general, the intersection of the sets
---   corresponding to the qualifiers).
-type Sort = Set Qualifier
-
--- | The special sort \(\top\) which includes all types.
-topSort :: Sort
-topSort = S.empty
 
 ------------------------------------------------------------
 -- Subtyping rules
@@ -217,22 +143,25 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual _ QCmp        = True
-hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
-hasQual (Fin n) QDiv  = isPrime n
-hasQual b       QNum  = b `elem` [N, Z, F, Q]
-hasQual b       QSub  = b `elem` [Z, Q]
-hasQual b       QDiv  = b `elem` [F, Q]
-hasQual b       QEnum = b `elem` [N, Z, F, Q, C]
-hasQual b       QBool = b `elem` [B, P]
+hasQual P       QCmp   = False    -- can't compare Props
+hasQual _       QCmp   = True
+hasQual P       QBasic = False
+hasQual _       QBasic = True
+-- hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
+-- hasQual (Fin n) QDiv  = isPrime n
+hasQual b       QNum   = b `elem` [N, Z, F, Q]
+hasQual b       QSub   = b `elem` [Z, Q]
+hasQual b       QDiv   = b `elem` [F, Q]
+hasQual b       QEnum  = b `elem` [N, Z, F, Q, C]
+hasQual b       QBool  = b `elem` [B, P]
 
 -- | Check whether a base type has a certain sort, which simply
 --   amounts to whether it satisfies every qualifier in the sort.
 hasSort :: BaseTy -> Sort -> Bool
 hasSort = all . hasQual
 
--- | 'qualRules' encodes the rules by which applications of type
---   constructors can satisfy various qualifiers.
+-- | 'qualRulesMap' encodes some of the rules by which applications of
+--   type constructors can satisfy various qualifiers.
 --
 --   Each constructor maps to a set of rules.  Each rule is a mapping
 --   from a qualifier to the list of qualifiers needed on the type
@@ -245,8 +174,8 @@ hasSort = all . hasQual
 --   however, you could imagine some particular qualifier requiring a
 --   set of qualifiers (i.e. a general sort) on a type argument.  In
 --   that case one would just have to encode 'sortRules' directly.
-qualRules :: Map Con (Map Qualifier [Maybe Qualifier])
-qualRules = M.fromList
+qualRulesMap :: Map Con (Map Qualifier [Maybe Qualifier])
+qualRulesMap = M.fromList
   [ CArr  ==> M.fromList
     [ QCmp ==> [Nothing, Just QCmp]
     ]
@@ -287,6 +216,15 @@ qualRules = M.fromList
   --   ]
   -- ]
 
+-- | Given a constructor T and a qualifier we want to hold of a type T
+--   t1 t2 ..., return a list of qualifiers that need to hold of t1,
+--   t2, ...
+qualRules :: Con -> Qualifier -> Maybe [Maybe Qualifier]
+-- T t1 t2 ... is basic (contains no Prop) iff t1, t2 ... all are.
+qualRules c QBasic = Just (map (const (Just QBasic)) (arity c))
+-- Otherwise, just look up in the qualRulesMap.
+qualRules c q      = (M.lookup c >=> M.lookup q) qualRulesMap
+
 -- | @sortRules T s = [s1, ..., sn]@ means that sort @s@ holds of
 --   type @(T t1 ... tn)@ if and only if  @s1 t1 /\ ... /\ sn tn@.
 --   For now this is just derived directly from 'qualRules'.
@@ -295,14 +233,10 @@ qualRules = M.fromList
 --   al.
 sortRules :: Con -> Sort -> Maybe [Sort]
 sortRules c s = do
-  -- If tycon c is not in the qualRules map, there's no way to make it
-  -- an instance of any sort, so fail
-  qualMap   <- M.lookup c qualRules
-
   -- If any of the quals q in sort s are not in the map corresponding
   -- to tycon c, there's no way to make c an instance of q, so fail
   -- (the mapM will succeed only if all lookups succeed)
-  needQuals <- mapM (flip M.lookup qualMap) (S.toList s)
+  needQuals <- mapM (qualRules c) (S.toList s)
 
   -- Otherwise we are left with a list (corresponding to all the quals
   -- in sort s) of lists (each one corresponds to the type args of c).

@@ -1,7 +1,7 @@
 ||| The eliminator for lists of natural numbers with a rational result.
 
-!!!   foldr (\x y. x + y) 0 [1,2,3] == 6
-!!!   foldr (\x y. x + y) 0 []      == 0
+!!!   foldr (\x, y. x + y) 0 [1,2,3] == 6
+!!!   foldr (\x, y. x + y) 0 []      == 0
 
 foldr : (a → b → b) → b → List a → b
 foldr f z []      = z
@@ -65,4 +65,3 @@ indexP (n+1) (_::l') = indexP n l'
 
 fib2 : ℕ → ℕ
 fib2 n = {? x when (indexP n (iterateP fib2_helper (0,1))) is (x,_) ?}
-

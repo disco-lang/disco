@@ -18,7 +18,7 @@ foldTree z f (left ()) = z
 foldTree z f (right (a,l,r)) = f a (foldTree z f l) (foldTree z f r)
 
 sumTree : Tree N -> N
-sumTree = foldTree 0 (\a l r. a+l+r)
+sumTree = foldTree 0 (\a, l, r. a+l+r)
 
 t : Tree N
 t = right (5, right (2, left (), left ()), right (7, right (1, left (), left ()), left ()))
@@ -34,4 +34,4 @@ foldAltList z _ _ (left ()) = z
 foldAltList z f g (right (a, l)) = f a (foldAltList z g f l)
 
 sumAltList : AltList N B -> N
-sumAltList = foldAltList 0 (\x y. x+y) (\b r. r)
+sumAltList = foldAltList 0 (\x, y. x+y) (\b, r. r)

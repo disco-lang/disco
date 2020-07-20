@@ -196,6 +196,12 @@ ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
+forall :: Parser ()
+forall = () <$ symbol "∀" <|> reserved "forall"
+
+exists :: Parser ()
+exists = () <$ symbol "∃" <|> reserved "exists"
+
 -- | Parse a natural number.
 natural :: Parser Integer
 natural = lexeme L.decimal <?> "natural number"
@@ -286,7 +292,7 @@ reservedWords =
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "List", "Bag", "Set"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
-  , "forall", "type"
+  , "∀", "forall", "∃", "exists", "type"
   , "import", "using"
   ]
 
@@ -409,18 +415,10 @@ parseDocString = label "documentation" $ L.nonIndented sc $
 --   @!!! forall x1 : ty1, ..., xn : tyn. term@.
 --
 --   The forall is optional.
-parseProperty :: Parser Property
+parseProperty :: Parser Term
 parseProperty = label "property" $ L.nonIndented sc $ do
   _ <- symbol "!!!"
-  indented $ do
-    bind
-      <$> (parseUniversal <|> return [])
-      <*> parseTerm
-  where
-    parseUniversal =
-         (() <$ symbol "∀" <|> reserved "forall")
-      *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
-      <* dot
+  indented parseTerm
 
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
@@ -467,7 +465,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' = label "expression" $
-      parseLambda
+      parseQuantified
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
@@ -653,9 +651,17 @@ parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
 -- | Parse an anonymous function.
-parseLambda :: Parser Term
-parseLambda =
-  TAbs <$> (bind <$> (lambda *> some parseAtomicPattern) <*> (dot *> parseTerm'))
+parseQuantified :: Parser Term
+parseQuantified =
+  TAbs <$> parseQuantifier
+       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm'))
+
+-- | Parse a quantifier symbol (lambda, forall, or exists).
+parseQuantifier :: Parser Quantifier
+parseQuantifier =
+      Lam <$ lambda
+  <|> All <$ forall
+  <|> Ex  <$ exists
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term

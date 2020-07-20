@@ -48,6 +48,11 @@ compileTerm = runFreshM . compileDTerm . runDSM . desugarTerm
 compileDefn :: Defn -> Core
 compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
 
+-- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
+--   by desugaring and then compilling.
+compileProperty :: AProperty -> Core
+compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
+
 ------------------------------------------------------------
 -- Compiling terms
 ------------------------------------------------------------
@@ -63,10 +68,28 @@ compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
-compileDTerm (DTLam _ l) = do
-  (x,body) <- unbind l
-  c <- compileDTerm body
-  return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
+compileDTerm term@(DTAbs q _ _) = do
+  (xs, tys, body) <- unbindDeep term
+  cbody <- compileDTerm body
+  case q of
+    Lam -> return $ abstract xs cbody
+    Ex  -> return $ quantify (OExists tys) (abstract xs cbody)
+    All -> return $ quantify (OForall tys) (abstract xs cbody)
+
+  where
+    -- Gather nested abstractions with the same quantifier.
+    unbindDeep :: DTerm -> FreshM ([Name DTerm], [Type], DTerm)
+    unbindDeep (DTAbs q' ty l) | q == q' = do
+      (name, inner) <- unbind l
+      (names, tys, body) <- unbindDeep inner
+      return (name:names, ty:tys, body)
+    unbindDeep t                         = return ([], [], t)
+
+    abstract :: [Name DTerm] -> Core -> Core
+    abstract xs body = CAbs (bind (map coerce xs) body)
+
+    quantify :: Op -> Core -> Core
+    quantify op f = CApp (CConst op) [(Lazy, f)]
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -96,6 +119,8 @@ compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CT
       ]
 
 compileDTerm (DTNil _)        = return $ CCons 0 []
+
+compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 
 ------------------------------------------------------------
 
@@ -190,6 +215,8 @@ compilePrim _ PrimCrash   = return $ CConst OCrash
 
 compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
+
+compilePrim _ PrimHolds   = return $ CConst OHolds
 
 compilePrim _ PrimLookupSeq   = return $ CConst OLookupSeq
 compilePrim _ PrimExtendSeq   = return $ CConst OExtendSeq
@@ -307,6 +334,10 @@ compileBOp _ _ _ op
 -- decideOrdFor.)
 compileBOp ty _ _ Eq = CConst (OEq ty)
 compileBOp ty _ _ Lt = CConst (OLt ty)
+
+-- Likewise, ShouldEq also needs to know the type at which the
+-- comparison is occurring.
+compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
 
 compileBOp ty (TyList _) _ Elem = CConst (OListElem ty)
 compileBOp ty _ _          Elem = CConst (OBagElem  ty)

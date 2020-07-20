@@ -1,0 +1,7 @@
+holds (forall (x : B). x or not x)
+holds (exists (x : B). x)
+holds (exists (f : B + B -> B + B). forall (a : B). (f (left a) == right a) and (f (right a) == left a))
+holds (exists (f : B -> B). f /= (\x. f (f (f x))))
+holds (forall (a:N, b:N, c:N). a^2 + b^2 == c^2)
+holds (exists (xs : List N). xs == [2, 2, 1])
+holds (exists (xs : Set Z). size xs == 3 and reduce(\(a, b). a + b, 0, xs) == 0)

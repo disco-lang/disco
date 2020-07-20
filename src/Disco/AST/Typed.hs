@@ -42,6 +42,7 @@ module Disco.AST.Typed
        , pattern ATContainerComp
        , pattern ATList
        , pattern ATListComp
+       , pattern ATTest
 
        , ALink
        , pattern ATLink
@@ -80,6 +81,7 @@ module Disco.AST.Typed
 
        , pattern ABinding
          -- * Utilities
+       , varsBound
        , getType
        , setType
 
@@ -111,6 +113,8 @@ type AProperty = Property_ TY
 
 type ATerm = Term_ TY
 
+type instance X_Binder          TY = [APattern]
+
 type instance X_TVar            TY = Type
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
@@ -121,7 +125,6 @@ type instance X_TRat            TY = ()
 type instance X_TChar           TY = ()
 type instance X_TString         TY = ()
 type instance X_TAbs            TY = Type
-type instance X_TAbsBind        TY = [APattern]
 type instance X_TApp            TY = Type
 type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
@@ -133,7 +136,10 @@ type instance X_TAscr           TY = Void -- No more type ascriptions in typeche
 type instance X_TTup            TY = Type
 type instance X_TParens         TY = Void -- No more explicit parens
 
-type instance X_Term TY = Void
+ -- A test frame for reporting counterexamples in a test. These don't appear
+ -- in source programs, but because the deugarer manipulates partly-desugared
+ -- terms it helps to be able to represent these in 'ATerm'.
+type instance X_Term TY = ([(String, Type, Name ATerm)], ATerm)
 
 pattern ATVar :: Type -> Name ATerm -> ATerm
 pattern ATVar ty name = TVar_ ty name
@@ -162,8 +168,8 @@ pattern ATChar c = TChar_ () c
 pattern ATString :: String -> ATerm
 pattern ATString s = TString_ () s
 
-pattern ATAbs :: Type -> Bind [APattern] ATerm -> ATerm
-pattern ATAbs ty bind = TAbs_ ty bind
+pattern ATAbs :: Quantifier -> Type -> Bind [APattern] ATerm -> ATerm
+pattern ATAbs q ty bind = TAbs_ q ty bind
 
 pattern ATApp  :: Type -> ATerm -> ATerm -> ATerm
 pattern ATApp ty term1 term2 = TApp_ ty term1 term2
@@ -189,9 +195,12 @@ pattern ATContainer ty c tl mets = TContainer_ ty c tl mets
 pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> ATerm
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
+pattern ATTest :: [(String, Type, Name ATerm)] -> ATerm -> ATerm
+pattern ATTest ns t = XTerm_ (ns, t)
+
 {-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
              ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATChain, ATTyOp,
-             ATContainer, ATContainerComp #-}
+             ATContainer, ATContainerComp, ATTest #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
 pattern ATList t xs e <- ATContainer t ListContainer (map fst -> xs) e
@@ -351,6 +360,24 @@ pattern APFrac ty p1 p2 <- PFrac_ (unembed -> ty) p1 p2
 {-# COMPLETE APVar, APWild, APUnit, APBool, APChar, APString,
     APTup, APInj, APNat, APCons, APList, APAdd, APMul, APSub, APNeg, APFrac #-}
 
+varsBound :: APattern -> [(Name ATerm, Type)]
+varsBound (APVar ty n)    = [(n, ty)]
+varsBound (APWild _)      = []
+varsBound APUnit          = []
+varsBound (APBool _)      = []
+varsBound (APChar _)      = []
+varsBound (APString _)    = []
+varsBound (APTup _ ps)    = varsBound =<< ps
+varsBound (APInj _ _ p)   = varsBound p
+varsBound (APNat _ _)     = []
+varsBound (APCons _ p q)  = varsBound p ++ varsBound q
+varsBound (APList _ ps)   = varsBound =<< ps
+varsBound (APAdd _ _ p _) = varsBound p
+varsBound (APMul _ _ p _) = varsBound p
+varsBound (APSub _ p _)   = varsBound p
+varsBound (APNeg _ p)     = varsBound p
+varsBound (APFrac _ p q)  = varsBound p ++ varsBound q
+
 ------------------------------------------------------------
 -- getType
 ------------------------------------------------------------
@@ -364,7 +391,7 @@ instance HasType ATerm where
   getType (ATRat _)                = TyF
   getType (ATChar _)               = TyC
   getType (ATString _)             = TyList TyC
-  getType (ATAbs ty _)             = ty
+  getType (ATAbs _ ty _)           = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
   getType (ATInj ty _ _)           = ty
@@ -374,6 +401,7 @@ instance HasType ATerm where
   getType (ATContainerComp ty _ _) = ty
   getType (ATLet ty _)             = ty
   getType (ATCase ty _)            = ty
+  getType (ATTest _ _ )            = TyProp
 
   setType ty (ATVar _ x      )       = ATVar ty x
   setType ty (ATPrim _ x     )       = ATPrim ty x
@@ -383,7 +411,7 @@ instance HasType ATerm where
   setType _  (ATRat r)               = ATRat r
   setType _ (ATChar c)               = ATChar c
   setType _ (ATString cs)            = ATString cs
-  setType ty (ATAbs _ x      )       = ATAbs ty x
+  setType ty (ATAbs q _ x    )       = ATAbs q ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
   setType ty (ATInj _ x y    )       = ATInj ty x y
@@ -393,6 +421,7 @@ instance HasType ATerm where
   setType ty (ATContainerComp _ x y) = ATContainerComp ty x y
   setType ty (ATLet _ x      )       = ATLet ty x
   setType ty (ATCase _ x     )       = ATCase ty x
+  setType _ (ATTest vs x)            = ATTest vs x
 
 instance HasType APattern where
   getType (APVar ty _)     = ty

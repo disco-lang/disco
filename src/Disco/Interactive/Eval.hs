@@ -37,6 +37,7 @@ showVal _ (VFun_ {})   = "<fun>"
 showVal _ (VDelay_ {}) = "<delay>"
 showVal _ (VBag {})    = "<bag>"
 showVal _ (VType {})   = "<type>"
+showVal _ (VProp {})   = "<prop>"
 
 printMem :: Disco IErr ()
 printMem = do

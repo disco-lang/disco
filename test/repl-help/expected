@@ -9,6 +9,7 @@ Commands available from the prompt:
 :load <filename>           Load a file
 :names                     Show all names in current scope
 :reload                    Reloads the most recently loaded file
+:test <property>           Test a property using random examples
 using <extension>          Enable an extension
 
 2

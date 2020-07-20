@@ -12,10 +12,7 @@
 
 module Disco.Interactive.Eval where
 
-import           System.Console.Haskeline                as H
-
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (use, (%=), (.=))
+import           Control.Lens                            (use)
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands

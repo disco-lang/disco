@@ -42,7 +42,6 @@ import           Data.Maybe                       (fromMaybe, isJust)
 
 import           Data.Coerce
 import           Unbound.Generics.LocallyNameless
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Disco.AST.Desugared
 import           Disco.AST.Surface

@@ -7,8 +7,8 @@ injective(f) = ∀ x : N, y : N. (f(x) == f(y)) ==> (x == y)
 surjective : (ℕ → ℕ) → Prop
 surjective(f) = ∀ y : N. ∃ x : N. f x == y
 
-bijective : (ℕ → ℕ) → Prop
-bijective(f) = injective(f) and surjective(f)
+-- bijective : (ℕ → ℕ) → Prop
+-- bijective(f) = injective(f) and surjective(f)
 
 idempotent : (ℕ → ℕ) → Prop
 idempotent(f) = ∀ x : N. f(f(x)) == f(x)

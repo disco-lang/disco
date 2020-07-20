@@ -18,8 +18,7 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           System.Console.Haskeline                as H
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import           System.Console.Haskeline                (IOException, handle)
 
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            (use, (%=), (.=))

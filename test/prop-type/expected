@@ -4,3 +4,6 @@
 ∃(x : ℕ). ∃(y : ℕ). x > y : Prop
 ∀ (x : ℕ), (y : ℕ), (z : ℕ). x + y + z == x + (y + z) : Prop
 ∃(x : ℕ). ∀(y : ℕ). x ≤ y : Prop
+Unsolvable NoUnify
+Unsolvable NoUnify
+Unsolvable NoUnify

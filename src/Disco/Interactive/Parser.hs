@@ -24,7 +24,6 @@ import           Data.List               (find, isPrefixOf)
 import           Text.Megaparsec         hiding (runParser)
 import qualified Text.Megaparsec.Char    as C
 
-import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Interactive.Types
 import           Disco.Parser

@@ -18,16 +18,16 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           System.Console.Haskeline                (IOException, handle)
+import           System.Console.Haskeline         (IOException, handle)
 
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            (use, (%=), (.=))
+import           Control.Arrow                    ((&&&))
+import           Control.Lens                     (use, (%=), (.=))
 import           Control.Monad.Except
 import           Data.Coerce
-import           Data.List                               (sortBy)
-import qualified Data.Map                                as M
+import           Data.List                        (sortBy)
+import qualified Data.Map                         as M
 import           Data.Typeable
-import           System.FilePath                         (splitFileName)
+import           System.FilePath                  (splitFileName)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -40,19 +40,18 @@ import           Disco.Interactive.Parser
 import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
-import           Disco.Parser                            (Parser, ident,
-                                                          parseExtName,
-                                                          parseImport, reserved,
-                                                          reservedOp, sc, term)
+import           Disco.Parser                     (Parser, ident, parseExtName,
+                                                   parseImport, reserved,
+                                                   reservedOp, sc, term)
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims                      (Prim (PrimBOp, PrimUOp))
+import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Typecheck.Monad
 import           Disco.Types
-import           Text.Megaparsec                         hiding (runParser)
+import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
 dispatch :: [SomeREPLCommand] -> SomeREPLExpr -> Disco IErr ()

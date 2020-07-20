@@ -247,7 +247,7 @@ getTestEnv :: TestVars -> Disco IErr TestEnv
 getTestEnv = mapM $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
-    Just v -> return (s, ty, v)
+    Just v  -> return (s, ty, v)
     Nothing -> throwError (UnboundError name)
 
 -- | The possible outcomes of a property test, parametrized over
@@ -284,7 +284,7 @@ data ValProp
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g ++ e))
-extendPropEnv g (VPSearch sm tys v e) = VPSearch sm tys v (g ++ e)
+extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g ++ e)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g ++ e)

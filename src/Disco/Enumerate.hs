@@ -1,5 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeApplications         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -42,8 +42,8 @@ module Disco.Enumerate
        where
 
 import qualified Data.Enumeration.Invertible as E
-import Disco.Eval
-import Disco.Types
+import           Disco.Eval
+import           Disco.Types
 
 type ValueEnumeration = E.IEnumeration Value
 
@@ -64,7 +64,7 @@ enumBool = E.mapE toV fromV $ E.finiteList [0, 1]
 --   (assumed to be a VNum).
 valToRat :: Value -> Rational
 valToRat (VNum _ r) = r
-valToRat _ = error "valToRat: value isn't a number"
+valToRat _          = error "valToRat: value isn't a number"
 
 ratToVal :: Rational -> Value
 ratToVal r = (VNum mempty r)

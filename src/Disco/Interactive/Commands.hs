@@ -61,6 +61,9 @@ dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
   Just e' -> action c e'
   Nothing -> dispatch cs r
 
+-- Resolution of REPL commands searches this list _in order_, which means
+-- ambiguous command prefixes (e.g. :t for :type) are resolved to the first
+-- matching command.
 discoCommands :: [SomeREPLCommand]
 discoCommands =
   [
@@ -79,8 +82,8 @@ discoCommands =
     SomeCmd prettyCmd,
     SomeCmd reloadCmd,
     SomeCmd showDefnCmd,
-    SomeCmd testPropCmd,
     SomeCmd typeCheckCmd,
+    SomeCmd testPropCmd,
     SomeCmd usingCmd
   ]
 

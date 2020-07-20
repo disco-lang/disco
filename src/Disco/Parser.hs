@@ -497,7 +497,7 @@ parseAtom = label "expression" $
 --   an identifier.
 parseWild :: Parser ()
 parseWild = (lexeme . try . void) $
-  string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'" <|> oneOf opChar)
+  string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'")
 
 -- | Parse a standalone operator name with tildes indicating argument
 --   slots, e.g. ~+~ for the addition operator.

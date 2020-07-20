@@ -578,7 +578,7 @@ mkQuant q argtys args c = foldr quantify c (zip args argtys)
 
 mkAbs :: Quantifier -> Type -> [Type] -> [Name ATerm] -> DTerm -> DTerm
 mkAbs Lam funty _ args c = mkLambda funty args c
-mkAbs q _ argtys args c = mkQuant q argtys args c
+mkAbs q _ argtys args c  = mkQuant q argtys args c
 
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
 desugarTuples :: Type -> [ATerm] -> DSM DTerm

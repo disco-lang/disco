@@ -361,22 +361,22 @@ pattern APFrac ty p1 p2 <- PFrac_ (unembed -> ty) p1 p2
     APTup, APInj, APNat, APCons, APList, APAdd, APMul, APSub, APNeg, APFrac #-}
 
 varsBound :: APattern -> [(Name ATerm, Type)]
-varsBound (APVar ty n)     = [(n, ty)]
-varsBound (APWild _)       = []
-varsBound APUnit           = []
-varsBound (APBool _)       = []
-varsBound (APChar _)       = []
-varsBound (APString _)     = []
-varsBound (APTup _ ps)     = varsBound =<< ps
-varsBound (APInj _ _ p)    = varsBound p
-varsBound (APNat _ _)      = []
-varsBound (APCons _ p q)   = varsBound p ++ varsBound q
-varsBound (APList _ ps)    = varsBound =<< ps
-varsBound (APAdd _ _ p _)  = varsBound p
-varsBound (APMul _ _ p _)  = varsBound p
-varsBound (APSub _ p _)    = varsBound p
-varsBound (APNeg _ p)      = varsBound p
-varsBound (APFrac _ p q)   = varsBound p ++ varsBound q
+varsBound (APVar ty n)    = [(n, ty)]
+varsBound (APWild _)      = []
+varsBound APUnit          = []
+varsBound (APBool _)      = []
+varsBound (APChar _)      = []
+varsBound (APString _)    = []
+varsBound (APTup _ ps)    = varsBound =<< ps
+varsBound (APInj _ _ p)   = varsBound p
+varsBound (APNat _ _)     = []
+varsBound (APCons _ p q)  = varsBound p ++ varsBound q
+varsBound (APList _ ps)   = varsBound =<< ps
+varsBound (APAdd _ _ p _) = varsBound p
+varsBound (APMul _ _ p _) = varsBound p
+varsBound (APSub _ p _)   = varsBound p
+varsBound (APNeg _ p)     = varsBound p
+varsBound (APFrac _ p q)  = varsBound p ++ varsBound q
 
 ------------------------------------------------------------
 -- getType

@@ -12,7 +12,7 @@
 
 module Disco.Interactive.Eval where
 
-import           Control.Lens                            (use)
+import           Control.Lens               (use)
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands

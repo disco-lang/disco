@@ -298,22 +298,22 @@ type instance X_QGuard DS = Void
 ------------------------------------------------------------
 
 instance HasType DTerm where
-  getType (DTVar ty _)    = ty
-  getType (DTPrim ty _)   = ty
-  getType DTUnit          = TyUnit
-  getType (DTBool ty _)   = ty
-  getType (DTChar _)      = TyC
-  getType (DTNat ty _)    = ty
-  getType (DTRat _)       = TyF
+  getType (DTVar ty _)     = ty
+  getType (DTPrim ty _)    = ty
+  getType DTUnit           = TyUnit
+  getType (DTBool ty _)    = ty
+  getType (DTChar _)       = TyC
+  getType (DTNat ty _)     = ty
+  getType (DTRat _)        = TyF
   getType (DTAbs Lam ty _) = ty
-  getType (DTAbs _ _ _)   = TyProp
-  getType (DTApp ty _ _)  = ty
-  getType (DTPair ty _ _) = ty
-  getType (DTInj ty _ _)  = ty
-  getType (DTCase ty _)   = ty
-  getType (DTTyOp ty _ _) = ty
-  getType (DTNil ty)      = ty
-  getType (DTTest _ _)    = TyProp
+  getType (DTAbs _ _ _)    = TyProp
+  getType (DTApp ty _ _)   = ty
+  getType (DTPair ty _ _)  = ty
+  getType (DTInj ty _ _)   = ty
+  getType (DTCase ty _)    = ty
+  getType (DTTyOp ty _ _)  = ty
+  getType (DTNil ty)       = ty
+  getType (DTTest _ _)     = TyProp
 
 instance HasType DPattern where
   getType (DPVar ty _)    = ty

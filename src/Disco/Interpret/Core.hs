@@ -54,7 +54,8 @@ module Disco.Interpret.Core
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (filterM, (>=>))
-import           Control.Monad.Except                    (throwError, catchError)
+import           Control.Monad.Except                    (catchError,
+                                                          throwError)
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
 import           Data.Coerce                             (coerce)

@@ -64,4 +64,3 @@ generateSamples (Randomized n m) e
     sizedNat k = QC.resize (fromIntegral k) QC.arbitrarySizedNatural
 
 -- XXX do shrinking for randomly generated test cases
-

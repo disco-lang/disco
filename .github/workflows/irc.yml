@@ -2,6 +2,7 @@ name: "IRC"
 on:
   push:
   pull_request:
+    types: [opened]
   issues:
     types: [opened]
   issue_comment:

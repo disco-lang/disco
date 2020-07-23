@@ -41,7 +41,7 @@ module Disco.Types
        , Type(..)
 
        , pattern TyVar
-       , pattern Skolem
+       , pattern TySkolem
        , pattern TyVoid
        , pattern TyUnit
        , pattern TyBool
@@ -372,8 +372,8 @@ instance Subst Type Void where
 pattern TyVar  :: Name Type -> Type
 pattern TyVar v = TyAtom (AVar (U v))
 
-pattern Skolem :: Name Type -> Type
-pattern Skolem v = TyAtom (AVar (S v))
+pattern TySkolem :: Name Type -> Type
+pattern TySkolem v = TyAtom (AVar (S v))
 
 pattern TyVoid :: Type
 pattern TyVoid = TyAtom (ABase Void)
@@ -440,7 +440,7 @@ pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
-      TyVar, Skolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
+      TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
       (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
 
 instance Subst Type Var

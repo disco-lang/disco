@@ -303,7 +303,7 @@ decomposeConstraint (CAll ty)    = do
 
   where
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
-    mkSkolems = map (id &&& Skolem)
+    mkSkolems = map (id &&& TySkolem)
 decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstraint cs)
 
 decomposeQual :: Type -> Qualifier -> SolveM SortMap

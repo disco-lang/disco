@@ -159,7 +159,7 @@ prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
   text (show c) <+> prettyTy' 9 InR ty
 prettyTy (TyUser name args) = mparens (PA 9 InR) $
   hsep (text name : map (prettyTy' 9 InR) args)
-prettyTy (Skolem n)       = text "%" <> prettyName n
+prettyTy (TySkolem n)     = text "%" <> prettyName n
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)

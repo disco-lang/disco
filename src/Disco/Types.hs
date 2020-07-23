@@ -27,7 +27,8 @@ module Disco.Types
        -- * Disco language types
        -- ** Atomic types
 
-         BaseTy(..), isCtr, Var(..), Atom(..)
+         BaseTy(..), isCtr, Var(..), Ilk(..), pattern U, pattern S
+       , Atom(..)
        , isVar, isBase, isSkolem
        , UAtom(..), uisVar, uatomToAtom, uatomToEither
 
@@ -200,13 +201,24 @@ isCtr = (`elem` [CtrSet, CtrBag, CtrList])
 --     "learning something" about a skolem variable is an error: it
 --     means that the function will only work for certain types, in
 --     contradiction to its claim to work for any type at all.
+data Ilk = Skolem | Unification
+  deriving (Eq, Ord, Read, Show, Generic)
+
+-- | 'Var' represents /type variables/, that is, variables which stand
+--   for some type.
 data Var where
-  -- | Unification variable
-  U :: Name Type -> Var
-  -- | Skolem variable
-  S :: Name Type -> Var
+  V :: Ilk -> Name Type -> Var
   deriving (Show, Eq, Ord, Generic)
 
+pattern U :: Name Type -> Var
+pattern U v = V Unification v
+
+pattern S :: Name Type -> Var
+pattern S v = V Skolem v
+
+{-# COMPLETE U, S #-}
+
+instance Alpha Ilk
 instance Alpha Var
 
 ----------------------------------------
@@ -226,7 +238,8 @@ data Atom where
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Atom
-instance Subst Atom Var where
+instance Subst Atom Ilk
+instance Subst Atom Var
 instance Subst Atom BaseTy
 instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
@@ -368,6 +381,20 @@ instance Subst Type Rational where
 instance Subst Type Void where
   subst _ _ = id
   substs _  = id
+instance Subst Type Ilk
+instance Subst Type Var
+instance Subst Type BaseTy
+instance Subst Type Atom
+instance Subst Type Con where
+  isCoerceVar (CContainer (AVar (U x)))
+    = Just (SubstCoerce x substCtrTy)
+    where
+      substCtrTy (TyAtom a) = Just (CContainer a)
+      substCtrTy _          = Nothing
+  isCoerceVar _                         = Nothing
+instance Subst Type Type where
+  isvar (TyAtom (AVar (U x))) = Just (SubstName x)
+  isvar _                     = Nothing
 
 pattern TyVar  :: Name Type -> Type
 pattern TyVar v = TyAtom (AVar (U v))
@@ -442,20 +469,6 @@ pattern TyString = TyList TyC
 {-# COMPLETE
       TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
       (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
-
-instance Subst Type Var
-instance Subst Type BaseTy
-instance Subst Type Atom
-instance Subst Type Con where
-  isCoerceVar (CContainer (AVar (U x)))
-    = Just (SubstCoerce x substCtrTy)
-    where
-      substCtrTy (TyAtom a) = Just (CContainer a)
-      substCtrTy _          = Nothing
-  isCoerceVar _                         = Nothing
-instance Subst Type Type where
-  isvar (TyAtom (AVar (U x))) = Just (SubstName x)
-  isvar _                     = Nothing
 
 -- | Is this a type variable?
 isTyVar :: Type -> Bool

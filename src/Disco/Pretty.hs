@@ -1,4 +1,5 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeFamilies              #-}
 {-# LANGUAGE ViewPatterns              #-}
 
@@ -29,7 +30,7 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
+import           Unbound.Generics.LocallyNameless (Bind, Embed, Name, lunbind,
                                                    string2Name, unembed)
 
 import           Disco.AST.Core
@@ -43,6 +44,7 @@ import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Erase            (eraseClause)
 import           Disco.Types
+import           Disco.Types.Qualifiers
 
 --------------------------------------------------
 -- Monadic pretty-printing
@@ -166,7 +168,28 @@ prettyTy' p a t = local (const (PA p a)) (prettyTy t)
 
 prettyPolyTy :: PolyType -> Doc
 prettyPolyTy (Forall bnd) = lunbind bnd $
-  \(_, body) -> prettyTy body
+  \(tvs, body) -> prettyTy body <+> prettyQualifiers tvs
+
+prettyQualifiers :: [(Name Type, Embed [Qualifier])] -> Doc
+prettyQualifiers tvs = case filter (not . null . unembed . snd) tvs of
+  []  -> empty
+  vqs -> do
+    ds <- punctuate (text ",") (map prettyQV (concatMap distribQ vqs))
+    brackets (hsep ds)
+
+  where
+    distribQ (v, unembed -> qs) = map (v,) qs
+
+prettyQV :: (Name Type, Qualifier) -> Doc
+prettyQV (a, q) = prettyQualifier q <+> prettyName a
+
+prettyQualifier QNum   = text "numeric"
+prettyQualifier QSub   = text "subtractive"
+prettyQualifier QDiv   = text "divisive"
+prettyQualifier QCmp   = text "comparable"
+prettyQualifier QEnum  = text "enumerable"
+prettyQualifier QBool  = text "boolean"
+prettyQualifier QBasic = text "basic"
 
 prettyTyDef :: String -> TyDefBody -> Doc
 prettyTyDef tyName (TyDefBody ps body)

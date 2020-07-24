@@ -63,6 +63,7 @@ module Disco.Eval
        , io, iputStrLn, iputStr, iprint
        , emitMessage, info, warning, err, panic, debug
        , runDisco, catchAsMessage, catchAndPrintErrors
+       , extIsEnabled
 
          -- ** Memory/environment utilities
        , allocate, delay, delay', mkValue, mkSimple
@@ -560,6 +561,13 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
     handler e                = iprint e
 
 ------------------------------------------------------------
+-- Extensions
+------------------------------------------------------------
+
+extIsEnabled :: Ext -> Disco e Bool
+extIsEnabled ext = (ext `S.member`) <$> use enabledExts
+
+------------------------------------------------------------
 -- Memory/environment utilities
 ------------------------------------------------------------
 
@@ -719,18 +727,14 @@ typecheckDisco tyctx tydefs tcm =
 --   'ModuleInfo' records to a map from module names to info records,
 --   and then typechecking the parent module in an environment with
 --   access to this map. This is really just a depth-first search.
---
---   If the given directory is Just, it will only load a module from
---   the specific given directory.  If it is Nothing, then it will look for
---   the module in the current directory or the standard library.
-loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
-loadDiscoModule resolver m = evalStateT (loadDiscoModule' resolver S.empty m) M.empty
+loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> Bool -> ModName -> m ModuleInfo
+loadDiscoModule resolver allowQualifiedTypes m = evalStateT (loadDiscoModule' resolver allowQualifiedTypes S.empty m) M.empty
 
 loadDiscoModule' ::
   (MonadError IErr m, MonadIO m) =>
-  Resolver -> S.Set ModName -> ModName ->
+  Resolver -> Bool -> S.Set ModName -> ModName ->
   StateT (M.Map ModName ModuleInfo) m ModuleInfo
-loadDiscoModule' resolver inProcess modName  = do
+loadDiscoModule' resolver allowQualifiedTypes inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
   modMap <- get
   case M.lookup modName modMap of
@@ -742,9 +746,9 @@ loadDiscoModule' resolver inProcess modName  = do
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
-      mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
+      mis <- mapM (loadDiscoModule' (withStdlib resolver) allowQualifiedTypes (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
-      m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
+      m  <- lift $ typecheckDisco tyctx tydefns (checkModule allowQualifiedTypes cm)
       m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
       modify (M.insert modName m')
       return m'

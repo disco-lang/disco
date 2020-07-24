@@ -5,6 +5,7 @@
 {-# LANGUAGE PatternSynonyms       #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TupleSections         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -66,7 +67,7 @@ module Disco.Types
        -- ** Quantified types
 
        , PolyType(..)
-       , toPolyType, closeType
+       , toPolyType, closeType, closeTypeWith
 
        -- * Type predicates
 
@@ -101,6 +102,7 @@ import           Control.Lens                     (toListOf)
 import           Data.List                        (nub)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Maybe                       (fromMaybe)
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
@@ -502,9 +504,15 @@ type TyDefCtx = M.Map String TyDefBody
 
 -- | 'PolyType' represents a polymorphic type of the form @forall a1
 --   a2 ... an. ty@ (note, however, that n may be 0, that is, we can
---   have a "trivial" polytype which quantifies zero variables).
-newtype PolyType = Forall (Bind [Name Type] Type)
+--   have a "trivial" polytype which quantifies over zero variables).
+--   Each bound type variable may also have an associated sort,
+--   i.e. list of qualifiers.
+newtype PolyType = Forall (Bind [(Name Type, Embed [Qualifier])] Type)
   deriving (Show, Generic)
+
+  -- Note that it would make more sense to say 'Embed Sort', but Sort
+  -- is implemented as a Data.Set of Qualifiers and it is difficult
+  -- making that an instance of Alpha.
 
 instance Alpha PolyType
 instance Subst Type PolyType
@@ -516,9 +524,19 @@ toPolyType :: Type -> PolyType
 toPolyType ty = Forall (bind [] ty)
 
 -- | Convert a monotype into a polytype by quantifying over all its
---   free type variables.
+--   free type variables (which are assumed to have no nontrivial sorts).
 closeType :: Type -> PolyType
-closeType ty = Forall (bind (nub $ toListOf fv ty) ty)
+closeType = closeTypeWith mempty
+
+-- | Convert a monotype into a polytype by quantifying over all its
+--   free type variables, which have sorts specified in the given
+--   'SortMap'.  Free type variables not occurring as keys in the
+--   'SortMap' are assumed to be unqualified.
+closeTypeWith :: Map (Name Type) Sort -> Type -> PolyType
+closeTypeWith sm ty = Forall (bind freeTyVars ty)
+  where
+    freeTyVars = map (\v -> (v, embed (S.toList . fromMaybe mempty $ M.lookup v sm)))
+                     (nub $ toListOf fv ty)
 
 --------------------------------------------------
 -- Counting inhabitants

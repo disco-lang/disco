@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ViewPatterns     #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -28,6 +29,7 @@ import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
+import           Disco.Types.Qualifiers
 
 ------------------------------------------------------------
 -- Contexts
@@ -118,8 +120,11 @@ constraints :: [Constraint] -> TCM ()
 constraints = constraint . cAnd
 
 -- | Close over the current constraint with a forall.
-forAll :: [Name Type] -> TCM a -> TCM a
-forAll nms = censor (CAll . bind nms)
+forAllC :: [(Name Type, Embed [Qualifier])] -> TCM a -> TCM a
+forAllC nms tcm = do
+  forM_ nms $ \(nm, unembed -> qs) ->
+    forM_ qs $ \q -> constraint (CQual q (TyVar nm))
+  censor (CAll . bind (map fst nms)) tcm
 
 -- | Run a 'TCM' computation, returning the generated 'Constraint'
 --   along with the output, and reset the 'Constraint' of the resulting
@@ -130,11 +135,11 @@ withConstraint = censor (const mempty) . listen
 -- | Run a 'TCM' computation and solve its generated constraint,
 --   returning the resulting substitution (or failing with an error).
 --   The resulting TCM computation generates the empty constraint.
-solve :: TCM a -> TCM (a, S)
-solve m = do
+solve :: Bool -> TCM a -> TCM (a, (S, TyVarInfoMap))
+solve allowQualifiedTypes m = do
   (a, c) <- withConstraint m
   tds <- get
-  case runSolveM . solveConstraint tds $ c of
+  case runSolveM . solveConstraint allowQualifiedTypes tds $ c of
     Left err -> throwError (Unsolvable err)
     Right s  -> return (a, s)
 

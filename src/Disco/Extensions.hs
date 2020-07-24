@@ -22,8 +22,9 @@ type ExtSet = Set Ext
 
 -- | Enumeration of optional language extensions.
 data Ext
-  = Primitives   -- ^ Allow primitives, i.e. @$prim@
-  | Randomness   -- ^ Allow randomness.  This is not implemented yet.
+  = Primitives      -- ^ Allow primitives, i.e. @$prim@
+  | Randomness      -- ^ Allow randomness.  This is not implemented yet.
+  | QualifiedTypes  -- ^ Allow qualified types in surface syntax.
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | The default set of language extensions (currently, the empty set).

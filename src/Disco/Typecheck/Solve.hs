@@ -53,15 +53,15 @@ import           Disco.Types
 import           Disco.Types.Qualifiers
 import           Disco.Types.Rules
 
--- import qualified Debug.Trace                      as Debug
+import qualified Debug.Trace                      as Debug
 
 traceM :: Applicative f => String -> f ()
-traceM _ = pure ()
--- traceM = Debug.traceM
+-- traceM _ = pure ()
+traceM = Debug.traceM
 
 traceShowM :: (Show a, Applicative f) => a -> f ()
-traceShowM _ = pure ()
--- traceShowM = Debug.traceShowM
+-- traceShowM _ = pure ()
+traceShowM = Debug.traceShowM
 
 --------------------------------------------------
 -- Solver errors
@@ -176,6 +176,10 @@ deleteVM = onVM . M.delete
 addSkolems :: [Name Type] -> TyVarInfoMap -> TyVarInfoMap
 addSkolems vs = onVM $ \vm -> foldl' (flip (\v -> M.insert v (mkTVI Skolem mempty))) vm vs
 
+-- | Extract a mapping from variable names to sorts from a 'TyVarInfoMap'.
+extractSortMap :: TyVarInfoMap -> Map (Name Type) Sort
+extractSortMap = M.map (view tyVarSort) . unVM
+
 -- | The @Semigroup@ instance for 'TyVarInfoMap' unions the two maps,
 --   combining the info records for any variables occurring in both
 --   maps.
@@ -235,8 +239,8 @@ lkup msg m k = fromMaybe (error errMsg) (M.lookup k m)
 --------------------------------------------------
 -- Top-level solver algorithm
 
-solveConstraint :: TyDefCtx -> Constraint -> SolveM S
-solveConstraint tyDefns c = do
+solveConstraint :: Bool -> TyDefCtx -> Constraint -> SolveM (S, TyVarInfoMap)
+solveConstraint allowQualifiedTypes tyDefns c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers; also expand disjunctions.  Result in a
@@ -252,12 +256,12 @@ solveConstraint tyDefns c = do
 
   -- Now try continuing with each set and pick the first one that has
   -- a solution.
-  msum (map (uncurry (solveConstraintChoice tyDefns)) qcList)
+  msum (map (uncurry (solveConstraintChoice allowQualifiedTypes tyDefns)) qcList)
 
-solveConstraintChoice :: TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> SolveM S
-solveConstraintChoice tyDefns quals cs = do
+solveConstraintChoice :: Bool -> TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> SolveM (S, TyVarInfoMap)
+solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
 
-  traceM (show quals)
+  traceM (show vm)
   traceM (show cs)
 
   -- Step 2. Check for weak unification to ensure termination. (a la
@@ -274,7 +278,7 @@ solveConstraintChoice tyDefns quals cs = do
   traceM "------------------------------"
   traceM "Running simplifier..."
 
-  (vm, atoms, theta_simp) <- liftExcept (simplify tyDefns quals cs)
+  (vm, atoms, theta_simp) <- liftExcept (simplify tyDefns vm cs)
 
   traceM (show vm)
   traceM (show atoms)
@@ -289,7 +293,7 @@ solveConstraintChoice tyDefns quals cs = do
   -- Some variables might have qualifiers but not participate in any
   -- equality or subtyping relations (see issue #153); make sure to
   -- extract them and include them in the constraint graph as isolated
-  -- vertices
+  -- vertices.
   let mkAVar (v, First (Just Skolem)) = AVar (S v)
       mkAVar (v, _                  ) = AVar (U v)
       vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm
@@ -356,7 +360,7 @@ solveConstraintChoice tyDefns quals cs = do
   traceM "------------------------------"
   traceM "Solving for type variables..."
 
-  theta_sol       <- solveGraph vm' g''
+  theta_sol       <- solveGraph allowQualifiedTypes vm' g''
   traceShowM theta_sol
 
   traceM "------------------------------"
@@ -364,8 +368,9 @@ solveConstraintChoice tyDefns quals cs = do
 
   let theta_final = (theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp)
   traceShowM theta_final
+  traceShowM vm'
 
-  return theta_final
+  return (theta_final, vm')
 
 
 --------------------------------------------------
@@ -834,8 +839,8 @@ glbBySort vm rm = limBySort vm rm SubTy
 --   complete algorithm.  We choose to assign it the sup of its
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
-solveGraph :: TyVarInfoMap -> Graph UAtom -> SolveM S
-solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
+solveGraph :: Bool -> TyVarInfoMap -> Graph UAtom -> SolveM S
+solveGraph allowQualifiedTypes vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
   where
     unifyWCC :: Substitution BaseTy -> Substitution Atom
     unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
@@ -896,7 +901,9 @@ solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
       []    -> return idS
 
       -- Solve one variable at a time.  See below.
-      (a:_) ->
+      (a:_) -> do
+
+        traceM $ "Solving for " ++ show a
 
         case solveVar a of
           Nothing       -> do
@@ -939,23 +946,43 @@ solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         -- Alternately, if we first solve a3 -> N then we will have a1
         -- -> N as well.  Both are acceptable.
         --
-        -- In fact, this exact graph comes from (^x.x+1) which was
+        -- In fact, this exact graph comes from (λx.x+1) which was
         -- erroneously being inferred to have type Z -> N when I first
         -- wrote the code.
 
         -- Get only the variables we can solve on this pass, which
-        -- have base types in their predecessor or successor set.  If
-        -- there are no such variables, then start picking any
-        -- remaining variables with a sort and pick types for them
-        -- (disco doesn't have qualified polymorphism so we can't just
-        -- leave them).
+        -- have base types in their predecessor or successor set.
+        --
+        -- If there are no such variables, and qualified types are not
+        -- allowed in the surface language, then start picking any
+        -- remaining variables with a sort and pick types for them.
         asBase
           = map fst
           . filter (not . S.null . baseRels . lkup "solveGraph.go.as" relMap)
           $ M.keys relMap
-        as = case asBase of
-          [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys relMap
-          _  -> asBase
+
+        as = case (asBase, allowQualifiedTypes) of
+          ([], False) -> filter ((/= topSort) . getSort vm) . map fst $ M.keys relMap
+          _           -> asBase
+
+        -- Consider the example of (\x. x + 1).  This generates
+        -- constraints to the effect that the type of x must be
+        -- numeric, and also that N must be a subtype of the type of x
+        -- (because of the literal 1).  Because of the subtyping
+        -- relationship with a base type, we would normally pick the
+        -- type N for x.  However, when allowing qualified types, we
+        -- would much rather get a qualified type like (a -> a
+        -- [numeric a]).
+        --
+        -- One might think we can do this whenever (1) a type variable
+        -- has a nontrivial sort, (2) all base types inhabiting that
+        -- sort also satisfy all the other subtyping constraints on
+        -- the variable; in that case we could just leave the variable
+        -- generic.  However, note that in the case of multiple type
+        -- variables with subtyping constraints between them we have
+        -- to be more careful.  In general, if we want a polymorphic
+        -- type we might end up with subtyping constraints as well as
+        -- qualifiers.
 
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.

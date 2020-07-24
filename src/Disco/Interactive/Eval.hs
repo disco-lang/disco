@@ -12,16 +12,22 @@
 
 module Disco.Interactive.Eval where
 
-import           Control.Lens               (use)
+import           Debug.Trace
+
+import           System.Console.Haskeline                as H
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+
+import           Control.Arrow                           ((&&&))
+import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands
-import           Disco.Interactive.Parser   (parseLine)
+import           Disco.Interactive.Parser                (parseLine)
 
 ------------------------------------------------------------
 
-import qualified Data.IntMap                as IM
-import           Data.List                  (intercalate)
+import qualified Data.IntMap                             as IM
+import           Data.List                               (intercalate)
 
 
 showVal :: Int -> Value -> String

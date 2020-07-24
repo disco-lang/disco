@@ -69,12 +69,16 @@ import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (.=))
 import           Control.Monad.State
 import           Data.Char                               (isDigit)
-import           Data.List                               (find, intercalate)
+import           Data.Function                           (on)
+import           Data.List                               (find, groupBy,
+                                                          intercalate, sortBy)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (catMaybes)
+import           Data.Ord                                (comparing)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
+import           Data.Tuple                              (swap)
 import           Data.Void
 
 import           Disco.AST.Surface
@@ -82,6 +86,7 @@ import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
+import           Disco.Types.Qualifiers
 
 ------------------------------------------------------------
 -- Lexer
@@ -294,6 +299,7 @@ reservedWords =
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "∀", "forall", "∃", "exists", "type"
   , "import", "using"
+  , "numeric", "negative", "fractional", "comparable", "enumerable"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -951,7 +957,32 @@ parseTyVar :: Parser (Name Type)
 parseTyVar = string2Name <$> parseTyVarName
 
 parsePolyTy :: Parser PolyType
-parsePolyTy = closeType <$> parseType
+parsePolyTy =
+  mkPolyType
+  <$> parseType
+  <*> optionMaybe (brackets (parseQualifiedTV `sepBy` comma))
+
+  where
+    mkPolyType :: Type -> Maybe [(Qualifier, Name Type)] -> PolyType
+    mkPolyType ty Nothing    = closeType ty
+    mkPolyType ty (Just qvs) = closeTypeWith sm ty
+      where
+        sm = M.fromList . map (\xs -> (fst (head xs), S.fromList $ map snd xs))
+           . groupBy ((==) `on` fst) . sortBy (comparing fst)
+           . map swap $ qvs
+
+parseQualifiedTV :: Parser (Qualifier, Name Type)
+parseQualifiedTV = (,) <$> parseQualifier <*> parseTyVar
+
+parseQualifier :: Parser Qualifier
+parseQualifier =
+      QNum   <$ reserved "numeric"
+  <|> QSub   <$ reserved "negative"
+  <|> QDiv   <$ reserved "fractional"
+  <|> QCmp   <$ reserved "comparable"
+  <|> QEnum  <$ reserved "enumerable"
+  <|> QBool  <$ reserved "propositional"
+  <|> QBasic <$ reserved "basic"
 
 -- | Parse a type expression built out of binary operators.
 parseType :: Parser Type

@@ -92,15 +92,15 @@ inferTelescope inferOne tel = do
 --   properties, types) from a module, returning a 'ModuleInfo' record
 --   on success.  This function does not handle imports at all; see
 --   'recCheckMod'.
-checkModule :: Module -> TCM ModuleInfo
-checkModule (Module _ _ m docs) = do
+checkModule :: Bool -> Module -> TCM ModuleInfo
+checkModule allowQualifiedTypes (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
     tyCtx     <- makeTyCtx typeDecls
     extends tyCtx $ do
       mapM_ checkTyDefn tydefs
-      adefns <- mapM checkDefn defns
+      adefns <- mapM (checkDefn allowQualifiedTypes) defns
       let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
       let dups = filterDups . map getDefnName $ adefns
       case dups of
@@ -215,13 +215,14 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 -- Top-level definitions
 
 -- | Type check a top-level definition.
-checkDefn :: TermDefn -> TCM Defn
-checkDefn (TermDefn x clauses) = do
+checkDefn :: Bool -> TermDefn -> TCM Defn
+checkDefn allowQualifiedTypes (TermDefn x clauses) = do
   Forall sig <- lookupTy x
-  ((acs, ty'), theta) <- solve $ do
+  ((acs, ty'), (theta, vm)) <- solve allowQualifiedTypes $ do
+    -- XXX do we need to use vm here at all?
     checkNumPats clauses
     (nms, ty) <- unbind sig
-    aclauses <- forAll nms $ mapM (checkClause ty) clauses
+    aclauses <- forAllC nms $ mapM (checkClause ty) clauses
     return (aclauses, ty)
 
   let defnTy = applySubst theta ty'
@@ -275,7 +276,7 @@ checkProperties docs =
 -- | Check the types of the terms embedded in a property.
 checkProperty :: Property -> TCM AProperty
 checkProperty prop = do
-  (at, theta) <- solve $ check prop TyProp
+  (at, (theta, _)) <- solve False $ check prop TyProp  -- XXX False?  Ignore TVIMap?
   -- XXX do we need to default container variables here?
   return $ applySubst theta at
 
@@ -341,7 +342,11 @@ checkPolyTy t (Forall sig) = do
   (at, cst) <- withConstraint $ check t tau
   case as of
     [] -> constraint cst
-    _  -> constraint $ CAll (bind as cst)
+    _  -> do
+      -- XXX duplicated code for forAllC in Disco.Typecheck.Monad
+      forM_ as $ \(a, unembed -> qs) ->
+        forM_ qs $ \q -> constraint (CQual q (TyVar a))
+      constraint $ CAll (bind (map fst as) cst)
   return at
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
@@ -360,7 +365,7 @@ inferTop t = do
 
   -- Run inference on the term and try to solve the resulting
   -- constraints.
-  (at, theta) <- solve $ infer t
+  (at, (theta, vm)) <- solve False $ infer t
   traceShowM at
 
       -- Apply the resulting substitution.
@@ -374,7 +379,8 @@ inferTop t = do
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return (at'', closeType (getType at''))
+
+  return (at'', closeTypeWith (extractSortMap vm) (getType at''))
 
 --------------------------------------------------
 -- The typecheck function

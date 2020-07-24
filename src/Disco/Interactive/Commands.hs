@@ -248,7 +248,8 @@ importCmd =
 
 handleImport :: REPLExpr 'CImport -> Disco IErr ()
 handleImport (Import modName) = catchAndPrintErrors () $ do
-  mi <- loadDiscoModule FromCwdOrStdlib modName
+  allowQT <- extIsEnabled QualifiedTypes
+  mi <- loadDiscoModule FromCwdOrStdlib allowQT modName
   addModule mi
 
 
@@ -302,7 +303,8 @@ handleLoadWrapper (Load fp) =  handleLoad fp >> return ()
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
+  allowQT <- extIsEnabled QualifiedTypes
+  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) allowQT modName
   setLoadedModule m
   t <- withTopEnv $ runAllTests props
   io . putStrLn $ "Loaded."

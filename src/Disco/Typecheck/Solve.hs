@@ -406,6 +406,7 @@ decomposeQual ty@(TyCon c tys) q
 checkQual :: Qualifier -> Atom -> SolveM TyVarInfoMap
 checkQual q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
 checkQual q (AVar (S v)) = throwError $ QualSkolem q v
+  -- XXX need to be able to look up v to see if it satisfies q
 checkQual q (ABase bty)  =
   case hasQual bty q of
     True  -> return mempty

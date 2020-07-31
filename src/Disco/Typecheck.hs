@@ -339,13 +339,14 @@ check t ty = typecheck (Check ty) t
 checkPolyTy :: Term -> PolyType -> TCM ATerm
 checkPolyTy t (Forall sig) = do
   (as, tau) <- unbind sig
+  -- XXX FIX ME
   (at, cst) <- withConstraint $ check t tau
   case as of
     [] -> constraint cst
     _  -> do
       -- XXX duplicated code for forAllC in Disco.Typecheck.Monad
       forM_ as $ \(a, unembed -> qs) ->
-        forM_ qs $ \q -> constraint (CQual q (TyVar a))
+        forM_ qs $ \q -> constraint (CQual q (TySkolem a))
       constraint $ CAll (bind (map fst as) cst)
   return at
 

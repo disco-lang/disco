@@ -1,0 +1,2 @@
+lt : a -> a -> B [comparable a]
+lt x y = x < y

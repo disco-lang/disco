@@ -1,0 +1,4 @@
+:load test/poly-qualified/poly-qualified.disco
+lt 3 5
+lt "hey" "there"
+lt [1,2] [3,4]

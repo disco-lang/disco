@@ -47,7 +47,7 @@ unacceptable behavior to [byorgey@gmail.com](mailto:byorgey@gmail.com).
 
 ## How can I contribute?
 
-There are lots of ways to contribute to Disco---regardless of your
+There are lots of ways to contribute to Disco—regardless of your
 background knowledge or level of mathematical or programming skill,
 there is probably a way you can help.  For general advice on
 contributing to open source projects like Disco, see [How to
@@ -62,7 +62,7 @@ contribute and instructions for how to do so.
 
 Even if you're not at the point where you would feel comfortable
 contributing code or documentation, playing around with the language
-and reporting any problems that you find is a super valuable way to
+and reporting any problems that you find is an immensely valuable way to
 help make the language better.
 
 Feel free to [submit a bug
@@ -72,7 +72,7 @@ the documentation, a program that yields an error even though you
 think it should be accepted, or a program that seems to output the
 wrong result.  Even if the error turns out to be in your understanding
 rather than in the documentation or code, it's still a valuable
-contribution since it may point out a way that the documentation or
+contribution, since it may point out a way that the documentation or
 interface could be improved to help reduce similar confusion in the
 future.
 
@@ -131,14 +131,13 @@ Disco has two main types of documentation:
    code, which is aimed at developers and those trying to understand
    the implementation of Disco.  If you know Haskell, one valuable way
    to contribute is by reading and trying to understand the code (feel
-   free to ask questions in the [`#disco-lang` IRC
-   channel]([`#disco-lang` IRC channel on
+   free to ask questions in the [`#disco-lang` IRC channel on
    `freenode.net`](https://webchat.freenode.net/#disco-lang) along the
    way!), and adding comments to document what you learn, especially
    in places where the comments are inadequate.
 
 Specific documentation that needs fixing, or specific documentation
-that needs to be written, can be found [on the issue tracker under the
+that needs to be written, can also be found [on the issue tracker under the
 "Documentation"
 label](https://github.com/disco-lang/disco/labels/Z-Documentation)
 (though as explained above, the issues on the issue tracker are by no
@@ -149,11 +148,12 @@ helpful).
 
 Disco is written in [Haskell](http://haskell.org).  The level of
 Haskell skill needed to understand and contribute to the Disco
-codebase varies widely, but generally speaking you will probably need
-to be comfortable with standard monads (`Except`, `Reader`, `State`,
-`Maybe`) and with standard container types like `Data.Set` and
-`Data.Map`.  If you'd like to learn enough Haskell to contribute to
-Disco, we recommend starting by [working through these course
+codebase varies widely depending on which part of the code you look
+at, but generally speaking you will probably need to be comfortable
+with standard monads (`Except`, `Reader`, `State`, `Maybe`) and with
+standard container types like `Data.Set` and `Data.Map`.  If you'd
+like to learn enough Haskell to contribute to Disco, we recommend
+starting by [working through these introductory Haskell course
 materials](https://www.cis.upenn.edu/~cis194/spring13/).
 
 If you'd like to contribute some code but are unsure where to begin,
@@ -162,13 +162,13 @@ Fruit"](https://github.com/disco-lang/disco/labels/C-Low%20Hanging%20Fruit)
 in the issue tracker.  These are bugs and features which should be
 appropriate for someone just getting started to tackle.  If you want
 help understanding or getting started on a particular issue, feel free
-to leave a comment on the issue, or ask in the [`#disco-lang` IRC
+to leave a comment on the issue or ask in the [`#disco-lang` IRC
 channel](https://webchat.freenode.net/#disco-lang).
 
 ### Development Workflow
 
 Never made an open source contribution before? Wondering how
-contributions work in the in our project? Here's a quick rundown!
+making a contribution actually works? Here's a quick rundown!
 
 1. Find an issue that you are interested in addressing or a feature
    that you would like to add.
@@ -176,13 +176,15 @@ contributions work in the in our project? Here's a quick rundown!
    (by clicking the "Fork" button in the upper-right corner).  This
    will make a copy of the repository in your personal GitHub account,
    that is, you will have your own personal copy of the repository
-   under `your-GitHub-username/disco`.
+   under `<your-GitHub-username>/disco`.
 1. *Clone* the repository to your local machine by opening a terminal,
    navigating to the directory where you would like to store the
    `disco` repository, and typing `git clone
-   https://github.com/your-GitHub-username/disco.git`.  You should now
-   have a subdirectory named `disco` containing an up-to-date copy of
-   the repository.
+   https://github.com/your-GitHub-username/disco.git`.  (If you don't
+   already have the `git` tool, you will have to [install it
+   first](https://git-scm.com/downloads).) You should now have a
+   subfolder named `disco` containing an up-to-date copy of the
+   repository.
 1. Create a new *branch* for your fix using `git checkout -b
    BRANCH-NAME` (replace `BRANCH-NAME` by some appropriate name based on
    the feature or fix you plan to make).
@@ -199,9 +201,9 @@ contributions work in the in our project? Here's a quick rundown!
    request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request-from-a-fork)
    from your fork to the `disco-lang/disco` repository.
 1. Title the pull request with a short description of the changes made
-   and the issue or bug number associated with your change. For
-   example, you can title an issue like so "Added more log output to
-   resolve #4352".
+   and the issue or bug number associated with your change (if
+   any). For example, you can title an issue like so "Added more log
+   output to resolve #4352".
 1. In the description of the pull request, explain the changes that
    you made, any issues you think exist with the pull request you
    made, and any questions you have for the maintainer. It's OK if

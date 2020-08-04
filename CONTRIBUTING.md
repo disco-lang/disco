@@ -229,9 +229,26 @@ Hack](https://felixge.de/2013/03/11/the-pull-request-hack.html):
 anyone who submits a pull request to Disco is likely to be granted
 push access in short order.
 
+One benefit is that when working on a new feature, you can create a
+branch in the `disco` repository itself (instead of in your own fork)
+and then open a pull request from the feature branch to `master`.
+This is actually *preferred* since it makes several things smoother
+(for example, the `restyled.io` bot works much better on pulls from
+local branches than from forks).
 
+Although being given push access does not imply any particular
+responsibility, you are welcome to do things such as help review and
+merge other pull requests, and help triage, label, and update issues
+in the issue tracker.
 
-### Pull Requests
+Having push access also means, of course, that you can push directly
+to `master`.  You are welcome to do so for typos, small fixes,
+documentation improvements, and the like; for larger fixes, new
+features, *etc.* opening a pull request from a feature branch is still
+preferred, to give a chance for others to offer suggestions for
+improvement.
+
+<!-- ### Pull Requests -->
 
 <!-- The process described here has several goals: -->
 
@@ -248,20 +265,20 @@ push access in short order.
 
 <!-- While the prerequisites above must be satisfied prior to having your pull request reviewed, the reviewer(s) may ask you to complete additional design work, tests, or other changes before your pull request can be ultimately accepted. -->
 
-## Style Guides
+<!-- ## Style Guides -->
 
-### Git Commit Messages
+<!-- ### Git Commit Messages -->
 
-* Use the present tense ("Add feature" not "Added feature")
-* Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
-* Limit the first line to 72 characters or less
-* Reference issues and pull requests liberally after the first line
-* When only changing documentation, include `[ci skip]` in the commit title.
+<!-- <\!-- * Use the present tense ("Add feature" not "Added feature") -\-> -->
+<!-- <\!-- * Use the imperative mood ("Move cursor to..." not "Moves cursor to...") -\-> -->
+<!-- <\!-- * Limit the first line to 72 characters or less -\-> -->
+<!-- <\!-- * Reference issues and pull requests liberally after the first line -\-> -->
+<!-- <\!-- * When only changing documentation, include `[ci skip]` in the commit title. -\-> -->
 
-### Documentation
+<!-- ### Documentation -->
 
 
 
-### Haskell
+<!-- ### Haskell -->
 
 

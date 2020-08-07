@@ -133,8 +133,28 @@ instance Subst Type SimpleConstraint
 -- | Information about a particular type variable.  More information
 --   may be added in the future (e.g. polarity).
 data TyVarInfo = TVI
-  { _tyVarIlk  :: First Ilk   -- ^ The ilk (unification or skolem) of the variable, if known
-  , _tyVarSort :: Sort        -- ^ The sort (set of qualifiers) of the type variable.
+  { _tyVarIlk  :: First Ilk
+    -- ^ The ilk (unification or skolem) of the variable, if known.
+
+  , _tyVarSort :: Sort
+    -- ^ The sort (set of qualifiers) of the type variable.
+    --
+    --   - If it is a unification variable, this is the /required/ or
+    --     /wanted/ sort, arising from unification.  For example, if
+    --     we assign a new unification variable type @a@ to a variable
+    --     @x@, and then later see that @x@ is used as an argument to
+    --     the addition operator, @a@ will aquire a 'QNum' qualifier
+    --     as part of its sort, indicating that whatever type is
+    --     chosen for @a@ must be numeric.
+    --
+    --   - If it is a skolem variable, it is the /specified/ or
+    --     /given/ sort, arising from an explicit qualified
+    --     polymorphic type signature.  For example, in the type @f :
+    --     a -> a [numeric a]@, while checking the body of @f@ we
+    --     would keep track of the skolem type variable @a@ with a
+    --     sort @QNum@, meaning that we may /assume/ @a@ is numeric.
+    --     Any @QNum@ constraints which arise on @a@ may be
+    --     automatically discharged.
   }
   deriving (Show)
 
@@ -313,9 +333,9 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   (g', theta_skolem) <- liftExcept (checkSkolems tyDefns vm g)
   traceShowM theta_skolem
 
+  -- XXX???
   -- We don't need to ensure that theta_skolem respects sorts since
   -- checkSkolems will only unify skolem vars with unsorted variables.
-
 
   -- Step 6. Eliminate cycles from the graph, turning each strongly
   -- connected component into a single node, unifying all the atoms in
@@ -376,37 +396,64 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
 
-decomposeConstraint :: Constraint -> SolveM [(TyVarInfoMap, [SimpleConstraint])]
-decomposeConstraint (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
-decomposeConstraint (CEq  t1 t2) = return [(mempty, [t1 :=: t2])]
-decomposeConstraint (CQual q ty) = ((:[]) . (, [])) <$> decomposeQual ty q
-decomposeConstraint (CAnd cs)    = (map mconcat . sequence) <$> mapM decomposeConstraint cs
-decomposeConstraint CTrue        = return [mempty]
-decomposeConstraint (CAll ty)    = do
-  (vars, c) <- unbind ty
-  let c' = substs (mkSkolems vars) c
-  (map . first . addSkolems) vars <$> decomposeConstraint c'
+-- XXX add a parameter to decomposeConstraint that keeps track of skolem info?
+
+-- | 'decomposeConstraint' takes a constraint and decomposes it into a
+--   list of /alternative/ sets of simple constraints. (Alternatives
+--   can arise from a 'COr' constraint.)  Each set of constraints is
+--   also accompanied by a 'TyVarInfoMap' with information about all
+--   the type variables mentioned in the constraints.
+--
+--   'decomposeConstraint' also takes a 'TyVarInfoMap' representing
+--   information about any skolem variables in scope, and their
+--   qualifiers (if any).
+decomposeConstraint :: TyVarInfoMap -> Constraint -> SolveM [(TyVarInfoMap, [SimpleConstraint])]
+decomposeConstraint _  (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
+decomposeConstraint _  (CEq  t1 t2) = [(mempty, [t1 :=: t2])]
+decomposeConstraint vm (CQual q ty) = ((:[]) . (, [])) <$> decomposeQual vm ty q
+decomposeConstraint vm (CAnd cs)
+  = (map mconcat . sequence) <$> mapM (decomposeConstraint vm) cs
+decomposeConstraint _ CTrue        = return [mempty]
+
+decomposeConstraint vm (CAll asc)    = do
+  (as, c) <- unbind asc
+  let c' = substs (mkSkolems (map fst as)) c
+  undefined  -- XXX extend vm to pass along; recurse on c'; add
+             -- extended vm to whatever gets returned from recursive
+             -- call
+
+-- XXX FIXME
+-- decomposeConstraint (CAll ty)    = do
+--   (vars, c) <- unbind ty
+--   let c' = substs (mkSkolems vars) c
+--   (map . first . addSkolems) vars <$> decomposeConstraint c'
 
   where
     mkSkolems :: [Name Type] -> [(Name Type, Type)]
     mkSkolems = map (id &&& TySkolem)
 
-decomposeConstraint (COr cs)     = concat <$> filterExcept (map decomposeConstraint cs)
+decomposeConstraint vm (COr cs)
+  = concat <$> filterExcept (map (decomposeConstraint vm) cs)
 
-decomposeQual :: Type -> Qualifier -> SolveM TyVarInfoMap
-decomposeQual (TyAtom a) q             = checkQual q a
+-- | XXX comment me
+decomposeQual :: TyVarInfoMap -> Type -> Qualifier -> SolveM TyVarInfoMap
+decomposeQual vm (TyAtom a) q             = checkQual vm q a
+
   -- XXX Really we should be able to check by induction whether a
   -- user-defined type has a certain sort.
-decomposeQual ty@(TyCon (CUser _) _) q = throwError $ Unqual q ty
-decomposeQual ty@(TyCon c tys) q
+decomposeQual _ ty@(TyCon (CUser _) _) q = throwError $ Unqual q ty
+decomposeQual vm ty@(TyCon c tys) q
   = case qualRules c q of
       Nothing -> throwError $ Unqual q ty
-      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual) tys qs
+      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual vm) tys qs
 
-checkQual :: Qualifier -> Atom -> SolveM TyVarInfoMap
-checkQual q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
-checkQual q (AVar (S v)) = throwError $ QualSkolem q v
-  -- XXX need to be able to look up v to see if it satisfies q
+-- | XXX comment me
+checkQual :: TyVarInfoMap -> Qualifier -> Atom -> SolveM TyVarInfoMap
+checkQual vm q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
+checkQual vm q (AVar (S v)) = case view tyVarSort <$> lookupTVI v vm of
+  Just s | inSort q s -> return mempty
+  _                   -> throwError $ QualSkolem q v
+
 checkQual q (ABase bty)  =
   case hasQual bty q of
     True  -> return mempty

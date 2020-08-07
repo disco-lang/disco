@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ViewPatterns     #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
@@ -121,16 +120,8 @@ constraints = constraint . cAnd
 
 -- | Close over the current constraint with a forall.
 forAllC :: [(Name Type, Embed [Qualifier])] -> TCM a -> TCM a
-forAllC nms tcm = do
-  forM_ nms $ \(nm, unembed -> qs) ->
-    forM_ qs $ \q -> constraint (CQual q (TySkolem nm))
-      -- XXX we don't actually want a *constraint* here, which is like
-      -- a 'wanted' in GHC parlance; it's actually a 'given', i.e. we
-      -- are told that certain skolem variables DO satisfy the given
-      -- qualifier.  We need to record this info somewhere so we can
-      -- look it up when checking a qualifier constraint on a skolem
-      -- (instead of always failing like we do now).
-  censor (CAll . bind (map fst nms)) tcm
+forAllC []  tcm = tcm
+forAllC nms tcm = censor (CAll . bind nms) tcm
 
 -- | Run a 'TCM' computation, returning the generated 'Constraint'
 --   along with the output, and reset the 'Constraint' of the resulting

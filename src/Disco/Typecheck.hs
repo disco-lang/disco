@@ -338,17 +338,12 @@ check t ty = typecheck (Check ty) t
 -- | Check that a term has the given polymorphic type.
 checkPolyTy :: Term -> PolyType -> TCM ATerm
 checkPolyTy t (Forall sig) = do
+  -- t : forall as. tau.  Open up tau.
   (as, tau) <- unbind sig
-  -- XXX FIX ME
-  (at, cst) <- withConstraint $ check t tau
-  case as of
-    [] -> constraint cst
-    _  -> do
-      -- XXX duplicated code for forAllC in Disco.Typecheck.Monad
-      forM_ as $ \(a, unembed -> qs) ->
-        forM_ qs $ \q -> constraint (CQual q (TySkolem a))
-      constraint $ CAll (bind (map fst as) cst)
-  return at
+
+  -- Check t at type tau, then re-quantify over the generated
+  -- constraints.
+  forAllC as $ check t tau
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.

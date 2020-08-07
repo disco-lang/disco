@@ -194,7 +194,11 @@ deleteVM = onVM . M.delete
 -- | Given a list of type variable names, add them all to the
 --   'TyVarInfoMap' as 'Skolem' variables (with a trivial sort).
 addSkolems :: [Name Type] -> TyVarInfoMap -> TyVarInfoMap
-addSkolems vs = onVM $ \vm -> foldl' (flip (\v -> M.insert v (mkTVI Skolem mempty))) vm vs
+addSkolems vs = onVM $ \vm -> foldl' (flip (\v -> M.insertWith (<>) v (mkTVI Skolem mempty))) vm vs
+
+-- | XXX
+addQSkolems :: [(Name Type, [Qualifier])] -> TyVarInfoMap -> TyVarInfoMap
+addQSkolems vs = onVM $ \vm -> foldl' (flip (\(v,qs) -> M.insertWith (<>) v (mkTVI Skolem (S.fromList qs)))) vm vs
 
 -- | Extract a mapping from variable names to sorts from a 'TyVarInfoMap'.
 extractSortMap :: TyVarInfoMap -> Map (Name Type) Sort
@@ -272,7 +276,7 @@ solveConstraint allowQualifiedTypes tyDefns c = do
   traceM "------------------------------"
   traceM "Decomposing constraints..."
 
-  qcList <- decomposeConstraint c
+  qcList <- decomposeConstraint mempty c
 
   -- Now try continuing with each set and pick the first one that has
   -- a solution.
@@ -298,9 +302,9 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   traceM "------------------------------"
   traceM "Running simplifier..."
 
-  (vm, atoms, theta_simp) <- liftExcept (simplify tyDefns vm cs)
+  (vm', atoms, theta_simp) <- liftExcept (simplify tyDefns vm cs)
 
-  traceM (show vm)
+  traceM (show vm')
   traceM (show atoms)
   traceM (show theta_simp)
 
@@ -316,7 +320,7 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   -- vertices.
   let mkAVar (v, First (Just Skolem)) = AVar (S v)
       mkAVar (v, _                  ) = AVar (U v)
-      vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm
+      vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm'
       g = mkConstraintGraph vars atoms
 
   traceShowM g
@@ -330,7 +334,7 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   traceM "------------------------------"
   traceM "Checking WCCs for skolems..."
 
-  (g', theta_skolem) <- liftExcept (checkSkolems tyDefns vm g)
+  (g', theta_skolem) <- liftExcept (checkSkolems tyDefns vm' g)
   traceShowM theta_skolem
 
   -- XXX???
@@ -350,7 +354,7 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   traceShowM theta_cyc
 
   -- Check that the resulting substitution respects sorts...
-  let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort vm x)
+  let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort vm' x)
       sortOK (_, TyAtom (AVar (U _))) = True
       sortOK p                        = error $ "Impossible! sortOK " ++ show p
   when (not $ all sortOK (Subst.toList theta_cyc))
@@ -361,16 +365,16 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   -- the sort of x.
 
   traceM "Old sort map:"
-  traceShowM vm
+  traceShowM vm'
 
-  let vm' = foldr updateVarMap vm (Subst.toList theta_cyc)
+  let vm'' = foldr updateVarMap vm' (Subst.toList theta_cyc)
         where
           updateVarMap :: (Name Type, Type) -> TyVarInfoMap -> TyVarInfoMap
           updateVarMap (x, TyAtom (AVar (U y))) vmm = extendSort y (getSort vmm x) vmm
           updateVarMap _                        vmm = vmm
 
   traceM "Updated sort map:"
-  traceShowM vm'
+  traceShowM vm''
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
@@ -380,7 +384,7 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
   traceM "------------------------------"
   traceM "Solving for type variables..."
 
-  theta_sol       <- solveGraph allowQualifiedTypes vm' g''
+  theta_sol       <- solveGraph allowQualifiedTypes vm'' g''
   traceShowM theta_sol
 
   traceM "------------------------------"
@@ -388,15 +392,13 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
 
   let theta_final = (theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp)
   traceShowM theta_final
-  traceShowM vm'
+  traceShowM vm''
 
-  return (theta_final, vm')
+  return (theta_final, vm'')
 
 
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
-
--- XXX add a parameter to decomposeConstraint that keeps track of skolem info?
 
 -- | 'decomposeConstraint' takes a constraint and decomposes it into a
 --   list of /alternative/ sets of simple constraints. (Alternatives
@@ -409,7 +411,7 @@ solveConstraintChoice allowQualifiedTypes tyDefns vm cs = do
 --   qualifiers (if any).
 decomposeConstraint :: TyVarInfoMap -> Constraint -> SolveM [(TyVarInfoMap, [SimpleConstraint])]
 decomposeConstraint _  (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
-decomposeConstraint _  (CEq  t1 t2) = [(mempty, [t1 :=: t2])]
+decomposeConstraint _  (CEq  t1 t2) = return [(mempty, [t1 :=: t2])]
 decomposeConstraint vm (CQual q ty) = ((:[]) . (, [])) <$> decomposeQual vm ty q
 decomposeConstraint vm (CAnd cs)
   = (map mconcat . sequence) <$> mapM (decomposeConstraint vm) cs
@@ -417,20 +419,18 @@ decomposeConstraint _ CTrue        = return [mempty]
 
 decomposeConstraint vm (CAll asc)    = do
   (as, c) <- unbind asc
-  let c' = substs (mkSkolems (map fst as)) c
-  undefined  -- XXX extend vm to pass along; recurse on c'; add
-             -- extended vm to whatever gets returned from recursive
-             -- call
 
--- XXX FIXME
--- decomposeConstraint (CAll ty)    = do
---   (vars, c) <- unbind ty
---   let c' = substs (mkSkolems vars) c
---   (map . first . addSkolems) vars <$> decomposeConstraint c'
+      -- Substitute new skolem variables into constraint c
+  let c'  = substs (map ((id &&& TySkolem) . fst) as) c
 
-  where
-    mkSkolems :: [Name Type] -> [(Name Type, Type)]
-    mkSkolems = map (id &&& TySkolem)
+      -- Extend var map with new skolems and their qualifiers
+      vm' = addQSkolems (map (second unembed) as) vm
+
+  -- Recurse on c'
+  csets <- decomposeConstraint vm' c'
+
+  -- Add info about skolems to returned TyVarInfoMaps
+  return $ map (first (vm' <>)) csets
 
 decomposeConstraint vm (COr cs)
   = concat <$> filterExcept (map (decomposeConstraint vm) cs)
@@ -449,12 +449,12 @@ decomposeQual vm ty@(TyCon c tys) q
 
 -- | XXX comment me
 checkQual :: TyVarInfoMap -> Qualifier -> Atom -> SolveM TyVarInfoMap
-checkQual vm q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
-checkQual vm q (AVar (S v)) = case view tyVarSort <$> lookupTVI v vm of
-  Just s | inSort q s -> return mempty
-  _                   -> throwError $ QualSkolem q v
+checkQual _  q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
+checkQual vm q (AVar (S v)) = case view tyVarSort <$> lookupVM v vm of
+  Just s | q `S.member` s -> return mempty
+  _                       -> throwError $ QualSkolem q v
 
-checkQual q (ABase bty)  =
+checkQual _ q (ABase bty)  =
   case hasQual bty q of
     True  -> return mempty
     False -> throwError $ UnqualBase q bty
@@ -676,7 +676,7 @@ simplify tyDefns origVM cs
 
       -- 2. Decompose the resulting qualifier constraints
 
-      vm' <- lift $ mconcat <$> mapM (uncurry decomposeQual) tyQualList
+      vm' <- lift $ mconcat <$> mapM (uncurry (decomposeQual mempty)) tyQualList
 
       -- 3. delete domain of s' from vm and merge in decomposed quals.
 
@@ -719,10 +719,11 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 
 -- | Check for any weakly connected components containing more than
 --   one skolem, or a skolem and a base type, or a skolem and any
---   variables with nontrivial sorts; such components are not allowed.
---   If there are any WCCs with a single skolem, no base types, and
---   only unsorted variables, just unify them all with the skolem and
---   remove those components.
+--   variables with nontrivial sorts that don't match the sort of the
+--   skolem; such components are not allowed.  If there are any WCCs
+--   with a single skolem, no base types, and only variables whose
+--   sorts are subsumed by the skolem's sort, just unify them all with
+--   the skolem and remove those components.
 checkSkolems :: TyDefCtx -> TyVarInfoMap -> Graph Atom -> Except SolveError (Graph UAtom, S)
 checkSkolems tyDefns vm graph = do
   let skolemWCCs :: [Set Atom]
@@ -731,8 +732,13 @@ checkSkolems tyDefns vm graph = do
       ok wcc =  S.size (S.filter isSkolem wcc) <= 1
              && all (\case { ABase _    -> False
                            ; AVar (S _) -> True
-                           ; AVar (U v) -> maybe True (S.null . view tyVarSort) (lookupVM v vm) })
+                           ; AVar (U v) -> maybe True matchesSkolemSort (lookupVM v vm) })
                 wcc
+        where
+          theSkolem  = head [sk | AVar (S sk) <- S.toList wcc]
+          skolemSort = maybe topSort (view tyVarSort) $ lookupVM theSkolem vm
+
+          matchesSkolemSort tvi = (tvi ^. tyVarSort) `S.isSubsetOf` skolemSort
 
       (good, bad) = partition ok skolemWCCs
 

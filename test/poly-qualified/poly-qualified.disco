@@ -1,2 +1,5 @@
 lt : a -> a -> B [comparable a]
 lt x y = x < y
+
+add : a -> a -> a [numeric a]
+add x y = x + y

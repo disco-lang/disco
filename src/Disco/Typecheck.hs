@@ -218,7 +218,7 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 checkDefn :: Bool -> TermDefn -> TCM Defn
 checkDefn allowQualifiedTypes (TermDefn x clauses) = do
   Forall sig <- lookupTy x
-  ((acs, ty'), (theta, vm)) <- solve allowQualifiedTypes $ do
+  ((acs, ty'), (theta, _vm)) <- solve allowQualifiedTypes $ do
     -- XXX do we need to use vm here at all?
     checkNumPats clauses
     (nms, ty) <- unbind sig
@@ -437,8 +437,23 @@ typecheck mode (TParens t) = typecheck mode t
 typecheck Infer (TVar x) = checkVar `catchError` checkPrim
   where
     checkVar = do
+      -- In the most general case, x could have a qualified polymorphic type like
+      --   forall a b c. ty [numeric a, propositional b]
+
+      -- Look up the type of x.
       Forall sig <- lookupTy x
-      (_, ty)    <- unbind sig
+
+      -- Open it up, substituting fresh type variable names for the
+      -- bound tyvars. vqs are the qualifiers, ty is the body of the
+      -- type.
+      (vqs, ty)    <- unbind sig
+
+      -- Generate some constraints to make sure the qualifiers are
+      -- respected (if any).
+      forM_ vqs $ \(a, unembed -> qs) ->
+        forM_ qs $ \q -> constraint (CQual q (TyVar a))
+
+      -- Finally, return the variable with its looked up type.
       return $ ATVar ty (coerce x)
 
     -- If the variable is not bound, check if it is an exposed primitive name.

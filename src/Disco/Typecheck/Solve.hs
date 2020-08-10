@@ -53,15 +53,15 @@ import           Disco.Types
 import           Disco.Types.Qualifiers
 import           Disco.Types.Rules
 
-import qualified Debug.Trace                      as Debug
+-- import qualified Debug.Trace                      as Debug
 
 traceM :: Applicative f => String -> f ()
--- traceM _ = pure ()
-traceM = Debug.traceM
+traceM _ = pure ()
+-- traceM = Debug.traceM
 
 traceShowM :: (Show a, Applicative f) => a -> f ()
--- traceShowM _ = pure ()
-traceShowM = Debug.traceShowM
+traceShowM _ = pure ()
+-- traceShowM = Debug.traceShowM
 
 --------------------------------------------------
 -- Solver errors

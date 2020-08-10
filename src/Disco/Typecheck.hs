@@ -357,7 +357,24 @@ infer t = typecheck Infer t
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
 inferTop :: Term -> TCM (ATerm, PolyType)
-inferTop t = do
+
+-- Special case for variables: look up & return the variable's
+-- polytype directly, instead of opening it, solving, and then trying
+-- to re-close over the inferred type (which loses any qualified
+-- polymorphism).
+inferTop (TVar x) = lookupVar `catchError` (\_ -> inferTop' (TVar x))
+  where
+    lookupVar = do
+      pty <- lookupTy x
+      ax  <- infer (TVar x)
+      return (ax, pty)
+
+-- Otherwise, just fall back to the general case (inferTop').
+inferTop t = inferTop' t
+
+-- The general case of inferTop.
+inferTop' :: Term -> TCM (ATerm, PolyType)
+inferTop' t = do
 
   -- Run inference on the term and try to solve the resulting
   -- constraints.
@@ -377,6 +394,26 @@ inferTop t = do
   -- the term along with the resulting polymorphic type.
 
   return (at'', closeTypeWith (extractSortMap vm) (getType at''))
+
+--------------------------------------------------
+-- Turning unbound variables into prims
+--------------------------------------------------
+
+-- | If we encounter an unbound variable while typechecking, we also
+--   try seeing if it is the name of an exposed primitive, and infer
+--   the type of that instead.
+checkPrim :: Name Term -> TCError -> TCM ATerm
+checkPrim x (Unbound _) =
+
+  -- If the variable is not bound, check if it is an exposed primitive name.
+  case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
+    -- If so, infer the type of the prim instead.
+    (prim:_) -> typecheck Infer (TPrim prim)
+    _        -> throwError (Unbound x)
+
+-- For any other error, just rethrow.
+checkPrim _ e = throwError e
+
 
 --------------------------------------------------
 -- The typecheck function
@@ -433,8 +470,8 @@ typecheck mode (TParens t) = typecheck mode t
 -- fall through to this case.
 --
 -- Note this is also where unbound identifiers may possibly be turned
--- into primitives if the name matches.
-typecheck Infer (TVar x) = checkVar `catchError` checkPrim
+-- into primitives if the name matches (see the checkPrim function).
+typecheck Infer (TVar x) = checkVar `catchError` checkPrim x
   where
     checkVar = do
       -- In the most general case, x could have a qualified polymorphic type like
@@ -455,16 +492,6 @@ typecheck Infer (TVar x) = checkVar `catchError` checkPrim
 
       -- Finally, return the variable with its looked up type.
       return $ ATVar ty (coerce x)
-
-    -- If the variable is not bound, check if it is an exposed primitive name.
-    checkPrim (Unbound _) =
-      case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
-        -- If so, infer the type of the prim instead.
-        (prim:_) -> typecheck Infer (TPrim prim)
-        _        -> throwError (Unbound x)
-
-    -- For any other error, just rethrow.
-    checkPrim e = throwError e
 
 --------------------------------------------------
 -- Primitives

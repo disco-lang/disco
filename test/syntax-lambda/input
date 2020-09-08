@@ -8,3 +8,5 @@ let q = \ (f : (N -> N) -> N) . f (\(x:N) . x*x) in q (\g. g 1 + g 2)
 let f = \(g : Z -> N -> B).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
 :type let f = \(g : Z -> N -> B).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
 let f = (\x.\y.x+y : N -> N -> N) in f 1 2
+:parse \_.3
+(\_.3) "hello"

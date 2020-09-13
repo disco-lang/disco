@@ -9,6 +9,17 @@ using Primitives
 isPrime : N -> Bool
 isPrime = $isPrime
 
+!!! log (2, 1024) == 10
+!!! log (2, 1023) == 9
+!!! log (7, 11398895185373143) == 19	
+log : N * N -> N
+log (b, x) = {? 0					 if (x == 1) || (b > 1 && b > x),
+			     1 + log (b, x // b) if b > 1 
+			  ?}
+
+lg : N -> N
+lg x = log (2,x)
+
 ||| Compute the prime factorization of the given natural number.
 factor : N -> Bag N
 factor = $factor

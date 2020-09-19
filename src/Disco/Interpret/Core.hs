@@ -826,7 +826,6 @@ whnfOp :: Op -> [Value] -> Disco IErr Value
 whnfOp OAdd            = arity2 "+"        $ numOp (+)
 whnfOp ONeg            = arity1 "negate"   $ uNumOp negate
 whnfOp OSqrt           = arity1 "sqrt"     $ uNumOp integerSqrt
-whnfOp OLg             = arity1 "lg"       $ lgOp
 whnfOp OFloor          = arity1 "floor"    $ uNumOp floorOp
 whnfOp OCeil           = arity1 "ceil"     $ uNumOp ceilOp
 whnfOp OAbs            = arity1 "abs"      $ uNumOp abs
@@ -1068,16 +1067,6 @@ floorOp n = (floor n) % 1
 
 ceilOp :: Rational -> Rational
 ceilOp n  = (ceiling n) % 1
-
--- | Perform a base-2 logarithmic operation
-lgOp :: Value -> Disco IErr Value
-lgOp v = do
-  VNum _ m <- whnfV v
-  lgOp' m
-
-lgOp' :: Rational -> Disco IErr Value
-lgOp' 0 = throwError LgOfZero
-lgOp' n = return $ vnum (toInteger (integerLog2 (numerator n)) % 1)
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.

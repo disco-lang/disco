@@ -16,9 +16,12 @@ isPrime = $isPrime
 !!! log (7, 11398895185373143) == 19	
 log : N * N -> N
 log (1,1) = 0
+log (0,_) = $crash "Log with this base is undefined"
+log (1,_) = $crash "Log with this base is undefined"
+log (_,0) = $crash "Log of Zero"
 log (b, x) = {?
-				0					if x >= 1 && b > x,
-			    1 + log (b, x // b) if (b > 1 && x > 0)
+				0					if b > x,
+			    1 + log (b, x // b) otherwise
 			  ?}
 
 lg : N -> N

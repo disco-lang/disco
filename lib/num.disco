@@ -9,21 +9,30 @@ using Primitives
 isPrime : N -> Bool
 isPrime = $isPrime
 
+||| Takes naturals b and n. Calculates the base b logarithm of n rounded down
 !!! log (1,1) == 0
 !!! log (3,1) == 0
 !!! log (2, 1024) == 10
 !!! log (2, 1023) == 9
-!!! log (7, 11398895185373143) == 19	
+!!! log (7, 11398895185373143) == 19
 log : N * N -> N
 log (1,1) = 0
-log (0,_) = $crash "Log with this base is undefined"
-log (1,_) = $crash "Log with this base is undefined"
+log (0,_) = $crash "Log base 0 is undefined"
+log (1,_) = $crash "Log base 1 is undefined for inputs other than 1"
 log (_,0) = $crash "Log of Zero"
 log (b, x) = {?
-				0					if b > x,
-			    1 + log (b, x // b) otherwise
-			  ?}
+                0                   if b > x,
+                1 + log (b, x // b) otherwise
+              ?}
 
+||| Calculate the base 2 logarithm of the given natural number rounded down
+!!! lg 4 == 2
+!!! lg 5 == 2
+!!! lg 7 == 2
+!!! lg 10 == 3
+!!! lg 25 == 4
+!!! lg 99887766554433221100 == 66
+!!! lg (2^100 + 1) == 100
 lg : N -> N
 lg x = log (2,x)
 

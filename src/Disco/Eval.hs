@@ -363,9 +363,6 @@ data IErr where
   -- | Overflow, e.g. (2^66)!
   Overflow      ::              IErr
 
-  -- | Taking the base-2 logarithm of zero.
-  LgOfZero      ::              IErr
-
   -- | v should be a boolean, but isn't.
   NotABool      :: Value     -> IErr
 

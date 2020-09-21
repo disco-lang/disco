@@ -39,7 +39,6 @@ data Prim where
   PrimBOp     :: BOp -> Prim  -- ^ Binary operator
 
   PrimSqrt    :: Prim      -- ^ Integer square root (@sqrt@)
-  PrimLg      :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
   PrimFloor   :: Prim      -- ^ Floor of fractional type (@floor@)
   PrimCeil    :: Prim      -- ^ Ceiling of fractional type (@ceiling@)
   PrimAbs     :: Prim      -- ^ Absolute value (@abs@)
@@ -111,7 +110,6 @@ primTable :: [PrimInfo]
 primTable =
   [ PrimInfo (PrimUOp Not) "not"     True
   , PrimInfo PrimSqrt      "sqrt"    True
-  , PrimInfo PrimLg        "lg"      True
   , PrimInfo PrimFloor     "floor"   True
   , PrimInfo PrimCeil      "ceiling" True
   , PrimInfo PrimAbs       "abs"     True

@@ -159,7 +159,6 @@ compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 
 compilePrim _ PrimSqrt  = return $ CConst OSqrt
-compilePrim _ PrimLg    = return $ CConst OLg
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil  = return $ CConst OCeil
 compilePrim _ PrimAbs   = return $ CConst OAbs

@@ -718,15 +718,10 @@ typecheck Infer (TPrim prim) = do
     ------------------------------------------------------------
 
     ----------------------------------------
-    -- Special arithmetic functions: fact, sqrt, lg, floor, ceil, abs
+    -- Special arithmetic functions: fact, sqrt, floor, ceil, abs
 
     inferPrim (PrimUOp Fact) = return $ TyN :->: TyN
-    inferPrim p | p `elem` [PrimSqrt, PrimLg] = return $ TyN :->: TyN
-
-    -- See Note [Pattern coverage] -----------------------------
-    inferPrim PrimSqrt = error "inferPrim Sqrt should be unreachable"
-    inferPrim PrimLg   = error "inferPrim Lg should be unreachable"
-    ------------------------------------------------------------
+    inferPrim PrimSqrt = return $ TyN :->: TyN
 
     inferPrim p | p `elem` [PrimFloor, PrimCeil] = do
       argTy <- freshTy

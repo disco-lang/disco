@@ -103,7 +103,6 @@ data Core where
 data Op = OAdd      -- ^ Addition (@+@)
         | ONeg      -- ^ Arithmetic negation (@-@)
         | OSqrt     -- ^ Integer square root (@sqrt@)
-        | OLg       -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor    -- ^ Floor of fractional type (@floor@)
         | OCeil     -- ^ Ceiling of fractional type (@ceiling@)
         | OAbs      -- ^ Absolute value (@abs@)

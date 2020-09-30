@@ -160,6 +160,8 @@ prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
 prettyTy (TyUser name args) = mparens (PA 9 InR) $
   hsep (text name : map (prettyTy' 9 InR) args)
 prettyTy (TySkolem n)     = text "%" <> prettyName n
+prettyTy (TyGraph ty)     = mparens (PA 9 InR) $
+  text "Graph" <+> prettyTy' 9 InR ty
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -447,6 +449,8 @@ prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
+prettyWHNF out (TyGraph a) (VGraph g) = out $ "TEST" ++ show g
+
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
@@ -539,6 +543,12 @@ prettyDecimal r = printedDecimal
        where
          (pre, rep) = splitAt len expan
          first102   = take 102 expan
+
+prettyGraph :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyGraph out ty val = out "Graph <" >> go val
+    where 
+      go (VGraph g) = 
+
 
 -- Given a list, find the indices of the list giving the first and
 -- second occurrence of the first element to repeat, or Nothing if

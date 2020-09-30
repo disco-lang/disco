@@ -194,6 +194,9 @@ qualRulesMap = M.fromList
   , CSet ==> M.fromList
     [ QCmp ==> [Just QCmp]
     ]
+  , CGraph ==> M.fromList
+    [ QCmp ==> [Just QCmp]
+    ]
   ]
   where
     (==>) :: a -> b -> (a,b)

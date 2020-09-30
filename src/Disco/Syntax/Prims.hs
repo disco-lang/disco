@@ -53,6 +53,10 @@ data Prim where
   PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
   PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
 
+  PrimVertex  :: Prim      -- ^ Construct a graph Vertex
+  PrimOverlay :: Prim      -- ^ Overlay two Graphs
+  PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
+
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
   PrimFilter  :: Prim      -- ^ Filter operation for containers
@@ -123,6 +127,10 @@ primTable =
 
   , PrimInfo PrimB2C       "bagCounts" True
   , PrimInfo PrimC2B       "bagFromCounts" True
+
+  , PrimInfo PrimVertex    "vertex"  True
+  , PrimInfo PrimOverlay   "overlay" True
+  , PrimInfo PrimConnect   "connect" True
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True

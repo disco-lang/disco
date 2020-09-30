@@ -516,6 +516,20 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QCmp a
       return $ TyContainer c (a :*: TyN) :->: TyBag a
 
+
+    inferPrim PrimVertex = do
+      a <- freshTy
+      return $ a :->: TyGraph a
+
+    inferPrim PrimOverlay = do
+      a <- freshTy
+      return $ TyGraph a :*: TyGraph a :->: TyGraph a
+
+
+    inferPrim PrimConnect = do
+      a <- freshTy
+      return $ TyGraph a :*: TyGraph a :->: TyGraph a
+
     ----------------------------------------
     -- Container primitives
 

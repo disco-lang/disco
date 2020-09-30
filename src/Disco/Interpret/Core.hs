@@ -90,6 +90,8 @@ import           Math.OEIS                               (catalogNums,
                                                           extendSequence,
                                                           lookupSequence)
 
+import           Algebra.Graph                           (Graph(Empty,Vertex,Overlay,Connect))
+
 ------------------------------------------------------------
 -- Evaluation
 ------------------------------------------------------------
@@ -857,6 +859,13 @@ whnfOp OEnum           = arity1 "enum"     $ enumOp
 whnfOp OCount          = arity1 "count"    $ countOp
 
 --------------------------------------------------
+-- Graphs
+
+whnfOp OVertex         = arity1 "graphVertex" $ graphVertex
+whnfOp OOverlay        = arity2 "graphOverlay" $ graphOverlay
+whnfOp OConnect        = arity2 "graphConnect" $ graphConnect
+
+--------------------------------------------------
 -- Comparison
 whnfOp (OEq ty)        = arity2 "eqOp"     $ eqOp ty
 whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
@@ -1601,3 +1610,22 @@ toHaskellList xs = map fromVNum xs
                    where
                       fromVNum (VNum _ x) = fromIntegral $ numerator x
                       fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
+
+
+
+
+graphVertex :: Value -> Disco IErr Value
+graphVertex v = return $ VGraph $ Vertex v
+
+graphOverlay :: Value -> Value -> Disco IErr Value
+graphOverlay g h = do
+    VGraph g' <- rnfV g
+    VGraph h' <- rnfV h
+    return $ VGraph $ Overlay g' h'
+
+graphConnect :: Value -> Value -> Disco IErr Value
+graphConnect g h = do
+    VGraph g' <- rnfV g
+    VGraph h' <- rnfV h
+    return $ VGraph $ Connect g' h'
+

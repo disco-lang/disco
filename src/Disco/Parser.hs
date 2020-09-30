@@ -290,7 +290,7 @@ reservedWords =
   , "enumerate", "count", "divides"
   , "Void", "Unit", "Bool", "Boolean", "B", "Proposition", "Prop", "Char", "C"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
-  , "List", "Bag", "Set"
+  , "List", "Bag", "Set", "Graph"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "∀", "forall", "∃", "exists", "type"
   , "import", "using"

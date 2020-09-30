@@ -159,6 +159,10 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
+        | OVertex         -- ^ Construct a vertex with given value
+        | OOverlay        -- ^ Graph overlay
+        | OConnect        -- ^ Graph connect
+
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@

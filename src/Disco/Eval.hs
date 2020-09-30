@@ -100,6 +100,7 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
+import           Algebra.Graph                           (Graph)
 import           System.Console.Haskeline.MonadException
 
 import           Disco.AST.Core
@@ -180,6 +181,9 @@ data Value where
   --   also used to represent sets (with the invariant that all counts
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
+
+  -- | 
+  VGraph :: Graph Value -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in

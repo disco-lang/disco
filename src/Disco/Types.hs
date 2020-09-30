@@ -35,7 +35,7 @@ module Disco.Types
        -- ** Type constructors
 
        , Con(..)
-       , pattern CList, pattern CBag, pattern CSet
+       , pattern CList, pattern CBag, pattern CSet, pattern CGraph
 
        -- ** Types
 
@@ -59,6 +59,7 @@ module Disco.Types
        , pattern TyList
        , pattern TyBag
        , pattern TySet
+       , pattern TyGraph
        , pattern TyContainer
        , pattern TyUser
        , pattern TyString
@@ -162,6 +163,8 @@ data BaseTy where
 
   -- | List container type.
   CtrList :: BaseTy
+
+  CtrGraph :: BaseTy
 
   deriving (Show, Eq, Ord, Generic)
 
@@ -336,7 +339,10 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CUser #-}
+pattern CGraph :: Con
+pattern CGraph = CContainer (ABase CtrGraph)
+
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CUser #-}
 
 ----------------------------------------
 -- Types
@@ -424,6 +430,7 @@ pattern TyQ = TyAtom (ABase Q)
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
 
+
 -- pattern TyFin :: Integer -> Type
 -- pattern TyFin n = TyAtom (ABase (Fin n))
 
@@ -454,6 +461,9 @@ pattern TySet elTy = TyCon CSet [elTy]
 pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
+pattern TyGraph :: Type -> Type
+pattern TyGraph elTy = TyCon (CGraph) [elTy]
+
 -- | An application of a user-defined type.
 pattern TyUser :: String -> [Type] -> Type
 pattern TyUser nm args = TyCon (CUser nm) args
@@ -463,7 +473,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
-      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
+      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyGraph, TyUser #-}
 
 -- | Is this a type variable?
 isTyVar :: Type -> Bool
@@ -550,6 +560,13 @@ countType (TyBag ty)
   | isEmptyTy ty        = Just 1
   | otherwise           = Nothing
 countType (TySet ty)    = (2^) <$> countType ty
+--as far as I can tell the number of graphs constructable with a label type that counts to t
+--is the sum from n=0 to t of (t choose n)*(4^(n*(n-1)/2))
+--(t choose n) is the number of ways we can choose n distinct labels
+--(4^(n*(n-1)/2)) represents deciding for each pair of nodes whether there is an edge pointing a->b, b->a, both, or neither
+--this function diverges ridiculously quickly though, so until further revision this is omitted
+--countType (TyGraph ty)  = Nothing
+
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing

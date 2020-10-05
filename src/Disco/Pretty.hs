@@ -544,10 +544,10 @@ prettyDecimal r = printedDecimal
          (pre, rep) = splitAt len expan
          first102   = take 102 expan
 
-prettyGraph :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
-prettyGraph out ty val = out "Graph <" >> go val
-    where 
-      go (VGraph g) = 
+--prettyGraph :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+--prettyGraph out ty val = out "Graph <" >> go val
+--    where 
+--      go (VGraph g) = 
 
 
 -- Given a list, find the indices of the list giving the first and

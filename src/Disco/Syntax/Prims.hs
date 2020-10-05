@@ -53,6 +53,7 @@ data Prim where
   PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
   PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
 
+  PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
   PrimVertex  :: Prim      -- ^ Construct a graph Vertex
   PrimOverlay :: Prim      -- ^ Overlay two Graphs
   PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
@@ -128,6 +129,7 @@ primTable =
   , PrimInfo PrimB2C       "bagCounts" True
   , PrimInfo PrimC2B       "bagFromCounts" True
 
+  , PrimInfo PrimSummary   "summary"  True
   , PrimInfo PrimVertex    "vertex"  True
   , PrimInfo PrimOverlay   "overlay" True
   , PrimInfo PrimConnect   "connect" True

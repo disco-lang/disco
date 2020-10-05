@@ -516,6 +516,9 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QCmp a
       return $ TyContainer c (a :*: TyN) :->: TyBag a
 
+    inferPrim PrimSummary = do
+      a <- freshTy
+      return $ TyGraph a :->: TyList (a :*: TyList a)
 
     inferPrim PrimVertex = do
       a <- freshTy

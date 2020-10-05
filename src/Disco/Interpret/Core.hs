@@ -53,7 +53,7 @@ module Disco.Interpret.Core
 
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (filterM, (>=>))
+import           Control.Monad                           (filterM, (>=>), join)
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
 import           Data.Bifunctor                          (first, second)
@@ -90,7 +90,9 @@ import           Math.OEIS                               (catalogNums,
                                                           extendSequence,
                                                           lookupSequence)
 
-import           Algebra.Graph                           (Graph(Empty,Vertex,Overlay,Connect))
+import           Algebra.Graph                           (Graph(Empty,Vertex,Overlay,Connect),foldg)
+import qualified Algebra.Graph.AdjacencyMap              as AdjMap
+
 
 ------------------------------------------------------------
 -- Evaluation
@@ -861,7 +863,8 @@ whnfOp OCount          = arity1 "count"    $ countOp
 --------------------------------------------------
 -- Graphs
 
-whnfOp OVertex         = arity1 "graphVertex" $ graphVertex
+whnfOp OSummary        = arity1 "graphSummary" $ graphSummary 
+whnfOp OVertex         = arity1 "graphVertex"  $ graphVertex
 whnfOp OOverlay        = arity2 "graphOverlay" $ graphOverlay
 whnfOp OConnect        = arity2 "graphConnect" $ graphConnect
 
@@ -1613,19 +1616,41 @@ toHaskellList xs = map fromVNum xs
 
 
 
+-- | Unsafely extract the numeric value of a @Value@
+--   (assumed to be a VNum).
+valToRat :: Value -> Rational
+valToRat (VNum _ r) = r
+valToRat _          = error "valToRat: value isn't a number"
 
+ratToVal :: Rational -> Value
+ratToVal r = (VNum mempty r)
+
+temp :: [(Rational,[Rational])] -> [Disco IErr Value]
+temp = map (\(v,edges) -> toDiscoList (map ratToVal edges) >>= (\edj -> pure $ VCons 0 [ratToVal v, edj]))
+
+toDiscoAdjList :: [(Rational, [Rational])] -> Disco IErr (Disco IErr Value)
+toDiscoAdjList = (fmap toDiscoList) . sequence . temp
+
+graphSummary :: Value -> Disco IErr Value
+graphSummary g = do
+    VGraph g' <- whnfV g
+    let g'' = fmap valToRat g'
+    let adj = AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect g''
+    --adj is of type [(v , [v])]
+    join $ toDiscoAdjList adj
+  
 graphVertex :: Value -> Disco IErr Value
 graphVertex v = return $ VGraph $ Vertex v
 
 graphOverlay :: Value -> Value -> Disco IErr Value
 graphOverlay g h = do
-    VGraph g' <- rnfV g
-    VGraph h' <- rnfV h
+    VGraph g' <- whnfV g
+    VGraph h' <- whnfV h
     return $ VGraph $ Overlay g' h'
 
 graphConnect :: Value -> Value -> Disco IErr Value
 graphConnect g h = do
-    VGraph g' <- rnfV g
-    VGraph h' <- rnfV h
+    VGraph g' <- whnfV g
+    VGraph h' <- whnfV h
     return $ VGraph $ Connect g' h'
 

@@ -892,7 +892,7 @@ typecheck Infer (TAbs q lam)    = do
         return $ ATAbs q TyProp (bind typedPats at)
   where
     getAscrOrFresh :: Pattern -> TCM Type
-    getAscrOrFresh (PAscr _ ty) = pure ty
+    getAscrOrFresh (PAscr _ ty) = checkTypeValid ty >> pure ty
     getAscrOrFresh _            = freshTy
 
     -- mkFunTy [ty1, ..., tyn] out = ty1 -> (ty2 -> ... (tyn -> out))

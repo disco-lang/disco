@@ -195,7 +195,8 @@ qualRulesMap = M.fromList
     [ QCmp ==> [Just QCmp]
     ]
   , CGraph ==> M.fromList
-    [ QCmp ==> [Just QCmp]
+    [ QCmp ==> [Just QCmp],
+      QNum ==> [Nothing]
     ]
   ]
   where

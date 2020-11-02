@@ -39,7 +39,7 @@ import           Disco.Types
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -163,6 +163,10 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OVertex         -- ^ Construct a vertex with given value
         | OOverlay        -- ^ Graph overlay
         | OConnect        -- ^ Graph connect
+
+        | OEmpty          -- ^ Map empty
+        | OInsert         -- ^ Map insert
+        | OQuery          -- ^ Map query
 
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@

@@ -35,7 +35,7 @@ module Disco.Types
        -- ** Type constructors
 
        , Con(..)
-       , pattern CList, pattern CBag, pattern CSet, pattern CGraph
+       , pattern CList, pattern CBag, pattern CSet, pattern CGraph, pattern CMap
 
        -- ** Types
 
@@ -60,6 +60,7 @@ module Disco.Types
        , pattern TyBag
        , pattern TySet
        , pattern TyGraph
+       , pattern TyMap
        , pattern TyContainer
        , pattern TyUser
        , pattern TyString
@@ -164,7 +165,11 @@ data BaseTy where
   -- | List container type.
   CtrList :: BaseTy
 
+  -- | Graph container type.
   CtrGraph :: BaseTy
+
+  -- | Map container type.
+  CtrMap :: BaseTy
 
   deriving (Show, Eq, Ord, Generic)
 
@@ -339,10 +344,17 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
+-- | 'CGraph' is provided for convenience; it represents a graph type
+--   constructor (/i.e./ @Graph a@).
 pattern CGraph :: Con
 pattern CGraph = CContainer (ABase CtrGraph)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CUser #-}
+-- | 'CMap' is provided for convenience; it represents a map type
+--   constructor (/i.e./ @Map a@).
+pattern CMap :: Con
+pattern CMap = CContainer (ABase CtrMap)
+
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CMap, CUser #-}
 
 ----------------------------------------
 -- Types
@@ -464,6 +476,9 @@ pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 pattern TyGraph :: Type -> Type
 pattern TyGraph elTy = TyCon (CGraph) [elTy]
 
+pattern TyMap :: Type -> Type -> Type
+pattern TyMap tyKey tyValue = TyCon (CMap) [tyKey, tyValue]
+
 -- | An application of a user-defined type.
 pattern TyUser :: String -> [Type] -> Type
 pattern TyUser nm args = TyCon (CUser nm) args
@@ -566,7 +581,7 @@ countType (TySet ty)    = (2^) <$> countType ty
 --(4^(n*(n-1)/2)) represents deciding for each pair of nodes whether there is an edge pointing a->b, b->a, both, or neither
 --this function diverges ridiculously quickly though, so until further revision this is omitted
 --countType (TyGraph ty)  = Nothing
-
+countType (TyMap tyKey tyValue) = (\a b -> a ^ (b+1)) <$> countType tyKey <*> countType tyValue 
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing

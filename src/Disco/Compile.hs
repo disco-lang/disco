@@ -188,6 +188,10 @@ compilePrim ty PrimVertex  = return $ CConst OVertex
 compilePrim ty PrimOverlay = return $ CConst OOverlay
 compilePrim ty PrimConnect = return $ CConst OConnect
 
+compilePrim ty PrimEmpty  = return $ CConst OEmpty
+compilePrim ty PrimInsert = return $ CConst OInsert
+compilePrim ty PrimQuery  = return $ CConst OQuery
+
 compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
 compilePrim (_ :*: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
@@ -314,6 +318,19 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 --       , Exp     ==> OMExp
 --       , Divides ==> OMDivides
 --       ]
+
+
+--Graph operations are separate, but use same syntax, as traditional addition and multiplication
+compileBOp (TyGraph _) (TyGraph _) (TyGraph _) op
+  | op `elem` [Add, Mul]
+  = CConst (regularOps ! op)
+  where
+    regularOps = M.fromList
+      [ Add     ==> OOverlay
+      , Mul     ==> OConnect
+      ]
+
+  
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

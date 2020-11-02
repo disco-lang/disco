@@ -27,6 +27,7 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
+       , AtomicValue(..)
 
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
@@ -182,14 +183,29 @@ data Value where
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
 
-  -- | 
+  -- | A Graph in the algebraic repesentation
   VGraph :: Graph Value -> Value
+
+  -- | A map from keys to values. Differs from functions because we can
+  --   actually construct the set of entries, while functions only have this
+  --   property when the key type is finite.
+  VMap :: M.Map AtomicValue AtomicValue -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
   VType :: Type -> Value
   deriving Show
+
+-- | Values which can be used as keys in a map.
+data AtomicValue where
+  AVNum   :: RationalDisplay -> Rational -> AtomicValue
+  AVCons  :: Int -> [AtomicValue] -> AtomicValue
+  --AVConst :: Op -> AtomicValue
+  AVMap   :: M.Map AtomicValue AtomicValue -> AtomicValue
+  AVBag   :: [(AtomicValue, Integer)] -> AtomicValue
+  AVType  :: Type -> AtomicValue
+  deriving (Show, Eq, Ord)
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
@@ -741,7 +757,7 @@ loadDiscoModule' resolver inProcess modName  = do
              >>= maybe (throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
-
+      
       -- mis only contains the module info from direct imports.
       mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis

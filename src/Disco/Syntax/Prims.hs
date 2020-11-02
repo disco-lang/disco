@@ -58,6 +58,10 @@ data Prim where
   PrimOverlay :: Prim      -- ^ Overlay two Graphs
   PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
 
+  PrimEmpty   :: Prim      -- ^ Empty Map
+  PrimInsert  :: Prim      -- ^ Insert into map
+  PrimQuery   :: Prim      -- ^ Get value associated with key in map
+
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
   PrimFilter  :: Prim      -- ^ Filter operation for containers
@@ -129,10 +133,14 @@ primTable =
   , PrimInfo PrimB2C       "bagCounts" True
   , PrimInfo PrimC2B       "bagFromCounts" True
 
-  , PrimInfo PrimSummary   "summary"  True
+  , PrimInfo PrimSummary   "summary" True
   , PrimInfo PrimVertex    "vertex"  True
   , PrimInfo PrimOverlay   "overlay" True
   , PrimInfo PrimConnect   "connect" True
+
+  , PrimInfo PrimEmpty     "empty"   True
+  , PrimInfo PrimInsert    "insert"  True
+  , PrimInfo PrimQuery     "query"   True
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True

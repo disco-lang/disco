@@ -48,12 +48,15 @@ module Disco.Interpret.Core
        , toDiscoList
        , vfoldr, vappend, vconcat, vmap
 
+         -- * Converting graphs to manipulable Haskell objects
+       , graphSummary
+
        )
        where
 
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (filterM, (>=>), join)
+import           Control.Monad                           (liftM, filterM, (>=>), join)
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
 import           Data.Bifunctor                          (first, second)
@@ -404,6 +407,29 @@ noMatch = return Nothing
 
 --------------------------------------------------
 -- Utilities
+
+atomize :: Value -> Disco IErr AtomicValue
+atomize v = do
+    v' <- whnfV v
+    case v'     of 
+        VNum d n -> return $ AVNum d n
+        VCons a xs -> do
+            xs' <- mapM atomize xs
+            return $ AVCons a xs'
+        VMap m -> return $ AVMap m
+        VBag bs -> do
+            bs' <- mapM (\(a,b) -> liftM (\a' -> (a' , b)) $ atomize a) bs 
+            return $ AVBag bs' 
+        VType t -> return $ AVType t
+        _ -> error $ "A nonn-atomic value was passed as atomic"
+
+deatomize :: AtomicValue -> Value
+deatomize (AVNum d n) = VNum d n
+deatomize (AVCons a xs) = VCons a $ map deatomize xs
+deatomize (AVMap m) = VMap m
+deatomize (AVBag bs) = VBag $ map (first deatomize)  bs  
+deatomize (AVType t) = VType t
+
 
 -- | Convert a Haskell list of Values into a Value representing a
 --   disco list.
@@ -867,6 +893,13 @@ whnfOp OSummary        = arity1 "graphSummary" $ graphSummary
 whnfOp OVertex         = arity1 "graphVertex"  $ graphVertex
 whnfOp OOverlay        = arity2 "graphOverlay" $ graphOverlay
 whnfOp OConnect        = arity2 "graphConnect" $ graphConnect
+
+--------------------------------------------------
+-- Maps
+
+whnfOp OEmpty          = const (return $ VMap $ M.empty)
+whnfOp OInsert         = arity3 "mapInsert" $ mapInsert 
+whnfOp OQuery          = arity2 "mapQuery"  $ mapQuery
 
 --------------------------------------------------
 -- Comparison
@@ -1626,19 +1659,21 @@ ratToVal :: Rational -> Value
 ratToVal r = (VNum mempty r)
 
 temp :: [(Rational,[Rational])] -> [Disco IErr Value]
-temp = map (\(v,edges) -> toDiscoList (map ratToVal edges) >>= (\edj -> pure $ VCons 0 [ratToVal v, edj]))
+temp = map (\(v,edges) -> do 
+            set <- valuesToSet TyQ $ map ratToVal edges
+            whs <- rnfV set
+            pure $ VCons 0 [ratToVal v, whs])
 
-toDiscoAdjList :: [(Rational, [Rational])] -> Disco IErr (Disco IErr Value)
-toDiscoAdjList = (fmap toDiscoList) . sequence . temp
+toDiscoAdjSet :: [(Rational, [Rational])] -> Disco IErr Value
+toDiscoAdjSet  = (>>= valuesToSet (TyQ :*: TySet TyQ)) . (sequence . temp)
+
+reifyGraph :: Value -> [(Rational, [Rational])]
+reifyGraph (VGraph g) =
+    AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect $ fmap valToRat g
 
 graphSummary :: Value -> Disco IErr Value
-graphSummary g = do
-    VGraph g' <- whnfV g
-    let g'' = fmap valToRat g'
-    let adj = AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect g''
-    --adj is of type [(v , [v])]
-    join $ toDiscoAdjList adj
-  
+graphSummary v = rnfV v >>= (toDiscoAdjSet . reifyGraph)
+
 graphVertex :: Value -> Disco IErr Value
 graphVertex v = return $ VGraph $ Vertex v
 
@@ -1654,3 +1689,20 @@ graphConnect g h = do
     VGraph h' <- whnfV h
     return $ VGraph $ Connect g' h'
 
+
+mapInsert :: Value -> Value -> Value -> Disco IErr Value
+mapInsert m k v = do
+    VMap m' <- whnfV m
+    k' <- atomize k
+    v' <- atomize v
+    return $ VMap $ M.insert k' v' m'
+
+mapQuery :: Value -> Value -> Disco IErr Value
+mapQuery m k = do
+    VMap m' <- whnfV m
+    k' <- atomize k
+    case M.lookup k' m' of
+        Just v' -> return $  VCons 1 [deatomize v']
+        otherwise -> return $ leftUnit
+    where 
+    leftUnit = VCons 0 [VCons 0 []]

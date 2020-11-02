@@ -518,7 +518,7 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimSummary = do
       a <- freshTy
-      return $ TyGraph a :->: TyList (a :*: TyList a)
+      return $ TyGraph a :->: TySet (a :*: TySet a)
 
     inferPrim PrimVertex = do
       a <- freshTy
@@ -528,11 +528,24 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
-
     inferPrim PrimConnect = do
       a <- freshTy
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
+    inferPrim PrimEmpty = do
+      a <- freshTy
+      b <- freshTy
+      return $ TyMap a b
+
+    inferPrim PrimInsert = do
+      a <- freshTy
+      b <- freshTy
+      return $ TyMap a b :*: a :*: b :->: TyMap a b
+
+    inferPrim PrimQuery = do
+      a <- freshTy
+      b <- freshTy
+      return $ TyMap a b :*: a :->: (TyUnit :+: b)
     ----------------------------------------
     -- Container primitives
 

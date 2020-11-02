@@ -37,7 +37,7 @@ import           Disco.AST.Surface
 import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
-import           Disco.Interpret.Core             (whnfV)
+import           Disco.Interpret.Core             (whnfV, graphSummary)
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -162,6 +162,8 @@ prettyTy (TyUser name args) = mparens (PA 9 InR) $
 prettyTy (TySkolem n)     = text "%" <> prettyName n
 prettyTy (TyGraph ty)     = mparens (PA 9 InR) $
   text "Graph" <+> prettyTy' 9 InR ty
+prettyTy (TyMap k v)      =  mparens (PA 9 InR) $
+  hsep ([text "Map", prettyTy' 9 InR k, prettyTy' 9 InR v])
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -449,7 +451,8 @@ prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
-prettyWHNF out (TyGraph a) (VGraph g) = out $ "TEST" ++ show g
+prettyWHNF out (TyGraph a) (VGraph g) = prettyWHNF out (TySet (a :*: TySet a)) =<< graphSummary (VGraph g)
+prettyWHNF out (TyMap k v) (VMap m) = out $ show "Some map"
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty

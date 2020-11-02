@@ -201,6 +201,8 @@ whnfV (VIndir loc)     = whnfIndir loc
 -- memory cells can be updated with their result.
 whnfV (VCons i vs)     = VCons i <$> mapM mkSimple vs
 
+whnfV (VConst OEmpty)  = return $ VMap M.empty
+
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
 whnfV v                = return v
@@ -241,8 +243,9 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage
       -- if the program already typechecked.
 
--- Function constants don't reduce in and of themselves.
-whnf (CConst x)     = return $ VConst x
+-- Function constants don't reduce in and of themselves. Map's empty constructor is an exception because it has arity 0
+whnf (CConst OEmpty) = return $ VMap $ M.empty
+whnf (CConst x)      = return $ VConst x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.

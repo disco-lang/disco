@@ -936,10 +936,11 @@ parseAtomicType = label "type" $
 
 parseCon :: Parser Con
 parseCon =
-      CList <$  reserved "List"
-  <|> CBag  <$  reserved "Bag"
-  <|> CSet  <$  reserved "Set"
-  <|> CUser <$> parseTyDef
+      CList  <$  reserved "List"
+  <|> CBag   <$  reserved "Bag"
+  <|> CSet   <$  reserved "Set"
+  <|> CGraph <$  reserved "Graph"
+  <|> CUser  <$> parseTyDef
 
 parseTyDef :: Parser String
 parseTyDef =  identifier upperChar

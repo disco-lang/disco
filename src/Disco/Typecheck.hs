@@ -524,6 +524,10 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       return $ a :->: TyGraph a
 
+    inferPrim PrimGEmpty = do
+      a <- freshTy
+      return $ TyGraph a
+
     inferPrim PrimOverlay = do
       a <- freshTy
       return $ TyGraph a :*: TyGraph a :->: TyGraph a

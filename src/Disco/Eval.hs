@@ -189,7 +189,7 @@ data Value where
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
-  VMap :: M.Map AtomicValue AtomicValue -> Value
+  VMap :: M.Map AtomicValue Value -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in

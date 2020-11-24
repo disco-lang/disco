@@ -474,10 +474,10 @@ pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
 pattern TyGraph :: Type -> Type
-pattern TyGraph elTy = TyCon (CGraph) [elTy]
+pattern TyGraph elTy = TyCon CGraph [elTy]
 
 pattern TyMap :: Type -> Type -> Type
-pattern TyMap tyKey tyValue = TyCon (CMap) [tyKey, tyValue]
+pattern TyMap tyKey tyValue = TyCon CMap [tyKey, tyValue]
 
 -- | An application of a user-defined type.
 pattern TyUser :: String -> [Type] -> Type
@@ -581,7 +581,7 @@ countType (TySet ty)    = (2^) <$> countType ty
 --(4^(n*(n-1)/2)) represents deciding for each pair of nodes whether there is an edge pointing a->b, b->a, both, or neither
 --this function diverges ridiculously quickly though, so until further revision this is omitted
 --countType (TyGraph ty)  = Nothing
-countType (TyMap tyKey tyValue) = (\a b -> a ^ (b+1)) <$> countType tyKey <*> countType tyValue 
+countType (TyMap tyKey tyValue) = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue 
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing

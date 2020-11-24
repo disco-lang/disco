@@ -169,6 +169,9 @@ rnfV v@(VThunk {}) = whnfV v >>= rnfV
 rnfV v@(VDelay {}) = whnfV v >>= rnfV
 rnfV v@(VIndir {}) = whnfV v >>= rnfV
 
+rnfV (VConst OGEmpty) = return $ VGraph $ Empty
+rnfV (VConst OEmpty)  = return $ VMap $ M.empty
+
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
 rnfV v             = return v
@@ -201,7 +204,9 @@ whnfV (VIndir loc)     = whnfIndir loc
 -- memory cells can be updated with their result.
 whnfV (VCons i vs)     = VCons i <$> mapM mkSimple vs
 
+-- Arity 0 functions can be boiled down to their core values
 whnfV (VConst OEmpty)  = return $ VMap M.empty
+whnfV (VConst OGEmpty) = return $ VGraph $ Empty
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
@@ -243,9 +248,10 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage
       -- if the program already typechecked.
 
--- Function constants don't reduce in and of themselves. Map's empty constructor is an exception because it has arity 0
-whnf (CConst OEmpty) = return $ VMap $ M.empty
-whnf (CConst x)      = return $ VConst x
+-- Function constants don't reduce in and of themselves. Map & Graph's empty constructors are exceptions because they have arity 0
+whnf (CConst OGEmpty) = return $ VGraph $ Empty
+whnf (CConst OEmpty)  = return $ VMap $ M.empty
+whnf (CConst x)       = return $ VConst x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
@@ -419,7 +425,7 @@ atomize v = do
         VCons a xs -> do
             xs' <- mapM atomize xs
             return $ AVCons a xs'
-        VMap m -> return $ AVMap m
+        --VMap m -> return $ AVMap m
         VBag bs -> do
             bs' <- mapM (\(a,b) -> liftM (\a' -> (a' , b)) $ atomize a) bs 
             return $ AVBag bs' 
@@ -429,7 +435,7 @@ atomize v = do
 deatomize :: AtomicValue -> Value
 deatomize (AVNum d n) = VNum d n
 deatomize (AVCons a xs) = VCons a $ map deatomize xs
-deatomize (AVMap m) = VMap m
+--deatomize (AVMap m) = VMap m
 deatomize (AVBag bs) = VBag $ map (first deatomize)  bs  
 deatomize (AVType t) = VType t
 
@@ -892,7 +898,8 @@ whnfOp OCount          = arity1 "count"    $ countOp
 --------------------------------------------------
 -- Graphs
 
-whnfOp OSummary        = arity1 "graphSummary" $ graphSummary 
+whnfOp OSummary        = arity1 "graphSummary" $ graphSummary
+whnfOp OGEmpty         = const (return $ VGraph $ Empty) 
 whnfOp OVertex         = arity1 "graphVertex"  $ graphVertex
 whnfOp OOverlay        = arity2 "graphOverlay" $ graphOverlay
 whnfOp OConnect        = arity2 "graphConnect" $ graphConnect
@@ -1661,14 +1668,14 @@ valToRat _          = error "valToRat: value isn't a number"
 ratToVal :: Rational -> Value
 ratToVal r = (VNum mempty r)
 
-temp :: [(Rational,[Rational])] -> [Disco IErr Value]
-temp = map (\(v,edges) -> do 
+toDiscoAdjList :: [(Rational,[Rational])] -> Disco IErr [Value]
+toDiscoAdjList = sequence . map (\(v,edges) -> do 
             set <- valuesToSet TyQ $ map ratToVal edges
             whs <- rnfV set
             pure $ VCons 0 [ratToVal v, whs])
 
 toDiscoAdjSet :: [(Rational, [Rational])] -> Disco IErr Value
-toDiscoAdjSet  = (>>= valuesToSet (TyQ :*: TySet TyQ)) . (sequence . temp)
+toDiscoAdjSet  = (>>= valuesToSet (TyQ :*: TySet TyQ)) . toDiscoAdjList
 
 reifyGraph :: Value -> [(Rational, [Rational])]
 reifyGraph (VGraph g) =
@@ -1697,15 +1704,15 @@ mapInsert :: Value -> Value -> Value -> Disco IErr Value
 mapInsert m k v = do
     VMap m' <- whnfV m
     k' <- atomize k
-    v' <- atomize v
-    return $ VMap $ M.insert k' v' m'
+    --v' <- atomize v
+    return $ VMap $ M.insert k' v m'
 
 mapQuery :: Value -> Value -> Disco IErr Value
 mapQuery m k = do
     VMap m' <- whnfV m
     k' <- atomize k
     case M.lookup k' m' of
-        Just v' -> return $  VCons 1 [deatomize v']
+        Just v' -> return $  VCons 1 [v'] -- [deatomize v']
         otherwise -> return $ leftUnit
     where 
     leftUnit = VCons 0 [VCons 0 []]

@@ -185,6 +185,7 @@ compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
 compilePrim ty PrimSummary = return $ CConst OSummary
 compilePrim ty PrimVertex  = return $ CConst OVertex
+compilePrim ty PrimGEmpty  = return $ CConst OGEmpty
 compilePrim ty PrimOverlay = return $ CConst OOverlay
 compilePrim ty PrimConnect = return $ CConst OConnect
 

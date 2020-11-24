@@ -55,6 +55,7 @@ data Prim where
 
   PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
   PrimVertex  :: Prim      -- ^ Construct a graph Vertex
+  PrimGEmpty  :: Prim      -- ^ Empty graph
   PrimOverlay :: Prim      -- ^ Overlay two Graphs
   PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
 
@@ -135,6 +136,7 @@ primTable =
 
   , PrimInfo PrimSummary   "summary" True
   , PrimInfo PrimVertex    "vertex"  True
+  , PrimInfo PrimGEmpty    "emptygraph" True
   , PrimInfo PrimOverlay   "overlay" True
   , PrimInfo PrimConnect   "connect" True
 

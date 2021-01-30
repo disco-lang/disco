@@ -31,7 +31,7 @@ module Disco.Interpret.Core
        , whnf, whnfV
 
          -- * Container utilities
-       , valuesToBag, valuesToSet
+       , valuesToBag, valuesToSet, mapToSet
 
          -- * Property testing
        , testProperty
@@ -420,17 +420,17 @@ noMatch = return Nothing
 atomize :: Value -> Disco IErr AtomicValue
 atomize v = do
     v' <- whnfV v
-    case v'     of 
+    case v' of 
         VNum d n -> return $ AVNum d n
         VCons a xs -> do
             xs' <- mapM atomize xs
             return $ AVCons a xs'
         --VMap m -> return $ AVMap m
         VBag bs -> do
-            bs' <- mapM (\(a,b) -> liftM (\a' -> (a' , b)) $ atomize a) bs 
+            bs' <- mapM (\(a,b) -> liftM (,b) $ atomize a) bs 
             return $ AVBag bs' 
         VType t -> return $ AVType t
-        _ -> error $ "A nonn-atomic value was passed as atomic"
+        _ -> error $ "A non-atomic value was passed as atomic"
 
 deatomize :: AtomicValue -> Value
 deatomize (AVNum d n) = VNum d n
@@ -591,6 +591,12 @@ valuesToBag ty = fmap VBag . countValues ty
 valuesToSet :: Type -> [Value] -> Disco IErr Value
 valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
 
+-- | Convert a list of pairs of values to a map. Note that key values should be atomic
+valuesToMap :: [Value] -> Disco IErr Value
+valuesToMap l = do
+        pairList <- sequence $ map (\(VCons 0 [k,v]) -> (,v) <$> (atomize k)) l
+        return $ VMap $ M.fromList pairList
+
 -- | Generic function for merging two sorted, count-annotated lists of
 --   type @[(a,Integer)]@ a la merge sort, using the given comparison
 --   function, and using the provided count combining function to
@@ -666,6 +672,12 @@ listToBag :: Type -> Value -> Disco IErr Value
 listToBag ty v = do
   vs <- fromDiscoList v
   VBag <$> countValues ty vs
+
+-- | Convert a map to a set of pairs.
+mapToSet :: Type -> Type -> Value -> Disco IErr Value
+mapToSet tyk tyv (VMap v) = do
+    dl <- toDiscoList $ (map (\(k,v) -> VCons 0 [deatomize k,v])) $ M.toList v
+    listToSet (tyk :*: tyv) dl
 
 -- | Convert a bag to a set of pairs, with each element paired with
 --   its count.
@@ -1674,15 +1686,15 @@ toDiscoAdjList = sequence . map (\(v,edges) -> do
             whs <- rnfV set
             pure $ VCons 0 [ratToVal v, whs])
 
-toDiscoAdjSet :: [(Rational, [Rational])] -> Disco IErr Value
-toDiscoAdjSet  = (>>= valuesToSet (TyQ :*: TySet TyQ)) . toDiscoAdjList
+toDiscoAdjMap :: [(Rational, [Rational])] -> Disco IErr Value
+toDiscoAdjMap  = (>>= valuesToMap) . toDiscoAdjList
 
 reifyGraph :: Value -> [(Rational, [Rational])]
 reifyGraph (VGraph g) =
     AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect $ fmap valToRat g
 
 graphSummary :: Value -> Disco IErr Value
-graphSummary v = rnfV v >>= (toDiscoAdjSet . reifyGraph)
+graphSummary v = rnfV v >>= (toDiscoAdjMap . reifyGraph)
 
 graphVertex :: Value -> Disco IErr Value
 graphVertex v = return $ VGraph $ Vertex v
@@ -1712,7 +1724,7 @@ mapQuery m k = do
     VMap m' <- whnfV m
     k' <- atomize k
     case M.lookup k' m' of
-        Just v' -> return $  VCons 1 [v'] -- [deatomize v']
+        Just v' -> return $ VCons 1 [v'] -- [deatomize v']
         otherwise -> return $ leftUnit
     where 
     leftUnit = VCons 0 [VCons 0 []]

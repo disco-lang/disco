@@ -518,7 +518,7 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimSummary = do
       a <- freshTy
-      return $ TyGraph a :->: TySet (a :*: TySet a)
+      return $ TyGraph a :->: TyMap a (TySet a)
 
     inferPrim PrimVertex = do
       a <- freshTy

@@ -417,28 +417,6 @@ noMatch = return Nothing
 --------------------------------------------------
 -- Utilities
 
-atomize :: Value -> Disco IErr AtomicValue
-atomize v = do
-    v' <- whnfV v
-    case v' of 
-        VNum d n -> return $ AVNum d n
-        VCons a xs -> do
-            xs' <- mapM atomize xs
-            return $ AVCons a xs'
-        --VMap m -> return $ AVMap m
-        VBag bs -> do
-            bs' <- mapM (\(a,b) -> liftM (,b) $ atomize a) bs 
-            return $ AVBag bs' 
-        VType t -> return $ AVType t
-        _ -> error $ "A non-atomic value was passed as atomic"
-
-deatomize :: AtomicValue -> Value
-deatomize (AVNum d n) = VNum d n
-deatomize (AVCons a xs) = VCons a $ map deatomize xs
---deatomize (AVMap m) = VMap m
-deatomize (AVBag bs) = VBag $ map (first deatomize)  bs  
-deatomize (AVType t) = VType t
-
 
 -- | Convert a Haskell list of Values into a Value representing a
 --   disco list.
@@ -910,11 +888,11 @@ whnfOp OCount          = arity1 "count"    $ countOp
 --------------------------------------------------
 -- Graphs
 
-whnfOp OSummary        = arity1 "graphSummary" $ graphSummary
+whnfOp (OSummary ty)   = arity1 "graphSummary"  $ graphSummary ty
 whnfOp OGEmpty         = const (return $ VGraph $ Empty) 
-whnfOp OVertex         = arity1 "graphVertex"  $ graphVertex
-whnfOp OOverlay        = arity2 "graphOverlay" $ graphOverlay
-whnfOp OConnect        = arity2 "graphConnect" $ graphConnect
+whnfOp OVertex         = arity1 "graphVertex"   $ whnfV >=> atomize >=> graphVertex
+whnfOp OOverlay        = arity2 "graphOverlay"  $ graphOverlay
+whnfOp OConnect        = arity2 "graphConnect"  $ graphConnect
 
 --------------------------------------------------
 -- Maps
@@ -1567,6 +1545,12 @@ decideOrdFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagComparison ty xs ys
 
+-- Deciding the ordering for two bags is the same.
+decideOrdFor (TyGraph a) g h = do
+  VGraph g' <- whnfV g
+  VGraph h' <- whnfV h
+  return $ compare g' h'
+
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.
 decideOrdFor _ v1 v2 = primValOrd <$> whnfV v1 <*> whnfV v2
@@ -1680,23 +1664,23 @@ valToRat _          = error "valToRat: value isn't a number"
 ratToVal :: Rational -> Value
 ratToVal r = (VNum mempty r)
 
-toDiscoAdjList :: [(Rational,[Rational])] -> Disco IErr [Value]
-toDiscoAdjList = sequence . map (\(v,edges) -> do 
-            set <- valuesToSet TyQ $ map ratToVal edges
+toDiscoAdjList :: Type -> [(AtomicValue,[AtomicValue])] -> Disco IErr [Value]
+toDiscoAdjList ty = sequence . map (\(v,edges) -> do 
+            set <- valuesToSet ty $ map deatomize edges
             whs <- rnfV set
-            pure $ VCons 0 [ratToVal v, whs])
+            pure $ VCons 0 [deatomize v, whs])
 
-toDiscoAdjMap :: [(Rational, [Rational])] -> Disco IErr Value
-toDiscoAdjMap  = (>>= valuesToMap) . toDiscoAdjList
+toDiscoAdjMap :: Type -> [(AtomicValue, [AtomicValue])] -> Disco IErr Value
+toDiscoAdjMap ty l = valuesToMap =<< toDiscoAdjList ty l 
 
-reifyGraph :: Value -> [(Rational, [Rational])]
+reifyGraph :: Value -> [(AtomicValue, [AtomicValue])]
 reifyGraph (VGraph g) =
-    AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect $ fmap valToRat g
+    AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect g
 
-graphSummary :: Value -> Disco IErr Value
-graphSummary v = rnfV v >>= (toDiscoAdjMap . reifyGraph)
+graphSummary :: Type -> Value -> Disco IErr Value
+graphSummary ty v = rnfV v >>= (toDiscoAdjMap ty . reifyGraph)
 
-graphVertex :: Value -> Disco IErr Value
+graphVertex :: AtomicValue -> Disco IErr Value
 graphVertex v = return $ VGraph $ Vertex v
 
 graphOverlay :: Value -> Value -> Disco IErr Value
@@ -1716,7 +1700,6 @@ mapInsert :: Value -> Value -> Value -> Disco IErr Value
 mapInsert m k v = do
     VMap m' <- whnfV m
     k' <- atomize k
-    --v' <- atomize v
     return $ VMap $ M.insert k' v m'
 
 mapQuery :: Value -> Value -> Disco IErr Value
@@ -1724,7 +1707,7 @@ mapQuery m k = do
     VMap m' <- whnfV m
     k' <- atomize k
     case M.lookup k' m' of
-        Just v' -> return $ VCons 1 [v'] -- [deatomize v']
+        Just v' -> return $ VCons 1 [v']
         otherwise -> return $ leftUnit
     where 
     leftUnit = VCons 0 [VCons 0 []]

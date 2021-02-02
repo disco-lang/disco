@@ -159,7 +159,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
-        | OSummary        -- ^ Adjacency List of given graph
+        | OSummary Type   -- ^ Adjacency List of given graph
         | OGEmpty         -- ^ Graph empty
         | OVertex         -- ^ Construct a vertex with given value
         | OOverlay        -- ^ Graph overlay

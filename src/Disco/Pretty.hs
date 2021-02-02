@@ -451,7 +451,7 @@ prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
-prettyWHNF out (TyGraph a) (VGraph g) = prettyWHNF out (TyMap a (TySet a)) =<< graphSummary (VGraph g)
+prettyWHNF out (TyGraph a) (VGraph g) = prettyWHNF out (TyMap a (TySet a)) =<< graphSummary a (VGraph g)
 prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
 prettyWHNF out (TyGraph a) (VConst OGEmpty) = out $ "[]"
 prettyWHNF out (TyMap k v) (VConst OEmpty)  = out $ show (M.empty :: M.Map AtomicValue AtomicValue)

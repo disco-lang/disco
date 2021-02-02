@@ -183,7 +183,7 @@ compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
 compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
-compilePrim ty PrimSummary = return $ CConst OSummary
+compilePrim ty PrimSummary = return $ CConst (OSummary ty)
 compilePrim ty PrimVertex  = return $ CConst OVertex
 compilePrim ty PrimGEmpty  = return $ CConst OGEmpty
 compilePrim ty PrimOverlay = return $ CConst OOverlay

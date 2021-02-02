@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -27,7 +28,7 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
-       , AtomicValue(..)
+       , AtomicValue(..), atomize, deatomize
 
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
@@ -88,6 +89,7 @@ import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
+import           Data.Bifunctor                          (first, second)
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import           Data.IntSet                             (IntSet)
@@ -101,7 +103,7 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Algebra.Graph                           (Graph)
+import           Algebra.Graph                           (Graph(Vertex, Overlay, Connect, Empty))
 import           System.Console.Haskeline.MonadException
 
 import           Disco.AST.Core
@@ -184,7 +186,7 @@ data Value where
   VBag :: [(Value, Integer)] -> Value
 
   -- | A Graph in the algebraic repesentation
-  VGraph :: Graph Value -> Value
+  VGraph :: Graph AtomicValue -> Value
 
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this
@@ -201,8 +203,7 @@ data Value where
 data AtomicValue where
   AVNum   :: RationalDisplay -> Rational -> AtomicValue
   AVCons  :: Int -> [AtomicValue] -> AtomicValue
-  --AVConst :: Op -> AtomicValue
-  AVMap   :: M.Map AtomicValue AtomicValue -> AtomicValue
+  AVGraph :: Graph AtomicValue -> AtomicValue
   AVBag   :: [(AtomicValue, Integer)] -> AtomicValue
   AVType  :: Type -> AtomicValue
   deriving (Show, Eq, Ord)
@@ -577,6 +578,37 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
     handler e                = iprint e
 
 ------------------------------------------------------------
+-- AtomicValue Utilities
+------------------------------------------------------------
+
+atomizeConstants :: Value -> Value
+atomizeConstants (VConst OGEmpty) = VGraph empty
+atomizeConstants x = x
+
+atomize :: Value -> Disco IErr AtomicValue
+atomize v = do
+    let v' = atomizeConstants v
+    case v' of 
+        VNum d n -> return $ AVNum d n
+        VCons a xs -> do
+            xs' <- mapM atomize xs
+            return $ AVCons a xs'
+        --VMap m -> return $ AVMap m
+        VBag bs -> do
+            bs' <- mapM (\(a,b) -> liftM (,b) $ atomize a) bs 
+            return $ AVBag bs' 
+        VType t -> return $ AVType t
+        VGraph g -> return $ AVGraph g
+        _ -> error $ "A non-atomic value was passed as atomic"
+
+deatomize :: AtomicValue -> Value
+deatomize (AVNum d n) = VNum d n
+deatomize (AVCons a xs) = VCons a $ map deatomize xs
+deatomize (AVBag bs) = VBag $ map (first deatomize) bs  
+deatomize (AVType t) = VType t
+deatomize (AVGraph g) = VGraph g
+
+------------------------------------------------------------
 -- Memory/environment utilities
 ------------------------------------------------------------
 
@@ -673,6 +705,10 @@ reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
 reachable (VProp p)       = reachableProp p
+reachable (VGraph (Vertex x)) = reachable (deatomize x)
+reachable (VGraph (Overlay g h)) = reachable (VGraph g) >> reachable (VGraph h)
+reachable (VGraph (Connect g h)) = reachable (VGraph g) >> reachable (VGraph h)
+reachable (VMap m)        = reachables (M.elems m)
 reachable _               = return ()
 
 -- | Mark the memory locations reachable from a prop.

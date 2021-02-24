@@ -71,6 +71,8 @@ arity CArr           = [Contra, Co]
 arity CPair          = [Co, Co]
 arity CSum           = [Co, Co]
 arity (CContainer _) = [Co]
+arity (CMap)         = [Contra, Co]
+arity (CGraph)       = [Co]
 arity (CUser _)      = error "Impossible! arity CUser"
   -- CUsers should always be replaced by their definitions before arity
   -- is called.

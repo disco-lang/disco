@@ -309,12 +309,13 @@ checkTypeValid (TyCon c tys) = do
 
 conArity :: Con -> TCM Int
 conArity (CContainer _) = return 1
+conArity CGraph = return 1
 conArity (CUser name)    = do
   d <- get
   case M.lookup name d of
     Nothing               -> throwError (NotTyDef name)
     Just (TyDefBody as _) -> return (length as)
-conArity _              = return 2  -- (->, *, +)
+conArity _              = return 2  -- (->, *, +, map)
 
 --------------------------------------------------
 -- Checking modes

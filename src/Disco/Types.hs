@@ -35,7 +35,7 @@ module Disco.Types
        -- ** Type constructors
 
        , Con(..)
-       , pattern CList, pattern CBag, pattern CSet, pattern CGraph, pattern CMap
+       , pattern CList, pattern CBag, pattern CSet
 
        -- ** Types
 
@@ -322,6 +322,13 @@ data Con where
   --   See also 'CList', 'CBag', and 'CSet'.
   CContainer :: Atom -> Con
 
+
+  -- | Key value maps, Map k v
+  CMap :: Con
+
+  -- | Graph constructor, Graph a
+  CGraph :: Con
+
   -- | The name of a user defined algebraic datatype.
   CUser :: String -> Con
 
@@ -343,16 +350,6 @@ pattern CBag = CContainer (ABase CtrBag)
 --   constructor (/i.e./ @Set a@).
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
-
--- | 'CGraph' is provided for convenience; it represents a graph type
---   constructor (/i.e./ @Graph a@).
-pattern CGraph :: Con
-pattern CGraph = CContainer (ABase CtrGraph)
-
--- | 'CMap' is provided for convenience; it represents a map type
---   constructor (/i.e./ @Map a@).
-pattern CMap :: Con
-pattern CMap = CContainer (ABase CtrMap)
 
 {-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CMap, CUser #-}
 

@@ -585,6 +585,7 @@ atomizeConstants :: Value -> Value
 atomizeConstants (VConst OGEmpty) = VGraph empty
 atomizeConstants x = x
 
+-- Invariant: the thing being applied is in WHNF.
 atomize :: Value -> Disco IErr AtomicValue
 atomize v = do
     let v' = atomizeConstants v
@@ -599,7 +600,7 @@ atomize v = do
             return $ AVBag bs' 
         VType t -> return $ AVType t
         VGraph g -> return $ AVGraph g
-        _ -> error $ "A non-atomic value was passed as atomic"
+        t -> error $ "A non-atomic value was passed as atomic" ++ show t
 
 deatomize :: AtomicValue -> Value
 deatomize (AVNum d n) = VNum d n

@@ -1652,18 +1652,7 @@ toHaskellList xs = map fromVNum xs
                    where
                       fromVNum (VNum _ x) = fromIntegral $ numerator x
                       fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
-
-
-
--- | Unsafely extract the numeric value of a @Value@
---   (assumed to be a VNum).
-valToRat :: Value -> Rational
-valToRat (VNum _ r) = r
-valToRat _          = error "valToRat: value isn't a number"
-
-ratToVal :: Rational -> Value
-ratToVal r = (VNum mempty r)
-
+                      
 toDiscoAdjList :: Type -> [(AtomicValue,[AtomicValue])] -> Disco IErr [Value]
 toDiscoAdjList ty = sequence . map (\(v,edges) -> do 
             set <- valuesToSet ty $ map deatomize edges
@@ -1699,14 +1688,16 @@ graphConnect g h = do
 mapInsert :: Value -> Value -> Value -> Disco IErr Value
 mapInsert m k v = do
     VMap m' <- whnfV m
-    k' <- atomize k
-    return $ VMap $ M.insert k' v m'
+    k' <- whnfV k
+    k'' <- atomize k'
+    return $ VMap $ M.insert k'' v m'
 
 mapQuery :: Value -> Value -> Disco IErr Value
 mapQuery m k = do
     VMap m' <- whnfV m
-    k' <- atomize k
-    case M.lookup k' m' of
+    k' <- whnfV k
+    k'' <- atomize k'
+    case M.lookup k'' m' of
         Just v' -> return $ VCons 1 [v']
         otherwise -> return $ leftUnit
     where 

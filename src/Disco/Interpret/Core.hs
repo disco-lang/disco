@@ -31,7 +31,7 @@ module Disco.Interpret.Core
        , whnf, whnfV
 
          -- * Container utilities
-       , valuesToBag, valuesToSet, mapToSet
+       , valuesToBag, valuesToSet, valuesToMap, mapToSet
 
          -- * Property testing
        , testProperty
@@ -169,7 +169,7 @@ rnfV v@(VThunk {}) = whnfV v >>= rnfV
 rnfV v@(VDelay {}) = whnfV v >>= rnfV
 rnfV v@(VIndir {}) = whnfV v >>= rnfV
 
-rnfV (VConst OGEmpty) = return $ VGraph $ Empty
+rnfV (VConst (OGEmpty ty)) = newGraph ty Empty
 rnfV (VConst OEmpty)  = return $ VMap $ M.empty
 
 -- Otherwise, the value is already in reduced normal form (for
@@ -206,7 +206,7 @@ whnfV (VCons i vs)     = VCons i <$> mapM mkSimple vs
 
 -- Arity 0 functions can be boiled down to their core values
 whnfV (VConst OEmpty)  = return $ VMap M.empty
-whnfV (VConst OGEmpty) = return $ VGraph $ Empty
+whnfV (VConst (OGEmpty ty)) = newGraph ty Empty
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
@@ -249,7 +249,7 @@ whnf (CVar x) = do
       -- if the program already typechecked.
 
 -- Function constants don't reduce in and of themselves. Map & Graph's empty constructors are exceptions because they have arity 0
-whnf (CConst OGEmpty) = return $ VGraph $ Empty
+whnf (CConst (OGEmpty ty)) = newGraph ty Empty
 whnf (CConst OEmpty)  = return $ VMap $ M.empty
 whnf (CConst x)       = return $ VConst x
 
@@ -889,10 +889,10 @@ whnfOp OCount          = arity1 "count"    $ countOp
 -- Graphs
 
 whnfOp (OSummary ty)   = arity1 "graphSummary"  $ graphSummary ty
-whnfOp OGEmpty         = const (return $ VGraph $ Empty) 
-whnfOp OVertex         = arity1 "graphVertex"   $ whnfV >=> atomize >=> graphVertex
-whnfOp OOverlay        = arity2 "graphOverlay"  $ graphOverlay
-whnfOp OConnect        = arity2 "graphConnect"  $ graphConnect
+whnfOp (OGEmpty ty)    = const (newGraph ty Empty) 
+whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> atomize >=> graphVertex ty
+whnfOp (OOverlay ty)   = arity2 "graphOverlay"  $ graphOverlay ty
+whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
 
 --------------------------------------------------
 -- Maps
@@ -1545,10 +1545,10 @@ decideOrdFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagComparison ty xs ys
 
--- Deciding the ordering for two bags is the same.
+-- Deciding the ordering for two graphs is the same.
 decideOrdFor (TyGraph a) g h = do
-  VGraph g' <- whnfV g
-  VGraph h' <- whnfV h
+  VGraph g' _ <- whnfV g
+  VGraph h' _ <- whnfV h
   return $ compare g' h'
 
 -- Otherwise we can compare the values primitively, without looking at
@@ -1652,37 +1652,49 @@ toHaskellList xs = map fromVNum xs
                    where
                       fromVNum (VNum _ x) = fromIntegral $ numerator x
                       fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
-                      
-toDiscoAdjList :: Type -> [(AtomicValue,[AtomicValue])] -> Disco IErr [Value]
-toDiscoAdjList ty = sequence . map (\(v,edges) -> do 
+
+newGraph :: Type -> Graph AtomicValue -> Disco IErr Value
+newGraph a g = do
+  adj <- directlyReduceSummary a g
+  loc <- allocate adj
+  return $ VGraph g $ VIndir loc
+
+toDiscoAdjSet :: Type -> [(AtomicValue,[AtomicValue])] -> Disco IErr [Value]
+toDiscoAdjSet ty = sequence . map (\(v,edges) -> do 
             set <- valuesToSet ty $ map deatomize edges
-            whs <- rnfV set
-            pure $ VCons 0 [deatomize v, whs])
+            pure $ VCons 0 [deatomize v, set])
 
 toDiscoAdjMap :: Type -> [(AtomicValue, [AtomicValue])] -> Disco IErr Value
-toDiscoAdjMap ty l = valuesToMap =<< toDiscoAdjList ty l 
+toDiscoAdjMap ty l = valuesToMap =<< toDiscoAdjSet ty l 
 
-reifyGraph :: Value -> [(AtomicValue, [AtomicValue])]
-reifyGraph (VGraph g) =
-    AdjMap.adjacencyList $ foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect g
+reifyGraph :: Graph AtomicValue -> [(AtomicValue, [AtomicValue])]
+reifyGraph =
+    AdjMap.adjacencyList . foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect
 
+-- Actually calculate the adjacency map, which we will store in the graph instances
+directlyReduceSummary :: Type -> Graph AtomicValue -> Disco IErr Value
+directlyReduceSummary ty = toDiscoAdjMap ty . reifyGraph
+
+-- Lookup the stored adjacency map from the indirection stored in this graph
 graphSummary :: Type -> Value -> Disco IErr Value
-graphSummary ty v = rnfV v >>= (toDiscoAdjMap ty . reifyGraph)
+graphSummary ty g = do
+    VGraph _ adj <- whnfV g
+    whnfV adj
 
-graphVertex :: AtomicValue -> Disco IErr Value
-graphVertex v = return $ VGraph $ Vertex v
+graphVertex :: Type -> AtomicValue -> Disco IErr Value
+graphVertex a v = newGraph a $ Vertex v
 
-graphOverlay :: Value -> Value -> Disco IErr Value
-graphOverlay g h = do
-    VGraph g' <- whnfV g
-    VGraph h' <- whnfV h
-    return $ VGraph $ Overlay g' h'
+graphOverlay :: Type -> Value -> Value -> Disco IErr Value
+graphOverlay a g h = do
+    VGraph g' _ <- whnfV g
+    VGraph h' _ <- whnfV h
+    newGraph a $ Overlay g' h'
 
-graphConnect :: Value -> Value -> Disco IErr Value
-graphConnect g h = do
-    VGraph g' <- whnfV g
-    VGraph h' <- whnfV h
-    return $ VGraph $ Connect g' h'
+graphConnect :: Type -> Value -> Value -> Disco IErr Value
+graphConnect a g h = do
+    VGraph g' _ <- whnfV g
+    VGraph h' _ <- whnfV h
+    newGraph a $ Connect g' h'
 
 
 mapInsert :: Value -> Value -> Value -> Disco IErr Value

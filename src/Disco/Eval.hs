@@ -103,7 +103,8 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Algebra.Graph                           (Graph(Vertex, Overlay, Connect, Empty))
+import           Algebra.Graph                           (Graph(Vertex, Overlay, Connect, Empty), foldg)
+import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 import           System.Console.Haskeline.MonadException
 
 import           Disco.AST.Core
@@ -186,7 +187,7 @@ data Value where
   VBag :: [(Value, Integer)] -> Value
 
   -- | A Graph in the algebraic repesentation
-  VGraph :: Graph AtomicValue -> Value
+  VGraph :: Graph AtomicValue -> Value -> Value
 
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this
@@ -203,7 +204,8 @@ data Value where
 data AtomicValue where
   AVNum   :: RationalDisplay -> Rational -> AtomicValue
   AVCons  :: Int -> [AtomicValue] -> AtomicValue
-  AVGraph :: Graph AtomicValue -> AtomicValue
+  --AVIndir :: Loc -> AtomicValue
+  --AVGraph :: Graph AtomicValue -> AtomicValue -> AtomicValue
   AVBag   :: [(AtomicValue, Integer)] -> AtomicValue
   AVType  :: Type -> AtomicValue
   deriving (Show, Eq, Ord)
@@ -581,25 +583,28 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
 -- AtomicValue Utilities
 ------------------------------------------------------------
 
-atomizeConstants :: Value -> Value
-atomizeConstants (VConst OGEmpty) = VGraph empty
-atomizeConstants x = x
+--atomizeConstants :: Value -> Value
+--atomizeConstants (VConst OGEmpty) = VGraph empty
+--atomizeConstants x = x
 
 -- Invariant: the thing being applied is in WHNF.
 atomize :: Value -> Disco IErr AtomicValue
 atomize v = do
-    let v' = atomizeConstants v
-    case v' of 
+    --let v' = atomizeConstants v
+    case v of 
         VNum d n -> return $ AVNum d n
         VCons a xs -> do
             xs' <- mapM atomize xs
             return $ AVCons a xs'
+        --VIndir l -> return $ AVIndir l
         --VMap m -> return $ AVMap m
         VBag bs -> do
             bs' <- mapM (\(a,b) -> liftM (,b) $ atomize a) bs 
             return $ AVBag bs' 
         VType t -> return $ AVType t
-        VGraph g -> return $ AVGraph g
+        --VGraph g adj -> do
+        --  adj' <- rnfV adj 
+        --  return $ AVGraph g $ atomize adj'
         t -> error $ "A non-atomic value was passed as atomic" ++ show t
 
 deatomize :: AtomicValue -> Value
@@ -607,7 +612,7 @@ deatomize (AVNum d n) = VNum d n
 deatomize (AVCons a xs) = VCons a $ map deatomize xs
 deatomize (AVBag bs) = VBag $ map (first deatomize) bs  
 deatomize (AVType t) = VType t
-deatomize (AVGraph g) = VGraph g
+--  deatomize (AVGraph g adj) = VGraph g adj
 
 ------------------------------------------------------------
 -- Memory/environment utilities
@@ -706,9 +711,7 @@ reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
 reachable (VProp p)       = reachableProp p
-reachable (VGraph (Vertex x)) = reachable (deatomize x)
-reachable (VGraph (Overlay g h)) = reachable (VGraph g) >> reachable (VGraph h)
-reachable (VGraph (Connect g h)) = reachable (VGraph g) >> reachable (VGraph h)
+reachable (VGraph _ adj)  = reachable adj -- A graph can only contain AtomicValues, which are by definition 
 reachable (VMap m)        = reachables (M.elems m)
 reachable _               = return ()
 

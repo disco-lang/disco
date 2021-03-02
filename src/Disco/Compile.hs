@@ -184,10 +184,10 @@ compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
 compilePrim (TyGraph a :->: TyMap _ _) PrimSummary = return $ CConst (OSummary a)
-compilePrim ty PrimVertex  = return $ CConst OVertex
-compilePrim ty PrimGEmpty  = return $ CConst OGEmpty
-compilePrim ty PrimOverlay = return $ CConst OOverlay
-compilePrim ty PrimConnect = return $ CConst OConnect
+compilePrim ty PrimVertex  = return $ CConst $ OVertex ty
+compilePrim ty PrimGEmpty  = return $ CConst $ OGEmpty ty
+compilePrim ty PrimOverlay = return $ CConst $ OOverlay ty
+compilePrim ty PrimConnect = return $ CConst $ OConnect ty
 
 compilePrim ty PrimEmpty  = return $ CConst OEmpty
 compilePrim ty PrimInsert = return $ CConst OInsert
@@ -322,13 +322,13 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 
 
 --Graph operations are separate, but use same syntax, as traditional addition and multiplication
-compileBOp (TyGraph _) (TyGraph _) (TyGraph _) op
+compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
   | op `elem` [Add, Mul]
   = CConst (regularOps ! op)
   where
     regularOps = M.fromList
-      [ Add     ==> OOverlay
-      , Mul     ==> OConnect
+      [ Add     ==> OOverlay a 
+      , Mul     ==> OConnect a
       ]
 
   

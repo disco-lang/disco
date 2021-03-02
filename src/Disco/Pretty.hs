@@ -37,7 +37,7 @@ import           Disco.AST.Surface
 import           Disco.Eval                       (Disco, IErr, Value (..), AtomicValue, io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
-import           Disco.Interpret.Core             (whnfV, graphSummary, mapToSet)
+import           Disco.Interpret.Core             (rnfV, whnfV, graphSummary, mapToSet)
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -451,9 +451,9 @@ prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
-prettyWHNF out (TyGraph a) (VGraph g) = prettyWHNF out (TyMap a (TySet a)) =<< graphSummary a (VGraph g)
+prettyWHNF out (TyGraph a) (VGraph g adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
 prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
-prettyWHNF out (TyGraph a) (VConst OGEmpty) = out $ "[]"
+prettyWHNF out (TyGraph a) (VConst (OGEmpty _)) = out $ "[]"
 prettyWHNF out (TyMap k v) (VConst OEmpty)  = out $ show (M.empty :: M.Map AtomicValue AtomicValue)
 
 prettyWHNF _ ty v = error $

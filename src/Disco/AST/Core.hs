@@ -160,10 +160,10 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
         | OSummary Type   -- ^ Adjacency List of given graph
-        | OGEmpty         -- ^ Graph empty
-        | OVertex         -- ^ Construct a vertex with given value
-        | OOverlay        -- ^ Graph overlay
-        | OConnect        -- ^ Graph connect
+        | OGEmpty Type    -- ^ Graph empty
+        | OVertex Type    -- ^ Construct a vertex with given value
+        | OOverlay Type   -- ^ Graph overlay
+        | OConnect Type   -- ^ Graph connect
 
         | OEmpty          -- ^ Map empty
         | OInsert         -- ^ Map insert

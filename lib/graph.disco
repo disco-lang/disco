@@ -1,0 +1,39 @@
+search : (N * N -> Bool) -> N -> Graph N -> N -> Bool * Set N  
+search eq target g pos = {? 
+                            search' eq target g pos {} if (contains g pos),
+                            (False, {}) otherwise
+                         ?}
+
+search' : (N * N -> Bool) -> N -> Graph N -> N -> Set N -> Bool * Set N  
+search' eq target g pos visited = {? 
+            (True, visited union {pos})                if (eq (pos, target) && (contains g pos)),
+            (False,visited)                            if                          pos ∈ visited,
+            sequence eq target g pos (list (neighbors g pos)) (visited union {pos})        otherwise
+            ?}
+
+sequence : (N * N -> Bool) -> N -> Graph N -> N -> List N -> Set N -> Bool * Set N
+sequence eq target g pos [] visited = (False, visited)
+sequence eq target g pos (a::as) visited = 
+    {? {?
+            (successful, v')                  if successful,
+            sequence eq target g pos as v'        otherwise 
+        ?} when search' eq target g a visited is (successful, v')
+    ?}
+
+searchDAG : (N * N -> Bool) -> N -> Graph N -> N -> Bool  
+searchDAG eq target g pos = (eq (pos, target) && (contains g pos)) || (any (map (searchDAG eq target g, neighbors g pos)))
+
+contains : Graph N -> N -> Bool
+contains g a = {?
+            True when lookup (a,summary g) is right _,
+            False                             otherwise
+               ?} 
+
+neighbors : Graph N -> N ->  Set N 
+neighbors g pos = {?
+            s when lookup (pos, summary g) is right s,
+            {}                              otherwise
+                  ?} 
+
+any : Set Bool -> Bool
+any s = true ∈ s

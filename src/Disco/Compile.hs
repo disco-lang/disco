@@ -191,7 +191,7 @@ compilePrim ty PrimConnect = return $ CConst $ OConnect ty
 
 compilePrim ty PrimEmpty  = return $ CConst OEmpty
 compilePrim ty PrimInsert = return $ CConst OInsert
-compilePrim ty PrimQuery  = return $ CConst OQuery
+compilePrim ty PrimLookup = return $ CConst OLookup
 
 compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)

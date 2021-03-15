@@ -165,12 +165,6 @@ data BaseTy where
   -- | List container type.
   CtrList :: BaseTy
 
-  -- | Graph container type.
-  CtrGraph :: BaseTy
-
-  -- | Map container type.
-  CtrMap :: BaseTy
-
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha BaseTy

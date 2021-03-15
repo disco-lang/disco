@@ -149,6 +149,8 @@ hasQual P       QCmp   = False    -- can't compare Props
 hasQual _       QCmp   = True
 hasQual P       QBasic = False
 hasQual _       QBasic = True
+hasQual P       QSimple = False
+hasQual _       QSimple = True
 -- hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
 -- hasQual (Fin n) QDiv  = isPrime n
 hasQual b       QNum   = b `elem` [N, Z, F, Q]
@@ -182,19 +184,24 @@ qualRulesMap = M.fromList
     [ QCmp ==> [Nothing, Just QCmp]
     ]
   , CPair ==> M.fromList
-    [ QCmp ==> [Just QCmp, Just QCmp]
+    [ QCmp ==> [Just QCmp, Just QCmp],
+      QSimple ==> [Just QSimple, Just QSimple]
     ]
   , CSum ==> M.fromList
-    [ QCmp ==> [Just QCmp, Just QCmp]
+    [ QCmp ==> [Just QCmp, Just QCmp],
+      QSimple ==> [Just QSimple, Just QSimple]
     ]
   , CList ==> M.fromList
-    [ QCmp ==> [Just QCmp]
+    [ QCmp ==> [Just QCmp],
+      QSimple ==> [Just QSimple]
     ]
   , CBag ==> M.fromList
-    [ QCmp ==> [Just QCmp]
+    [ QCmp ==> [Just QCmp],
+      QSimple ==> [Just QSimple]
     ]
   , CSet ==> M.fromList
-    [ QCmp ==> [Just QCmp]
+    [ QCmp ==> [Just QCmp],
+      QSimple ==> [Just QSimple]
     ]
   , CGraph ==> M.fromList
     [ QCmp ==> [Just QCmp],
@@ -204,6 +211,8 @@ qualRulesMap = M.fromList
   where
     (==>) :: a -> b -> (a,b)
     (==>) = (,)
+
+  -- We could (theoretically) make graphs and maps also be simple values if we require the map's values are also simple. 
 
   -- Eventually we can easily imagine adding an opt-in mode where
   -- numeric operations can be used on pairs and functions, then the
@@ -252,11 +261,12 @@ sortRules c s = do
 -- | Pick a base type (generally the "simplest") that satisfies a given sort.
 pickSortBaseTy :: Sort -> BaseTy
 pickSortBaseTy s
-  | QDiv  `S.member` s && QSub `S.member` s = Q
-  | QDiv  `S.member` s = F
-  | QSub  `S.member` s = Z
-  | QNum  `S.member` s = N
-  | QCmp  `S.member` s = N
-  | QEnum `S.member` s = N
-  | QBool `S.member` s = B
-  | otherwise          = Unit
+  | QDiv    `S.member` s && QSub `S.member` s = Q
+  | QDiv    `S.member` s = F
+  | QSub    `S.member` s = Z
+  | QNum    `S.member` s = N
+  | QCmp    `S.member` s = N
+  | QEnum   `S.member` s = N
+  | QBool   `S.member` s = B
+  | QSimple `S.member` s = N
+  | otherwise            = Unit

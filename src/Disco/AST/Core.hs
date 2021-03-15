@@ -167,7 +167,7 @@ data Op = OAdd      -- ^ Addition (@+@)
 
         | OEmpty          -- ^ Map empty
         | OInsert         -- ^ Map insert
-        | OQuery          -- ^ Map query
+        | OLookup         -- ^ Map lookup
 
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@

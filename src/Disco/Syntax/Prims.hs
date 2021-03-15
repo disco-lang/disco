@@ -61,7 +61,7 @@ data Prim where
 
   PrimEmpty   :: Prim      -- ^ Empty Map
   PrimInsert  :: Prim      -- ^ Insert into map
-  PrimQuery   :: Prim      -- ^ Get value associated with key in map
+  PrimLookup  :: Prim      -- ^ Get value associated with key in map
 
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
@@ -142,7 +142,7 @@ primTable =
 
   , PrimInfo PrimEmpty     "empty"   True
   , PrimInfo PrimInsert    "insert"  True
-  , PrimInfo PrimQuery     "query"   True
+  , PrimInfo PrimLookup    "lookup"  True
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True

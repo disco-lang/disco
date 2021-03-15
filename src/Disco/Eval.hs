@@ -28,7 +28,7 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
-       , AtomicValue(..), atomize, deatomize
+       , SimpleValue(..), toSimpleValue, fromSimpleValue
 
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
@@ -187,12 +187,12 @@ data Value where
   VBag :: [(Value, Integer)] -> Value
 
   -- | A Graph in the algebraic repesentation
-  VGraph :: Graph AtomicValue -> Value -> Value
+  VGraph :: Graph SimpleValue -> Value -> Value
 
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
-  VMap :: M.Map AtomicValue Value -> Value
+  VMap :: M.Map SimpleValue Value -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
@@ -201,13 +201,13 @@ data Value where
   deriving Show
 
 -- | Values which can be used as keys in a map.
-data AtomicValue where
-  AVNum   :: RationalDisplay -> Rational -> AtomicValue
-  AVCons  :: Int -> [AtomicValue] -> AtomicValue
-  --AVIndir :: Loc -> AtomicValue
-  --AVGraph :: Graph AtomicValue -> AtomicValue -> AtomicValue
-  AVBag   :: [(AtomicValue, Integer)] -> AtomicValue
-  AVType  :: Type -> AtomicValue
+data SimpleValue where
+  SNum   :: RationalDisplay -> Rational -> SimpleValue
+  SCons  :: Int -> [SimpleValue] -> SimpleValue
+  --AVIndir :: Loc -> SimpleValue
+  --AVGraph :: Graph SimpleValue -> SimpleValue -> SimpleValue
+  SBag   :: [(SimpleValue, Integer)] -> SimpleValue
+  SType  :: Type -> SimpleValue
   deriving (Show, Eq, Ord)
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
@@ -580,39 +580,39 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
     handler e                = iprint e
 
 ------------------------------------------------------------
--- AtomicValue Utilities
+-- SimpleValue Utilities
 ------------------------------------------------------------
 
---atomizeConstants :: Value -> Value
---atomizeConstants (VConst OGEmpty) = VGraph empty
---atomizeConstants x = x
+--toSimpleValueConstants :: Value -> Value
+--toSimpleValueConstants (VConst OGEmpty) = VGraph empty
+--toSimpleValueConstants x = x
 
 -- Invariant: the thing being applied is in WHNF.
-atomize :: Value -> Disco IErr AtomicValue
-atomize v = do
-    --let v' = atomizeConstants v
+toSimpleValue :: Value -> Disco IErr SimpleValue
+toSimpleValue v = do
+    --let v' = toSimpleValueConstants v
     case v of 
-        VNum d n -> return $ AVNum d n
+        VNum d n -> return $ SNum d n
         VCons a xs -> do
-            xs' <- mapM atomize xs
-            return $ AVCons a xs'
-        --VIndir l -> return $ AVIndir l
-        --VMap m -> return $ AVMap m
+            xs' <- mapM toSimpleValue xs
+            return $ SCons a xs'
+        --VIndir l -> return $ SIndir l
+        --VMap m -> return $ SMap m
         VBag bs -> do
-            bs' <- mapM (\(a,b) -> liftM (,b) $ atomize a) bs 
-            return $ AVBag bs' 
-        VType t -> return $ AVType t
+            bs' <- mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs 
+            return $ SBag bs' 
+        VType t -> return $ SType t
         --VGraph g adj -> do
         --  adj' <- rnfV adj 
-        --  return $ AVGraph g $ atomize adj'
-        t -> error $ "A non-atomic value was passed as atomic" ++ show t
+        --  return $ SGraph g $ toSimpleValue adj'
+        t -> error $ "A non-simple value was passed as simple" ++ show t
 
-deatomize :: AtomicValue -> Value
-deatomize (AVNum d n) = VNum d n
-deatomize (AVCons a xs) = VCons a $ map deatomize xs
-deatomize (AVBag bs) = VBag $ map (first deatomize) bs  
-deatomize (AVType t) = VType t
---  deatomize (AVGraph g adj) = VGraph g adj
+fromSimpleValue :: SimpleValue -> Value
+fromSimpleValue (SNum d n) = VNum d n
+fromSimpleValue (SCons a xs) = VCons a $ map fromSimpleValue xs
+fromSimpleValue (SBag bs) = VBag $ map (first fromSimpleValue) bs  
+fromSimpleValue (SType t) = VType t
+--  fromSimpleValue (AVGraph g adj) = VGraph g adj
 
 ------------------------------------------------------------
 -- Memory/environment utilities
@@ -711,7 +711,7 @@ reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
 reachable (VProp p)       = reachableProp p
-reachable (VGraph _ adj)  = reachable adj -- A graph can only contain AtomicValues, which are by definition 
+reachable (VGraph _ adj)  = reachable adj -- A graph can only contain SimpleValues, which by def contain no indirection
 reachable (VMap m)        = reachables (M.elems m)
 reachable _               = return ()
 

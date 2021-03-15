@@ -569,10 +569,10 @@ valuesToBag ty = fmap VBag . countValues ty
 valuesToSet :: Type -> [Value] -> Disco IErr Value
 valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
 
--- | Convert a list of pairs of values to a map. Note that key values should be atomic
+-- | Convert a list of pairs of values to a map. Note that key values should be Simple
 valuesToMap :: [Value] -> Disco IErr Value
 valuesToMap l = do
-        pairList <- sequence $ map (\(VCons 0 [k,v]) -> (,v) <$> (atomize k)) l
+        pairList <- sequence $ map (\(VCons 0 [k,v]) -> (,v) <$> (toSimpleValue k)) l
         return $ VMap $ M.fromList pairList
 
 -- | Generic function for merging two sorted, count-annotated lists of
@@ -654,7 +654,7 @@ listToBag ty v = do
 -- | Convert a map to a set of pairs.
 mapToSet :: Type -> Type -> Value -> Disco IErr Value
 mapToSet tyk tyv (VMap v) = do
-    dl <- toDiscoList $ (map (\(k,v) -> VCons 0 [deatomize k,v])) $ M.toList v
+    dl <- toDiscoList $ (map (\(k,v) -> VCons 0 [fromSimpleValue k,v])) $ M.toList v
     listToSet (tyk :*: tyv) dl
 
 -- | Convert a bag to a set of pairs, with each element paired with
@@ -890,7 +890,7 @@ whnfOp OCount          = arity1 "count"    $ countOp
 
 whnfOp (OSummary ty)   = arity1 "graphSummary"  $ graphSummary ty
 whnfOp (OGEmpty ty)    = const (newGraph ty Empty) 
-whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> atomize >=> graphVertex ty
+whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> toSimpleValue >=> graphVertex ty
 whnfOp (OOverlay ty)   = arity2 "graphOverlay"  $ graphOverlay ty
 whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
 
@@ -899,7 +899,7 @@ whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
 
 whnfOp OEmpty          = const (return $ VMap $ M.empty)
 whnfOp OInsert         = arity3 "mapInsert" $ mapInsert 
-whnfOp OQuery          = arity2 "mapQuery"  $ mapQuery
+whnfOp OLookup         = arity2 "mapLookup" $ mapLookup
 
 --------------------------------------------------
 -- Comparison
@@ -1653,26 +1653,26 @@ toHaskellList xs = map fromVNum xs
                       fromVNum (VNum _ x) = fromIntegral $ numerator x
                       fromVNum v          = error $ "Impossible!  fromVNum on " ++ show v
 
-newGraph :: Type -> Graph AtomicValue -> Disco IErr Value
+newGraph :: Type -> Graph SimpleValue -> Disco IErr Value
 newGraph a g = do
   adj <- directlyReduceSummary a g
   loc <- allocate adj
   return $ VGraph g $ VIndir loc
 
-toDiscoAdjSet :: Type -> [(AtomicValue,[AtomicValue])] -> Disco IErr [Value]
+toDiscoAdjSet :: Type -> [(SimpleValue,[SimpleValue])] -> Disco IErr [Value]
 toDiscoAdjSet ty = sequence . map (\(v,edges) -> do 
-            set <- valuesToSet ty $ map deatomize edges
-            pure $ VCons 0 [deatomize v, set])
+            set <- valuesToSet ty $ map fromSimpleValue edges
+            pure $ VCons 0 [fromSimpleValue v, set])
 
-toDiscoAdjMap :: Type -> [(AtomicValue, [AtomicValue])] -> Disco IErr Value
+toDiscoAdjMap :: Type -> [(SimpleValue, [SimpleValue])] -> Disco IErr Value
 toDiscoAdjMap ty l = valuesToMap =<< toDiscoAdjSet ty l 
 
-reifyGraph :: Graph AtomicValue -> [(AtomicValue, [AtomicValue])]
+reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
 reifyGraph =
     AdjMap.adjacencyList . foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect
 
 -- Actually calculate the adjacency map, which we will store in the graph instances
-directlyReduceSummary :: Type -> Graph AtomicValue -> Disco IErr Value
+directlyReduceSummary :: Type -> Graph SimpleValue -> Disco IErr Value
 directlyReduceSummary ty = toDiscoAdjMap ty . reifyGraph
 
 -- Lookup the stored adjacency map from the indirection stored in this graph
@@ -1681,7 +1681,7 @@ graphSummary ty g = do
     VGraph _ adj <- whnfV g
     whnfV adj
 
-graphVertex :: Type -> AtomicValue -> Disco IErr Value
+graphVertex :: Type -> SimpleValue -> Disco IErr Value
 graphVertex a v = newGraph a $ Vertex v
 
 graphOverlay :: Type -> Value -> Value -> Disco IErr Value
@@ -1698,17 +1698,17 @@ graphConnect a g h = do
 
 
 mapInsert :: Value -> Value -> Value -> Disco IErr Value
-mapInsert m k v = do
+mapInsert k v m = do
     VMap m' <- whnfV m
     k' <- whnfV k
-    k'' <- atomize k'
+    k'' <- toSimpleValue k'
     return $ VMap $ M.insert k'' v m'
 
-mapQuery :: Value -> Value -> Disco IErr Value
-mapQuery m k = do
+mapLookup :: Value -> Value -> Disco IErr Value
+mapLookup k m = do
     VMap m' <- whnfV m
     k' <- whnfV k
-    k'' <- atomize k'
+    k'' <- toSimpleValue k'
     case M.lookup k'' m' of
         Just v' -> return $ VCons 1 [v']
         otherwise -> return $ leftUnit

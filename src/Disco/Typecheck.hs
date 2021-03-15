@@ -519,38 +519,46 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimSummary = do
       a <- freshTy
+      constraint $ CQual QSimple a
       return $ TyGraph a :->: TyMap a (TySet a)
 
     inferPrim PrimVertex = do
       a <- freshTy
+      constraint $ CQual QSimple a
       return $ a :->: TyGraph a
 
     inferPrim PrimGEmpty = do
       a <- freshTy
+      constraint $ CQual QSimple a
       return $ TyGraph a
 
     inferPrim PrimOverlay = do
       a <- freshTy
+      constraint $ CQual QSimple a
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
     inferPrim PrimConnect = do
       a <- freshTy
+      constraint $ CQual QSimple a
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
     inferPrim PrimEmpty = do
       a <- freshTy
       b <- freshTy
+      constraint $ CQual QSimple a
       return $ TyMap a b
 
     inferPrim PrimInsert = do
       a <- freshTy
       b <- freshTy
-      return $ TyMap a b :*: a :*: b :->: TyMap a b
+      constraint $ CQual QSimple a
+      return $ a :*: b :*: TyMap a b :->: TyMap a b
 
-    inferPrim PrimQuery = do
+    inferPrim PrimLookup = do
       a <- freshTy
       b <- freshTy
-      return $ TyMap a b :*: a :->: (TyUnit :+: b)
+      constraint $ CQual QSimple a
+      return $ a :*: TyMap a b :->: (TyUnit :+: b)
     ----------------------------------------
     -- Container primitives
 

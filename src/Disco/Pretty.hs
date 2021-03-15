@@ -34,7 +34,7 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, Value (..), AtomicValue, io,
+import           Disco.Eval                       (Disco, IErr, Value (..), SimpleValue, io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (rnfV, whnfV, graphSummary, mapToSet)
@@ -454,7 +454,7 @@ prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 prettyWHNF out (TyGraph a) (VGraph g adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
 prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
 prettyWHNF out (TyGraph a) (VConst (OGEmpty _)) = out $ "[]"
-prettyWHNF out (TyMap k v) (VConst OEmpty)  = out $ show (M.empty :: M.Map AtomicValue AtomicValue)
+prettyWHNF out (TyMap k v) (VConst OEmpty)  = out $ show (M.empty :: M.Map SimpleValue SimpleValue)
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty

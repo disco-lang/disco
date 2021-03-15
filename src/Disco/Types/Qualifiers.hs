@@ -37,6 +37,7 @@ data Qualifier
   | QEnum      -- ^ Enumerable, i.e. supports ellipsis notation [x .. y]
   | QBool      -- ^ Boolean, i.e. supports and, or, not (Bool or Prop)
   | QBasic     -- ^ Things that do not involve Prop.
+  | QSimple    -- ^ Things for which we can derive a *Haskell* Ord instance
   deriving (Show, Eq, Ord, Generic)
 
 instance Alpha Qualifier

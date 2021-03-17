@@ -1392,6 +1392,10 @@ decideEqFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagEquality ty xs ys
 
+decideEqFor (TyGraph a) g h = (==EQ) <$> decideOrdFor (TyGraph a) g h
+
+decideEqFor (TyMap k v) m1 m2 = (==EQ) <$> decideOrdFor (TyMap k v) m1 m2
+
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
 decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
@@ -1545,11 +1549,34 @@ decideOrdFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagComparison ty xs ys
 
--- Deciding the ordering for two graphs is the same.
+-- Graphs are compared directly
 decideOrdFor (TyGraph a) g h = do
   VGraph g' _ <- whnfV g
   VGraph h' _ <- whnfV h
   return $ compare g' h'
+
+-- Deciding the ordering for two maps is very similar to function ordering.
+decideOrdFor (TyMap k v) m1 m2 = do
+  VMap m1' <- whnfV m1
+  VMap m2' <- whnfV m2
+  go (M.assocs m1') (M.assocs m2')
+  where 
+    go []    [] = return EQ
+    go (_:_) [] = return GT
+    go [] (_:_) = return LT
+    go ((k1,v1):xs) ((k2,v2):ys) = do
+
+      kOrd <- decideOrdFor k (fromSimpleValue k1) (fromSimpleValue k2)    
+      vOrd <- decideOrdFor v v1 v2
+      -- Order primarily on keys, and then on values 
+      let o = if (kOrd == EQ) then vOrd else kOrd
+      case o of
+
+        -- Recurse if all are EQ.
+        EQ -> go xs ys
+
+        -- Otherwise return the found ordering.
+        _  -> return o
 
 -- Otherwise we can compare the values primitively, without looking at
 -- the type.

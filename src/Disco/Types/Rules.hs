@@ -207,6 +207,9 @@ qualRulesMap = M.fromList
     [ QCmp ==> [Just QCmp],
       QNum ==> [Nothing]
     ]
+  , CMap ==> M.fromList
+    [ QCmp ==> [Just QCmp, Just QCmp]
+    ]
   ]
   where
     (==>) :: a -> b -> (a,b)

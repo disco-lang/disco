@@ -28,7 +28,7 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
-       , SimpleValue(..), toSimpleValue, fromSimpleValue
+       , SimpleValue(..)
 
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
@@ -186,7 +186,7 @@ data Value where
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
 
-  -- | A Graph in the algebraic repesentation
+  -- | A Graph in the algebraic repesentation. The stored value is an indirection to the graph's adjacency map representation.
   VGraph :: Graph SimpleValue -> Value -> Value
 
   -- | A map from keys to values. Differs from functions because we can
@@ -200,12 +200,14 @@ data Value where
   VType :: Type -> Value
   deriving Show
 
--- | Values which can be used as keys in a map.
+-- | Values which can be used as keys in a map, i.e. those for which a Haskell Ord instance can be easily created.
+-- | These should always be of a type for which the QSimple qualifier can be constructed.
+-- | At the moment these are always fully evaluated (containing no indirections) and thus don't need memory management.
+-- | At some point in the future constructors for simple graphs and simple maps could be created, if the value type is also QSimple. 
+-- | The only reason for actually doing this would be constructing graphs of graphs or maps of maps, or the like.
 data SimpleValue where
   SNum   :: RationalDisplay -> Rational -> SimpleValue
   SCons  :: Int -> [SimpleValue] -> SimpleValue
-  --AVIndir :: Loc -> SimpleValue
-  --AVGraph :: Graph SimpleValue -> SimpleValue -> SimpleValue
   SBag   :: [(SimpleValue, Integer)] -> SimpleValue
   SType  :: Type -> SimpleValue
   deriving (Show, Eq, Ord)
@@ -580,41 +582,6 @@ catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
     handler e                = iprint e
 
 ------------------------------------------------------------
--- SimpleValue Utilities
-------------------------------------------------------------
-
---toSimpleValueConstants :: Value -> Value
---toSimpleValueConstants (VConst OGEmpty) = VGraph empty
---toSimpleValueConstants x = x
-
--- Invariant: the thing being applied is in WHNF.
-toSimpleValue :: Value -> Disco IErr SimpleValue
-toSimpleValue v = do
-    --let v' = toSimpleValueConstants v
-    case v of 
-        VNum d n -> return $ SNum d n
-        VCons a xs -> do
-            xs' <- mapM toSimpleValue xs
-            return $ SCons a xs'
-        --VIndir l -> return $ SIndir l
-        --VMap m -> return $ SMap m
-        VBag bs -> do
-            bs' <- mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs 
-            return $ SBag bs' 
-        VType t -> return $ SType t
-        --VGraph g adj -> do
-        --  adj' <- rnfV adj 
-        --  return $ SGraph g $ toSimpleValue adj'
-        t -> error $ "A non-simple value was passed as simple" ++ show t
-
-fromSimpleValue :: SimpleValue -> Value
-fromSimpleValue (SNum d n) = VNum d n
-fromSimpleValue (SCons a xs) = VCons a $ map fromSimpleValue xs
-fromSimpleValue (SBag bs) = VBag $ map (first fromSimpleValue) bs  
-fromSimpleValue (SType t) = VType t
---  fromSimpleValue (AVGraph g adj) = VGraph g adj
-
-------------------------------------------------------------
 -- Memory/environment utilities
 ------------------------------------------------------------
 
@@ -711,7 +678,7 @@ reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
 reachable (VProp p)       = reachableProp p
-reachable (VGraph _ adj)  = reachable adj -- A graph can only contain SimpleValues, which by def contain no indirection
+reachable (VGraph _ adj)  = reachable adj -- A graph can only contain SimpleValues, which by def contain no indirection. However its buffered adjacency map can.
 reachable (VMap m)        = reachables (M.elems m)
 reachable _               = return ()
 

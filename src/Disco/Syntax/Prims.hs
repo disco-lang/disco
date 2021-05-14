@@ -52,6 +52,7 @@ data Prim where
 
   PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
   PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
+  PrimMapToSet :: Prim     -- ^ Map k v -> set of (k,v)
 
   PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
   PrimVertex  :: Prim      -- ^ Construct a graph Vertex
@@ -133,6 +134,7 @@ primTable =
 
   , PrimInfo PrimB2C       "bagCounts" True
   , PrimInfo PrimC2B       "bagFromCounts" True
+  , PrimInfo PrimMapToSet  "mapToSet"  True
 
   , PrimInfo PrimSummary   "summary" True
   , PrimInfo PrimVertex    "vertex"  True

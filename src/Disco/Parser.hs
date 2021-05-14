@@ -940,6 +940,7 @@ parseCon =
   <|> CBag   <$  reserved "Bag"
   <|> CSet   <$  reserved "Set"
   <|> CGraph <$  reserved "Graph"
+  <|> CMap   <$  reserved "Map"
   <|> CUser  <$> parseTyDef
 
 parseTyDef :: Parser String

@@ -1,27 +1,27 @@
-search : (N * N -> Bool) -> N -> Graph N -> N -> Bool * Set N  
-search eq target g pos = {? 
-                            search' eq target g pos {} if (contains g pos),
+search : N -> Graph N -> N -> Bool * Set N  
+search target g pos = {? 
+                            (search' target g pos {}) if (contains g pos),
                             (False, {}) otherwise
                          ?}
 
-search' : (N * N -> Bool) -> N -> Graph N -> N -> Set N -> Bool * Set N  
-search' eq target g pos visited = {? 
-            (True, visited union {pos})                if (eq (pos, target) && (contains g pos)),
+search' : N -> Graph N -> N -> Set N -> Bool * Set N  
+search' target g pos visited = {? 
+            (True, visited union {pos})                if (pos == target && contains g pos),
             (False,visited)                            if                          pos ∈ visited,
-            sequence eq target g pos (list (neighbors g pos)) (visited union {pos})        otherwise
+            sequence target g pos (list (neighbors g pos)) (visited union {pos})        otherwise
             ?}
 
-sequence : (N * N -> Bool) -> N -> Graph N -> N -> List N -> Set N -> Bool * Set N
-sequence eq target g pos [] visited = (False, visited)
-sequence eq target g pos (a::as) visited = 
+sequence : N -> Graph N -> N -> List N -> Set N -> Bool * Set N
+sequence target g pos [] visited = (False, visited)
+sequence target g pos (a::as) visited = 
     {? {?
             (successful, v')                  if successful,
-            sequence eq target g pos as v'        otherwise 
-        ?} when search' eq target g a visited is (successful, v')
+            sequence target g pos as v'        otherwise 
+        ?} when search' target g a visited is (successful, v')
     ?}
 
-searchDAG : (N * N -> Bool) -> N -> Graph N -> N -> Bool  
-searchDAG eq target g pos = (eq (pos, target) && (contains g pos)) || (any (map (searchDAG eq target g, neighbors g pos)))
+searchDAG : N -> Graph N -> N -> Bool  
+searchDAG target g pos = (pos == target && contains g pos) || (true ∈ (map (searchDAG target g, neighbors g pos)))
 
 contains : Graph N -> N -> Bool
 contains g a = {?
@@ -35,5 +35,26 @@ neighbors g pos = {?
             {}                              otherwise
                   ?} 
 
-any : Set Bool -> Bool
-any s = true ∈ s
+vertices : Graph N -> List N
+vertices g = map ((\(k,_). k), (list (mapToSet (summary g))))
+
+topsort : Graph N -> Unit + List N * Set N
+topsort g = downstream g (vertices g) {} {} []
+
+searchFrom' : Graph N -> N -> Set N -> Set N -> List N -> Unit + List N * Set N
+searchFrom' g pos visited locked stack = {? 
+            left ()                                                 if  pos ∈ locked,
+            right (stack, visited)                                  if  pos ∈ visited,
+            right (pos :: s', v' union {pos}) when downstream g (list (neighbors g pos)) visited (locked union {pos}) stack is right (s', v'),
+            left ()        otherwise
+            ?}
+
+downstream : Graph N -> List N -> Set N -> Set N -> List N -> Unit + List N * Set N
+downstream g [] visited locked stack = right (stack, visited)
+downstream g (a::as) visited locked stack = 
+    {? 
+        downstream g as v' locked s'  when searchFrom' g a visited locked stack  is right (s',v'),
+        left () otherwise
+    ?}
+
+    

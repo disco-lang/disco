@@ -183,6 +183,7 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   Carries the element type.
         | OBagToCounts    -- ^ bag -> set of counts
         | OCountsToBag Type  -- ^ set of counts -> bag
+        | OMapToSet Type Type -- ^ map -> set (forget order)
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test

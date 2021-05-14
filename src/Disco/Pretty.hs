@@ -453,8 +453,6 @@ prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
 prettyWHNF out (TyGraph a) (VGraph g adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
 prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
-prettyWHNF out (TyGraph a) (VConst (OGEmpty _)) = out $ "[]"
-prettyWHNF out (TyMap k v) (VConst OEmpty)  = out $ show (M.empty :: M.Map SimpleValue SimpleValue)
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
@@ -548,12 +546,6 @@ prettyDecimal r = printedDecimal
        where
          (pre, rep) = splitAt len expan
          first102   = take 102 expan
-
---prettyGraph :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
---prettyGraph out ty val = out "Graph <" >> go val
---    where 
---      go (VGraph g) = 
-
 
 -- Given a list, find the indices of the list giving the first and
 -- second occurrence of the first element to repeat, or Nothing if

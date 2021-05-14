@@ -169,9 +169,6 @@ rnfV v@(VThunk {}) = whnfV v >>= rnfV
 rnfV v@(VDelay {}) = whnfV v >>= rnfV
 rnfV v@(VIndir {}) = whnfV v >>= rnfV
 
-rnfV (VConst (OGEmpty ty)) = newGraph ty Empty
-rnfV (VConst OEmpty)  = return $ VMap $ M.empty
-
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
 rnfV v             = return v
@@ -571,9 +568,7 @@ valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
 
 -- | Convert a list of pairs of values to a map. Note that key values should be Simple
 valuesToMap :: [Value] -> Disco IErr Value
-valuesToMap l = do
-        pairList <- sequence $ map (\(VCons 0 [k,v]) -> (,v) <$> (toSimpleValue k)) l
-        return $ VMap $ M.fromList pairList
+valuesToMap l = (VMap . M.fromList) <$> (mapM (\(VCons 0 [k,v]) -> (,v) <$> (toSimpleValue k)) l)
 
 -- | Generic function for merging two sorted, count-annotated lists of
 --   type @[(a,Integer)]@ a la merge sort, using the given comparison
@@ -654,8 +649,8 @@ listToBag ty v = do
 -- | Convert a map to a set of pairs.
 mapToSet :: Type -> Type -> Value -> Disco IErr Value
 mapToSet tyk tyv (VMap v) = do
-    dl <- toDiscoList $ (map (\(k,v) -> VCons 0 [fromSimpleValue k,v])) $ M.toList v
-    listToSet (tyk :*: tyv) dl
+  vcs <- countValues (tyk :*: tyv) $ (map (\(k,v) -> VCons 0 [fromSimpleValue k,v])) $ M.toList v
+  return $ VBag $ (map . fmap) (const 1) vcs
 
 -- | Convert a bag to a set of pairs, with each element paired with
 --   its count.
@@ -889,7 +884,6 @@ whnfOp OCount          = arity1 "count"    $ countOp
 -- Graphs
 
 whnfOp (OSummary ty)   = arity1 "graphSummary"  $ graphSummary ty
-whnfOp (OGEmpty ty)    = const (newGraph ty Empty) 
 whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> toSimpleValue >=> graphVertex ty
 whnfOp (OOverlay ty)   = arity2 "graphOverlay"  $ graphOverlay ty
 whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
@@ -897,7 +891,6 @@ whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
 --------------------------------------------------
 -- Maps
 
-whnfOp OEmpty          = const (return $ VMap $ M.empty)
 whnfOp OInsert         = arity3 "mapInsert" $ mapInsert 
 whnfOp OLookup         = arity2 "mapLookup" $ mapLookup
 
@@ -925,6 +918,8 @@ whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 
 whnfOp OBagToCounts    = arity1 "bagCounts" $ primBagCounts
 whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
+
+whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
 
 --------------------------------------------------
 -- Map/reduce
@@ -1392,9 +1387,9 @@ decideEqFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagEquality ty xs ys
 
-decideEqFor (TyGraph a) g h = (==EQ) <$> decideOrdFor (TyGraph a) g h
+decideEqFor ty@(TyGraph {}) g h = (==EQ) <$> decideOrdFor ty g h
 
-decideEqFor (TyMap k v) m1 m2 = (==EQ) <$> decideOrdFor (TyMap k v) m1 m2
+decideEqFor ty@(TyMap {})m1 m2 = (==EQ) <$> decideOrdFor ty m1 m2
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
@@ -1550,7 +1545,7 @@ decideOrdFor (TyBag ty) v1 v2 = do
   bagComparison ty xs ys
 
 -- Graphs are compared directly
-decideOrdFor (TyGraph a) g h = do
+decideOrdFor (TyGraph _) g h = do
   VGraph g' _ <- whnfV g
   VGraph h' _ <- whnfV h
   return $ compare g' h'
@@ -1566,7 +1561,11 @@ decideOrdFor (TyMap k v) m1 m2 = do
     go [] (_:_) = return LT
     go ((k1,v1):xs) ((k2,v2):ys) = do
 
-      kOrd <- decideOrdFor k (fromSimpleValue k1) (fromSimpleValue k2)    
+      -- we want to invert the ordering of keys 
+      -- because if one map contains a higher key
+      -- that means that it is actually missing
+      -- the lesser key, so we think of it as being less
+      kOrd <- decideOrdFor k (fromSimpleValue k2) (fromSimpleValue k1)   
       vOrd <- decideOrdFor v v1 v2
       -- Order primarily on keys, and then on values 
       let o = if (kOrd == EQ) then vOrd else kOrd
@@ -1638,6 +1637,25 @@ primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
 primValOrd v1           v2
   = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"
 
+------------------------------------------------------------
+-- SimpleValue Utilities
+------------------------------------------------------------
+
+toSimpleValue :: Value -> Disco IErr SimpleValue
+toSimpleValue v = do
+    v' <- whnfV v
+    case v' of 
+        VNum d n   -> return $ SNum d n
+        VCons a xs -> SCons a <$> mapM toSimpleValue xs
+        VBag bs    -> SBag <$> mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs 
+        VType t    -> return $ SType t
+        t          -> error $ "A non-simple value was passed as simple" ++ show t
+
+fromSimpleValue :: SimpleValue -> Value
+fromSimpleValue (SNum d n)   = VNum d n
+fromSimpleValue (SCons a xs) = VCons a $ map fromSimpleValue xs
+fromSimpleValue (SBag bs)    = VBag $ map (first fromSimpleValue) bs  
+fromSimpleValue (SType t)    = VType t
 
 ------------------------------------------------------------
 -- OEIS
@@ -1672,6 +1690,10 @@ oeisExtend v = do
     let newseq = extendSequence xs
     toDiscoList $ map (vnum . (%1)) newseq
 
+------------------------------------------------------------
+-- Graph Utilities
+------------------------------------------------------------
+
 -- | Convert a Disco integer list to a Haskell list
 toHaskellList :: [Value] -> [Integer]
 toHaskellList [] = []
@@ -1682,17 +1704,16 @@ toHaskellList xs = map fromVNum xs
 
 newGraph :: Type -> Graph SimpleValue -> Disco IErr Value
 newGraph a g = do
-  adj <- directlyReduceSummary a g
+  adj <- delay $ directlyReduceSummary a g
   loc <- allocate adj
   return $ VGraph g $ VIndir loc
 
-toDiscoAdjSet :: Type -> [(SimpleValue,[SimpleValue])] -> Disco IErr [Value]
-toDiscoAdjSet ty = sequence . map (\(v,edges) -> do 
-            set <- valuesToSet ty $ map fromSimpleValue edges
-            pure $ VCons 0 [fromSimpleValue v, set])
-
 toDiscoAdjMap :: Type -> [(SimpleValue, [SimpleValue])] -> Disco IErr Value
-toDiscoAdjMap ty l = valuesToMap =<< toDiscoAdjSet ty l 
+toDiscoAdjMap ty l = 
+    VMap . M.fromList <$> 
+    mapM (\(v,edges) -> do 
+              set <- valuesToSet ty $ map fromSimpleValue edges
+              return $ (v,set)) l
 
 reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
 reifyGraph =
@@ -1723,20 +1744,21 @@ graphConnect a g h = do
     VGraph h' _ <- whnfV h
     newGraph a $ Connect g' h'
 
+------------------------------------------------------------
+-- Map Utilities
+------------------------------------------------------------
 
 mapInsert :: Value -> Value -> Value -> Disco IErr Value
 mapInsert k v m = do
     VMap m' <- whnfV m
-    k' <- whnfV k
-    k'' <- toSimpleValue k'
-    return $ VMap $ M.insert k'' v m'
+    k' <- toSimpleValue k
+    return $ VMap $ M.insert k' v m'
 
 mapLookup :: Value -> Value -> Disco IErr Value
 mapLookup k m = do
     VMap m' <- whnfV m
-    k' <- whnfV k
-    k'' <- toSimpleValue k'
-    case M.lookup k'' m' of
+    k' <- toSimpleValue k
+    case M.lookup k' m' of
         Just v' -> return $ VCons 1 [v']
         otherwise -> return $ leftUnit
     where 

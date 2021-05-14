@@ -106,6 +106,7 @@ import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Void
+import           Math.Combinatorics.Exact.Binomial       (choose)
 
 import           Disco.Subst                      (Substitution)
 import           Disco.Types.Qualifiers
@@ -479,7 +480,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
-      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyGraph, TyUser #-}
+      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyGraph, TyMap, TyUser #-}
 
 -- | Is this a type variable?
 isTyVar :: Type -> Bool
@@ -566,14 +567,11 @@ countType (TyBag ty)
   | isEmptyTy ty        = Just 1
   | otherwise           = Nothing
 countType (TySet ty)    = (2^) <$> countType ty
---as far as I can tell the number of graphs constructable with a label type that counts to t
---is the sum from n=0 to t of (t choose n)*(4^(n*(n-1)/2))
---(t choose n) is the number of ways we can choose n distinct labels
---(4^(n*(n-1)/2)) represents deciding for each pair of nodes whether there is an edge pointing a->b, b->a, both, or neither
---this function diverges ridiculously quickly though, so until further revision this is omitted
---countType (TyGraph ty)  = Nothing
-countType (TyMap tyKey tyValue) = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue 
-
+countType (TyGraph ty)  = (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..t]) <$> countType ty
+countType (TyMap tyKey tyValue)
+  | countType tyKey == Just 0   = Just 1
+  | countType tyValue == Just 0 = Just 1
+  | otherwise                   = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing
 

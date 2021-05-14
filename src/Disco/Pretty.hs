@@ -34,10 +34,11 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, Value (..), SimpleValue, io,
-                                                   iputStr, iputStrLn,
-                                                   topTyDefns)
-import           Disco.Interpret.Core             (rnfV, whnfV, graphSummary, mapToSet)
+import           Disco.Eval                       (Disco, IErr, SimpleValue,
+                                                   Value (..), io, iputStr,
+                                                   iputStrLn, topTyDefns)
+import           Disco.Interpret.Core             (graphSummary, mapToSet, rnfV,
+                                                   whnfV)
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -305,7 +306,7 @@ prettyBOp :: BOp -> Doc
 prettyBOp op =
   case M.lookup op bopMap of
     Just (OpInfo _ (syn:_) _) -> text syn
-    _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
+    _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches []     = error "Empty branches are disallowed."

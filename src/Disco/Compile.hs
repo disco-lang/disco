@@ -329,11 +329,11 @@ compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
   = CConst (regularOps ! op)
   where
     regularOps = M.fromList
-      [ Add     ==> OOverlay a 
+      [ Add     ==> OOverlay a
       , Mul     ==> OConnect a
       ]
 
-  
+
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

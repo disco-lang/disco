@@ -103,7 +103,8 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Algebra.Graph                           (Graph(Vertex, Overlay, Connect, Empty), foldg)
+import           Algebra.Graph                           (Graph (Connect, Empty, Overlay, Vertex),
+                                                          foldg)
 import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 import           System.Console.Haskeline.MonadException
 
@@ -203,7 +204,7 @@ data Value where
 -- | Values which can be used as keys in a map, i.e. those for which a Haskell Ord instance can be easily created.
 -- | These should always be of a type for which the QSimple qualifier can be constructed.
 -- | At the moment these are always fully evaluated (containing no indirections) and thus don't need memory management.
--- | At some point in the future constructors for simple graphs and simple maps could be created, if the value type is also QSimple. 
+-- | At some point in the future constructors for simple graphs and simple maps could be created, if the value type is also QSimple.
 -- | The only reason for actually doing this would be constructing graphs of graphs or maps of maps, or the like.
 data SimpleValue where
   SNum   :: RationalDisplay -> Rational -> SimpleValue
@@ -764,7 +765,7 @@ loadDiscoModule' resolver inProcess modName  = do
              >>= maybe (throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
-      
+
       -- mis only contains the module info from direct imports.
       mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis

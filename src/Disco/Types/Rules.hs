@@ -145,19 +145,19 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual P       QCmp   = False    -- can't compare Props
-hasQual _       QCmp   = True
-hasQual P       QBasic = False
-hasQual _       QBasic = True
+hasQual P       QCmp    = False    -- can't compare Props
+hasQual _       QCmp    = True
+hasQual P       QBasic  = False
+hasQual _       QBasic  = True
 hasQual P       QSimple = False
 hasQual _       QSimple = True
 -- hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
 -- hasQual (Fin n) QDiv  = isPrime n
-hasQual b       QNum   = b `elem` [N, Z, F, Q]
-hasQual b       QSub   = b `elem` [Z, Q]
-hasQual b       QDiv   = b `elem` [F, Q]
-hasQual b       QEnum  = b `elem` [N, Z, F, Q, C]
-hasQual b       QBool  = b `elem` [B, P]
+hasQual b       QNum    = b `elem` [N, Z, F, Q]
+hasQual b       QSub    = b `elem` [Z, Q]
+hasQual b       QDiv    = b `elem` [F, Q]
+hasQual b       QEnum   = b `elem` [N, Z, F, Q, C]
+hasQual b       QBool   = b `elem` [B, P]
 
 -- | Check whether a base type has a certain sort, which simply
 --   amounts to whether it satisfies every qualifier in the sort.
@@ -215,7 +215,7 @@ qualRulesMap = M.fromList
     (==>) :: a -> b -> (a,b)
     (==>) = (,)
 
-  -- We could (theoretically) make graphs and maps also be simple values if we require the map's values are also simple. 
+  -- We could (theoretically) make graphs and maps also be simple values if we require the map's values are also simple.
 
   -- Eventually we can easily imagine adding an opt-in mode where
   -- numeric operations can be used on pairs and functions, then the

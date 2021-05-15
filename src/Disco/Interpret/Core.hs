@@ -56,7 +56,8 @@ module Disco.Interpret.Core
 
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (liftM, filterM, (>=>), join)
+import           Control.Monad                           (filterM, join, liftM,
+                                                          (>=>))
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
 import           Data.Bifunctor                          (first, second)
@@ -93,7 +94,8 @@ import           Math.OEIS                               (catalogNums,
                                                           extendSequence,
                                                           lookupSequence)
 
-import           Algebra.Graph                           (Graph(Empty,Vertex,Overlay,Connect),foldg)
+import           Algebra.Graph                           (Graph (Connect, Empty, Overlay, Vertex),
+                                                          foldg)
 import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 
 
@@ -183,31 +185,31 @@ whnfV :: Value -> Disco IErr Value
 
 -- If the value is a thunk, use its stored environment and evaluate
 -- the expression to WHNF.
-whnfV (VThunk c e)     = withEnv e $ whnf c
+whnfV (VThunk c e)          = withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
 -- in its stored environment and reduce the result to WHNF.
-whnfV (VDelay imv _ e) = withEnv e imv >>= whnfV
+whnfV (VDelay imv _ e)      = withEnv e imv >>= whnfV
 
 -- If it is an indirection, call 'whnfIndir' which will look up the
 -- value it points to, reduce it, and store the result so it won't
 -- have to be re-evaluated the next time loc is referenced.
-whnfV (VIndir loc)     = whnfIndir loc
+whnfV (VIndir loc)          = whnfIndir loc
 
 -- If it is a cons, all well and good, it is already in WHNF---but at
 -- the same time make sure that any subparts are either simple
 -- constants or are turned into indirections to new memory cells.
 -- This way, when the subparts are eventually evaluated, the new
 -- memory cells can be updated with their result.
-whnfV (VCons i vs)     = VCons i <$> mapM mkSimple vs
+whnfV (VCons i vs)          = VCons i <$> mapM mkSimple vs
 
 -- Arity 0 functions can be boiled down to their core values
-whnfV (VConst OEmpty)  = return $ VMap M.empty
+whnfV (VConst OEmpty)       = return $ VMap M.empty
 whnfV (VConst (OGEmpty ty)) = newGraph ty Empty
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
-whnfV v                = return v
+whnfV v                     = return v
 
 
 -- | Reduce the value stored at the given location to WHNF.  We need a
@@ -891,7 +893,7 @@ whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
 --------------------------------------------------
 -- Maps
 
-whnfOp OInsert         = arity3 "mapInsert" $ mapInsert 
+whnfOp OInsert         = arity3 "mapInsert" $ mapInsert
 whnfOp OLookup         = arity2 "mapLookup" $ mapLookup
 
 --------------------------------------------------
@@ -1555,19 +1557,19 @@ decideOrdFor (TyMap k v) m1 m2 = do
   VMap m1' <- whnfV m1
   VMap m2' <- whnfV m2
   go (M.assocs m1') (M.assocs m2')
-  where 
+  where
     go []    [] = return EQ
     go (_:_) [] = return GT
     go [] (_:_) = return LT
     go ((k1,v1):xs) ((k2,v2):ys) = do
 
-      -- we want to invert the ordering of keys 
+      -- we want to invert the ordering of keys
       -- because if one map contains a higher key
       -- that means that it is actually missing
       -- the lesser key, so we think of it as being less
-      kOrd <- decideOrdFor k (fromSimpleValue k2) (fromSimpleValue k1)   
+      kOrd <- decideOrdFor k (fromSimpleValue k2) (fromSimpleValue k1)
       vOrd <- decideOrdFor v v1 v2
-      -- Order primarily on keys, and then on values 
+      -- Order primarily on keys, and then on values
       let o = if (kOrd == EQ) then vOrd else kOrd
       case o of
 
@@ -1644,17 +1646,17 @@ primValOrd v1           v2
 toSimpleValue :: Value -> Disco IErr SimpleValue
 toSimpleValue v = do
     v' <- whnfV v
-    case v' of 
+    case v' of
         VNum d n   -> return $ SNum d n
         VCons a xs -> SCons a <$> mapM toSimpleValue xs
-        VBag bs    -> SBag <$> mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs 
+        VBag bs    -> SBag <$> mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs
         VType t    -> return $ SType t
         t          -> error $ "A non-simple value was passed as simple" ++ show t
 
 fromSimpleValue :: SimpleValue -> Value
 fromSimpleValue (SNum d n)   = VNum d n
 fromSimpleValue (SCons a xs) = VCons a $ map fromSimpleValue xs
-fromSimpleValue (SBag bs)    = VBag $ map (first fromSimpleValue) bs  
+fromSimpleValue (SBag bs)    = VBag $ map (first fromSimpleValue) bs
 fromSimpleValue (SType t)    = VType t
 
 ------------------------------------------------------------
@@ -1709,9 +1711,9 @@ newGraph a g = do
   return $ VGraph g $ VIndir loc
 
 toDiscoAdjMap :: Type -> [(SimpleValue, [SimpleValue])] -> Disco IErr Value
-toDiscoAdjMap ty l = 
-    VMap . M.fromList <$> 
-    mapM (\(v,edges) -> do 
+toDiscoAdjMap ty l =
+    VMap . M.fromList <$>
+    mapM (\(v,edges) -> do
               set <- valuesToSet ty $ map fromSimpleValue edges
               return $ (v,set)) l
 
@@ -1759,7 +1761,7 @@ mapLookup k m = do
     VMap m' <- whnfV m
     k' <- toSimpleValue k
     case M.lookup k' m' of
-        Just v' -> return $ VCons 1 [v']
+        Just v'   -> return $ VCons 1 [v']
         otherwise -> return $ leftUnit
-    where 
+    where
     leftUnit = VCons 0 [VCons 0 []]

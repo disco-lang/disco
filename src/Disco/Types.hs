@@ -96,19 +96,19 @@ module Disco.Types
        where
 
 import           Data.Coerce
-import           GHC.Generics                     (Generic)
+import           GHC.Generics                      (Generic)
 import           Unbound.Generics.LocallyNameless
 
-import           Control.Lens                     (toListOf)
-import           Data.List                        (nub)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import           Control.Lens                      (toListOf)
+import           Data.List                         (nub)
+import           Data.Map                          (Map)
+import qualified Data.Map                          as M
+import           Data.Set                          (Set)
+import qualified Data.Set                          as S
 import           Data.Void
-import           Math.Combinatorics.Exact.Binomial       (choose)
+import           Math.Combinatorics.Exact.Binomial (choose)
 
-import           Disco.Subst                      (Substitution)
+import           Disco.Subst                       (Substitution)
 import           Disco.Types.Qualifiers
 
 --------------------------------------------------
@@ -571,7 +571,7 @@ countType (TyGraph ty)  = (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..
 countType (TyMap tyKey tyValue)
   | countType tyKey == Just 0   = Just 1
   | countType tyValue == Just 0 = Just 1
-  | otherwise                   = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue 
+  | otherwise                   = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing
 

@@ -1,11 +1,11 @@
-search : N -> Graph N -> N -> Bool * Set N  
-search target g pos = {? 
+search : N -> Graph N -> N -> Bool * Set N
+search target g pos = {?
                             (search' target g pos {}) if (contains g pos),
                             (False, {}) otherwise
                          ?}
 
-search' : N -> Graph N -> N -> Set N -> Bool * Set N  
-search' target g pos visited = {? 
+search' : N -> Graph N -> N -> Set N -> Bool * Set N
+search' target g pos visited = {?
             (True, visited union {pos})                if (pos == target && contains g pos),
             (False,visited)                            if                          pos ∈ visited,
             sequence target g pos (list (neighbors g pos)) (visited union {pos})        otherwise
@@ -13,27 +13,27 @@ search' target g pos visited = {?
 
 sequence : N -> Graph N -> N -> List N -> Set N -> Bool * Set N
 sequence target g pos [] visited = (False, visited)
-sequence target g pos (a::as) visited = 
+sequence target g pos (a::as) visited =
     {? {?
             (successful, v')                  if successful,
-            sequence target g pos as v'        otherwise 
+            sequence target g pos as v'        otherwise
         ?} when search' target g a visited is (successful, v')
     ?}
 
-searchDAG : N -> Graph N -> N -> Bool  
+searchDAG : N -> Graph N -> N -> Bool
 searchDAG target g pos = (pos == target && contains g pos) || (true ∈ (map (searchDAG target g, neighbors g pos)))
 
 contains : Graph N -> N -> Bool
 contains g a = {?
             True when lookup (a,summary g) is right _,
             False                             otherwise
-               ?} 
+               ?}
 
-neighbors : Graph N -> N ->  Set N 
+neighbors : Graph N -> N ->  Set N
 neighbors g pos = {?
             s when lookup (pos, summary g) is right s,
             {}                              otherwise
-                  ?} 
+                  ?}
 
 vertices : Graph N -> List N
 vertices g = map ((\(k,_). k), (list (mapToSet (summary g))))
@@ -42,7 +42,7 @@ topsort : Graph N -> Unit + List N * Set N
 topsort g = downstream g (vertices g) {} {} []
 
 searchFrom' : Graph N -> N -> Set N -> Set N -> List N -> Unit + List N * Set N
-searchFrom' g pos visited locked stack = {? 
+searchFrom' g pos visited locked stack = {?
             left ()                                                 if  pos ∈ locked,
             right (stack, visited)                                  if  pos ∈ visited,
             right (pos :: s', v' union {pos}) when downstream g (list (neighbors g pos)) visited (locked union {pos}) stack is right (s', v'),
@@ -51,10 +51,8 @@ searchFrom' g pos visited locked stack = {?
 
 downstream : Graph N -> List N -> Set N -> Set N -> List N -> Unit + List N * Set N
 downstream g [] visited locked stack = right (stack, visited)
-downstream g (a::as) visited locked stack = 
-    {? 
+downstream g (a::as) visited locked stack =
+    {?
         downstream g as v' locked s'  when searchFrom' g a visited locked stack  is right (s',v'),
         left () otherwise
     ?}
-
-    

@@ -164,7 +164,7 @@ prettyTy (TySkolem n)     = text "%" <> prettyName n
 prettyTy (TyGraph ty)     = mparens (PA 9 InR) $
   text "Graph" <+> prettyTy' 9 InR ty
 prettyTy (TyMap k v)      =  mparens (PA 9 InR) $
-  hsep ([text "Map", prettyTy' 9 InR k, prettyTy' 9 InR v])
+  hsep [text "Map", prettyTy' 9 InR k, prettyTy' 9 InR v]
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -182,7 +182,7 @@ prettyTyDef tyName (TyDefBody ps body)
 mparens :: PA -> Doc -> Doc
 mparens pa doc = do
   parentPA <- ask
-  (if (pa < parentPA) then parens else id) doc
+  (if pa < parentPA then parens else id) doc
 
 prettyName :: Name a -> Doc
 prettyName = text . show
@@ -205,11 +205,11 @@ prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
 prettyTerm (TAbs q bnd)  = mparens initPA $
-  lunbind bnd $ \(args, body) -> do
+  lunbind bnd $ \(args, body) ->
   prettyQ q <> (if length args > 1 then text " " else empty)
-            <> (hsep =<< punctuate (text ",") (map prettyPattern args))
-            <> text "."
-            <+> prettyTerm' 0 InL body
+          <> (hsep =<< punctuate (text ",") (map prettyPattern args))
+          <> text "."
+          <+> prettyTerm' 0 InL body
   where
     prettyQ Lam = text "λ"
     prettyQ All = text "∀"
@@ -313,7 +313,7 @@ prettyBranches []     = error "Empty branches are disallowed."
 prettyBranches (b:bs) =
   prettyBranch False b
   $+$
-  foldr ($+$) empty (map (prettyBranch True) bs)
+  foldr (($+$) . prettyBranch True) empty bs
 
 prettyBranch :: Bool -> Branch -> Doc
 prettyBranch com br = lunbind br $ \(gs,t) ->
@@ -325,7 +325,7 @@ prettyGuards (fromTelescope -> gs)
   = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
 prettyGuard :: Guard -> Doc
-prettyGuard (GBool et)  = text "if" <+> (prettyTerm (unembed et))
+prettyGuard (GBool et)  = text "if" <+> prettyTerm (unembed et)
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
 prettyGuard (GLet b)    = text "let" <+> prettyBinding b
 
@@ -387,7 +387,7 @@ prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
 prettyClause :: Name a -> Bind [Pattern] Term -> Doc
 prettyClause x b
   = lunbind b $ \(ps, t) ->
-      (prettyName x <+> (hsep $ map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+      (prettyName x <+> hsep (map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
 
 prettyProperty :: Property -> Doc
 prettyProperty = prettyTerm
@@ -469,7 +469,7 @@ prettyPlaceholder out ty = do
 prettySequence :: (String -> Disco IErr ()) -> Type -> [Value] -> String -> Disco IErr ()
 prettySequence out _ []     _   = out ""
 prettySequence out t [x]    _   = prettyValueWith out t x
-prettySequence out t (x:xs) del = (prettyValueWith out t x) >> out del >> (prettySequence out t xs del)
+prettySequence out t (x:xs) del = prettyValueWith out t x >> out del >> prettySequence out t xs del
 
 prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
 prettyBag out _ []         = out "⟅⟆"
@@ -538,7 +538,7 @@ prettyDecimal r = printedDecimal
      (n,d) = properFraction r :: (Integer, Rational)
      (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
      printedDecimal
-       | length first102 > 101 || length first102 == 101 && (last first102 /= 0)
+       | length first102 > 101 || length first102 == 101 && last first102 /= 0
          = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
        | rep == [0]
          = show n ++ "." ++ (if null pre then "0" else concatMap show pre)
@@ -576,7 +576,7 @@ findRep' prevs ix (x:xs)
 digitalExpansion :: Integer -> Integer -> Integer -> ([Integer], Int)
 digitalExpansion b n d = digits
   where
-    longDivStep (_, r) = ((b*r) `divMod` d)
+    longDivStep (_, r) = (b*r) `divMod` d
     res       = tail $ iterate longDivStep (0,n)
     digits    = first (map fst) (findRep res)
 
@@ -584,6 +584,6 @@ digitalExpansion b n d = digits
 
 prettyDefn :: Defn -> Doc
 prettyDefn (Defn x patTys ty clauses) = vcat $
-  (prettyTyDecl x (foldr (:->:) ty patTys))
+  prettyTyDecl x (foldr (:->:) ty patTys)
   :
   map (prettyClause x . eraseClause) clauses

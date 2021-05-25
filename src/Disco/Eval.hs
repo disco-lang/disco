@@ -201,11 +201,15 @@ data Value where
   VType :: Type -> Value
   deriving Show
 
--- | Values which can be used as keys in a map, i.e. those for which a Haskell Ord instance can be easily created.
--- | These should always be of a type for which the QSimple qualifier can be constructed.
--- | At the moment these are always fully evaluated (containing no indirections) and thus don't need memory management.
--- | At some point in the future constructors for simple graphs and simple maps could be created, if the value type is also QSimple.
--- | The only reason for actually doing this would be constructing graphs of graphs or maps of maps, or the like.
+-- | Values which can be used as keys in a map, i.e. those for which a
+--   Haskell Ord instance can be easily created.  These should always
+--   be of a type for which the QSimple qualifier can be constructed.
+--   At the moment these are always fully evaluated (containing no
+--   indirections) and thus don't need memory management.  At some
+--   point in the future constructors for simple graphs and simple
+--   maps could be created, if the value type is also QSimple.  The
+--   only reason for actually doing this would be constructing graphs
+--   of graphs or maps of maps, or the like.
 data SimpleValue where
   SNum   :: RationalDisplay -> Rational -> SimpleValue
   SCons  :: Int -> [SimpleValue] -> SimpleValue

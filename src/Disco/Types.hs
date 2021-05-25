@@ -567,11 +567,27 @@ countType (TyBag ty)
   | isEmptyTy ty        = Just 1
   | otherwise           = Nothing
 countType (TySet ty)    = (2^) <$> countType ty
-countType (TyGraph ty)  = (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..t]) <$> countType ty
+
+  -- t = number of elements in vertex type.
+  -- n = number of vertices in the graph.
+  -- For each n in [0..t], we can choose which n values to use for the
+  --   vertices; then for each ordered pair of vertices (u,v)
+  --   (including the possibility that u = v), we choose whether or
+  --   not there is a directed edge u -> v.
+  --
+  -- https://oeis.org/A135748
+
+countType (TyGraph ty)  =
+  (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..t]) <$>
+  countType ty
+
 countType (TyMap tyKey tyValue)
-  | countType tyKey == Just 0   = Just 1
-  | countType tyValue == Just 0 = Just 1
-  | otherwise                   = (\a b -> (b+1) ^ a) <$> countType tyKey <*> countType tyValue
+  | isEmptyTy tyKey     = Just 1     -- If we can't have any keys or values,
+  | isEmptyTy tyValue   = Just 1     -- only option is empty map
+  | otherwise           = (\k v -> (v+1) ^ k) <$> countType tyKey <*> countType tyValue
+      -- (v+1)^k since for each key, we can choose among v values to associate with it,
+      -- or we can choose to not have the key in the map.
+
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing
 
@@ -586,17 +602,15 @@ isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
-isEmptyTy TyVoid         = True
--- isEmptyTy (TyFin 0)      = True
-isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
-isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
-isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
-isEmptyTy _              = False
+isEmptyTy ty
+  | Just 0 <- countType ty = True
+  | otherwise              = False
 
 -- | Decide whether a type is finite.
 isFiniteTy :: Type -> Bool
-isFiniteTy ty | Just _ <- countType ty = True
-              | otherwise              = False
+isFiniteTy ty
+  | Just _ <- countType ty = True
+  | otherwise              = False
 
 -- | Decide whether a type is searchable, i.e. effectively enumerable.
 isSearchable :: Type -> Bool

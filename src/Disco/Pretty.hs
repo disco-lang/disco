@@ -34,10 +34,11 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, Value (..), io,
-                                                   iputStr, iputStrLn,
-                                                   topTyDefns)
-import           Disco.Interpret.Core             (whnfV)
+import           Disco.Eval                       (Disco, IErr, SimpleValue,
+                                                   Value (..), io, iputStr,
+                                                   iputStrLn, topTyDefns)
+import           Disco.Interpret.Core             (graphSummary, mapToSet, rnfV,
+                                                   whnfV)
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -160,6 +161,10 @@ prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
 prettyTy (TyUser name args) = mparens (PA 9 InR) $
   hsep (text name : map (prettyTy' 9 InR) args)
 prettyTy (TySkolem n)     = text "%" <> prettyName n
+prettyTy (TyGraph ty)     = mparens (PA 9 InR) $
+  text "Graph" <+> prettyTy' 9 InR ty
+prettyTy (TyMap k v)      =  mparens (PA 9 InR) $
+  hsep ([text "Map", prettyTy' 9 InR k, prettyTy' 9 InR v])
 
 prettyTy' :: Prec -> BFixity -> Type -> Doc
 prettyTy' p a t = local (const (PA p a)) (prettyTy t)
@@ -301,7 +306,7 @@ prettyBOp :: BOp -> Doc
 prettyBOp op =
   case M.lookup op bopMap of
     Just (OpInfo _ (syn:_) _) -> text syn
-    _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
+    _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 prettyBranches :: [Branch] -> Doc
 prettyBranches []     = error "Empty branches are disallowed."
@@ -446,6 +451,9 @@ prettyWHNF out ty@(_ :->: _) _ = prettyPlaceholder out ty
 prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
+
+prettyWHNF out (TyGraph a) (VGraph g adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
+prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty

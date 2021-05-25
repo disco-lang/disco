@@ -52,6 +52,17 @@ data Prim where
 
   PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
   PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
+  PrimMapToSet :: Prim     -- ^ Map k v -> set of (k,v)
+
+  PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
+  PrimVertex  :: Prim      -- ^ Construct a graph Vertex
+  PrimGEmpty  :: Prim      -- ^ Empty graph
+  PrimOverlay :: Prim      -- ^ Overlay two Graphs
+  PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
+
+  PrimEmpty   :: Prim      -- ^ Empty Map
+  PrimInsert  :: Prim      -- ^ Insert into map
+  PrimLookup  :: Prim      -- ^ Get value associated with key in map
 
   PrimMap     :: Prim      -- ^ Map operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
@@ -123,6 +134,17 @@ primTable =
 
   , PrimInfo PrimB2C       "bagCounts" True
   , PrimInfo PrimC2B       "bagFromCounts" True
+  , PrimInfo PrimMapToSet  "mapToSet"  True
+
+  , PrimInfo PrimSummary   "summary" True
+  , PrimInfo PrimVertex    "vertex"  True
+  , PrimInfo PrimGEmpty    "emptygraph" True
+  , PrimInfo PrimOverlay   "overlay" True
+  , PrimInfo PrimConnect   "connect" True
+
+  , PrimInfo PrimEmpty     "empty"   True
+  , PrimInfo PrimInsert    "insert"  True
+  , PrimInfo PrimLookup    "lookup"  True
 
   , PrimInfo PrimMap       "map"     True
   , PrimInfo PrimReduce    "reduce"  True

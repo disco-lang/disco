@@ -39,7 +39,7 @@ import           Disco.Types
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -159,6 +159,16 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
+        | OSummary Type   -- ^ Adjacency List of given graph
+        | OGEmpty Type    -- ^ Graph empty
+        | OVertex Type    -- ^ Construct a vertex with given value
+        | OOverlay Type   -- ^ Graph overlay
+        | OConnect Type   -- ^ Graph connect
+
+        | OEmpty          -- ^ Map empty
+        | OInsert         -- ^ Map insert
+        | OLookup         -- ^ Map lookup
+
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
@@ -173,6 +183,7 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   Carries the element type.
         | OBagToCounts    -- ^ bag -> set of counts
         | OCountsToBag Type  -- ^ set of counts -> bag
+        | OMapToSet Type Type -- ^ map -> set (forget order)
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test

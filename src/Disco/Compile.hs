@@ -183,6 +183,18 @@ compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
 compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
+compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
+
+compilePrim (TyGraph a :->: TyMap _ _) PrimSummary = return $ CConst (OSummary a)
+compilePrim ty PrimVertex  = return $ CConst $ OVertex ty
+compilePrim ty PrimGEmpty  = return $ CConst $ OGEmpty ty
+compilePrim ty PrimOverlay = return $ CConst $ OOverlay ty
+compilePrim ty PrimConnect = return $ CConst $ OConnect ty
+
+compilePrim ty PrimEmpty  = return $ CConst OEmpty
+compilePrim ty PrimInsert = return $ CConst OInsert
+compilePrim ty PrimLookup = return $ CConst OLookup
+
 compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
 compilePrim (_ :*: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
@@ -309,6 +321,19 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 --       , Exp     ==> OMExp
 --       , Divides ==> OMDivides
 --       ]
+
+
+--Graph operations are separate, but use same syntax, as traditional addition and multiplication
+compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
+  | op `elem` [Add, Mul]
+  = CConst (regularOps ! op)
+  where
+    regularOps = M.fromList
+      [ Add     ==> OOverlay a
+      , Mul     ==> OConnect a
+      ]
+
+
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

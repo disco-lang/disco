@@ -309,12 +309,13 @@ checkTypeValid (TyCon c tys) = do
 
 conArity :: Con -> TCM Int
 conArity (CContainer _) = return 1
+conArity CGraph = return 1
 conArity (CUser name)    = do
   d <- get
   case M.lookup name d of
     Nothing               -> throwError (NotTyDef name)
     Just (TyDefBody as _) -> return (length as)
-conArity _              = return 2  -- (->, *, +)
+conArity _              = return 2  -- (->, *, +, map)
 
 --------------------------------------------------
 -- Checking modes
@@ -516,6 +517,54 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QCmp a
       return $ TyContainer c (a :*: TyN) :->: TyBag a
 
+    inferPrim PrimMapToSet  = do
+      k <- freshTy
+      v <- freshTy
+      constraint $ CQual QSimple k
+      return $ TyMap k v :->: TySet (k :*: v)
+
+    inferPrim PrimSummary = do
+      a <- freshTy
+      constraint $ CQual QSimple a
+      return $ TyGraph a :->: TyMap a (TySet a)
+
+    inferPrim PrimVertex = do
+      a <- freshTy
+      constraint $ CQual QSimple a
+      return $ a :->: TyGraph a
+
+    inferPrim PrimGEmpty = do
+      a <- freshTy
+      constraint $ CQual QSimple a
+      return $ TyGraph a
+
+    inferPrim PrimOverlay = do
+      a <- freshTy
+      constraint $ CQual QSimple a
+      return $ TyGraph a :*: TyGraph a :->: TyGraph a
+
+    inferPrim PrimConnect = do
+      a <- freshTy
+      constraint $ CQual QSimple a
+      return $ TyGraph a :*: TyGraph a :->: TyGraph a
+
+    inferPrim PrimEmpty = do
+      a <- freshTy
+      b <- freshTy
+      constraint $ CQual QSimple a
+      return $ TyMap a b
+
+    inferPrim PrimInsert = do
+      a <- freshTy
+      b <- freshTy
+      constraint $ CQual QSimple a
+      return $ a :*: b :*: TyMap a b :->: TyMap a b
+
+    inferPrim PrimLookup = do
+      a <- freshTy
+      b <- freshTy
+      constraint $ CQual QSimple a
+      return $ a :*: TyMap a b :->: (TyUnit :+: b)
     ----------------------------------------
     -- Container primitives
 

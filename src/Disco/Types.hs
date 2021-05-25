@@ -59,6 +59,8 @@ module Disco.Types
        , pattern TyList
        , pattern TyBag
        , pattern TySet
+       , pattern TyGraph
+       , pattern TyMap
        , pattern TyContainer
        , pattern TyUser
        , pattern TyString
@@ -94,18 +96,19 @@ module Disco.Types
        where
 
 import           Data.Coerce
-import           GHC.Generics                     (Generic)
+import           GHC.Generics                      (Generic)
 import           Unbound.Generics.LocallyNameless
 
-import           Control.Lens                     (toListOf)
-import           Data.List                        (nub)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import           Control.Lens                      (toListOf)
+import           Data.List                         (nub)
+import           Data.Map                          (Map)
+import qualified Data.Map                          as M
+import           Data.Set                          (Set)
+import qualified Data.Set                          as S
 import           Data.Void
+import           Math.Combinatorics.Exact.Binomial (choose)
 
-import           Disco.Subst                      (Substitution)
+import           Disco.Subst                       (Substitution)
 import           Disco.Types.Qualifiers
 
 --------------------------------------------------
@@ -314,6 +317,13 @@ data Con where
   --   See also 'CList', 'CBag', and 'CSet'.
   CContainer :: Atom -> Con
 
+
+  -- | Key value maps, Map k v
+  CMap :: Con
+
+  -- | Graph constructor, Graph a
+  CGraph :: Con
+
   -- | The name of a user defined algebraic datatype.
   CUser :: String -> Con
 
@@ -336,7 +346,7 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CUser #-}
+{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CMap, CUser #-}
 
 ----------------------------------------
 -- Types
@@ -424,6 +434,7 @@ pattern TyQ = TyAtom (ABase Q)
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
 
+
 -- pattern TyFin :: Integer -> Type
 -- pattern TyFin n = TyAtom (ABase (Fin n))
 
@@ -454,6 +465,12 @@ pattern TySet elTy = TyCon CSet [elTy]
 pattern TyContainer :: Atom -> Type -> Type
 pattern TyContainer c elTy = TyCon (CContainer c) [elTy]
 
+pattern TyGraph :: Type -> Type
+pattern TyGraph elTy = TyCon CGraph [elTy]
+
+pattern TyMap :: Type -> Type -> Type
+pattern TyMap tyKey tyValue = TyCon CMap [tyKey, tyValue]
+
 -- | An application of a user-defined type.
 pattern TyUser :: String -> [Type] -> Type
 pattern TyUser nm args = TyCon (CUser nm) args
@@ -463,7 +480,7 @@ pattern TyString = TyList TyC
 
 {-# COMPLETE
       TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
-      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyUser #-}
+      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyGraph, TyMap, TyUser #-}
 
 -- | Is this a type variable?
 isTyVar :: Type -> Bool
@@ -551,6 +568,26 @@ countType (TyBag ty)
   | otherwise           = Nothing
 countType (TySet ty)    = (2^) <$> countType ty
 
+  -- t = number of elements in vertex type.
+  -- n = number of vertices in the graph.
+  -- For each n in [0..t], we can choose which n values to use for the
+  --   vertices; then for each ordered pair of vertices (u,v)
+  --   (including the possibility that u = v), we choose whether or
+  --   not there is a directed edge u -> v.
+  --
+  -- https://oeis.org/A135748
+
+countType (TyGraph ty)  =
+  (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..t]) <$>
+  countType ty
+
+countType (TyMap tyKey tyValue)
+  | isEmptyTy tyKey     = Just 1     -- If we can't have any keys or values,
+  | isEmptyTy tyValue   = Just 1     -- only option is empty map
+  | otherwise           = (\k v -> (v+1) ^ k) <$> countType tyKey <*> countType tyValue
+      -- (v+1)^k since for each key, we can choose among v values to associate with it,
+      -- or we can choose to not have the key in the map.
+
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
 countType _             = Nothing
 
@@ -565,17 +602,15 @@ isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
-isEmptyTy TyVoid         = True
--- isEmptyTy (TyFin 0)      = True
-isEmptyTy (ty1 :*: ty2)  = isEmptyTy ty1 || isEmptyTy ty2
-isEmptyTy (ty1 :+: ty2)  = isEmptyTy ty1 && isEmptyTy ty2
-isEmptyTy (ty1 :->: ty2) = not (isEmptyTy ty1) && isEmptyTy ty2
-isEmptyTy _              = False
+isEmptyTy ty
+  | Just 0 <- countType ty = True
+  | otherwise              = False
 
 -- | Decide whether a type is finite.
 isFiniteTy :: Type -> Bool
-isFiniteTy ty | Just _ <- countType ty = True
-              | otherwise              = False
+isFiniteTy ty
+  | Just _ <- countType ty = True
+  | otherwise              = False
 
 -- | Decide whether a type is searchable, i.e. effectively enumerable.
 isSearchable :: Type -> Bool

@@ -4,6 +4,7 @@
 {-# LANGUAGE GADTs             #-}
 {-# LANGUAGE PatternSynonyms   #-}
 {-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TupleSections     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadException instances, see below.
@@ -27,6 +28,7 @@ module Disco.Eval
          -- * Values
 
          Value(.., VFun, VDelay)
+       , SimpleValue(..)
 
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
@@ -87,6 +89,7 @@ import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
+import           Data.Bifunctor                          (first, second)
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import           Data.IntSet                             (IntSet)
@@ -100,6 +103,9 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
+import           Algebra.Graph                           (Graph (Connect, Empty, Overlay, Vertex),
+                                                          foldg)
+import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 import           System.Console.Haskeline.MonadException
 
 import           Disco.AST.Core
@@ -181,11 +187,35 @@ data Value where
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
 
+  -- | A Graph in the algebraic repesentation. The stored value is an indirection to the graph's adjacency map representation.
+  VGraph :: Graph SimpleValue -> Value -> Value
+
+  -- | A map from keys to values. Differs from functions because we can
+  --   actually construct the set of entries, while functions only have this
+  --   property when the key type is finite.
+  VMap :: M.Map SimpleValue Value -> Value
+
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
   VType :: Type -> Value
   deriving Show
+
+-- | Values which can be used as keys in a map, i.e. those for which a
+--   Haskell Ord instance can be easily created.  These should always
+--   be of a type for which the QSimple qualifier can be constructed.
+--   At the moment these are always fully evaluated (containing no
+--   indirections) and thus don't need memory management.  At some
+--   point in the future constructors for simple graphs and simple
+--   maps could be created, if the value type is also QSimple.  The
+--   only reason for actually doing this would be constructing graphs
+--   of graphs or maps of maps, or the like.
+data SimpleValue where
+  SNum   :: RationalDisplay -> Rational -> SimpleValue
+  SCons  :: Int -> [SimpleValue] -> SimpleValue
+  SBag   :: [(SimpleValue, Integer)] -> SimpleValue
+  SType  :: Type -> SimpleValue
+  deriving (Show, Eq, Ord)
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
@@ -653,6 +683,8 @@ reachable (VIndir l)      = reachableLoc l
 reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
 reachable (VBag vs)       = reachables (map fst vs)
 reachable (VProp p)       = reachableProp p
+reachable (VGraph _ adj)  = reachable adj -- A graph can only contain SimpleValues, which by def contain no indirection. However its buffered adjacency map can.
+reachable (VMap m)        = reachables (M.elems m)
 reachable _               = return ()
 
 -- | Mark the memory locations reachable from a prop.

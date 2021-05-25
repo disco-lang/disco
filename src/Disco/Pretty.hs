@@ -34,11 +34,10 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, SimpleValue,
-                                                   Value (..), io, iputStr,
-                                                   iputStrLn, topTyDefns)
-import           Disco.Interpret.Core             (graphSummary, mapToSet, rnfV,
-                                                   whnfV)
+import           Disco.Eval                       (Disco, IErr, Value (..), io,
+                                                   iputStr, iputStrLn,
+                                                   topTyDefns)
+import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -452,7 +451,7 @@ prettyWHNF out (TySet t) (VBag xs) =
   out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
-prettyWHNF out (TyGraph a) (VGraph g adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
+prettyWHNF out (TyGraph a) (VGraph _ adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
 prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
 
 prettyWHNF _ ty v = error $

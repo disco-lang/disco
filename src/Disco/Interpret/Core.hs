@@ -56,8 +56,7 @@ module Disco.Interpret.Core
 
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (filterM, join, liftM,
-                                                          (>=>))
+import           Control.Monad                           (filterM, liftM, (>=>))
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
 import           Data.Bifunctor                          (first, second)
@@ -74,7 +73,6 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Math.Combinatorics.Exact.Binomial       (choose)
 import           Math.Combinatorics.Exact.Factorial      (factorial)
 
-import           Math.NumberTheory.Logarithms            (integerLog2)
 import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
                                                           invertSomeMod, modulo,
                                                           powSomeMod)
@@ -885,7 +883,7 @@ whnfOp OCount          = arity1 "count"    $ countOp
 --------------------------------------------------
 -- Graphs
 
-whnfOp (OSummary ty)   = arity1 "graphSummary"  $ graphSummary ty
+whnfOp OSummary        = arity1 "graphSummary"  graphSummary
 whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> toSimpleValue >=> graphVertex ty
 whnfOp (OOverlay ty)   = arity2 "graphOverlay"  $ graphOverlay ty
 whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
@@ -1726,8 +1724,8 @@ directlyReduceSummary :: Type -> Graph SimpleValue -> Disco IErr Value
 directlyReduceSummary ty = toDiscoAdjMap ty . reifyGraph
 
 -- Lookup the stored adjacency map from the indirection stored in this graph
-graphSummary :: Type -> Value -> Disco IErr Value
-graphSummary ty g = do
+graphSummary :: Value -> Disco IErr Value
+graphSummary g = do
     VGraph _ adj <- whnfV g
     whnfV adj
 
@@ -1761,7 +1759,7 @@ mapLookup k m = do
     VMap m' <- whnfV m
     k' <- toSimpleValue k
     case M.lookup k' m' of
-        Just v'   -> return $ VCons 1 [v']
-        otherwise -> return $ leftUnit
+        Just v' -> return $ VCons 1 [v']
+        _       -> return leftUnit
     where
     leftUnit = VCons 0 [VCons 0 []]

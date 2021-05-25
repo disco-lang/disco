@@ -28,16 +28,18 @@ showVal :: Int -> Value -> String
 showVal 0 _            = "_"
 showVal _ (VNum _ r)   = show r
 showVal k (VCons i vs) = "K" ++ show i ++ " [" ++ intercalate ", " (map (showVal (k-1)) vs) ++ "]"
-showVal _ (VConst op)  = show op
-showVal _ (VClos {})   = "<closure>"
-showVal _ (VPAp {} )   = "<pap>"
-showVal _ (VThunk {})  = "<thunk>"
-showVal _ (VIndir l)   = "-> " ++ show l
-showVal _ (VFun_ {})   = "<fun>"
-showVal _ (VDelay_ {}) = "<delay>"
-showVal _ (VBag {})    = "<bag>"
-showVal _ (VType {})   = "<type>"
-showVal _ (VProp {})   = "<prop>"
+showVal _ (VConst op) = show op
+showVal _ VClos{}     = "<closure>"
+showVal _ VPAp{}      = "<pap>"
+showVal _ VThunk{}    = "<thunk>"
+showVal _ (VIndir l)  = "-> " ++ show l
+showVal _ VFun_{}     = "<fun>"
+showVal _ VDelay_{}   = "<delay>"
+showVal _ VBag{}      = "<bag>"
+showVal _ VType{}     = "<type>"
+showVal _ VProp{}     = "<prop>"
+showVal _ VGraph{}    = "<graph>"
+showVal _ VMap{}      = "<map>"
 
 printMem :: Disco IErr ()
 printMem = do
@@ -53,6 +55,6 @@ handleCMD :: String -> Disco IErr ()
 handleCMD "" = return ()
 handleCMD s = do
     exts <- use enabledExts
-    case (parseLine discoCommands exts s) of
+    case parseLine discoCommands exts s of
       Left msg -> io $ putStrLn msg
       Right l -> dispatch discoCommands l `catchError` (io . print  {- XXX pretty-print error -})

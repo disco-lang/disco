@@ -578,7 +578,7 @@ countType (TySet ty)    = (2^) <$> countType ty
   -- https://oeis.org/A135748
 
 countType (TyGraph ty)  =
-  (\t -> sum $ map (\n -> (t `choose` n) * 2^(n^2)) [0..t]) <$>
+  (\t -> sum $ map (\n -> (t `choose` n) * 2^(n*n)) [0 .. t]) <$>
   countType ty
 
 countType (TyMap tyKey tyValue)

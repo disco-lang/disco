@@ -185,15 +185,15 @@ compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
 compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
 
-compilePrim (TyGraph a :->: TyMap _ _) PrimSummary = return $ CConst (OSummary a)
+compilePrim (TyGraph _ :->: TyMap _ _) PrimSummary = return $ CConst OSummary
 compilePrim ty PrimVertex  = return $ CConst $ OVertex ty
 compilePrim ty PrimGEmpty  = return $ CConst $ OGEmpty ty
 compilePrim ty PrimOverlay = return $ CConst $ OOverlay ty
 compilePrim ty PrimConnect = return $ CConst $ OConnect ty
 
-compilePrim ty PrimEmpty  = return $ CConst OEmpty
-compilePrim ty PrimInsert = return $ CConst OInsert
-compilePrim ty PrimLookup = return $ CConst OLookup
+compilePrim _  PrimEmpty  = return $ CConst OEmpty
+compilePrim _  PrimInsert = return $ CConst OInsert
+compilePrim _  PrimLookup = return $ CConst OLookup
 
 compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)

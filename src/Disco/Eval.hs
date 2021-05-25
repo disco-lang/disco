@@ -89,7 +89,6 @@ import qualified Control.Monad.Fail                      as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
-import           Data.Bifunctor                          (first, second)
 import           Data.IntMap.Lazy                        (IntMap)
 import qualified Data.IntMap.Lazy                        as IntMap
 import           Data.IntSet                             (IntSet)
@@ -103,9 +102,7 @@ import           Text.Megaparsec                         hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Algebra.Graph                           (Graph (Connect, Empty, Overlay, Vertex),
-                                                          foldg)
-import qualified Algebra.Graph.AdjacencyMap              as AdjMap
+import           Algebra.Graph                           (Graph)
 import           System.Console.Haskeline.MonadException
 
 import           Disco.AST.Core

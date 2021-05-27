@@ -186,15 +186,15 @@ compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
 compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst (OSetToMap k v)
 
-compilePrim (TyGraph _ :->: TyMap _ _) PrimSummary = return $ CConst OSummary
-compilePrim ty PrimVertex  = return $ CConst $ OVertex ty
-compilePrim ty PrimGEmpty  = return $ CConst $ OGEmpty ty
-compilePrim ty PrimOverlay = return $ CConst $ OOverlay ty
-compilePrim ty PrimConnect = return $ CConst $ OConnect ty
+compilePrim _     PrimSummary = return $ CConst OSummary
+compilePrim (TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty
+compilePrim (TyGraph ty) PrimEmptyGraph = return $ CConst $ OEmptyGraph ty
+compilePrim (_ :->: TyGraph ty) PrimOverlay    = return $ CConst $ OOverlay ty
+compilePrim (_ :->: TyGraph ty) PrimConnect    = return $ CConst $ OConnect ty
 
-compilePrim _  PrimEmpty  = return $ CConst OEmpty
-compilePrim _  PrimInsert = return $ CConst OInsert
-compilePrim _  PrimLookup = return $ CConst OLookup
+compilePrim _  PrimEmptyMap   = return $ CConst OEmptyMap
+compilePrim _  PrimInsert     = return $ CConst OInsert
+compilePrim _  PrimLookup     = return $ CConst OLookup
 
 compilePrim (_ :*: TyList _ :->: _)          PrimEach = return $ CConst OEachList
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
@@ -323,8 +323,8 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 --       , Divides ==> OMDivides
 --       ]
 
-
---Graph operations are separate, but use same syntax, as traditional addition and multiplication
+-- Graph operations are separate, but use the same syntax, as traditional
+-- addition and multiplication.
 compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
   | op `elem` [Add, Mul]
   = CConst (regularOps ! op)
@@ -333,8 +333,6 @@ compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
       [ Add     ==> OOverlay a
       , Mul     ==> OConnect a
       ]
-
-
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

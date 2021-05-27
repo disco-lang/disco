@@ -539,7 +539,7 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QSimple a
       return $ a :->: TyGraph a
 
-    inferPrim PrimGEmpty = do
+    inferPrim PrimEmptyGraph = do
       a <- freshTy
       constraint $ CQual QSimple a
       return $ TyGraph a
@@ -554,7 +554,7 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QSimple a
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
-    inferPrim PrimEmpty = do
+    inferPrim PrimEmptyMap = do
       a <- freshTy
       b <- freshTy
       constraint $ CQual QSimple a

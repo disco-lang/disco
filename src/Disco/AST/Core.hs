@@ -160,12 +160,12 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
         | OSummary        -- ^ Adjacency List of given graph
-        | OGEmpty Type    -- ^ Graph empty
+        | OEmptyGraph Type -- ^ Empty graph
         | OVertex Type    -- ^ Construct a vertex with given value
         | OOverlay Type   -- ^ Graph overlay
         | OConnect Type   -- ^ Graph connect
 
-        | OEmpty          -- ^ Map empty
+        | OEmptyMap       -- ^ Empty map
         | OInsert         -- ^ Map insert
         | OLookup         -- ^ Map lookup
 
@@ -208,11 +208,12 @@ data Op = OAdd      -- ^ Addition (@+@)
   deriving (Show, Generic)
 
 -- | Get the arity (desired number of arguments) of a function
---   constant.  Note, this used to do something interesting, but now
---   that primitives and things in the standard library are uncurried,
---   the arity of everything is 1.
+--   constant.  A few constants have arity 0; everything else is
+--   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity _ = 1
+opArity OEmptyMap       = 0
+opArity (OEmptyGraph _) = 0
+opArity _               = 1
 
 -- opArity OAdd             = 2
 -- opArity ONeg             = 1

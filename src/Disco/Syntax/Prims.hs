@@ -35,54 +35,54 @@ import           Disco.Syntax.Operators
 
 -- | Primitives, /i.e./ built-in constants.
 data Prim where
-  PrimUOp     :: UOp -> Prim  -- ^ Unary operator
-  PrimBOp     :: BOp -> Prim  -- ^ Binary operator
+  PrimUOp        :: UOp -> Prim -- ^ Unary operator
+  PrimBOp        :: BOp -> Prim -- ^ Binary operator
 
-  PrimSqrt    :: Prim      -- ^ Integer square root (@sqrt@)
-  PrimFloor   :: Prim      -- ^ Floor of fractional type (@floor@)
-  PrimCeil    :: Prim      -- ^ Ceiling of fractional type (@ceiling@)
-  PrimAbs     :: Prim      -- ^ Absolute value (@abs@)
+  PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
+  PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)
+  PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
+  PrimAbs        :: Prim        -- ^ Absolute value (@abs@)
 
-  PrimSize    :: Prim      -- ^ Size of a set (XXX should be in library)
-  PrimPower   :: Prim      -- ^ Power set (XXX or bag?)
+  PrimSize       :: Prim        -- ^ Size of a set (XXX should be in library)
+  PrimPower      :: Prim        -- ^ Power set (XXX or bag?)
 
-  PrimList    :: Prim      -- ^ Container -> list conversion
-  PrimBag     :: Prim      -- ^ Container -> bag conversion
-  PrimSet     :: Prim      -- ^ Container -> set conversion
+  PrimList       :: Prim        -- ^ Container -> list conversion
+  PrimBag        :: Prim        -- ^ Container -> bag conversion
+  PrimSet        :: Prim        -- ^ Container -> set conversion
 
-  PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
-  PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
-  PrimMapToSet :: Prim     -- ^ Map k v -> Set (k × v)
-  PrimSetToMap :: Prim     -- ^ Set (k × v) -> Map k v
+  PrimB2C        :: Prim        -- ^ bag -> set of counts conversion
+  PrimC2B        :: Prim        -- ^ set of counts -> bag conversion
+  PrimMapToSet   :: Prim        -- ^ Map k v -> Set (k × v)
+  PrimSetToMap   :: Prim        -- ^ Set (k × v) -> Map k v
 
-  PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
-  PrimVertex  :: Prim      -- ^ Construct a graph Vertex
-  PrimGEmpty  :: Prim      -- ^ Empty graph
-  PrimOverlay :: Prim      -- ^ Overlay two Graphs
-  PrimConnect :: Prim      -- ^ Connect Graph to another with directed edges
+  PrimSummary    :: Prim        -- ^ Get Adjacency list of Graph
+  PrimVertex     :: Prim        -- ^ Construct a graph Vertex
+  PrimEmptyGraph :: Prim        -- ^ Empty graph
+  PrimOverlay    :: Prim        -- ^ Overlay two Graphs
+  PrimConnect    :: Prim        -- ^ Connect Graph to another with directed edges
 
-  PrimEmpty   :: Prim      -- ^ Empty Map
-  PrimInsert  :: Prim      -- ^ Insert into map
-  PrimLookup  :: Prim      -- ^ Get value associated with key in map
+  PrimEmptyMap   :: Prim        -- ^ Empty Map
+  PrimInsert     :: Prim        -- ^ Insert into map
+  PrimLookup     :: Prim        -- ^ Get value associated with key in map
 
-  PrimEach    :: Prim      -- ^ Each operation for containers
-  PrimReduce  :: Prim      -- ^ Reduce operation for containers
-  PrimFilter  :: Prim      -- ^ Filter operation for containers
-  PrimJoin    :: Prim      -- ^ Monadic join for containers
-  PrimMerge   :: Prim      -- ^ Generic merge operation for bags/sets
+  PrimEach       :: Prim        -- ^ Each operation for containers
+  PrimReduce     :: Prim        -- ^ Reduce operation for containers
+  PrimFilter     :: Prim        -- ^ Filter operation for containers
+  PrimJoin       :: Prim        -- ^ Monadic join for containers
+  PrimMerge      :: Prim        -- ^ Generic merge operation for bags/sets
 
-  PrimIsPrime :: Prim      -- ^ Efficient primality test
-  PrimFactor  :: Prim      -- ^ Factorization
+  PrimIsPrime    :: Prim        -- ^ Efficient primality test
+  PrimFactor     :: Prim        -- ^ Factorization
 
-  PrimCrash   :: Prim      -- ^ Crash
+  PrimCrash      :: Prim        -- ^ Crash
 
-  PrimForever :: Prim      -- ^ @[x, y, z .. ]@
-  PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+  PrimForever    :: Prim        -- ^ @[x, y, z .. ]@
+  PrimUntil      :: Prim        -- ^ @[x, y, z .. e]@
 
-  PrimHolds   :: Prim      -- ^ Test whether a proposition holds
+  PrimHolds      :: Prim        -- ^ Test whether a proposition holds
 
-  PrimLookupSeq :: Prim    -- ^ Lookup OEIS sequence
-  PrimExtendSeq :: Prim    -- ^ Extend OEIS sequence
+  PrimLookupSeq  :: Prim        -- ^ Lookup OEIS sequence
+  PrimExtendSeq  :: Prim        -- ^ Extend OEIS sequence
   deriving (Show, Read, Eq, Ord, Generic)
 
 instance Alpha Prim
@@ -140,11 +140,11 @@ primTable =
 
   , PrimInfo PrimSummary   "summary"        True
   , PrimInfo PrimVertex    "vertex"         True
-  , PrimInfo PrimGEmpty    "emptyGraph"     True
+  , PrimInfo PrimEmptyGraph "emptyGraph"     True
   , PrimInfo PrimOverlay   "overlay"        True
   , PrimInfo PrimConnect   "connect"        True
 
-  , PrimInfo PrimEmpty     "emptyMap"       True
+  , PrimInfo PrimEmptyMap  "emptyMap"       True
   , PrimInfo PrimInsert    "insert"         True
   , PrimInfo PrimLookup    "lookup"         True
 

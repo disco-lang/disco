@@ -54,9 +54,11 @@ module Disco.Interpret.Core
        )
        where
 
+import           Debug.Trace
+
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
-import           Control.Monad                           (filterM, liftM, (>=>))
+import           Control.Monad                           (filterM, (>=>))
 import           Control.Monad.Except                    (catchError,
                                                           throwError)
 import           Data.Bifunctor                          (first, second)
@@ -159,19 +161,19 @@ rnfV :: Value -> Disco IErr Value
 
 -- The value is a constructor: keep the constructor and recursively
 -- reduce all its contents.
-rnfV (VCons i vs)  = VCons i <$> mapM rnfV vs
+rnfV (VCons i vs) = VCons i <$> mapM rnfV vs
 
 -- If the value is a thunk (i.e. unevaluated expression), a delayed
 -- computation, or an indirection (i.e. a pointer to a value), reduce
 -- it one step using 'whnfV' and then recursively continue reducing
 -- the result.
-rnfV v@(VThunk {}) = whnfV v >>= rnfV
-rnfV v@(VDelay {}) = whnfV v >>= rnfV
-rnfV v@(VIndir {}) = whnfV v >>= rnfV
+rnfV v@VThunk{}   = whnfV v >>= rnfV
+rnfV v@VDelay{}   = whnfV v >>= rnfV
+rnfV v@VIndir{}   = whnfV v >>= rnfV
 
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
-rnfV v             = return v
+rnfV v            = return v
 
 --------------------------------------------------
 -- Weak head normal form (WHNF)
@@ -202,8 +204,8 @@ whnfV (VIndir loc)          = whnfIndir loc
 whnfV (VCons i vs)          = VCons i <$> mapM mkSimple vs
 
 -- Arity 0 functions can be boiled down to their core values
-whnfV (VConst OEmpty)       = return $ VMap M.empty
-whnfV (VConst (OGEmpty ty)) = newGraph ty Empty
+whnfV (VConst op)
+  | opArity op == 0 = whnfOp op []
 
 -- Otherwise, the value is already in WHNF (it is a number, a
 -- function, or a constructor).
@@ -246,13 +248,11 @@ whnf (CVar x) = do
       -- if the program already typechecked.
 
 -- Function constants don't reduce in and of themselves. Map & Graph's empty constructors are exceptions because they have arity 0
-whnf (CConst (OGEmpty ty)) = newGraph ty Empty
-whnf (CConst OEmpty)  = return $ VMap $ M.empty
 whnf (CConst x)       = return $ VConst x
 
 -- A constructor is already in WHNF, so just turn its contents into
 -- thunks to be evaluated later when they are demanded.
-whnf (CCons i cs)   = VCons i <$> (mapM mkValue cs)
+whnf (CCons i cs)   = VCons i <$> mapM mkValue cs
 
 -- A number is in WHNF, just turn it into a VNum.
 whnf (CNum d n)     = return $ VNum d n
@@ -385,14 +385,10 @@ match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
 match _ CPWild        = ok
 match v (CPCons i xs) = do
   VCons j vs <- whnfV v
-  case i == j of
-    False -> noMatch
-    True  -> return (Just . M.fromList $ zip xs vs)
+  if i == j then return (Just . M.fromList $ zip xs vs) else noMatch
 match v (CPNat n)     = do
   VNum _ m <- whnfV v
-  case m == n % 1 of
-    False -> noMatch
-    True  -> ok
+  if m == n % 1 then ok else noMatch
 match v (CPFrac x y) = do
   VNum _ r <- whnfV v
   return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
@@ -540,7 +536,7 @@ constdiff (x:xs)
 --   pairing each unique value with its count.  Used to
 --   construct/normalize bags and sets.
 countValues :: Type -> [Value] -> Disco IErr [(Value, Integer)]
-countValues ty = sortNCount (decideOrdFor ty) . (map (,1))
+countValues ty = sortNCount (decideOrdFor ty) . map (,1)
 
 -- | Normalize a list of values where each value is paired with a
 --   count, but there could be duplicate values.  This function uses
@@ -568,7 +564,10 @@ valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
 
 -- | Convert a list of pairs of values to a map. Note that key values should be Simple
 valuesToMap :: [Value] -> Disco IErr Value
-valuesToMap l = (VMap . M.fromList) <$> (mapM (\(VCons 0 [k,v]) -> (,v) <$> (toSimpleValue k)) l)
+valuesToMap l = VMap . M.fromList <$> mapM simpleKey l
+  where
+    simpleKey (VCons 0 [k,v]) = (,v) <$> toSimpleValue k
+    simpleKey v'              = error $ "unexpected value " ++ show v' ++ " in simpleKey"
 
 -- | Generic function for merging two sorted, count-annotated lists of
 --   type @[(a,Integer)]@ a la merge sort, using the given comparison
@@ -648,9 +647,10 @@ listToBag ty v = do
 
 -- | Convert a map to a set of pairs.
 mapToSet :: Type -> Type -> Value -> Disco IErr Value
-mapToSet tyk tyv (VMap v) = do
-  vcs <- countValues (tyk :*: tyv) $ (map (\(k,v) -> VCons 0 [fromSimpleValue k,v])) $ M.toList v
+mapToSet tyk tyv (VMap val) = do
+  vcs <- countValues (tyk :*: tyv) . map (\(k,v) -> VCons 0 [fromSimpleValue k,v]) $ M.toList val
   return $ VBag $ (map . fmap) (const 1) vcs
+mapToSet _ _ v' = error $ "unexpected value " ++ show v' ++ " in mapToSet"
 
 -- | Convert a set of pairs to a map.
 setToMap :: Type -> Type -> Value -> Disco IErr Value
@@ -658,6 +658,7 @@ setToMap tyk tyv (VBag cs) = do
   let kvs = map fst cs
   kvs' <- mapM (whnfV >=> \case { VCons 0 [k, v] -> (,v) <$> toSimpleValue k }) kvs
   return . VMap . M.fromList $ kvs'
+setToMap _ _ v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
 
 -- | Convert a bag to a set of pairs, with each element paired with
 --   its count.
@@ -706,7 +707,7 @@ primEachSet ty f xs = do
   f'       <- whnfV f
   VBag cts <- whnfV xs
   cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
-  (VBag . map (second (const 1))) <$> sortNCount (decideOrdFor ty) cts'
+  VBag . map (second (const 1)) <$> sortNCount (decideOrdFor ty) cts'
 
 --------------------------------------------------
 -- Reduce
@@ -745,9 +746,7 @@ primFilterList p xs = do
     filterOne :: Value -> Value -> Value -> Disco IErr Value
     filterOne p' a as = do
       b <- testPredicate p' a
-      case b of
-        False -> return as
-        True  -> return $ VCons 1 [a, as]
+      if b then return $ VCons 1 [a, as] else return as
 
 -- | Filter a bag (or set) according to a given predicate.
 primFilterBag :: Value -> Value -> Disco IErr Value
@@ -775,7 +774,7 @@ primBagUnions ty bbs = do
 primUnions :: Type -> Value -> Disco IErr Value
 primUnions ty s = do
   VBag cts <- whnfV s
-  ss <- mapM whnfV (map fst cts)
+  ss <- mapM (whnfV . fst) cts
   valuesToSet ty [ x | VBag xs <- ss, (x,_) <- xs ]
 
 --------------------------------------------------
@@ -827,9 +826,7 @@ bagElem ty x b = do
     elemOf [] = return False
     elemOf (y:ys) = do
       eq <- decideEqFor ty x y
-      case eq of
-        False -> elemOf ys
-        True  -> return True
+      if eq then return True else elemOf ys
 
 -- | Test whether a given value is an element of a list.
 listElem :: Type -> Value -> Value -> Disco IErr Value
@@ -839,9 +836,7 @@ listElem ty x xs = do
     VCons 0 _      -> return $ mkEnum False
     VCons 1 [y,ys] -> do
       eq <- decideEqFor ty x y
-      case eq of
-        False -> listElem ty x ys
-        True  -> return $ mkEnum True
+      if eq then return $ mkEnum True else listElem ty x ys
     v -> error $ "Impossible! Non-list value " ++ show v ++ " in listElem"
 
 ------------------------------------------------------------
@@ -882,24 +877,26 @@ whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
 --------------------------------------------------
 -- Combinatorics
 
-whnfOp OMultinom       = arity2 "multinom" $ multinomOp
+whnfOp OMultinom       = arity2 "multinom" multinomOp
 whnfOp OFact           = arity1 "fact"     $ uNumOp' fact
-whnfOp OEnum           = arity1 "enum"     $ enumOp
-whnfOp OCount          = arity1 "count"    $ countOp
+whnfOp OEnum           = arity1 "enum"     enumOp
+whnfOp OCount          = arity1 "count"    countOp
 
 --------------------------------------------------
 -- Graphs
 
-whnfOp OSummary        = arity1 "graphSummary"  graphSummary
-whnfOp (OVertex ty)    = arity1 "graphVertex"   $ whnfV >=> toSimpleValue >=> graphVertex ty
-whnfOp (OOverlay ty)   = arity2 "graphOverlay"  $ graphOverlay ty
-whnfOp (OConnect ty)   = arity2 "graphConnect"  $ graphConnect ty
+whnfOp OSummary         = arity1 "graphSummary"  graphSummary
+whnfOp (OEmptyGraph ty) = arity0 "emptyGraph"    $ newGraph ty Empty
+whnfOp (OVertex ty)     = arity1 "graphVertex"   $ whnfV >=> toSimpleValue >=> graphVertex ty
+whnfOp (OOverlay ty)    = arity2 "graphOverlay"  $ graphOverlay ty
+whnfOp (OConnect ty)    = arity2 "graphConnect"  $ graphConnect ty
 
 --------------------------------------------------
 -- Maps
 
-whnfOp OInsert         = arity3 "mapInsert" $ mapInsert
-whnfOp OLookup         = arity2 "mapLookup" $ mapLookup
+whnfOp OEmptyMap       = arity0 "emptyMap"  $ return (VMap M.empty)
+whnfOp OInsert         = arity3 "mapInsert" mapInsert
+whnfOp OLookup         = arity2 "mapLookup" mapLookup
 
 --------------------------------------------------
 -- Comparison
@@ -909,7 +906,7 @@ whnfOp (OLt ty)        = arity2 "ltOp"     $ ltOp ty
 --------------------------------------------------
 -- Container operations
 
-whnfOp (OSize)         = arity1 "ctrSize"  $ ctrSize
+whnfOp OSize           = arity1 "ctrSize" ctrSize
 whnfOp (OPower ty)     = arity1 "power"    $ power ty
 whnfOp (OBagElem ty)   = arity2 "bagElem"  $ bagElem ty
 whnfOp (OListElem ty)  = arity2 "listElem" $ listElem ty
@@ -923,7 +920,7 @@ whnfOp OSetToList      = arity1 "setToList" $ whnfV >=> setToList
 whnfOp (OListToSet ty) = arity1 "listToSet" $ whnfV >=> listToSet ty
 whnfOp (OListToBag ty) = arity1 "listToBag" $ whnfV >=> listToBag ty
 
-whnfOp OBagToCounts    = arity1 "bagCounts" $ primBagCounts
+whnfOp OBagToCounts    = arity1 "bagCounts" primBagCounts
 whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
 
 whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
@@ -932,23 +929,23 @@ whnfOp (OSetToMap tyK tyV) = arity1 "map"      $ whnfV >=> setToMap tyK tyV
 --------------------------------------------------
 -- Each/reduce
 
-whnfOp OEachList        = (arity2 "eachList"  $ primEachList  ) >=> whnfV
-whnfOp (OEachBag ty)    = (arity2 "eachBag"   $ primEachBag ty) >=> whnfV
-whnfOp (OEachSet ty)    = (arity2 "eachSet"   $ primEachSet ty) >=> whnfV
+whnfOp OEachList        = arity2 "eachList"  primEachList >=> whnfV
+whnfOp (OEachBag ty)    = arity2 "eachBag" (primEachBag ty) >=> whnfV
+whnfOp (OEachSet ty)    = arity2 "eachSet" (primEachSet ty) >=> whnfV
 
-whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
-whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV
+whnfOp OReduceList     = arity3 "reduceList" primReduceList >=> whnfV
+whnfOp OReduceBag      = arity3 "reduceBag"  primReduceBag >=> whnfV
 
 --------------------------------------------------
 -- Filter
 
-whnfOp OFilterList     = (arity2 "filterList" $ primFilterList) >=> whnfV
-whnfOp OFilterBag      = (arity2 "filterBag"  $ primFilterBag)  >=> whnfV
+whnfOp OFilterList     = arity2 "filterList" primFilterList >=> whnfV
+whnfOp OFilterBag      = arity2 "filterBag"  primFilterBag  >=> whnfV
 
 --------------------------------------------------
 -- Join
 
-whnfOp OConcat         = (arity1 "concat"   $ vconcat) >=> whnfV
+whnfOp OConcat         = arity1 "concat"   vconcat >=> whnfV
 whnfOp (OBagUnions ty) = arity1 "bagUnions" $ primBagUnions ty
 whnfOp (OUnions ty)    = arity1 "unions"    $ primUnions ty
 
@@ -975,14 +972,21 @@ whnfOp (OShouldEq ty)  = arity2 "shouldEq"  $ shouldEqOp ty
 --------------------------------------------------
 -- Other primitives
 
-whnfOp OCrash          = arity1 "crash"     $ primCrash
-whnfOp OId             = arity1 "id"        $ whnfV
+whnfOp OCrash          = arity1 "crash"     primCrash
+whnfOp OId             = arity1 "id"        whnfV
 
-whnfOp OExtendSeq      = arity1 "extendSequence" $ oeisExtend
-whnfOp OLookupSeq      = arity1 "lookupSequence" $ oeisLookup
+whnfOp OExtendSeq      = arity1 "extendSequence" oeisExtend
+whnfOp OLookupSeq      = arity1 "lookupSequence" oeisLookup
 
 --------------------------------------------------
 -- Utility functions
+
+-- | Convert a constant ("arity-0 function") to the right shape to
+--   accept a list of arguments; throw an error if the wrong number of
+--   arguments are given.
+arity0 :: String -> Disco IErr Value -> [Value] -> Disco IErr Value
+arity0 _    x [] = x
+arity0 name _ vs = error $ arityError name vs
 
 -- | Convert an arity-1 function to the right shape to accept a list
 --   of arguments; throw an error if the wrong number of arguments are
@@ -1047,7 +1051,7 @@ modDiv n v1 v2 = do
   VNum _ b <- whnfV v2
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
-    Just (InfMod{})   -> error "Impossible! InfMod in modDiv"
+    Just InfMod{}     -> error "Impossible! InfMod in modDiv"
     Nothing           -> throwError DivByZero
 
 modDivides :: Integer -> Value -> Value -> Disco IErr Value
@@ -1062,7 +1066,7 @@ modExp n v1 v2 = do
   VNum _ r1 <- whnfV v1
   VNum _ r2 <- whnfV v2
   let base = numerator r1 `modulo` fromInteger n
-      ma = if (numerator r2 >= 0)
+      ma = if numerator r2 >= 0
              then Just base
              else invertSomeMod base
       b = abs (numerator r2)
@@ -1111,10 +1115,10 @@ integerSqrt' n =
 (^!) x n = x^n
 
 floorOp :: Rational -> Rational
-floorOp n = (floor n) % 1
+floorOp n = floor n % 1
 
 ceilOp :: Rational -> Rational
-ceilOp n  = (ceiling n) % 1
+ceilOp n  = ceiling n % 1
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
@@ -1310,6 +1314,9 @@ testProperty initialSt v = whnfV v >>= ensureProp >>= checkProp
 eqOp :: Type -> Value -> Value -> Disco IErr Value
 eqOp ty v1 v2 = mkEnum <$> decideEqFor ty v1 v2
 
+{-# ANN decideEqFor "HLint: ignore Use if" #-}
+{-# ANN decideEqFor "HLint: ignore Use head" #-}
+
 -- | Lazily decide equality of two values at the given type.
 decideEqFor :: Type -> Value -> Value -> Disco IErr Bool
 
@@ -1395,9 +1402,9 @@ decideEqFor (TyBag ty) v1 v2 = do
   VBag ys <- whnfV v2
   bagEquality ty xs ys
 
-decideEqFor ty@(TyGraph {}) g h = (==EQ) <$> decideOrdFor ty g h
+decideEqFor ty@TyGraph{} g h = (==EQ) <$> decideOrdFor ty g h
 
-decideEqFor ty@(TyMap {})m1 m2 = (==EQ) <$> decideOrdFor ty m1 m2
+decideEqFor ty@TyMap{} m1 m2 = (==EQ) <$> decideOrdFor ty m1 m2
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
@@ -1410,9 +1417,7 @@ bagEquality _ [] _ = return False
 bagEquality _ _ [] = return False
 bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
   eq <- (n1 == n2 &&) <$> decideEqFor ty x y
-  case eq of
-    False -> return False
-    True  -> bagEquality ty xs ys
+  if eq then bagEquality ty xs ys else return False
 
 -- | Decide equality for two values at a given type, when we already
 --   know the values are in RNF.  This means the result doesn't need
@@ -1425,6 +1430,8 @@ decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerateType ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
+
+{-# ANN decideEqForClosures "HLint: ignore Use if" #-}
 
 -- | @decideEqForClosures ty f1 f2 vs@ lazily decides whether the given
 --   functions @f1@ and @f2@ produce the same output (of type @ty@) on
@@ -1468,7 +1475,7 @@ primValEq v1 v2                     = error $ "primValEq on non-primitive values
 -- | Test two expressions to see whether the first is less than the
 --   second at the given type.
 ltOp :: Type -> Value -> Value -> Disco IErr Value
-ltOp ty v1 v2 = (mkEnum . (==LT)) <$> decideOrdFor ty v1 v2
+ltOp ty v1 v2 = mkEnum . (==LT) <$> decideOrdFor ty v1 v2
 
 -- | Lazily decide the ordering of two values at the given type.
 decideOrdFor :: Type -> Value -> Value -> Disco IErr Ordering
@@ -1576,7 +1583,7 @@ decideOrdFor (TyMap k v) m1 m2 = do
       kOrd <- decideOrdFor k (fromSimpleValue k2) (fromSimpleValue k1)
       vOrd <- decideOrdFor v v1 v2
       -- Order primarily on keys, and then on values
-      let o = if (kOrd == EQ) then vOrd else kOrd
+      let o = if kOrd == EQ then vOrd else kOrd
       case o of
 
         -- Recurse if all are EQ.
@@ -1655,7 +1662,7 @@ toSimpleValue v = do
     case v' of
         VNum d n   -> return $ SNum d n
         VCons a xs -> SCons a <$> mapM toSimpleValue xs
-        VBag bs    -> SBag <$> mapM (\(a,b) -> liftM (,b) $ toSimpleValue a) bs
+        VBag bs    -> SBag <$> mapM (\(a,b) -> (,b) <$> toSimpleValue a) bs
         VType t    -> return $ SType t
         t          -> error $ "A non-simple value was passed as simple" ++ show t
 
@@ -1721,7 +1728,7 @@ toDiscoAdjMap ty l =
     VMap . M.fromList <$>
     mapM (\(v,edges) -> do
               set <- valuesToSet ty $ map fromSimpleValue edges
-              return $ (v,set)) l
+              return (v,set)) l
 
 reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
 reifyGraph =
@@ -1742,15 +1749,16 @@ graphVertex a v = newGraph a $ Vertex v
 
 graphOverlay :: Type -> Value -> Value -> Disco IErr Value
 graphOverlay a g h = do
-    VGraph g' _ <- whnfV g
-    VGraph h' _ <- whnfV h
-    newGraph a $ Overlay g' h'
+  VGraph g' _ <- whnfV g
+  VGraph h' _ <- whnfV h
+  newGraph a $ Overlay g' h'
 
 graphConnect :: Type -> Value -> Value -> Disco IErr Value
 graphConnect a g h = do
-    VGraph g' _ <- whnfV g
-    VGraph h' _ <- whnfV h
-    newGraph a $ Connect g' h'
+  traceShowM a
+  VGraph g' _ <- whnfV g
+  VGraph h' _ <- whnfV h
+  newGraph a $ Connect g' h'
 
 ------------------------------------------------------------
 -- Map Utilities

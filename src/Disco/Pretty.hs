@@ -504,7 +504,12 @@ prettyWHNF out (TySet t) (VBag xs) =
 prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
 
 prettyWHNF out (TyGraph a) (VGraph _ adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
-prettyWHNF out (TyMap k v) (VMap m) = prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
+prettyWHNF out (TyMap k v) (VMap m)
+  | M.null m = out "emptyMap"
+  | otherwise = do
+      out "setToMap("
+      prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
+      out ")"
 
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty

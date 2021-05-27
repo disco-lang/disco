@@ -523,6 +523,12 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QSimple k
       return $ TyMap k v :->: TySet (k :*: v)
 
+    inferPrim PrimSetToMap  = do
+      k <- freshTy
+      v <- freshTy
+      constraint $ CQual QSimple k
+      return $ TySet (k :*: v) :->: TyMap k v
+
     inferPrim PrimSummary = do
       a <- freshTy
       constraint $ CQual QSimple a

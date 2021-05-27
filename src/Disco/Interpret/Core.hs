@@ -652,6 +652,13 @@ mapToSet tyk tyv (VMap v) = do
   vcs <- countValues (tyk :*: tyv) $ (map (\(k,v) -> VCons 0 [fromSimpleValue k,v])) $ M.toList v
   return $ VBag $ (map . fmap) (const 1) vcs
 
+-- | Convert a set of pairs to a map.
+setToMap :: Type -> Type -> Value -> Disco IErr Value
+setToMap tyk tyv (VBag cs) = do
+  let kvs = map fst cs
+  kvs' <- mapM (whnfV >=> \case { VCons 0 [k, v] -> (,v) <$> toSimpleValue k }) kvs
+  return . VMap . M.fromList $ kvs'
+
 -- | Convert a bag to a set of pairs, with each element paired with
 --   its count.
 primBagCounts :: Value -> Disco IErr Value
@@ -920,6 +927,7 @@ whnfOp OBagToCounts    = arity1 "bagCounts" $ primBagCounts
 whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
 
 whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
+whnfOp (OSetToMap tyK tyV) = arity1 "setToMap" $ whnfV >=> setToMap tyK tyV
 
 --------------------------------------------------
 -- Map/reduce

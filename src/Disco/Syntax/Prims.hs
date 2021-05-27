@@ -52,7 +52,8 @@ data Prim where
 
   PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
   PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
-  PrimMapToSet :: Prim     -- ^ Map k v -> set of (k,v)
+  PrimMapToSet :: Prim     -- ^ Map k v -> Set (k × v)
+  PrimSetToMap :: Prim     -- ^ Set (k × v) -> Map k v
 
   PrimSummary :: Prim      -- ^ Get Adjacency list of Graph
   PrimVertex  :: Prim      -- ^ Construct a graph Vertex
@@ -119,48 +120,49 @@ data PrimInfo =
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-  [ PrimInfo (PrimUOp Not) "not"     True
-  , PrimInfo PrimSqrt      "sqrt"    True
-  , PrimInfo PrimFloor     "floor"   True
-  , PrimInfo PrimCeil      "ceiling" True
-  , PrimInfo PrimAbs       "abs"     True
+  [ PrimInfo (PrimUOp Not) "not"            True
+  , PrimInfo PrimSqrt      "sqrt"           True
+  , PrimInfo PrimFloor     "floor"          True
+  , PrimInfo PrimCeil      "ceiling"        True
+  , PrimInfo PrimAbs       "abs"            True
 
-  , PrimInfo PrimSize      "size"    True
-  , PrimInfo PrimPower     "power"   True
+  , PrimInfo PrimSize      "size"           True
+  , PrimInfo PrimPower     "power"          True
 
-  , PrimInfo PrimList      "list"    True
-  , PrimInfo PrimBag       "bag"     True
-  , PrimInfo PrimSet       "set"     True
+  , PrimInfo PrimList      "list"           True
+  , PrimInfo PrimBag       "bag"            True
+  , PrimInfo PrimSet       "set"            True
 
-  , PrimInfo PrimB2C       "bagCounts" True
-  , PrimInfo PrimC2B       "bagFromCounts" True
-  , PrimInfo PrimMapToSet  "mapToSet"  True
+  , PrimInfo PrimB2C       "bagCounts"      True
+  , PrimInfo PrimC2B       "bagFromCounts"  True
+  , PrimInfo PrimMapToSet  "mapToSet"       True
+  , PrimInfo PrimSetToMap  "setToMap"       True
 
-  , PrimInfo PrimSummary   "summary" True
-  , PrimInfo PrimVertex    "vertex"  True
-  , PrimInfo PrimGEmpty    "emptygraph" True
-  , PrimInfo PrimOverlay   "overlay" True
-  , PrimInfo PrimConnect   "connect" True
+  , PrimInfo PrimSummary   "summary"        True
+  , PrimInfo PrimVertex    "vertex"         True
+  , PrimInfo PrimGEmpty    "emptyGraph"     True
+  , PrimInfo PrimOverlay   "overlay"        True
+  , PrimInfo PrimConnect   "connect"        True
 
-  , PrimInfo PrimEmpty     "empty"   True
-  , PrimInfo PrimInsert    "insert"  True
-  , PrimInfo PrimLookup    "lookup"  True
+  , PrimInfo PrimEmpty     "emptyMap"       True
+  , PrimInfo PrimInsert    "insert"         True
+  , PrimInfo PrimLookup    "lookup"         True
 
-  , PrimInfo PrimMap       "map"     True
-  , PrimInfo PrimReduce    "reduce"  True
-  , PrimInfo PrimFilter    "filter"  True
-  , PrimInfo PrimJoin      "join"    False
-  , PrimInfo PrimMerge     "merge"   False
+  , PrimInfo PrimMap       "map"            True
+  , PrimInfo PrimReduce    "reduce"         True
+  , PrimInfo PrimFilter    "filter"         True
+  , PrimInfo PrimJoin      "join"           False
+  , PrimInfo PrimMerge     "merge"          False
 
-  , PrimInfo PrimIsPrime   "isPrime" False
-  , PrimInfo PrimFactor    "factor"  False
+  , PrimInfo PrimIsPrime   "isPrime"        False
+  , PrimInfo PrimFactor    "factor"         False
 
-  , PrimInfo PrimCrash     "crash"   False
+  , PrimInfo PrimCrash     "crash"          False
 
-  , PrimInfo PrimForever   "forever" False
-  , PrimInfo PrimUntil     "until"   False
+  , PrimInfo PrimForever   "forever"        False
+  , PrimInfo PrimUntil     "until"          False
 
-  , PrimInfo PrimHolds     "holds"   True
+  , PrimInfo PrimHolds     "holds"          True
 
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False

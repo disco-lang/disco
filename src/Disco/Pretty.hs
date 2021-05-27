@@ -208,6 +208,11 @@ prettyTyDef tyName (TyDefBody ps body)
 prettyName :: Name a -> Doc
 prettyName = text . show
 
+-- Pretty-print a term with guaranteed parentheses.
+prettyTermP :: Term -> Doc
+prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
+prettyTermP t        = withPA initPA $ prettyTerm t
+
 prettyTerm :: Term -> Doc
 prettyTerm (TVar x)      = prettyName x
 prettyTerm (TPrim (PrimUOp uop)) = case M.lookup uop uopMap of
@@ -254,10 +259,8 @@ prettyTerm (TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])) = withPA (getPA bop) $
   ]
 
 -- Always pretty-print function applications with parentheses
-prettyTerm (TApp t1 t2@TTup{}) = withPA funPA $      -- f(x,y)
-  lt (prettyTerm t1) <> rt (prettyTerm t2)
-prettyTerm (TApp t1 t2)  = withPA funPA $            -- f(x)
-  lt (prettyTerm t1) <> withPA initPA (prettyTerm t2)
+prettyTerm (TApp t1 t2)  = withPA funPA $
+  lt (prettyTerm t1) <> prettyTermP t2
 
 prettyTerm (TTup ts)     = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyTerm ts)
@@ -275,10 +278,8 @@ prettyTerm (TContainer c ts e)  = setPA initPA $ do
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
   setPA initPA $ containerDelims c (hsep [prettyTerm t, text "|", prettyQuals qs])
-prettyTerm (TInj side t@TTup{})  = withPA funPA $
-  prettySide side <> rt (prettyTerm t)
 prettyTerm (TInj side t)  = withPA funPA $
-  prettySide side <> withPA initPA (prettyTerm t)
+  prettySide side <> prettyTermP t
 prettyTerm (TNat n)       = integer n
 prettyTerm (TChain t lks) = withPA (getPA Eq) . hsep $
     lt (prettyTerm t)
@@ -371,6 +372,11 @@ prettyQual (QBind x (unembed -> t))
 prettyQual (QGuard (unembed -> t))
   = prettyTerm t
 
+-- Print out a pattern with guaranteed parentheses.
+prettyPatternP :: Pattern -> Doc
+prettyPatternP p@PTup{} = setPA initPA $ prettyPattern p
+prettyPatternP p        = withPA initPA $ prettyPattern p
+
 prettyPattern :: Pattern -> Doc
 prettyPattern (PVar x)          = prettyName x
 prettyPattern PWild             = text "_"
@@ -383,10 +389,8 @@ prettyPattern (PString s)       = text (show s)
 prettyPattern (PTup ts)         = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyPattern ts)
   parens (hsep ds)
-prettyPattern (PInj s p@PTup{}) = withPA funPA $
-  prettySide s <> rt (prettyPattern p)
 prettyPattern (PInj s p)        = withPA funPA $
-  prettySide s <> withPA initPA (prettyPattern p)
+  prettySide s <> prettyPatternP p
 prettyPattern (PNat n)          = integer n
 prettyPattern (PCons p1 p2)     = withPA (getPA Cons) $
   lt (prettyPattern p1) <+> text "::" <+> rt (prettyPattern p2)
@@ -428,7 +432,7 @@ prettyDefn (Defn x patTys ty clauses) = vcat $
 prettyClause :: Name a -> Bind [Pattern] Term -> Doc
 prettyClause x b
   = withPA funPA . lunbind b $ \(ps, t) ->
-      prettyName x <> hcat (map (withPA initPA . prettyPattern) ps) <+> text "=" <+> setPA initPA (prettyTerm t)
+      prettyName x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (prettyTerm t)
 
 prettyProperty :: Property -> Doc
 prettyProperty = prettyTerm

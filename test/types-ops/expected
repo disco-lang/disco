@@ -1,20 +1,20 @@
-right 0
-right 1
-right 2
-right 16
-right 4
-right 1
-right 1
-left ()
-right 0
-right 0
-right 1
-right 0
-right 1
+right(0)
+right(1)
+right(2)
+right(16)
+right(4)
+right(1)
+right(1)
+left(())
+right(0)
+right(0)
+right(1)
+right(0)
+right(1)
 []
 [<Bool → Bool>, <Bool → Bool>, <Bool → Bool>, <Bool → Bool>]
-[left (false, false), left (false, true), left (true, false), left (true, true), right false, right true]
-[left (), right false, right true]
+[left(false, false), left(false, true), left(true, false), left(true, true), right(false), right(true)]
+[left(()), right(false), right(true)]
 []
 [[]]
 [[]]
@@ -24,14 +24,14 @@ InfiniteTy (TyCon (CContainer (ABase CtrList)) [TyAtom (ABase Unit)])
 [<Void → ℕ>]
 []
 [<Void → Void>]
-right 1
-left ()
-right 1
-right 2
-right 4
-right 1114112
-right 1
-right 0
+right(1)
+left(())
+right(1)
+right(2)
+right(4)
+right(1114112)
+right(1)
+right(0)
 true
 true
 false

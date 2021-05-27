@@ -465,6 +465,12 @@ prettyValue ty v = do
 prettyValueWith :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
 prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 
+-- | Pretty-print a value with guaranteed parentheses.  Do nothing for
+--   tuples; add an extra set of parens for other values.
+prettyValueWithP :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyValueWithP k ty@(_ :*: _) v = prettyValueWith k ty v
+prettyValueWithP k ty           v = k "(" >> prettyValueWith k ty v >> k ")"
+
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
 prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
@@ -482,8 +488,8 @@ prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(_ :*: _)    v            = out "(" >> prettyTuple out ty v >> out ")"
 prettyWHNF out (ty1 :+: ty2) (VCons i [v])
   = case i of
-      0 -> out "left "  >> prettyValueWith out ty1 v
-      1 -> out "right " >> prettyValueWith out ty2 v
+      0 -> out "left"  >> prettyValueWithP out ty1 v
+      1 -> out "right" >> prettyValueWithP out ty2 v
       _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyWHNF"
 prettyWHNF out _ (VNum d r)
   | denominator r == 1 = out $ show (numerator r)

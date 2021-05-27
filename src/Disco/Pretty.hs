@@ -50,6 +50,9 @@ import           Disco.Types
 vcat :: Monad f => [f PP.Doc] -> f PP.Doc
 vcat ds  = PP.vcat <$> sequence ds
 
+hcat :: Monad f => [f PP.Doc] -> f PP.Doc
+hcat ds  = PP.hcat <$> sequence ds
+
 hsep :: Monad f => [f PP.Doc] -> f PP.Doc
 hsep ds  = PP.hsep <$> sequence ds
 
@@ -118,16 +121,42 @@ instance Ord PA where
 initPA :: PA
 initPA = PA 0 InL
 
+ascrPA :: PA
+ascrPA = PA 1 InL
+
 funPA :: PA
 funPA = PA funPrec InL
 
-arrPA :: PA
-arrPA = PA 1 InR
+rPA :: Int -> PA
+rPA n = PA n InR
+
+tarrPA, taddPA, tmulPA, tfunPA :: PA
+tarrPA = rPA 1
+taddPA = rPA 6
+tmulPA = rPA 7
+tfunPA = PA 9 InL
 
 type Doc = ReaderT PA (Disco IErr) PP.Doc
 
 renderDoc :: Doc -> Disco IErr String
 renderDoc = fmap PP.render . flip runReaderT initPA
+
+withPA :: PA -> Doc -> Doc
+withPA pa = mparens pa . setPA pa
+
+setPA :: PA -> Doc -> Doc
+setPA pa = local (const pa)
+
+lt :: Doc -> Doc
+lt = local (\(PA p _) -> PA p InL)
+
+rt :: Doc -> Doc
+rt = local (\(PA p _) -> PA p InR)
+
+mparens :: PA -> Doc -> Doc
+mparens pa doc = do
+  parentPA <- ask
+  (if pa < parentPA then parens else id) doc
 
 --------------------------------------------------
 
@@ -138,35 +167,33 @@ prettyTy TyUnit           = text "Unit"
 prettyTy TyBool           = text "Bool"
 prettyTy TyProp           = text "Prop"
 prettyTy TyC              = text "Char"
-prettyTy (ty1 :->: ty2)   = mparens arrPA $
-  prettyTy' 1 InL ty1 <+> text "→" <+> prettyTy' 1 InR ty2
-prettyTy (ty1 :*: ty2)    = mparens (PA 7 InR) $
-  prettyTy' 7 InL ty1 <+> text "×" <+> prettyTy' 7 InR ty2
-prettyTy (ty1 :+: ty2)    = mparens (PA 6 InR) $
-  prettyTy' 6 InL ty1 <+> text "+" <+> prettyTy' 6 InR ty2
+prettyTy (ty1 :->: ty2)   = withPA tarrPA $
+  lt (prettyTy ty1) <+> text "→" <+> rt (prettyTy ty2)
+prettyTy (ty1 :*: ty2)    = withPA tmulPA $
+  lt (prettyTy ty1) <+> text "×" <+> rt (prettyTy ty2)
+prettyTy (ty1 :+: ty2)    = withPA taddPA $
+  lt (prettyTy ty1) <+> text "+" <+> rt (prettyTy ty2)
 prettyTy TyN              = text "ℕ"
 prettyTy TyZ              = text "ℤ"
 prettyTy TyQ              = text "ℚ"
 prettyTy TyF              = text "𝔽"
 -- prettyTy (TyFin n)        = text "ℤ" <> (integer n)
-prettyTy (TyList ty)      = mparens (PA 9 InR) $
-  text "List" <+> prettyTy' 9 InR ty
-prettyTy (TyBag ty)       = mparens (PA 9 InR) $
-  text "Bag" <+> prettyTy' 9 InR ty
-prettyTy (TySet ty)       = mparens (PA 9 InR) $
-  text "Set" <+> prettyTy' 9 InR ty
-prettyTy (TyContainer (AVar (U c)) ty) = mparens (PA 9 InR) $
-  text (show c) <+> prettyTy' 9 InR ty
-prettyTy (TyUser name args) = mparens (PA 9 InR) $
-  hsep (text name : map (prettyTy' 9 InR) args)
+prettyTy (TyList ty)      = withPA tfunPA $
+  text "List" <+> rt (prettyTy ty)
+prettyTy (TyBag ty)       = withPA tfunPA $
+  text "Bag" <+> rt (prettyTy ty)
+prettyTy (TySet ty)       = withPA tfunPA $
+  text "Set" <+> rt (prettyTy ty)
+prettyTy (TyContainer (AVar (U c)) ty) = withPA tfunPA $
+  text (show c) <+> rt (prettyTy ty)
+prettyTy (TyUser name [])   = text name
+prettyTy (TyUser name args) = withPA tfunPA $
+  hsep (text name : map (rt . prettyTy) args)
 prettyTy (TySkolem n)     = text "%" <> prettyName n
-prettyTy (TyGraph ty)     = mparens (PA 9 InR) $
-  text "Graph" <+> prettyTy' 9 InR ty
-prettyTy (TyMap k v)      =  mparens (PA 9 InR) $
-  hsep [text "Map", prettyTy' 9 InR k, prettyTy' 9 InR v]
-
-prettyTy' :: Prec -> BFixity -> Type -> Doc
-prettyTy' p a t = local (const (PA p a)) (prettyTy t)
+prettyTy (TyGraph ty)     = withPA tfunPA $
+  text "Graph" <+> rt (prettyTy ty)
+prettyTy (TyMap k v)      =  withPA tfunPA $
+  hsep [text "Map", rt (prettyTy k), rt (prettyTy v)]
 
 prettyPolyTy :: PolyType -> Doc
 prettyPolyTy (Forall bnd) = lunbind bnd $
@@ -177,11 +204,6 @@ prettyTyDef tyName (TyDefBody ps body)
   = text tyName <+> hsep (map text ps) <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
 
 --------------------------------------------------
-
-mparens :: PA -> Doc -> Doc
-mparens pa doc = do
-  parentPA <- ask
-  (if pa < parentPA then parens else id) doc
 
 prettyName :: Name a -> Doc
 prettyName = text . show
@@ -203,12 +225,12 @@ prettyTerm TUnit         = text "()"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
-prettyTerm (TAbs q bnd)  = mparens initPA $
+prettyTerm (TAbs q bnd)  = withPA initPA $
   lunbind bnd $ \(args, body) ->
-  prettyQ q <> (if length args > 1 then text " " else empty)
-          <> (hsep =<< punctuate (text ",") (map prettyPattern args))
-          <> text "."
-          <+> prettyTerm' 0 InL body
+  prettyQ q
+    <> (hsep =<< punctuate (text ",") (map prettyPattern args))
+    <> text "."
+    <+> lt (prettyTerm body)
   where
     prettyQ Lam = text "λ"
     prettyQ All = text "∀"
@@ -217,26 +239,30 @@ prettyTerm (TAbs q bnd)  = mparens initPA $
 -- special case for fully applied unary operators
 prettyTerm (TApp (TPrim (PrimUOp uop)) t) =
   case M.lookup uop uopMap of
-    Just (OpInfo (UOpF Post _) _ _) -> mparens (ugetPA uop) $
-      prettyTerm' (1 + funPrec) InL t <> prettyUOp uop
-    Just (OpInfo (UOpF Pre  _) _ _) -> mparens (ugetPA uop) $
-      prettyUOp uop <> prettyTerm' (1 + funPrec) InR t
+    Just (OpInfo (UOpF Post _) _ _) -> withPA (ugetPA uop) $
+      lt (prettyTerm t) <> prettyUOp uop
+    Just (OpInfo (UOpF Pre  _) _ _) -> withPA (ugetPA uop) $
+      prettyUOp uop <> rt (prettyTerm t)
     _ -> error $ "prettyTerm: uopMap doesn't contain " ++ show uop
 
 -- special case for fully applied binary operators
-prettyTerm (TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])) = mparens (getPA bop) $
+prettyTerm (TApp (TPrim (PrimBOp bop)) (TTup [t1, t2])) = withPA (getPA bop) $
   hsep
-  [ prettyTerm' (bPrec bop) InL t1
+  [ lt (prettyTerm t1)
   , prettyBOp bop
-  , prettyTerm' (bPrec bop) InR t2
+  , rt (prettyTerm t2)
   ]
 
-prettyTerm (TApp t1 t2)  = mparens funPA $
-  prettyTerm' funPrec InL t1 <+> prettyTerm' funPrec InR t2
-prettyTerm (TTup ts)     = do
-  ds <- punctuate (text ",") (map (prettyTerm' 0 InL) ts)
+-- Always pretty-print function applications with parentheses
+prettyTerm (TApp t1 t2@TTup{}) = withPA funPA $      -- f(x,y)
+  lt (prettyTerm t1) <> rt (prettyTerm t2)
+prettyTerm (TApp t1 t2)  = withPA funPA $            -- f(x)
+  lt (prettyTerm t1) <> withPA initPA (prettyTerm t2)
+
+prettyTerm (TTup ts)     = setPA initPA $ do
+  ds <- punctuate (text ",") (map prettyTerm ts)
   parens (hsep ds)
-prettyTerm (TContainer c ts e)  = do
+prettyTerm (TContainer c ts e)  = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyCount ts)
   let pe = case e of
              Nothing        -> []
@@ -244,42 +270,42 @@ prettyTerm (TContainer c ts e)  = do
              Just (Until t) -> [text "..", prettyTerm t]
   containerDelims c (hsep (ds ++ pe))
   where
-    prettyCount (t, Nothing) = prettyTerm' 0 InL t
-    prettyCount (t, Just n)  = prettyTerm' 0 InL t <+> text "#" <+> prettyTerm' 0 InR n
+    prettyCount (t, Nothing) = prettyTerm t
+    prettyCount (t, Just n)  = lt (prettyTerm t) <+> text "#" <+> rt (prettyTerm n)
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
-  containerDelims c (hsep [prettyTerm' 0 InL t, text "|", prettyQuals qs])
-prettyTerm (TInj side t) = mparens funPA $
-  prettySide side <+> prettyTerm' funPrec InR t
-prettyTerm (TNat n)      = integer n
-prettyTerm (TChain t lks) = mparens (getPA Eq) . hsep $
-    prettyTerm' (bPrec Eq) InL t
+  setPA initPA $ containerDelims c (hsep [prettyTerm t, text "|", prettyQuals qs])
+prettyTerm (TInj side t@TTup{})  = withPA funPA $
+  prettySide side <> rt (prettyTerm t)
+prettyTerm (TInj side t)  = withPA funPA $
+  prettySide side <> withPA initPA (prettyTerm t)
+prettyTerm (TNat n)       = integer n
+prettyTerm (TChain t lks) = withPA (getPA Eq) . hsep $
+    lt (prettyTerm t)
     : concatMap prettyLink lks
   where
     prettyLink (TLink op t2) =
       [ prettyBOp op
-      , prettyTerm' (bPrec op) InR t2
+      , setPA (getPA op) . rt $ prettyTerm t2
       ]
-prettyTerm (TLet bnd) = mparens initPA $
+prettyTerm (TLet bnd) = withPA initPA $
   lunbind bnd $ \(bs, t2) -> do
     ds <- punctuate (text ",") (map prettyBinding (fromTelescope bs))
     hsep
       [ text "let"
       , hsep ds
       , text "in"
-      , prettyTerm' 0 InL t2
+      , prettyTerm t2
       ]
 
-prettyTerm (TCase b)    = (text "{?" <+> prettyBranches b) $+$ text "?}"
-  -- XXX FIX ME: what is the precedence of ascription?
-prettyTerm (TAscr t ty) = parens (prettyTerm t <+> text ":" <+> prettyPolyTy ty)
+prettyTerm (TCase b)    = withPA initPA $
+  (text "{?" <+> prettyBranches b) $+$ text "?}"
+prettyTerm (TAscr t ty) = withPA ascrPA $
+  lt (prettyTerm t) <+> text ":" <+> rt (prettyPolyTy ty)
 prettyTerm (TRat  r)    = text (prettyDecimal r)
-prettyTerm (TTyOp op ty)  = mparens funPA $
-    prettyTyOp op <+> prettyTy' funPrec InR ty
+prettyTerm (TTyOp op ty)  = withPA funPA $
+  prettyTyOp op <+> prettyTy ty
 prettyTerm TWild = text "_"
-
-prettyTerm' :: Prec -> BFixity -> Term -> Doc
-prettyTerm' p a t = local (const (PA p a)) (prettyTerm t)
 
 prettySide :: Side -> Doc
 prettySide L = text "left"
@@ -330,9 +356,9 @@ prettyGuard (GLet b)    = text "let" <+> prettyBinding b
 
 prettyBinding :: Binding -> Doc
 prettyBinding (Binding Nothing x (unembed -> t))
-  = hsep [prettyName x, text "=", prettyTerm' 0 InL t]
+  = hsep [prettyName x, text "=", prettyTerm t]
 prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
-  = hsep [prettyName x, text ":", prettyPolyTy ty, text "=", prettyTerm' 0 InL t]
+  = hsep [prettyName x, text ":", prettyPolyTy ty, text "=", prettyTerm t]
 
 prettyQuals :: Telescope Qual -> Doc
 prettyQuals (fromTelescope -> qs) = do
@@ -341,36 +367,46 @@ prettyQuals (fromTelescope -> qs) = do
 
 prettyQual :: Qual -> Doc
 prettyQual (QBind x (unembed -> t))
-  = hsep [prettyName x, text "in", prettyTerm' 0 InL t]
+  = hsep [prettyName x, text "in", prettyTerm t]
 prettyQual (QGuard (unembed -> t))
-  = prettyTerm' 0 InL t
+  = prettyTerm t
 
--- XXX TODO: now that this can have arith pats in it, it needs to
--- actually take precedence, associativity etc. into account
 prettyPattern :: Pattern -> Doc
-prettyPattern (PVar x) = prettyName x
-prettyPattern PWild = text "_"
-prettyPattern (PAscr p ty) = parens (prettyPattern p <+> text ":" <+> prettyTy ty)
-prettyPattern PUnit = text "()"
-prettyPattern (PBool b) = text $ map toLower $ show b
-prettyPattern (PChar c) = text (show c)
-prettyPattern (PString s) = text (show s)
-prettyPattern (PTup ts) = do
+prettyPattern (PVar x)          = prettyName x
+prettyPattern PWild             = text "_"
+prettyPattern (PAscr p ty)      = withPA ascrPA $
+  lt (prettyPattern p) <+> text ":" <+> rt (prettyTy ty)
+prettyPattern PUnit             = text "()"
+prettyPattern (PBool b)         = text $ map toLower $ show b
+prettyPattern (PChar c)         = text (show c)
+prettyPattern (PString s)       = text (show s)
+prettyPattern (PTup ts)         = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyPattern ts)
   parens (hsep ds)
-prettyPattern (PInj s p) = prettySide s <+> prettyPattern p
-prettyPattern (PNat n) = integer n
-prettyPattern (PCons p1 p2) = prettyPattern p1 <+> text "::" <+> prettyPattern p2
-prettyPattern (PList ps) = do
+prettyPattern (PInj s p@PTup{}) = withPA funPA $
+  prettySide s <> rt (prettyPattern p)
+prettyPattern (PInj s p)        = withPA funPA $
+  prettySide s <> withPA initPA (prettyPattern p)
+prettyPattern (PNat n)          = integer n
+prettyPattern (PCons p1 p2)     = withPA (getPA Cons) $
+  lt (prettyPattern p1) <+> text "::" <+> rt (prettyPattern p2)
+prettyPattern (PList ps)        = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyPattern ps)
   brackets (hsep ds)
-prettyPattern (PAdd L p t)  = prettyPattern p <+> text "+" <+> prettyTerm t
-prettyPattern (PAdd R p t)  = prettyTerm t <+> text "+" <+> prettyPattern p
-prettyPattern (PMul L p t)  = prettyPattern p <+> text "*" <+> prettyTerm t
-prettyPattern (PMul R p t)  = prettyTerm t <+> text "*" <+> prettyPattern p
-prettyPattern (PSub p t)    = prettyPattern p <+> text "-" <+> prettyTerm t
-prettyPattern (PNeg p)      = text "-" <> prettyPattern p
-prettyPattern (PFrac p1 p2) = prettyPattern p1 <+> text "/" <+> prettyPattern p2
+prettyPattern (PAdd L p t)      = withPA (getPA Add) $
+  lt (prettyPattern p) <+> text "+" <+> rt (prettyTerm t)
+prettyPattern (PAdd R p t)      = withPA (getPA Add) $
+  lt (prettyTerm t) <+> text "+" <+> rt (prettyPattern p)
+prettyPattern (PMul L p t)      = withPA (getPA Mul) $
+  lt (prettyPattern p) <+> text "*" <+> rt (prettyTerm t)
+prettyPattern (PMul R p t)      = withPA (getPA Mul) $
+  lt (prettyTerm t) <+> text "*" <+> rt (prettyPattern p)
+prettyPattern (PSub p t)        = withPA (getPA Sub) $
+  lt (prettyPattern p) <+> text "-" <+> rt (prettyTerm t)
+prettyPattern (PNeg p)          = withPA (ugetPA Neg) $
+  text "-" <> rt (prettyPattern p)
+prettyPattern (PFrac p1 p2)     = withPA (getPA Div) $
+  lt (prettyPattern p1) <+> text "/" <+> rt (prettyPattern p2)
 
 ------------------------------------------------------------
 
@@ -383,10 +419,16 @@ prettyDecl (DTyDef (TypeDefn x args body))
   = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
 
+prettyDefn :: Defn -> Doc
+prettyDefn (Defn x patTys ty clauses) = vcat $
+  prettyTyDecl x (foldr (:->:) ty patTys)
+  :
+  map (prettyClause x . eraseClause) clauses
+
 prettyClause :: Name a -> Bind [Pattern] Term -> Doc
 prettyClause x b
-  = lunbind b $ \(ps, t) ->
-      (prettyName x <+> hsep (map prettyPattern ps) <+> text "=" <+> prettyTerm t) $+$ text " "
+  = withPA funPA . lunbind b $ \(ps, t) ->
+      prettyName x <> hcat (map (withPA initPA . prettyPattern) ps) <+> text "=" <+> setPA initPA (prettyTerm t)
 
 prettyProperty :: Property -> Doc
 prettyProperty = prettyTerm
@@ -578,11 +620,3 @@ digitalExpansion b n d = digits
     longDivStep (_, r) = (b*r) `divMod` d
     res       = tail $ iterate longDivStep (0,n)
     digits    = first (map fst) (findRep res)
-
-------------------------------------------------------------
-
-prettyDefn :: Defn -> Doc
-prettyDefn (Defn x patTys ty clauses) = vcat $
-  prettyTyDecl x (foldr (:->:) ty patTys)
-  :
-  map (prettyClause x . eraseClause) clauses

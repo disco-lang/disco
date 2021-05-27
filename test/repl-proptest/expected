@@ -1,10 +1,10 @@
   - Test passed: ¬false
   - Test passed: {1, 2} =!= {2, 1}
-  - Test passed: ∃ a, b. (a and b) =!= (a or b)
+  - Test passed: ∃a, b. (a and b) =!= (a or b)
     Found example:
       a = false
       b = false
-  - Test result mismatch for: ∀ a, b. (a and b) =!= (a or b)
+  - Test result mismatch for: ∀a, b. (a and b) =!= (a or b)
     - Left side:  true
     - Right side: false
     Counterexample:

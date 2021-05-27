@@ -1,0 +1,4 @@
+:load example/catalan.disco
+:defn treesOfSize
+:load example/tree.disco
+:defn treeFold

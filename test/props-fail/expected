@@ -1,21 +1,21 @@
 Loading bad-tests.disco...
 Running tests...
   badmap:
-  - Test failed: badmap (λx. x / 0) [3, 4, 5] =!= [6, 7, 8]
+  - Test failed: badmap(λx. x / 0)([3, 4, 5]) =!= [6, 7, 8]
     DivByZero
-  - Test result mismatch for: badmap (λx. x) [1, 2] =!= [1, 2]
+  - Test result mismatch for: badmap(λx. x)([1, 2]) =!= [1, 2]
     - Left side:  [1, 2]
     - Right side: [1, 1, 2, 2, 3]
-  - Test is false: badmap (λx. x + 1) [3, 4] > [5, 6]
+  - Test is false: badmap(λx. x + 1)([3, 4]) > [5, 6]
   divide:
-  - Test failed: ∀ a, b. divide a b * b =!= a
+  - Test failed: ∀a, b. divide(a)(b) * b =!= a
     DivByZero
     Counterexample:
       a = 0
       b = 0
-  - Test is false: ∀a. divide a 2 < a
+  - Test is false: ∀a. divide(a)(2) < a
     Counterexample:
       a = 0
-  - No example was found: ∃a. divide a 2 =!= abs a + 1
+  - No example was found: ∃a. divide(a)(2) =!= abs(a) + 1
     Checked 50 possibilities.
 Loaded.

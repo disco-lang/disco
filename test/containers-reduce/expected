@@ -5,7 +5,7 @@ Running tests...
   setSize: OK
 Loaded.
 reduce : (a × a → a) × a × List a → a
-reduce (~+~, 0, [1 .. 10]) : ℕ
+reduce(~+~, 0, [1 .. 10]) : ℕ
 55
 60
 true

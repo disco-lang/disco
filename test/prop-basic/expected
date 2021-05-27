@@ -1,12 +1,12 @@
 Loading prop-basic.disco...
 Loaded.
-  - Test passed: injective (λx. x * 2)
+  - Test passed: injective(λx. x * 2)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: idempotent (λx. x max 10)
+  - Test passed: idempotent(λx. x max 10)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: commutative (λ(a, b). a * b)
+  - Test passed: commutative(λ(a, b). a * b)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: associative (λ(a, b). a + b)
+  - Test passed: associative(λ(a, b). a + b)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: identityFor (0, λ(a, b). a max b)
+  - Test passed: identityFor(0, λ(a, b). a max b)
     Checked 100 possibilities without finding a counterexample.

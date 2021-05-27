@@ -645,11 +645,11 @@ parseInj :: Parser Side
 parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
--- | Parse an anonymous function.
+-- | Parse a quantified abstraction (λ, ∀, ∃).
 parseQuantified :: Parser Term
 parseQuantified =
   TAbs <$> parseQuantifier
-       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm'))
+       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm))
 
 -- | Parse a quantifier symbol (lambda, forall, or exists).
 parseQuantifier :: Parser Quantifier

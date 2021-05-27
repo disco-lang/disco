@@ -2,10 +2,10 @@ Loading prim.disco...
 Crash "nope"
 Crash "nope"
 7
-let x : ℕ = crash "nope" in 3 + x : ℕ
+let x : ℕ = crash("nope") in 3 + x : ℕ
 Crash "nope"
 crash : List Char → a
 1
 Crash "nope"
-(λ(x : ℕ). 1) (crash "nope") : ℕ
+(λx : ℕ. 1)(crash("nope")) : ℕ
 Crash "nope"

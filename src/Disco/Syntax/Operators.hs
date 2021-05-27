@@ -185,7 +185,9 @@ opTable =
     uopInfo fx op syns = OpInfo (UOpF fx op) syns (-1)
     bopInfo fx op syns = OpInfo (BOpF fx op) syns (-1)
 
-    assignPrecLevels table = zipWith assignPrecs (reverse [1 .. length table]) table
+    -- Start at precedence level 2 so we can give level 1 to ascription, and level 0
+    -- to the ambient context + parentheses etc.
+    assignPrecLevels table = zipWith assignPrecs (reverse [2 .. length table+1]) table
     assignPrecs p ops      = map (assignPrec p) ops
     assignPrec  p op       = op { opPrec = p }
 
@@ -217,4 +219,4 @@ assoc op =
 -- | The precedence level of function application (higher than any
 --   other precedence level).
 funPrec :: Int
-funPrec = length opTable
+funPrec = length opTable+1

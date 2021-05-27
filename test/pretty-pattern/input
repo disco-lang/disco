@@ -1,0 +1,11 @@
+:pretty \(5 * (x + 3)).x
+:pretty \((x + 3) * 5).x
+:pretty \(5 * (x - 3)).x
+:pretty \((x - 3) * 5).x
+:pretty \(5 + x - 3).x
+:pretty \((5 + x) - 3).x
+:pretty \(5 + (x - 3)).x
+:pretty \1 + x + 2 + 3.x
+:pretty \1 + (x + (2 + 3)).x
+:pretty \(p+1)/(q+1).p+q
+:pretty \-p/q.p+q

@@ -138,10 +138,10 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagElem Type   -- ^ Set/bag element test.
         | OListElem Type  -- ^ List element test.
 
-        | OMapList        -- ^ Map a function over a list.
-        | OMapBag Type    -- ^ Map a function over a bag.  Carries the
+        | OEachList       -- ^ Map a function over a list.
+        | OEachBag Type   -- ^ Map a function over a bag.  Carries the
                           --   output type of the function.
-        | OMapSet Type    -- ^ Map a function over a set. Carries the
+        | OEachSet Type   -- ^ Map a function over a set. Carries the
                           --   output type of the function.
 
         | OReduceList     -- ^ Reduce/fold a list.

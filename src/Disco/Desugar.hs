@@ -524,7 +524,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
             mapTy  = (xTy :->: c tTy) :*: c xTy :->: c (c tTy)
         return $ tapp (ATPrim joinTy PrimJoin) $
           tapp
-            (ATPrim mapTy PrimMap)
+            (ATPrim mapTy PrimEach)
             (mkPair
               (ATAbs Lam (xTy :->: c tTy) (bind [APVar xTy x] tqs))
               lst

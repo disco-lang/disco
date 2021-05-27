@@ -685,15 +685,15 @@ primBagFromCounts ty b = do
 -- Map
 
 -- | Map a function over a list.
-primMapList :: Value -> Value -> Disco IErr Value
-primMapList f xs = do
+primEachList :: Value -> Value -> Disco IErr Value
+primEachList f xs = do
   f' <- whnfV f
   vmap (\v -> whnfApp f' [v]) xs
 
 -- | Map a function over a bag.  The type argument is the /output/
 --   type of the function.
-primMapBag :: Type -> Value -> Value -> Disco IErr Value
-primMapBag ty f xs = do
+primEachBag :: Type -> Value -> Value -> Disco IErr Value
+primEachBag ty f xs = do
   f'       <- whnfV f
   VBag cts <- whnfV xs
   cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
@@ -701,8 +701,8 @@ primMapBag ty f xs = do
 
 -- | Map a function over a bag.  The type argument is the /output/
 --   type of the function.
-primMapSet :: Type -> Value -> Value -> Disco IErr Value
-primMapSet ty f xs = do
+primEachSet :: Type -> Value -> Value -> Disco IErr Value
+primEachSet ty f xs = do
   f'       <- whnfV f
   VBag cts <- whnfV xs
   cts' <- mapM (\(v,n) -> (,n) <$> whnfApp f' [v]) cts
@@ -930,11 +930,11 @@ whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
 whnfOp (OSetToMap tyK tyV) = arity1 "setToMap" $ whnfV >=> setToMap tyK tyV
 
 --------------------------------------------------
--- Map/reduce
+-- Each/reduce
 
-whnfOp OMapList        = (arity2 "mapList"    $ primMapList  ) >=> whnfV
-whnfOp (OMapBag ty)    = (arity2 "mapBag"     $ primMapBag ty) >=> whnfV
-whnfOp (OMapSet ty)    = (arity2 "mapSet"     $ primMapSet ty) >=> whnfV
+whnfOp OEachList        = (arity2 "mapList"    $ primEachList  ) >=> whnfV
+whnfOp (OEachBag ty)    = (arity2 "mapBag"     $ primEachBag ty) >=> whnfV
+whnfOp (OEachSet ty)    = (arity2 "mapSet"     $ primEachSet ty) >=> whnfV
 
 whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV

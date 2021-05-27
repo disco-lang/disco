@@ -31,15 +31,15 @@ concat (l::ls) = append(l, concat ls)
 ||| Apply a function to each element of a list, returning a new list
 ||| of the results.  Note, this is here just for illustration
 ||| purposes; it is much more efficient to use the builtin primitive
-||| 'map' function (which also works on bags and sets).
+||| 'each' function (which also works on bags and sets).
 
-!!!   maplist(\x.x+1, []       ) == []
-!!!   maplist(\x.2,   "hello"  ) == [2,2,2,2,2]
-!!!   maplist(\x. 5x, [2,4,1,7]) == [10,20,5,35]
+!!!   eachlist(\x.x+1, []       ) == []
+!!!   eachlist(\x.2,   "hello"  ) == [2,2,2,2,2]
+!!!   eachlist(\x. 5x, [2,4,1,7]) == [10,20,5,35]
 
-maplist : (a → b) × List a → List b
-maplist(f, [])    = []
-maplist(f, x::xs) = f(x) :: maplist(f, xs)
+eachlist : (a → b) × List a → List b
+eachlist(f, [])    = []
+eachlist(f, x::xs) = f(x) :: eachlist(f, xs)
 
 ||| Take the first n elements of a list.
 !!!   take(1, [true, false, true]) == [true]

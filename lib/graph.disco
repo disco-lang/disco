@@ -21,7 +21,7 @@ sequence target g pos (a::as) visited =
     ?}
 
 searchDAG : N -> Graph N -> N -> Bool
-searchDAG target g pos = (pos == target && contains g pos) || (true ∈ (map (searchDAG target g, neighbors g pos)))
+searchDAG target g pos = (pos == target && contains g pos) || (true ∈ (each (searchDAG target g, neighbors g pos)))
 
 contains : Graph N -> N -> Bool
 contains g a = {?
@@ -36,7 +36,7 @@ neighbors g pos = {?
                   ?}
 
 vertices : Graph N -> List N
-vertices g = map ((\(k,_). k), (list (mapToSet (summary g))))
+vertices g = each ((\(k,_). k), (list (mapToSet (summary g))))
 
 topsort : Graph N -> Unit + List N * Set N
 topsort g = downstream g (vertices g) {} {} []

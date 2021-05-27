@@ -56,14 +56,14 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-cmp/input
                      test/containers-convert/expected
                      test/containers-convert/input
+                     test/containers-each/expected
+                     test/containers-each/input
                      test/containers-ellipsis/expected
                      test/containers-ellipsis/input
                      test/containers-filter/expected
                      test/containers-filter/input
                      test/containers-join/expected
                      test/containers-join/input
-                     test/containers-map/expected
-                     test/containers-map/input
                      test/containers-merge/expected
                      test/containers-merge/input
                      test/containers-reduce/containers-reduce.disco
@@ -87,6 +87,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/logic-bools/input
                      test/logic-cmp/expected
                      test/logic-cmp/input
+                     test/map-basic/expected
+                     test/map-basic/input
                      test/module-basic/a.disco
                      test/module-basic/b.disco
                      test/module-basic/c.disco
@@ -94,6 +96,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/module-basic/expected
                      test/module-basic/input
                      test/module-basic/subdir/d.disco
+                     test/parse-245/expected
+                     test/parse-245/input
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
@@ -112,17 +116,31 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/poly-rectype/poly-rectype.disco
                      test/pretty-functions/expected
                      test/pretty-functions/input
+                     test/pretty-issue258/expected
+                     test/pretty-issue258/input
                      test/pretty-lazy/expected
                      test/pretty-lazy/input
+                     test/pretty-lit/expected
+                     test/pretty-lit/input
+                     test/pretty-ops/expected
+                     test/pretty-ops/input
+                     test/pretty-pattern/expected
+                     test/pretty-pattern/input
+                     test/pretty-torture/expected
+                     test/pretty-torture/input
                      test/pretty-type/expected
                      test/pretty-type/input
                      test/pretty-whnf/expected
                      test/pretty-whnf/input
+                     test/prim-crash/expected
+                     test/prim-crash/input
                      test/prop-basic/expected
                      test/prop-basic/input
                      test/prop-basic/prop-basic.disco
                      test/prop-cmp/expected
                      test/prop-cmp/input
+                     test/prop-fairness/expected
+                     test/prop-fairness/input
                      test/prop-holds/expected
                      test/prop-holds/input
                      test/prop-impredicative/expected
@@ -136,6 +154,11 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/props-fail/bad-tests.disco
                      test/props-fail/expected
                      test/props-fail/input
+                     test/props-higher-order/expected
+                     test/props-higher-order/higher-order.disco
+                     test/props-higher-order/input
+                     test/repl-ann/expected
+                     test/repl-ann/input
                      test/repl-compile/expected
                      test/repl-compile/input
                      test/repl-defn/expected
@@ -151,6 +174,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-names/expected
                      test/repl-names/input
                      test/repl-names/logic.disco
+                     test/repl-proptest/expected
+                     test/repl-proptest/input
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
@@ -209,6 +234,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-compare/input
                      test/types-container/expected
                      test/types-container/input
+                     test/types-kinds/expected
+                     test/types-kinds/input
+                     test/types-naked-ops/expected
+                     test/types-naked-ops/input
                      test/types-ops/expected
                      test/types-ops/input
                      test/types-rational/expected

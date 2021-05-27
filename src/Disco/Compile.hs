@@ -196,10 +196,10 @@ compilePrim _  PrimEmpty  = return $ CConst OEmpty
 compilePrim _  PrimInsert = return $ CConst OInsert
 compilePrim _  PrimLookup = return $ CConst OLookup
 
-compilePrim (_ :*: TyList _ :->: _)          PrimMap = return $ CConst OMapList
-compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
-compilePrim (_ :*: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
-compilePrim ty                               PrimMap = compilePrimErr PrimMap ty
+compilePrim (_ :*: TyList _ :->: _)          PrimEach = return $ CConst OEachList
+compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
+compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
+compilePrim ty                               PrimEach = compilePrimErr PrimEach ty
 
 compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
 compilePrim (_ :*: _ :*: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag

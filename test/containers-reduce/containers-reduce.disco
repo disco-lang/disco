@@ -11,4 +11,4 @@ dummy = ()
 !!! setSize {1,1,1,2,3} == 3
 !!! ∀ s : Set N. setSize s == setSize (s ∪ s)
 setSize : Set N -> N
-setSize s = reduce(~+~, 0, map (\x.1, bag s))
+setSize s = reduce(~+~, 0, each (\x.1, bag s))

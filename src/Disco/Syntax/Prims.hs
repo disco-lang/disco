@@ -65,7 +65,7 @@ data Prim where
   PrimInsert  :: Prim      -- ^ Insert into map
   PrimLookup  :: Prim      -- ^ Get value associated with key in map
 
-  PrimMap     :: Prim      -- ^ Map operation for containers
+  PrimEach    :: Prim      -- ^ Each operation for containers
   PrimReduce  :: Prim      -- ^ Reduce operation for containers
   PrimFilter  :: Prim      -- ^ Filter operation for containers
   PrimJoin    :: Prim      -- ^ Monadic join for containers
@@ -148,7 +148,7 @@ primTable =
   , PrimInfo PrimInsert    "insert"         True
   , PrimInfo PrimLookup    "lookup"         True
 
-  , PrimInfo PrimMap       "map"            True
+  , PrimInfo PrimEach      "each"           True
   , PrimInfo PrimReduce    "reduce"         True
   , PrimInfo PrimFilter    "filter"         True
   , PrimInfo PrimJoin      "join"           False

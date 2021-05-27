@@ -11,7 +11,7 @@ import list
 -- numbers.
 
 encrypt : N * N -> List N -> List N
-encrypt key xs = map (encrypt1 key, xs)
+encrypt key xs = each (encrypt1 key, xs)
 
 decrypt : N * N -> List N -> List N
 decrypt = encrypt

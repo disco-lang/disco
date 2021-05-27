@@ -579,8 +579,8 @@ typecheck Infer (TPrim prim) = do
       return $ a :*: TyList a :->: TyList a
 
     -- XXX see https://github.com/disco-lang/disco/issues/160
-    -- map : (a -> b) × c a -> c b
-    inferPrim PrimMap = do
+    -- each : (a -> b) × c a -> c b
+    inferPrim PrimEach = do
       c <- freshAtom
       a <- freshTy
       b <- freshTy

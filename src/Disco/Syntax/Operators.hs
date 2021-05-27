@@ -133,7 +133,7 @@ data OpInfo =
 --   parser and the pretty-printer.
 opTable :: [[OpInfo]]
 opTable =
-  assignPrecLevels $
+  assignPrecLevels
   [ [ uopInfo Pre  Not     ["¬"]
     ]
   , [ uopInfo Post Fact    ["!"]

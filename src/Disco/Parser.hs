@@ -77,6 +77,7 @@ import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 import           Data.Void
 
+import           Data.Foldable                           (asum)
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Syntax.Operators
@@ -231,21 +232,21 @@ decimal = lexeme (readDecimal <$> some digit <* char '.'
     digit = satisfy isDigit
     fractionalPart =
           -- either some digits optionally followed by bracketed digits...
-          (,) <$> some digit <*> optionMaybe (brackets (some digit))
+          (,) <$> some digit <*> optional (brackets (some digit))
           -- ...or just bracketed digits.
-      <|> (,) <$> pure []    <*> (Just <$> brackets (some digit))
+      <|> ([],) <$> (Just <$> brackets (some digit))
 
     readDecimal a (b, mrep)
       = read a % 1   -- integer part
 
         -- next part is just b/10^n
-        + (if null b then 0 else read b) % (10^(length b))
+        + (if null b then 0 else read b) % (10^length b)
 
         -- repeating part
         + readRep (length b) mrep
 
     readRep _      Nothing    = 0
-    readRep offset (Just rep) = read rep % (10^offset * (10^(length rep) - 1))
+    readRep offset (Just rep) = read rep % (10^offset * (10^length rep - 1))
       -- If s = 0.[rep] then 10^(length rep) * s = rep.[rep], so
       -- 10^(length rep) * s - s = rep, so
       --
@@ -309,12 +310,7 @@ identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
-ident = string2Name <$> (identifier letterChar)
-
--- | Optionally parse, succesfully returning 'Nothing' if the parse
---   fails.
-optionMaybe :: Parser a -> Parser (Maybe a)
-optionMaybe p = (Just <$> p) <|> pure Nothing
+ident = string2Name <$> identifier letterChar
 
 ------------------------------------------------------------
 -- Parser
@@ -336,7 +332,7 @@ parseModule = do
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
+      groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
       groupTLs _ [] = []
       groupTLs revDocs (TLDoc doc : rest)
         = groupTLs (doc : revDocs) rest
@@ -428,14 +424,14 @@ parseDecl = try (DType <$> parseTyDecl) <|> DDefn <$> parseDefn <|> DTyDef <$> p
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser TypeDecl
 parseTyDecl = label "type declaration" $
-  TypeDecl <$> ident <*> (indented $ colon *> parsePolyTy)
+  TypeDecl <$> ident <*> indented (colon *> parsePolyTy)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser TermDefn
 parseDefn = label "definition" $
   TermDefn
   <$> ident
-  <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+  <*> indented ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the definition of a user-defined algebraic data type.
 parseTyDefn :: Parser TypeDefn
@@ -445,8 +441,7 @@ parseTyDefn = label "type defintion" $ do
     name <- parseTyDef
     args <- many parseTyVarName
     _ <- symbol "="
-    body <- parseType
-    return $ TypeDefn name args body
+    TypeDefn name args <$> parseType
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -457,7 +452,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parsePolyTy))
+  ascribe <$> parseTerm' <*> optional (label "type annotation" $ colon *> parsePolyTy)
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -485,13 +480,13 @@ parseAtom = label "expression" $
   <|> TNat <$> natural
   <|> TInj <$> parseInj <*> parseAtom
   <|> parseTypeOp
-  <|> (TApp (TPrim PrimFloor) . TParens) <$> fbrack parseTerm
-  <|> (TApp (TPrim PrimCeil)  . TParens) <$> cbrack parseTerm
+  <|> TApp (TPrim PrimFloor) . TParens <$> fbrack parseTerm
+  <|> TApp (TPrim PrimCeil)  . TParens <$> cbrack parseTerm
   <|> parseCase
   <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
-  <|> tuple <$> (parens (parseTerm `sepBy` comma))
+  <|> tuple <$> parens (parseTerm `sepBy` comma)
 
 -- | Parse a wildcard, which is an underscore that isn't the start of
 --   an identifier.
@@ -502,7 +497,7 @@ parseWild = (lexeme . try . void) $
 -- | Parse a standalone operator name with tildes indicating argument
 --   slots, e.g. ~+~ for the addition operator.
 parseStandaloneOp :: Parser Prim
-parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat opTable)
+parseStandaloneOp = asum $ concatMap mkStandaloneOpParsers (concat opTable)
   where
     mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
     mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
@@ -580,13 +575,13 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
 
     parseRepTerm = do
       t <- parseTerm
-      n <- optionMaybe $ do
+      n <- optional $ do
         guard (c == BagContainer)
         void hash
         parseTerm
       return (t, n)
 
-    singletonContainer t = TContainer c [t] <$> optionMaybe parseEllipsis
+    singletonContainer t = TContainer c [t] <$> optional parseEllipsis
 
     -- The remainder of a container after the first term starts with
     -- either a pipe (for a comprehension) or a comma (for a literal
@@ -602,7 +597,7 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
           -- the first, then an optional ellipsis, and return
           -- everything together.
           ts <- parseRepTerm `sepBy` comma
-          e  <- optionMaybe parseEllipsis
+          e  <- optional parseEllipsis
 
           return $ TContainer c ((t,n):ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
@@ -612,7 +607,7 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
 parseEllipsis :: Parser (Ellipsis Term)
 parseEllipsis = do
   _ <- ellipsis
-  maybe Forever Until <$> optionMaybe parseTerm
+  maybe Forever Until <$> optional parseTerm
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.
@@ -633,7 +628,7 @@ parseQual = try parseSelection <|> parseQualGuard
     selector = reservedOp "<-" <|> reserved "in"
 
     parseQualGuard = label "boolean expression" $
-      QGuard <$> embed <$> parseTerm
+      QGuard . embed <$> parseTerm
 
 -- | Turn a parenthesized list of zero or more terms into the
 --   appropriate syntax node: zero terms @()@ is a TUnit; one term
@@ -676,7 +671,7 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parsePolyTy)
+  mty <- optional (colon *> parsePolyTy)
   t   <- symbol "=" *> (embed <$> parseTerm)
   return $ Binding (embed <$> mty) x t
 
@@ -723,10 +718,10 @@ parsePattern = label "pattern" $ do
 
 -- | Attempt converting a term to a pattern.
 termToPattern :: Term -> Maybe Pattern
-termToPattern TWild       = Just $ PWild
+termToPattern TWild       = Just PWild
 termToPattern (TVar x)    = Just $ PVar x
 termToPattern (TParens t) = termToPattern t
-termToPattern TUnit       = Just $ PUnit
+termToPattern TUnit       = Just PUnit
 termToPattern (TBool b)   = Just $ PBool b
 termToPattern (TNat n)    = Just $ PNat n
 termToPattern (TChar c)   = Just $ PChar c
@@ -745,11 +740,11 @@ termToPattern (TBin Add t1 t2)
   = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PAdd L p t2
       (_, Just p)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t1) == 0
+        && null (toListOf fvAny t1)
         -> Just $ PAdd R p t1
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -759,11 +754,11 @@ termToPattern (TBin Mul t1 t2)
   = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PMul L p t2
       (_, Just p)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t1) == 0
+        && null (toListOf fvAny t1)
         -> Just $ PMul R p t1
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -773,7 +768,7 @@ termToPattern (TBin Sub t1 t2)
   = case termToPattern t1 of
       Just p
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PSub p t2
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -789,13 +784,13 @@ termToPattern (TBin Div t1 t2)
 termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
 termToPattern (TContainer ListContainer ts Nothing)
-  = PList <$> mapM termToPattern (map fst ts)
+  = PList <$> mapM (termToPattern . fst) ts
 
 termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
-parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "expression")
+parseExpr = fixJuxtMul . fixChains <$> (makeExprParser parseAtom table <?> "expression")
   where
     table
         -- Special case for function application, with highest
@@ -812,10 +807,10 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 
     withOpFixity (UOpF fx op) syn
-      = (ufxParser fx) ((reservedOp syn <?> "operator") >> return (TUn op))
+      = ufxParser fx ((reservedOp syn <?> "operator") >> return (TUn op))
 
     withOpFixity (BOpF fx op) syn
-      = (bfxParser fx) ((reservedOp syn <?> "operator") >> return (TBin op))
+      = bfxParser fx ((reservedOp syn <?> "operator") >> return (TBin op))
 
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
@@ -886,8 +881,8 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
     isMultiplicativeTerm (TNat _)    = True
-    isMultiplicativeTerm (TUn {})    = True
-    isMultiplicativeTerm (TBin {})   = True
+    isMultiplicativeTerm TUn{}       = True
+    isMultiplicativeTerm TBin{}      = True
     isMultiplicativeTerm (TParens t) = isMultiplicativeTerm t
     isMultiplicativeTerm _           = False
 

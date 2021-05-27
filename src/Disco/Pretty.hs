@@ -507,7 +507,7 @@ prettyWHNF out (TyGraph a) (VGraph _ adj) = prettyWHNF out (TyMap a (TySet a)) =
 prettyWHNF out (TyMap k v) (VMap m)
   | M.null m = out "emptyMap"
   | otherwise = do
-      out "setToMap("
+      out "map("
       prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
       out ")"
 

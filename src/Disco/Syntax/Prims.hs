@@ -136,7 +136,7 @@ primTable =
   , PrimInfo PrimB2C       "bagCounts"      True
   , PrimInfo PrimC2B       "bagFromCounts"  True
   , PrimInfo PrimMapToSet  "mapToSet"       True
-  , PrimInfo PrimSetToMap  "setToMap"       True
+  , PrimInfo PrimSetToMap  "map"            True
 
   , PrimInfo PrimSummary   "summary"        True
   , PrimInfo PrimVertex    "vertex"         True

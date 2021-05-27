@@ -927,14 +927,14 @@ whnfOp OBagToCounts    = arity1 "bagCounts" $ primBagCounts
 whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
 
 whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
-whnfOp (OSetToMap tyK tyV) = arity1 "setToMap" $ whnfV >=> setToMap tyK tyV
+whnfOp (OSetToMap tyK tyV) = arity1 "map"      $ whnfV >=> setToMap tyK tyV
 
 --------------------------------------------------
 -- Each/reduce
 
-whnfOp OEachList        = (arity2 "mapList"    $ primEachList  ) >=> whnfV
-whnfOp (OEachBag ty)    = (arity2 "mapBag"     $ primEachBag ty) >=> whnfV
-whnfOp (OEachSet ty)    = (arity2 "mapSet"     $ primEachSet ty) >=> whnfV
+whnfOp OEachList        = (arity2 "eachList"  $ primEachList  ) >=> whnfV
+whnfOp (OEachBag ty)    = (arity2 "eachBag"   $ primEachBag ty) >=> whnfV
+whnfOp (OEachSet ty)    = (arity2 "eachSet"   $ primEachSet ty) >=> whnfV
 
 whnfOp OReduceList     = (arity3 "reduceList" $ primReduceList) >=> whnfV
 whnfOp OReduceBag      = (arity3 "reduceBag"  $ primReduceBag ) >=> whnfV

@@ -54,8 +54,6 @@ module Disco.Interpret.Core
        )
        where
 
-import           Debug.Trace
-
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (filterM, (>=>))
@@ -1755,7 +1753,6 @@ graphOverlay a g h = do
 
 graphConnect :: Type -> Value -> Value -> Disco IErr Value
 graphConnect a g h = do
-  traceShowM a
   VGraph g' _ <- whnfV g
   VGraph h' _ <- whnfV h
   newGraph a $ Connect g' h'

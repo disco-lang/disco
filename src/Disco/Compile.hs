@@ -187,10 +187,15 @@ compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
 compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst (OSetToMap k v)
 
 compilePrim _     PrimSummary = return $ CConst OSummary
-compilePrim (TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty
-compilePrim (TyGraph ty) PrimEmptyGraph = return $ CConst $ OEmptyGraph ty
+compilePrim (_ :->: TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty
+compilePrim (TyGraph ty)        PrimEmptyGraph = return $ CConst $ OEmptyGraph ty
 compilePrim (_ :->: TyGraph ty) PrimOverlay    = return $ CConst $ OOverlay ty
 compilePrim (_ :->: TyGraph ty) PrimConnect    = return $ CConst $ OConnect ty
+
+compilePrim ty PrimVertex = compilePrimErr PrimVertex ty
+compilePrim ty PrimEmptyGraph = compilePrimErr PrimEmptyGraph ty
+compilePrim ty PrimOverlay = compilePrimErr PrimOverlay ty
+compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
 
 compilePrim _  PrimEmptyMap   = return $ CConst OEmptyMap
 compilePrim _  PrimInsert     = return $ CConst OInsert

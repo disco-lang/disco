@@ -1,6 +1,11 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE TypeFamilies              #-}
-{-# LANGUAGE ViewPatterns              #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE NoMonomorphismRestriction  #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE ViewPatterns               #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -20,7 +25,8 @@ import           Prelude                          hiding ((<>))
 import           System.IO                        (hFlush, stdout)
 
 import           Control.Applicative              hiding (empty)
-import           Control.Monad.Reader
+import           Control.Monad                    ((>=>))
+import           Control.Monad.Reader             (ReaderT(..))
 import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
@@ -28,8 +34,10 @@ import           Data.Ratio
 
 import           Control.Lens                     (use)
 
+import           Capability.Reader
+import           Capability.Source
 import qualified Text.PrettyPrint                 as PP
-import           Unbound.Generics.LocallyNameless (Bind, Name, lunbind,
+import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
                                                    string2Name, unembed)
 
 import           Disco.AST.Core
@@ -136,26 +144,34 @@ taddPA = rPA 6
 tmulPA = rPA 7
 tfunPA = PA 9 InL
 
-type Doc = ReaderT PA (Disco IErr) PP.Doc
+newtype DocM a = DocM { runDocM :: ReaderT PA (Disco IErr) a }
+  deriving (Functor, Applicative, Monad, LFresh)
+  deriving (HasReader "pa" PA, HasSource "pa" PA) via
+    MonadReader (ReaderT PA (Disco IErr))
+
+type instance TypeOf _ "pa" = PA
+
+type Doc = DocM PP.Doc
+
 
 renderDoc :: Doc -> Disco IErr String
-renderDoc = fmap PP.render . flip runReaderT initPA
+renderDoc = fmap PP.render . flip runReaderT initPA . runDocM
 
-withPA :: PA -> Doc -> Doc
+withPA :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
 withPA pa = mparens pa . setPA pa
 
-setPA :: PA -> Doc -> Doc
-setPA pa = local (const pa)
+setPA :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
+setPA = local @"pa" . const
 
-lt :: Doc -> Doc
-lt = local (\(PA p _) -> PA p InL)
+lt :: HasReader' "pa" m => m PP.Doc -> m PP.Doc
+lt = local @"pa" (\(PA p _) -> PA p InL)
 
-rt :: Doc -> Doc
-rt = local (\(PA p _) -> PA p InR)
+rt :: HasReader' "pa" m => m PP.Doc -> m PP.Doc
+rt = local @"pa" (\(PA p _) -> PA p InR)
 
-mparens :: PA -> Doc -> Doc
+mparens :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
 mparens pa doc = do
-  parentPA <- ask
+  parentPA <- ask @"pa"
   (if pa < parentPA then parens else id) doc
 
 --------------------------------------------------

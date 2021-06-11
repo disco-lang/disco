@@ -181,7 +181,7 @@ mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 --   @
 --     n -> p -> { n*x + y  when p = (x,y)
 --   @
-desugarDefn :: Defn -> DSM DTerm
+desugarDefn :: Fresh m => Defn -> m DTerm
 desugarDefn (Defn _ patTys bodyTy def) =
   desugarAbs Lam (foldr (:->:) bodyTy patTys) def
 
@@ -194,7 +194,7 @@ desugarDefn (Defn _ patTys bodyTy def) =
 --   (which happen to be named), and source-level lambdas are also
 --   abstractions (which happen to have only one clause).
 
-desugarAbs :: Quantifier -> Type -> [Clause] -> DSM DTerm
+desugarAbs :: Fresh m => Quantifier -> Type -> [Clause] -> m DTerm
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
   let (pats, bodies) = unzip clausePairs
@@ -221,13 +221,13 @@ desugarAbs quant overallTy body = do
     -- with the same quantifier when there's only a single clause. That
     -- way, we generate a chain of abstractions followed by a case, instead
     -- of a bunch of alternating abstractions and cases.
-    unbindClauses :: [Clause] -> DSM [([APattern], ATerm)]
+    unbindClauses :: Fresh m => [Clause] -> m [([APattern], ATerm)]
     unbindClauses [c] | quant `elem` [All, Ex] = do
       (ps, t) <- liftClause c
       return [(ps, addDbgInfo ps t)]
     unbindClauses cs  = mapM unbind cs
 
-    liftClause :: Bind [APattern] ATerm -> DSM ([APattern], ATerm)
+    liftClause :: Fresh m => Bind [APattern] ATerm -> m ([APattern], ATerm)
     liftClause c = unbind c >>= \case
       (ps, ATAbs q _ c') | q == quant -> do
         (ps', b) <- liftClause c'
@@ -245,7 +245,7 @@ desugarAbs quant overallTy body = do
 ------------------------------------------------------------
 
 -- | Desugar a typechecked term.
-desugarTerm :: ATerm -> DSM DTerm
+desugarTerm :: Fresh m => ATerm -> m DTerm
 desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
 desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
   | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
@@ -302,7 +302,7 @@ desugarTerm (ATTest info t) = DTTest (coerce info) <$> desugarTerm t
 
 -- | Desugar a property by wrapping its corresponding term in a test
 --   frame to catch its exceptions & convert booleans to props.
-desugarProperty :: AProperty -> DSM DTerm
+desugarProperty :: Fresh m => AProperty -> m DTerm
 desugarProperty p = DTTest [] <$> desugarTerm p
 
 ------------------------------------------------------------
@@ -315,7 +315,7 @@ uopDesugars :: Type -> Type -> UOp -> Bool
 -- uopDesugars _ (TyFin _) Neg = True
 uopDesugars _ _         uop = uop `elem` [Not]
 
-desugarPrimUOp :: Type -> Type -> UOp -> DSM DTerm
+desugarPrimUOp :: Fresh m => Type -> Type -> UOp -> m DTerm
 desugarPrimUOp argTy resTy op = do
   x <- fresh (string2Name "arg")
   body <- desugarUnApp resTy op (ATVar argTy x)
@@ -336,7 +336,7 @@ bopDesugars _   _   _ bop = bop `elem`
   ]
 
 -- | Desugar a primitive binary operator at the given type.
-desugarPrimBOp :: Type -> Type -> Type -> BOp -> DSM DTerm
+desugarPrimBOp :: Fresh m => Type -> Type -> Type -> BOp -> m DTerm
 desugarPrimBOp ty1 ty2 resTy op = do
   p <- fresh (string2Name "pair1")
   x <- fresh (string2Name "arg1")
@@ -352,7 +352,7 @@ desugarPrimBOp ty1 ty2 resTy op = do
 
 -- | Desugar a saturated application of a unary operator.
 --   The first argument is the type of the result.
-desugarUnApp :: Type -> UOp -> ATerm -> DSM DTerm
+desugarUnApp :: Fresh m => Type -> UOp -> ATerm -> m DTerm
 
 -- Desugar negation on TyFin to a negation on TyZ followed by a mod.
 -- See the comments below re: Add and Mul on TyFin.
@@ -371,7 +371,7 @@ desugarUnApp ty uop t = error $ "Impossible! desugarUnApp " ++ show ty ++ " " ++
 
 -- | Desugar a saturated application of a binary operator.
 --   The first argument is the type of the result.
-desugarBinApp :: Type -> BOp -> ATerm -> ATerm -> DSM DTerm
+desugarBinApp :: Fresh m => Type -> BOp -> ATerm -> ATerm -> m DTerm
 
 -- Implies, and, or should all be turned into a standard library
 -- definition.  This will require first (1) adding support for
@@ -500,11 +500,11 @@ desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarBinApp " ++ show ty ++ 
 
 -- | Desugar a container comprehension.  First translate it into an
 --   expanded ATerm and then recursively desugar that.
-desugarComp :: Container -> ATerm -> Telescope AQual -> DSM DTerm
+desugarComp :: Fresh m => Container -> ATerm -> Telescope AQual -> m DTerm
 desugarComp ctr t qs = expandComp ctr t qs >>= desugarTerm
 
 -- | Expand a container comprehension into an equivalent ATerm.
-expandComp :: Container -> ATerm -> Telescope AQual -> DSM ATerm
+expandComp :: Fresh m => Container -> ATerm -> Telescope AQual -> m ATerm
 
 -- [ t | ] = [ t ]
 expandComp ctr t TelEmpty = return $ ctrSingleton ctr t
@@ -546,7 +546,7 @@ expandComp ctr t (TelCons (unrebind -> (q,qs)))
 --   desugars to
 --
 --     @(\x. (\y. q) t) s@
-desugarLet :: [ABinding] -> ATerm -> DSM DTerm
+desugarLet :: Fresh m => [ABinding] -> ATerm -> m DTerm
 desugarLet [] t = desugarTerm t
 desugarLet ((ABinding _ x (unembed -> t1)) : ls) t =
   dtapp
@@ -581,7 +581,7 @@ mkAbs Lam funty _ args c = mkLambda funty args c
 mkAbs q _ argtys args c  = mkQuant q argtys args c
 
 -- | Desugar a tuple to nested pairs, /e.g./ @(a,b,c,d) ==> (a,(b,(c,d)))@.a
-desugarTuples :: Type -> [ATerm] -> DSM DTerm
+desugarTuples :: Fresh m => Type -> [ATerm] -> m DTerm
 desugarTuples _ [t]                    = desugarTerm t
 desugarTuples ty@(_ :*: ty2) (t:ts) = DTPair ty <$> desugarTerm t <*> desugarTuples ty2 ts
 desugarTuples ty ats
@@ -602,7 +602,7 @@ expandChain t1 (ATLink op t2 : links) =
     (expandChain t2 links)
 
 -- | Desugar a branch of a case expression.
-desugarBranch :: ABranch -> DSM DBranch
+desugarBranch :: Fresh m => ABranch -> m DBranch
 desugarBranch b = do
   (ags, at) <- unbind b
   dgs <- desugarGuards ags
@@ -612,10 +612,10 @@ desugarBranch b = do
 -- | Desugar the list of guards in one branch of a case expression.
 --   Pattern guards essentially remain as they are; boolean guards get
 --   turned into pattern guards which match against @true@.
-desugarGuards :: Telescope AGuard -> DSM (Telescope DGuard)
+desugarGuards :: Fresh m => Telescope AGuard -> m (Telescope DGuard)
 desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   where
-    desugarGuard :: AGuard -> DSM [DGuard]
+    desugarGuard :: Fresh m => AGuard -> m [DGuard]
 
     -- A Boolean guard is desugared to a pattern-match on @true@.
     desugarGuard (AGBool (unembed -> at)) = do
@@ -652,7 +652,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     --   combination of matching, computation, and boolean checks.
     --   For example, 'when t is (y+1)' becomes 'when t is x0 if x0 >=
     --   1 let y = x0-1'.
-    desugarMatch :: DTerm -> APattern -> DSM [DGuard]
+    desugarMatch :: Fresh m => DTerm -> APattern -> m [DGuard]
     desugarMatch dt (APVar ty x)      = mkMatch dt (DPVar ty (coerce x))
     desugarMatch _  (APWild _)        = return []
     desugarMatch dt APUnit            = mkMatch dt DPUnit
@@ -662,7 +662,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     desugarMatch dt (APString s)      = desugarMatch dt (APList (TyList TyC) (map APChar s))
     desugarMatch dt (APTup tupTy pat) = desugarTuplePats tupTy dt pat
       where
-        desugarTuplePats :: Type -> DTerm -> [APattern] -> DSM [DGuard]
+        desugarTuplePats :: Fresh m => Type -> DTerm -> [APattern] -> m [DGuard]
         desugarTuplePats _ _  [] = error "Impossible! desugarTuplePats []"
         desugarTuplePats _ t [p] = desugarMatch t p
         desugarTuplePats ty@(_ :*: ty2) t (p:ps) = do
@@ -736,29 +736,30 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
 
       return (g1 ++ g2 ++ g3)
 
-    mkMatch :: DTerm -> DPattern -> DSM [DGuard]
+    mkMatch :: Fresh m => DTerm -> DPattern -> m [DGuard]
     mkMatch dt dp = return [DGPat (embed dt) dp]
 
-    varMatch :: DTerm -> Name DTerm -> DSM [DGuard]
+    varMatch :: Fresh m => DTerm -> Name DTerm -> m [DGuard]
     varMatch dt x = mkMatch dt (DPVar (getType dt) x)
 
-    varFor :: DTerm -> DSM (Name DTerm, [DGuard])
+    varFor :: Fresh m => DTerm -> m (Name DTerm, [DGuard])
     varFor (DTVar _ x) = return (x, [])
     varFor dt          = do
       x <- fresh (string2Name "x")
       g <- varMatch dt x
       return (x, g)
 
-    varForPat :: APattern -> DSM (Name DTerm, [DGuard])
+    varForPat :: Fresh m => APattern -> m (Name DTerm, [DGuard])
     varForPat (APVar _ x) = return (coerce x, [])
     varForPat p           = do
       x <- fresh (string2Name "x")
       (x,) <$> desugarMatch (DTVar (getType p) x) p
 
     arithBinMatch
-      :: (Type -> Maybe (ATerm -> ATerm -> ATerm))
+      :: Fresh m
+      => (Type -> Maybe (ATerm -> ATerm -> ATerm))
       -> (ATerm -> ATerm -> ATerm)
-      -> DTerm -> Type -> APattern -> ATerm -> DSM [DGuard]
+      -> DTerm -> Type -> APattern -> ATerm -> m [DGuard]
     arithBinMatch restrict inverse dt ty p t = do
       (x0, g1) <- varFor dt
 
@@ -781,7 +782,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       return (g1 ++ g2 ++ g3 ++ g4)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
-desugarContainer :: Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellipsis ATerm) -> DSM DTerm
+desugarContainer :: Fresh m => Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellipsis ATerm) -> m DTerm
 
 -- Literal list containers desugar to nested applications of cons.
 desugarContainer ty ListContainer es Nothing =

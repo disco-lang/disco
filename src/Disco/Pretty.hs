@@ -19,14 +19,18 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Pretty where
+-- TODO: the calls to 'error' should be replaced with logging/error capabilities.
+
+module Disco.Pretty
+  ( module Disco.Pretty.Monadic
+  , module Disco.Pretty
+  )
+  where
 
 import           Prelude                          hiding ((<>))
 import           System.IO                        (hFlush, stdout)
 
-import           Control.Applicative              hiding (empty)
 import           Control.Monad                    ((>=>))
-import           Control.Monad.Reader             (ReaderT(..))
 import           Data.Bifunctor
 import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
@@ -35,9 +39,7 @@ import           Data.Ratio
 import           Control.Lens                     (use)
 
 import           Capability.Reader
-import           Capability.Source
 import           Text.PrettyPrint                 (Doc)
-import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
                                                    string2Name, unembed)
 
@@ -48,112 +50,12 @@ import           Disco.Eval                       (Disco, IErr, Value (..), io,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
 import           Disco.Module
+import           Disco.Pretty.Monadic
+import           Disco.Pretty.Prec
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Erase            (eraseClause)
 import           Disco.Types
-
---------------------------------------------------
--- Monadic pretty-printing
-
-vcat :: Monad f => [f Doc] -> f Doc
-vcat ds  = PP.vcat <$> sequence ds
-
-hcat :: Monad f => [f Doc] -> f Doc
-hcat ds  = PP.hcat <$> sequence ds
-
-hsep :: Monad f => [f Doc] -> f Doc
-hsep ds  = PP.hsep <$> sequence ds
-
-parens :: Functor f => f Doc -> f Doc
-parens   = fmap PP.parens
-
-brackets :: Functor f => f Doc -> f Doc
-brackets = fmap PP.brackets
-
-braces :: Functor f => f Doc -> f Doc
-braces = fmap PP.braces
-
-bag :: Monad f => f Doc -> f Doc
-bag p = text "⟅" <> p <> text "⟆"
-
-quotes :: Functor f => f Doc -> f Doc
-quotes = fmap PP.quotes
-
-doubleQuotes :: Functor f => f Doc -> f Doc
-doubleQuotes = fmap PP.doubleQuotes
-
-text :: Monad m => String -> m Doc
-text     = return . PP.text
-
-integer :: Monad m => Integer -> m Doc
-integer  = return . PP.integer
-
-nest :: Functor f => Int -> f Doc -> f Doc
-nest n d = PP.nest n <$> d
-
-empty :: Monad m => m Doc
-empty    = return PP.empty
-
-(<+>) :: Applicative f => f Doc -> f Doc -> f Doc
-(<+>) = liftA2 (PP.<+>)
-
-(<>) :: Applicative f => f Doc -> f Doc -> f Doc
-(<>)  = liftA2 (PP.<>)
-
-($+$) :: Applicative f => f Doc -> f Doc -> f Doc
-($+$) = liftA2 (PP.$+$)
-
-punctuate :: Monad f => f Doc -> [f Doc] -> f [f Doc]
-punctuate p ds = do
-  p' <- p
-  ds' <- sequence ds
-  return . map return $ PP.punctuate p' ds'
-
---------------------------------------------------
--- Precedence and associativity
-
-type Prec = Int
-
-ugetPA :: UOp -> PA
-ugetPA op = PA (uPrec op) In
-
-getPA :: BOp -> PA
-getPA op = PA (bPrec op) (assoc op)
-
-data PA = PA Prec BFixity
-  deriving (Show, Eq)
-
-instance Ord PA where
-  compare (PA p1 a1) (PA p2 a2) = compare p1 p2 `mappend` (if a1 == a2 then EQ else LT)
-
-initPA :: PA
-initPA = PA 0 InL
-
-ascrPA :: PA
-ascrPA = PA 1 InL
-
-funPA :: PA
-funPA = PA funPrec InL
-
-rPA :: Int -> PA
-rPA n = PA n InR
-
-tarrPA, taddPA, tmulPA, tfunPA :: PA
-tarrPA = rPA 1
-taddPA = rPA 6
-tmulPA = rPA 7
-tfunPA = PA 9 InL
-
-newtype DocM a = DocM { runDocM :: ReaderT PA (Disco IErr) a }
-  deriving (Functor, Applicative, Monad, LFresh)
-  deriving (HasReader "pa" PA, HasSource "pa" PA) via
-    MonadReader (ReaderT PA (Disco IErr))
-
-type instance TypeOf _ "pa" = PA
-
-renderDoc :: DocM Doc -> Disco IErr String
-renderDoc = fmap PP.render . flip runReaderT initPA . runDocM
 
 withPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
 withPA pa = mparens pa . setPA pa

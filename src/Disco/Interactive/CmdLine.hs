@@ -26,6 +26,7 @@ module Disco.Interactive.CmdLine
   ) where
 
 import           Control.Monad              (when)
+import           Control.Monad.Catch        (SomeException, catch)
 import           Control.Monad.IO.Class     (MonadIO (..))
 import           Control.Monad.Trans.Class  (MonadTrans (..))
 import           Data.List                  (isPrefixOf)
@@ -115,7 +116,7 @@ discoMain = do
       Just str -> handleCMD str
       Nothing  -> return ()
 
-    when (not batch) $ runInputT settings loop
+    when (not batch) $ runInputT settings (H.withInterrupt loop)
 
   case res of
 
@@ -134,7 +135,8 @@ discoMain = do
       io $ putStrLn (show e)
       act
 
-    withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
+    withCtrlC :: InputT (Disco e) a -> InputT (Disco e) a -> InputT (Disco e) a
+    withCtrlC resume act = catch act (ctrlC resume)
 
     loop :: InputT (Disco IErr) ()
     loop = do

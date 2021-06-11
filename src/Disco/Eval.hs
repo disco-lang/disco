@@ -7,7 +7,7 @@
 {-# LANGUAGE TupleSections     #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
-  -- For MonadException instances, see below.
+  -- For MonadFail instance, see below.
 
 -----------------------------------------------------------------------------
 -- |
@@ -80,30 +80,28 @@ module Disco.Eval
 
 import           Text.Printf
 
-import           Control.Lens                            (makeLenses, use, (%=),
-                                                          (<+=), (<>=))
-import           Control.Monad.Except                    (MonadError,
-                                                          catchError,
-                                                          throwError)
-import qualified Control.Monad.Fail                      as Fail
+import           Control.Lens                     (makeLenses, use, (%=), (<+=),
+                                                   (<>=))
+import           Control.Monad.Except             (MonadError, catchError,
+                                                   throwError)
+import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.State.Strict
-import           Data.IntMap.Lazy                        (IntMap)
-import qualified Data.IntMap.Lazy                        as IntMap
-import           Data.IntSet                             (IntSet)
-import qualified Data.IntSet                             as IntSet
-import qualified Data.Map                                as M
-import qualified Data.Sequence                           as Seq
-import qualified Data.Set                                as S
+import           Data.IntMap.Lazy                 (IntMap)
+import qualified Data.IntMap.Lazy                 as IntMap
+import           Data.IntSet                      (IntSet)
+import qualified Data.IntSet                      as IntSet
+import qualified Data.Map                         as M
+import qualified Data.Sequence                    as Seq
+import qualified Data.Set                         as S
 import           Data.Void
-import           System.FilePath                         ((-<.>))
-import           Text.Megaparsec                         hiding (runParser)
+import           System.FilePath                  ((-<.>))
+import           Text.Megaparsec                  hiding (runParser)
 
 import           Unbound.Generics.LocallyNameless
 
-import           Algebra.Graph                           (Graph)
-import           System.Console.Haskeline.MonadException
+import           Algebra.Graph                    (Graph)
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
@@ -113,7 +111,7 @@ import           Disco.Extensions
 import           Disco.Messages
 import           Disco.Module
 import           Disco.Parser
-import           Disco.Typecheck                         (checkModule)
+import           Disco.Typecheck                  (checkModule)
 import           Disco.Typecheck.Monad
 import           Disco.Types
 
@@ -502,32 +500,11 @@ initDiscoState = DiscoState
 type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
 
 ------------------------------------------------------------
--- Some instances needed to ensure that Disco is an instance of the
--- MonadException class from haskeline.
-
--- Orphan instance, since it doesn't really seem sensible for either
--- unbound-generics or haskeline to depend on the other.
-instance MonadException m => MonadException (LFreshMT m) where
-  controlIO f = LFreshMT $ controlIO $ \(RunIO run) -> let
-                  run' = RunIO (fmap LFreshMT . run . unLFreshMT)
-                  in unLFreshMT <$> f run'
+-- Some needed instances.
 
 -- This should eventually move into unbound-generics.
 instance MonadFail m => MonadFail (LFreshMT m) where
   fail = LFreshMT . Fail.fail
-
--- We need this orphan instance too.  It would seem to make sense for
--- haskeline to provide an instance for ExceptT, but see:
---   https://github.com/judah/haskeline/issues/18
---   https://github.com/judah/haskeline/pull/22
---
--- Idris does the same thing,
---   https://github.com/idris-lang/Idris-dev/blob/5d7388bb3c71fe56b7c09c0b31a94d44bf9f4f25/src/Idris/Output.hs#L38
-
-instance MonadException m => MonadException (ExceptT e m) where
-  controlIO f = ExceptT $ controlIO $ \(RunIO run) -> let
-                  run' = RunIO (fmap ExceptT . run . runExceptT)
-                  in runExceptT <$> f run'
 
 ------------------------------------------------------------
 -- Lenses for state

@@ -1,17 +1,18 @@
+cabal-version:       2.4
 name:                disco
 version:             0.1.0.0
 synopsis:            Functional programming language for teaching discrete math.
 description:         Disco is a simple functional programming language for use in
                      teaching discrete math.  Its syntax is designed to be close
                      to standard mathematical practice.
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Disco team
 maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 8.6.3
+tested-with:         GHC == 8.10.4
 
 data-dir:            lib
 
@@ -256,7 +257,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-tydefs/types-tydefs.disco
                      --- TEST FILES END ---
 
-cabal-version:       1.18
 build-type:          Simple
 
 source-repository head
@@ -317,26 +317,28 @@ library
                        TemplateHaskell
                        UndecidableInstances
 
-  build-depends:       base >=4.8 && <4.14,
+  build-depends:       base >=4.8 && <4.16,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 8.1,
-                       parser-combinators >= 1.0.0 && < 1.3,
+                       megaparsec >= 6.1.1 && < 9.1,
+                       parser-combinators >= 1.0.0 && < 1.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 4.19,
+                       capability >= 0.4 && < 0.5,
+                       lens >= 4.14 && < 5.1,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.10 && < 0.11,
+                       arithmoi >= 0.10 && < 0.13,
                        integer-logarithms >= 1.0 && < 1.1,
                        simple-enumeration >= 0.2 && < 0.3,
-                       haskeline >=0.7 && <0.8,
-                       QuickCheck >= 2.9 && < 2.14,
+                       haskeline >=0.8 && <0.9,
+                       exceptions >= 0.10 && < 0.11,
+                       QuickCheck >= 2.9 && < 2.15,
                        fgl >= 5.5 && < 5.8,
-                       optparse-applicative >= 0.12 && < 0.16,
+                       optparse-applicative >= 0.12 && < 0.17,
                        oeis >= 0.3.10,
                        algebraic-graphs >= 0.5
 
@@ -350,14 +352,14 @@ executable disco
                        disco,
                        directory,
                        filepath,
-                       haskeline >=0.7 && <0.8,
+                       haskeline >=0.8 && <0.9,
                        mtl >=2.2 && <2.3,
                        transformers >= 0.4 && < 0.6,
-                       megaparsec >= 6.1.1 && < 8.1,
+                       megaparsec >= 6.1.1 && < 9.1,
                        containers >= 0.5 && < 0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 4.19,
-                       optparse-applicative >= 0.12 && < 0.16,
+                       lens >= 4.14 && < 5.1,
+                       optparse-applicative >= 0.12 && < 0.17,
                        oeis >= 0.3.10
 
   default-language:    Haskell2010
@@ -367,13 +369,13 @@ test-suite disco-tests
   main-is: Tests.hs
   hs-source-dirs: test
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.14,
-                    tasty >= 0.10 && < 1.3,
+  build-depends:    base >= 4.7 && < 4.16,
+                    tasty >= 0.10 && < 1.5,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7,
-                    bytestring >= 0.9 && < 0.11,
+                    bytestring >= 0.9 && < 0.12,
                     disco
   default-language: Haskell2010
 
@@ -382,7 +384,7 @@ test-suite disco-examples
   main-is: TestExamples.hs
   hs-source-dirs: example
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.14,
+  build-depends:    base >= 4.7 && < 4.16,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

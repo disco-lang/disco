@@ -18,9 +18,8 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
-import           System.Console.Haskeline         (IOException, handle)
-
 import           Control.Arrow                    ((&&&))
+import           Control.Exception                (IOException, handle)
 import           Control.Lens                     (use, (%=), (.=))
 import           Control.Monad.Except
 import           Data.Coerce

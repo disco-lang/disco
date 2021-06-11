@@ -36,6 +36,7 @@ import           Control.Lens                     (use)
 
 import           Capability.Reader
 import           Capability.Source
+import           Text.PrettyPrint                 (Doc)
 import qualified Text.PrettyPrint                 as PP
 import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
                                                    string2Name, unembed)
@@ -55,55 +56,55 @@ import           Disco.Types
 --------------------------------------------------
 -- Monadic pretty-printing
 
-vcat :: Monad f => [f PP.Doc] -> f PP.Doc
+vcat :: Monad f => [f Doc] -> f Doc
 vcat ds  = PP.vcat <$> sequence ds
 
-hcat :: Monad f => [f PP.Doc] -> f PP.Doc
+hcat :: Monad f => [f Doc] -> f Doc
 hcat ds  = PP.hcat <$> sequence ds
 
-hsep :: Monad f => [f PP.Doc] -> f PP.Doc
+hsep :: Monad f => [f Doc] -> f Doc
 hsep ds  = PP.hsep <$> sequence ds
 
-parens :: Functor f => f PP.Doc -> f PP.Doc
+parens :: Functor f => f Doc -> f Doc
 parens   = fmap PP.parens
 
-brackets :: Functor f => f PP.Doc -> f PP.Doc
+brackets :: Functor f => f Doc -> f Doc
 brackets = fmap PP.brackets
 
-braces :: Functor f => f PP.Doc -> f PP.Doc
+braces :: Functor f => f Doc -> f Doc
 braces = fmap PP.braces
 
-bag :: Monad f => f PP.Doc -> f PP.Doc
+bag :: Monad f => f Doc -> f Doc
 bag p = text "⟅" <> p <> text "⟆"
 
-quotes :: Functor f => f PP.Doc -> f PP.Doc
+quotes :: Functor f => f Doc -> f Doc
 quotes = fmap PP.quotes
 
-doubleQuotes :: Functor f => f PP.Doc -> f PP.Doc
+doubleQuotes :: Functor f => f Doc -> f Doc
 doubleQuotes = fmap PP.doubleQuotes
 
-text :: Monad m => String -> m PP.Doc
+text :: Monad m => String -> m Doc
 text     = return . PP.text
 
-integer :: Monad m => Integer -> m PP.Doc
+integer :: Monad m => Integer -> m Doc
 integer  = return . PP.integer
 
-nest :: Functor f => Int -> f PP.Doc -> f PP.Doc
+nest :: Functor f => Int -> f Doc -> f Doc
 nest n d = PP.nest n <$> d
 
-empty :: Monad m => m PP.Doc
+empty :: Monad m => m Doc
 empty    = return PP.empty
 
-(<+>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+(<+>) :: Applicative f => f Doc -> f Doc -> f Doc
 (<+>) = liftA2 (PP.<+>)
 
-(<>) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+(<>) :: Applicative f => f Doc -> f Doc -> f Doc
 (<>)  = liftA2 (PP.<>)
 
-($+$) :: Applicative f => f PP.Doc -> f PP.Doc -> f PP.Doc
+($+$) :: Applicative f => f Doc -> f Doc -> f Doc
 ($+$) = liftA2 (PP.$+$)
 
-punctuate :: Monad f => f PP.Doc -> [f PP.Doc] -> f [f PP.Doc]
+punctuate :: Monad f => f Doc -> [f Doc] -> f [f Doc]
 punctuate p ds = do
   p' <- p
   ds' <- sequence ds
@@ -151,32 +152,29 @@ newtype DocM a = DocM { runDocM :: ReaderT PA (Disco IErr) a }
 
 type instance TypeOf _ "pa" = PA
 
-type Doc = DocM PP.Doc
-
-
-renderDoc :: Doc -> Disco IErr String
+renderDoc :: DocM Doc -> Disco IErr String
 renderDoc = fmap PP.render . flip runReaderT initPA . runDocM
 
-withPA :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
+withPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
 withPA pa = mparens pa . setPA pa
 
-setPA :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
+setPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
 setPA = local @"pa" . const
 
-lt :: HasReader' "pa" m => m PP.Doc -> m PP.Doc
+lt :: HasReader' "pa" m => m Doc -> m Doc
 lt = local @"pa" (\(PA p _) -> PA p InL)
 
-rt :: HasReader' "pa" m => m PP.Doc -> m PP.Doc
+rt :: HasReader' "pa" m => m Doc -> m Doc
 rt = local @"pa" (\(PA p _) -> PA p InR)
 
-mparens :: HasReader' "pa" m => PA -> m PP.Doc -> m PP.Doc
+mparens :: HasReader' "pa" m => PA -> m Doc -> m Doc
 mparens pa doc = do
   parentPA <- ask @"pa"
   (if pa < parentPA then parens else id) doc
 
 --------------------------------------------------
 
-prettyTy :: Type -> Doc
+prettyTy :: HasReader' "pa" m => Type -> m Doc
 prettyTy (TyVar v)        = text (show v)
 prettyTy TyVoid           = text "Void"
 prettyTy TyUnit           = text "Unit"
@@ -211,25 +209,25 @@ prettyTy (TyGraph ty)     = withPA tfunPA $
 prettyTy (TyMap k v)      =  withPA tfunPA $
   hsep [text "Map", rt (prettyTy k), rt (prettyTy v)]
 
-prettyPolyTy :: PolyType -> Doc
+prettyPolyTy :: (LFresh m, HasReader' "pa" m) => PolyType -> m Doc
 prettyPolyTy (Forall bnd) = lunbind bnd $
   \(_, body) -> prettyTy body
 
-prettyTyDef :: String -> TyDefBody -> Doc
+prettyTyDef :: HasReader' "pa" m => String -> TyDefBody -> m Doc
 prettyTyDef tyName (TyDefBody ps body)
   = text tyName <+> hsep (map text ps) <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
 
 --------------------------------------------------
 
-prettyName :: Name a -> Doc
+prettyName :: HasReader' "pa" m => Name a -> m Doc
 prettyName = text . show
 
 -- Pretty-print a term with guaranteed parentheses.
-prettyTermP :: Term -> Doc
+prettyTermP :: (LFresh m, HasReader' "pa" m) => Term -> m Doc
 prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
 prettyTermP t        = withPA initPA $ prettyTerm t
 
-prettyTerm :: Term -> Doc
+prettyTerm :: (LFresh m, HasReader' "pa" m) => Term -> m Doc
 prettyTerm (TVar x)      = prettyName x
 prettyTerm (TPrim (PrimUOp uop)) = case M.lookup uop uopMap of
   Just (OpInfo (UOpF Pre _) (syn:_) _)  -> text syn <> text "~"
@@ -324,76 +322,76 @@ prettyTerm (TTyOp op ty)  = withPA funPA $
   prettyTyOp op <+> prettyTy ty
 prettyTerm TWild = text "_"
 
-prettySide :: Side -> Doc
+prettySide :: HasReader' "pa" m => Side -> m Doc
 prettySide L = text "left"
 prettySide R = text "right"
 
-containerDelims :: Container -> (Doc -> Doc)
+containerDelims :: HasReader' "pa" m => Container -> (m Doc -> m Doc)
 containerDelims ListContainer = brackets
 containerDelims BagContainer  = bag
 containerDelims SetContainer  = braces
 
-prettyTyOp :: TyOp -> Doc
+prettyTyOp :: HasReader' "pa" m => TyOp -> m Doc
 prettyTyOp Enumerate = text "enumerate"
 prettyTyOp Count     = text "count"
 
-prettyUOp :: UOp -> Doc
+prettyUOp :: HasReader' "pa" m => UOp -> m Doc
 prettyUOp op =
   case M.lookup op uopMap of
     Just (OpInfo _ (syn:_) _) ->
       text $ syn ++ (if all isAlpha syn then " " else "")
     _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
 
-prettyBOp :: BOp -> Doc
+prettyBOp :: HasReader' "pa" m => BOp -> m Doc
 prettyBOp op =
   case M.lookup op bopMap of
     Just (OpInfo _ (syn:_) _) -> text syn
     _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
-prettyBranches :: [Branch] -> Doc
+prettyBranches :: (LFresh m, HasReader' "pa" m) => [Branch] -> m Doc
 prettyBranches []     = error "Empty branches are disallowed."
 prettyBranches (b:bs) =
   prettyBranch False b
   $+$
   foldr (($+$) . prettyBranch True) empty bs
 
-prettyBranch :: Bool -> Branch -> Doc
+prettyBranch :: (LFresh m, HasReader' "pa" m) => Bool -> Branch -> m Doc
 prettyBranch com br = lunbind br $ \(gs,t) ->
   (if com then (text "," <+>) else id) (prettyTerm t <+> prettyGuards gs)
 
-prettyGuards :: Telescope Guard -> Doc
+prettyGuards :: (LFresh m, HasReader' "pa" m) => Telescope Guard -> m Doc
 prettyGuards TelEmpty                     = text "otherwise"
 prettyGuards (fromTelescope -> gs)
   = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
-prettyGuard :: Guard -> Doc
+prettyGuard :: (LFresh m, HasReader' "pa" m) => Guard -> m Doc
 prettyGuard (GBool et)  = text "if" <+> prettyTerm (unembed et)
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
 prettyGuard (GLet b)    = text "let" <+> prettyBinding b
 
-prettyBinding :: Binding -> Doc
+prettyBinding :: (LFresh m, HasReader' "pa" m) => Binding -> m Doc
 prettyBinding (Binding Nothing x (unembed -> t))
   = hsep [prettyName x, text "=", prettyTerm t]
 prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
   = hsep [prettyName x, text ":", prettyPolyTy ty, text "=", prettyTerm t]
 
-prettyQuals :: Telescope Qual -> Doc
+prettyQuals :: (LFresh m, HasReader' "pa" m) => Telescope Qual -> m Doc
 prettyQuals (fromTelescope -> qs) = do
   ds <- punctuate (text ",") (map prettyQual qs)
   hsep ds
 
-prettyQual :: Qual -> Doc
+prettyQual :: (LFresh m, HasReader' "pa" m) => Qual -> m Doc
 prettyQual (QBind x (unembed -> t))
   = hsep [prettyName x, text "in", prettyTerm t]
 prettyQual (QGuard (unembed -> t))
   = prettyTerm t
 
 -- Print out a pattern with guaranteed parentheses.
-prettyPatternP :: Pattern -> Doc
+prettyPatternP :: (LFresh m, HasReader' "pa" m) => Pattern -> m Doc
 prettyPatternP p@PTup{} = setPA initPA $ prettyPattern p
 prettyPatternP p        = withPA initPA $ prettyPattern p
 
-prettyPattern :: Pattern -> Doc
+prettyPattern :: (LFresh m, HasReader' "pa" m) => Pattern -> m Doc
 prettyPattern (PVar x)          = prettyName x
 prettyPattern PWild             = text "_"
 prettyPattern (PAscr p ty)      = withPA ascrPA $
@@ -433,27 +431,27 @@ prettyPattern (PFrac p1 p2)     = withPA (getPA Div) $
 -- prettyModule :: Module -> Doc
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
-prettyDecl :: Decl -> Doc
+prettyDecl :: (LFresh m, HasReader' "pa" m) => Decl -> m Doc
 prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettyPolyTy ty
 prettyDecl (DTyDef (TypeDefn x args body))
   = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
 
-prettyDefn :: Defn -> Doc
+prettyDefn :: (LFresh m, HasReader' "pa" m) => Defn -> m Doc
 prettyDefn (Defn x patTys ty clauses) = vcat $
   prettyTyDecl x (foldr (:->:) ty patTys)
   :
   map (prettyClause x . eraseClause) clauses
 
-prettyClause :: Name a -> Bind [Pattern] Term -> Doc
+prettyClause :: (LFresh m, HasReader' "pa" m) => Name a -> Bind [Pattern] Term -> m Doc
 prettyClause x b
   = withPA funPA . lunbind b $ \(ps, t) ->
       prettyName x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (prettyTerm t)
 
-prettyProperty :: Property -> Doc
+prettyProperty :: (LFresh m, HasReader' "pa" m) => Property -> m Doc
 prettyProperty = prettyTerm
 
-prettyTyDecl :: Name t -> Type -> Doc
+prettyTyDecl :: HasReader' "pa" m => Name t -> Type -> m Doc
 prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 
 ------------------------------------------------------------

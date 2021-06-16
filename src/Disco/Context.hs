@@ -1,4 +1,10 @@
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE KindSignatures      #-}
+{-# LANGUAGE MagicHash           #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE TypeInType          #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,9 +29,11 @@ module Disco.Context
 
 import           Prelude                          hiding (lookup)
 
-import           Control.Monad.Reader
+import           Capability.Reader
 import qualified Data.Map                         as M
 
+import           Capability.Source                (await_)
+import           GHC.Exts                         (Proxy#, proxy#)
 import           Unbound.Generics.LocallyNameless
 
 -- | A context maps names to things.  In particular a @Ctx a b@ maps
@@ -54,17 +62,26 @@ joinCtx = M.union
 joinCtxs :: [Ctx a b] -> Ctx a b
 joinCtxs = M.unions
 
+lookup_ :: forall k (tag :: k) m a b. HasReader tag (Ctx a b) m => Proxy# tag -> Name a -> m (Maybe b)
+lookup_ tag x = M.lookup x <$> await_ tag
+
 -- | Look up a name in a context.
-lookup :: MonadReader (Ctx a b) m => Name a -> m (Maybe b)
-lookup x = M.lookup x <$> ask
+lookup :: forall tag m a b. HasReader tag (Ctx a b) m => Name a -> m (Maybe b)
+lookup = lookup_ (proxy# @tag)
+
+extend_ :: forall k (tag :: k) m a b r. HasReader tag (Ctx a b) m => Proxy# tag -> Name a -> b -> m r -> m r
+extend_ tag x b = local_ tag (M.insert x b)
 
 -- | Run a computation under a context extended with a new binding.
 --   The new binding shadows any old binding for the same name.
-extend :: MonadReader (Ctx a b) m => Name a -> b -> m r -> m r
-extend x b = local (M.insert x b)
+extend :: forall tag m a b r. HasReader tag (Ctx a b) m => Name a -> b -> m r -> m r
+extend = extend_ (proxy# @tag)
+
+extends_ :: forall k (tag :: k) m a b r. HasReader tag (Ctx a b) m => Proxy# tag -> Ctx a b -> m r -> m r
+extends_ tag ctx = local_ tag (joinCtx ctx)
 
 -- | Run a computation in a context extended with an additional
 --   context.  Bindings in the additional context shadow any bindings
 --   with the same names in the existing context.
-extends :: MonadReader (Ctx a b) m => Ctx a b -> m r -> m r
-extends ctx = local (joinCtx ctx)
+extends :: forall tag m a b r. HasReader tag (Ctx a b) m => Ctx a b -> m r -> m r
+extends = extends_ (proxy# @tag)

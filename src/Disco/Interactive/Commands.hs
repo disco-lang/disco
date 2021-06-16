@@ -1,5 +1,7 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE GADTs     #-}
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE GADTs            #-}
+{-# LANGUAGE TypeApplications #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interactive.Commands
@@ -105,7 +107,7 @@ handleAnn :: REPLExpr 'CAnn -> Disco IErr ()
 handleAnn (Ann t) = do
     ctx   <- use topCtx
     tymap <- use topTyDefns
-    s <- case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
+    s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left  e       -> return . show $ e
         Right (at, _) -> return . show $ at
     iputStrLn s
@@ -125,7 +127,7 @@ compileCmd =
 handleCompile :: REPLExpr 'CCompile -> Disco IErr ()
 handleCompile (Compile t) = do
   ctx <- use topCtx
-  s <- case evalTCM (extends ctx $ inferTop t) of
+  s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return . show $ e
         Right (at,_) -> return . show . compileTerm $ at
   iputStrLn s
@@ -146,7 +148,7 @@ desugarCmd =
 handleDesugar :: REPLExpr 'CDesugar -> Disco IErr ()
 handleDesugar (Desugar t) = do
   ctx <- use topCtx
-  s <- case evalTCM (extends ctx $ inferTop t) of
+  s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return.show $ e
         Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
   iputStrLn s
@@ -192,7 +194,7 @@ handleEval :: REPLExpr 'CEval -> Disco IErr ()
 handleEval (Eval t) = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
-  case evalTCM (extends ctx $ withTyDefns tymap $ inferTop t) of
+  case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
       let ty = getType at
@@ -267,7 +269,7 @@ handleLet :: REPLExpr 'CLet -> Disco IErr ()
 handleLet (Let x t) = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  let mat = evalTCM (extends ctx $ withTyDefns tymap $ inferTop t)
+  let mat = evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
@@ -442,7 +444,7 @@ handleTest :: REPLExpr 'CTestProp -> Disco IErr ()
 handleTest (TestProp t) = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
-  case evalTCM (extends ctx $ withTyDefns tymap $ checkProperty t) of
+  case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ checkProperty t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right at -> do
       withTopEnv $ do
@@ -467,7 +469,7 @@ handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco IErr ()
 handleTypeCheck (TypeCheck t) = do
   ctx <- use topCtx
   tymap <- use topTyDefns
-  s <- case (evalTCM $ extends ctx $ withTyDefns tymap $ inferTop t) of
+  s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left e        -> return.show $ e    -- XXX pretty-print
         Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
   iputStrLn s

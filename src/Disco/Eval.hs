@@ -1,10 +1,14 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE GADTs             #-}
-{-# LANGUAGE PatternSynonyms   #-}
-{-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE TupleSections     #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
+{-# LANGUAGE TypeApplications           #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadFail instance, see below.
@@ -80,14 +84,23 @@ module Disco.Eval
 
 import           Text.Printf
 
+import           Capability.Reader
+import           Capability.Source
 import           Control.Lens                     (makeLenses, use, (%=), (<+=),
                                                    (<>=))
+import           Control.Monad                    (when)
+import           Control.Monad.Catch              (MonadCatch, MonadMask,
+                                                   MonadThrow)
 import           Control.Monad.Except             (MonadError, catchError,
                                                    throwError)
 import qualified Control.Monad.Fail               as Fail
-import           Control.Monad.Reader
+import           Control.Monad.IO.Class
+import           Control.Monad.Reader             (ReaderT (..))
+import qualified Control.Monad.Reader             as CMR
+import           Control.Monad.State              (StateT (..))
+import qualified Control.Monad.State              as CMS
+import           Control.Monad.Trans.Class        (lift)
 import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State.Strict
 import           Data.IntMap.Lazy                 (IntMap)
 import qualified Data.IntMap.Lazy                 as IntMap
 import           Data.IntSet                      (IntSet)
@@ -324,22 +337,22 @@ type Env  = Ctx Core Value
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
 extendEnv :: Name Core -> Value -> Disco e a -> Disco e a
-extendEnv x v = avoid [AnyName x] . extend x v
+extendEnv x v = avoid [AnyName x] . extend @"env" x v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
 extendsEnv :: Env -> Disco e a -> Disco e a
-extendsEnv e' = avoid (map AnyName (names e')) . extends e'
+extendsEnv e' = avoid (map AnyName (names e')) . extends @"env" e'
 
 -- | Get the current environment.
 getEnv :: Disco e Env
-getEnv = ask
+getEnv = ask @"env"
 
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
 withEnv :: Env -> Disco e a -> Disco e a
-withEnv = local . const
+withEnv = local @"env" . const
 
 ------------------------------------------------------------
 -- Memory cells
@@ -497,7 +510,10 @@ initDiscoState = DiscoState
 --   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
+newtype Disco e a = Disco { unDisco :: StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO))) a }
+  deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState (DiscoState e), MonadError e, MonadFail, MonadThrow, MonadCatch, MonadMask)
+  deriving (HasReader "env" Env, HasSource "env" Env) via
+    (MonadReader (StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))))
 
 ------------------------------------------------------------
 -- Some needed instances.
@@ -545,7 +561,8 @@ runDisco
   = runLFreshMT
   . runExceptT
   . flip runReaderT emptyCtx
-  . flip evalStateT initDiscoState
+  . flip CMS.evalStateT initDiscoState
+  . unDisco
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and turn it into a message.
@@ -625,7 +642,7 @@ garbageCollect :: Disco e ()
 garbageCollect = do
 
     --  reachableLocs .= IntSet.empty  yields some sort of ambiguity error...
-  modify (\s -> s { _reachableLocs = IntSet.empty })
+  CMS.modify (\s -> s { _reachableLocs = IntSet.empty })
 
   env  <- use topEnv
   reachableEnv env
@@ -638,7 +655,7 @@ garbageCollect = do
 --   @Disco@ state.
 getReachables :: [Value] -> Disco e IntSet
 getReachables vs = do
-  modify (\s -> s { _reachableLocs = IntSet.empty })
+  CMS.modify (\s -> s { _reachableLocs = IntSet.empty })
   reachables vs
   use reachableLocs
 
@@ -715,7 +732,7 @@ parseDiscoModule file = do
 --   fails.
 typecheckDisco :: MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
 typecheckDisco tyctx tydefs tcm =
-  adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends tyctx $ tcm)
+  adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends @"tyctx" tyctx $ tcm)
 
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
@@ -727,7 +744,7 @@ typecheckDisco tyctx tydefs tcm =
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
 loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
-loadDiscoModule resolver m = evalStateT (loadDiscoModule' resolver S.empty m) M.empty
+loadDiscoModule resolver m = CMS.evalStateT (loadDiscoModule' resolver S.empty m) M.empty
 
 loadDiscoModule' ::
   (MonadError IErr m, MonadIO m) =>
@@ -735,7 +752,7 @@ loadDiscoModule' ::
   StateT (M.Map ModName ModuleInfo) m ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
   when (S.member modName inProcess) (throwError $ CyclicImport modName)
-  modMap <- get
+  modMap <- CMS.get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
@@ -749,7 +766,7 @@ loadDiscoModule' resolver inProcess modName  = do
       imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
       m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
       m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
-      modify (M.insert modName m')
+      CMS.modify (M.insert modName m')
       return m'
 
 -------------------------------------

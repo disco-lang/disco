@@ -1,8 +1,10 @@
+{-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE DeriveGeneric            #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TemplateHaskell          #-}
+{-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
@@ -20,9 +22,11 @@
 
 module Disco.Typecheck where
 
+import           Capability.Reader
+
 import           Control.Arrow                           ((&&&))
 import           Control.Monad.Except
-import           Control.Monad.RWS                       (get)
+import qualified Control.Monad.State                     as CMS
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, sort)
@@ -80,7 +84,7 @@ inferTelescope inferOne tel = do
     go []     = return ([], emptyCtx)
     go (b:bs) = do
       (tyb, ctx) <- inferOne b
-      extends ctx $ do
+      extends @"tyctx" ctx $ do
       (tybs, ctx') <- go bs
       return (tyb:tybs, ctx `joinCtx` ctx')
 
@@ -98,7 +102,7 @@ checkModule (Module _ _ m docs) = do
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
     tyCtx     <- makeTyCtx typeDecls
-    extends tyCtx $ do
+    extends @"tyctx" tyCtx $ do
       mapM_ checkTyDefn tydefs
       adefns <- mapM checkDefn defns
       let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
@@ -119,7 +123,7 @@ checkModule (Module _ _ m docs) = do
 --   definitions already in the context.
 makeTyDefnCtx :: [TypeDefn] -> TCM TyDefCtx
 makeTyDefnCtx tydefs = do
-  oldTyDefs <- get
+  oldTyDefs <- ask @"tydefctx"
   let oldNames = M.keys oldTyDefs
       newNames = map (\(TypeDefn x _ _) -> x) tydefs
       dups = filterDups $ newNames ++ oldNames
@@ -251,7 +255,7 @@ checkDefn (TermDefn x clauses) = do
      return ([], at)
     go (p:ps) (ty1 :->: ty2) body = do
       (ctx, apt) <- checkPattern p ty1
-      (apts, at) <- extends ctx $ go ps ty2 body
+      (apts, at) <- extends @"tyctx" ctx $ go ps ty2 body
       return (apt:apts, at)
     go _ _ _ = throwError NumPatterns   -- XXX include more info
 
@@ -311,7 +315,7 @@ conArity :: Con -> TCM Int
 conArity (CContainer _) = return 1
 conArity CGraph = return 1
 conArity (CUser name)    = do
-  d <- get
+  d <- ask @"tydefctx"
   case M.lookup name d of
     Nothing               -> throwError (NotTyDef name)
     Just (TyDefBody as _) -> return (length as)
@@ -864,7 +868,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
 
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
-  extends ctx $
+  extends @"tyctx" ctx $
     ATAbs Lam checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
 
   where
@@ -930,7 +934,7 @@ typecheck Infer (TAbs q lam)    = do
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.
-  extends (joinCtxs pCtxs) $ do
+  extends @"tyctx" (joinCtxs pCtxs) $ do
 
 
     case q of
@@ -1052,7 +1056,7 @@ typecheck mode tcc@(TContainerComp c bqt) = do
   eltMode <- ensureConstrMode1 (containerToCon c) mode (Left tcc)
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
-  extends cx $ do
+  extends @"tyctx" cx $ do
     at <- typecheck eltMode t
     let resTy = case mode of
           Infer    -> containerTy c (getType at)
@@ -1081,7 +1085,7 @@ typecheck mode (TLet l) = do
   (as, ctx) <- inferTelescope inferBinding bs
 
   -- ...then check/infer the body under an extended context.
-  extends ctx $ do
+  extends @"tyctx" ctx $ do
     at2 <- typecheck mode t2
     return $ ATLet (getType at2) (bind as at2)
 
@@ -1119,7 +1123,7 @@ typecheck mode (TCase bs) = do
     typecheckBranch b = do
       (gs, t) <- unbind b
       (ags, ctx) <- inferTelescope inferGuard gs
-      extends ctx $
+      extends @"tyctx" ctx $
         bind ags <$> typecheck mode t
 
     -- Infer the type of a guard, returning the type-annotated guard

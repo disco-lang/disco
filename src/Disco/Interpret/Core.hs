@@ -1,7 +1,9 @@
+{-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE TupleSections            #-}
+{-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
@@ -343,7 +345,7 @@ whnfApp f vs =
 --   arguments.
 whnfAppExact :: Value -> [Value] -> Disco IErr Value
 whnfAppExact (VClos b e) vs  =
-  lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
+  lunbind b $ \(xs,t) -> withEnv e $ extends @"env" (M.fromList $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
 whnfAppExact (VFun _)    vs  =
   error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
@@ -362,7 +364,7 @@ whnfCase (b:bs) = do
   res <- checkGuards (fromTelescope gs)
   case res of
     Nothing -> whnfCase bs
-    Just e' -> extends e' $ whnf t
+    Just e' -> extends @"env" e' $ whnf t
 
 -- | Check a chain of guards on one branch of a case.  Returns
 --   @Nothing@ if the guards fail to match, or a resulting environment
@@ -374,7 +376,7 @@ checkGuards ((unembed -> c, p) : gs) = do
   res <- match v p
   case res of
     Nothing -> return Nothing
-    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
+    Just e  -> extends @"env" e (fmap (M.union e) <$> checkGuards gs)
 
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.

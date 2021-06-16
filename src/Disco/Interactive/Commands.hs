@@ -231,7 +231,7 @@ handleHelp Help = do
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
     filteredCommands cmds = filter (\(SomeCmd c) -> category c == User) cmds
-    showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ (shortHelp c)
+    showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
 
@@ -298,7 +298,7 @@ loadCmd =
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper :: REPLExpr 'CLoad -> Disco IErr ()
-handleLoadWrapper (Load fp) =  handleLoad fp >> return ()
+handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
 handleLoad :: FilePath -> Disco IErr Bool
 handleLoad fp = catchAndPrintErrors False $ do
@@ -363,7 +363,7 @@ parseCmd =
     }
 
 handleParse :: REPLExpr 'CParse -> Disco IErr ()
-handleParse (Parse t) = iprint $ t
+handleParse (Parse t) = iprint t
 
 
 prettyCmd :: REPLCommand 'CPretty
@@ -399,7 +399,7 @@ handleReload Reload = do
       file <- use lastFile
       case file of
         Nothing -> iputStrLn "No file to reload."
-        Just f  -> handleLoad f >> return()
+        Just f  -> void (handleLoad f)
 
 
 showDefnCmd :: REPLCommand 'CShowDefn
@@ -561,7 +561,7 @@ prettySuccessReason (TestNotFound (Randomized n m)) = do
 prettySuccessReason _ = return ()
 
 prettyFailureReason :: AProperty -> TestReason -> Disco IErr ()
-prettyFailureReason prop (TestBool) = do
+prettyFailureReason prop TestBool = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStr     "  - Test is false: " >> iputStrLn dp
 prettyFailureReason prop (TestEqual ty v1 v2) = do
@@ -626,7 +626,7 @@ runAllTests aprops
     runTests :: Name ATerm -> [AProperty] -> Disco IErr Bool
     runTests n props = do
       iputStr ("  " ++ name2String n ++ ":")
-      results <- sequenceA . fmap sequenceA $ map (id &&& runTest numSamples) props
+      results <- traverse (sequenceA . (id &&& runTest numSamples)) props
       let failures = filter (not . testIsOk . snd) results
       case null failures of
         True  -> iputStrLn " OK"

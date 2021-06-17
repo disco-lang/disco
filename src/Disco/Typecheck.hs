@@ -26,6 +26,7 @@ module Disco.Typecheck where
 import           Capability.Reader
 
 import           Control.Arrow                           ((&&&))
+import           Control.Monad                           (zipWithM)
 import           Control.Monad.Except
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
@@ -80,7 +81,7 @@ inferTelescope
   => (b -> m (tyb, TyCtx)) -> Telescope b -> m (Telescope tyb, TyCtx)
 inferTelescope inferOne tel = do
   (tel1, ctx) <- go (fromTelescope tel)
-  return $ (toTelescope tel1, ctx)
+  return (toTelescope tel1, ctx)
   where
     go []     = return ([], emptyCtx)
     go (b:bs) = do
@@ -239,7 +240,7 @@ checkDefn (TermDefn x clauses) = do
     checkNumPats [_]    = return ()
     checkNumPats (c:cs)
       | all ((==0) . numPats) (c:cs) = throwError (DuplicateDefns x)
-      | not (all (== numPats c) (map numPats cs)) = throwError NumPatterns
+      | not (all ((== numPats c) . numPats) cs) = throwError NumPatterns
                -- XXX more info, this error actually means # of
                -- patterns don't match across different clauses
       | otherwise = return ()
@@ -271,7 +272,7 @@ checkDefn (TermDefn x clauses) = do
 --   properties attached to each name and typecheck them.
 checkProperties :: Ctx Term Docs -> TCM (Ctx ATerm [AProperty])
 checkProperties docs =
-  (M.mapKeys coerce . M.filter (not.null))
+  M.mapKeys coerce . M.filter (not.null)
     <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
@@ -356,7 +357,7 @@ checkPolyTy t (Forall sig) = do
 --   This function is provided for convenience; it simply calls
 --   'typecheck' with an appropriate 'Mode'.
 infer :: Term -> TCM ATerm
-infer t = typecheck Infer t
+infer = typecheck Infer
 
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting
@@ -833,7 +834,7 @@ typecheck Infer             (TString cs) = return $ ATString cs
 typecheck Infer             (TNat n)     = return $ ATNat TyN n
 typecheck Infer             (TRat r)     = return $ ATRat r
 
-typecheck _                 TWild        = throwError $ NoTWild
+typecheck _                 TWild        = throwError NoTWild
 
 --------------------------------------------------
 -- Abstractions (lambdas and quantifiers)
@@ -921,7 +922,7 @@ typecheck Infer (TAbs q lam)    = do
   -- and check each pattern at that variable to refine them, collecting
   -- the types of each pattern's bound variables in a context.
   tys <- mapM getAscrOrFresh args
-  (pCtxs, typedPats) <- unzip <$> sequence (zipWith checkPattern args tys)
+  (pCtxs, typedPats) <- unzip <$> zipWithM checkPattern args tys
 
   -- In the case of ∀, ∃, have to ensure that the argument types are
   -- searchable.
@@ -930,7 +931,7 @@ typecheck Infer (TAbs q lam)    = do
     -- the solver runs, but right now the patterns might have a
     -- concrete type from annotations inside tuples.
     forM_ (map getType typedPats) $ \ty ->
-      when (not $ isSearchable ty) $
+      unless (isSearchable ty) $
         throwError $ NoSearch ty
 
   -- Extend the context with the given arguments, and then do
@@ -984,7 +985,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
       (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
-      return $ (getType at :*: ty, at : ats)
+      return (getType at :*: ty, at : ats)
 
 --------------------------------------------------
 -- Sum types
@@ -1032,13 +1033,13 @@ typecheck Infer (TTyOp Count t)     = do
 -- Literal containers, including ellipses
 typecheck mode t@(TContainer c xs ell)  = do
   eltMode <- ensureConstrMode1 (containerToCon c) mode (Left t)
-  axns  <- mapM (\(x,n) -> (,) <$> typecheck eltMode x <*> traverse (flip check TyN) n) xs
+  axns  <- mapM (\(x,n) -> (,) <$> typecheck eltMode x <*> traverse (`check` TyN) n) xs
   aell  <- typecheckEllipsis eltMode ell
   resTy <- case mode of
     Infer -> do
-      let tys = [ getType at | Just (Until at) <- [aell] ] ++ (map (getType . fst)) axns
+      let tys = [ getType at | Just (Until at) <- [aell] ] ++ map (getType . fst) axns
       tyv  <- freshTy
-      constraints $ map (flip CSub tyv) tys
+      constraints $ map (`CSub` tyv) tys
       return $ containerTy c tyv
     Check ty -> return ty
   when (isJust ell) $ do
@@ -1050,7 +1051,7 @@ typecheck mode t@(TContainer c xs ell)  = do
     typecheckEllipsis :: Mode -> Maybe (Ellipsis Term) -> TCM (Maybe (Ellipsis ATerm))
     typecheckEllipsis _ Nothing           = return Nothing
     typecheckEllipsis _ (Just Forever)    = return $ Just Forever
-    typecheckEllipsis m (Just (Until tm)) = (Just . Until) <$> typecheck m tm
+    typecheckEllipsis m (Just (Until tm)) = Just . Until <$> typecheck m tm
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do
@@ -1102,7 +1103,7 @@ typecheck mode (TLet l) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return $ (ABinding mty (coerce x) (embed at), singleCtx x (toPolyType $ getType at))
+      return (ABinding mty (coerce x) (embed at), singleCtx x (toPolyType $ getType at))
 
 --------------------------------------------------
 -- Case
@@ -1115,7 +1116,7 @@ typecheck mode (TCase bs) = do
     Check ty -> return ty
     Infer    -> do
       x <- freshTy
-      constraints $ map (flip CSub x) (map getType bs')
+      constraints $ map ((`CSub` x) . getType) bs'
       return x
   return $ ATCase resTy bs'
 
@@ -1207,7 +1208,7 @@ checkPattern (PTup tup) tupTy = do
   return (joinCtxs ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
 
   where
-    checkTuplePat :: [Pattern] -> Type -> TCM ([(TyCtx, APattern)])
+    checkTuplePat :: [Pattern] -> Type -> TCM [(TyCtx, APattern)]
     checkTuplePat [] _   = error "Impossible! checkTuplePat []"
     checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
       (ctx, apt) <- checkPattern p ty
@@ -1255,7 +1256,7 @@ checkPattern p@(PCons p1 p2) ty = do
 
 checkPattern p@(PList ps) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
-  listCtxtAps <- mapM (flip checkPattern tyl) ps
+  listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (joinCtxs ctxs, APList (TyList tyl) aps)
 
@@ -1431,7 +1432,7 @@ lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throw @"tcerr" $ NoLub ty1 t
 -- to be subtypes of it
 lub ty1 ty2 = do
   tyLub <- freshTy
-  constraints $ [CSub ty1 tyLub, CSub ty2 tyLub]
+  constraints [CSub ty1 tyLub, CSub ty2 tyLub]
   return tyLub
 
 ------------------------------------------------------------

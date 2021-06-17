@@ -161,6 +161,7 @@ type instance TypeOf _ "tcerr"       = TCError
 type Rd tag = HasReader' tag
 type Wr tag = HasWriter' tag
 type Th tag = HasThrow' tag
+type Ct tag = HasCatch' tag
 
 type Has cs m = CC.All cs m
 

@@ -43,6 +43,7 @@ import           Capability.Error
 import           Disco.AST.Generic                       (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Capability
 import           Disco.Context
 import           Disco.Module
 import           Disco.Subst                             (applySubst)

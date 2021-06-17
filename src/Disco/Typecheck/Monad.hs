@@ -47,6 +47,7 @@ import           Prelude                          hiding (lookup)
 
 import           Data.Bifunctor                   (second)
 import           Disco.AST.Surface
+import           Disco.Capability
 import           Disco.Context
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
@@ -157,13 +158,6 @@ type instance TypeOf _ "constraints" = Constraint
 type instance TypeOf _ "tyctx"       = TyCtx
 type instance TypeOf _ "tydefctx"    = TyDefCtx
 type instance TypeOf _ "tcerr"       = TCError
-
-type Rd tag = HasReader' tag
-type Wr tag = HasWriter' tag
-type Th tag = HasThrow' tag
-type Ct tag = HasCatch' tag
-
-type Has cs m = CC.All cs m
 
 ------------------------------------------------------------
 -- Running

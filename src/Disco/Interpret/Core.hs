@@ -653,12 +653,12 @@ mapToSet tyk tyv (VMap val) = do
 mapToSet _ _ v' = error $ "unexpected value " ++ show v' ++ " in mapToSet"
 
 -- | Convert a set of pairs to a map.
-setToMap :: Type -> Type -> Value -> Disco IErr Value
-setToMap tyk tyv (VBag cs) = do
+setToMap :: Value -> Disco IErr Value
+setToMap (VBag cs) = do
   let kvs = map fst cs
   kvs' <- mapM (whnfV >=> \case { VCons 0 [k, v] -> (,v) <$> toSimpleValue k }) kvs
   return . VMap . M.fromList $ kvs'
-setToMap _ _ v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
+setToMap v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
 
 -- | Convert a bag to a set of pairs, with each element paired with
 --   its count.
@@ -924,7 +924,7 @@ whnfOp OBagToCounts    = arity1 "bagCounts" primBagCounts
 whnfOp (OCountsToBag ty) = arity1 "bagFromCounts" $ primBagFromCounts ty
 
 whnfOp (OMapToSet tyK tyV) = arity1 "mapToSet" $ whnfV >=> mapToSet tyK tyV
-whnfOp (OSetToMap tyK tyV) = arity1 "map"      $ whnfV >=> setToMap tyK tyV
+whnfOp OSetToMap           = arity1 "map"      $ whnfV >=> setToMap
 
 --------------------------------------------------
 -- Each/reduce

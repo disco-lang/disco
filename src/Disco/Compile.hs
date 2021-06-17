@@ -187,7 +187,7 @@ compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
 compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
-compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst (OSetToMap k v)
+compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst OSetToMap
 
 compilePrim _     PrimSummary = return $ CConst OSummary
 compilePrim (_ :->: TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty

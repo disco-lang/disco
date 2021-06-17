@@ -184,7 +184,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagToCounts    -- ^ bag -> set of counts
         | OCountsToBag Type  -- ^ set of counts -> bag
         | OMapToSet Type Type -- ^ Map k v -> Set (k × v)
-        | OSetToMap Type Type -- ^ Set (k × v) -> Map k v
+        | OSetToMap           -- ^ Set (k × v) -> Map k v
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test

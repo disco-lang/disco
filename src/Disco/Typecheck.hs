@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE TypeApplications         #-}
 {-# LANGUAGE ViewPatterns             #-}
@@ -26,7 +27,6 @@ import           Capability.Reader
 
 import           Control.Arrow                           ((&&&))
 import           Control.Monad.Except
-import qualified Control.Monad.State                     as CMS
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, sort)
@@ -39,6 +39,7 @@ import           Prelude                                 hiding (lookup)
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
+import           Capability.Error
 import           Disco.AST.Generic                       (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -75,8 +76,8 @@ containerToCon SetContainer  = CSet
 --   context is then added to the overall context when inferring
 --   subsequent items in the telescope.
 inferTelescope
-  :: (Alpha b, Alpha tyb)
-  => (b -> TCM (tyb, TyCtx)) -> Telescope b -> TCM (Telescope tyb, TyCtx)
+  :: (Alpha b, Alpha tyb, Has '[Rd "tyctx"] m)
+  => (b -> m (tyb, TyCtx)) -> Telescope b -> m (Telescope tyb, TyCtx)
 inferTelescope inferOne tel = do
   (tel1, ctx) <- go (fromTelescope tel)
   return $ (toTelescope tel1, ctx)
@@ -1290,8 +1291,6 @@ checkPattern (PFrac p q) ty = do
   (ctx2, ap2) <- checkPattern q tyQ
   return (joinCtx ctx1 ctx2, APFrac ty ap1 ap2)
 
-checkPattern p ty = throwError (PatternType p ty)
-
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp
 ------------------------------------------------------------
@@ -1299,7 +1298,7 @@ checkPattern p ty = throwError (PatternType p ty)
 -- | Given an input type @ty@, return a type which represents the
 --   output type of the absolute value function, and generate
 --   appropriate constraints.
-cPos :: Type -> TCM Type
+cPos :: Has '[Wr "constraints", Fresh] m => Type -> m Type
 cPos ty = do
   constraint $ CQual QNum ty   -- The input type has to be numeric.
   case ty of
@@ -1328,7 +1327,7 @@ cPos ty = do
 -- | Given an input type @ty@, return a type which represents the
 --   output type of the floor or ceiling functions, and generate
 --   appropriate constraints.
-cInt :: Type -> TCM Type
+cInt :: Has '[Wr "constraints", Fresh] m => Type -> m Type
 cInt ty = do
   constraint $ CQual QNum ty
   case ty of
@@ -1358,7 +1357,7 @@ cInt ty = do
 -- | Given input types to the exponentiation operator, return a type
 --   which represents the output type, and generate appropriate
 --   constraints.
-cExp :: Type -> Type -> TCM Type
+cExp :: Has '[Wr "constraints", Fresh] m => Type -> Type -> m Type
 cExp ty1 TyN = do
   constraint $ CQual QNum ty1
   return ty1
@@ -1415,13 +1414,13 @@ isKnownSubBase b1 b2 = (b1,b2) `elem` basePairs
 --   This saves work in the constraint solver, makes it easier to
 --   generate good error messages, and even sometimes saves us the
 --   indignity of exponential time complexity in the constraint solver.
-lub :: Type -> Type -> TCM Type
+lub :: (Has '[Wr "constraints", Th "tcerr", Fresh] m) => Type -> Type -> m Type
 lub ty1 ty2
   | isKnownSub ty1 ty2 = return ty2
   | isKnownSub ty2 ty1 = return ty1
 lub TyF TyZ = return TyQ
 lub TyZ TyF = return TyQ
-lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throwError $ NoLub ty1 ty2
+lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throw @"tcerr" $ NoLub ty1 ty2
 
 -- Would make sense eventually to add this case, but we would need a glb function too
 -- lub ty1@(TyCon c1 ts) ty2@(TyCon c2 t2)
@@ -1442,7 +1441,7 @@ lub ty1 ty2 = do
 -- | Get the argument (element) type of a (known) container type.  Returns a
 --   fresh variable with a suitable constraint if the given type is
 --   not literally a container type.
-getEltTy :: Container -> Type -> TCM Type
+getEltTy :: Has '[Wr "constraints", Fresh] m => Container -> Type -> m Type
 getEltTy _ (TyContainer _ e) = return e
 getEltTy c ty = do
   eltTy <- freshTy
@@ -1456,10 +1455,12 @@ getEltTy c ty = do
 --   type variable's outermost constructor matches the provided
 --   constructor, and a list of fresh type variables is returned whose
 --   count matches the arity of the provided constructor.
-ensureConstr :: Con -> Type -> Either Term Pattern -> TCM [Type]
+ensureConstr
+  :: forall m. Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Type -> Either Term Pattern -> m [Type]
 ensureConstr c ty targ = matchConTy c ty
   where
-    matchConTy :: Con -> Type -> TCM [Type]
+    matchConTy :: Con -> Type -> m [Type]
     matchConTy c1 (TyCon c2 tys) = do
       matchCon c1 c2
       return tys
@@ -1475,7 +1476,7 @@ ensureConstr c ty targ = matchConTy c ty
     --   unifying container variables if we are matching two container
     --   types; otherwise, simply ensure that the constructors are
     --   equal.  Throw a 'matchError' if they do not match.
-    matchCon :: Con -> Con -> TCM ()
+    matchCon :: Con -> Con -> m ()
     matchCon c1 c2                            | c1 == c2 = return ()
     matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
       constraint $ CEq (TyAtom v) (TyAtom ctr2)
@@ -1483,15 +1484,17 @@ ensureConstr c ty targ = matchConTy c ty
       constraint $ CEq (TyAtom ctr1) (TyAtom v)
     matchCon _ _                              = matchError
 
-    matchError :: TCM a
+    matchError :: m a
     matchError = case targ of
-      Left term -> throwError (NotCon c term ty)
-      Right pat -> throwError (PatternType pat ty)
+      Left term -> throw @"tcerr" (NotCon c term ty)
+      Right pat -> throw @"tcerr" (PatternType pat ty)
 
 -- | A variant of ensureConstr that expects to get exactly one
 --   argument type out, and throws an error if we get any other
 --   number.
-ensureConstr1 :: Con -> Type -> Either Term Pattern -> TCM Type
+ensureConstr1
+  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Type -> Either Term Pattern -> m Type
 ensureConstr1 c ty targ = do
   tys <- ensureConstr c ty targ
   case tys of
@@ -1503,7 +1506,9 @@ ensureConstr1 c ty targ = do
 -- | A variant of ensureConstr that expects to get exactly two
 --   argument types out, and throws an error if we get any other
 --   number.
-ensureConstr2 :: Con -> Type -> Either Term Pattern -> TCM (Type, Type)
+ensureConstr2
+  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Type -> Either Term Pattern -> m (Type, Type)
 ensureConstr2 c ty targ  = do
   tys <- ensureConstr c ty targ
   case tys of
@@ -1512,18 +1517,21 @@ ensureConstr2 c ty targ  = do
       "Impossible! Wrong number of arg types in ensureConstr2 " ++ show c ++ " "
         ++ show ty ++ ": " ++ show tys
 
-
 -- | A variant of 'ensureConstr' that works on 'Mode's instead of
 --   'Type's.  Behaves similarly to 'ensureConstr' if the 'Mode' is
 --   'Check'; otherwise it generates an appropriate number of copies
 --   of 'Infer'.
-ensureConstrMode :: Con -> Mode -> Either Term Pattern -> TCM [Mode]
+ensureConstrMode
+  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Mode -> Either Term Pattern -> m [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
 
 -- | A variant of 'ensureConstrMode' that expects to get a single
 --   'Mode' and throws an error if it encounters any other number.
-ensureConstrMode1 :: Con -> Mode -> Either Term Pattern -> TCM Mode
+ensureConstrMode1
+  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Mode -> Either Term Pattern -> m Mode
 ensureConstrMode1 c m targ = do
   ms <- ensureConstrMode c m targ
   case ms of
@@ -1534,7 +1542,9 @@ ensureConstrMode1 c m targ = do
 
 -- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
 --   and throws an error if it encounters any other number.
-ensureConstrMode2 :: Con -> Mode -> Either Term Pattern -> TCM (Mode, Mode)
+ensureConstrMode2
+  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  => Con -> Mode -> Either Term Pattern -> m (Mode, Mode)
 ensureConstrMode2 c m targ = do
   ms <- ensureConstrMode c m targ
   case ms of
@@ -1546,7 +1556,7 @@ ensureConstrMode2 c m targ = do
 -- | Ensure that two types are equal:
 --     1. Do nothing if they are literally equal
 --     2. Generate an equality constraint otherwise
-ensureEq :: Type -> Type -> TCM ()
+ensureEq :: Has '[Wr "constraints"] m => Type -> Type -> m ()
 ensureEq ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise  = constraint $ CEq ty1 ty2

@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes        #-}
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingVia                #-}
@@ -23,12 +24,16 @@
 -- Definition of the TCM monad used during typechecking and related
 -- utilities.
 --
+-- XXX fix documentation.  Not just about TCM monad anymore, uses
+-- capability style.
+--
 -----------------------------------------------------------------------------
 
 module Disco.Typecheck.Monad where
 
 import           Unbound.Generics.LocallyNameless
 
+import qualified Capability.Constraints           as CC
 import           Capability.Error
 import           Capability.Reader
 import           Capability.Sink
@@ -37,7 +42,6 @@ import           Capability.Writer
 import           Control.Monad.Except             (ExceptT (..))
 import qualified Control.Monad.Except             as CME
 import           Control.Monad.State              (StateT (..))
-import qualified Control.Monad.State              as CMS
 import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
 
@@ -48,7 +52,6 @@ import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
-import           Disco.Types.Qualifiers
 import           GHC.Exts                         (Proxy#, proxy#)
 import           GHC.Generics                     (Generic)
 
@@ -155,6 +158,12 @@ type instance TypeOf _ "tyctx"       = TyCtx
 type instance TypeOf _ "tydefctx"    = TyDefCtx
 type instance TypeOf _ "tcerr"       = TCError
 
+type Rd tag = HasReader' tag
+type Wr tag = HasWriter' tag
+type Th tag = HasThrow' tag
+
+type Has cs m = CC.All cs m
+
 ------------------------------------------------------------
 -- Running
 ------------------------------------------------------------
@@ -173,11 +182,11 @@ evalTCM = fmap fst . runTCM
 ------------------------------------------------------------
 
 -- | Emit a constraint.
-constraint :: HasWriter' "constraints" m => Constraint -> m ()
+constraint :: Has '[Wr "constraints"] m => Constraint -> m ()
 constraint = tell @"constraints"
 
 -- | Emit a list of constraints.
-constraints :: HasWriter' "constraints" m => [Constraint] -> m ()
+constraints :: Has '[Wr "constraints"] m => [Constraint] -> m ()
 constraints = constraint . cAnd
 
 -- XXX copied from mtl, should be in capability library?
@@ -226,24 +235,25 @@ censor = censor_ (proxy# @tag)
   -- errors at call sites again.
 
 -- | Close over the current constraint with a forall.
-forAll :: HasWriter' "constraints" m => [Name Type] -> m a -> m a
+forAll :: Has '[Wr "constraints"] m => [Name Type] -> m a -> m a
 forAll nms = censor @"constraints" (CAll . bind nms)
 
+-- XXX fix documentation (references to TCM)
 -- | Run a 'TCM' computation, returning the generated 'Constraint'
 --   along with the output, and reset the 'Constraint' of the resulting
 --   computation to 'mempty'.
-withConstraint :: HasWriter' "constraints" m => m a -> m (a, Constraint)
+withConstraint :: Has '[Wr "constraints"] m => m a -> m (a, Constraint)
 withConstraint = censor @"constraints" (const mempty) . listen @"constraints"
 
 -- | Run a 'TCM' computation and solve its generated constraint,
 --   returning the resulting substitution (or failing with an error).
 --   The resulting TCM computation generates the empty constraint.
-solve :: TCM a -> TCM (a, S)
+solve :: Has '[Wr "constraints", Rd "tydefctx", Th "tcerr"] m => m a -> m (a, S)
 solve m = do
   (a, c) <- withConstraint m
   tds <- ask @"tydefctx"
   case runSolveM . solveConstraint tds $ c of
-    Left err -> CME.throwError (Unsolvable err)
+    Left err -> throw @"tcerr" (Unsolvable err)
     Right s  -> return (a, s)
 
 ------------------------------------------------------------

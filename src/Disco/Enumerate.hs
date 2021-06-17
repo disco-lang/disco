@@ -1,4 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE TypeApplications         #-}
 
 -----------------------------------------------------------------------------
@@ -67,7 +68,7 @@ valToRat (VNum _ r) = r
 valToRat _          = error "valToRat: value isn't a number"
 
 ratToVal :: Rational -> Value
-ratToVal r = (VNum mempty r)
+ratToVal = VNum mempty
 
 enumN :: ValueEnumeration
 enumN = E.mapE (ratToVal . fromInteger) (floor . valToRat) E.nat
@@ -90,7 +91,7 @@ enumC = E.mapE toV fromV (E.boundedEnum @Char)
 enumSet :: ValueEnumeration -> ValueEnumeration
 enumSet e = E.mapE toV fromV (E.finiteSubsetOf e)
   where
-    toV = VBag . map (\v -> (v, 1))
+    toV = VBag . map (,1)
     fromV (VBag vs) = map fst vs
     fromV _         = error "enumSet.fromV: value isn't a set"
 
@@ -150,7 +151,7 @@ enumTypes :: [Type] -> E.IEnumeration [Value]
 enumTypes []     = E.singleton []
 enumTypes (t:ts) = E.mapE toL fromL $ (E.><) (enumType t) (enumTypes ts)
   where
-    toL (x, xs) = (x:xs)
+    toL (x, xs)  = x:xs
     fromL (x:xs) = (x, xs)
     fromL []     = error "enumTypes.fromL: empty list not in enumeration range"
 

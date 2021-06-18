@@ -9,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadFail instance, see below.
@@ -119,6 +120,7 @@ import           Algebra.Graph                    (Graph)
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Capability
 import           Disco.Context
 import           Disco.Extensions
 import           Disco.Messages
@@ -336,22 +338,22 @@ type Env  = Ctx Core Value
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extendEnv :: Name Core -> Value -> Disco e a -> Disco e a
+extendEnv :: Has '[Rd "env", LFresh] m => Name Core -> Value -> m a -> m a
 extendEnv x v = avoid [AnyName x] . extend @"env" x v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Env -> Disco e a -> Disco e a
+extendsEnv :: Has '[Rd "env", LFresh] m => Env -> m a -> m a
 extendsEnv e' = avoid (map AnyName (names e')) . extends @"env" e'
 
 -- | Get the current environment.
-getEnv :: Disco e Env
+getEnv :: Has '[Rd "env"] m => m Env
 getEnv = ask @"env"
 
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Env -> Disco e a -> Disco e a
+withEnv :: Has '[Rd "env"] m => Env -> m a -> m a
 withEnv = local @"env" . const
 
 ------------------------------------------------------------
@@ -515,10 +517,14 @@ newtype Disco e a = Disco { unDisco :: StateT (DiscoState e) (ReaderT Env (Excep
   deriving (HasReader "env" Env, HasSource "env" Env) via
     (MonadReader (StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))))
 
+type instance TypeOf _ "env" = Env
+
 ------------------------------------------------------------
 -- Some needed instances.
 
--- This should eventually move into unbound-generics.
+-- This was introduced in unbound-generics-0.4.1.  Once we start
+-- building with that version, this orphan instance can be removed
+-- (and we can also remove the -fno-warn-orphans flag).
 instance MonadFail m => MonadFail (LFreshMT m) where
   fail = LFreshMT . Fail.fail
 
@@ -533,7 +539,7 @@ makeLenses ''DiscoState
 ------------------------------------------------------------
 
 io :: MonadIO m => IO a -> m a
-io i = liftIO i
+io = liftIO
 
 iputStrLn :: MonadIO m => String -> m ()
 iputStrLn = io . putStrLn
@@ -594,12 +600,12 @@ allocate v = do
 --   amount of space: some are OK as they are; for others, we turn
 --   them into an indirection and allocate a new memory cell for them.
 mkSimple :: Value -> Disco e Value
-mkSimple v@(VNum {})    = return v
+mkSimple v@VNum{}       = return v
 mkSimple v@(VCons _ []) = return v
-mkSimple v@(VConst _)   = return v
-mkSimple v@(VClos {})   = return v
-mkSimple v@(VType {})   = return v
-mkSimple v@(VIndir {})  = return v
+mkSimple v@VConst{}     = return v
+mkSimple v@VClos{}      = return v
+mkSimple v@VType{}      = return v
+mkSimple v@VIndir{}     = return v
 mkSimple v              = VIndir <$> allocate v
 
 -- | Delay a @Disco e Value@ computation by packaging it into a
@@ -626,7 +632,7 @@ mkValue (CConst op)  = return $ VConst op
 mkValue (CCons i cs) = VCons i <$> mapM mkValue cs
 mkValue (CNum d r)   = return $ VNum d r
 mkValue (CType ty)   = return $ VType ty
-mkValue c            = VIndir <$> (allocate =<< (VThunk c <$> getEnv))
+mkValue c            = VIndir <$> (allocate . VThunk c =<< getEnv)
 
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time

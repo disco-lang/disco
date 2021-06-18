@@ -1084,9 +1084,7 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: Value -> Disco IErr Value
-enumOp (VType ty)
-  | isFiniteTy ty = toDiscoList (enumerateType ty)
-  | otherwise     = throwError $ InfiniteTy ty
+enumOp (VType ty) = toDiscoList (enumerateType ty)
 enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,

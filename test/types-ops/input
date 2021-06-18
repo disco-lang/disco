@@ -1,3 +1,4 @@
+import list
 count Void
 count Unit
 count Bool
@@ -18,7 +19,10 @@ enumerate (Unit + Bool)
 enumerate (Void * Unit)
 enumerate (List Void)
 enumerate (List (Void * Bool + Void))
-enumerate (List Unit)
+enumerate(Bool)
+take(5, enumerate(List Unit))
+take(10, enumerate(N))
+take(6, enumerate(N * N))
 enumerate (Void * Nat)
 enumerate (Nat * Void)
 enumerate (Void -> Nat)

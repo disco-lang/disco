@@ -500,6 +500,13 @@ initDiscoState = DiscoState
 type Disco e = StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))
 
 ------------------------------------------------------------
+-- Some needed instances.
+
+-- This should eventually move into unbound-generics.
+instance MonadFail m => MonadFail (LFreshMT m) where
+  fail = LFreshMT . Fail.fail
+
+------------------------------------------------------------
 -- Lenses for state
 ------------------------------------------------------------
 

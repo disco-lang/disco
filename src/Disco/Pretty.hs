@@ -45,7 +45,7 @@ import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr, Value (..), io,
+import           Disco.Eval                       (Disco, Value (..), io,
                                                    iputStr, iputStrLn,
                                                    topTyDefns)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
@@ -369,7 +369,7 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  This version actually prints the values on the console, followed
 --   by a newline.  For a more general version, see 'prettyValueWith'.
-prettyValue :: Type -> Value -> Disco IErr ()
+prettyValue :: Type -> Value -> Disco ()
 prettyValue ty v = do
   prettyValueWith (\s -> iputStr s >> io (hFlush stdout)) ty v
   iputStrLn ""
@@ -378,18 +378,18 @@ prettyValue ty v = do
 --   evaluation.  Takes a continuation that specifies how the output
 --   should be processed (which will be called many times as the
 --   output is produced incrementally).
-prettyValueWith :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyValueWith :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyValueWith k ty = whnfV >=> prettyWHNF k ty
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyValueWithP :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyValueWithP :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyValueWithP k ty@(_ :*: _) v = prettyValueWith k ty v
 prettyValueWithP k ty           v = k "(" >> prettyValueWith k ty v >> k ")"
 
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
-prettyWHNF :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyWHNF :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyWHNF out (TyUser nm args) v = do
   tymap <- use topTyDefns
   case M.lookup nm tymap of
@@ -430,7 +430,7 @@ prettyWHNF out (TyMap k v) (VMap m)
 prettyWHNF _ ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
-prettyPlaceholder :: (String -> Disco IErr ()) -> Type -> Disco IErr ()
+prettyPlaceholder :: (String -> Disco ()) -> Type -> Disco ()
 prettyPlaceholder out ty = do
   out "<"
   tyStr <- renderDoc (prettyTy ty)
@@ -438,12 +438,12 @@ prettyPlaceholder out ty = do
   out ">"
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: (String -> Disco IErr ()) -> Type -> [Value] -> String -> Disco IErr ()
+prettySequence :: (String -> Disco ()) -> Type -> [Value] -> String -> Disco ()
 prettySequence out _ []     _   = out ""
 prettySequence out t [x]    _   = prettyValueWith out t x
 prettySequence out t (x:xs) del = prettyValueWith out t x >> out del >> prettySequence out t xs del
 
-prettyBag :: (String -> Disco IErr ()) -> Type -> [(Value, Integer)] -> Disco IErr ()
+prettyBag :: (String -> Disco ()) -> Type -> [(Value, Integer)] -> Disco ()
 prettyBag out _ []         = out "⟅⟆"
 prettyBag out t vs
   | all ((==1) . snd) vs   = out "⟅" >> prettySequence out t (map fst vs) ", " >> out "⟆"
@@ -457,14 +457,14 @@ prettyBag out t vs
     prettyCount (v,1) = prettyValueWith out t v
     prettyCount (v,n) = prettyValueWith out t v >> out (" # " ++ show n)
 
-prettyString :: (String -> Disco IErr ()) -> Value -> Disco IErr ()
+prettyString :: (String -> Disco ()) -> Value -> Disco ()
 prettyString out str = out "\"" >> go str >> out "\""
   where
     toChar :: Value -> String
     toChar (VNum _ c) = drop 1 . reverse . drop 1 . reverse . show $ [chr (fromIntegral (numerator c))]
     toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
 
-    go :: Value -> Disco IErr ()
+    go :: Value -> Disco ()
     go v = do
       v' <- whnfV v
       case v' of
@@ -477,7 +477,7 @@ prettyString out str = out "\"" >> go str >> out "\""
 
 -- | Pretty-print a list with elements of a given type, assuming the
 --   list has already been reduced to WHNF.
-prettyList :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyList :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyList out ty v = out "[" >> go v
   where
     go (VCons 0 []) = out "]"
@@ -491,7 +491,7 @@ prettyList out ty v = out "[" >> go v
 
     go v' = error $ "Impossible! Value that's not a list (or not in WHNF) in prettyList: " ++ show v'
 
-prettyTuple :: (String -> Disco IErr ()) -> Type -> Value -> Disco IErr ()
+prettyTuple :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyTuple out (ty1 :*: ty2) (VCons 0 [v1, v2]) = do
   prettyValueWith out ty1 v1
   out ", "

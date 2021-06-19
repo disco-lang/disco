@@ -98,12 +98,12 @@ punctuate p ds = do
 -- This should probably be replaced at some point in the future, with
 -- a single concrete application mega-monad.
 
-newtype DocM a = DocM { runDocM :: ReaderT PA (Disco IErr) a }
+newtype DocM a = DocM { runDocM :: ReaderT PA Disco a }
   deriving (Functor, Applicative, Monad, LFresh)
   deriving (HasReader "pa" PA, HasSource "pa" PA) via
-    MonadReader (ReaderT PA (Disco IErr))
+    MonadReader (ReaderT PA Disco)
 
 type instance TypeOf _ "pa" = PA
 
-renderDoc :: DocM Doc -> Disco IErr String
+renderDoc :: DocM Doc -> Disco String
 renderDoc = fmap PP.render . flip runReaderT initPA . runDocM

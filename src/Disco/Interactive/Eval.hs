@@ -41,7 +41,7 @@ showVal _ VProp{}     = "<prop>"
 showVal _ VGraph{}    = "<graph>"
 showVal _ VMap{}      = "<map>"
 
-printMem :: Disco IErr ()
+printMem :: Disco ()
 printMem = do
   env <- use topEnv
   mem <- use memory
@@ -51,7 +51,7 @@ printMem = do
   forM_ (IM.assocs mem) $ \(k, Cell v _) ->
     io $ putStrLn $ show k ++ ": " ++ showVal 3 v
 
-handleCMD :: String -> Disco IErr ()
+handleCMD :: String -> Disco ()
 handleCMD "" = return ()
 handleCMD s = do
     exts <- use enabledExts

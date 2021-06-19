@@ -55,7 +55,7 @@ import           Disco.Types
 import           Text.Megaparsec                  hiding (runParser)
 import           Unbound.Generics.LocallyNameless
 
-dispatch :: [SomeREPLCommand] -> SomeREPLExpr -> Disco IErr ()
+dispatch :: [SomeREPLCommand] -> SomeREPLExpr -> Disco ()
 dispatch [] _ = return ()
 dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
   Just e' -> action c e'
@@ -103,7 +103,7 @@ annCmd =
       parser = Ann <$> term
     }
 
-handleAnn :: REPLExpr 'CAnn -> Disco IErr ()
+handleAnn :: REPLExpr 'CAnn -> Disco ()
 handleAnn (Ann t) = do
     ctx   <- use topCtx
     tymap <- use topTyDefns
@@ -124,7 +124,7 @@ compileCmd =
       parser = Compile <$> term
     }
 
-handleCompile :: REPLExpr 'CCompile -> Disco IErr ()
+handleCompile :: REPLExpr 'CCompile -> Disco ()
 handleCompile (Compile t) = do
   ctx <- use topCtx
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
@@ -145,7 +145,7 @@ desugarCmd =
       parser = Desugar <$> term
     }
 
-handleDesugar :: REPLExpr 'CDesugar -> Disco IErr ()
+handleDesugar :: REPLExpr 'CDesugar -> Disco ()
 handleDesugar (Desugar t) = do
   ctx <- use topCtx
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
@@ -165,7 +165,7 @@ docCmd =
       parser = Doc <$> (sc *> ident)
     }
 
-handleDoc :: REPLExpr 'CDoc -> Disco IErr ()
+handleDoc :: REPLExpr 'CDoc -> Disco ()
 handleDoc (Doc x) = do
   ctx  <- use topCtx
   docs <- use topDocs
@@ -190,7 +190,7 @@ evalCmd =
       parser = Eval <$> term
     }
 
-handleEval :: REPLExpr 'CEval -> Disco IErr ()
+handleEval :: REPLExpr 'CEval -> Disco ()
 handleEval (Eval t) = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
@@ -220,7 +220,7 @@ helpCmd =
       parser = return Help
     }
 
-handleHelp :: REPLExpr 'CHelp -> Disco IErr ()
+handleHelp :: REPLExpr 'CHelp -> Disco ()
 handleHelp Help = do
   iputStrLn "Commands available from the prompt:\n"
   let maxlen = longestCmd discoCommands
@@ -247,7 +247,7 @@ importCmd =
       parser = Import <$> parseImport
     }
 
-handleImport :: REPLExpr 'CImport -> Disco IErr ()
+handleImport :: REPLExpr 'CImport -> Disco ()
 handleImport (Import modName) = catchAndPrintErrors () $ do
   mi <- loadDiscoModule FromCwdOrStdlib modName
   addModule mi
@@ -265,7 +265,7 @@ letCmd =
       parser = letParser
     }
 
-handleLet :: REPLExpr 'CLet -> Disco IErr ()
+handleLet :: REPLExpr 'CLet -> Disco ()
 handleLet (Let x t) = do
   ctx <- use topCtx
   tymap <- use topTyDefns
@@ -297,10 +297,10 @@ loadCmd =
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
-handleLoadWrapper :: REPLExpr 'CLoad -> Disco IErr ()
+handleLoadWrapper :: REPLExpr 'CLoad -> Disco ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
-handleLoad :: FilePath -> Disco IErr Bool
+handleLoad :: FilePath -> Disco Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
   m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
@@ -324,7 +324,7 @@ namesCmd =
     }
 
 -- | show names and types for each item in 'topCtx'
-handleNames :: REPLExpr 'CNames -> Disco IErr ()
+handleNames :: REPLExpr 'CNames -> Disco ()
 handleNames Names = do
   ctx  <- use topCtx
   mapM_ showFn $ M.toList ctx
@@ -346,7 +346,7 @@ nopCmd =
       parser = Nop <$ (sc <* eof)
     }
 
-handleNop :: REPLExpr 'CNop -> Disco IErr ()
+handleNop :: REPLExpr 'CNop -> Disco ()
 handleNop Nop = return ()
 
 
@@ -362,7 +362,7 @@ parseCmd =
       parser = Parse <$> term
     }
 
-handleParse :: REPLExpr 'CParse -> Disco IErr ()
+handleParse :: REPLExpr 'CParse -> Disco ()
 handleParse (Parse t) = iprint t
 
 
@@ -378,7 +378,7 @@ prettyCmd =
       parser = Pretty <$> term
     }
 
-handlePretty :: REPLExpr 'CPretty -> Disco IErr ()
+handlePretty :: REPLExpr 'CPretty -> Disco ()
 handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= iputStrLn
 
 
@@ -394,7 +394,7 @@ reloadCmd =
       parser = return Reload
     }
 
-handleReload :: REPLExpr 'CReload -> Disco IErr ()
+handleReload :: REPLExpr 'CReload -> Disco ()
 handleReload Reload = do
       file <- use lastFile
       case file of
@@ -414,7 +414,7 @@ showDefnCmd =
       parser = ShowDefn <$> (sc *> ident)
     }
 
-handleShowDefn :: REPLExpr 'CShowDefn -> Disco IErr ()
+handleShowDefn :: REPLExpr 'CShowDefn -> Disco ()
 handleShowDefn (ShowDefn x) = do
   defns   <- use topDefns
   tyDefns <- use topTyDefns
@@ -440,7 +440,7 @@ testPropCmd =
       parser = TestProp <$> term
     }
 
-handleTest :: REPLExpr 'CTestProp -> Disco IErr ()
+handleTest :: REPLExpr 'CTestProp -> Disco ()
 handleTest (TestProp t) = do
   ctx   <- use topCtx
   tymap <- use topTyDefns
@@ -465,7 +465,7 @@ typeCheckCmd =
         parser = parseTypeCheck
         }
 
-handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco IErr ()
+handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco ()
 handleTypeCheck (TypeCheck t) = do
   ctx <- use topCtx
   tymap <- use topTyDefns
@@ -503,14 +503,14 @@ usingCmd =
         parser = Using <$> (reserved "using" *> parseExtName)
         }
 
-handleUsing :: REPLExpr 'CUsing -> Disco IErr ()
+handleUsing :: REPLExpr 'CUsing -> Disco ()
 handleUsing (Using e) = enabledExts %= addExtension e
 
 ------------------------------------------
 --- Util functions
 ------------------------------------------
 
-addModule :: ModuleInfo -> Disco IErr ()
+addModule :: ModuleInfo -> Disco ()
 addModule mi = do
   curMI <- use topModInfo
   mi' <- adaptError TypeCheckErr $ combineModuleInfo [curMI, mi]
@@ -520,10 +520,10 @@ addModule mi = do
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
 
-loadFile :: FilePath -> Disco IErr (Maybe String)
+loadFile :: FilePath -> Disco (Maybe String)
 loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
 
-populateCurrentModuleInfo :: Disco IErr ()
+populateCurrentModuleInfo :: Disco ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds <- use topModInfo
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
@@ -536,20 +536,20 @@ populateCurrentModuleInfo = do
 
 -- XXX redo with message framework, with proper support for indentation etc.
 -- XXX move it to Pretty or Property or something
-prettyTestFailure :: AProperty -> TestResult -> Disco IErr ()
+prettyTestFailure :: AProperty -> TestResult -> Disco ()
 prettyTestFailure _    (TestResult True _ _)    = return ()
 prettyTestFailure prop (TestResult False r env) = do
   prettyFailureReason prop r
   prettyTestEnv "    Counterexample:" env
 
-prettyTestResult :: AProperty -> TestResult -> Disco IErr ()
+prettyTestResult :: AProperty -> TestResult -> Disco ()
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   = do
     dp <- renderDoc $ prettyProperty (eraseProperty prop)
     iputStr       "  - Test passed: " >> iputStrLn dp
     prettySuccessReason r
 
-prettySuccessReason :: TestReason -> Disco IErr ()
+prettySuccessReason :: TestReason -> Disco ()
 prettySuccessReason (TestFound (TestResult _ _ vs)) = do
   prettyTestEnv "    Found example:" vs
 prettySuccessReason (TestNotFound Exhaustive) = do
@@ -560,7 +560,7 @@ prettySuccessReason (TestNotFound (Randomized n m)) = do
   iputStrLn " possibilities without finding a counterexample."
 prettySuccessReason _ = return ()
 
-prettyFailureReason :: AProperty -> TestReason -> Disco IErr ()
+prettyFailureReason :: AProperty -> TestReason -> Disco ()
 prettyFailureReason prop TestBool = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStr     "  - Test is false: " >> iputStrLn dp
@@ -588,7 +588,7 @@ prettyFailureReason prop (TestNotFound (Randomized n m)) = do
   iputStrLn dp
   iputStr     "    Checked " >> iputStr (show (n + m)) >> iputStrLn " possibilities."
 
-prettyTestEnv :: String -> TestEnv -> Disco IErr ()
+prettyTestEnv :: String -> TestEnv -> Disco ()
 prettyTestEnv _ [] = return ()
 prettyTestEnv s vs = do
   iputStrLn s
@@ -602,7 +602,7 @@ prettyTestEnv s vs = do
       iputStr " = "
       prettyValue ty v
 
-runTest :: Int -> AProperty -> Disco IErr TestResult
+runTest :: Int -> AProperty -> Disco TestResult
 runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
   where
     n' = fromIntegral (n `div` 2)
@@ -610,7 +610,7 @@ runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
 -- to the Property module.
-runAllTests :: Ctx ATerm [AProperty] -> Disco IErr Bool  -- (Ctx ATerm [TestResult])
+runAllTests :: Ctx ATerm [AProperty] -> Disco Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
@@ -623,7 +623,7 @@ runAllTests aprops
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
-    runTests :: Name ATerm -> [AProperty] -> Disco IErr Bool
+    runTests :: Name ATerm -> [AProperty] -> Disco Bool
     runTests n props = do
       iputStr ("  " ++ name2String n ++ ":")
       results <- traverse (sequenceA . (id &&& runTest numSamples)) props
@@ -638,7 +638,7 @@ runAllTests aprops
 -- | Add information from ModuleInfo to the Disco monad. This includes updating the
 --   Disco monad with new term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
-setLoadedModule :: ModuleInfo -> Disco IErr ()
+setLoadedModule :: ModuleInfo -> Disco ()
 setLoadedModule mi = do
   topModInfo .= mi
   populateCurrentModuleInfo

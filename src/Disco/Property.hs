@@ -51,7 +51,7 @@ invertPropResult res@(TestResult b r env)
 -- | Select samples from an enumeration according to a search type. Also returns
 --   a 'SearchType' describing the results, which may be 'Exhaustive' if the
 --   enumeration is no larger than the number of samples requested.
-generateSamples :: SearchType -> E.IEnumeration a -> Disco e ([a], SearchType)
+generateSamples :: SearchType -> E.IEnumeration a -> Disco ([a], SearchType)
 generateSamples Exhaustive e           = return (E.enumerate e, Exhaustive)
 generateSamples (Randomized n m) e
   | E.Finite k <- E.card e, k <= n + m = return (E.enumerate e, Exhaustive)

@@ -1,3 +1,4 @@
+Loading list.disco...
 right(0)
 right(1)
 right(2)
@@ -18,7 +19,10 @@ right(1)
 []
 [[]]
 [[]]
-InfiniteTy (TyCon (CContainer (ABase CtrList)) [TyAtom (ABase Unit)])
+[false, true]
+[[], [()], [(), ()], [(), (), ()], [(), (), (), ()]]
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+[(0, 0), (0, 1), (1, 0), (0, 2), (1, 1), (2, 0)]
 []
 []
 [<Void → ℕ>]

@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -85,23 +86,18 @@ module Disco.Eval
 
 import           Text.Printf
 
+import           Capability.Error
 import           Capability.Reader
 import           Capability.Source
 import           Control.Lens                     (makeLenses, use, (%=), (<+=),
                                                    (<>=))
 import           Control.Monad                    (when)
-import           Control.Monad.Catch              (MonadCatch, MonadMask,
-                                                   MonadThrow)
-import           Control.Monad.Except             (MonadError, catchError,
-                                                   throwError)
+import qualified Control.Monad.Except             as CME
 import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.IO.Class
-import           Control.Monad.Reader             (ReaderT (..))
-import qualified Control.Monad.Reader             as CMR
 import           Control.Monad.State              (StateT (..))
 import qualified Control.Monad.State              as CMS
 import           Control.Monad.Trans.Class        (lift)
-import           Control.Monad.Trans.Except
 import           Data.IntMap.Lazy                 (IntMap)
 import qualified Data.IntMap.Lazy                 as IntMap
 import           Data.IntSet                      (IntSet)
@@ -110,6 +106,7 @@ import qualified Data.Map                         as M
 import qualified Data.Sequence                    as Seq
 import qualified Data.Set                         as S
 import           Data.Void
+import           GHC.Generics                     (Generic)
 import           System.FilePath                  ((-<.>))
 import           Text.Megaparsec                  hiding (runParser)
 
@@ -117,6 +114,7 @@ import           Unbound.Generics.LocallyNameless
 
 import           Algebra.Graph                    (Graph)
 
+import qualified Control.Monad.Catch              as CMC
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -283,12 +281,12 @@ type TestVars = [(String, Type, Name Core)]
 -- | A variable assignment found during a test.
 type TestEnv = [(String, Type, Value)]
 
-getTestEnv :: TestVars -> Disco IErr TestEnv
+getTestEnv :: Has '[Rd "env", Th "err"] m => TestVars -> m TestEnv
 getTestEnv = mapM $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> throwError (UnboundError name)
+    Nothing -> throw @"err" (UnboundError name)
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
@@ -437,6 +435,9 @@ data DiscoState e = DiscoState
     --   start as indirections to thunks).  Set by 'loadDefs'.
     --   Use it when evaluating with 'withTopEnv'.
 
+  , _localEnv      :: Env
+    -- ^ Local environment used during evaluation of expressions.
+
   , _topDocs       :: Ctx Term Docs
     -- ^ Top-level documentation.
 
@@ -467,6 +468,7 @@ data DiscoState e = DiscoState
     --   prompt, not modules loaded into the REPL; each module
     --   specifies its own extensions.
   }
+  deriving (Generic)
 
 -- | The initial state for the @Disco@ monad.
 initDiscoState :: DiscoState e
@@ -477,6 +479,7 @@ initDiscoState = DiscoState
   , _topTyDefns    = M.empty
   , _topDocs       = emptyCtx
   , _topEnv        = emptyCtx
+  , _localEnv      = emptyCtx
   , _memory        = IntMap.empty
   , _nextLoc       = 0
   , _reachableLocs = IntSet.empty
@@ -500,12 +503,19 @@ initDiscoState = DiscoState
 --   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-newtype Disco e a = Disco { unDisco :: StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO))) a }
-  deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState (DiscoState e), MonadError e, MonadFail, MonadThrow, MonadCatch, MonadMask)
+newtype Disco e a = Disco { unDisco :: StateT (DiscoState e) (CME.ExceptT e (LFreshMT IO)) a }
+  deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState (DiscoState e), CME.MonadError e, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
   deriving (HasReader "env" Env, HasSource "env" Env) via
-    (MonadReader (StateT (DiscoState e) (ReaderT Env (ExceptT e (LFreshMT IO)))))
+    (ReadStatePure
+    (Rename "_localEnv"
+    (Field "_localEnv" ()
+    (MonadState
+    (StateT (DiscoState e) (CME.ExceptT e (LFreshMT IO)))))))
+  deriving (HasThrow "err" e, HasCatch "err" e) via
+    (MonadError (StateT (DiscoState e) (CME.ExceptT e (LFreshMT IO))))
 
 type instance TypeOf _ "env" = Env
+type instance TypeOf _ "err" = IErr
 
 ------------------------------------------------------------
 -- Some needed instances.
@@ -553,19 +563,18 @@ debug   = emitMessage Debug
 runDisco :: Disco e a -> IO (Either e a)
 runDisco
   = runLFreshMT
-  . runExceptT
-  . flip runReaderT emptyCtx
+  . CME.runExceptT
   . flip CMS.evalStateT initDiscoState
   . unDisco
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and turn it into a message.
 catchAsMessage :: Disco e () -> Disco e ()
-catchAsMessage m = m `catchError` (err . Item)
+catchAsMessage m = m `CME.catchError` (err . Item)
 
 -- XXX eventually we should get rid of this and replace with catchAsMessage
 catchAndPrintErrors :: a -> Disco IErr a -> Disco IErr a
-catchAndPrintErrors a m = m `catchError` (\e -> handler e >> return a)
+catchAndPrintErrors a m = m `CME.catchError` (\e -> handler e >> return a)
   where
     handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
     handler (TypeCheckErr e) = iprint e
@@ -712,19 +721,19 @@ showMemory = use memory >>= (mapM_ showCell . IntMap.assocs)
 
 -- | Utility function: given an 'Either', wrap a 'Left' in the given
 --   function and throw it as a 'Disco' error, or return a 'Right'.
-adaptError :: MonadError e2 m => (e1 -> e2) -> Either e1 a -> m a
-adaptError f = either (throwError . f) return
+adaptError :: CME.MonadError e2 m => (e1 -> e2) -> Either e1 a -> m a
+adaptError f = either (CME.throwError . f) return
 
 -- | Parse a module from a file, re-throwing a parse error if it
 --   fails.
-parseDiscoModule :: (MonadError IErr m, MonadIO m) => FilePath -> m Module
+parseDiscoModule :: (CME.MonadError IErr m, MonadIO m) => FilePath -> m Module
 parseDiscoModule file = do
   str <- io $ readFile file
   adaptError ParseErr $ runParser wholeModule file str
 
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.
-typecheckDisco :: MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
+typecheckDisco :: CME.MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
 typecheckDisco tyctx tydefs tcm =
   adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends @"tyctx" tyctx $ tcm)
 
@@ -737,21 +746,21 @@ typecheckDisco tyctx tydefs tcm =
 --   If the given directory is Just, it will only load a module from
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
-loadDiscoModule :: (MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
+loadDiscoModule :: (CME.MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
 loadDiscoModule resolver m = CMS.evalStateT (loadDiscoModule' resolver S.empty m) M.empty
 
 loadDiscoModule' ::
-  (MonadError IErr m, MonadIO m) =>
+  (CME.MonadError IErr m, MonadIO m) =>
   Resolver -> S.Set ModName -> ModName ->
   StateT (M.Map ModName ModuleInfo) m ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
-  when (S.member modName inProcess) (throwError $ CyclicImport modName)
+  when (S.member modName inProcess) (CME.throwError $ CyclicImport modName)
   modMap <- CMS.get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule resolver modName
-             >>= maybe (throwError $ ModuleNotFound modName) return
+             >>= maybe (CME.throwError $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 

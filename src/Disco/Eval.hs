@@ -388,12 +388,6 @@ data IErr where
   -- | An unbound name.
   UnboundError  :: Name Core -> IErr
 
-  -- | An unknown prim name.
-  UnknownPrim   :: String    -> IErr
-
-  -- | v should be a number, but isn't.
-  NotANum       :: Value     -> IErr
-
   -- | Division by zero.
   DivByZero     ::              IErr
 
@@ -403,17 +397,11 @@ data IErr where
   -- | Overflow, e.g. (2^66)!
   Overflow      ::              IErr
 
-  -- | v should be a boolean, but isn't.
-  NotABool      :: Value     -> IErr
-
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              IErr
 
   -- | Trying to count an infinite type.
   InfiniteTy    :: Type      -> IErr
-
-  -- | Internal error for features not yet implemented.
-  Unimplemented :: String    -> IErr
 
   -- | User-generated crash.
   Crash         :: String    -> IErr

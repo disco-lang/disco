@@ -4,7 +4,6 @@
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TemplateHaskell          #-}
 {-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE UndecidableInstances     #-}
 {-# LANGUAGE ViewPatterns             #-}
@@ -21,9 +20,6 @@
 -- language.
 --
 -----------------------------------------------------------------------------
-
--- XXX TODO
---   Write linting typechecker for DTerm?
 
 module Disco.Desugar
        ( -- * Desugaring monad

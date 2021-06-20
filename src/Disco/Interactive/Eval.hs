@@ -1,3 +1,6 @@
+{-# LANGUAGE DataKinds        #-}
+{-# LANGUAGE TypeApplications #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interactive.Eval
@@ -12,6 +15,7 @@
 
 module Disco.Interactive.Eval where
 
+import           Capability.Error
 import           Control.Lens               (use)
 import           Control.Monad.Except
 import           Disco.Eval
@@ -57,4 +61,4 @@ handleCMD s = do
     exts <- use enabledExts
     case parseLine discoCommands exts s of
       Left msg -> io $ putStrLn msg
-      Right l -> dispatch discoCommands l `catchError` (io . print  {- XXX pretty-print error -})
+      Right l -> catch @"err" (dispatch discoCommands l) (io . print  {- XXX pretty-print error -})

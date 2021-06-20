@@ -506,7 +506,7 @@ initDiscoState = DiscoState
 --   * Can generate fresh names
 --   * Can do I/O
 newtype Disco a = Disco { unDisco :: StateT DiscoState (CME.ExceptT IErr (LFreshMT IO)) a }
-  deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState DiscoState, CME.MonadError IErr, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
+  deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState DiscoState, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
   deriving (HasReader "env" Env, HasSource "env" Env) via
     (ReadStatePure
     (Rename "_localEnv"
@@ -572,11 +572,11 @@ runDisco
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and turn it into a message.
 catchAsMessage :: Disco () -> Disco ()
-catchAsMessage m = m `CME.catchError` (err . Item)
+catchAsMessage m = catch @"err" m (err . Item)
 
 -- XXX eventually we should get rid of this and replace with catchAsMessage
 catchAndPrintErrors :: a -> Disco a -> Disco a
-catchAndPrintErrors a m = m `CME.catchError` (\e -> handler e >> return a)
+catchAndPrintErrors a m = catch @"err" m (\e -> handler e >> return a)
   where
     handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
     handler (TypeCheckErr e) = iprint e
@@ -723,19 +723,19 @@ showMemory = use memory >>= (mapM_ showCell . IntMap.assocs)
 
 -- | Utility function: given an 'Either', wrap a 'Left' in the given
 --   function and throw it as a 'Disco' error, or return a 'Right'.
-adaptError :: CME.MonadError e2 m => (e1 -> e2) -> Either e1 a -> m a
-adaptError f = either (CME.throwError . f) return
+adaptError :: Has '[Th "err"] m => (e -> IErr) -> Either e a -> m a
+adaptError f = either (throw @"err" . f) return
 
 -- | Parse a module from a file, re-throwing a parse error if it
 --   fails.
-parseDiscoModule :: (CME.MonadError IErr m, MonadIO m) => FilePath -> m Module
+parseDiscoModule :: Has '[Th "err", MonadIO] m => FilePath -> m Module
 parseDiscoModule file = do
   str <- io $ readFile file
   adaptError ParseErr $ runParser wholeModule file str
 
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.
-typecheckDisco :: CME.MonadError IErr m => TyCtx -> TyDefCtx -> TCM a -> m a
+typecheckDisco :: Has '[Th "err"] m => TyCtx -> TyDefCtx -> TCM a -> m a
 typecheckDisco tyctx tydefs tcm =
   adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends @"tyctx" tyctx $ tcm)
 
@@ -748,29 +748,32 @@ typecheckDisco tyctx tydefs tcm =
 --   If the given directory is Just, it will only load a module from
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
-loadDiscoModule :: (CME.MonadError IErr m, MonadIO m) => Resolver -> ModName -> m ModuleInfo
+loadDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> ModName -> m ModuleInfo
 loadDiscoModule resolver m = CMS.evalStateT (loadDiscoModule' resolver S.empty m) M.empty
 
+-- XXX put the Map ModName ModuleInfo into the Disco State, and give it a tag.
+-- Arrange things so this is the only place we use it??
+
 loadDiscoModule' ::
-  (CME.MonadError IErr m, MonadIO m) =>
+  Has '[Th "err", MonadIO] m =>
   Resolver -> S.Set ModName -> ModName ->
   StateT (M.Map ModName ModuleInfo) m ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
-  when (S.member modName inProcess) (CME.throwError $ CyclicImport modName)
+  when (S.member modName inProcess) (lift $ throw @"err" $ CyclicImport modName)
   modMap <- CMS.get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule resolver modName
-             >>= maybe (CME.throwError $ ModuleNotFound modName) return
+             >>= maybe (lift $ throw @"err" $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
       mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
-      imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
+      imports@(ModuleInfo _ _ tyctx tydefns _) <- lift $ adaptError TypeCheckErr $ combineModuleInfo mis
       m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
-      m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
+      m' <- lift $ adaptError TypeCheckErr $ combineModuleInfo [imports, m]
       CMS.modify (M.insert modName m')
       return m'
 

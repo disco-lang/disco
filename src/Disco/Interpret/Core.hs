@@ -56,11 +56,10 @@ module Disco.Interpret.Core
        )
        where
 
+import           Capability.Error
 import           Control.Arrow                           ((***))
 import           Control.Lens                            (use, (%=), (.=))
 import           Control.Monad                           (filterM, (>=>))
-import           Control.Monad.Except                    (catchError,
-                                                          throwError)
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
 import           Data.Coerce                             (coerce)
@@ -358,7 +357,7 @@ whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
 
 -- | Reduce a case expression to weak head normal form.
 whnfCase :: [CBranch] -> Disco Value
-whnfCase []     = throwError NonExhaustive
+whnfCase []     = throw @"err" NonExhaustive
 whnfCase (b:bs) = do
   lunbind b $ \(gs, t) -> do
   res <- checkGuards (fromTelescope gs)
@@ -1052,7 +1051,7 @@ modDiv n v1 v2 = do
   case invertSomeMod (numerator b `modulo` fromInteger n) of
     Just (SomeMod b') -> modOp (a * (getVal b' % 1)) (n % 1)
     Just InfMod{}     -> error "Impossible! InfMod in modDiv"
-    Nothing           -> throwError DivByZero
+    Nothing           -> throw @"err" DivByZero
 
 modDivides :: Integer -> Value -> Value -> Disco Value
 modDivides n v1 v2 = do
@@ -1071,7 +1070,7 @@ modExp n v1 v2 = do
              else invertSomeMod base
       b = abs (numerator r2)
   case ma of
-    Nothing -> throwError DivByZero
+    Nothing -> throw @"err" DivByZero
     Just a  ->
       case powSomeMod a b of
         SomeMod v' -> return $ vnum (getVal v' % 1)
@@ -1088,7 +1087,7 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 enumOp :: Value -> Disco Value
 enumOp (VType ty)
   | isFiniteTy ty = toDiscoList (enumerateType ty)
-  | otherwise     = throwError $ InfiniteTy ty
+  | otherwise     = throw @"err" $ InfiniteTy ty
 enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,
@@ -1123,7 +1122,7 @@ ceilOp n  = ceiling n % 1
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
 divOp :: Rational -> Rational -> Disco Value
-divOp _ 0 = throwError DivByZero
+divOp _ 0 = throw @"err" DivByZero
 divOp m n = return $ vnum (m / n)
 
 -- | Perform a mod operation; throw division by zero error if the
@@ -1132,7 +1131,7 @@ divOp m n = return $ vnum (m / n)
 --   then the arguments must in fact be integers.
 modOp :: Rational -> Rational -> Disco Value
 modOp m n
-  | n == 0    = throwError DivByZero
+  | n == 0    = throw @"err" DivByZero
   | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
@@ -1165,7 +1164,7 @@ multinomOp v1 v2 = do
 -- | Factorial.  The argument will always be a natural number.
 fact :: Rational -> Disco Rational
 fact (numerator -> n)
-  | n > fromIntegral (maxBound :: Int) = throwError Overflow
+  | n > fromIntegral (maxBound :: Int) = throw @"err" Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
 
 -- | Semantics of the @$isPrime@ prim: a relatively fast test for
@@ -1181,7 +1180,7 @@ primIsPrime _                         = error "impossible!  primIsPrime on non-V
 primFactor :: Value -> Disco Value
 primFactor (VNum d (numerator -> n)) =
   case n of
-    0 -> throwError (Crash "0 has no prime factorization!")
+    0 -> throw @"err" (Crash "0 has no prime factorization!")
     _ -> return . VBag $ map ((VNum d . (%1) . unPrime) *** fromIntegral) (factorise n)
 primFactor _                         = error "impossible! primFactor on non-VNum"
 
@@ -1190,7 +1189,7 @@ primFactor _                         = error "impossible! primFactor on non-VNum
 primCrash :: Value -> Disco Value
 primCrash v = do
   s <- valueToString v
-  throwError (Crash s)
+  throw @"err" (Crash s)
 
 -- | Convert a Disco value representing a list of characters into a
 --   Haskell 'String'.
@@ -1242,7 +1241,7 @@ ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool [])
 ensureProp _            = error "ensureProp: non-prop value"
 
 failTestOnError :: Disco ValProp -> Disco ValProp
-failTestOnError m = catchError m $ \e ->
+failTestOnError m = catch @"err" m $ \e ->
   return $ VPDone (TestResult False (TestRuntimeError e) [])
 
 -- | Normalize under a test frame, augmenting the reported prop
@@ -1270,7 +1269,7 @@ primHolds :: Value -> Disco Value
 primHolds v = resultToBool =<< testProperty Exhaustive v
   where
     resultToBool :: TestResult -> Disco Value
-    resultToBool (TestResult _ (TestRuntimeError e) _) = throwError e
+    resultToBool (TestResult _ (TestRuntimeError e) _) = throw @"err" e
     resultToBool (TestResult b _ _) = return $ VCons (fromEnum b) []
 
 -- | Invert a prop, keeping its evidence or its suspended search.

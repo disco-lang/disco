@@ -176,6 +176,7 @@ The tilde goes wherever the argument to the operator would go.
 This can be used to pass them to a higher-order function.
 
 ::
+
     Disco> :type ~+~
     ~+~ : ℕ × ℕ → ℕ
 

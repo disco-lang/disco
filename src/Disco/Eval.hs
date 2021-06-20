@@ -1,19 +1,17 @@
+{-# OPTIONS_GHC -fno-warn-orphans     #-}
+  -- For MonadFail instance; see below.
+
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
-
-{-# OPTIONS_GHC -fno-warn-orphans     #-}
-  -- For MonadFail instance, see below.
 
 -----------------------------------------------------------------------------
 -- |
@@ -88,16 +86,18 @@ import           Text.Printf
 
 import           Capability.Error
 import           Capability.Reader
+import           Capability.Sink                  (HasSink)
 import           Capability.Source
-import           Control.Lens                     (makeLenses, use, (%=), (<+=),
-                                                   (<>=))
+import           Capability.State
+import           Capability.Writer
+import           Control.Lens                     (makeLenses, use, (%=), (<+=))
 import           Control.Monad                    (when)
+import qualified Control.Monad.Catch              as CMC
 import qualified Control.Monad.Except             as CME
 import qualified Control.Monad.Fail               as Fail
 import           Control.Monad.IO.Class
 import           Control.Monad.State              (StateT (..))
 import qualified Control.Monad.State              as CMS
-import           Control.Monad.Trans.Class        (lift)
 import           Data.IntMap.Lazy                 (IntMap)
 import qualified Data.IntMap.Lazy                 as IntMap
 import           Data.IntSet                      (IntSet)
@@ -114,7 +114,6 @@ import           Unbound.Generics.LocallyNameless
 
 import           Algebra.Graph                    (Graph)
 
-import qualified Control.Monad.Catch              as CMC
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -492,6 +491,8 @@ initDiscoState = DiscoState
 -- Disco monad
 ------------------------------------------------------------
 
+type DiscoM = StateT DiscoState (CME.ExceptT IErr (LFreshMT IO))
+
 -- | The main monad used by the Disco REPL, and by the interpreter and
 --   pretty printer.
 --
@@ -505,19 +506,31 @@ initDiscoState = DiscoState
 --   * Can log messages (errors, warnings, etc.)
 --   * Can generate fresh names
 --   * Can do I/O
-newtype Disco a = Disco { unDisco :: StateT DiscoState (CME.ExceptT IErr (LFreshMT IO)) a }
+newtype Disco a = Disco { unDisco :: DiscoM a }
   deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState DiscoState, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
   deriving (HasReader "env" Env, HasSource "env" Env) via
     (ReadStatePure
     (Rename "_localEnv"
     (Field "_localEnv" ()
-    (MonadState
-    (StateT DiscoState (CME.ExceptT IErr (LFreshMT IO)))))))
+    (MonadState DiscoM))))
   deriving (HasThrow "err" IErr, HasCatch "err" IErr) via
-    (MonadError (StateT DiscoState (CME.ExceptT IErr (LFreshMT IO))))
+    (MonadError DiscoM)
+  deriving (HasWriter "msg" (MessageLog IErr), HasSink "msg" (MessageLog IErr)) via
+    (WriterLog
+    (Rename "_messageLog"
+    (Field "_messageLog" ()
+    (MonadState DiscoM))))
+
+-- NEXT:
+--   - make HasState capability for "mem" (Memory).
+--   - then redo anything that uses memory
+--   - that should also enable changing all the reachableFoo functions to use
+--     capability style, with an extra state capability for reachableLocs
+--     (dispatch via the withExtraState function)
 
 type instance TypeOf _ "env" = Env
 type instance TypeOf _ "err" = IErr
+type instance TypeOf _ "msg" = MessageLog IErr
 
 ------------------------------------------------------------
 -- Some needed instances.
@@ -550,10 +563,10 @@ iputStr = io . putStr
 iprint :: (MonadIO m, Show a) => a -> m ()
 iprint = io . print
 
-emitMessage :: MessageLevel -> MessageBody IErr -> Disco ()
-emitMessage lev body = messageLog <>= Seq.singleton (Message lev body)
+emitMessage :: Has '[Wr "msg"] m => MessageLevel -> MessageBody IErr -> m ()
+emitMessage lev body = tell @"msg" $ Seq.singleton (Message lev body)
 
-info, warning, err, panic, debug :: MessageBody IErr -> Disco ()
+info, warning, err, panic, debug :: Has '[Wr "msg"] m => MessageBody IErr -> m ()
 info    = emitMessage Info
 warning = emitMessage Warning
 err     = emitMessage Error
@@ -571,11 +584,11 @@ runDisco
 
 -- | Run a @Disco@ computation; if it throws an exception, catch it
 --   and turn it into a message.
-catchAsMessage :: Disco () -> Disco ()
+catchAsMessage :: Has '[Ct "err", Wr "msg"] m => m () -> m ()
 catchAsMessage m = catch @"err" m (err . Item)
 
 -- XXX eventually we should get rid of this and replace with catchAsMessage
-catchAndPrintErrors :: a -> Disco a -> Disco a
+catchAndPrintErrors :: Has '[Ct "err", MonadIO] m => a -> m a -> m a
 catchAndPrintErrors a m = catch @"err" m (\e -> handler e >> return a)
   where
     handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
@@ -749,97 +762,32 @@ typecheckDisco tyctx tydefs tcm =
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
 loadDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> ModName -> m ModuleInfo
-loadDiscoModule resolver m = CMS.evalStateT (loadDiscoModule' resolver S.empty m) M.empty
+loadDiscoModule resolver m =
+  withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
+    loadDiscoModule' resolver S.empty m
 
--- XXX put the Map ModName ModuleInfo into the Disco State, and give it a tag.
--- Arrange things so this is the only place we use it??
-
+-- | Recursively load a Disco module while keeping track of an extra
+--   Map from module names to 'ModuleInfo' records, to avoid loading
+--   any imported module more than once.
 loadDiscoModule' ::
-  Has '[Th "err", MonadIO] m =>
+  Has '[Th "err", MonadIO, HasState "modmap" (M.Map ModName ModuleInfo)] m =>
   Resolver -> S.Set ModName -> ModName ->
-  StateT (M.Map ModName ModuleInfo) m ModuleInfo
+  m ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
-  when (S.member modName inProcess) (lift $ throw @"err" $ CyclicImport modName)
-  modMap <- CMS.get
+  when (S.member modName inProcess) (throw @"err" $ CyclicImport modName)
+  modMap <- get @"modmap"
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule resolver modName
-             >>= maybe (lift $ throw @"err" $ ModuleNotFound modName) return
+             >>= maybe (throw @"err" $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      cm@(Module _ mns _ _) <- lift $ parseDiscoModule file
+      cm@(Module _ mns _ _) <- parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
       mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
-      imports@(ModuleInfo _ _ tyctx tydefns _) <- lift $ adaptError TypeCheckErr $ combineModuleInfo mis
-      m  <- lift $ typecheckDisco tyctx tydefns (checkModule cm)
-      m' <- lift $ adaptError TypeCheckErr $ combineModuleInfo [imports, m]
-      CMS.modify (M.insert modName m')
+      imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
+      m  <- typecheckDisco tyctx tydefns (checkModule cm)
+      m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
+      modify @"modmap" (M.insert modName m')
       return m'
-
--------------------------------------
---Tries
---
--- data VTrie a where
---   SumTrie :: IntMap (VTrie a) -> VTrie a
---   ProdTrie :: VTrie (VTrie a) -> VTrie a
---   Singleton :: [Value] -> a -> VTrie a
---   Empty :: VTrie a
---
--- -- trieLookup :: Value -> VTrie a -> Disco (Maybe a)
--- -- trieLookup _ Empty = return Nothing
--- -- trieLookup (VNum _ r) (SumTrie m) = do
--- --   let maybeTrie = IntMap.lookup (numerator r) m
--- --   case maybeTrie of
--- --     Just (SumTrie m') -> do
--- --        let maybeSingleton = IntMap.lookup (denominator r) m'
--- --        case maybeSingleton of
--- --          Just (Singleton [] a) -> return $ Just a
--- --          _                     -> return Nothing
--- --     Nothing -> return Nothing
---
---
--- class TrieKey k where
---   adjustKey :: k -> (Maybe a -> Maybe a) -> VTrie a -> Disco (Maybe a, VTrie a)
---   buildTrie :: k -> a -> Disco (VTrie a)
---
--- insertKey :: (TrieKey k) => k -> a -> VTrie a -> Disco (VTrie a)
--- insertKey k a t = adjustKey k (const (Just a)) t
---
--- lookupKey :: k -> VTrie a -> Disco (Maybe a, VTrie a)
--- lookupKey k t = adjustKey k id t
---
--- instance TrieKey () where
---   adjustKey () f Empty = return $ (Nothing, maybe Empty Leaf (f Nothing))
---   adjustKey () f (Leaf a) = return $ (Just a, maybe Empty Leaf (f (Just a)))
---
---   buildTrie () = Leaf
---
--- pattern Leaf a = Singleton [] a
---
--- expandSingleton :: Value -> [Value] -> a -> Disco (VTrie a)
--- expandSingleton v vs a = do
---   t <- buildTrie v (Singleton vs a)
---   return $ ProdTrie t
---
--- instance (TrieKey j, TrieKey k) => TrieKey (j,k) where
---   adjustKey (j,k) f Empty = case f Nothing of
---     Nothing -> return (Nothing, Empty)
---     Just a  -> do
---       newTrie <- buildTrie (j,k) a
---       return (Nothing, newTrie)
---   adjustKey (j,k) f (Singleton (v:vs) a) = do
---     newTrie <- expandSingleton v vs a
---     adjustKey (j,k) f newTrie
---   adjustKey (j,k) f (ProdTrie t) = do
---     let g Nothing  = fmap (buildTrie k) (f Nothing)
---         g (Just u) = adjustKey k f u
---     (mTrie, t') <- adjustKey j g t
---     case mTrie of
---       Nothing -> return (Nothing, t')
---       Just u  -> do
---         (kValue, u') <- lookupKey k u
---         updatedTrie <- ProdTrie $ insertKey j u' t'
---         return $ (kValue, updatedTrie)
-
---adjustKey (j,k)

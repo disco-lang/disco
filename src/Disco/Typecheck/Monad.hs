@@ -31,6 +31,9 @@
 
 module Disco.Typecheck.Monad where
 
+import           GHC.Exts                         (Proxy#, proxy#)
+import           GHC.Generics                     (Generic)
+
 import           Unbound.Generics.LocallyNameless
 
 import qualified Capability.Constraints           as CC
@@ -46,6 +49,7 @@ import qualified Data.Map                         as M
 import           Prelude                          hiding (lookup)
 
 import           Data.Bifunctor                   (second)
+
 import           Disco.AST.Surface
 import           Disco.Capability
 import           Disco.Context
@@ -53,8 +57,6 @@ import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
-import           GHC.Exts                         (Proxy#, proxy#)
-import           GHC.Generics                     (Generic)
 
 ------------------------------------------------------------
 -- Contexts
@@ -184,10 +186,10 @@ constraint = tell @"constraints"
 constraints :: Has '[Wr "constraints"] m => [Constraint] -> m ()
 constraints = constraint . cAnd
 
--- XXX copied from mtl, should be in capability library?
--- submitted PR: https://github.com/tweag/capability/pull/94
--- If this is eventually merged and released, we can depend on a newer
--- version of capability and delete the following two functions
+-- XXX copied from mtl, should be in capability library?  submitted
+-- PR: https://github.com/tweag/capability/pull/94 PR was merged.  If
+-- this is eventually released, we can depend on a newer version of
+-- capability and delete the following two functions
 censor_ :: forall k (tag :: k) w m a. HasWriter tag w m => Proxy# tag -> (w -> w) -> m a -> m a
 censor_ tag f m = pass_ tag $ (,f) <$> m
 
@@ -214,7 +216,8 @@ censor = censor_ (proxy# @tag)
   -- The solution is to explicitly declare 'tag' to be
   -- kind-polymorphic, by declaring a kind variable k bound by the
   -- forall and putting a kind signature on tag.  Note that k does not
-  -- count as the first argument with TypeApplications.
+  -- count as the first argument with TypeApplications.  ...UNLESS we
+  -- have enabled TypeInType!! Then it does count!
   --
   -- Also, it seems that for some reason both censor_ and censor are
   -- required.  It seems like we could define

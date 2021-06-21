@@ -736,10 +736,10 @@ instance Reachable Loc where
           Nothing         -> return ()
           Just (Cell v _) -> reachable v
 
-showMemory :: Disco ()
+showMemory :: Has '[St "mem", MonadIO] m => m ()
 showMemory = get @"mem" >>= (mapM_ showCell . IntMap.assocs)
   where
-    showCell :: (Int, Cell) -> Disco ()
+    showCell :: MonadIO m => (Int, Cell) -> m ()
     showCell (i, Cell v b) = liftIO $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
 
 ------------------------------------------------------------

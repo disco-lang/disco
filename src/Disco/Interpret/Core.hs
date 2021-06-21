@@ -59,7 +59,6 @@ module Disco.Interpret.Core
 import           Capability.Error
 import           Capability.State
 import           Control.Arrow                           ((***))
-import           Control.Lens                            ((.=))
 import           Control.Monad                           (filterM, (>=>))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
@@ -84,6 +83,7 @@ import           Math.NumberTheory.Primes.Testing        (isPrime)
 import           Disco.AST.Core
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
+import           Disco.Capability
 import           Disco.Context
 import           Disco.Enumerate
 import           Disco.Eval
@@ -105,7 +105,7 @@ import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
-loadDefs :: Ctx Core Core -> Disco ()
+loadDefs :: Has '[Rd "env", Sc "nextloc", St "mem", St "topenv"] m => Ctx Core Core -> m ()
 loadDefs cenv = do
 
   -- Clear out any leftover memory.
@@ -963,8 +963,8 @@ whnfOp OUntil          = arity2 "until"     $ ellipsis . Until
 --------------------------------------------------
 -- Propositions
 
-whnfOp (OExists tys)   = arity1 "exists"    $ whnfV >=> primExists tys
-whnfOp (OForall tys)   = arity1 "forall"    $ whnfV >=> primForall tys
+whnfOp (OExists tys)   = arity1 "exists"    $ (primExists tys <$>) . whnfV
+whnfOp (OForall tys)   = arity1 "forall"    $ (primForall tys <$>) . whnfV
 whnfOp OHolds          = arity1 "holds"     $ whnfV >=> primHolds
 whnfOp ONotProp        = arity1 "notProp"   $ whnfV >=> primNotProp
 whnfOp (OShouldEq ty)  = arity2 "shouldEq"  $ shouldEqOp ty
@@ -1235,13 +1235,13 @@ valueToString = fmap toString . rnfV
 -- as things are alright at the CTest frame that encloses it.
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
-ensureProp :: Value -> Disco ValProp
+ensureProp :: Monad m => Value -> m ValProp
 ensureProp (VProp p)    = return p
 ensureProp (VCons 0 []) = return $ VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _            = error "ensureProp: non-prop value"
 
-failTestOnError :: Disco ValProp -> Disco ValProp
+failTestOnError :: Has '[Ct "err"] m => m ValProp -> m ValProp
 failTestOnError m = catch @"err" m $ \e ->
   return $ VPDone (TestResult False (TestRuntimeError e) emptyTestEnv)
 
@@ -1253,11 +1253,11 @@ whnfTest vs c = do
   e' <- getTestEnv vs
   return . VProp $ extendPropEnv e' result
 
-primExists :: [Type] -> Value -> Disco Value
-primExists tys v = return $ VProp (VPSearch SMExists tys v emptyTestEnv)
+primExists :: [Type] -> Value -> Value
+primExists tys v = VProp (VPSearch SMExists tys v emptyTestEnv)
 
-primForall :: [Type] -> Value -> Disco Value
-primForall tys v = return $ VProp (VPSearch SMForall tys v emptyTestEnv)
+primForall :: [Type] -> Value -> Value
+primForall tys v = VProp (VPSearch SMForall tys v emptyTestEnv)
 
 -- | Assert the equality of two values.
 shouldEqOp :: Type -> Value -> Value -> Disco Value
@@ -1269,7 +1269,7 @@ shouldEqOp t x y = toProp <$> decideEqFor t x y
 primHolds :: Value -> Disco Value
 primHolds v = resultToBool =<< testProperty Exhaustive v
   where
-    resultToBool :: TestResult -> Disco Value
+    resultToBool :: Has '[Th "err"] m => TestResult -> m Value
     resultToBool (TestResult _ (TestRuntimeError e) _) = throw @"err" e
     resultToBool (TestResult b _ _) = return $ VCons (fromEnum b) []
 

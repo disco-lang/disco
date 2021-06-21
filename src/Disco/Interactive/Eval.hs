@@ -17,7 +17,6 @@ module Disco.Interactive.Eval where
 
 import           Capability.Error
 import           Capability.State
-import           Control.Lens               (use)
 import           Control.Monad.Except
 import           Disco.Eval
 import           Disco.Interactive.Commands
@@ -59,7 +58,7 @@ printMem = do
 handleCMD :: String -> Disco ()
 handleCMD "" = return ()
 handleCMD s = do
-    exts <- use enabledExts
+    exts <- get @"exts"
     case parseLine discoCommands exts s of
       Left msg -> io $ putStrLn msg
       Right l -> catch @"err" (dispatch discoCommands l) (io . print  {- XXX pretty-print error -})

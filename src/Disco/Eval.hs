@@ -63,8 +63,7 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topModInfo, topCtx, topDefns, topTyDefns, topDocs
-       , lastFile, enabledExts
+       , topCtx, topDefns, topTyDefns, topDocs
 
          -- * Disco monad
 
@@ -540,6 +539,18 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
     (Rename "_topEnv"
     (Field "_topEnv" ()
     (MonadState DiscoM)))
+  deriving (HasState "exts" ExtSet, HasSource "exts" ExtSet, HasSink "exts" ExtSet) via
+    (Rename "_enabledExts"
+    (Field "_enabledExts" ()
+    (MonadState DiscoM)))
+  deriving (HasState "lastfile" (Maybe FilePath), HasSource "lastfile" (Maybe FilePath), HasSink "lastfile" (Maybe FilePath)) via
+    (Rename "_lastFile"
+    (Field "_lastFile" ()
+    (MonadState DiscoM)))
+  deriving (HasState "modinfo" ModuleInfo, HasSource "modinfo" ModuleInfo, HasSink "modinfo" ModuleInfo) via
+    (Rename "_topModInfo"
+    (Field "_topModInfo" ()
+    (MonadState DiscoM)))
 
 newtype Counter m a = Counter (m a)
   deriving (Functor, Applicative, Monad, MonadIO)
@@ -547,12 +558,15 @@ newtype Counter m a = Counter (m a)
 instance (Monad m, HasState tag Loc m) => HasSource (tag :: k) Loc (Counter m) where
   await_ tag = Counter $ state_ tag $ \i -> (i,i+1)
 
-type instance TypeOf _ "env"     = Env
-type instance TypeOf _ "err"     = IErr
-type instance TypeOf _ "msg"     = MessageLog IErr
-type instance TypeOf _ "mem"     = Memory
-type instance TypeOf _ "nextloc" = Loc
-type instance TypeOf _ "topenv"  = Env
+type instance TypeOf _ "env"      = Env
+type instance TypeOf _ "err"      = IErr
+type instance TypeOf _ "msg"      = MessageLog IErr
+type instance TypeOf _ "mem"      = Memory
+type instance TypeOf _ "nextloc"  = Loc
+type instance TypeOf _ "topenv"   = Env
+type instance TypeOf _ "exts"     = ExtSet
+type instance TypeOf _ "lastfile" = Maybe FilePath
+type instance TypeOf _ "modinfo"  = ModuleInfo
 
 ------------------------------------------------------------
 -- Some needed instances.

@@ -307,6 +307,7 @@ handleLoad fp = catchAndPrintErrors False $ do
   m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- withTopEnv $ runAllTests props
+  put @"lastfile" $ Just fp
   io . putStrLn $ "Loaded."
   garbageCollect
   return t
@@ -397,7 +398,7 @@ reloadCmd =
 
 handleReload :: REPLExpr 'CReload -> Disco ()
 handleReload Reload = do
-      file <- use lastFile
+      file <- get @"lastfile"
       case file of
         Nothing -> iputStrLn "No file to reload."
         Just f  -> void (handleLoad f)
@@ -505,7 +506,7 @@ usingCmd =
         }
 
 handleUsing :: REPLExpr 'CUsing -> Disco ()
-handleUsing (Using e) = enabledExts %= addExtension e
+handleUsing (Using e) = modify @"exts" $ addExtension e
 
 ------------------------------------------
 --- Util functions
@@ -513,10 +514,9 @@ handleUsing (Using e) = enabledExts %= addExtension e
 
 addModule :: ModuleInfo -> Disco ()
 addModule mi = do
-  curMI <- use topModInfo
+  curMI <- get @"modinfo"
   mi' <- adaptError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  topModInfo .= mi'
-  populateCurrentModuleInfo
+  setLoadedModule mi'
 
 fileNotFound :: FilePath -> IOException -> IO ()
 fileNotFound file _ = putStrLn $ "File not found: " ++ file
@@ -526,7 +526,7 @@ loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just 
 
 populateCurrentModuleInfo :: Disco ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds <- use topModInfo
+  ModuleInfo docs _ tys tyds tmds <- get @"modinfo"
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   topDocs    .= docs
   topCtx     .= tys
@@ -641,5 +641,5 @@ runAllTests aprops
 --   Replaces any previously loaded module.
 setLoadedModule :: ModuleInfo -> Disco ()
 setLoadedModule mi = do
-  topModInfo .= mi
+  put @"modinfo" mi
   populateCurrentModuleInfo

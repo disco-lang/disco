@@ -127,7 +127,7 @@ loadDefs cenv = do
 
   -- Finally, set the top-level environment to the one we just
   -- created.
-  topEnv .= env
+  put @"topenv" env
 
   where
     replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b

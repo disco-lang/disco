@@ -23,6 +23,7 @@ import qualified Capability.Constraints as CC
 import           Capability.Error
 import           Capability.Reader
 import           Capability.Reflection  (interpret)
+import           Capability.Source
 import           Capability.State
 import           Capability.Writer
 import           Control.Monad.IO.Class
@@ -31,6 +32,7 @@ import           Data.IORef
 type Rd tag = HasReader' tag
 type Wr tag = HasWriter' tag
 type St tag = HasState' tag
+type Sc tag = HasSource' tag
 type Th tag = HasThrow' tag
 type Ct tag = HasCatch' tag
 

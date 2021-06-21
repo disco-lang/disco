@@ -6,13 +6,16 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeInType                 #-}
 {-# LANGUAGE TypeSynonymInstances       #-}
 
 -----------------------------------------------------------------------------
@@ -60,8 +63,8 @@ module Disco.Eval
 
          -- ** Lenses
 
-       , topModInfo, topCtx, topDefns, topTyDefns, topDocs, topEnv
-       , nextLoc, lastFile, enabledExts
+       , topModInfo, topCtx, topDefns, topTyDefns, topDocs
+       , lastFile, enabledExts
 
          -- * Disco monad
 
@@ -92,7 +95,7 @@ import           Capability.Sink                  (HasSink)
 import           Capability.Source
 import           Capability.State
 import           Capability.Writer
-import           Control.Lens                     (makeLenses, use, (<+=))
+import           Control.Lens                     (makeLenses)
 import           Control.Monad                    (forM, forM_, when)
 import qualified Control.Monad.Catch              as CMC
 import qualified Control.Monad.Except             as CME
@@ -528,11 +531,28 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
     (Rename "_memory"
     (Field "_memory" ()
     (MonadState DiscoM)))
+  deriving (HasSource "nextloc" Loc) via
+    (Counter
+    (Rename "_nextLoc"
+    (Field "_nextLoc" ()
+    (MonadState DiscoM))))
+  deriving (HasState "topenv" Env, HasSource "topenv" Env, HasSink "topenv" Env) via
+    (Rename "_topEnv"
+    (Field "_topEnv" ()
+    (MonadState DiscoM)))
 
-type instance TypeOf _ "env" = Env
-type instance TypeOf _ "err" = IErr
-type instance TypeOf _ "msg" = MessageLog IErr
-type instance TypeOf _ "mem" = Memory
+newtype Counter m a = Counter (m a)
+  deriving (Functor, Applicative, Monad, MonadIO)
+
+instance (Monad m, HasState tag Loc m) => HasSource (tag :: k) Loc (Counter m) where
+  await_ tag = Counter $ state_ tag $ \i -> (i,i+1)
+
+type instance TypeOf _ "env"     = Env
+type instance TypeOf _ "err"     = IErr
+type instance TypeOf _ "msg"     = MessageLog IErr
+type instance TypeOf _ "mem"     = Memory
+type instance TypeOf _ "nextloc" = Loc
+type instance TypeOf _ "topenv"  = Env
 
 ------------------------------------------------------------
 -- Some needed instances.
@@ -603,9 +623,9 @@ catchAndPrintErrors a m = catch @"err" m (\e -> handler e >> return a)
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.
-allocate :: Value -> Disco Loc
+allocate :: Has '[Sc "nextloc", St "mem"] m => Value -> m Loc
 allocate v = do
-  loc <- nextLoc <+= 1
+  loc <- await @"nextloc"
   -- io $ putStrLn $ "allocating " ++ show v ++ " at location " ++ show loc
   modify @"mem" $ IntMap.insert loc (mkCell v)
   return loc
@@ -613,7 +633,7 @@ allocate v = do
 -- | Turn a value into a "simple" value which takes up a constant
 --   amount of space: some are OK as they are; for others, we turn
 --   them into an indirection and allocate a new memory cell for them.
-mkSimple :: Value -> Disco Value
+mkSimple :: Has '[Sc "nextloc", St "mem"] m => Value -> m Value
 mkSimple v@VNum{}       = return v
 mkSimple v@(VCons _ []) = return v
 mkSimple v@VConst{}     = return v
@@ -641,7 +661,7 @@ delay' vs imv = do
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkValue :: Core -> Disco Value
+mkValue :: Has '[Rd "env", Sc "nextloc", St "mem"] m => Core -> m Value
 mkValue (CConst op)  = return $ VConst op
 mkValue (CCons i cs) = VCons i <$> mapM mkValue cs
 mkValue (CNum d r)   = return $ VNum d r
@@ -651,16 +671,16 @@ mkValue c            = VIndir <$> (allocate . VThunk c =<< getEnv)
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
-withTopEnv :: Disco a -> Disco a
+withTopEnv :: Has '[Rd "env", St "topenv"] m => m a -> m a
 withTopEnv m = do
-  env <- use topEnv
+  env <- get @"topenv"
   withEnv env m
 
 -- | Deallocate any memory cells which are no longer referred to by
 --   any top-level binding.
-garbageCollect :: Disco ()
+garbageCollect :: Has '[St "topenv", St "mem", MonadIO] m => m ()
 garbageCollect = do
-  env  <- use topEnv
+  env  <- get @"topenv"
   keep <- getReachable env
   modify @"mem" $ \mem -> IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep)
 

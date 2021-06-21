@@ -48,7 +48,7 @@ showVal _ VMap{}      = "<map>"
 
 printMem :: Disco ()
 printMem = do
-  env <- use topEnv
+  env <- get @"topenv"
   mem <- get @"mem"
 
   io $ print env

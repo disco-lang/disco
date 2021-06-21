@@ -20,6 +20,7 @@ module Disco.Interactive.Commands
     loadFile
   ) where
 
+import           Capability.State
 import           Control.Arrow                    ((&&&))
 import           Control.Exception                (IOException, handle)
 import           Control.Lens                     (use, (%=), (.=))
@@ -205,7 +206,7 @@ handleEval (Eval t) = do
           prettyValue ty cv
           return cv
         topCtx %= M.insert (string2Name "it") (toPolyType ty)
-        topEnv %= M.insert (string2Name "it") v
+        modify @"topenv" $ M.insert (string2Name "it") v
         garbageCollect
 
 helpCmd :: REPLCommand 'CHelp
@@ -278,7 +279,7 @@ handleLet (Let x t) = do
       topCtx   %= M.insert x sig
         -- XXX ability to define more complex things at REPL prompt, with patterns etc.
       topDefns %= M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
-      topEnv   %= M.insert (coerce x) thnk
+      modify @"topenv" $ M.insert (coerce x) thnk
 
 
 loadCmd :: REPLCommand 'CLoad

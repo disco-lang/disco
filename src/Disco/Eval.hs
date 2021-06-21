@@ -61,10 +61,6 @@ module Disco.Eval
 
        , Loc, DiscoState(..), initDiscoState
 
-         -- ** Lenses
-
-       , topCtx, topDefns, topTyDefns, topDocs
-
          -- * Disco monad
 
        , Disco
@@ -94,7 +90,6 @@ import           Capability.Sink                  (HasSink)
 import           Capability.Source
 import           Capability.State
 import           Capability.Writer
-import           Control.Lens                     (makeLenses)
 import           Control.Monad                    (forM, forM_, when)
 import qualified Control.Monad.Catch              as CMC
 import qualified Control.Monad.Except             as CME
@@ -535,9 +530,25 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
     (Rename "_nextLoc"
     (Field "_nextLoc" ()
     (MonadState DiscoM))))
+  deriving (HasState "topctx" (Ctx Term PolyType), HasSource "topctx" (Ctx Term PolyType), HasSink "topctx" (Ctx Term PolyType)) via
+    (Rename "_topCtx"
+    (Field "_topCtx" ()
+    (MonadState DiscoM)))
+  deriving (HasState "topdefs" (Ctx ATerm Defn), HasSource "topdefs" (Ctx ATerm Defn), HasSink "topdefs" (Ctx ATerm Defn)) via
+    (Rename "_topDefns"
+    (Field "_topDefns" ()
+    (MonadState DiscoM)))
+  deriving (HasState "toptydefs" TyDefCtx, HasSource "toptydefs" TyDefCtx, HasSink "toptydefs" TyDefCtx) via
+    (Rename "_topTyDefns"
+    (Field "_topTyDefns" ()
+    (MonadState DiscoM)))
   deriving (HasState "topenv" Env, HasSource "topenv" Env, HasSink "topenv" Env) via
     (Rename "_topEnv"
     (Field "_topEnv" ()
+    (MonadState DiscoM)))
+  deriving (HasState "topdocs" (Ctx Term Docs), HasSource "topdocs" (Ctx Term Docs), HasSink "topdocs" (Ctx Term Docs)) via
+    (Rename "_topDocs"
+    (Field "_topDocs" ()
     (MonadState DiscoM)))
   deriving (HasState "exts" ExtSet, HasSource "exts" ExtSet, HasSink "exts" ExtSet) via
     (Rename "_enabledExts"
@@ -576,12 +587,6 @@ type instance TypeOf _ "modinfo"  = ModuleInfo
 -- (and we can also remove the -fno-warn-orphans flag).
 instance MonadFail m => MonadFail (LFreshMT m) where
   fail = LFreshMT . Fail.fail
-
-------------------------------------------------------------
--- Lenses for state
-------------------------------------------------------------
-
-makeLenses ''DiscoState
 
 ------------------------------------------------------------
 -- Utilities

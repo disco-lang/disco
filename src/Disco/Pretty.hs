@@ -36,9 +36,8 @@ import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
-import           Control.Lens                     (use)
-
 import           Capability.Reader
+import           Capability.State
 import           Text.PrettyPrint                 (Doc)
 import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
                                                    string2Name, unembed)
@@ -46,8 +45,7 @@ import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Eval                       (Disco, Value (..), io,
-                                                   iputStr, iputStrLn,
-                                                   topTyDefns)
+                                                   iputStr, iputStrLn)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
 import           Disco.Module
 import           Disco.Pretty.Monadic
@@ -391,7 +389,7 @@ prettyValueWithP k ty           v = k "(" >> prettyValueWith k ty v >> k ")"
 --   head normal form.
 prettyWHNF :: (String -> Disco ()) -> Type -> Value -> Disco ()
 prettyWHNF out (TyUser nm args) v = do
-  tymap <- use topTyDefns
+  tymap <- get @"toptydefs"
   case M.lookup nm tymap of
     Just (TyDefBody _ body) -> prettyWHNF out (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"

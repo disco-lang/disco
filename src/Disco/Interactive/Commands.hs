@@ -23,7 +23,6 @@ module Disco.Interactive.Commands
 import           Capability.State
 import           Control.Arrow                    ((&&&))
 import           Control.Exception                (IOException, handle)
-import           Control.Lens                     (use, (%=), (.=))
 import           Control.Monad.Except
 import           Data.Coerce
 import           Data.List                        (sortBy)
@@ -106,8 +105,8 @@ annCmd =
 
 handleAnn :: REPLExpr 'CAnn -> Disco ()
 handleAnn (Ann t) = do
-    ctx   <- use topCtx
-    tymap <- use topTyDefns
+    ctx   <- get @"topctx"
+    tymap <- get @"toptydefs"
     s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left  e       -> return . show $ e
         Right (at, _) -> return . show $ at
@@ -127,7 +126,7 @@ compileCmd =
 
 handleCompile :: REPLExpr 'CCompile -> Disco ()
 handleCompile (Compile t) = do
-  ctx <- use topCtx
+  ctx <- get @"topctx"
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return . show $ e
         Right (at,_) -> return . show . compileTerm $ at
@@ -148,7 +147,7 @@ desugarCmd =
 
 handleDesugar :: REPLExpr 'CDesugar -> Disco ()
 handleDesugar (Desugar t) = do
-  ctx <- use topCtx
+  ctx <- get @"topctx"
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return.show $ e
         Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
@@ -168,8 +167,8 @@ docCmd =
 
 handleDoc :: REPLExpr 'CDoc -> Disco ()
 handleDoc (Doc x) = do
-  ctx  <- use topCtx
-  docs <- use topDocs
+  ctx  <- get @"topctx"
+  docs <- get @"topdocs"
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
@@ -193,8 +192,8 @@ evalCmd =
 
 handleEval :: REPLExpr 'CEval -> Disco ()
 handleEval (Eval t) = do
-  ctx   <- use topCtx
-  tymap <- use topTyDefns
+  ctx   <- get @"topctx"
+  tymap <- get @"toptydefs"
   case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
@@ -205,7 +204,7 @@ handleEval (Eval t) = do
           cv <- mkValue c
           prettyValue ty cv
           return cv
-        topCtx %= M.insert (string2Name "it") (toPolyType ty)
+        modify @"topctx" $M.insert (string2Name "it") (toPolyType ty)
         modify @"topenv" $ M.insert (string2Name "it") v
         garbageCollect
 
@@ -268,17 +267,17 @@ letCmd =
 
 handleLet :: REPLExpr 'CLet -> Disco ()
 handleLet (Let x t) = do
-  ctx <- use topCtx
-  tymap <- use topTyDefns
+  ctx <- get @"topctx"
+  tymap <- get @"toptydefs"
   let mat = evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
       let c = compileTerm at
       thnk <- withTopEnv (mkValue c)
-      topCtx   %= M.insert x sig
+      modify @"topctx" $ M.insert x sig
         -- XXX ability to define more complex things at REPL prompt, with patterns etc.
-      topDefns %= M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
+      modify @"topdefs"$ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
       modify @"topenv" $ M.insert (coerce x) thnk
 
 
@@ -325,10 +324,10 @@ namesCmd =
       parser = return Names
     }
 
--- | show names and types for each item in 'topCtx'
+-- | Show names and types for each item in the top-level context.
 handleNames :: REPLExpr 'CNames -> Disco ()
 handleNames Names = do
-  ctx  <- use topCtx
+  ctx  <- get @"topctx"
   mapM_ showFn $ M.toList ctx
   where
       showFn (x, ty) = do
@@ -418,8 +417,8 @@ showDefnCmd =
 
 handleShowDefn :: REPLExpr 'CShowDefn -> Disco ()
 handleShowDefn (ShowDefn x) = do
-  defns   <- use topDefns
-  tyDefns <- use topTyDefns
+  defns   <- get @"topdefs"
+  tyDefns <- get @"toptydefs"
   s <- case M.lookup (coerce x) defns of
           Just d  -> renderDoc $ prettyDefn d
           Nothing -> case M.lookup name2s tyDefns of
@@ -444,8 +443,8 @@ testPropCmd =
 
 handleTest :: REPLExpr 'CTestProp -> Disco ()
 handleTest (TestProp t) = do
-  ctx   <- use topCtx
-  tymap <- use topTyDefns
+  ctx   <- get @"topctx"
+  tymap <- get @"toptydefs"
   case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ checkProperty t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right at -> do
@@ -469,8 +468,8 @@ typeCheckCmd =
 
 handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco ()
 handleTypeCheck (TypeCheck t) = do
-  ctx <- use topCtx
-  tymap <- use topTyDefns
+  ctx <- get @"topctx"
+  tymap <- get @"toptydefs"
   s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left e        -> return.show $ e    -- XXX pretty-print
         Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
@@ -528,10 +527,10 @@ populateCurrentModuleInfo :: Disco ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds <- get @"modinfo"
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
-  topDocs    .= docs
-  topCtx     .= tys
-  topTyDefns .= tyds
-  topDefns   .= tmds
+  put @"topdocs"   docs
+  put @"topctx"    tys
+  put @"toptydefs" tyds
+  put @"topdefs"   tmds
   loadDefs cdefns
   return ()
 

@@ -6,12 +6,14 @@
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeSynonymInstances       #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,7 +39,7 @@ module Disco.Eval
          -- * Props & testing
        , ValProp(..), TestResult(..), TestReason_(..), TestReason
        , SearchType(..), SearchMotive(.., SMExists, SMForall)
-       , TestVars, TestEnv, getTestEnv, extendPropEnv, extendResultEnv
+       , TestVars(..), TestEnv(..), emptyTestEnv, getTestEnv, extendPropEnv, extendResultEnv
 
          -- * Environments
 
@@ -59,7 +61,7 @@ module Disco.Eval
          -- ** Lenses
 
        , topModInfo, topCtx, topDefns, topTyDefns, topDocs, topEnv
-       , memory, nextLoc, lastFile, enabledExts
+       , nextLoc, lastFile, enabledExts
 
          -- * Disco monad
 
@@ -90,8 +92,8 @@ import           Capability.Sink                  (HasSink)
 import           Capability.Source
 import           Capability.State
 import           Capability.Writer
-import           Control.Lens                     (makeLenses, use, (%=), (<+=))
-import           Control.Monad                    (when)
+import           Control.Lens                     (makeLenses, use, (<+=))
+import           Control.Monad                    (forM, forM_, when)
 import qualified Control.Monad.Catch              as CMC
 import qualified Control.Monad.Except             as CME
 import qualified Control.Monad.Fail               as Fail
@@ -275,13 +277,18 @@ pattern SMExists = SearchMotive (True, True)
 
 -- | A collection of variables that might need to be reported for
 --   a test, along with their types and user-legible names.
-type TestVars = [(String, Type, Name Core)]
+newtype TestVars = TestVars [(String, Type, Name Core)]
+  deriving (Show, Semigroup, Monoid)
 
 -- | A variable assignment found during a test.
-type TestEnv = [(String, Type, Value)]
+newtype TestEnv = TestEnv [(String, Type, Value)]
+  deriving (Show, Semigroup, Monoid)
+
+emptyTestEnv :: TestEnv
+emptyTestEnv = TestEnv []
 
 getTestEnv :: Has '[Rd "env", Th "err"] m => TestVars -> m TestEnv
-getTestEnv = mapM $ \(s, ty, name) -> do
+getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
     Just v  -> return (s, ty, v)
@@ -320,11 +327,11 @@ data ValProp
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
-extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g ++ e))
-extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g ++ e)
+extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g <> e))
+extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g <> e)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
-extendResultEnv g (TestResult b r e) = TestResult b r (g ++ e)
+extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
 
 ------------------------------------------------------------
 -- Environments
@@ -412,35 +419,37 @@ data IErr where
 -- | A location in memory is represented by an @Int@.
 type Loc = Int
 
+type Memory = IntMap Cell
+
 -- | The various pieces of state tracked by the 'Disco' monad.
 data DiscoState = DiscoState
-  { _topModInfo    :: ModuleInfo
+  { _topModInfo  :: ModuleInfo
     -- ^ Info about the top-level currently loaded module.  Due to
     --   import statements this may actually be a combination of info
     --   about multiple physical modules.
 
-  , _topCtx        :: Ctx Term PolyType
+  , _topCtx      :: Ctx Term PolyType
     -- ^ Top-level type environment.
 
-  , _topDefns      :: Ctx ATerm Defn
+  , _topDefns    :: Ctx ATerm Defn
     -- ^ Environment of top-level surface syntax definitions.  Set by
     --   'loadDefs' and by 'let' command at the REPL.
 
-  , _topTyDefns    :: TyDefCtx
+  , _topTyDefns  :: TyDefCtx
     -- ^ Environment of top-level type definitions.
 
-  , _topEnv        :: Env
+  , _topEnv      :: Env
     -- ^ Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDefs'.
     --   Use it when evaluating with 'withTopEnv'.
 
-  , _localEnv      :: Env
+  , _localEnv    :: Env
     -- ^ Local environment used during evaluation of expressions.
 
-  , _topDocs       :: Ctx Term Docs
+  , _topDocs     :: Ctx Term Docs
     -- ^ Top-level documentation.
 
-  , _memory        :: IntMap Cell
+  , _memory      :: Memory
     -- ^ A memory is a mapping from "locations" (uniquely generated
     --   identifiers) to values, along with a flag saying whether the
     --   value has been evaluated yet.  It also keeps track of the
@@ -448,20 +457,16 @@ data DiscoState = DiscoState
     --   evaluation, and can create new memory locations to store
     --   things that should only be evaluated once.
 
-  , _nextLoc       :: Loc
+  , _nextLoc     :: Loc
     -- ^ The next available (unused) memory location.
 
-  , _reachableLocs :: IntSet
-    -- ^ The memory locations found to be reachable during a garbage
-    --   collection pass.
-
-  , _messageLog    :: MessageLog IErr
+  , _messageLog  :: MessageLog IErr
     -- ^ A stream of messages generated by the system.
 
-  , _lastFile      :: Maybe FilePath
+  , _lastFile    :: Maybe FilePath
     -- ^ The most recent file which was :loaded by the user.
 
-  , _enabledExts   :: ExtSet
+  , _enabledExts :: ExtSet
     -- ^ The set of language extensions currently enabled in the REPL.
     --   Note this affects only expressions entered at the REPL
     --   prompt, not modules loaded into the REPL; each module
@@ -481,7 +486,6 @@ initDiscoState = DiscoState
   , _localEnv      = emptyCtx
   , _memory        = IntMap.empty
   , _nextLoc       = 0
-  , _reachableLocs = IntSet.empty
   , _messageLog    = emptyMessageLog
   , _lastFile      = Nothing
   , _enabledExts   = defaultExts
@@ -520,17 +524,15 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
     (Rename "_messageLog"
     (Field "_messageLog" ()
     (MonadState DiscoM))))
-
--- NEXT:
---   - make HasState capability for "mem" (Memory).
---   - then redo anything that uses memory
---   - that should also enable changing all the reachableFoo functions to use
---     capability style, with an extra state capability for reachableLocs
---     (dispatch via the withExtraState function)
+  deriving (HasState "mem" Memory, HasSource "mem" Memory, HasSink "mem" Memory) via
+    (Rename "_memory"
+    (Field "_memory" ()
+    (MonadState DiscoM)))
 
 type instance TypeOf _ "env" = Env
 type instance TypeOf _ "err" = IErr
 type instance TypeOf _ "msg" = MessageLog IErr
+type instance TypeOf _ "mem" = Memory
 
 ------------------------------------------------------------
 -- Some needed instances.
@@ -605,7 +607,7 @@ allocate :: Value -> Disco Loc
 allocate v = do
   loc <- nextLoc <+= 1
   -- io $ putStrLn $ "allocating " ++ show v ++ " at location " ++ show loc
-  memory %= IntMap.insert loc (mkCell v)
+  modify @"mem" $ IntMap.insert loc (mkCell v)
   return loc
 
 -- | Turn a value into a "simple" value which takes up a constant
@@ -630,7 +632,7 @@ delay = delay' []
 --   referenced by the values from being garbage collected.
 delay' :: [Value] -> Disco Value -> Disco Value
 delay' vs imv = do
-  ls <- getReachables vs
+  ls <- getReachable vs
   VDelay imv ls <$> getEnv
 
 -- | Turn a Core expression into a value.  Some kinds of expressions
@@ -658,74 +660,64 @@ withTopEnv m = do
 --   any top-level binding.
 garbageCollect :: Disco ()
 garbageCollect = do
-
-    --  reachableLocs .= IntSet.empty  yields some sort of ambiguity error...
-  CMS.modify (\s -> s { _reachableLocs = IntSet.empty })
-
   env  <- use topEnv
-  reachableEnv env
-  keep <- use reachableLocs
-
-  memory %= (\mem -> IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep))
+  keep <- getReachable env
+  modify @"mem" $ \mem -> IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep)
 
 -- | Get the set of memory locations reachable from a set of values.
---   Note that this clobbers the 'reachableLocs' component of the
---   @Disco@ state.
-getReachables :: [Value] -> Disco IntSet
-getReachables vs = do
-  CMS.modify (\s -> s { _reachableLocs = IntSet.empty })
-  reachables vs
-  use reachableLocs
+getReachable :: (Reachable v, Has '[St "mem", MonadIO] m) => v -> m IntSet
+getReachable v =
+  fmap snd $
+    withLocalState @_ @"reachables" @IntSet @'[St "mem"] IntSet.empty $
+      reachable v
 
--- | Mark the memory locations reachable from the values stored in an
---   environment.
-reachableEnv :: Env -> Disco ()
-reachableEnv = reachables . M.elems
+class Reachable v where
+  -- | @reachable v@ marks the memory locations reachable from the
+  --   values stored in @v@.
+  reachable :: Has '[St "mem", HasState "reachables" IntSet] m => v -> m ()
 
--- | Mark the memory locations reachable from a value.
-reachable :: Value -> Disco ()
-reachable (VCons _ vs)    = reachables vs
-reachable (VClos _ e)     = reachableEnv e
-reachable (VPAp v vs)     = reachables (v:vs)
-reachable (VThunk _ e)    = reachableEnv e
-reachable (VIndir l)      = reachableLoc l
-reachable (VDelay _ ls e) = (reachableLocs %= IntSet.union ls) >> reachableEnv e
-reachable (VBag vs)       = reachables (map fst vs)
-reachable (VProp p)       = reachableProp p
-reachable (VGraph _ adj)  = reachable adj -- A graph can only contain SimpleValues, which by def contain no indirection. However its buffered adjacency map can.
-reachable (VMap m)        = reachables (M.elems m)
-reachable _               = return ()
+instance Reachable Value where
+  reachable (VCons _ vs)    = reachable vs
+  reachable (VClos _ e)     = reachable e
+  reachable (VPAp v vs)     = reachable (v:vs)
+  reachable (VThunk _ e)    = reachable e
+  reachable (VIndir l)      = reachable l
+  reachable (VDelay _ ls e) = (modify @"reachables" $ IntSet.union ls) >> reachable e
+  reachable (VBag vs)       = reachable (map fst vs)
+  reachable (VProp p)       = reachable p
+  reachable (VGraph _ adj)  = reachable adj
+    -- A graph can only contain SimpleValues, which by def contain no indirection.
+    -- However its buffered adjacency map can.
+  reachable (VMap m)        = reachable (M.elems m)
+  reachable _               = return ()
 
--- | Mark the memory locations reachable from a prop.
-reachableProp :: ValProp -> Disco ()
-reachableProp (VPDone (TestResult _ r vs)) = mapM_ reachable r >> reachableTestEnv vs
-reachableProp (VPSearch _ _ v vs)   = reachable v >> reachableTestEnv vs
+instance Reachable Env where
+  reachable = reachable . M.elems
 
--- | Mark the memory locations reachable from a @TestEnv@.
-reachableTestEnv :: TestEnv -> Disco ()
-reachableTestEnv = mapM_ $ \(_, _, v) -> reachable v
+instance Reachable v => Reachable [v] where
+  reachable = mapM_ reachable
 
--- | Mark the memory locations reachable from a set of values.
-reachables :: [Value] -> Disco ()
-reachables = mapM_ reachable
+instance Reachable ValProp where
+  reachable (VPDone (TestResult _ r vs)) = mapM_ reachable r >> reachable vs
+  reachable (VPSearch _ _ v vs)          = reachable v >> reachable vs
 
--- | Mark the given memory location, and continue recursively marking
---   anything reachable from the value stored at this location if it
---   wasn't already visited.
-reachableLoc :: Loc -> Disco ()
-reachableLoc l = do
-  reach <- use reachableLocs
-  case IntSet.member l reach of
-    True -> return ()
-    False -> do
-      reachableLocs %= IntSet.insert l
-      mem <- use memory
-      case IntMap.lookup l mem of
-        Nothing         -> return ()
-        Just (Cell v _) -> reachable v
+instance Reachable TestEnv where
+  reachable (TestEnv te) = forM_ te $ \(_, _, v) -> reachable v
+
+instance Reachable Loc where
+  reachable l = do
+    reach <- get @"reachables"
+    case IntSet.member l reach of
+      True -> return ()
+      False -> do
+        modify @"reachables" $ IntSet.insert l
+        mem <- get @"mem"
+        case IntMap.lookup l mem of
+          Nothing         -> return ()
+          Just (Cell v _) -> reachable v
 
 showMemory :: Disco ()
-showMemory = use memory >>= (mapM_ showCell . IntMap.assocs)
+showMemory = get @"mem" >>= (mapM_ showCell . IntMap.assocs)
   where
     showCell :: (Int, Cell) -> Disco ()
     showCell (i, Cell v b) = liftIO $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
@@ -763,8 +755,9 @@ typecheckDisco tyctx tydefs tcm =
 --   the module in the current directory or the standard library.
 loadDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> ModName -> m ModuleInfo
 loadDiscoModule resolver m =
-  withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
-    loadDiscoModule' resolver S.empty m
+  fmap fst $
+    withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
+      loadDiscoModule' resolver S.empty m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading

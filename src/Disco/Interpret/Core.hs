@@ -57,8 +57,9 @@ module Disco.Interpret.Core
        where
 
 import           Capability.Error
+import           Capability.State
 import           Control.Arrow                           ((***))
-import           Control.Lens                            (use, (%=), (.=))
+import           Control.Lens                            ((.=))
 import           Control.Monad                           (filterM, (>=>))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
@@ -108,7 +109,7 @@ loadDefs :: Ctx Core Core -> Disco ()
 loadDefs cenv = do
 
   -- Clear out any leftover memory.
-  memory .= IntMap.empty
+  put @"mem" IntMap.empty
 
   -- Take the environment mapping names to definitions, and turn
   -- each one into an indirection to a thunk stored in memory.
@@ -122,7 +123,7 @@ loadDefs cenv = do
   -- For now we know that the only things we have stored in memory
   -- are the thunks we just made, so just iterate through them and
   -- replace their environments.
-  memory %= IntMap.map (replaceThunkEnv env)
+  modify @"mem" $ IntMap.map (replaceThunkEnv env)
 
   -- Finally, set the top-level environment to the one we just
   -- created.
@@ -218,13 +219,13 @@ whnfV v                     = return v
 --   not need to be re-evaluated later.
 whnfIndir :: Loc -> Disco Value
 whnfIndir loc = do
-  m <- use memory                   -- Get the memory map
+  m <- get @"mem"                   -- Get the memory map
   let c = m ! loc                   -- Look up the given location and reduce it to WHNF
   case c of
     Cell v True  -> return v        -- Already evaluated, just return it
     Cell v False -> do
       v' <- whnfV v                               -- Needs to be reduced
-      memory %= IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
+      modify @"mem" $ IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
       return v'                                   -- Finally, return the value.
 
 
@@ -283,7 +284,7 @@ whnf (CApp c cs)    = do
 whnf (CCase bs)     = whnfCase bs
 
 -- Reduce under a test frame.
-whnf (CTest vars c) = whnfTest vars c
+whnf (CTest vars c) = whnfTest (TestVars vars) c
 
 ------------------------------------------------------------
 -- Function application
@@ -1236,13 +1237,13 @@ valueToString = fmap toString . rnfV
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
 ensureProp :: Value -> Disco ValProp
 ensureProp (VProp p)    = return p
-ensureProp (VCons 0 []) = return $ VPDone (TestResult False TestBool [])
-ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool [])
+ensureProp (VCons 0 []) = return $ VPDone (TestResult False TestBool emptyTestEnv)
+ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _            = error "ensureProp: non-prop value"
 
 failTestOnError :: Disco ValProp -> Disco ValProp
 failTestOnError m = catch @"err" m $ \e ->
-  return $ VPDone (TestResult False (TestRuntimeError e) [])
+  return $ VPDone (TestResult False (TestRuntimeError e) emptyTestEnv)
 
 -- | Normalize under a test frame, augmenting the reported prop
 --   with the frame's variables.
@@ -1253,16 +1254,16 @@ whnfTest vs c = do
   return . VProp $ extendPropEnv e' result
 
 primExists :: [Type] -> Value -> Disco Value
-primExists tys v = return $ VProp (VPSearch SMExists tys v [])
+primExists tys v = return $ VProp (VPSearch SMExists tys v emptyTestEnv)
 
 primForall :: [Type] -> Value -> Disco Value
-primForall tys v = return $ VProp (VPSearch SMForall tys v [])
+primForall tys v = return $ VProp (VPSearch SMForall tys v emptyTestEnv)
 
 -- | Assert the equality of two values.
 shouldEqOp :: Type -> Value -> Value -> Disco Value
 shouldEqOp t x y = toProp <$> decideEqFor t x y
   where
-    toProp b = VProp (VPDone (TestResult b (TestEqual t x y) []))
+    toProp b = VProp (VPDone (TestResult b (TestEqual t x y) emptyTestEnv))
 
 -- | Convert a prop to a boolean by dropping its evidence.
 primHolds :: Value -> Disco Value
@@ -1291,7 +1292,7 @@ testProperty initialSt v = whnfV v >>= ensureProp >>= checkProp
         (SearchMotive (whenFound, wantsSuccess)) = sm
 
         go :: ([[Value]], SearchType) -> Disco TestResult
-        go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) []
+        go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) emptyTestEnv
         go (x:xs, st) = do
           prop <- ensureProp =<< whnfApp f x
           case prop of

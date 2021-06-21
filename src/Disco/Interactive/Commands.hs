@@ -589,8 +589,8 @@ prettyFailureReason prop (TestNotFound (Randomized n m)) = do
   iputStr     "    Checked " >> iputStr (show (n + m)) >> iputStrLn " possibilities."
 
 prettyTestEnv :: String -> TestEnv -> Disco ()
-prettyTestEnv _ [] = return ()
-prettyTestEnv s vs = do
+prettyTestEnv _ (TestEnv []) = return ()
+prettyTestEnv s (TestEnv vs) = do
   iputStrLn s
   mapM_ prettyBind vs
   where

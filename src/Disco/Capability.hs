@@ -41,7 +41,7 @@ type Has cs m = CC.All cs m
 withLocalState
   :: forall k (tag :: k) st (cs :: [(* -> *) -> CC.Constraint]) m a.
      (MonadIO m, Has cs m)
-  => st -> (forall m'. (HasState tag st m', MonadIO m', Has cs m') => m' a) -> m a
+  => st -> (forall m'. (HasState tag st m', MonadIO m', Has cs m') => m' a) -> m (a, st)
 withLocalState s m = do
   ref <- liftIO $ newIORef s
   interpret @tag @(MonadIO : cs) ReifiedState
@@ -54,5 +54,7 @@ withLocalState s m = do
         { _await = liftIO $ readIORef ref }
     , _stateSink = ReifiedSink
         { _yield = liftIO . writeIORef ref }
-    }
-    m
+    } $ do
+      a <- m
+      s' <- get @tag
+      return (a,s')

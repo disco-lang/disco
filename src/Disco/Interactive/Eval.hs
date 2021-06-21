@@ -16,6 +16,7 @@
 module Disco.Interactive.Eval where
 
 import           Capability.Error
+import           Capability.State
 import           Control.Lens               (use)
 import           Control.Monad.Except
 import           Disco.Eval
@@ -48,7 +49,7 @@ showVal _ VMap{}      = "<map>"
 printMem :: Disco ()
 printMem = do
   env <- use topEnv
-  mem <- use memory
+  mem <- get @"mem"
 
   io $ print env
 

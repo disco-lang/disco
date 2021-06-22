@@ -27,6 +27,7 @@ import           Disco.Interactive.Parser   (parseLine)
 
 import qualified Data.IntMap                as IM
 import           Data.List                  (intercalate)
+import           Disco.Capability
 
 
 showVal :: Int -> Value -> String
@@ -46,7 +47,7 @@ showVal _ VProp{}     = "<prop>"
 showVal _ VGraph{}    = "<graph>"
 showVal _ VMap{}      = "<map>"
 
-printMem :: Disco ()
+printMem :: Has '[St "top", St "mem", MonadIO] m => m ()
 printMem = do
   env <- gets @"top" (view topEnv)
   mem <- get @"mem"

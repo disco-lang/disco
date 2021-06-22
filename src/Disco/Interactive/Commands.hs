@@ -23,6 +23,7 @@ module Disco.Interactive.Commands
 import           Capability.State
 import           Control.Arrow                    ((&&&))
 import           Control.Exception                (IOException, handle)
+import           Control.Lens                     (view, (%~), (.~))
 import           Control.Monad.Except
 import           Data.Coerce
 import           Data.List                        (sortBy)
@@ -32,6 +33,7 @@ import           System.FilePath                  (splitFileName)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Capability
 import           Disco.Compile
 import           Disco.Context
 import           Disco.Desugar
@@ -103,10 +105,10 @@ annCmd =
       parser = Ann <$> term
     }
 
-handleAnn :: REPLExpr 'CAnn -> Disco ()
+handleAnn :: Has '[St "top", MonadIO] m => REPLExpr 'CAnn -> m ()
 handleAnn (Ann t) = do
-    ctx   <- get @"topctx"
-    tymap <- get @"toptydefs"
+    ctx   <- gets @"top" (view topCtx)
+    tymap <- gets @"top" (view topTyDefs)
     s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left  e       -> return . show $ e
         Right (at, _) -> return . show $ at
@@ -124,9 +126,9 @@ compileCmd =
       parser = Compile <$> term
     }
 
-handleCompile :: REPLExpr 'CCompile -> Disco ()
+handleCompile :: Has '[St "top", MonadIO] m => REPLExpr 'CCompile -> m ()
 handleCompile (Compile t) = do
-  ctx <- get @"topctx"
+  ctx <- gets @"top" (view topCtx)
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return . show $ e
         Right (at,_) -> return . show . compileTerm $ at
@@ -145,9 +147,9 @@ desugarCmd =
       parser = Desugar <$> term
     }
 
-handleDesugar :: REPLExpr 'CDesugar -> Disco ()
+handleDesugar :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CDesugar -> m ()
 handleDesugar (Desugar t) = do
-  ctx <- get @"topctx"
+  ctx <- gets @"top" (view topCtx)
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return.show $ e
         Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
@@ -165,10 +167,10 @@ docCmd =
       parser = Doc <$> (sc *> ident)
     }
 
-handleDoc :: REPLExpr 'CDoc -> Disco ()
+handleDoc :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CDoc -> m ()
 handleDoc (Doc x) = do
-  ctx  <- get @"topctx"
-  docs <- get @"topdocs"
+  ctx  <- gets @"top" (view topCtx)
+  docs <- gets @"top" (view topDocs)
   case M.lookup x ctx of
     Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
@@ -190,10 +192,11 @@ evalCmd =
       parser = Eval <$> term
     }
 
+-- XXX converting to capability style depends on converting prettyValue etc.
 handleEval :: REPLExpr 'CEval -> Disco ()
 handleEval (Eval t) = do
-  ctx   <- get @"topctx"
-  tymap <- get @"toptydefs"
+  ctx   <- gets @"top" (view topCtx)
+  tymap <- gets @"top" (view topTyDefs)
   case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right (at,_) ->
@@ -204,8 +207,9 @@ handleEval (Eval t) = do
           cv <- mkValue c
           prettyValue ty cv
           return cv
-        modify @"topctx" $M.insert (string2Name "it") (toPolyType ty)
-        modify @"topenv" $ M.insert (string2Name "it") v
+        modify @"top" $
+          (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
+          (topEnv %~ M.insert (string2Name "it") v)
         garbageCollect
 
 helpCmd :: REPLCommand 'CHelp
@@ -220,7 +224,7 @@ helpCmd =
       parser = return Help
     }
 
-handleHelp :: REPLExpr 'CHelp -> Disco ()
+handleHelp :: MonadIO m => REPLExpr 'CHelp -> m ()
 handleHelp Help = do
   iputStrLn "Commands available from the prompt:\n"
   let maxlen = longestCmd discoCommands
@@ -247,7 +251,9 @@ importCmd =
       parser = Import <$> parseImport
     }
 
-handleImport :: REPLExpr 'CImport -> Disco ()
+handleImport
+  :: Has '[St "top", Rd "env", Sc "nextloc", St "mem", Th "err", Ct "err", MonadIO] m
+  => REPLExpr 'CImport -> m ()
 handleImport (Import modName) = catchAndPrintErrors () $ do
   mi <- loadDiscoModule FromCwdOrStdlib modName
   addModule mi
@@ -265,21 +271,21 @@ letCmd =
       parser = letParser
     }
 
-handleLet :: REPLExpr 'CLet -> Disco ()
+handleLet :: Has '[St "top", St "mem", Sc "nextloc", Rd "env", MonadIO] m => REPLExpr 'CLet -> m ()
 handleLet (Let x t) = do
-  ctx <- get @"topctx"
-  tymap <- get @"toptydefs"
+  ctx   <- gets @"top" (view topCtx)
+  tymap <- gets @"top" (view topTyDefs)
   let mat = evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t)
   case mat of
     Left e -> io.print $ e   -- XXX pretty print
     Right (at, sig) -> do
       let c = compileTerm at
       thnk <- withTopEnv (mkValue c)
-      modify @"topctx" $ M.insert x sig
-        -- XXX ability to define more complex things at REPL prompt, with patterns etc.
-      modify @"topdefs"$ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])
-      modify @"topenv" $ M.insert (coerce x) thnk
-
+      modify @"top" $
+        (topCtx  %~ M.insert x sig) .
+          -- XXX ability to define more complex things at REPL prompt, with patterns etc.
+        (topDefs %~ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])) .
+        (topEnv  %~ M.insert (coerce x) thnk)
 
 loadCmd :: REPLCommand 'CLoad
 loadCmd =
@@ -300,6 +306,7 @@ loadCmd =
 handleLoadWrapper :: REPLExpr 'CLoad -> Disco ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
+-- XXX runAllTests
 handleLoad :: FilePath -> Disco Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
@@ -325,9 +332,9 @@ namesCmd =
     }
 
 -- | Show names and types for each item in the top-level context.
-handleNames :: REPLExpr 'CNames -> Disco ()
+handleNames :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CNames -> m ()
 handleNames Names = do
-  ctx  <- get @"topctx"
+  ctx  <- gets @"top" (view topCtx)
   mapM_ showFn $ M.toList ctx
   where
       showFn (x, ty) = do
@@ -347,8 +354,8 @@ nopCmd =
       parser = Nop <$ (sc <* eof)
     }
 
-handleNop :: REPLExpr 'CNop -> Disco ()
-handleNop Nop = return ()
+handleNop :: Applicative m => REPLExpr 'CNop -> m ()
+handleNop Nop = pure ()
 
 
 parseCmd :: REPLCommand 'CParse
@@ -363,7 +370,7 @@ parseCmd =
       parser = Parse <$> term
     }
 
-handleParse :: REPLExpr 'CParse -> Disco ()
+handleParse :: MonadIO m => REPLExpr 'CParse -> m ()
 handleParse (Parse t) = iprint t
 
 
@@ -379,7 +386,7 @@ prettyCmd =
       parser = Pretty <$> term
     }
 
-handlePretty :: REPLExpr 'CPretty -> Disco ()
+handlePretty :: Has '[MonadIO, LFresh] m => REPLExpr 'CPretty -> m ()
 handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= iputStrLn
 
 
@@ -396,6 +403,7 @@ reloadCmd =
     }
 
 handleReload :: REPLExpr 'CReload -> Disco ()
+-- handleReload :: Has '[St "lastfile", MonadIO] m => REPLExpr 'CReload -> m ()
 handleReload Reload = do
       file <- get @"lastfile"
       case file of
@@ -415,10 +423,10 @@ showDefnCmd =
       parser = ShowDefn <$> (sc *> ident)
     }
 
-handleShowDefn :: REPLExpr 'CShowDefn -> Disco ()
+handleShowDefn :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CShowDefn -> m ()
 handleShowDefn (ShowDefn x) = do
-  defns   <- get @"topdefs"
-  tyDefns <- get @"toptydefs"
+  defns   <- gets @"top" (view topDefs)
+  tyDefns <- gets @"top" (view topTyDefs)
   s <- case M.lookup (coerce x) defns of
           Just d  -> renderDoc $ prettyDefn d
           Nothing -> case M.lookup name2s tyDefns of
@@ -441,10 +449,12 @@ testPropCmd =
       parser = TestProp <$> term
     }
 
+-- XXX prettyTestResult
 handleTest :: REPLExpr 'CTestProp -> Disco ()
+-- handleTest :: Has '[St "top", MonadIO] m => REPLExpr 'CTestProp -> m ()
 handleTest (TestProp t) = do
-  ctx   <- get @"topctx"
-  tymap <- get @"toptydefs"
+  ctx   <- gets @"top" (view topCtx)
+  tymap <- gets @"top" (view topTyDefs)
   case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ checkProperty t) of
     Left e   -> iprint e    -- XXX pretty-print
     Right at -> do
@@ -466,10 +476,10 @@ typeCheckCmd =
         parser = parseTypeCheck
         }
 
-handleTypeCheck :: REPLExpr 'CTypeCheck -> Disco ()
+handleTypeCheck :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CTypeCheck -> m ()
 handleTypeCheck (TypeCheck t) = do
-  ctx <- get @"topctx"
-  tymap <- get @"toptydefs"
+  ctx   <- gets @"top" (view topCtx)
+  tymap <- gets @"top" (view topTyDefs)
   s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
         Left e        -> return.show $ e    -- XXX pretty-print
         Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
@@ -504,33 +514,42 @@ usingCmd =
         parser = Using <$> (reserved "using" *> parseExtName)
         }
 
-handleUsing :: REPLExpr 'CUsing -> Disco ()
+handleUsing :: Has '[St "exts"] m => REPLExpr 'CUsing -> m ()
 handleUsing (Using e) = modify @"exts" $ addExtension e
 
 ------------------------------------------
 --- Util functions
 ------------------------------------------
 
-addModule :: ModuleInfo -> Disco ()
+fileNotFound :: MonadIO m => FilePath -> IOException -> m ()
+fileNotFound file _ = iputStrLn $ "File not found: " ++ file
+
+loadFile :: MonadIO m => FilePath -> m (Maybe String)
+loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
+
+addModule :: Has '[St "top", Rd "env", Sc "nextloc", St "mem", Th "err"] m => ModuleInfo -> m ()
 addModule mi = do
-  curMI <- get @"modinfo"
+  curMI <- gets @"top" (view topModInfo)
   mi' <- adaptError TypeCheckErr $ combineModuleInfo [curMI, mi]
   setLoadedModule mi'
 
-fileNotFound :: FilePath -> IOException -> IO ()
-fileNotFound file _ = putStrLn $ "File not found: " ++ file
+-- | Add information from ModuleInfo to the Disco monad. This includes updating the
+--   Disco monad with new term definitions, documentation, types, and type definitions.
+--   Replaces any previously loaded module.
+setLoadedModule :: Has '[St "top", Rd "env", Sc "nextloc", St "mem"] m => ModuleInfo -> m ()
+setLoadedModule mi = do
+  modify @"top" $ topModInfo .~ mi
+  populateCurrentModuleInfo
 
-loadFile :: FilePath -> Disco (Maybe String)
-loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
-
-populateCurrentModuleInfo :: Disco ()
+populateCurrentModuleInfo :: Has '[St "top", Rd "env", Sc "nextloc", St "mem"] m => m ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds <- get @"modinfo"
+  ModuleInfo docs _ tys tyds tmds <- gets @"top" (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
-  put @"topdocs"   docs
-  put @"topctx"    tys
-  put @"toptydefs" tyds
-  put @"topdefs"   tmds
+  modify @"top" $
+    (topDocs   .~ docs) .
+    (topCtx    .~ tys)  .
+    (topTyDefs .~ tyds) .
+    (topDefs   .~ tmds)
   loadDefs cdefns
   return ()
 
@@ -634,11 +653,3 @@ runAllTests aprops
           iputStrLn ""
           forM_ failures (uncurry prettyTestFailure)
       return (null failures)
-
--- | Add information from ModuleInfo to the Disco monad. This includes updating the
---   Disco monad with new term definitions, documentation, types, and type definitions.
---   Replaces any previously loaded module.
-setLoadedModule :: ModuleInfo -> Disco ()
-setLoadedModule mi = do
-  put @"modinfo" mi
-  populateCurrentModuleInfo

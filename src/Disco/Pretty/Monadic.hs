@@ -29,7 +29,6 @@ import           Control.Monad.Reader             (ReaderT (..))
 import           Text.PrettyPrint                 (Doc)
 import qualified Text.PrettyPrint                 as PP
 
-import           Disco.Eval
 import           Disco.Pretty.Prec
 
 ------------------------------------------------------------
@@ -98,12 +97,12 @@ punctuate p ds = do
 -- This should probably be replaced at some point in the future, with
 -- a single concrete application mega-monad.
 
-newtype DocM a = DocM { runDocM :: ReaderT PA Disco a }
+newtype DocM m a = DocM { runDocM :: ReaderT PA m a }
   deriving (Functor, Applicative, Monad, LFresh)
   deriving (HasReader "pa" PA, HasSource "pa" PA) via
-    MonadReader (ReaderT PA Disco)
+    MonadReader (ReaderT PA m)
 
 type instance TypeOf _ "pa" = PA
 
-renderDoc :: DocM Doc -> Disco String
+renderDoc :: Functor m => DocM m Doc -> m String
 renderDoc = fmap PP.render . flip runReaderT initPA . runDocM

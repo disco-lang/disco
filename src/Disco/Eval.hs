@@ -51,9 +51,9 @@ module Disco.Eval
        , Env, extendEnv, extendsEnv, getEnv, withEnv, withTopEnv
        , garbageCollect
 
-         -- * Memory cells
+         -- * Memory
 
-       , Cell(..), mkCell, showMemory
+       , Cell(..), mkCell, Loc, Memory, showMemory
 
          -- * Errors
 
@@ -61,7 +61,11 @@ module Disco.Eval
 
          -- * Disco monad state
 
-       , Loc, DiscoState(..), initDiscoState
+       , DiscoState(..), initDiscoState
+
+         -- * Lenses for top-level info record
+
+       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs
 
          -- * Disco monad
 
@@ -111,6 +115,7 @@ import           GHC.Generics                     (Generic)
 import           System.FilePath                  ((-<.>))
 import           Text.Megaparsec                  hiding (runParser)
 
+import           Control.Lens                     (makeLenses, view)
 import           Unbound.Generics.LocallyNameless
 
 import           Algebra.Graph                    (Graph)
@@ -363,11 +368,21 @@ withEnv = local @"env" . const
 -- Memory cells
 ------------------------------------------------------------
 
+-- | A memory cell holds a value, along with a flag recording whether
+--   the value has been reduced to WHNF.
 data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
   deriving (Show)
 
+-- | Create a memory cell from a value, with the WHNF flag initially
+--   set to false.
 mkCell :: Value -> Cell
 mkCell v = Cell v False
+
+-- | A location in memory is represented by an @Int@.
+type Loc = Int
+
+-- | Memory is a collection of cells indexed by location.
+type Memory = IntMap Cell
 
 ------------------------------------------------------------
 -- Errors
@@ -415,38 +430,41 @@ data IErr where
 -- Disco monad state
 ------------------------------------------------------------
 
--- | A location in memory is represented by an @Int@.
-type Loc = Int
-
-type Memory = IntMap Cell
-
--- | The various pieces of state tracked by the 'Disco' monad.
-data DiscoState = DiscoState
-  { _topModInfo  :: ModuleInfo
+-- | A record of information about the current top-level environment.
+data TopInfo = TopInfo
+  { _topModInfo :: ModuleInfo
     -- ^ Info about the top-level currently loaded module.  Due to
     --   import statements this may actually be a combination of info
     --   about multiple physical modules.
 
-  , _topCtx      :: Ctx Term PolyType
+  , _topCtx     :: Ctx Term PolyType
     -- ^ Top-level type environment.
 
-  , _topDefns    :: Ctx ATerm Defn
+  , _topDefs    :: Ctx ATerm Defn
     -- ^ Environment of top-level surface syntax definitions.  Set by
     --   'loadDefs' and by 'let' command at the REPL.
 
-  , _topTyDefns  :: TyDefCtx
+  , _topTyDefs  :: TyDefCtx
     -- ^ Environment of top-level type definitions.
 
-  , _topEnv      :: Env
+  , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDefs'.
     --   Use it when evaluating with 'withTopEnv'.
 
+  , _topDocs    :: Ctx Term Docs
+    -- ^ Top-level documentation.
+  }
+  deriving (Generic)
+
+-- | The various pieces of state tracked by the 'Disco' monad.
+data DiscoState = DiscoState
+  { _topInfo     :: TopInfo
+    -- ^ Information about the current top-level environment
+    --   (definitions, types, documentation, etc.).
+
   , _localEnv    :: Env
     -- ^ Local environment used during evaluation of expressions.
-
-  , _topDocs     :: Ctx Term Docs
-    -- ^ Top-level documentation.
 
   , _memory      :: Memory
     -- ^ A memory is a mapping from "locations" (uniquely generated
@@ -473,15 +491,20 @@ data DiscoState = DiscoState
   }
   deriving (Generic)
 
+initTopInfo :: TopInfo
+initTopInfo = TopInfo
+  { _topModInfo = emptyModuleInfo
+  , _topCtx     = emptyCtx
+  , _topDefs    = emptyCtx
+  , _topTyDefs  = M.empty
+  , _topDocs    = emptyCtx
+  , _topEnv     = emptyCtx
+  }
+
 -- | The initial state for the @Disco@ monad.
 initDiscoState :: DiscoState
 initDiscoState = DiscoState
-  { _topModInfo    = emptyModuleInfo
-  , _topCtx        = emptyCtx
-  , _topDefns      = emptyCtx
-  , _topTyDefns    = M.empty
-  , _topDocs       = emptyCtx
-  , _topEnv        = emptyCtx
+  { _topInfo       = initTopInfo
   , _localEnv      = emptyCtx
   , _memory        = IntMap.empty
   , _nextLoc       = 0
@@ -511,6 +534,10 @@ type DiscoM = StateT DiscoState (CME.ExceptT IErr (LFreshMT IO))
 --   * Can do I/O
 newtype Disco a = Disco { unDisco :: DiscoM a }
   deriving (Functor, Applicative, Monad, LFresh, MonadIO, CMS.MonadState DiscoState, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
+  deriving (HasState "top" TopInfo, HasSource "top" TopInfo, HasSink "top" TopInfo) via
+    (Rename "_topInfo"
+    (Field "_topInfo" ()
+    (MonadState DiscoM)))
   deriving (HasReader "env" Env, HasSource "env" Env) via
     (ReadStatePure
     (Rename "_localEnv"
@@ -532,26 +559,6 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
     (Rename "_nextLoc"
     (Field "_nextLoc" ()
     (MonadState DiscoM))))
-  deriving (HasState "topctx" (Ctx Term PolyType), HasSource "topctx" (Ctx Term PolyType), HasSink "topctx" (Ctx Term PolyType)) via
-    (Rename "_topCtx"
-    (Field "_topCtx" ()
-    (MonadState DiscoM)))
-  deriving (HasState "topdefs" (Ctx ATerm Defn), HasSource "topdefs" (Ctx ATerm Defn), HasSink "topdefs" (Ctx ATerm Defn)) via
-    (Rename "_topDefns"
-    (Field "_topDefns" ()
-    (MonadState DiscoM)))
-  deriving (HasState "toptydefs" TyDefCtx, HasSource "toptydefs" TyDefCtx, HasSink "toptydefs" TyDefCtx) via
-    (Rename "_topTyDefns"
-    (Field "_topTyDefns" ()
-    (MonadState DiscoM)))
-  deriving (HasState "topenv" Env, HasSource "topenv" Env, HasSink "topenv" Env) via
-    (Rename "_topEnv"
-    (Field "_topEnv" ()
-    (MonadState DiscoM)))
-  deriving (HasState "topdocs" (Ctx Term Docs), HasSource "topdocs" (Ctx Term Docs), HasSink "topdocs" (Ctx Term Docs)) via
-    (Rename "_topDocs"
-    (Field "_topDocs" ()
-    (MonadState DiscoM)))
   deriving (HasState "exts" ExtSet, HasSource "exts" ExtSet, HasSink "exts" ExtSet) via
     (Rename "_enabledExts"
     (Field "_enabledExts" ()
@@ -559,10 +566,6 @@ newtype Disco a = Disco { unDisco :: DiscoM a }
   deriving (HasState "lastfile" (Maybe FilePath), HasSource "lastfile" (Maybe FilePath), HasSink "lastfile" (Maybe FilePath)) via
     (Rename "_lastFile"
     (Field "_lastFile" ()
-    (MonadState DiscoM)))
-  deriving (HasState "modinfo" ModuleInfo, HasSource "modinfo" ModuleInfo, HasSink "modinfo" ModuleInfo) via
-    (Rename "_topModInfo"
-    (Field "_topModInfo" ()
     (MonadState DiscoM)))
 
 newtype Counter m a = Counter (m a)
@@ -576,10 +579,9 @@ type instance TypeOf _ "err"      = IErr
 type instance TypeOf _ "msg"      = MessageLog IErr
 type instance TypeOf _ "mem"      = Memory
 type instance TypeOf _ "nextloc"  = Loc
-type instance TypeOf _ "topenv"   = Env
+type instance TypeOf _ "top"      = TopInfo
 type instance TypeOf _ "exts"     = ExtSet
 type instance TypeOf _ "lastfile" = Maybe FilePath
-type instance TypeOf _ "modinfo"  = ModuleInfo
 
 type MonadDisco m = Has '[Rd "env", St "mem", Sc "nextloc", Th "err", Ct "err", MonadIO, MonadFail, LFresh] m
 
@@ -591,6 +593,12 @@ type MonadDisco m = Has '[Rd "env", St "mem", Sc "nextloc", Th "err", Ct "err", 
 -- (and we can also remove the -fno-warn-orphans flag).
 instance MonadFail m => MonadFail (LFreshMT m) where
   fail = LFreshMT . Fail.fail
+
+------------------------------------------------------------
+-- Lenses
+------------------------------------------------------------
+
+makeLenses ''TopInfo
 
 ------------------------------------------------------------
 -- Utilities
@@ -694,16 +702,16 @@ mkValue c            = VIndir <$> (allocate . VThunk c =<< getEnv)
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
-withTopEnv :: Has '[Rd "env", St "topenv"] m => m a -> m a
+withTopEnv :: Has '[Rd "env", St "top"] m => m a -> m a
 withTopEnv m = do
-  env <- get @"topenv"
+  env <- gets @"top" (view topEnv)
   withEnv env m
 
 -- | Deallocate any memory cells which are no longer referred to by
 --   any top-level binding.
-garbageCollect :: Has '[St "topenv", St "mem", MonadIO] m => m ()
+garbageCollect :: Has '[St "top", St "mem", MonadIO] m => m ()
 garbageCollect = do
-  env  <- get @"topenv"
+  env  <- gets @"top" (view topEnv)
   keep <- getReachable env
   modify @"mem" $ \mem -> IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep)
 

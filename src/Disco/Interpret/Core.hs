@@ -60,6 +60,7 @@ module Disco.Interpret.Core
 import           Capability.Error
 import           Capability.State
 import           Control.Arrow                           ((***))
+import           Control.Lens                            ((.~))
 import           Control.Monad                           (filterM, (>=>))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
@@ -106,7 +107,7 @@ import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
-loadDefs :: Has '[Rd "env", Sc "nextloc", St "mem", St "topenv"] m => Ctx Core Core -> m ()
+loadDefs :: Has '[Rd "env", Sc "nextloc", St "mem", St "top"] m => Ctx Core Core -> m ()
 loadDefs cenv = do
 
   -- Clear out any leftover memory.
@@ -128,7 +129,7 @@ loadDefs cenv = do
 
   -- Finally, set the top-level environment to the one we just
   -- created.
-  put @"topenv" env
+  modify @"top" (topEnv .~ env)
 
   where
     replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b

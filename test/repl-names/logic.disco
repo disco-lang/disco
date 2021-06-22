@@ -20,3 +20,6 @@ implication x y =
 
 exor : B -> B -> B
 exor x y = (x && not y) || (not x && y)
+
+-- A custom type used to validate :names output
+type Maybe a = Unit + a

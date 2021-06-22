@@ -334,9 +334,14 @@ namesCmd =
 -- | Show names and types for each item in the top-level context.
 handleNames :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CNames -> m ()
 handleNames Names = do
-  ctx  <- gets @"top" (view topCtx)
+  ctx   <- gets @"top" (view topCtx)
+  tyDef <- gets @"top" (view topTyDefs)
+  mapM_ showTyDef $ M.toList tyDef
   mapM_ showFn $ M.toList ctx
   where
+      showTyDef (name, body) = do
+        p <- renderDoc (prettyTyDef name body)
+        io . putStrLn $ p
       showFn (x, ty) = do
         p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
         io . putStrLn $ p

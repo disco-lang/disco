@@ -1088,10 +1088,8 @@ countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
 enumOp :: MonadDisco m => Value -> m Value
-enumOp (VType ty)
-  | isFiniteTy ty = toDiscoList (enumerateType ty)
-  | otherwise     = throw @"err" $ InfiniteTy ty
-enumOp v = error $ "Impossible! enumOp on non-type " ++ show v
+enumOp (VType ty) = toDiscoList (enumerateType ty)
+enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Naturals

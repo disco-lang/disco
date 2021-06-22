@@ -167,3 +167,28 @@ not a multiplicative term.
    :math:`x(y+3)` as function application, although they might also
    rightly complain that :math:`x` is a strange choice for the name of
    a function.
+
+Operator functions
+==================
+
+Operators can be manipulated as function using the ``~`` notation.
+The tilde goes wherever the argument to the operator would go.
+This can be used to pass them to a higher-order function.
+
+::
+
+    Disco> :type ~+~
+    ~+~ : ℕ × ℕ → ℕ
+
+    Disco> import list
+    Loading list.disco...
+    Disco> foldr(~+~,0,[1 .. 10])
+    55
+
+    Disco> -- factorial
+    Disco> :type ~!
+    ~! : ℕ → ℕ
+
+    Disco> -- negation
+    Disco> :type -~
+    -~ : ℤ → ℤ

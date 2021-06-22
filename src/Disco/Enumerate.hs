@@ -43,8 +43,8 @@ module Disco.Enumerate
        where
 
 import qualified Data.Enumeration.Invertible as E
-import           Disco.Eval
 import           Disco.Types
+import           Disco.Value
 
 type ValueEnumeration = E.IEnumeration Value
 

@@ -285,6 +285,8 @@ library
                        Disco.Desugar
                        Disco.Compile
                        Disco.Enumerate
+                       Disco.Value
+                       Disco.Error
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst

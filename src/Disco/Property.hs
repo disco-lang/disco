@@ -18,7 +18,8 @@ import qualified Data.Enumeration.Invertible as E
 import qualified Test.QuickCheck             as QC
 
 import           Control.Monad.IO.Class
-import           Disco.Eval
+import           Disco.Util
+import           Disco.Value
 
 -- | Whether the property test resulted in a runtime error.
 testIsError :: TestResult -> Bool

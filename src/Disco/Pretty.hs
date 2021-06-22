@@ -47,9 +47,7 @@ import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Capability
-import           Disco.Eval                       (MonadDisco, Value (..), io,
-                                                   iputStr, iputStrLn,
-                                                   topTyDefs)
+import           Disco.Eval                       (topTyDefs)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
 import           Disco.Module
 import           Disco.Pretty.Monadic
@@ -58,6 +56,8 @@ import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Erase            (eraseClause)
 import           Disco.Types
+import           Disco.Util
+import           Disco.Value
 
 withPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
 withPA pa = mparens pa . setPA pa

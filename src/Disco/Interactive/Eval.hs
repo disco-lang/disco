@@ -19,16 +19,15 @@ import           Capability.Error
 import           Capability.State
 import           Control.Lens               (view)
 import           Control.Monad.Except
+import qualified Data.IntMap                as IM
+import           Data.List                  (intercalate)
+
+import           Disco.Capability
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Interactive.Parser   (parseLine)
-
-------------------------------------------------------------
-
-import qualified Data.IntMap                as IM
-import           Data.List                  (intercalate)
-import           Disco.Capability
-
+import           Disco.Util
+import           Disco.Value
 
 showVal :: Int -> Value -> String
 showVal 0 _            = "_"

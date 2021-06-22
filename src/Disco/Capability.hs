@@ -19,15 +19,17 @@
 
 module Disco.Capability where
 
-import qualified Capability.Constraints as CC
+import qualified Capability.Constraints           as CC
 import           Capability.Error
 import           Capability.Reader
-import           Capability.Reflection  (interpret)
+import           Capability.Reflection            (interpret)
 import           Capability.Source
 import           Capability.State
 import           Capability.Writer
 import           Control.Monad.IO.Class
 import           Data.IORef
+
+import           Unbound.Generics.LocallyNameless
 
 type Rd tag = HasReader' tag
 type Wr tag = HasWriter' tag
@@ -37,6 +39,8 @@ type Th tag = HasThrow' tag
 type Ct tag = HasCatch' tag
 
 type Has cs m = CC.All cs m
+
+type MonadDisco m = Has '[Rd "env", St "mem", Sc "nextloc", Th "err", Ct "err", MonadIO, MonadFail, LFresh] m
 
 -- | Interpret an action while providing an additional local state
 --   capability, stored internally using an IORef.

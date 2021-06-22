@@ -91,6 +91,7 @@ import           Disco.Enumerate
 import           Disco.Eval
 import           Disco.Property
 import           Disco.Types
+import           Disco.Value
 
 import           Math.OEIS                               (catalogNums,
                                                           extendSequence,

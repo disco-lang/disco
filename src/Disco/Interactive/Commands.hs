@@ -192,8 +192,7 @@ evalCmd =
       parser = Eval <$> term
     }
 
--- XXX converting to capability style depends on converting prettyValue etc.
-handleEval :: REPLExpr 'CEval -> Disco ()
+handleEval :: (Has '[St "top"] m, MonadDisco m) => REPLExpr 'CEval -> m ()
 handleEval (Eval t) = do
   ctx   <- gets @"top" (view topCtx)
   tymap <- gets @"top" (view topTyDefs)
@@ -303,11 +302,10 @@ loadCmd =
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
-handleLoadWrapper :: REPLExpr 'CLoad -> Disco ()
+handleLoadWrapper :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => REPLExpr 'CLoad -> m ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
--- XXX runAllTests
-handleLoad :: FilePath -> Disco Bool
+handleLoad :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => FilePath -> m Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
   m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
@@ -402,8 +400,7 @@ reloadCmd =
       parser = return Reload
     }
 
-handleReload :: REPLExpr 'CReload -> Disco ()
--- handleReload :: Has '[St "lastfile", MonadIO] m => REPLExpr 'CReload -> m ()
+handleReload :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => REPLExpr 'CReload -> m ()
 handleReload Reload = do
       file <- get @"lastfile"
       case file of
@@ -449,9 +446,7 @@ testPropCmd =
       parser = TestProp <$> term
     }
 
--- XXX prettyTestResult
-handleTest :: REPLExpr 'CTestProp -> Disco ()
--- handleTest :: Has '[St "top", MonadIO] m => REPLExpr 'CTestProp -> m ()
+handleTest :: (Has '[St "top"] m, MonadDisco m) => REPLExpr 'CTestProp -> m ()
 handleTest (TestProp t) = do
   ctx   <- gets @"top" (view topCtx)
   tymap <- gets @"top" (view topTyDefs)
@@ -555,20 +550,20 @@ populateCurrentModuleInfo = do
 
 -- XXX redo with message framework, with proper support for indentation etc.
 -- XXX move it to Pretty or Property or something
-prettyTestFailure :: AProperty -> TestResult -> Disco ()
+prettyTestFailure :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestResult -> m ()
 prettyTestFailure _    (TestResult True _ _)    = return ()
 prettyTestFailure prop (TestResult False r env) = do
   prettyFailureReason prop r
   prettyTestEnv "    Counterexample:" env
 
-prettyTestResult :: AProperty -> TestResult -> Disco ()
+prettyTestResult :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestResult -> m ()
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   = do
     dp <- renderDoc $ prettyProperty (eraseProperty prop)
     iputStr       "  - Test passed: " >> iputStrLn dp
     prettySuccessReason r
 
-prettySuccessReason :: TestReason -> Disco ()
+prettySuccessReason :: (Has '[St "top"] m, MonadDisco m) => TestReason -> m ()
 prettySuccessReason (TestFound (TestResult _ _ vs)) = do
   prettyTestEnv "    Found example:" vs
 prettySuccessReason (TestNotFound Exhaustive) = do
@@ -579,7 +574,7 @@ prettySuccessReason (TestNotFound (Randomized n m)) = do
   iputStrLn " possibilities without finding a counterexample."
 prettySuccessReason _ = return ()
 
-prettyFailureReason :: AProperty -> TestReason -> Disco ()
+prettyFailureReason :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestReason -> m ()
 prettyFailureReason prop TestBool = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   iputStr     "  - Test is false: " >> iputStrLn dp
@@ -607,7 +602,7 @@ prettyFailureReason prop (TestNotFound (Randomized n m)) = do
   iputStrLn dp
   iputStr     "    Checked " >> iputStr (show (n + m)) >> iputStrLn " possibilities."
 
-prettyTestEnv :: String -> TestEnv -> Disco ()
+prettyTestEnv :: (Has '[St "top"] m, MonadDisco m) => String -> TestEnv -> m ()
 prettyTestEnv _ (TestEnv []) = return ()
 prettyTestEnv s (TestEnv vs) = do
   iputStrLn s
@@ -621,7 +616,7 @@ prettyTestEnv s (TestEnv vs) = do
       iputStr " = "
       prettyValue ty v
 
-runTest :: Int -> AProperty -> Disco TestResult
+runTest :: MonadDisco m => Int -> AProperty -> m TestResult
 runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
   where
     n' = fromIntegral (n `div` 2)
@@ -629,7 +624,7 @@ runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing.  Then move it
 -- to the Property module.
-runAllTests :: Ctx ATerm [AProperty] -> Disco Bool  -- (Ctx ATerm [TestResult])
+runAllTests :: (Has '[St "top"] m, MonadDisco m) => Ctx ATerm [AProperty] -> m Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
   | M.null aprops = return True
   | otherwise     = do
@@ -642,7 +637,7 @@ runAllTests aprops
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
-    runTests :: Name ATerm -> [AProperty] -> Disco Bool
+    runTests :: (Has '[St "top"] m, MonadDisco m) => Name ATerm -> [AProperty] -> m Bool
     runTests n props = do
       iputStr ("  " ++ name2String n ++ ":")
       results <- traverse (sequenceA . (id &&& runTest numSamples)) props

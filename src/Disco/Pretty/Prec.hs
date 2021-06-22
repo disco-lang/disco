@@ -51,4 +51,3 @@ ugetPA op = PA (uPrec op) In
 
 getPA :: BOp -> PA
 getPA op = PA (bPrec op) (assoc op)
-

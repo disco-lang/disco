@@ -29,8 +29,7 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Disco values and evaluation monad. This is the main monad used in
--- the REPL and for evaluation and pretty-printing.
+-- The top-level Disco monad and associated capabilities.
 --
 -----------------------------------------------------------------------------
 
@@ -236,56 +235,64 @@ initDiscoState = do
 -- Disco monad
 ------------------------------------------------------------
 
+-- | We concretely use a monad based on the ReaderT IO design pattern
+--   (https://www.fpcomplete.com/blog/2017/06/readert-design-pattern/).
 type DiscoM = ReaderT DiscoState (LFreshMT IO)
 
--- | The main monad used by the Disco REPL, and by the interpreter and
---   pretty printer.
---
---   XXX redo this comment
---
---   * Keeps track of state such as current top-level definitions,
---     types, and documentation, and memory for allocation of thunks.
---   * Keeps track of a read-only environment for binding local
---     variables to their values.
---   * Can throw exceptions of type @e@
---   * Can log messages (errors, warnings, etc.)
---   * Can generate fresh names
---   * Can do I/O
+-- | The main concrete Disco monad, together with a bunch of
+--   associated capabilities it provides, using the capability library
+--   (https://hackage.haskell.org/package/capability).
 newtype Disco a = Disco { unDisco :: DiscoM a }
   deriving newtype (Functor, Applicative, Monad, LFresh, MonadIO, CMR.MonadReader DiscoState, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
+
+  -- Top-level info record state
   deriving (HasState "top" TopInfo, HasSource "top" TopInfo, HasSink "top" TopInfo) via
     (ReaderIORef
     (Rename "_topInfo"
     (Field "_topInfo" ()
     (MonadReader DiscoM))))
+
+  -- Environment reader (for tracking local bindings during evaluation)
   deriving (HasReader "env" Env, HasSource "env" Env) via
     (Rename "_localEnv"
     (Field "_localEnv" ()
     (MonadReader DiscoM)))
+
+  -- Throwing & catching errors
   deriving (HasThrow "err" IErr, HasCatch "err" IErr) via
     (SafeExceptions IErr DiscoM)
+
+  -- Message log
   deriving (HasWriter "msg" (MessageLog IErr), HasSink "msg" (MessageLog IErr)) via
     (WriterLog
     (ReaderIORef
     (Rename "_messageLog"
     (Field "_messageLog" ()
     (MonadReader DiscoM)))))
+
+  -- Read/write memory
   deriving (HasState "mem" Memory, HasSource "mem" Memory, HasSink "mem" Memory) via
     (ReaderIORef
     (Rename "_memory"
     (Field "_memory" ()
     (MonadReader DiscoM))))
+
+  -- Next free memory location
   deriving (HasSource "nextloc" Loc) via
     (Counter
     (ReaderIORef
     (Rename "_nextLoc"
     (Field "_nextLoc" ()
     (MonadReader DiscoM)))))
+
+  -- Enabled extensions
   deriving (HasState "exts" ExtSet, HasSource "exts" ExtSet, HasSink "exts" ExtSet) via
     (ReaderIORef
     (Rename "_enabledExts"
     (Field "_enabledExts" ()
     (MonadReader DiscoM))))
+
+  -- Last file loaded in the REPL
   deriving (HasState "lastfile" (Maybe FilePath), HasSource "lastfile" (Maybe FilePath), HasSink "lastfile" (Maybe FilePath)) via
     (ReaderIORef
     (Rename "_lastFile"

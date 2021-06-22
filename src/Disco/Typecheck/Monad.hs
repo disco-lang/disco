@@ -22,10 +22,7 @@
 -- Maintainer  :  byorgey@gmail.com
 --
 -- Definition of the TCM monad used during typechecking and related
--- utilities.
---
--- XXX fix documentation.  Not just about TCM monad anymore, uses
--- capability style.
+-- capabilities + utilities.
 --
 -----------------------------------------------------------------------------
 
@@ -236,16 +233,15 @@ censor = censor_ (proxy# @tag)
 forAll :: Has '[Wr "constraints"] m => [Name Type] -> m a -> m a
 forAll nms = censor @"constraints" (CAll . bind nms)
 
--- XXX fix documentation (references to TCM)
--- | Run a 'TCM' computation, returning the generated 'Constraint'
---   along with the output, and reset the 'Constraint' of the resulting
---   computation to 'mempty'.
+-- | Run a computation that generates constraint, returning the
+--   generated 'Constraint' along with the output, and reset the
+--   'Constraint' of the resulting computation to 'mempty'.
 withConstraint :: Has '[Wr "constraints"] m => m a -> m (a, Constraint)
 withConstraint = censor @"constraints" (const mempty) . listen @"constraints"
 
--- | Run a 'TCM' computation and solve its generated constraint,
---   returning the resulting substitution (or failing with an error).
---   The resulting TCM computation generates the empty constraint.
+-- | Run a computation and solve its generated constraint, returning
+--   the resulting substitution (or failing with an error).  The
+--   resulting computation generates the empty constraint.
 solve :: Has '[Wr "constraints", Rd "tydefctx", Th "tcerr"] m => m a -> m (a, S)
 solve m = do
   (a, c) <- withConstraint m

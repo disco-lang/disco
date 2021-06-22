@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-orphans     #-}
   -- For MonadFail instance; see below.
 
+{-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -12,6 +13,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE PatternSynonyms            #-}
+{-# LANGUAGE RankNTypes                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -63,7 +65,7 @@ module Disco.Eval
 
          -- * Disco monad
 
-       , Disco
+       , Disco, MonadDisco
 
          -- ** Utilities
        , io, iputStrLn, iputStr, iprint
@@ -237,12 +239,12 @@ pattern VFun f = VFun_ (ValFun f)
 -- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (Disco Value)
+newtype ValDelay = ValDelay (forall m. MonadDisco m => m Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
 
-pattern VDelay :: Disco Value -> IntSet -> Env -> Value
+pattern VDelay :: (forall m. MonadDisco m => m Value) -> IntSet -> Env -> Value
 pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
 
 ------------------------------------------------------------
@@ -579,6 +581,8 @@ type instance TypeOf _ "exts"     = ExtSet
 type instance TypeOf _ "lastfile" = Maybe FilePath
 type instance TypeOf _ "modinfo"  = ModuleInfo
 
+type MonadDisco m = Has '[Rd "env", St "mem", Sc "nextloc", Th "err", Ct "err", MonadIO, MonadFail, LFresh] m
+
 ------------------------------------------------------------
 -- Some needed instances.
 
@@ -663,13 +667,13 @@ mkSimple v              = VIndir <$> allocate v
 
 -- | Delay a @Disco Value@ computation by packaging it into a
 --   @VDelay@ constructor along with the current environment.
-delay :: Disco Value -> Disco Value
+delay :: MonadDisco m => (forall m'. MonadDisco m' => m' Value) -> m Value
 delay = delay' []
 
 -- | Like 'delay', but also specify a set of values which will be
 --   needed during the delayed computation, to prevent any memory
 --   referenced by the values from being garbage collected.
-delay' :: [Value] -> Disco Value -> Disco Value
+delay' :: MonadDisco m => [Value] -> (forall m'. MonadDisco m' => m' Value) -> m Value
 delay' vs imv = do
   ls <- getReachable vs
   VDelay imv ls <$> getEnv

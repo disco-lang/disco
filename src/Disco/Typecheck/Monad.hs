@@ -33,7 +33,6 @@ import           GHC.Generics                     (Generic)
 
 import           Unbound.Generics.LocallyNameless
 
-import qualified Capability.Constraints           as CC
 import           Capability.Error
 import           Capability.Reader
 import           Capability.Sink

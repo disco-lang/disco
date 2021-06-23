@@ -39,7 +39,6 @@ module Disco.Value
   ) where
 
 import           Data.IntSet                      (IntSet)
-import qualified Data.IntSet                      as IntSet
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
@@ -48,8 +47,6 @@ import           Unbound.Generics.LocallyNameless
 
 import           Capability.Error
 import           Capability.Reader
-import           Capability.State
-import           Control.Lens                     (view)
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.Capability

@@ -339,8 +339,8 @@ handleNames Names = do
   mapM_ showTyDef $ M.toList tyDef
   mapM_ showFn $ M.toList ctx
   where
-      showTyDef (name, body) = do
-        p <- renderDoc (prettyTyDef name body)
+      showTyDef (nm, body) = do
+        p <- renderDoc (prettyTyDef nm body)
         io . putStrLn $ p
       showFn (x, ty) = do
         p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]

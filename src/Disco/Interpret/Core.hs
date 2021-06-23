@@ -658,8 +658,12 @@ mapToSet _ _ v' = error $ "unexpected value " ++ show v' ++ " in mapToSet"
 setToMap :: MonadDisco m => Value -> m Value
 setToMap (VBag cs) = do
   let kvs = map fst cs
-  kvs' <- mapM (whnfV >=> \case { VCons 0 [k, v] -> (,v) <$> toSimpleValue k }) kvs
+  kvs' <- mapM (whnfV >=> convertAssoc) kvs
   return . VMap . M.fromList $ kvs'
+
+  where
+    convertAssoc (VCons 0 [k, v]) = (,v) <$> toSimpleValue k
+    convertAssoc v                = error $ "unexpected value " ++ show v ++ " in setToMap.convertAssoc"
 setToMap v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
 
 -- | Convert a bag to a set of pairs, with each element paired with

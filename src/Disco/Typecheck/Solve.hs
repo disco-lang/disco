@@ -502,7 +502,6 @@ simplify tyDefns origVM cs
     simplifiable (TyVar {} :<: TyCon {})                 = True
     simplifiable (TyCon {} :<: TyVar {})                 = True
     simplifiable (TyCon (CUser _) _ :<: _)               = True
-    simplifiable (TyCon (CUser _) _ :<: _)               = True
     simplifiable (_ :<: TyCon (CUser _) _)               = True
     simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
 
@@ -591,6 +590,9 @@ simplify tyDefns origVM cs
       case isSubB b1 b2 of
         True  -> return ()
         False -> throwError NoUnify
+
+    simplifyOne' (s :<: t) =
+      error $ "Impossible! simplifyOne' " ++ show s ++ " :<: " ++ show t
 
     expandStruct :: Name Type -> Con -> SimpleConstraint -> SimplifyM ()
     expandStruct a c con = do

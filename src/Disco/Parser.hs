@@ -305,7 +305,7 @@ identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
-                then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
+                then fail $ "keyword \"" ++ x ++ "\" cannot be used as an identifier"
                 else return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.

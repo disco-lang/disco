@@ -39,6 +39,7 @@ import           System.Console.Haskeline   as H
 import           Disco.Eval
 import           Disco.Interactive.Commands (handleLoad, loadFile)
 import           Disco.Interactive.Eval
+import           Disco.Util
 
 ------------------------------------------------------------
 -- Command-line options parser
@@ -130,15 +131,15 @@ discoMain = do
 
   where
 
-    ctrlC :: InputT (Disco e) a -> SomeException -> InputT (Disco e) a
+    ctrlC :: InputT Disco a -> SomeException -> InputT Disco a
     ctrlC act e = do
       io $ putStrLn (show e)
       act
 
-    withCtrlC :: InputT (Disco e) a -> InputT (Disco e) a -> InputT (Disco e) a
+    withCtrlC :: InputT Disco a -> InputT Disco a -> InputT Disco a
     withCtrlC resume act = catch act (ctrlC resume)
 
-    loop :: InputT (Disco IErr) ()
+    loop :: InputT (Disco) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of

@@ -23,7 +23,7 @@ module Disco.Interactive.Types
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco, IErr)
+import           Disco.Eval                       (Disco)
 import           Disco.Extensions
 import           Disco.Parser
 
@@ -84,7 +84,7 @@ data REPLCommand (c :: CmdTag) = REPLCommand
   , shortHelp :: String
   , category  :: REPLCommandCategory
   , cmdtype   :: REPLCommandType
-  , action    :: REPLExpr c -> Disco IErr ()
+  , action    :: REPLExpr c -> Disco ()
   , parser    :: Parser (REPLExpr c)
   }
 

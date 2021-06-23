@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Compile
@@ -33,6 +35,7 @@ import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
+import           Disco.Capability
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -59,12 +62,12 @@ compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
 
 -- | Compile a typechecked, desugared 'DTerm' to an untyped 'Core'
 --   term.
-compileDTerm :: DTerm -> FreshM Core
+compileDTerm :: Has '[Fresh] m => DTerm -> m Core
 compileDTerm (DTVar _ x)   = return $ CVar (coerce x)
 compileDTerm (DTPrim ty x) = compilePrim ty x
 compileDTerm DTUnit        = return $ CCons 0 []
 compileDTerm (DTBool _ b)  = return $ CCons (fromEnum b) []
-compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
+compileDTerm (DTChar c)    = return $ CNum Fraction (toInteger (fromEnum c) % 1)
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
@@ -78,7 +81,7 @@ compileDTerm term@(DTAbs q _ _) = do
 
   where
     -- Gather nested abstractions with the same quantifier.
-    unbindDeep :: DTerm -> FreshM ([Name DTerm], [Type], DTerm)
+    unbindDeep :: Has '[Fresh] m => DTerm -> m ([Name DTerm], [Type], DTerm)
     unbindDeep (DTAbs q' ty l) | q == q' = do
       (name, inner) <- unbind l
       (names, tys, body) <- unbindDeep inner
@@ -127,7 +130,7 @@ compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 -- | Compile a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
--- compileNat :: Type -> Integer -> FreshM Core
+-- compileNat :: Has '[Fresh] m => Type -> Integer -> m Core
 -- compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
 -- compileNat _         x = return $ CNum Fraction (x % 1)
 
@@ -135,14 +138,14 @@ compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 
 -- | Compile a DTerm which will be an argument to a function,
 --   packaging it up along with the strictness of its type.
-compileArg :: DTerm -> FreshM (Strictness, Core)
+compileArg :: Has '[Fresh] m => DTerm -> m (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
 -- | Compile a primitive.  Typically primitives turn into a
 --   corresponding function constant in the core language, but
 --   sometimes the particular constant it turns into may depend on the
 --   type.
-compilePrim :: Type -> Prim -> FreshM Core
+compilePrim :: Has '[Fresh] m => Type -> Prim -> m Core
 
 compilePrim (argTy :->: _) (PrimUOp uop) = return $ compileUOp argTy uop
 compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
@@ -184,7 +187,7 @@ compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
 compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
-compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst (OSetToMap k v)
+compilePrim (_ :->: TyMap k v) PrimSetToMap = return $ CConst OSetToMap
 
 compilePrim _     PrimSummary = return $ CConst OSummary
 compilePrim (_ :->: TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty
@@ -247,13 +250,13 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 
 -- | Compile a desugared branch.  This does very little actual work, just
 --   translating directly from one AST to another.
-compileBranch :: DBranch -> FreshM CBranch
+compileBranch :: Has '[Fresh] m => DBranch -> m CBranch
 compileBranch b = do
   (gs, d) <- unbind b
   bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
 
 -- | Compile a desugared guard.
-compileGuard :: DGuard -> FreshM (Embed Core, CPattern)
+compileGuard :: Has '[Fresh] m => DGuard -> m (Embed Core, CPattern)
 compileGuard (DGPat (unembed -> d) dpat) =
   (,)
     <$> (embed <$> compileDTerm d)
@@ -290,7 +293,7 @@ compileUOp
 compileUOp _ op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
-    coreUOps = M.fromList $
+    coreUOps = M.fromList
       [ Neg      ==> ONeg
       , Fact     ==> OFact
       ]

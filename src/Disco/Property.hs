@@ -17,7 +17,9 @@ module Disco.Property
 import qualified Data.Enumeration.Invertible as E
 import qualified Test.QuickCheck             as QC
 
-import           Disco.Eval
+import           Control.Monad.IO.Class
+import           Disco.Util
+import           Disco.Value
 
 -- | Whether the property test resulted in a runtime error.
 testIsError :: TestResult -> Bool
@@ -51,7 +53,7 @@ invertPropResult res@(TestResult b r env)
 -- | Select samples from an enumeration according to a search type. Also returns
 --   a 'SearchType' describing the results, which may be 'Exhaustive' if the
 --   enumeration is no larger than the number of samples requested.
-generateSamples :: SearchType -> E.IEnumeration a -> Disco e ([a], SearchType)
+generateSamples :: MonadIO m => SearchType -> E.IEnumeration a -> m ([a], SearchType)
 generateSamples Exhaustive e           = return (E.enumerate e, Exhaustive)
 generateSamples (Randomized n m) e
   | E.Finite k <- E.card e, k <= n + m = return (E.enumerate e, Exhaustive)

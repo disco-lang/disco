@@ -268,6 +268,7 @@ library
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
                        Disco.Extensions
+                       Disco.Capability
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic
@@ -278,10 +279,14 @@ library
                        Disco.Module
                        Disco.Parser
                        Disco.Pretty
+                       Disco.Pretty.Monadic
+                       Disco.Pretty.Prec
                        Disco.Property
                        Disco.Desugar
                        Disco.Compile
                        Disco.Enumerate
+                       Disco.Value
+                       Disco.Error
                        Disco.Eval
                        Disco.Interpret.Core
                        Disco.Subst

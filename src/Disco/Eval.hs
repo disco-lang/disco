@@ -2,9 +2,7 @@
   -- For MonadFail instance; see below.
 
 {-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveFoldable             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
@@ -19,7 +17,6 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeInType                 #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -352,7 +349,7 @@ emitMessage :: Has '[Wr "msg"] m => MessageLevel -> MessageBody IErr -> m ()
 emitMessage lev body = tell @"msg" $ Seq.singleton (Message lev body)
 
 info, warning, err, panic, debug :: Has '[Wr "msg"] m => MessageBody IErr -> m ()
-info    body = emitMessage Info body
+info    = emitMessage Info
 warning = emitMessage Warning
 err     = emitMessage Error
 panic   = emitMessage Panic

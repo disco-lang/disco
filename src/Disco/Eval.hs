@@ -2,9 +2,9 @@
   -- For MonadFail instance; see below.
 
 {-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DataKinds                  #-}
+
 {-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveFoldable             #-}
+
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingVia                #-}
@@ -19,7 +19,7 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeInType                 #-}
-{-# LANGUAGE TypeSynonymInstances       #-}
+
 
 -----------------------------------------------------------------------------
 -- |

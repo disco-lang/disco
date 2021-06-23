@@ -352,7 +352,7 @@ emitMessage :: Has '[Wr "msg"] m => MessageLevel -> MessageBody IErr -> m ()
 emitMessage lev body = tell @"msg" $ Seq.singleton (Message lev body)
 
 info, warning, err, panic, debug :: Has '[Wr "msg"] m => MessageBody IErr -> m ()
-info    = emitMessage Info
+info    body = emitMessage Info body
 warning = emitMessage Warning
 err     = emitMessage Error
 panic   = emitMessage Panic

@@ -289,7 +289,7 @@ reservedWords =
   , "min", "max"
   , "union", "∪", "intersect", "∩", "subset", "⊆", "elem", "∈"
   , "enumerate", "count", "divides"
-  , "Void", "Unit", "Bool", "Boolean", "B", "Proposition", "Prop", "Char", "C"
+  , "Void", "Unit", "Bool", "Boolean", "Proposition", "Prop", "Char"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
   , "List", "Bag", "Set", "Graph", "Map"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
@@ -913,9 +913,9 @@ parseAtomicType :: Parser Type
 parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
-  <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
+  <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool")
   <|> TyProp <$ (reserved "Proposition" <|> reserved "Prop")
-  <|> TyC    <$ (reserved "Char" <|> reserved "C")
+  <|> TyC    <$ reserved "Char"
   -- <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")

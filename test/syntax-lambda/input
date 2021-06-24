@@ -4,11 +4,11 @@ let f = (λx. x + 1) : N -> N in f 3
 :type let f = (λx. x + 1) : N -> N in f
 :type let f = λx. (x + 1 : N) in f
 :type let f = λx. x + 1 : N in f
-let g = λx:N, b:B.{? x*x if b, x+2 otherwise ?} in (g 3 true, g 6 false)
+let g = λx:N, b:Bool.{? x*x if b, x+2 otherwise ?} in (g 3 true, g 6 false)
 let q = \ (f : (N -> N) -> N) . f (\(x:N) . x*x) in q (\g. g 1 + g 2)
 :type (\ x:Z, y:N . x * y)
-let f = \(g : Z -> N -> B).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
-:type let f = \(g : Z -> N -> B).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
+let f = \(g : Z -> N -> Bool).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
+:type let f = \(g : Z -> N -> Bool).[g 1 1, g 1 2, g (-1) 0] in f (\x, y:Z. x + 1 == y)
 let f : N -> N -> N = \x.\y.x+y in f 1 2
 :parse \_.3
 (\_.3) "hello"

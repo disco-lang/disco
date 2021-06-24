@@ -52,8 +52,8 @@ plusIsoR n =
 !!! ∀ bs : List Bool. toBin (fromBin bs) == bs
 !!! ∀ q : F. q >= 0
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0
-!!! ∀ bs : B * B. {? b1 when bs is (b1,b2) if b2, false otherwise ?}
-               == {? b1 and b2 when bs is (b1,b2) ?}
+!!! ∀ bs : Bool * Bool. {? b1 when bs is (b1,b2) if b2, false otherwise ?}
+                     == {? b1 and b2 when bs is (b1,b2) ?}
 !!! ∀ x : N + N. plusIsoR (plusIso x) == x
 
 !!! ∀ x : Void + N. {? true when x is right _, false otherwise ?}

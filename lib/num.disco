@@ -40,8 +40,8 @@ lg x = log (2,x)
 factor : N -> Bag N
 factor = $factor
 
-even : Z -> B
+even : Z -> Bool
 even x = 2 divides x
 
-odd : Z -> B
+odd : Z -> Bool
 odd x = ¬(2 divides x)

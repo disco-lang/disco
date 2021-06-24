@@ -2,7 +2,7 @@
 [-1 : Z, -1 : Int, -1 : Integer, -1 : ℤ]
 [1/2 : F, 1/2 : 𝔽]
 [-1/2 : Q, -1/2 : Rational, -1/2 : ℚ]
-[true : B, true : Bool, true : Boolean]
+[true : Bool, true : Boolean]
 [() : Unit]
 [] : List Void
 -- [3 : Fin 5, 3 : Z 5, 3 : Z5, 3 : ℤ 5, 3 : ℤ5]

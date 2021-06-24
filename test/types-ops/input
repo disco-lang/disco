@@ -42,7 +42,7 @@ count (Bag Unit)
 count (Set Void)
 count (Set Unit)
 count (Set Bool)
-count C
+count Char
 count ((N -> Void) -> N)
 count (N -> (N -> Void))
 enumerate (Unit -> Unit) == [\_ . ()]

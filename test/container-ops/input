@@ -5,7 +5,7 @@
 {3,4,5} intersect {4,2}
 {3,4,5} intersect {1,6}
 {1,2,3} \ {3,2}
-({5,6} ⊆ {5,6,7} : B)
+({5,6} ⊆ {5,6,7} : Bool)
 {} ⊆ {{6}}
 {{6}} ⊆ {{6}}
 power {1,2,3}
@@ -24,7 +24,7 @@ bag [3,4,5] intersect bag [4,2]
 bag [3,4,5] intersect bag [1,6]
 bag [2,2,2,3,2,4,5] intersect bag [2,3,2,5,5,6]
 bag [1,2,3] \ bag [3,2]
-(bag [5,6] ⊆ bag [5,6,7] : B)
+(bag [5,6] ⊆ bag [5,6,7] : Bool)
 bag [] ⊆ bag [bag [6]]
 bag [bag [6]] ⊆ bag [bag [6]]
 power (bag [])

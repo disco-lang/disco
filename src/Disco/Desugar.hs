@@ -273,8 +273,6 @@ desugarTerm (ATApp resTy (ATPrim _ (PrimBOp bop)) (ATTup _ [t1,t2]))
 desugarTerm (ATApp ty t1 t2)     =
   DTApp ty <$> desugarTerm t1 <*> desugarTerm t2
 desugarTerm (ATTup ty ts)        = desugarTuples ty ts
-desugarTerm (ATInj ty s t)       =
-  DTInj ty s <$> desugarTerm t
 desugarTerm (ATNat ty n)         = return $ DTNat ty n
 desugarTerm (ATRat r)            = return $ DTRat r
 

@@ -40,7 +40,6 @@ import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Capability.Error
-import           Disco.AST.Generic                       (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Capability
@@ -1028,20 +1027,6 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return (getType at :*: ty, at : ats)
-
---------------------------------------------------
--- Sum types
-
--- Check/infer the type of an injection into a sum type.
-typecheck mode lt@(TInj s t) = do
-  (mL, mR) <- ensureConstrMode2 CSum mode (Left lt)
-  at <- typecheck (selectSide s mL mR) t
-  resTy <- case mode of
-    Infer    ->
-      selectSide s ((:+:) <$> pure (getType at) <*> freshTy          )
-                   ((:+:) <$> freshTy           <*> pure (getType at))
-    Check ty -> return ty
-  return $ ATInj resTy s at
 
 ----------------------------------------
 -- Comparison chain

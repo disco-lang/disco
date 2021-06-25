@@ -43,7 +43,7 @@ module Disco.Parser
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
        , parseContainer, parseEllipsis, parseContainerComp, parseQual
-       , parseInj, parseLet, parseTypeOp
+       , parseLet, parseTypeOp
 
          -- ** Case and patterns
        , parseCase, parseBranch, parseGuards, parseGuard
@@ -485,7 +485,6 @@ parseAtom = label "expression" $
   <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
-  -- <|> TInj <$> parseInj <*> parseAtom
   <|> parseTypeOp
   <|> TApp (TPrim PrimFloor) . TParens <$> fbrack parseTerm
   <|> TApp (TPrim PrimCeil)  . TParens <$> cbrack parseTerm
@@ -646,11 +645,6 @@ tuple :: [Term] -> Term
 tuple []  = TUnit
 tuple [x] = TParens x
 tuple t   = TTup t
-
--- | Parse an injection, i.e. either @left@ or @right@.
-parseInj :: Parser Side
-parseInj =
-  L <$ reserved "left" <|> R <$ reserved "right"
 
 -- | Parse a quantified abstraction (λ, ∀, ∃).
 parseQuantified :: Parser Term

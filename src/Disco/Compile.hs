@@ -115,9 +115,6 @@ compileDTerm (DTApp _ t1 t2)
 compileDTerm (DTPair _ t1 t2)
   = CCons 0 <$> mapM compileDTerm [t1,t2]
 
-compileDTerm (DTInj _ s t)
-  = CCons (fromEnum s) <$> mapM compileDTerm [t]
-
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 

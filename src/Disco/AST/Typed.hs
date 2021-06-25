@@ -34,7 +34,6 @@ module Disco.AST.Typed
        , pattern ATAbs
        , pattern ATApp
        , pattern ATTup
-       , pattern ATInj
        , pattern ATCase
        , pattern ATChain
        , pattern ATTyOp
@@ -126,7 +125,6 @@ type instance X_TChar           TY = ()
 type instance X_TString         TY = ()
 type instance X_TAbs            TY = Type
 type instance X_TApp            TY = Type
-type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
 type instance X_TChain          TY = Type
 type instance X_TTyOp           TY = Type
@@ -177,9 +175,6 @@ pattern ATApp ty term1 term2 = TApp_ ty term1 term2
 pattern ATTup :: Type -> [ATerm] -> ATerm
 pattern ATTup ty termlist = TTup_ ty termlist
 
-pattern ATInj :: Type -> Side -> ATerm -> ATerm
-pattern ATInj ty side term = TInj_ ty side term
-
 pattern ATCase :: Type -> [ABranch] -> ATerm
 pattern ATCase ty branch = TCase_ ty branch
 
@@ -199,7 +194,7 @@ pattern ATTest :: [(String, Type, Name ATerm)] -> ATerm -> ATerm
 pattern ATTest ns t = XTerm_ (ns, t)
 
 {-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
-             ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATChain, ATTyOp,
+             ATString, ATAbs, ATApp, ATTup, ATCase, ATChain, ATTyOp,
              ATContainer, ATContainerComp, ATTest #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
@@ -394,7 +389,6 @@ instance HasType ATerm where
   getType (ATAbs _ ty _)           = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
-  getType (ATInj ty _ _)           = ty
   getType (ATTyOp ty _ _)          = ty
   getType (ATChain ty _ _)         = ty
   getType (ATContainer ty _ _ _)   = ty
@@ -414,7 +408,6 @@ instance HasType ATerm where
   setType ty (ATAbs q _ x    )       = ATAbs q ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
-  setType ty (ATInj _ x y    )       = ATInj ty x y
   setType ty (ATTyOp _ x y   )       = ATTyOp ty x y
   setType ty (ATChain _ x y  )       = ATChain ty x y
   setType ty (ATContainer _ x y z)   = ATContainer ty x y z

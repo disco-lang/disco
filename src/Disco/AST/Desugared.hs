@@ -31,7 +31,6 @@ module Disco.AST.Desugared
        , pattern DTAbs
        , pattern DTApp
        , pattern DTPair
-       , pattern DTInj
        , pattern DTCase
        , pattern DTTyOp
        , pattern DTNil
@@ -97,7 +96,6 @@ type instance X_TRat DS           = ()
 type instance X_TAbs DS           = Type -- For lambas this is the function type but
                                          -- for forall/exists it's the argument type
 type instance X_TApp DS           = Type
-type instance X_TInj DS           = Type
 type instance X_TCase DS          = Type
 type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
                                          -- binary comparisons
@@ -154,9 +152,6 @@ pattern DTApp ty term1 term2 = TApp_ ty term1 term2
 pattern DTPair :: Type -> DTerm -> DTerm -> DTerm
 pattern DTPair ty t1 t2 = XTerm_ (DTPair_ ty t1 t2)
 
-pattern DTInj :: Type -> Side -> DTerm -> DTerm
-pattern DTInj ty side term = TInj_ ty side term
-
 pattern DTCase :: Type -> [DBranch] -> DTerm
 pattern DTCase ty branch = TCase_ ty branch
 
@@ -173,7 +168,7 @@ pattern DTTest :: [(String, Type, Name DTerm)] -> DTerm -> DTerm
 pattern DTTest ns t = XTerm_ (DTTest_ ns t)
 
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
-             DTAbs, DTApp, DTPair, DTInj, DTCase, DTTyOp,
+             DTAbs, DTApp, DTPair, DTCase, DTTyOp,
              DTNil, DTTest #-}
 
 type instance X_TLink DS = Void
@@ -309,7 +304,6 @@ instance HasType DTerm where
   getType (DTAbs _ _ _)    = TyProp
   getType (DTApp ty _ _)   = ty
   getType (DTPair ty _ _)  = ty
-  getType (DTInj ty _ _)   = ty
   getType (DTCase ty _)    = ty
   getType (DTTyOp ty _ _)  = ty
   getType (DTNil ty)       = ty

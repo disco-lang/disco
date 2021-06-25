@@ -196,8 +196,6 @@ prettyTerm (TContainer c ts e)  = setPA initPA $ do
 prettyTerm (TContainerComp c bqst) =
   lunbind bqst $ \(qs,t) ->
   setPA initPA $ containerDelims c (hsep [prettyTerm t, text "|", prettyQuals qs])
-prettyTerm (TInj side t)  = withPA funPA $
-  prettySide side <> prettyTermP t
 prettyTerm (TNat n)       = integer n
 prettyTerm (TChain t lks) = withPA (getPA Eq) . hsep $
     lt (prettyTerm t)

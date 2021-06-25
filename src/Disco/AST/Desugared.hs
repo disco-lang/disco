@@ -301,7 +301,7 @@ instance HasType DTerm where
   getType (DTNat ty _)     = ty
   getType (DTRat _)        = TyF
   getType (DTAbs Lam ty _) = ty
-  getType (DTAbs {})    = TyProp
+  getType DTAbs{}          = TyProp
   getType (DTApp ty _ _)   = ty
   getType (DTPair ty _ _)  = ty
   getType (DTCase ty _)    = ty

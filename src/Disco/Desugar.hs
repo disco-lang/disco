@@ -257,7 +257,7 @@ desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
   return $ mkLambda ty [c] body
 
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
-desugarTerm ATUnit               = return $ DTUnit
+desugarTerm ATUnit               = return DTUnit
 desugarTerm (ATBool ty b)        = return $ DTBool ty b
 desugarTerm (ATChar c)           = return $ DTChar c
 desugarTerm (ATString cs)        =
@@ -307,7 +307,7 @@ desugarProperty p = DTTest [] <$> desugarTerm p
 --   desugared, given the type of the argument and result.
 uopDesugars :: Type -> Type -> UOp -> Bool
 -- uopDesugars _ (TyFin _) Neg = True
-uopDesugars _ _         uop = uop `elem` [Not]
+uopDesugars _ _         uop = uop == Not
 
 desugarPrimUOp :: Fresh m => Type -> Type -> UOp -> m DTerm
 desugarPrimUOp argTy resTy op = do
@@ -780,7 +780,7 @@ desugarContainer :: Fresh m => Type -> Container -> [(ATerm, Maybe ATerm)] -> Ma
 
 -- Literal list containers desugar to nested applications of cons.
 desugarContainer ty ListContainer es Nothing =
-  foldr (dtbin ty (PrimBOp Cons)) (DTNil ty) <$> mapM desugarTerm (map fst es)
+  foldr (dtbin ty (PrimBOp Cons)) (DTNil ty) <$> mapM (desugarTerm . fst) es
 
 -- A list container with an ellipsis (@[x, y, z ..]@) desugars to
 -- an application of the primitive 'forever' function...
@@ -798,7 +798,7 @@ desugarContainer ty@(TyList _) ListContainer es (Just (Until t)) =
 -- an application of bagFromCounts to a bag of pairs (with a literal
 -- value of 1 filled in for missing counts as needed).
 desugarContainer (TyBag eltTy) BagContainer es mell
-  | any isJust (map snd es) =
+  | any (isJust . snd) es =
     dtapp (DTPrim (TySet (eltTy :*: TyN) :->: TyBag eltTy) PrimC2B)
       <$> desugarContainer (TyBag (eltTy :*: TyN)) BagContainer counts mell
 

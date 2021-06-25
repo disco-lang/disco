@@ -125,18 +125,10 @@ data PrimInfo =
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-<<<<<<< HEAD
-  [ PrimInfo PrimLeft      "left"    True
-  , PrimInfo PrimRight     "right"   True
+  [ PrimInfo PrimLeft      "left"           True
+  , PrimInfo PrimRight     "right"          True
 
-  , PrimInfo (PrimUOp Not) "not"     True
-  , PrimInfo PrimSqrt      "sqrt"    True
-  , PrimInfo PrimLg        "lg"      True
-  , PrimInfo PrimFloor     "floor"   True
-  , PrimInfo PrimCeil      "ceiling" True
-  , PrimInfo PrimAbs       "abs"     True
-=======
-  [ PrimInfo (PrimUOp Not) "not"            True
+  , PrimInfo (PrimUOp Not) "not"            True
   , PrimInfo PrimSqrt      "sqrt"           True
   , PrimInfo PrimFloor     "floor"          True
   , PrimInfo PrimCeil      "ceiling"        True
@@ -159,7 +151,6 @@ primTable =
   , PrimInfo PrimEmptyGraph "emptyGraph"     True
   , PrimInfo PrimOverlay   "overlay"        True
   , PrimInfo PrimConnect   "connect"        True
->>>>>>> master
 
   , PrimInfo PrimEmptyMap  "emptyMap"       True
   , PrimInfo PrimInsert    "insert"         True

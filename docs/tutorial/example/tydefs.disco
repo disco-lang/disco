@@ -17,14 +17,11 @@ unconsStream s = s
   -- Just the identity function, because there's no way to tell the difference
   -- between a Stream and an N * Stream !
 
-
 streamy : N * N * N * Stream -> N * N * Stream
 streamy s = s
 
 streamy2 : Stream -> Stream
 streamy2 (n,s) = (n+1,n+1,s)
-
-type Lst = Unit + N * Lst
 
 nats : Stream
 nats = natsFrom 0
@@ -34,6 +31,8 @@ natsFrom n = (n, natsFrom (n+1))
 
 addStreams : Stream -> Stream -> Stream
 addStreams (a,s) (b,t) = (a+b, addStreams s t)
+
+type Lst = Unit + N * Lst
 
 takeStream : N -> Stream -> Lst
 takeStream 0     _     = left ()

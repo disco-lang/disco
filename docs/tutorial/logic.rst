@@ -6,9 +6,10 @@ Logic
 Booleans
 ========
 
-The type of booleans, written ``B`` or ``Bool``, represents logical truth
-and falsehood.  The two values of this type are written ``true`` and
-``false``. (For convenience ``True`` and ``False`` also work.)
+The type of booleans, written ``Bool`` or ``Boolean``, represents
+logical truth and falsehood.  The two values of this type are written
+``true`` and ``false``. (For convenience ``True`` and ``False`` also
+work.)
 
 * Logical AND can be written ``and``, ``&&``, or ``∧`` (note that ``∧``
   is ``U+2227 LOGICAL AND``, not a caret symbol ``^``, which is

@@ -94,7 +94,7 @@ for ``N + (N + N)``.  ``sum3`` therefore begins with a ``right`` tag,
 to show that it contains a value of the right-hand type, namely, ``N +
 N``; this value in turn consists of another ``right`` tag along with a
 value of type ``N``.  Other values of the same type ``N + N + N``
-include ``right (left 6)`` and ``left 5``.
+include ``right(left(6))`` and ``left(5)``.
 
 Unit and Void types
 ===================

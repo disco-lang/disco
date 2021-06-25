@@ -73,7 +73,7 @@ followed by a stream---since these two types would be
 indistinguishable.
 
 .. literalinclude:: example/tydefs.disco
-   :lines: 13-37
+   :lines: 13-
    :language: idris
    :caption:
 

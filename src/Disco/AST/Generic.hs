@@ -1,13 +1,9 @@
 {-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DeriveFoldable        #-}
-{-# LANGUAGE DeriveFunctor         #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DeriveTraversable     #-}
-{-# LANGUAGE EmptyCase             #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE KindSignatures        #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE StandaloneDeriving    #-}
 {-# LANGUAGE TypeFamilies          #-}
@@ -79,7 +75,6 @@ module Disco.AST.Generic
        , X_TAbs
        , X_TApp
        , X_TTup
-       , X_TInj
        , X_TCase
        , X_TChain
        , X_TTyOp
@@ -269,7 +264,6 @@ type family X_TString e
 type family X_TAbs e
 type family X_TApp e
 type family X_TTup e
-type family X_TInj e
 type family X_TCase e
 type family X_TChain e
 type family X_TTyOp e
@@ -338,9 +332,6 @@ data Term_ e where
   -- | An n-tuple, @(t1, ..., tn)@.
   TTup_   :: X_TTup e -> [Term_ e] -> Term_ e
 
-  -- | An injection into a sum type, @left x@ or @right x@.
-  TInj_   :: X_TInj e -> Side -> Term_ e -> Term_ e
-
   -- | A case expression.
   TCase_  :: X_TCase e -> [Branch_ e] -> Term_ e
 
@@ -381,7 +372,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TString e)
     , a (X_TAbs e)
     , a (X_TApp e)
-    , a (X_TInj e)
     , a (X_TCase e)
     , a (X_TTup e)
     , a (X_TChain e)

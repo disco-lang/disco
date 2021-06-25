@@ -38,6 +38,9 @@ data Prim where
   PrimUOp        :: UOp -> Prim -- ^ Unary operator
   PrimBOp        :: BOp -> Prim -- ^ Binary operator
 
+  PrimLeft       :: Prim        -- ^ Left injection into a sum type.
+  PrimRight      :: Prim        -- ^ Right injection into a sum type.
+
   PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
   PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)
   PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
@@ -106,21 +109,25 @@ data PrimInfo =
     -- Is the prim available in the normal syntax of the language?
     --
     --   primExposed = True means that the bare primSyntax can be used
-    --   in the surface syntax, and in particular it is a reserved
-    --   word; the prim will be pretty-printed as the primSyntax.
+    --   in the surface syntax, and the prim will be pretty-printed as
+    --   the primSyntax.
     --
     --   primExposed = False means that the only way to enter it is to
     --   enable the Primitives language extension and write a $
-    --   followed by the primSyntax, and the primSyntax is not a
-    --   reserved word.  The prim will be pretty-printed with a $
+    --   followed by the primSyntax.  The prim will be pretty-printed with a $
     --   prefix.
+    --
+    --   In no case is a prim a reserved word.
   }
 
 -- | A table containing a 'PrimInfo' record for every non-operator
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-  [ PrimInfo (PrimUOp Not) "not"            True
+  [ PrimInfo PrimLeft      "left"           True
+  , PrimInfo PrimRight     "right"          True
+
+  , PrimInfo (PrimUOp Not) "not"            True
   , PrimInfo PrimSqrt      "sqrt"           True
   , PrimInfo PrimFloor     "floor"          True
   , PrimInfo PrimCeil      "ceiling"        True

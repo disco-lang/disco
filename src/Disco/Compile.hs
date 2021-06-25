@@ -99,6 +99,13 @@ compileDTerm term@(DTAbs q _ _) = do
 compileDTerm (DTApp _ (DTPrim _ (PrimBOp Cons)) (DTPair _ t1 t2))
   = CCons 1 <$> mapM compileDTerm [t1, t2]
 
+-- Special cases for left and right, which also compile to constructor applications.
+compileDTerm (DTApp _ (DTPrim _ PrimLeft) t)
+  = CCons 0 <$> mapM compileDTerm [t]
+
+compileDTerm (DTApp _ (DTPrim _ PrimRight) t)
+  = CCons 1 <$> mapM compileDTerm [t]
+
 compileDTerm (DTApp _ t1 t2)
   = appChain t1 [t2]
   where
@@ -107,9 +114,6 @@ compileDTerm (DTApp _ t1 t2)
 
 compileDTerm (DTPair _ t1 t2)
   = CCons 0 <$> mapM compileDTerm [t1,t2]
-
-compileDTerm (DTInj _ s t)
-  = CCons (fromEnum s) <$> mapM compileDTerm [t]
 
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
@@ -157,6 +161,14 @@ compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
   return $ CAbs $ bind [hd, tl] $ CCons 1 [CVar hd, CVar tl]
+
+compilePrim _ PrimLeft = do
+  a <- fresh (string2Name "a")
+  return $ CAbs $ bind [a] $ CCons 0 [CVar a]
+
+compilePrim _ PrimRight = do
+  a <- fresh (string2Name "a")
+  return $ CAbs $ bind [a] $ CCons 1 [CVar a]
 
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty

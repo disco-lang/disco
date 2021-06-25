@@ -43,7 +43,7 @@ module Disco.Parser
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
        , parseContainer, parseEllipsis, parseContainerComp, parseQual
-       , parseInj, parseLet, parseTypeOp
+       , parseLet, parseTypeOp
 
          -- ** Case and patterns
        , parseCase, parseBranch, parseGuards, parseGuard
@@ -283,7 +283,7 @@ reserved w = (lexeme . try) $ string w *> notFollowedBy alphaNumChar
 -- | The list of all reserved words.
 reservedWords :: [String]
 reservedWords =
-  [ "true", "false", "True", "False", "left", "right", "let", "in", "is"
+  [ "true", "false", "True", "False", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "mod", "choose", "implies"
   , "min", "max"
@@ -474,11 +474,17 @@ parseAtom = label "expression" $
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ try parseWild
   <|> TPrim <$> try parseStandaloneOp
+
+  -- Note primitives are NOT reserved words, so they are just parsed
+  -- as identifiers.  This means that it is possible to shadow a
+  -- primitive in a local context, as it should be.  Vars are turned
+  -- into prims at scope-checking time: if a var is not in scope but
+  -- there is a prim of that name then it becomes a TPrim.  See the
+  -- 'typecheck Infer (TVar x)' case in Disco.Typecheck.
   <|> TVar <$> ident
   <|> TPrim <$> (ensureEnabled Primitives *> parsePrim)
   <|> TRat <$> try decimal
   <|> TNat <$> natural
-  <|> TInj <$> parseInj <*> parseAtom
   <|> parseTypeOp
   <|> TApp (TPrim PrimFloor) . TParens <$> fbrack parseTerm
   <|> TApp (TPrim PrimCeil)  . TParens <$> cbrack parseTerm
@@ -640,11 +646,6 @@ tuple []  = TUnit
 tuple [x] = TParens x
 tuple t   = TTup t
 
--- | Parse an injection, i.e. either @left@ or @right@.
-parseInj :: Parser Side
-parseInj =
-  L <$ reserved "left" <|> R <$ reserved "right"
-
 -- | Parse a quantified abstraction (λ, ∀, ∃).
 parseQuantified :: Parser Term
 parseQuantified =
@@ -727,7 +728,10 @@ termToPattern (TNat n)    = Just $ PNat n
 termToPattern (TChar c)   = Just $ PChar c
 termToPattern (TString s) = Just $ PString s
 termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
-termToPattern (TInj s t)  = PInj s <$> termToPattern t
+termToPattern (TApp (TVar i) t)
+  | i == string2Name "left"  = PInj L <$> termToPattern t
+  | i == string2Name "right" = PInj R <$> termToPattern t
+-- termToPattern (TInj s t)  = PInj s <$> termToPattern t
 
 termToPattern (TAscr t s) = case s of
   Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'

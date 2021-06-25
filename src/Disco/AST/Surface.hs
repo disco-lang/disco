@@ -48,7 +48,6 @@ module Disco.AST.Surface
        , pattern TAbs
        , pattern TApp
        , pattern TTup
-       , pattern TInj
        , pattern TCase
        , pattern TChain
        , pattern TTyOp
@@ -111,7 +110,7 @@ module Disco.AST.Surface
        )
        where
 
-import           Control.Lens                     ((%~), _1, _2, _3)
+import           Control.Lens                     (_1, _2, _3, (%~))
 import           Data.Set                         (Set)
 import           Data.Void
 
@@ -213,7 +212,6 @@ type instance X_TString         UD = ()
 type instance X_TAbs            UD = ()
 type instance X_TApp            UD = ()
 type instance X_TTup            UD = ()
-type instance X_TInj            UD = ()
 type instance X_TCase           UD = ()
 type instance X_TChain          UD = ()
 type instance X_TTyOp           UD = ()
@@ -267,9 +265,6 @@ pattern TApp term1 term2 = TApp_ () term1 term2
 pattern TTup :: [Term] -> Term
 pattern TTup termlist = TTup_ () termlist
 
-pattern TInj :: Side -> Term -> Term
-pattern TInj side term = TInj_ () side term
-
 pattern TCase :: [Branch] -> Term
 pattern TCase branch = TCase_ () branch
 
@@ -295,7 +290,7 @@ pattern TWild :: Term
 pattern TWild = XTerm_ ()
 
 {-# COMPLETE TVar, TPrim, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
-             TString, TAbs, TApp, TTup, TInj, TCase, TChain, TTyOp,
+             TString, TAbs, TApp, TTup, TCase, TChain, TTyOp,
              TContainer, TContainerComp, TAscr, TWild #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term

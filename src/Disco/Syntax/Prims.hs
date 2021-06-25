@@ -38,8 +38,8 @@ data Prim where
   PrimUOp        :: UOp -> Prim -- ^ Unary operator
   PrimBOp        :: BOp -> Prim -- ^ Binary operator
 
-  PrimLeft    :: Prim      -- XXX
-  PrimRight   :: Prim      -- XXX
+  PrimLeft       :: Prim        -- ^ Left injection into a sum type.
+  PrimRight      :: Prim        -- ^ Right injection into a sum type.
 
   PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
   PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)

@@ -42,7 +42,6 @@ data Prim where
   PrimRight   :: Prim      -- XXX
 
   PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
-  PrimLg         :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
   PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)
   PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
   PrimAbs        :: Prim        -- ^ Absolute value (@abs@)

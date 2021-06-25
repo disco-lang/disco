@@ -45,33 +45,34 @@ data UOp = Neg   -- ^ Arithmetic negation (@-@)
   deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Binary operators.
-data BOp = Add     -- ^ Addition (@+@)
-         | Sub     -- ^ Subtraction (@-@)
-         | SSub    -- ^ Saturating Subtraction (@.-@ / @∸@)
-         | Mul     -- ^ Multiplication (@*@)
-         | Div     -- ^ Division (@/@)
-         | Exp     -- ^ Exponentiation (@^@)
-         | IDiv    -- ^ Integer division (@//@)
-         | Eq      -- ^ Equality test (@==@)
-         | Neq     -- ^ Not-equal (@/=@)
-         | Lt      -- ^ Less than (@<@)
-         | Gt      -- ^ Greater than (@>@)
-         | Leq     -- ^ Less than or equal (@<=@)
-         | Geq     -- ^ Greater than or equal (@>=@)
-         | Min     -- ^ Minimum (@min@)
-         | Max     -- ^ Maximum (@max@)
-         | And     -- ^ Logical and (@&&@ / @and@)
-         | Or      -- ^ Logical or (@||@ / @or@)
-         | Impl    -- ^ Logical implies (@==>@ / @implies@)
-         | Mod     -- ^ Modulo (@mod@)
-         | Divides -- ^ Divisibility test (@|@)
-         | Choose  -- ^ Binomial and multinomial coefficients (@choose@)
-         | Cons    -- ^ List cons (@::@)
-         | Union   -- ^ Union of two sets (@union@ / @∪@)
-         | Inter   -- ^ Intersection of two sets (@intersect@ / @∩@)
-         | Diff    -- ^ Difference between two sets (@\@)
-         | Elem    -- ^ Element test (@∈@)
-         | Subset  -- ^ Subset test (@⊆@)
+data BOp = Add      -- ^ Addition (@+@)
+         | Sub      -- ^ Subtraction (@-@)
+         | SSub     -- ^ Saturating Subtraction (@.-@ / @∸@)
+         | Mul      -- ^ Multiplication (@*@)
+         | Div      -- ^ Division (@/@)
+         | Exp      -- ^ Exponentiation (@^@)
+         | IDiv     -- ^ Integer division (@//@)
+         | Eq       -- ^ Equality test (@==@)
+         | Neq      -- ^ Not-equal (@/=@)
+         | Lt       -- ^ Less than (@<@)
+         | Gt       -- ^ Greater than (@>@)
+         | Leq      -- ^ Less than or equal (@<=@)
+         | Geq      -- ^ Greater than or equal (@>=@)
+         | Min      -- ^ Minimum (@min@)
+         | Max      -- ^ Maximum (@max@)
+         | And      -- ^ Logical and (@&&@ / @and@)
+         | Or       -- ^ Logical or (@||@ / @or@)
+         | Impl     -- ^ Logical implies (@==>@ / @implies@)
+         | Mod      -- ^ Modulo (@mod@)
+         | Divides  -- ^ Divisibility test (@|@)
+         | Choose   -- ^ Binomial and multinomial coefficients (@choose@)
+         | Cons     -- ^ List cons (@::@)
+         | Union    -- ^ Union of two sets (@union@ / @∪@)
+         | Inter    -- ^ Intersection of two sets (@intersect@ / @∩@)
+         | Diff     -- ^ Difference between two sets (@\@)
+         | Elem     -- ^ Element test (@∈@)
+         | Subset   -- ^ Subset test (@⊆@)
+         | ShouldEq -- ^ Equality assertion (@=!=@)
   deriving (Show, Read, Eq, Ord, Generic)
 
 -- | Type operators.
@@ -132,7 +133,7 @@ data OpInfo =
 --   parser and the pretty-printer.
 opTable :: [[OpInfo]]
 opTable =
-  assignPrecLevels $
+  assignPrecLevels
   [ [ uopInfo Pre  Not     ["¬"]
     ]
   , [ uopInfo Post Fact    ["!"]
@@ -163,6 +164,7 @@ opTable =
   , [ bopInfo InR  Cons    ["::"]
     ]
   , [ bopInfo InR  Eq      ["=="]
+    , bopInfo InR  ShouldEq ["=!="]
     , bopInfo InR  Neq     ["≠", "/="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]
@@ -183,7 +185,9 @@ opTable =
     uopInfo fx op syns = OpInfo (UOpF fx op) syns (-1)
     bopInfo fx op syns = OpInfo (BOpF fx op) syns (-1)
 
-    assignPrecLevels table = zipWith assignPrecs (reverse [1 .. length table]) table
+    -- Start at precedence level 2 so we can give level 1 to ascription, and level 0
+    -- to the ambient context + parentheses etc.
+    assignPrecLevels table = zipWith assignPrecs (reverse [2 .. length table+1]) table
     assignPrecs p ops      = map (assignPrec p) ops
     assignPrec  p op       = op { opPrec = p }
 
@@ -215,4 +219,4 @@ assoc op =
 -- | The precedence level of function application (higher than any
 --   other precedence level).
 funPrec :: Int
-funPrec = length opTable
+funPrec = length opTable+1

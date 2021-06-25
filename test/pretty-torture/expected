@@ -1,0 +1,25 @@
+Loading demo.disco...
+Loaded.
+{} : Set (Map (Set ℕ) (Map (Set ℕ) (Graph (Set ℕ))))
+right(()) : P (Set ℕ) + Unit
+[1, 2 : ℕ, 3]
+TAbs_ Lam () (<[PVar_ () x]> TAscr_ () (TVar_ () 0@0) (Forall (<[]> TyAtom (ABase N))))
+λx. x : ℕ
+(λx. x) : ℕ
+λx. x : ℕ
+let f = λx. x + 1 : ℕ → ℕ in f : ℕ → ℕ
+(let f = λx. x + 1 : ℕ → ℕ in f) : ℕ → ℕ
+let f = λx. x + 1 : ℕ → ℕ in f(3 : ℕ)
+let f = λx. x + 1 : ℕ → ℕ in f(3) : ℕ
+(let f = λx. x + 1 : ℕ → ℕ in f)(3) : ℕ
+(let f = λx. x + 1 : ℕ → ℕ in f)(3 : ℕ)
+(let x = 3 in x) : ℕ
+let x = 3 in x : ℕ
+let x = 3 in x : ℕ
+λx : ℕ. x
+λ(x : ℕ) + 1. x
+λx + 1 : ℕ. x
+(λx. x)(2, 3)
+right(2, 3)
+Loading num.disco...
+lg(24)!

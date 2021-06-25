@@ -16,7 +16,7 @@
 import list
 
 expensiveList : List N
-expensiveList = map expensiveId [0 ..]
+expensiveList = each(expensiveId, [0 ..])
 
 expensiveId : N -> N
 expensiveId 0     = 0

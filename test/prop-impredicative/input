@@ -1,0 +1,9 @@
+:load test/prop-impredicative/prop-impredicative.disco
+:type exists (x:Prop). x and (3 > 2)
+:type forall (x:Prop). (true ==> x)
+:type forall (f: N -> Prop). f 3
+:type forall (f: List Prop -> N). 3 == 3
+-- Should reinstate these later once we can analyze whether a type synonym has a certain sort
+-- First one should be OK, second should not.
+-- :type forall (f: T N -> N). f (left ()) == 2
+-- :type forall (f: T Prop -> N). f (left ()) == 2

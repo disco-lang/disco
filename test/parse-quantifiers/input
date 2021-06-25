@@ -1,0 +1,36 @@
+:parse λ x. x > 3
+:parse λ (x:N). x > 3
+:parse λ (x:N), y. x > y
+:parse λ (x:N), (y:F). x > y
+:parse λ x, (y:F). x > y
+:parse \ x. x > 3
+:parse \ (x:N). x > 3
+:parse \ (x:N), y. x > y
+:parse \ (x:N), (y:F). x > y
+:parse \ x, (y:F). x > y
+(\x, y. x + y) 3 5
+(\(x : N, y : N). x + y) 3 5
+(\(x : N, y : N). x + y) (3, 5)
+(\(x:N), (y:N). x + y) 3 5
+(\(x:N). \(y:N). x + y) 3 5
+:parse exists x. x > 3
+:parse exists (x:N). x > 3
+:parse exists (x:N), y. x > y
+:parse exists (x:N), (y:F). x > y
+:parse exists x, (y:F). x > y
+:parse ∃ x. x > 3
+:parse ∃ (x:N). x > 3
+:parse ∃ (x:N), y. x > y
+:parse ∃ (x:N), (y:F). x > y
+:parse ∃ x, (y:F). x > y
+:parse forall x. x > 3
+:parse forall (x:N). x > 3
+:parse forall (x:N), y. x > y
+:parse forall (x:N), (y:F). x > y
+:parse forall x, (y:F). x > y
+:parse ∀ x. x > 3
+:parse ∀ (x:N). x > 3
+:parse ∀ (x:N), y. x > y
+:parse ∀ (x:N), (y:F). x > y
+:parse ∀ x, (y:F). x > y
+:parse ∀ (x : N, y : N, z: N). (x == y) and (y == z) ==> x == z

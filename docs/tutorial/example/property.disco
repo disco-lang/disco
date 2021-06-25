@@ -1,5 +1,5 @@
-!!! ∀ x:B. neg (neg x) == x
-neg : B -> B
+!!! ∀ x:Bool. neg (neg x) == x
+neg : Bool -> Bool
 neg x = not x
 
 !!! ∀p: N + N. plusIsoR (plusIso p) == p

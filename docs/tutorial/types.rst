@@ -9,7 +9,7 @@ program must match correctly (*i.e.* the program must *typecheck*)
 before it can be run.  The type system has for the most part been
 designed to correspond to common mathematical practice, so if you are
 used to type systems in other programming languages (even other
-functional languages) you may be in for a surprise or two.  
+functional languages) you may be in for a surprise or two.
 
 Disco can often infer the type of an expression.  To find out what
 type disco has inferred for a given expression, you can use the
@@ -20,7 +20,7 @@ type disco has inferred for a given expression, you can use the
     Disco> :type 3
     3 : ℕ
     Disco> :type 2/3
-    2 / 3 : ℚ⁺
+    2 / 3 : 𝔽
     Disco> :type [1,2,5]
     [1, 2, 5] : List ℕ
 
@@ -45,28 +45,29 @@ Primitive numeric types
 =======================
 
 Disco has four built-in primitive numeric types: natural numbers,
-integers, positive rationals, and rationals.
+integers, fractions (*i.e.* nonnegative rationals), and rationals.
 
 * The type of natural numbers, written ``Natural``, ``Nat``, ``N``, or ``ℕ``,
   includes the counting numbers :math:`0, 1, 2, \dots`.
 * The type of integers, written ``Integer``, ``Int``, ``Z``, or ``ℤ``,
   includes the natural numbers as well as their negatives.
-* The type of positive rationals, written ``QP`` or ``ℚ⁺``, includes
-  all ratios of the form :math:`a/b` where :math:`a` and :math:`b` are
-  natural numbers, with :math:`b \neq 0`.
+* The type of fractions (*i.e.* nonnegative rationals), written
+  ``Fractional``, ``Frac``, ``F``, or ``𝔽``, includes all ratios of
+  the form :math:`a/b` where :math:`a` and :math:`b` are natural
+  numbers, with :math:`b \neq 0`.
 * The type of rational numbers, written ``Rational``, ``Q`` or ``ℚ``,
   includes all ratios of integers.
 
-In mathematics, it is typically not so common to think of the positive
-rationals :math:`\mathbb{Q}^+` as a separate set by themselves; but
-this is mostly for historical reasons and because of the way the
-development of rational numbers is usually presented.  The natural
-numbers support addition and multiplication.  Extending them to
-support subtraction yields the integers; then, extending these again
-to support division yields the rationals.  However, what if we do
-these extensions in the opposite order?  Extending the natural numbers
-to support division results in the positive rational numbers; then
-extending these with subtraction again yields the rationals.  All
+In mathematics, it is typically not so common to think of the
+nonnegative rationals :math:`\mathbb{F}` as a separate set by
+themselves; but this is mostly for historical reasons and because of
+the way the development of rational numbers is usually presented.  The
+natural numbers support addition and multiplication.  Extending them
+to support subtraction yields the integers; then, extending these
+again to support division yields the rationals.  However, what if we
+do these extensions in the opposite order?  Extending the natural
+numbers to support division results in the positive rational numbers;
+then extending these with subtraction again yields the rationals.  All
 told, the relationship between these four types forms a diamond-shaped
 lattice:
 
@@ -74,16 +75,17 @@ lattice:
 
       Q
      / \
-    Z   Q+
+    Z   F
      \ /
       N
 
+
 Each type is a subset of the type or types above it.  Going northwest
 in this diagram (:math:`\mathbb{N} \to \mathbb{Z}` or
-:math:`\mathbb{Q}^+ \to \mathbb{Q}`) corresponds to adding negatives,
+:math:`\mathbb{F} \to \mathbb{Q}`) corresponds to allowing negatives,
 that is, subtraction; going northeast (:math:`\mathbb{N} \to
-\mathbb{Q}^+` or :math:`\mathbb{Z} \to \mathbb{Q}`) corresponds to
-adding reciprocals, that is, division.
+\mathbb{F}` or :math:`\mathbb{Z} \to \mathbb{Q}`) corresponds to
+allowing reciprocals, that is, division.
 
 Try evaluating each of the following expressions at the disco prompt,
 and also request their inferred type with the ``:type`` command.  What
@@ -115,44 +117,16 @@ can be automatically upgraded to an integer.
 In the above example, the natural number ``3`` is automatically
 upgraded to an integer so that it can be added to ``-1``.  When we
 discuss functions later, we will see that this principle extends to
-function arguments as well: if a function is expecting an integer as
-input, it is acceptable to give it a natural number, since the natural
-number can be upgraded to an integer.
-
-Modular types
-=============
-
-In addition to the four primitive numeric types discussed above, disco
-also supports an infinite family of "modular" or finite types of the
-form :math:`\mathbb{Z}_n`.  For a given natural number :math:`n`, the
-type :math:`\mathbb{Z}_n` consists of the :math:`n` values :math:`\{0,
-1, 2, \dots, n-1\}`.  Addition, subtraction, multiplication, and
-exponentiation are performed :math:`\pmod{n}`.
-
-::
-
-    Disco> (3 + 5) : Z6
-    2
-    Disco> (3 - 5) : Z6
-    4
-    Disco> 2^20 : Z7
-    4
-
-In addition, division can be performed as long as :math:`n` is prime:
-
-::
-
-    Disco> 1 / 5 : Z7   -- compute the inverse of 5 mod 7
-    3
-    Disco> 3 * 5 : Z7   -- sure enough, 3 * 5 is 1 mod 7
-    1
+function arguments as well: for example, if a function is expecting an
+integer as input, it is acceptable to give it a natural number, since
+the natural number can be upgraded to an integer.
 
 Other types
 ===========
 
 There are many other types built into disco as well---``Bool``, ``Void``,
 ``Unit``, ``List``, product, and sum types, to name a few.  These will be
-covered throughout the rest of the tutorial and appropriate places.
+covered throughout the rest of the tutorial in appropriate places.
 For now, try executing these commands and see if you can guess what is
 going on:
 
@@ -163,3 +137,4 @@ going on:
 * ``:type [1, 2, -3, 4/5]``
 * ``:type [[1,2], [3,4,5]]``
 * ``:type (1, true)``
+* ``:type left(3)``

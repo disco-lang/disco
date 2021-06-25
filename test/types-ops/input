@@ -1,3 +1,4 @@
+import list
 count Void
 count Unit
 count Bool
@@ -18,26 +19,32 @@ enumerate (Unit + Bool)
 enumerate (Void * Unit)
 enumerate (List Void)
 enumerate (List (Void * Bool + Void))
-enumerate (List Unit)
+enumerate(Bool)
+take(5, enumerate(List Unit))
+take(10, enumerate(N))
+take(6, enumerate(N * N))
 enumerate (Void * Nat)
 enumerate (Nat * Void)
 enumerate (Void -> Nat)
 enumerate (Nat -> Void)
 enumerate (Void -> Void)
-count Z5
-count (Z5 * Z4)
-count (Z3 + Z6)
-count (Z3 -> Z2)
-count (Z3 + Z4 -> Z2)
-enumerate Z10
-enumerate (Z2 * Z3)
-enumerate (Z2 -> Z2)
-enumerate (Z3 + Z4)
+-- count Z5
+-- count (Z5 * Z4)
+-- count (Z3 + Z6)
+-- count (Z3 -> Z2)
+-- count (Z3 + Z4 -> Z2)
+-- enumerate Z10
+-- enumerate (Z2 * Z3)
+-- enumerate (Z2 -> Z2)
+-- enumerate (Z3 + Z4)
 count (Bag Void)
 count (Bag Unit)
 count (Set Void)
 count (Set Unit)
 count (Set Bool)
-count C
+count Char
 count ((N -> Void) -> N)
 count (N -> (N -> Void))
+enumerate (Unit -> Unit) == [\_ . ()]
+enumerate (Unit -> Bool) == [\_ . false, \_ . true]
+enumerate (Bool -> Bool) == [\x. false]

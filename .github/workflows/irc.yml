@@ -1,0 +1,54 @@
+name: "IRC"
+on:
+  push:
+  pull_request:
+    types: [opened]
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  irc:
+    runs-on: ubuntu-latest
+    steps:
+      - name: irc push
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'push'
+        with:
+          channel: "#disco-lang"
+          nickname: disco-bot
+          message: |
+            ${{ github.actor }} pushed to ${{ github.event.ref }} ${{ github.event.compare }}
+            ${{ join(github.event.commits.*.message, '\n') }}
+          notice: true
+      - name: irc pull request
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'pull_request'
+        with:
+          channel: "#disco-lang"
+          nickname: disco-bot
+          message: |
+            ${{ github.actor }} opened PR ${{ github.event.pull_request.html_url }}
+          notice: true
+      - name: irc issue
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'issues'
+        with:
+          channel: "#disco-lang"
+          nickname: disco-bot
+          message: |
+            ${{ github.actor }} opened ${{ github.event.issue.html_url }}
+            ${{ github.event.issue.title }}
+            ${{ github.event.issue.body }}
+          notice: true
+      - name: irc comment
+        uses: rectalogic/notify-irc@v1
+        if: github.event_name == 'issue_comment'
+        with:
+          channel: "#disco-lang"
+          nickname: disco-bot
+          message: |
+            ${{ github.actor }} commented on ${{ github.event.issue.html_url }}
+            ${{ github.event.comment.body }}
+          notice: true

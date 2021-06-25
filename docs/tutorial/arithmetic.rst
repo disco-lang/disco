@@ -52,13 +52,13 @@ still be entered using decimal notation.  Try these expressions as
 well:
 
 * ``2.3 + 1.6``
-* ``1/5.``
-* ``1/7.``
+* ``1/5.0``
+* ``1/7.0``
 
 Disco automatically picks either fractional or decimal notation for
 the output, depending on whether any values with decimal points were
-used in the input (for example, compare ``1/5`` and ``1/5.``, or
-``1./5``).  Note that ``1/7.`` results in ``0.[142857]``;
+used in the input (for example, compare ``1/5`` and ``1/5.0``, or
+``1.0/5``).  Note that ``1/7.0`` results in ``0.[142857]``;
 can you figure out what the brackets indicate?
 
 The standard ``floor`` and ``ceiling`` operations are built-in:
@@ -168,10 +168,10 @@ might not find built in to other languages.
 
         Disco> sqrt (299^2 + 1)
         299
-        Disco> sqrt (299^2 - 1)
+        Disco> sqrt (299^2 .- 1)
         298
         Disco> lg (2^35 + 7)
         35
-        Disco> lg (2^35 - 1)
+        Disco> lg (2^35 .- 1)
         34
 

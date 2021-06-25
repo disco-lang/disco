@@ -10,4 +10,3 @@
 list : List a → List a
 bag : List ℕ → Bag ℕ
 set : List ℕ → Set ℕ
-({1, 2, 3} union {4, 5} : Set ℤ3) : Set ℤ3

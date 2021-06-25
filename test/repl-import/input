@@ -1,0 +1,4 @@
+import num
+import list
+isPrime 20
+filter(\x. x > 3, [1 .. 5])

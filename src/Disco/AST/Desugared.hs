@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PatternSynonyms       #-}
@@ -27,13 +28,14 @@ module Disco.AST.Desugared
        , pattern DTChar
        , pattern DTNat
        , pattern DTRat
-       , pattern DTLam
+       , pattern DTAbs
        , pattern DTApp
        , pattern DTPair
        , pattern DTInj
        , pattern DTCase
        , pattern DTTyOp
        , pattern DTNil
+       , pattern DTTest
 
        , Container(..)
        , DBinding
@@ -61,6 +63,8 @@ module Disco.AST.Desugared
        )
        where
 
+import           GHC.Generics
+
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
@@ -79,22 +83,22 @@ type DProperty = Property_ DS
 
 type DTerm = Term_ DS
 
+type instance X_Binder DS         = Name DTerm
+
 type instance X_TVar DS           = Type
 type instance X_TPrim DS          = Type
 type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
-type instance X_TBool DS          = ()
+type instance X_TBool DS          = Type
 type instance X_TChar DS          = ()
 type instance X_TString DS        = Void
 type instance X_TNat DS           = Type
 type instance X_TRat DS           = ()
-type instance X_TAbs DS           = Void -- TAbs represents lambdas with multiple args;
-                                         -- see TLam
+type instance X_TAbs DS           = Type -- For lambas this is the function type but
+                                         -- for forall/exists it's the argument type
 type instance X_TApp DS           = Type
 type instance X_TInj DS           = Type
 type instance X_TCase DS          = Type
-type instance X_TUn DS            = Type
-type instance X_TBin DS           = Type
 type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
                                          -- binary comparisons
 type instance X_TTyOp DS          = Type
@@ -109,13 +113,16 @@ type instance X_TTup DS           = Void -- No tuples, only pairs
 type instance X_TParens DS        = Void -- No explicit parens
 
 -- Extra constructors
-type instance X_Term DS =
-  Either
-    (Type, DTerm, DTerm)               -- DTPair
-    (Either
-      (Type, Bind (Name DTerm) DTerm)  -- DTLam
-      Type                             -- DTCons
-    )
+type instance X_Term DS = X_DTerm
+
+data X_DTerm
+  = DTPair_ Type DTerm DTerm
+  | DTNil_ Type
+  | DTTest_ [(String, Type, Name DTerm)] DTerm
+  deriving (Show, Generic)
+
+instance Subst Type X_DTerm
+instance Alpha X_DTerm
 
 pattern DTVar :: Type -> Name DTerm -> DTerm
 pattern DTVar ty name = TVar_ ty name
@@ -126,8 +133,8 @@ pattern DTPrim ty name = TPrim_ ty name
 pattern DTUnit :: DTerm
 pattern DTUnit = TUnit_ ()
 
-pattern DTBool :: Bool -> DTerm
-pattern DTBool bool = TBool_ () bool
+pattern DTBool :: Type -> Bool -> DTerm
+pattern DTBool ty bool = TBool_ ty bool
 
 pattern DTNat  :: Type -> Integer -> DTerm
 pattern DTNat ty int = TNat_ ty int
@@ -138,14 +145,14 @@ pattern DTRat rat = TRat_ () rat
 pattern DTChar :: Char -> DTerm
 pattern DTChar c = TChar_ () c
 
-pattern DTLam :: Type -> Bind (Name DTerm) DTerm -> DTerm
-pattern DTLam ty lam = XTerm_ (Right (Left (ty, lam)))
+pattern DTAbs :: Quantifier -> Type -> Bind (Name DTerm) DTerm -> DTerm
+pattern DTAbs q ty lam = TAbs_ q ty lam
 
 pattern DTApp  :: Type -> DTerm -> DTerm -> DTerm
 pattern DTApp ty term1 term2 = TApp_ ty term1 term2
 
 pattern DTPair :: Type -> DTerm -> DTerm -> DTerm
-pattern DTPair ty t1 t2 = XTerm_ (Left (ty, t1, t2))
+pattern DTPair ty t1 t2 = XTerm_ (DTPair_ ty t1 t2)
 
 pattern DTInj :: Type -> Side -> DTerm -> DTerm
 pattern DTInj ty side term = TInj_ ty side term
@@ -157,11 +164,17 @@ pattern DTTyOp :: Type -> TyOp -> Type -> DTerm
 pattern DTTyOp ty1 tyop ty2 = TTyOp_ ty1 tyop ty2
 
 pattern DTNil :: Type -> DTerm
-pattern DTNil ty = XTerm_ (Right (Right ty))
+pattern DTNil ty = XTerm_ (DTNil_ ty)
+
+-- | A test frame, recording a collection of variables with their types and
+--   their original user-facing names. Used for legible reporting of test
+--   failures inside the enclosed term.
+pattern DTTest :: [(String, Type, Name DTerm)] -> DTerm -> DTerm
+pattern DTTest ns t = XTerm_ (DTTest_ ns t)
 
 {-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
-             DTLam, DTApp, DTPair, DTInj, DTCase, DTTyOp,
-             DTNil #-}
+             DTAbs, DTApp, DTPair, DTInj, DTCase, DTTyOp,
+             DTNil, DTTest #-}
 
 type instance X_TLink DS = Void
 
@@ -189,6 +202,7 @@ type DPattern = Pattern_ DS
 
 type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
+type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = ()
 type instance X_PChar    DS = ()
@@ -284,20 +298,22 @@ type instance X_QGuard DS = Void
 ------------------------------------------------------------
 
 instance HasType DTerm where
-  getType (DTVar ty _)    = ty
-  getType (DTPrim ty _)   = ty
-  getType DTUnit          = TyUnit
-  getType (DTBool _)      = TyBool
-  getType (DTChar _)      = TyC
-  getType (DTNat ty _)    = ty
-  getType (DTRat _)       = TyF
-  getType (DTLam ty _)    = ty
-  getType (DTApp ty _ _)  = ty
-  getType (DTPair ty _ _) = ty
-  getType (DTInj ty _ _)  = ty
-  getType (DTCase ty _)   = ty
-  getType (DTTyOp ty _ _) = ty
-  getType (DTNil ty)      = ty
+  getType (DTVar ty _)     = ty
+  getType (DTPrim ty _)    = ty
+  getType DTUnit           = TyUnit
+  getType (DTBool ty _)    = ty
+  getType (DTChar _)       = TyC
+  getType (DTNat ty _)     = ty
+  getType (DTRat _)        = TyF
+  getType (DTAbs Lam ty _) = ty
+  getType (DTAbs _ _ _)    = TyProp
+  getType (DTApp ty _ _)   = ty
+  getType (DTPair ty _ _)  = ty
+  getType (DTInj ty _ _)   = ty
+  getType (DTCase ty _)    = ty
+  getType (DTTyOp ty _ _)  = ty
+  getType (DTNil ty)       = ty
+  getType (DTTest _ _)     = TyProp
 
 instance HasType DPattern where
   getType (DPVar ty _)    = ty

@@ -1,6 +1,6 @@
 import num
 
-!!! ∀ x : ℕ. (x > 0) ==> reduce (\x y. x * y) 1 (factor x) == x
+!!! ∀ x : ℕ. (x > 0) ==> reduce(~*~, 1, factor x) == x
 dummy : Unit
 dummy = ()
 
@@ -11,4 +11,4 @@ dummy = ()
 !!! setSize {1,1,1,2,3} == 3
 !!! ∀ s : Set N. setSize s == setSize (s ∪ s)
 setSize : Set N -> N
-setSize s = reduce (\x y. x + y) 0 (map (\x.1) (bag s))
+setSize s = reduce(~+~, 0, each (\x.1, bag s))

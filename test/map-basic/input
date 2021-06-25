@@ -1,0 +1,22 @@
+import list
+:type map
+:type map {(1,3), (4,6)}
+map {(1,3), (4,6)}
+:type insert
+:type emptyMap
+emptyMap
+:type insert(1, 3, insert(4, 6, emptyMap))
+insert(1, 3, insert(4, 6, emptyMap))
+insert(1, 3, insert(1, 4, emptyMap))
+m = insert(1, 3, insert(4, 6, emptyMap))
+:type lookup
+lookup(1,m)
+lookup(4,m)
+lookup(5,m)
+foldr(\((k,v),m). insert(k,v,m), emptyMap, [(1,"hello"), (3, "there"), (4, "you")])
+map {(1,3), (1,1), (1,2)}
+:type insert(1, {"hi","there"}, insert(2, {}, insert(4, {"why","not","now"}, insert(2, {"blah"}, emptyMap))))
+insert(1, {"hi","there"}, insert(2, {}, insert(4, {"why","not","now"}, insert(2, {"blah"}, emptyMap))))
+insert(1, "A", insert(1, "B", emptyMap))
+insert(1, "B", insert(1, "A", emptyMap))
+insert("hi", 1, insert("there", 2, emptyMap))

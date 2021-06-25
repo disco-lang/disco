@@ -35,41 +35,58 @@ import           Disco.Syntax.Operators
 
 -- | Primitives, /i.e./ built-in constants.
 data Prim where
-  PrimUOp     :: UOp -> Prim  -- ^ Unary operator
-  PrimBOp     :: BOp -> Prim  -- ^ Binary operator
+  PrimUOp        :: UOp -> Prim -- ^ Unary operator
+  PrimBOp        :: BOp -> Prim -- ^ Binary operator
 
   PrimLeft    :: Prim      -- XXX
   PrimRight   :: Prim      -- XXX
 
-  PrimSqrt    :: Prim      -- ^ Integer square root (@sqrt@)
-  PrimLg      :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
-  PrimFloor   :: Prim      -- ^ Floor of fractional type (@floor@)
-  PrimCeil    :: Prim      -- ^ Ceiling of fractional type (@ceiling@)
-  PrimAbs     :: Prim      -- ^ Absolute value (@abs@)
+  PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
+  PrimLg         :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
+  PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)
+  PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
+  PrimAbs        :: Prim        -- ^ Absolute value (@abs@)
 
-  PrimSize    :: Prim      -- ^ Size of a set (XXX should be in library)
-  PrimPower   :: Prim      -- ^ Power set (XXX or bag?)
+  PrimSize       :: Prim        -- ^ Size of a set (XXX should be in library)
+  PrimPower      :: Prim        -- ^ Power set (XXX or bag?)
 
-  PrimList    :: Prim      -- ^ Container -> list conversion
-  PrimBag     :: Prim      -- ^ Container -> bag conversion
-  PrimSet     :: Prim      -- ^ Container -> set conversion
+  PrimList       :: Prim        -- ^ Container -> list conversion
+  PrimBag        :: Prim        -- ^ Container -> bag conversion
+  PrimSet        :: Prim        -- ^ Container -> set conversion
 
-  PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
-  PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
+  PrimB2C        :: Prim        -- ^ bag -> set of counts conversion
+  PrimC2B        :: Prim        -- ^ set of counts -> bag conversion
+  PrimMapToSet   :: Prim        -- ^ Map k v -> Set (k × v)
+  PrimSetToMap   :: Prim        -- ^ Set (k × v) -> Map k v
 
-  PrimMap     :: Prim      -- ^ Map operation for containers
-  PrimReduce  :: Prim      -- ^ Reduce operation for containers
-  PrimFilter  :: Prim      -- ^ Filter operation for containers
-  PrimJoin    :: Prim      -- ^ Monadic join for containers
-  PrimMerge   :: Prim      -- ^ Generic merge operation for bags/sets
+  PrimSummary    :: Prim        -- ^ Get Adjacency list of Graph
+  PrimVertex     :: Prim        -- ^ Construct a graph Vertex
+  PrimEmptyGraph :: Prim        -- ^ Empty graph
+  PrimOverlay    :: Prim        -- ^ Overlay two Graphs
+  PrimConnect    :: Prim        -- ^ Connect Graph to another with directed edges
 
-  PrimIsPrime :: Prim      -- ^ Efficient primality test
-  PrimFactor  :: Prim      -- ^ Factorization
+  PrimEmptyMap   :: Prim        -- ^ Empty Map
+  PrimInsert     :: Prim        -- ^ Insert into map
+  PrimLookup     :: Prim        -- ^ Get value associated with key in map
 
-  PrimCrash   :: Prim      -- ^ Crash
+  PrimEach       :: Prim        -- ^ Each operation for containers
+  PrimReduce     :: Prim        -- ^ Reduce operation for containers
+  PrimFilter     :: Prim        -- ^ Filter operation for containers
+  PrimJoin       :: Prim        -- ^ Monadic join for containers
+  PrimMerge      :: Prim        -- ^ Generic merge operation for bags/sets
 
-  PrimForever :: Prim      -- ^ @[x, y, z .. ]@
-  PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+  PrimIsPrime    :: Prim        -- ^ Efficient primality test
+  PrimFactor     :: Prim        -- ^ Factorization
+
+  PrimCrash      :: Prim        -- ^ Crash
+
+  PrimForever    :: Prim        -- ^ @[x, y, z .. ]@
+  PrimUntil      :: Prim        -- ^ @[x, y, z .. e]@
+
+  PrimHolds      :: Prim        -- ^ Test whether a proposition holds
+
+  PrimLookupSeq  :: Prim        -- ^ Lookup OEIS sequence
+  PrimExtendSeq  :: Prim        -- ^ Extend OEIS sequence
   deriving (Show, Read, Eq, Ord, Generic)
 
 instance Alpha Prim
@@ -108,6 +125,7 @@ data PrimInfo =
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
+<<<<<<< HEAD
   [ PrimInfo PrimLeft      "left"    True
   , PrimInfo PrimRight     "right"   True
 
@@ -117,30 +135,54 @@ primTable =
   , PrimInfo PrimFloor     "floor"   True
   , PrimInfo PrimCeil      "ceiling" True
   , PrimInfo PrimAbs       "abs"     True
+=======
+  [ PrimInfo (PrimUOp Not) "not"            True
+  , PrimInfo PrimSqrt      "sqrt"           True
+  , PrimInfo PrimFloor     "floor"          True
+  , PrimInfo PrimCeil      "ceiling"        True
+  , PrimInfo PrimAbs       "abs"            True
 
-  , PrimInfo PrimSize      "size"    True
-  , PrimInfo PrimPower     "power"   True
+  , PrimInfo PrimSize      "size"           True
+  , PrimInfo PrimPower     "power"          True
 
-  , PrimInfo PrimList      "list"    True
-  , PrimInfo PrimBag       "bag"     True
-  , PrimInfo PrimSet       "set"     True
+  , PrimInfo PrimList      "list"           True
+  , PrimInfo PrimBag       "bag"            True
+  , PrimInfo PrimSet       "set"            True
 
-  , PrimInfo PrimB2C       "bagCounts" True
-  , PrimInfo PrimC2B       "bagFromCounts" True
+  , PrimInfo PrimB2C       "bagCounts"      True
+  , PrimInfo PrimC2B       "bagFromCounts"  True
+  , PrimInfo PrimMapToSet  "mapToSet"       True
+  , PrimInfo PrimSetToMap  "map"            True
 
-  , PrimInfo PrimMap       "map"     True
-  , PrimInfo PrimReduce    "reduce"  True
-  , PrimInfo PrimFilter    "filter"  True
-  , PrimInfo PrimJoin      "join"    False
-  , PrimInfo PrimMerge     "merge"   False
+  , PrimInfo PrimSummary   "summary"        True
+  , PrimInfo PrimVertex    "vertex"         True
+  , PrimInfo PrimEmptyGraph "emptyGraph"     True
+  , PrimInfo PrimOverlay   "overlay"        True
+  , PrimInfo PrimConnect   "connect"        True
+>>>>>>> master
 
-  , PrimInfo PrimIsPrime   "isPrime" False
-  , PrimInfo PrimFactor    "factor"  False
+  , PrimInfo PrimEmptyMap  "emptyMap"       True
+  , PrimInfo PrimInsert    "insert"         True
+  , PrimInfo PrimLookup    "lookup"         True
 
-  , PrimInfo PrimCrash     "crash"   False
+  , PrimInfo PrimEach      "each"           True
+  , PrimInfo PrimReduce    "reduce"         True
+  , PrimInfo PrimFilter    "filter"         True
+  , PrimInfo PrimJoin      "join"           False
+  , PrimInfo PrimMerge     "merge"          False
 
-  , PrimInfo PrimForever   "forever" False
-  , PrimInfo PrimUntil     "until"   False
+  , PrimInfo PrimIsPrime   "isPrime"        False
+  , PrimInfo PrimFactor    "factor"         False
+
+  , PrimInfo PrimCrash     "crash"          False
+
+  , PrimInfo PrimForever   "forever"        False
+  , PrimInfo PrimUntil     "until"          False
+
+  , PrimInfo PrimHolds     "holds"          True
+
+  , PrimInfo PrimLookupSeq "lookupSequence" False
+  , PrimInfo PrimExtendSeq "extendSequence" False
   ]
 
 -- | A convenient map from each 'Prim' to its info record.

@@ -1,5 +1,7 @@
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Compile
@@ -33,6 +35,7 @@ import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
+import           Disco.Capability
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -48,29 +51,52 @@ compileTerm = runFreshM . compileDTerm . runDSM . desugarTerm
 compileDefn :: Defn -> Core
 compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
 
+-- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
+--   by desugaring and then compilling.
+compileProperty :: AProperty -> Core
+compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
+
 ------------------------------------------------------------
 -- Compiling terms
 ------------------------------------------------------------
 
 -- | Compile a typechecked, desugared 'DTerm' to an untyped 'Core'
 --   term.
-compileDTerm :: DTerm -> FreshM Core
+compileDTerm :: Has '[Fresh] m => DTerm -> m Core
 compileDTerm (DTVar _ x)   = return $ CVar (coerce x)
 compileDTerm (DTPrim ty x) = compilePrim ty x
 compileDTerm DTUnit        = return $ CCons 0 []
-compileDTerm (DTBool b)    = return $ CCons (fromEnum b) []
-compileDTerm (DTChar c)    = return $ CNum Fraction ((toInteger $ fromEnum c) % 1)
-compileDTerm (DTNat ty n)  = compileNat ty n
+compileDTerm (DTBool _ b)  = return $ CCons (fromEnum b) []
+compileDTerm (DTChar c)    = return $ CNum Fraction (toInteger (fromEnum c) % 1)
+compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
 
-compileDTerm (DTLam _ l) = do
-  (x,body) <- unbind l
-  c <- compileDTerm body
-  return $ CAbs (bind [coerce x] c)   -- XXX collect up nested DTLam into a single CAbs?
+compileDTerm term@(DTAbs q _ _) = do
+  (xs, tys, body) <- unbindDeep term
+  cbody <- compileDTerm body
+  case q of
+    Lam -> return $ abstract xs cbody
+    Ex  -> return $ quantify (OExists tys) (abstract xs cbody)
+    All -> return $ quantify (OForall tys) (abstract xs cbody)
+
+  where
+    -- Gather nested abstractions with the same quantifier.
+    unbindDeep :: Has '[Fresh] m => DTerm -> m ([Name DTerm], [Type], DTerm)
+    unbindDeep (DTAbs q' ty l) | q == q' = do
+      (name, inner) <- unbind l
+      (names, tys, body) <- unbindDeep inner
+      return (name:names, ty:tys, body)
+    unbindDeep t                         = return ([], [], t)
+
+    abstract :: [Name DTerm] -> Core -> Core
+    abstract xs body = CAbs (bind (map coerce xs) body)
+
+    quantify :: Op -> Core -> Core
+    quantify op f = CApp (CConst op) [(Lazy, f)]
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
-compileDTerm (DTApp _ (DTApp _ (DTPrim _ (PrimBOp Cons)) t1) t2)
+compileDTerm (DTApp _ (DTPrim _ (PrimBOp Cons)) (DTPair _ t1 t2))
   = CCons 1 <$> mapM compileDTerm [t1, t2]
 
 -- Special cases for left and right, which also compile to constructor applications.
@@ -104,27 +130,29 @@ compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CT
 
 compileDTerm (DTNil _)        = return $ CCons 0 []
 
+compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
+
 ------------------------------------------------------------
 
 -- | Compile a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
-compileNat :: Type -> Integer -> FreshM Core
-compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
-compileNat _         x = return $ CNum Fraction (x % 1)
+-- compileNat :: Has '[Fresh] m => Type -> Integer -> m Core
+-- compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
+-- compileNat _         x = return $ CNum Fraction (x % 1)
 
 ------------------------------------------------------------
 
 -- | Compile a DTerm which will be an argument to a function,
 --   packaging it up along with the strictness of its type.
-compileArg :: DTerm -> FreshM (Strictness, Core)
+compileArg :: Has '[Fresh] m => DTerm -> m (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
 -- | Compile a primitive.  Typically primitives turn into a
 --   corresponding function constant in the core language, but
 --   sometimes the particular constant it turns into may depend on the
 --   type.
-compilePrim :: Type -> Prim -> FreshM Core
+compilePrim :: Has '[Fresh] m => Type -> Prim -> m Core
 
 compilePrim (argTy :->: _) (PrimUOp uop) = return $ compileUOp argTy uop
 compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
@@ -145,11 +173,10 @@ compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
   return $ CAbs $ bind [a] $ CCons 1 [CVar a]
 
-compilePrim (ty1 :->: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
+compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 
 compilePrim _ PrimSqrt  = return $ CConst OSqrt
-compilePrim _ PrimLg    = return $ CConst OLg
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil  = return $ CConst OCeil
 compilePrim _ PrimAbs   = return $ CConst OAbs
@@ -174,29 +201,50 @@ compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
 compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
-compilePrim (_ :->: TyList _ :->: _)          PrimMap = return $ CConst OMapList
-compilePrim (_ :->: TyBag _ :->: TyBag outTy) PrimMap = return $ CConst (OMapBag outTy)
-compilePrim (_ :->: TySet _ :->: TySet outTy) PrimMap = return $ CConst (OMapSet outTy)
-compilePrim ty                                PrimMap = compilePrimErr PrimMap ty
+compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
+compilePrim (_ :->: TyMap _ _) PrimSetToMap = return $ CConst OSetToMap
 
-compilePrim (_ :->: _ :->: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
-compilePrim (_ :->: _ :->: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
-compilePrim (_ :->: _ :->: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
-compilePrim ty                              PrimReduce = compilePrimErr PrimReduce ty
+compilePrim ty PrimMapToSet = compilePrimErr PrimMapToSet ty
+compilePrim ty PrimSetToMap = compilePrimErr PrimSetToMap ty
 
-compilePrim (_ :->: TyList _ :->: _) PrimFilter = return $ CConst OFilterList
-compilePrim (_ :->: TyBag  _ :->: _) PrimFilter = return $ CConst OFilterBag
-compilePrim (_ :->: TySet  _ :->: _) PrimFilter = return $ CConst OFilterBag
-compilePrim ty                       PrimFilter = compilePrimErr PrimFilter ty
+compilePrim _     PrimSummary = return $ CConst OSummary
+compilePrim (_ :->: TyGraph ty) PrimVertex     = return $ CConst $ OVertex ty
+compilePrim (TyGraph ty)        PrimEmptyGraph = return $ CConst $ OEmptyGraph ty
+compilePrim (_ :->: TyGraph ty) PrimOverlay    = return $ CConst $ OOverlay ty
+compilePrim (_ :->: TyGraph ty) PrimConnect    = return $ CConst $ OConnect ty
+
+compilePrim ty PrimVertex     = compilePrimErr PrimVertex ty
+compilePrim ty PrimEmptyGraph = compilePrimErr PrimEmptyGraph ty
+compilePrim ty PrimOverlay    = compilePrimErr PrimOverlay ty
+compilePrim ty PrimConnect    = compilePrimErr PrimConnect ty
+
+compilePrim _  PrimEmptyMap   = return $ CConst OEmptyMap
+compilePrim _  PrimInsert     = return $ CConst OInsert
+compilePrim _  PrimLookup     = return $ CConst OLookup
+
+compilePrim (_ :*: TyList _ :->: _)          PrimEach = return $ CConst OEachList
+compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
+compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
+compilePrim ty                               PrimEach = compilePrimErr PrimEach ty
+
+compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :*: _ :*: TyBag  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :*: _ :*: TySet  _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim ty                            PrimReduce = compilePrimErr PrimReduce ty
+
+compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $ CConst OFilterList
+compilePrim (_ :*: TyBag  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim (_ :*: TySet  _ :->: _) PrimFilter = return $ CConst OFilterBag
+compilePrim ty                      PrimFilter = compilePrimErr PrimFilter ty
 
 compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty                PrimJoin = compilePrimErr PrimJoin ty
 
-compilePrim (_ :->: TyBag a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim (_ :->: TySet a :->: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim ty                             PrimMerge = compilePrimErr PrimMerge ty
+compilePrim (_ :*: TyBag a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim (_ :*: TySet a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
+compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
@@ -205,6 +253,11 @@ compilePrim _ PrimCrash   = return $ CConst OCrash
 
 compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
+
+compilePrim _ PrimHolds   = return $ CConst OHolds
+
+compilePrim _ PrimLookupSeq   = return $ CConst OLookupSeq
+compilePrim _ PrimExtendSeq   = return $ CConst OExtendSeq
 
 compilePrimErr :: Prim -> Type -> a
 compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad type " ++ show ty
@@ -215,13 +268,13 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 
 -- | Compile a desugared branch.  This does very little actual work, just
 --   translating directly from one AST to another.
-compileBranch :: DBranch -> FreshM CBranch
+compileBranch :: Has '[Fresh] m => DBranch -> m CBranch
 compileBranch b = do
   (gs, d) <- unbind b
   bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
 
 -- | Compile a desugared guard.
-compileGuard :: DGuard -> FreshM (Embed Core, CPattern)
+compileGuard :: Has '[Fresh] m => DGuard -> m (Embed Core, CPattern)
 compileGuard (DGPat (unembed -> d) dpat) =
   (,)
     <$> (embed <$> compileDTerm d)
@@ -258,7 +311,7 @@ compileUOp
 compileUOp _ op = CConst (coreUOps ! op)
   where
     -- Just look up the corresponding core operator.
-    coreUOps = M.fromList $
+    coreUOps = M.fromList
       [ Neg      ==> ONeg
       , Fact     ==> OFact
       ]
@@ -286,14 +339,25 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 --
 -- We match on the type of arg1 because that is the only one which
 -- will consistently be TyFin in the case of Div, Exp, and Divides.
-compileBOp (TyFin n) _ _ op
-  | op `elem` [Div, Exp, Divides]
-  = CConst ((omOps ! op) n)
+-- compileBOp (TyFin n) _ _ op
+--   | op `elem` [Div, Exp, Divides]
+--   = CConst ((omOps ! op) n)
+--   where
+--     omOps = M.fromList
+--       [ Div     ==> OMDiv
+--       , Exp     ==> OMExp
+--       , Divides ==> OMDivides
+--       ]
+
+-- Graph operations are separate, but use the same syntax, as traditional
+-- addition and multiplication.
+compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
+  | op `elem` [Add, Mul]
+  = CConst (regularOps ! op)
   where
-    omOps = M.fromList
-      [ Div     ==> OMDiv
-      , Exp     ==> OMExp
-      , Divides ==> OMDivides
+    regularOps = M.fromList
+      [ Add     ==> OOverlay a
+      , Mul     ==> OConnect a
       ]
 
 -- Some regular arithmetic operations that just translate straightforwardly.
@@ -319,6 +383,10 @@ compileBOp _ _ _ op
 -- decideOrdFor.)
 compileBOp ty _ _ Eq = CConst (OEq ty)
 compileBOp ty _ _ Lt = CConst (OLt ty)
+
+-- Likewise, ShouldEq also needs to know the type at which the
+-- comparison is occurring.
+compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
 
 compileBOp ty (TyList _) _ Elem = CConst (OListElem ty)
 compileBOp ty _ _          Elem = CConst (OBagElem  ty)

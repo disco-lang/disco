@@ -4,10 +4,8 @@ Running tests...
   dummy: OK
   setSize: OK
 Loaded.
-reduce : (a → a → a) → a → List a → a
-reduce (λ x y. x + y) : ℕ → List ℕ → ℕ
-reduce (λ x y. x + y) 0 : List ℕ → ℕ
-reduce (λ x y. x + y) 0 [1 .. 10] : ℕ
+reduce : (a × a → a) × a × List a → a
+reduce(~+~, 0, [1 .. 10]) : ℕ
 55
 60
 true

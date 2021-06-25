@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections   #-}
 {-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE ViewPatterns    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,6 +38,7 @@ module Disco.Parser
 
          -- ** Modules
        , wholeModule, parseModule, parseExtName, parseTopLevel, parseDecl
+       , parseImport, parseModuleName
 
          -- ** Terms
        , term, parseTerm, parseTerm', parseExpr, parseAtom
@@ -53,28 +55,29 @@ module Disco.Parser
        )
        where
 
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
+                                                          fvAny, string2Name)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Control.Monad.Combinators        (many, (<|>))
 import           Control.Monad.Combinators.Expr
-import           Text.Megaparsec                  hiding (runParser)
-import qualified Text.Megaparsec                  as MP
+import           Text.Megaparsec                         hiding (runParser)
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer       as L
+import qualified Text.Megaparsec.Char.Lexer              as L
 
-import           Control.Lens                     (makeLenses, toListOf, use,
-                                                   (.=))
+import           Control.Lens                            (makeLenses, toListOf,
+                                                          use, (.=))
 import           Control.Monad.State
-import           Data.Char                        (isDigit)
-import           Data.List                        (find, intercalate)
-import qualified Data.Map                         as M
-import           Data.Maybe                       (catMaybes)
+import           Data.Char                               (isDigit)
+import           Data.List                               (find, intercalate)
+import qualified Data.Map                                as M
+import           Data.Maybe                              (catMaybes)
 import           Data.Ratio
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import           Data.Set                                (Set)
+import qualified Data.Set                                as S
 import           Data.Void
 
+import           Data.Foldable                           (asum)
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Syntax.Operators
@@ -194,15 +197,22 @@ ellipsis  = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
+forall :: Parser ()
+forall = () <$ symbol "∀" <|> reserved "forall"
+
+exists :: Parser ()
+exists = () <$ symbol "∃" <|> reserved "exists"
+
 -- | Parse a natural number.
 natural :: Parser Integer
 natural = lexeme L.decimal <?> "natural number"
 
 -- | Parse a nonnegative decimal of the form @xxx.yyyy[zzz]@, where
---   the @y@s and bracketed @z@s are optional.  For example, this
---   parser accepts all of the following:
+--   the @y@s and bracketed @z@s are both optional as long as the
+--   other is present.  (In other words, there must be something after
+--   the period.) For example, this parser accepts all of the
+--   following:
 --
---   > 2.
 --   > 2.0
 --   > 2.333
 --   > 2.33[45]
@@ -211,26 +221,32 @@ natural = lexeme L.decimal <?> "natural number"
 --   The idea is that brackets surround an infinitely repeating
 --   sequence of digits.
 --
---   We are careful to only parse a decimal terminated by a period if
---   there is not another period immediately following.  This way
---   something like @[1..]@ parses properly as the number 1 with an
---   ellipsis.
+--   We used to accept @2.@ with no trailing digits, but no longer do.
+--   See https://github.com/disco-lang/disco/issues/245 and Note
+--   [Trailing period].
 decimal :: Parser Rational
-decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char '.')
-                              <*> many digit
-                              <*> optionMaybe (brackets (some digit))
+decimal = lexeme (readDecimal <$> some digit <* char '.'
+                              <*> fractionalPart
                  )
   where
     digit = satisfy isDigit
-    readDecimal a b mrep = read a % 1   -- integer part
+    fractionalPart =
+          -- either some digits optionally followed by bracketed digits...
+          (,) <$> some digit <*> optional (brackets (some digit))
+          -- ...or just bracketed digits.
+      <|> ([],) <$> (Just <$> brackets (some digit))
 
-                           -- next part is just b/10^n
-                         + (if null b then 0 else read b) % (10^(length b))
+    readDecimal a (b, mrep)
+      = read a % 1   -- integer part
 
-                           -- repeating part
-                         + readRep (length b) mrep
+        -- next part is just b/10^n
+        + (if null b then 0 else read b) % (10^length b)
+
+        -- repeating part
+        + readRep (length b) mrep
+
     readRep _      Nothing    = 0
-    readRep offset (Just rep) = read rep % (10^offset * (10^(length rep) - 1))
+    readRep offset (Just rep) = read rep % (10^offset * (10^length rep - 1))
       -- If s = 0.[rep] then 10^(length rep) * s = rep.[rep], so
       -- 10^(length rep) * s - s = rep, so
       --
@@ -238,6 +254,27 @@ decimal = lexeme (readDecimal <$> some digit <* char '.' <* notFollowedBy (char 
       --
       -- We also have to divide by 10^(length b) to shift it over
       -- past any non-repeating prefix.
+
+-- ~~~~ Note [Trailing period]
+--
+-- We used to accept numbers with nothing after the trailing period,
+-- such as @2.@. However, this caused some problems with parsing:
+--
+--   - First, https://github.com/disco-lang/disco/issues/99 which we
+--     solved by making sure there was not another period after the
+--     trailing period.
+--   - Next, https://github.com/disco-lang/disco/issues/245.
+--
+-- I first tried solving #245 by disallowing *any* operator character
+-- after the trailing period, but then some tests in the test suite
+-- started failing, where we had written things like @1./(10^5)@.  The
+-- problem is that when a period is followed by another operator
+-- symbol, sometimes we might want them to be parsed as an operator
+-- (as in @2.-4@, #245), and sometimes we might not (as in
+-- @1./(10^5)@).  So in the end it seems simpler and cleaner to
+-- require at least a 0 digit after the period --- just like pretty
+-- much every other programming language and just like standard
+-- mathematical practice.
 
 -- | Parse a reserved word.
 reserved :: String -> Parser ()
@@ -252,11 +289,11 @@ reservedWords =
   , "min", "max"
   , "union", "∪", "intersect", "∩", "subset", "⊆", "elem", "∈"
   , "enumerate", "count", "divides"
-  , "Void", "Unit", "Bool", "Boolean", "B", "Char", "C"
+  , "Void", "Unit", "Bool", "Boolean", "Proposition", "Prop", "Char"
   , "Nat", "Natural", "Int", "Integer", "Frac", "Fractional", "Rational", "Fin"
-  , "List", "Bag", "Set"
+  , "List", "Bag", "Set", "Graph", "Map"
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
-  , "forall", "type"
+  , "∀", "forall", "∃", "exists", "type"
   , "import", "using"
   ]
 
@@ -268,17 +305,12 @@ identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
     check x = if x `elem` reservedWords
-                then fail $ "keyword " ++ show x ++ " cannot be used as an identifier"
+                then fail $ "keyword \"" ++ x ++ "\" cannot be used as an identifier"
                 else return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
-ident = string2Name <$> (identifier letterChar)
-
--- | Optionally parse, succesfully returning 'Nothing' if the parse
---   fails.
-optionMaybe :: Parser a -> Parser (Maybe a)
-optionMaybe p = (Just <$> p) <|> pure Nothing
+ident = string2Name <$> identifier letterChar
 
 ------------------------------------------------------------
 -- Parser
@@ -300,7 +332,7 @@ parseModule = do
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      groupTLs :: [DocThing] -> [TopLevel] -> ([(Decl, Maybe (Name Term, [DocThing]))])
+      groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
       groupTLs _ [] = []
       groupTLs revDocs (TLDoc doc : rest)
         = groupTLs (doc : revDocs) rest
@@ -340,10 +372,12 @@ parseExtName = choice (map parseOneExt allExtsList) <?> "language extension name
 -- | Parse an import, of the form @import <modulename>@.
 parseImport :: Parser ModName
 parseImport = L.nonIndented sc $
-  reserved "import" *> moduleName
-  where
-    moduleName = lexeme $
-      intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
+  reserved "import" *> parseModuleName
+
+-- | Parse the name of a module.
+parseModuleName :: Parser ModName
+parseModuleName = lexeme $
+  intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.
@@ -377,18 +411,10 @@ parseDocString = label "documentation" $ L.nonIndented sc $
 --   @!!! forall x1 : ty1, ..., xn : tyn. term@.
 --
 --   The forall is optional.
-parseProperty :: Parser Property
+parseProperty :: Parser Term
 parseProperty = label "property" $ L.nonIndented sc $ do
   _ <- symbol "!!!"
-  indented $ do
-    bind
-      <$> (parseUniversal <|> return [])
-      <*> parseTerm
-  where
-    parseUniversal =
-         (() <$ symbol "∀" <|> reserved "forall")
-      *> ((,) <$> ident <*> (colon *> parseType)) `sepBy` comma
-      <* dot
+  indented parseTerm
 
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).
@@ -398,14 +424,14 @@ parseDecl = try (DType <$> parseTyDecl) <|> DDefn <$> parseDefn <|> DTyDef <$> p
 -- | Parse a top-level type declaration of the form @x : ty@.
 parseTyDecl :: Parser TypeDecl
 parseTyDecl = label "type declaration" $
-  TypeDecl <$> ident <*> (indented $ colon *> parsePolyTy)
+  TypeDecl <$> ident <*> indented (colon *> parsePolyTy)
 
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser TermDefn
 parseDefn = label "definition" $
   TermDefn
   <$> ident
-  <*> (indented $ (:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+  <*> indented ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
 
 -- | Parse the definition of a user-defined algebraic data type.
 parseTyDefn :: Parser TypeDefn
@@ -415,8 +441,7 @@ parseTyDefn = label "type defintion" $ do
     name <- parseTyDef
     args <- many parseTyVarName
     _ <- symbol "="
-    body <- parseType
-    return $ TypeDefn name args body
+    TypeDefn name args <$> parseType
 
 -- | Parse the entire input as a term (with leading whitespace and
 --   no leftovers).
@@ -427,7 +452,7 @@ term = between sc eof parseTerm
 --   followed by an ascription.
 parseTerm :: Parser Term
 parseTerm = -- trace "parseTerm" $
-  (ascribe <$> parseTerm' <*> optionMaybe (label "type annotation" $ colon *> parsePolyTy))
+  ascribe <$> parseTerm' <*> optional (label "type annotation" $ colon *> parsePolyTy)
   where
     ascribe t Nothing   = t
     ascribe t (Just ty) = TAscr t ty
@@ -435,7 +460,7 @@ parseTerm = -- trace "parseTerm" $
 -- | Parse a non-atomic, non-ascribed term.
 parseTerm' :: Parser Term
 parseTerm' = label "expression" $
-      parseLambda
+      parseQuantified
   <|> parseLet
   <|> parseExpr
   <|> parseAtom
@@ -462,24 +487,24 @@ parseAtom = label "expression" $
   <|> TNat <$> natural
   -- <|> TInj <$> parseInj <*> parseAtom
   <|> parseTypeOp
-  <|> (TApp (TPrim PrimFloor) . TParens) <$> fbrack parseTerm
-  <|> (TApp (TPrim PrimCeil)  . TParens) <$> cbrack parseTerm
+  <|> TApp (TPrim PrimFloor) . TParens <$> fbrack parseTerm
+  <|> TApp (TPrim PrimCeil)  . TParens <$> cbrack parseTerm
   <|> parseCase
   <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
-  <|> tuple <$> (parens (parseTerm `sepBy` comma))
+  <|> tuple <$> parens (parseTerm `sepBy` comma)
 
 -- | Parse a wildcard, which is an underscore that isn't the start of
 --   an identifier.
 parseWild :: Parser ()
 parseWild = (lexeme . try . void) $
-  string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'" <|> oneOf opChar)
+  string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'")
 
 -- | Parse a standalone operator name with tildes indicating argument
 --   slots, e.g. ~+~ for the addition operator.
 parseStandaloneOp :: Parser Prim
-parseStandaloneOp = foldr (<|>) empty $ concatMap mkStandaloneOpParsers (concat opTable)
+parseStandaloneOp = asum $ concatMap mkStandaloneOpParsers (concat opTable)
   where
     mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
     mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
@@ -557,13 +582,13 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
 
     parseRepTerm = do
       t <- parseTerm
-      n <- optionMaybe $ do
+      n <- optional $ do
         guard (c == BagContainer)
         void hash
         parseTerm
       return (t, n)
 
-    singletonContainer t = TContainer c [t] <$> optionMaybe parseEllipsis
+    singletonContainer t = TContainer c [t] <$> optional parseEllipsis
 
     -- The remainder of a container after the first term starts with
     -- either a pipe (for a comprehension) or a comma (for a literal
@@ -579,7 +604,7 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
           -- the first, then an optional ellipsis, and return
           -- everything together.
           ts <- parseRepTerm `sepBy` comma
-          e  <- optionMaybe parseEllipsis
+          e  <- optional parseEllipsis
 
           return $ TContainer c ((t,n):ts) e
         _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
@@ -589,7 +614,7 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
 parseEllipsis :: Parser (Ellipsis Term)
 parseEllipsis = do
   _ <- ellipsis
-  maybe Forever Until <$> optionMaybe parseTerm
+  maybe Forever Until <$> optional parseTerm
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.
@@ -610,7 +635,7 @@ parseQual = try parseSelection <|> parseQualGuard
     selector = reservedOp "<-" <|> reserved "in"
 
     parseQualGuard = label "boolean expression" $
-      QGuard <$> embed <$> parseTerm
+      QGuard . embed <$> parseTerm
 
 -- | Turn a parenthesized list of zero or more terms into the
 --   appropriate syntax node: zero terms @()@ is a TUnit; one term
@@ -627,17 +652,18 @@ parseInj :: Parser Side
 parseInj =
   L <$ reserved "left" <|> R <$ reserved "right"
 
--- | Parse an anonymous function.
-parseLambda :: Parser Term
-parseLambda =
-  TAbs <$> (bind <$> (lambda *> some parseLambdaArg) <*> (dot *> parseTerm'))
+-- | Parse a quantified abstraction (λ, ∀, ∃).
+parseQuantified :: Parser Term
+parseQuantified =
+  TAbs <$> parseQuantifier
+       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm))
 
--- | Parse an argument to a lambda, either a variable or a binding of
---   the form @(x:ty)@.
-parseLambdaArg :: Parser (Name Term, Embed (Maybe Type))
-parseLambdaArg =
-      parens ((,) <$> ident <*> (symbol ":" *> ((embed . Just) <$> parseType)))
-  <|> (, embed Nothing) <$> ident
+-- | Parse a quantifier symbol (lambda, forall, or exists).
+parseQuantifier :: Parser Quantifier
+parseQuantifier =
+      Lam <$ lambda
+  <|> All <$ forall
+  <|> Ex  <$ exists
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
 parseLet :: Parser Term
@@ -652,7 +678,7 @@ parseLet =
 parseBinding :: Parser Binding
 parseBinding = do
   x   <- ident
-  mty <- optionMaybe (colon *> parsePolyTy)
+  mty <- optional (colon *> parsePolyTy)
   t   <- symbol "=" *> (embed <$> parseTerm)
   return $ Binding (embed <$> mty) x t
 
@@ -699,10 +725,10 @@ parsePattern = label "pattern" $ do
 
 -- | Attempt converting a term to a pattern.
 termToPattern :: Term -> Maybe Pattern
-termToPattern TWild       = Just $ PWild
+termToPattern TWild       = Just PWild
 termToPattern (TVar x)    = Just $ PVar x
 termToPattern (TParens t) = termToPattern t
-termToPattern TUnit       = Just $ PUnit
+termToPattern TUnit       = Just PUnit
 termToPattern (TBool b)   = Just $ PBool b
 termToPattern (TNat n)    = Just $ PNat n
 termToPattern (TChar c)   = Just $ PChar c
@@ -713,6 +739,10 @@ termToPattern (TApp (TVar i) t)
   | i == string2Name "right" = PInj R <$> termToPattern t
 -- termToPattern (TInj s t)  = PInj s <$> termToPattern t
 
+termToPattern (TAscr t s) = case s of
+  Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'
+  _                                 -> Nothing
+
 termToPattern (TBin Cons t1 t2)
   = PCons <$> termToPattern t1 <*> termToPattern t2
 
@@ -720,11 +750,11 @@ termToPattern (TBin Add t1 t2)
   = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PAdd L p t2
       (_, Just p)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t1) == 0
+        && null (toListOf fvAny t1)
         -> Just $ PAdd R p t1
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -734,11 +764,11 @@ termToPattern (TBin Mul t1 t2)
   = case (termToPattern t1, termToPattern t2) of
       (Just p, _)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PMul L p t2
       (_, Just p)
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t1) == 0
+        && null (toListOf fvAny t1)
         -> Just $ PMul R p t1
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -748,7 +778,7 @@ termToPattern (TBin Sub t1 t2)
   = case termToPattern t1 of
       Just p
         |  length (toListOf fvAny p) == 1
-        && length (toListOf fvAny t2) == 0
+        && null (toListOf fvAny t2)
         -> Just $ PSub p t2
       _ -> Nothing
       -- If t1 is a pattern binding one variable, and t2 has no fvs,
@@ -764,13 +794,13 @@ termToPattern (TBin Div t1 t2)
 termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
 termToPattern (TContainer ListContainer ts Nothing)
-  = PList <$> mapM termToPattern (map fst ts)
+  = PList <$> mapM (termToPattern . fst) ts
 
 termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term
-parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "expression")
+parseExpr = fixJuxtMul . fixChains <$> (makeExprParser parseAtom table <?> "expression")
   where
     table
         -- Special case for function application, with highest
@@ -787,10 +817,10 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
 
     withOpFixity (UOpF fx op) syn
-      = (ufxParser fx) ((reservedOp syn <?> "operator") >> return (TUn op))
+      = ufxParser fx ((reservedOp syn <?> "operator") >> return (TUn op))
 
     withOpFixity (BOpF fx op) syn
-      = (bfxParser fx) ((reservedOp syn <?> "operator") >> return (TBin op))
+      = bfxParser fx ((reservedOp syn <?> "operator") >> return (TBin op))
 
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix
@@ -836,7 +866,7 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- like a multiplicative term.  However, we must be sure to
     -- *first* recursively fix the subterms (particularly the
     -- left-hand one) *before* doing this analysis.  See
-    -- https://github.com/disco-lang/disco/issues/71 .
+    -- <https://github.com/disco-lang/disco/issues/71> .
     fixJuxtMul (TApp t1 t2)
       | isMultiplicativeTerm t1' = fixPrec $ TBin Mul t1' t2'
       | otherwise                = fixPrec $ TApp     t1' t2'
@@ -861,8 +891,8 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     -- parenthezised, but contains a TApp rather than a TBin or TUn.
     isMultiplicativeTerm :: Term -> Bool
     isMultiplicativeTerm (TNat _)    = True
-    isMultiplicativeTerm (TUn {})    = True
-    isMultiplicativeTerm (TBin {})   = True
+    isMultiplicativeTerm TUn{}       = True
+    isMultiplicativeTerm TBin{}      = True
     isMultiplicativeTerm (TParens t) = isMultiplicativeTerm t
     isMultiplicativeTerm _           = False
 
@@ -886,12 +916,6 @@ parseExpr = (fixJuxtMul . fixChains) <$> (makeExprParser parseAtom table <?> "ex
     fixPrec (TBin bop1 t1 (TBin bop2 t2 t3))
       | bPrec bop2 < bPrec bop1 = TBin bop2 (fixPrec $ TBin bop1 t1 t2) t3
 
-    fixPrec (TApp (TBin bop t1 t2) t3)
-      | bPrec bop < funPrec = TBin bop t1 (fixPrec $ TApp t2 t3)
-
-    fixPrec (TApp t1 (TBin bop t2 t3))
-      | bPrec bop < funPrec = TBin bop (fixPrec $ TApp t1 t2) t3
-
     fixPrec t = t
 
 -- | Parse an atomic type.
@@ -899,9 +923,10 @@ parseAtomicType :: Parser Type
 parseAtomicType = label "type" $
       TyVoid <$ reserved "Void"
   <|> TyUnit <$ reserved "Unit"
-  <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool" <|> reserved "B")
-  <|> TyC    <$ (reserved "Char" <|> reserved "C")
-  <|> try parseTyFin
+  <|> TyBool <$ (reserved "Boolean" <|> reserved "Bool")
+  <|> TyProp <$ (reserved "Proposition" <|> reserved "Prop")
+  <|> TyC    <$ reserved "Char"
+  -- <|> try parseTyFin
   <|> TyN    <$ (reserved "Natural" <|> reserved "Nat" <|> reserved "N" <|> reserved "ℕ")
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
@@ -910,16 +935,18 @@ parseAtomicType = label "type" $
   <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
-parseTyFin :: Parser Type
-parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
-         <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
+-- parseTyFin :: Parser Type
+-- parseTyFin = TyFin  <$> (reserved "Fin" *> natural)
+--          <|> TyFin  <$> (lexeme (string "Z" <|> string "ℤ") *> natural)
 
 parseCon :: Parser Con
 parseCon =
-      CList <$  reserved "List"
-  <|> CBag  <$  reserved "Bag"
-  <|> CSet  <$  reserved "Set"
-  <|> CUser <$> parseTyDef
+      CList  <$  reserved "List"
+  <|> CBag   <$  reserved "Bag"
+  <|> CSet   <$  reserved "Set"
+  <|> CGraph <$  reserved "Graph"
+  <|> CMap   <$  reserved "Map"
+  <|> CUser  <$> parseTyDef
 
 parseTyDef :: Parser String
 parseTyDef =  identifier upperChar

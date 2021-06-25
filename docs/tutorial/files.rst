@@ -43,21 +43,23 @@ defined in the file are available for use.  For example:
     Loaded.
     Disco> approx_pi
     22/7
-    Disco> increment 3
+    Disco> increment(3)
     4
     Disco> :type increment
     increment : ℕ → ℕ
-    Disco> approx_pi + increment 17
+    Disco> approx_pi + increment(17)
     148/7
+
+(If you want to follow along, note that the above interaction assumes
+that the disco REPL was run from the `docs/tutorial` subdirectory.)
 
 Comments and documentation
 ==========================
 
-Comments in disco can be written in one of two ways, using the same
-syntax as Haskell.  Two consecutive hyphens ``--`` will cause disco to ignore
-everything until the next newline character; ``{- ... -}`` creates a
-multi-line comment causing disco to ignore everything in between
-``{-`` and ``-}``.
+Comments in disco have a similar syntax to Haskell, with the exception
+that only single-line comments are supported, and not multi-line
+comments.  In particular, two consecutive hyphens ``--`` will cause
+disco to ignore everything until the next newline character.
 
 .. literalinclude:: example/comment.disco
    :language: idris
@@ -112,15 +114,7 @@ developers.
     ::
 
         Disco> :parse 2 + [3,4 : Int]
-        TBin Add (TNat 2) (TList [TNat 3,TAscr (TNat 4) TyZ] Nothing)
-
-* ``:desugar`` shows the desugared core language term corresponding to
-  an expression.
-
-    ::
-
-        Disco> :desugar [3,4]
-        CCons 1 [CNum Fraction (3 % 1),CCons 1 [CNum Fraction (4 % 1),CCons 0 []]]
+        TBin_ () Add (TNat_ () 2) (TContainer_ () ListContainer [(TNat_ () 3,Nothing),(TAscr_ () (TNat_ () 4) (Forall (<[]> TyAtom (ABase Z))),Nothing)] Nothing)
 
 * ``:pretty`` shows the pretty-printed form of a term (without
   typechecking it).
@@ -129,3 +123,19 @@ developers.
 
         Disco> :pretty 2 + [3,4:Int]
         2 + [3, (4 : ℤ)]
+
+* ``:desugar`` shows the desugared term corresponding to
+  an expression.
+
+    ::
+
+        Disco> :desugar [3,4]
+        3 :: 4 :: []
+
+* ``:compile`` shows the compiled core language term corresponding to
+  an expression.
+
+    ::
+
+       Disco> :compile [3 - 4]
+       CCons 1 [CApp (CConst OAdd) [(Lazy,CCons 0 [CNum Fraction (3 % 1),CApp (CConst ONeg) [(Strict,CNum Fraction (4 % 1))]])],CCons 0 []]

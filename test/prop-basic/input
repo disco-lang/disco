@@ -1,0 +1,9 @@
+:load test/prop-basic/prop-basic.disco
+:test injective (\x. x * 2)
+:test idempotent (\x. x max 10)
+:test commutative (\(a, b). a * b)
+:test associative (\(a, b). a + b)
+:test identityFor(0, \(a, b). a max b)
+
+-- Randomized testing doesn't do a good job with exists inside forall!
+-- :test surjective (\x. x)

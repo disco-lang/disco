@@ -83,8 +83,8 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
 
     -- At this point we know ty2 isn't the same skolem nor a unification variable.
     -- Skolems don't unify with anything.
-    unifyOne' (Skolem _, _) = mzero
-    unifyOne' (_, Skolem _) = mzero
+    unifyOne' (TySkolem _, _) = mzero
+    unifyOne' (_, TySkolem _) = mzero
 
     -- Unify two container types: unify the container descriptors as
     -- well as the type arguments

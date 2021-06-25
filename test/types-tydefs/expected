@@ -1,7 +1,7 @@
 Loading types-tydefs.disco...
 Loaded.
 incr : Wahoo → Wahoo
-let f = λ(x : Wahoo). x + 1 in f 3 : ℕ
+let f = λx : Wahoo. x + 1 in f(3) : ℕ
 4
 sumTripletList : List Triplet → ℕ
 21

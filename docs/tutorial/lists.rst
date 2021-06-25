@@ -10,9 +10,7 @@ Basic lists
 ===========
 
 All the elements of a list must be the same type, and the type of a
-list with elements of type ``T`` is written ``List T``.  Since it is
-unambiguous, nested list types can be written without parentheses,
-*e.g.* ``List List List T``.
+list with elements of type ``T`` is written ``List T``.
 
 The basic syntax for constructing and pattern-matching on lists is
 almost exactly the same as in Haskell, with the one difference that

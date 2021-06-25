@@ -1,0 +1,30 @@
+# The input parts
+{
+    "Type" = [
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "test",
+        "chore"
+    ]
+    "Scope" = @
+    "Subject" = @
+    "Body" = !@
+    "Footer" = !@
+}
+
+# predefined messages
+{
+    vb = "chore: version bump"
+}
+
+# The output format
+# Takes the values provided from the input stage
+# and interpolates them in
+${Type} (${Scope}): ${Subject}
+
+${Body}
+
+${Footer}

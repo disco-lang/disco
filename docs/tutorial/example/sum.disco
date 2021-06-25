@@ -1,8 +1,8 @@
 sum1 : N + Bool
-sum1 = left 3
+sum1 = left(3)
 
 sum2 : N + Bool
-sum2 = right false
+sum2 = right(false)
 
 sum3 : N + N + N
-sum3 = right (right 3)
+sum3 = right(right(3))

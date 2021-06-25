@@ -71,28 +71,23 @@ The syntax for an anonymous function in disco consists of a *lambda*
 (either a backslash or an actual ``λ``) followed by one or more
 *bindings*, a period, and an arbitrary disco expression (the *body*).
 
-Each *binding* specifies the name of an input to the function.  A
-binding can be either a simple variable name, or a parenthesized
-variable name with a type annotation (*e.g.* ``(x:Nat)``).  There can
-be multiple bindings separated by whitespace, which creates a
-(curried) "multi-argument" function.
+Each *binding* is a *pattern*, which could be a single variable name,
+or a more complex pattern. Note that patterns can also contain type
+annotations. There can be multiple bindings separated by commas, which
+creates a (curried) "multi-argument" function.
 
-.. note::
-
-   Currently, bindings cannot contain patterns, but in general we
-   might want to allow this, for example, ``(λ(x,y). x + y) : N*N -> N``.
-
-Here are a few examples of using anonymous functions as arguments
-to ``thrice``:
+Here are a few examples to illustrate the possibilities:
 
 ::
 
     Disco> thrice(\x. x*2)(1)
     8
-    Disco> thrice(\(z:Nat). z^2 + 2z + 1)(7)
+    Disco> thrice(\z:Nat. z^2 + 2z + 1)(7)
     17859076
-
-TODO example of using multi-argument anonymous function
+    Disco> (\(x,y). x + y) (3,2)
+    5
+    Disco> (\x:N, y:Q. x > y) 5 (9/2)
+    true
 
 Comparing functions
 ===================
@@ -102,24 +97,34 @@ compared to see which is less or greater.
 
 ::
 
-    Disco> (\(x:Bool). x) = (\(x:Bool). not (not x))
+    Disco> (\x:Bool. x) == (\x:Bool. not (not x))
     true
-    Disco> (\(x:Bool). x) = (\(x:Bool). not x)
+    Disco> (\x:Bool. x) == (\x:Bool. not x)
     false
 
 There is no magic involved, and it does not work by looking at the
 definitions of the functions. Simply put, two functions are equal if
-they give the same output for every input.  So disco can only test two
-functions for equality if they have a finite input type, in which case
-it simply enumerates all possible values of the input type, and tests
-that the two functions give equal outputs for every input.
+they give the same output for every input. Disco enumerates all
+possible values of the input type, and tests that the two functions
+give equal outputs for every input.  For functions with finite input
+types, this is guaranteed to return a result.  For functions with
+infinite input types, disco will do its best to search for a
+counterexample, returning ``false`` if it finds an input for which the
+functions disagree, and running forever otherwise.
+
+::
+
+    Disco> (\x:N. x) == (\x:N. 3)
+    false
+    Disco> (\x:N. x) == (\x:N. (x+1) .- 1)
+    ^CInterrupt
 
 Functions are ordered by conceptually listing all their outputs
 ordered by inputs (that is, list the values of the input type in order
 from smallest to largest and apply the function to each) and then
 comparing these lists of outputs lexicographically.  That is, if ``i``
 is the smallest possible input value and ``f i < g i``, then ``f <
-g``.  If ``f i = g i``, then we move on to consider the second
+g``.  If ``f i == g i``, then disco moves on to consider the second
 smallest input value, and so on.
 
 Disambiguating function application and multiplication
@@ -169,3 +174,29 @@ not a multiplicative term.
    :math:`x(y+3)` as function application, although they might also
    rightly complain that :math:`x` is a strange choice for the name of
    a function.
+
+Operator functions
+==================
+
+Operators can be manipulated as functions using the ``~`` notation.
+The tilde goes wherever the argument to the operator would go.  This
+can be used, for example, to pass an operator to a higher-order
+function.
+
+::
+
+    Disco> :type ~+~
+    ~+~ : ℕ × ℕ → ℕ
+
+    Disco> import list
+    Loading list.disco...
+    Disco> foldr(~+~,0,[1 .. 10])
+    55
+
+    Disco> -- factorial
+    Disco> :type ~!
+    ~! : ℕ → ℕ
+
+    Disco> -- negation
+    Disco> :type -~
+    -~ : ℤ → ℤ

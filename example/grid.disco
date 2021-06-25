@@ -50,13 +50,13 @@ diagIso' n =
 
 ||| Every POSITIVE n can be decomposed into a power of two times an
 ||| odd number, n = 2^x (2y + 1).  This creates an isomorphism n <->
-||| (x,y).
-|||
-||| This is actually an isomorphism between {n | n : ℕ, n > 0} and ℕ×ℕ,
-||| but at the moment the disco type system doesn't let us say that.
+||| (x,y).  This is actually an isomorphism between {n | n : ℕ, n > 0}
+||| and ℕ×ℕ, but at the moment the disco type system doesn't let us
+||| say that (and it likely never will).
 
 -- We have to be careful not to call powerIso' 0 because it gets stuck
--- in infinite recursion!  One way would is to write the test as follows:
+-- in infinite recursion!  One way that would work is to write the
+-- test as follows:
 
 !!! forall n:Nat. powerIso (powerIso' (n+1)) == (n+1)
 
@@ -73,7 +73,3 @@ powerIso' n =
   {? (0, n//2)  if not (2 divides n),
      (x+1,y)    when powerIso' (n//2) is (x,y)
   ?}
-
-all : (N -> B) -> List N -> B
-all _ [] = True
-all p (n::ns) = p n and all p ns

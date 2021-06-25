@@ -1,0 +1,9 @@
+:type ∃ (x:Z). x > 3
+:type ∃ (x:Q). x > 3
+:type ∃ (x:N), (y : N). x > y
+:type ∃ (x:N). ∃ (y:N). x > y
+:type ∀ (x:N), (y:N), (z:N). (x + y) + z == x + (y + z)
+:type ∃ (x:N). ∀ (y:N). x <= y
+:type not (∀ x:Bool. true or x)
+:type (∀ x:Void. false) and true
+:type (∀ x:Void. false) or true

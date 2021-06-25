@@ -1,9 +1,0 @@
-import list
-
-downfrom : N -> List N
-downfrom 0     = []
-downfrom (n+1) = (n+1) :: downfrom n
-
-even : N -> Bool
-even 0     = true
-even (n+1) = not (even n)

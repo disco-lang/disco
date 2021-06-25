@@ -98,14 +98,40 @@ combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
 -- Module resolution
 ------------------------------------------------------------
 
--- | Given a directory and a module name, relavent directories are searched for the file
---   containing the provided module name. Currently, Disco searches for the module in
---   the standard library directory (lib), and the directory passed in to resolveModule.
---   Returns Nothing if no module with the given name could be found.
-resolveModule :: MonadIO m => FilePath -> ModName -> m (Maybe FilePath)
-resolveModule directory modname = do
+-- | A data type indicating where we should look for Disco modules to
+--   be loaded.
+data Resolver
+  = FromDir FilePath          -- ^ Load only from a specific directory     (:load)
+  | FromCwdOrStdlib           -- ^ Load from current working dir or stdlib (import at REPL)
+  | FromDirOrStdlib FilePath  -- ^ Load from specific dir or stdlib        (import in file)
+
+-- | Add the possibility of loading imports from the stdlib.  For
+--   example, this is what we want to do after a user loads a specific
+--   file using `:load` (for which we will NOT look in the stdlib),
+--   but then we need to recursively load modules which it imports
+--   (which may either be in the stdlib, or the same directory as the
+--   `:load`ed module).
+withStdlib :: Resolver -> Resolver
+withStdlib (FromDir fp) = FromDirOrStdlib fp
+withStdlib r            = r
+
+-- | Given (possibly) a directory and a module name, relavent
+--   directories are searched for the file containing the provided
+--   module name. If a directory is provided, look only in the
+--   specific given directory.  If the directory is @Nothing@, then
+--   Disco searches for the module first in the standard library
+--   directory (lib), and then in the directory passed in to
+--   resolveModule.  Returns Nothing if no module with the given name
+--   could be found.
+resolveModule :: MonadIO m => Resolver -> ModName -> m (Maybe FilePath)
+resolveModule resolver modname = do
   datadir <- liftIO getDataDir
-  let fps = map (</> replaceExtension modname "disco") [directory, datadir]
+  let searchPath =
+        case resolver of
+          FromDir dir         -> [dir]
+          FromCwdOrStdlib     -> [datadir, "."]
+          FromDirOrStdlib dir -> [datadir, dir]
+  let fps = map (</> replaceExtension modname "disco") searchPath
   fexists <- liftIO $ filterM doesFileExist fps
   case fexists of
     []     -> return Nothing

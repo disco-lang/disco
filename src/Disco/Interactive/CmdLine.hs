@@ -25,18 +25,21 @@ module Disco.Interactive.CmdLine
 
   ) where
 
-import           Control.Monad             (when)
-import           Control.Monad.IO.Class    (MonadIO (..))
-import           Control.Monad.Trans.Class (MonadTrans (..))
-import           Data.List                 (isPrefixOf)
-import           Data.Maybe                (isJust)
-import           System.Exit               (exitFailure, exitSuccess)
+import           Control.Monad              (when)
+import           Control.Monad.Catch        (SomeException, catch)
+import           Control.Monad.IO.Class     (MonadIO (..))
+import           Control.Monad.Trans.Class  (MonadTrans (..))
+import           Data.List                  (isPrefixOf)
+import           Data.Maybe                 (isJust)
+import           System.Exit                (exitFailure, exitSuccess)
 
-import qualified Options.Applicative       as O
-import           System.Console.Haskeline  as H
+import qualified Options.Applicative        as O
+import           System.Console.Haskeline   as H
 
 import           Disco.Eval
+import           Disco.Interactive.Commands (handleLoad, loadFile)
 import           Disco.Interactive.Eval
+import           Disco.Util
 
 ------------------------------------------------------------
 -- Command-line options parser
@@ -114,7 +117,7 @@ discoMain = do
       Just str -> handleCMD str
       Nothing  -> return ()
 
-    when (not batch) $ runInputT settings loop
+    when (not batch) $ runInputT settings (H.withInterrupt loop)
 
   case res of
 
@@ -128,14 +131,15 @@ discoMain = do
 
   where
 
-    ctrlC :: InputT (Disco e) a -> SomeException -> InputT (Disco e) a
+    ctrlC :: InputT Disco a -> SomeException -> InputT Disco a
     ctrlC act e = do
       io $ putStrLn (show e)
       act
 
-    withCtrlC resume act = H.catch (H.withInterrupt act) (ctrlC resume)
+    withCtrlC :: InputT Disco a -> InputT Disco a -> InputT Disco a
+    withCtrlC resume act = catch act (ctrlC resume)
 
-    loop :: InputT (Disco IErr) ()
+    loop :: InputT (Disco) ()
     loop = do
       minput <- withCtrlC (return $ Just "") (getInputLine "Disco> ")
       case minput of

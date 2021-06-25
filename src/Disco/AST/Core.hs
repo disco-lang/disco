@@ -39,7 +39,7 @@ import           Disco.Types
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Show, Generic, Ord)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -87,6 +87,11 @@ data Core where
   -- | A case expression.
   CCase :: [CBranch] -> Core
 
+  -- | A "test frame" under which a test case is run. Records the
+  --   types and legible names of the variables that should
+  --   be reported to the user if the test fails.
+  CTest :: [(String, Type, Name Core)] -> Core -> Core
+
   -- | A type.
   CType :: Type -> Core
 
@@ -98,7 +103,6 @@ data Core where
 data Op = OAdd      -- ^ Addition (@+@)
         | ONeg      -- ^ Arithmetic negation (@-@)
         | OSqrt     -- ^ Integer square root (@sqrt@)
-        | OLg       -- ^ Floor of base-2 logarithm (@lg@)
         | OFloor    -- ^ Floor of fractional type (@floor@)
         | OCeil     -- ^ Ceiling of fractional type (@ceiling@)
         | OAbs      -- ^ Absolute value (@abs@)
@@ -134,10 +138,10 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagElem Type   -- ^ Set/bag element test.
         | OListElem Type  -- ^ List element test.
 
-        | OMapList        -- ^ Map a function over a list.
-        | OMapBag Type    -- ^ Map a function over a bag.  Carries the
+        | OEachList       -- ^ Map a function over a list.
+        | OEachBag Type   -- ^ Map a function over a bag.  Carries the
                           --   output type of the function.
-        | OMapSet Type    -- ^ Map a function over a set. Carries the
+        | OEachSet Type   -- ^ Map a function over a set. Carries the
                           --   output type of the function.
 
         | OReduceList     -- ^ Reduce/fold a list.
@@ -155,6 +159,16 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
         | OUnions Type    -- ^ Set join, i.e. union a set of sets.
 
+        | OSummary        -- ^ Adjacency List of given graph
+        | OEmptyGraph Type -- ^ Empty graph
+        | OVertex Type    -- ^ Construct a vertex with given value
+        | OOverlay Type   -- ^ Graph overlay
+        | OConnect Type   -- ^ Graph connect
+
+        | OEmptyMap       -- ^ Empty map
+        | OInsert         -- ^ Map insert
+        | OLookup         -- ^ Map lookup
+
         -- Ellipses
         | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
@@ -169,69 +183,87 @@ data Op = OAdd      -- ^ Addition (@+@)
                           --   Carries the element type.
         | OBagToCounts    -- ^ bag -> set of counts
         | OCountsToBag Type  -- ^ set of counts -> bag
+        | OMapToSet Type Type -- ^ Map k v -> Set (k × v)
+        | OSetToMap           -- ^ Set (k × v) -> Map k v
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
 
+        -- Propositions
+        | OForall [Type]  -- ^ Universal quantification. Applied to a closure
+                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+        | OExists [Type]  -- ^ Existential quantification. Applied to a closure
+                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+        | OHolds          -- ^ Convert Prop -> Bool via exhaustive search.
+        | ONotProp        -- ^ Flip success and failure for a prop.
+        | OShouldEq Type  -- ^ Equality assertion, @=!=@
+
         -- Other primitives
         | OCrash          -- ^ Crash with a user-supplied message
         | OId             -- ^ No-op/identity function
+        | OLookupSeq      -- ^ Lookup OEIS sequence
+        | OExtendSeq      -- ^ Extend a List via OEIS
 
   deriving (Show, Generic)
 
 -- | Get the arity (desired number of arguments) of a function
---   constant.
+--   constant.  A few constants have arity 0; everything else is
+--   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity OAdd             = 2
-opArity ONeg             = 1
-opArity OSqrt            = 1
-opArity OLg              = 1
-opArity OFloor           = 1
-opArity OCeil            = 1
-opArity OAbs             = 1
-opArity OMul             = 2
-opArity ODiv             = 2
-opArity OExp             = 2
-opArity OMod             = 2
-opArity ODivides         = 2
-opArity OMultinom        = 2
-opArity OFact            = 1
-opArity (OEq _)          = 2
-opArity (OLt _)          = 2
-opArity OEnum            = 1
-opArity OCount           = 1
-opArity (OMDiv _)        = 2
-opArity (OMExp _)        = 2
-opArity (OMDivides _)    = 2
-opArity OSize            = 1
-opArity (OPower _)       = 1
-opArity (OBagElem _)     = 2
-opArity (OListElem _)    = 2
-opArity OMapList         = 2
-opArity (OMapBag _)      = 2
-opArity (OMapSet _)      = 2
-opArity OReduceList      = 3
-opArity OReduceBag       = 3
-opArity OFilterList      = 2
-opArity OFilterBag       = 2
-opArity OConcat          = 1
-opArity (OBagUnions _)   = 1
-opArity (OUnions _)      = 1
-opArity (OMerge _)       = 3
-opArity OForever         = 1
-opArity OUntil           = 2
-opArity OSetToList       = 1
-opArity OBagToSet        = 1
-opArity OBagToList       = 1
-opArity (OListToSet _)   = 1
-opArity (OListToBag _)   = 1
-opArity OBagToCounts     = 1
-opArity (OCountsToBag _) = 1
-opArity OIsPrime         = 1
-opArity OFactor          = 1
-opArity OCrash           = 1
-opArity OId              = 1
+opArity OEmptyMap       = 0
+opArity (OEmptyGraph _) = 0
+opArity _               = 1
+
+-- opArity OAdd             = 2
+-- opArity ONeg             = 1
+-- opArity OSqrt            = 1
+-- opArity OLg              = 1
+-- opArity OFloor           = 1
+-- opArity OCeil            = 1
+-- opArity OAbs             = 1
+-- opArity OMul             = 2
+-- opArity ODiv             = 2
+-- opArity OExp             = 2
+-- opArity OMod             = 2
+-- opArity ODivides         = 2
+-- opArity OMultinom        = 2
+-- opArity OFact            = 1
+-- opArity (OEq _)          = 2
+-- opArity (OLt _)          = 2
+-- opArity OEnum            = 1
+-- opArity OCount           = 1
+-- opArity (OMDiv _)        = 2
+-- opArity (OMExp _)        = 2
+-- opArity (OMDivides _)    = 2
+-- opArity OSize            = 1
+-- opArity (OPower _)       = 1
+-- opArity (OBagElem _)     = 2
+-- opArity (OListElem _)    = 2
+-- opArity OMapList         = 2
+-- opArity (OMapBag _)      = 2
+-- opArity (OMapSet _)      = 2
+-- opArity OReduceList      = 3
+-- opArity OReduceBag       = 3
+-- opArity OFilterList      = 2
+-- opArity OFilterBag       = 2
+-- opArity OConcat          = 1
+-- opArity (OBagUnions _)   = 1
+-- opArity (OUnions _)      = 1
+-- opArity (OMerge _)       = 3
+-- opArity OForever         = 1
+-- opArity OUntil           = 2
+-- opArity OSetToList       = 1
+-- opArity OBagToSet        = 1
+-- opArity OBagToList       = 1
+-- opArity (OListToSet _)   = 1
+-- opArity (OListToBag _)   = 1
+-- opArity OBagToCounts     = 1
+-- opArity (OCountsToBag _) = 1
+-- opArity OIsPrime         = 1
+-- opArity OFactor          = 1
+-- opArity OCrash           = 1
+-- opArity OId              = 1
 
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind (Telescope (Embed Core, CPattern)) Core

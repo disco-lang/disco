@@ -1,0 +1,25 @@
+-- copied from example/logic.disco as it might change, but this file shouldn't
+
+-- Basic logical operators
+
+lnot1 : Bool -> Bool
+lnot1 true  = false
+lnot1 false = true
+
+lnot2 : Bool -> Bool
+lnot2 x =
+  {? false if x,
+     true  otherwise
+  ?}
+
+implication : Bool -> Bool -> Bool
+implication x y =
+  {? false   if x and not y,
+     true    otherwise
+  ?}
+
+exor : Bool -> Bool -> Bool
+exor x y = (x && not y) || (not x && y)
+
+-- A custom type used to validate :names output
+type Maybe a = Unit + a

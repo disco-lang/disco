@@ -30,7 +30,7 @@
 --
 -- Najd and Peyton Jones, "Trees that Grow". Journal of Universal
 -- Computer Science, vol. 23 no. 1 (2017), 42-62.
--- https://www.microsoft.com/en-us/research/uploads/prod/2016/11/trees-that-grow.pdf
+-- <https://arxiv.org/abs/1610.04799>
 --
 -- Essentially, we define a basic generic 'Term_' type, with a type
 -- index to indicate what kind of term it is, i.e. what phase the term
@@ -81,8 +81,6 @@ module Disco.AST.Generic
        , X_TTup
        , X_TInj
        , X_TCase
-       , X_TUn
-       , X_TBin
        , X_TChain
        , X_TTyOp
        , X_TContainer
@@ -125,6 +123,7 @@ module Disco.AST.Generic
        , Pattern_ (..)
        , X_PVar
        , X_PWild
+       , X_PAscr
        , X_PUnit
        , X_PBool
        , X_PTup
@@ -141,6 +140,12 @@ module Disco.AST.Generic
        , X_PFrac
        , X_Pattern
        , ForallPattern
+
+       -- * Quantifiers
+
+       , Quantifier(..)
+       , Binder_
+       , X_Binder
 
        -- * Property
 
@@ -266,8 +271,6 @@ type family X_TApp e
 type family X_TTup e
 type family X_TInj e
 type family X_TCase e
-type family X_TUn e
-type family X_TBin e
 type family X_TChain e
 type family X_TTyOp e
 type family X_TContainer e
@@ -320,13 +323,17 @@ data Term_ e where
   -- | A string literal, /e.g./ @"disco"@.
   TString_ :: X_TString e -> [Char] -> Term_ e
 
-  -- | An anonymous function, /e.g./ @\x (y:N). 2x + y@.  There can be
-  --   multiple arguments, and each argument may be annotated with a
-  --   type.
-  TAbs_   :: X_TAbs e -> Bind [(Name (Term_ e), Embed (Maybe Type))] (Term_ e) -> Term_ e
+  -- | A binding abstraction, of the form @Q vars. expr@ where @Q@ is
+  --   a quantifier and @vars@ is a list of bound variables and
+  --   optional type annotations.  In particular, this could be a
+  --   lambda abstraction, /i.e./ an anonymous function (/e.g./ @\x,
+  --   (y:N). 2x + y@), a universal quantifier (@forall x, (y:N). x^2 +
+  --   y > 0@), or an existential quantifier (@exists x, (y:N). x^2 + y
+  --   == 0@).
+  TAbs_   :: Quantifier -> X_TAbs e -> Binder_ e (Term_ e) -> Term_ e
 
   -- | Function application, @t1 t2@.
-  TApp_  :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
+  TApp_   :: X_TApp e -> Term_ e -> Term_ e -> Term_ e
 
   -- | An n-tuple, @(t1, ..., tn)@.
   TTup_   :: X_TTup e -> [Term_ e] -> Term_ e
@@ -337,14 +344,9 @@ data Term_ e where
   -- | A case expression.
   TCase_  :: X_TCase e -> [Branch_ e] -> Term_ e
 
-  -- | An application of a unary operator.
-  TUn_    :: X_TUn e -> UOp -> Term_ e -> Term_ e
-
-  -- | An application of a binary operator.
-  TBin_   :: X_TBin e -> BOp -> Term_ e -> Term_ e -> Term_ e
-
-  -- | A chained comparison.  Should contain only comparison
-  --   operators.
+  -- | A chained comparison, consisting of a term followed by one or
+  --   more "links", where each link is a comparison operator and
+  --   another term.
   TChain_ :: X_TChain e -> Term_ e -> [Link_ e] -> Term_ e
 
   -- | An application of a type operator.
@@ -382,8 +384,6 @@ type ForallTerm (a :: * -> Constraint) e
     , a (X_TInj e)
     , a (X_TCase e)
     , a (X_TTup e)
-    , a (X_TUn e)
-    , a (X_TBin e)
     , a (X_TChain e)
     , a (X_TTyOp e)
     , a (X_TContainer e)
@@ -395,6 +395,7 @@ type ForallTerm (a :: * -> Constraint) e
     , a (Link_ e)
     , a (Binding_ e)
     , a (Pattern_ e)
+    , a (Binder_ e (Term_ e))
     )
 
 deriving instance ForallTerm Show e => Show (Term_ e)
@@ -412,7 +413,13 @@ instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
 
 type family X_TLink e
 
+-- | A "link" is a comparison operator and a term; a single term
+--   followed by a sequence of links makes up a comparison chain, such
+--   as @2 < x < y < 10@.
 data Link_ e where
+
+  -- | Note that although the type of 'TLink_' says it can hold any
+  --   'BOp', it should really only hold comparison operators.
   TLink_ :: X_TLink e -> BOp -> Term_ e -> Link_ e
   deriving Generic
 
@@ -432,12 +439,15 @@ instance (Typeable e, Show (Link_ e), ForallLink Alpha e) => Alpha (Link_ e)
 type family X_QBind e
 type family X_QGuard e
 
+-- | A container comprehension consists of a head term and then a list
+--   of qualifiers. Each qualifier either binds a variable to some
+--   collection or consists of a boolean guard.
 data Qual_ e where
 
-  -- | A binding qualifier (i.e. @x <- t@)
+  -- | A binding qualifier (i.e. @x in t@).
   QBind_   :: X_QBind e -> Name (Term_ e) -> Embed (Term_ e) -> Qual_ e
 
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
+  -- | A boolean guard qualfier (i.e. @x + y > 4@).
   QGuard_  :: X_QGuard e -> Embed (Term_ e) -> Qual_ e
 
   deriving Generic
@@ -456,7 +466,8 @@ instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
 -- Binding
 ------------------------------------------------------------
 
--- | A binding is a name along with its definition.
+-- | A binding is a name along with its definition, and optionally its
+--   type.
 data Binding_ e = Binding_ (Maybe (Embed PolyType)) (Name (Term_ e)) (Embed (Term_ e))
   deriving (Generic)
 
@@ -482,6 +493,7 @@ type family X_GBool e
 type family X_GPat e
 type family X_GLet e
 
+-- | Guards in case expressions.
 data Guard_ e where
 
   -- | Boolean guard (@if <test>@)
@@ -514,6 +526,7 @@ instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
 
 type family X_PVar e
 type family X_PWild e
+type family X_PAscr e
 type family X_PUnit e
 type family X_PBool e
 type family X_PTup e
@@ -538,6 +551,9 @@ data Pattern_ e where
 
   -- | Wildcard pattern @_@: matches anything.
   PWild_ :: X_PWild e -> Pattern_ e
+
+  -- | Type ascription pattern @pat : ty@.
+  PAscr_ :: X_PAscr e -> Pattern_ e -> Type -> Pattern_ e
 
   -- | Unit pattern @()@: matches @()@.
   PUnit_ :: X_PUnit e -> Pattern_ e
@@ -589,6 +605,7 @@ data Pattern_ e where
 type ForallPattern (a :: * -> Constraint) e
       = ( a (X_PVar e)
         , a (X_PWild e)
+        , a (X_PAscr e)
         , a (X_PUnit e)
         , a (X_PBool e)
         , a (X_PNat e)
@@ -612,10 +629,31 @@ instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
 instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
 
 ------------------------------------------------------------
+-- Quantifiers and binders
+------------------------------------------------------------
+
+-- | A type family specifying what the binder in an abstraction can be.
+--   Should have at least variables in it, but how many variables and
+--   what other information is carried along may vary.
+type family X_Binder e
+
+-- | A binder represents the stuff between the quantifier and the body
+--   of a lambda, ∀, or ∃ abstraction, as in @x : N, r : F@.
+type Binder_ e a = Bind (X_Binder e) a
+
+-- | A quantifier: λ, ∀, or ∃
+data Quantifier = Lam | Ex | All
+  deriving (Generic, Eq, Ord, Show)
+
+instance Subst Type Quantifier
+instance Alpha Quantifier
+
+------------------------------------------------------------
 -- Property
 ------------------------------------------------------------
 
-type Property_ e = Bind [(Name (Term_ e), Type)] (Term_ e)
+-- | A property is just a term (of type Prop).
+type Property_ e = Term_ e
 
 ------------------------------------------------------------
 -- Orphan instances

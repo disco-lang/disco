@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingVia                #-}
 {-# LANGUAGE FlexibleContexts           #-}
@@ -12,7 +13,6 @@
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeInType                 #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -93,6 +93,7 @@ data TCError
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show
+  deriving anyclass Exception
 
 instance Semigroup TCError where
   _ <> r = r
@@ -124,7 +125,7 @@ initTCMState = TCMState
 --   variables with types and of type name definitions; collects
 --   constraints; can throw @TCError@s; and can generate fresh names.
 newtype TCM a = TCM { unTCM :: StateT TCMState (ExceptT TCError FreshM) a }
-  deriving (Functor, Applicative, Monad, Fresh, CME.MonadError TCError)
+  deriving newtype (Functor, Applicative, Monad, Fresh, CME.MonadError TCError)
   deriving (HasReader "tyctx" TyCtx, HasSource "tyctx" TyCtx) via
     (ReadStatePure
     (Rename "tcmTyCtx"
@@ -147,11 +148,6 @@ newtype TCM a = TCM { unTCM :: StateT TCMState (ExceptT TCError FreshM) a }
     (MonadError
     (StateT TCMState (ExceptT TCError FreshM)))
 
--- -- This is an orphan instance, but we can't very well add it to either
--- -- 'containers' or 'unbound-generic'.
--- instance (Monoid w, Fresh m) => Fresh (StateT s m) where
---   fresh = lift . fresh
-
 type instance TypeOf _ "constraints" = Constraint
 type instance TypeOf _ "tyctx"       = TyCtx
 type instance TypeOf _ "tydefctx"    = TyDefCtx
@@ -161,14 +157,14 @@ type instance TypeOf _ "tcerr"       = TCError
 -- Running
 ------------------------------------------------------------
 
--- | Run a 'TCM' computation starting in the empty context.
-runTCM :: TCM a -> Either TCError (a, Constraint)
-runTCM = runFreshM . CME.runExceptT . fmap (second tcmConstraints) . (`runStateT` initTCMState) . unTCM
+-- -- | Run a 'TCM' computation starting in the empty context.
+-- runTCM :: TCM a -> Either TCError (a, Constraint)
+-- runTCM = runFreshM . CME.runExceptT . fmap (second tcmConstraints) . (`runStateT` initTCMState) . unTCM
 
--- | Run a 'TCM' computation starting in the empty context, returning
---   only the result of the computation.
-evalTCM :: TCM a -> Either TCError a
-evalTCM = fmap fst . runTCM
+-- -- | Run a 'TCM' computation starting in the empty context, returning
+-- --   only the result of the computation.
+-- evalTCM :: TCM a -> Either TCError a
+-- evalTCM = fmap fst . runTCM
 
 ------------------------------------------------------------
 -- Constraints

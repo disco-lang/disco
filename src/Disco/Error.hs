@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs              #-}
 
@@ -22,6 +23,7 @@ import           Disco.AST.Core                   (Core)
 import           Disco.AST.Surface
 import           Disco.Typecheck.Monad            (TCError)
 import           Disco.Types                      (Type)
+import           GHC.Generics
 import           Text.Megaparsec                  (ParseErrorBundle)
 import           Unbound.Generics.LocallyNameless
 
@@ -66,4 +68,5 @@ data IErr where
   Crash         :: String    -> IErr
 
   deriving Show
+  deriving Generic
   deriving anyclass Exception

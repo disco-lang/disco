@@ -64,3 +64,49 @@ withLocalState s m = do
       a <- m
       s' <- get @tag
       return (a,s')
+
+withLocalReader
+  :: forall k (tag :: k) r (cs :: [(* -> *) -> CC.Constraint]) m a.
+     (MonadIO m, Has cs m)
+  => r -> (forall m'. (HasReader tag r m', MonadIO m', Has cs m') => m' a) -> m a
+withLocalReader r m = do
+  ref <- liftIO $ newIORef r
+  interpret @tag @(MonadIO : cs) ReifiedReader
+    { _readerSource = ReifiedSource { _await = liftIO $ readIORef ref }
+    , _local = \f m' -> do
+        old <- liftIO $ readIORef ref
+        liftIO $ writeIORef ref (f old)
+        a <- m'
+        liftIO $ writeIORef ref old
+        pure a
+    , _reader = \f -> f <$> liftIO (readIORef ref)
+    }
+    m
+
+withLocalWriter
+  :: forall k (tag :: k) w (cs :: [(* -> *) -> CC.Constraint]) m a.
+     (MonadIO m, Has cs m, Monoid w)
+  => (forall m'. (HasWriter tag w m', MonadIO m', Has cs m') => m' a) -> m (a, w)
+withLocalWriter m = do
+  ref <- liftIO $ newIORef (mempty :: w)
+  interpret @tag @(MonadIO : cs) ReifiedWriter
+    { _writerSink = ReifiedSink
+      { _yield = \a -> liftIO $ modifyIORef ref (<>a)
+      }
+    , _writer = \(a, w) -> liftIO (modifyIORef ref (<>w) >> return a)
+    , _listen = \m' -> do
+        a <- m'
+        w <- liftIO $ readIORef ref
+        return (a, w)
+    , _pass = \m' -> do
+        (a, f) <- m'
+        liftIO $ modifyIORef ref f
+        return a
+    } (listen @tag m)
+
+-- withLocalFresh
+--   :: forall (cs :: [CC.Capability]) m a.
+--      Has cs m
+--   => (forall m'. (Fresh m', Has cs m') => m' a) -> m a
+-- withLocalFresh =
+--   runFreshMT $

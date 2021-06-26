@@ -111,10 +111,13 @@ handleAnn :: Has '[St "top", MonadIO] m => REPLExpr 'CAnn -> m ()
 handleAnn (Ann t) = do
     ctx   <- gets @"top" (view topCtx)
     tymap <- gets @"top" (view topTyDefs)
-    s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
-        Left  e       -> return . show $ e
-        Right (at, _) -> return . show $ at
-    iputStrLn s
+    at <- typecheckDisco @'[] ctx tymap $ inferTop t
+    -- s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
+    --     Left  e       -> return . show $ e
+    --     Right (at, _) -> return . show $ at
+    iputStrLn (show at)
+
+evalTCM = undefined
 
 compileCmd :: REPLCommand 'CCompile
 compileCmd =

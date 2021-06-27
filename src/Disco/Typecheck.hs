@@ -264,8 +264,11 @@ checkDefn (TermDefn x clauses) = do
       :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
       => [Pattern] -> Type -> Term -> m ([APattern], ATerm)
     go [] ty body = do
-     at <- check body ty
-     return ([], at)
+      at <- check body ty
+      return ([], at)
+    go (p:ps) (TyUser name args) body = do
+      ty <- lookupTyDefn name args
+      go (p:ps) ty body
     go (p:ps) (ty1 :->: ty2) body = do
       (ctx, apt) <- checkPattern p ty1
       (apts, at) <- extends @"tyctx" ctx $ go ps ty2 body

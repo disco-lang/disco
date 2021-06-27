@@ -99,6 +99,11 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/module-basic/subdir/d.disco
                      test/parse-245/expected
                      test/parse-245/input
+                     test/parse-280/capitalvars.disco
+                     test/parse-280/expected
+                     test/parse-280/input
+                     test/parse-283/expected
+                     test/parse-283/input
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
@@ -135,6 +140,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-whnf/input
                      test/prim-crash/expected
                      test/prim-crash/input
+                     test/prim-sum/expected
+                     test/prim-sum/input
                      test/prop-basic/expected
                      test/prop-basic/input
                      test/prop-basic/prop-basic.disco
@@ -239,6 +246,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-kinds/input
                      test/types-naked-ops/expected
                      test/types-naked-ops/input
+                     test/types-numpats/expected
+                     test/types-numpats/input
+                     test/types-numpats/types-numpats.disco
                      test/types-ops/expected
                      test/types-ops/input
                      test/types-rational/expected

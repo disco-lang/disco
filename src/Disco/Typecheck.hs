@@ -140,7 +140,8 @@ makeTyDefnCtx tydefs = do
 --   directly cyclic (i.e. ensure it is a "productive" definition),
 --   and also make sure it does not use any polymorphic recursion
 --   (polymorphic recursion isn't allowed at the moment since it can
---   make the subtyping checker diverge), nor any unbound type variables.
+--   make the subtyping checker diverge), nor any unbound type
+--   variables or undefined types.
 checkTyDefn :: Has '[Rd "tydefctx", Th "tcerr"] m => TypeDefn -> m ()
 checkTyDefn defn@(TypeDefn x args _) = do
   _ <- checkCyclicTy (TyUser x (map (TyVar . string2Name) args)) S.empty
@@ -170,15 +171,16 @@ checkCyclicTy (TyUser name args) set = do
 checkCyclicTy _ set = return set
 
 -- | Ensure that a type definition does not use any unbound type
---   variables.
-checkUnboundVars :: Has '[Th "tcerr"] m => TypeDefn -> m ()
+--   variables or undefined types.
+checkUnboundVars :: Has '[Rd "tydefctx", Th "tcerr"] m => TypeDefn -> m ()
 checkUnboundVars (TypeDefn _ args body) = go body
   where
     go (TyAtom (AVar (U x)))
       | name2String x `elem` args = return ()
       | otherwise                 = throw @"tcerr" $ UnboundTyVar x
-    go (TyAtom _)    = return ()
-    go (TyCon _ tys) = mapM_ go tys
+    go (TyAtom _)        = return ()
+    go (TyUser name tys) = lookupTyDefn name tys >> mapM_ go tys
+    go (TyCon _ tys)     = mapM_ go tys
 
 -- | Check for polymorphic recursion: starting from a user-defined
 --   type, keep expanding its definition recursively, ensuring that

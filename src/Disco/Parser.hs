@@ -283,7 +283,7 @@ reserved w = (lexeme . try) $ string w *> notFollowedBy alphaNumChar
 -- | The list of all reserved words.
 reservedWords :: [String]
 reservedWords =
-  [ "true", "false", "True", "False", "let", "in", "is"
+  [ "unit", "true", "false", "True", "False", "let", "in", "is"
   , "if", "when"
   , "otherwise", "and", "or", "mod", "choose", "implies"
   , "min", "max"
@@ -468,7 +468,8 @@ parseTerm' = label "expression" $
 -- | Parse an atomic term.
 parseAtom :: Parser Term
 parseAtom = label "expression" $
-      TBool True  <$ (reserved "true" <|> reserved "True")
+      parseUnit
+  <|> TBool True  <$ (reserved "true" <|> reserved "True")
   <|> TBool False <$ (reserved "false" <|> reserved "False")
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
@@ -492,7 +493,10 @@ parseAtom = label "expression" $
   <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
-  <|> tuple <$> parens (parseTerm `sepBy` comma)
+  <|> tuple <$> parens (parseTerm `sepBy1` comma)
+
+parseUnit :: Parser Term
+parseUnit = TUnit <$ (reserved "unit" <|> void (symbol "■"))
 
 -- | Parse a wildcard, which is an underscore that isn't the start of
 --   an identifier.
@@ -637,12 +641,11 @@ parseQual = try parseSelection <|> parseQualGuard
       QGuard . embed <$> parseTerm
 
 -- | Turn a parenthesized list of zero or more terms into the
---   appropriate syntax node: zero terms @()@ is a TUnit; one term
---   @(t)@ is just the term itself (but we record the fact that it was
---   parenthesized, in order to correctly turn juxtaposition into
---   multiplication); two or more terms @(t1,t2,...)@ are a tuple.
+--   appropriate syntax node: one term @(t)@ is just the term itself
+--   (but we record the fact that it was parenthesized, in order to
+--   correctly turn juxtaposition into multiplication); two or more
+--   terms @(t1,t2,...)@ are a tuple.
 tuple :: [Term] -> Term
-tuple []  = TUnit
 tuple [x] = TParens x
 tuple t   = TTup t
 

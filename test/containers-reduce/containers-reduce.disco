@@ -2,7 +2,7 @@ import num
 
 !!! ∀ x : ℕ. (x > 0) ==> reduce(~*~, 1, factor x) == x
 dummy : Unit
-dummy = ()
+dummy = unit
 
 ||| The size (cardinality) of a set.
 !!! setSize {} == 0

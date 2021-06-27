@@ -43,10 +43,10 @@ topsort g = downstream g (vertices g) {} {} []
 
 searchFrom' : Graph N -> N -> Set N -> Set N -> List N -> Unit + List N * Set N
 searchFrom' g pos visited locked stack = {?
-            left ()                                                 if  pos ∈ locked,
+            left(unit)                                              if  pos ∈ locked,
             right (stack, visited)                                  if  pos ∈ visited,
             right (pos :: s', v' union {pos}) when downstream g (list (neighbors g pos)) visited (locked union {pos}) stack is right (s', v'),
-            left ()        otherwise
+            left(unit)        otherwise
             ?}
 
 downstream : Graph N -> List N -> Set N -> Set N -> List N -> Unit + List N * Set N
@@ -54,5 +54,5 @@ downstream g [] visited locked stack = right (stack, visited)
 downstream g (a::as) visited locked stack =
     {?
         downstream g as v' locked s'  when searchFrom' g a visited locked stack  is right (s',v'),
-        left () otherwise
+        left(unit) otherwise
     ?}

@@ -6,7 +6,7 @@
 :load test/interp-lazymatch/bomb.disco
 {? 1 when (0, bomb 'a' ) is (x+1, 'a' ), 2 otherwise ?}
 {? 1 when (0, bomb true) is (x+1, true), 2 otherwise ?}
-{? 1 when (0, bomb ()  ) is (x+1, ()  ), 2 otherwise ?}
+{? 1 when (0, bomb unit) is (x+1, unit), 2 otherwise ?}
 {? 1 when (0, bomb []  ) is (x+1, []  ), 2 otherwise ?}
 {? 1 when (0, bomb "xy") is (x+1, "xy"), 2 otherwise ?}
 {? 1 when left (0/0) is right 3, 2 otherwise ?}

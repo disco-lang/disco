@@ -9,10 +9,10 @@ Loaded.
     No counterexamples exist.
   - Test is false: all([true, true, true, false, true])
     Counterexample:
-      and_side = right(())
-      and_side = right(())
-      and_side = right(())
-      and_side = left(())
+      and_side = right(■)
+      and_side = right(■)
+      and_side = right(■)
+      and_side = left(■)
   - Test passed: ∃k. hasFactors(2 ^ k + 1)
     Found example:
       k = 3

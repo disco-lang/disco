@@ -45,6 +45,6 @@ count (Set Bool)
 count Char
 count ((N -> Void) -> N)
 count (N -> (N -> Void))
-enumerate (Unit -> Unit) == [\_ . ()]
+enumerate (Unit -> Unit) == [\_ . unit]
 enumerate (Unit -> Bool) == [\_ . false, \_ . true]
 enumerate (Bool -> Bool) == [\x. false]

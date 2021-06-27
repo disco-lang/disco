@@ -145,7 +145,7 @@ prettyTerm (TPrim p)     =
     Just (PrimInfo _ nm False) -> text "$" <> text nm
     Nothing -> error $ "prettyTerm: Prim " ++ show p ++ " is not in the primMap!"
 prettyTerm (TParens t)   = prettyTerm t
-prettyTerm TUnit         = text "()"
+prettyTerm TUnit         = text "■"
 prettyTerm (TBool b)     = text (map toLower $ show b)
 prettyTerm (TChar c)     = text (show c)
 prettyTerm (TString cs)  = doubleQuotes $ text cs
@@ -299,7 +299,7 @@ prettyPattern (PVar x)          = prettyName x
 prettyPattern PWild             = text "_"
 prettyPattern (PAscr p ty)      = withPA ascrPA $
   lt (prettyPattern p) <+> text ":" <+> rt (prettyTy ty)
-prettyPattern PUnit             = text "()"
+prettyPattern PUnit             = text "■"
 prettyPattern (PBool b)         = text $ map toLower $ show b
 prettyPattern (PChar c)         = text (show c)
 prettyPattern (PString s)       = text (show s)
@@ -396,7 +396,7 @@ prettyWHNF out (TyUser nm args) v = do
   case M.lookup nm tymap of
     Just (TyDefBody _ body) -> prettyWHNF out (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
-prettyWHNF out TyUnit          VUnit        = out "()"
+prettyWHNF out TyUnit          VUnit        = out "■"
 prettyWHNF out TyProp          _            = prettyPlaceholder out TyProp
 prettyWHNF out TyBool          (VInj s _)   = out $ map toLower (show (selectSide s False True))
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))

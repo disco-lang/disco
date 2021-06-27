@@ -131,7 +131,7 @@ For now, try executing these commands and see if you can guess what is
 going on:
 
 * ``:type false``
-* ``:type ()``
+* ``:type unit``
 * ``:type [1, 2, 3]``
 * ``:type [1, 2, -3]``
 * ``:type [1, 2, -3, 4/5]``

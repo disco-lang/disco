@@ -11,7 +11,7 @@ map({(1, 3)})
 lookup : ℕ × Map ℕ a → Unit + a
 right(3)
 right(6)
-left(())
+left(■)
 map({(1, "hello"), (3, "there"), (4, "you")})
 map({(1, 3)})
 insert(1, {"hi", "there"}, insert(2, {}, insert(4, {"why", "not", "now"}, insert(2, {"blah"}, emptyMap)))) : Map ℕ (Set (List Char))

@@ -1,7 +1,7 @@
 using Primitives
 
-||| Lookup a sequence of integers using https://oeis.org
-!!!  lookupSequence [] == left ()
+||| Look up a sequence of integers using https://oeis.org
+!!!  lookupSequence [] == left(unit)
 !!!  lookupSequence [1,1,2,3] == right "https://oeis.org/A000045"
 lookupSequence : List N -> Unit + List Char
 lookupSequence = $lookupSequence

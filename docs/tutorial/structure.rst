@@ -102,12 +102,12 @@ Unit and Void types
 Disco has two other special built-in types which are rarely useful on
 their own, but often play an important role in describing other types.
 
-* The type ``Unit`` has just a single value, called ``()``.
+* The type ``Unit`` has just a single value, called ``unit`` or ``■``.
 
     ::
 
-        Disco> :type ()
-        () : Unit
+        Disco> :type unit
+        ■ : Unit
 
 * The type ``Void`` has *no* values.
 

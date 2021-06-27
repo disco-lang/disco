@@ -3,7 +3,7 @@
 [1/2 : F, 1/2 : 𝔽]
 [-1/2 : Q, -1/2 : Rational, -1/2 : ℚ]
 [true : Bool, true : Boolean]
-[() : Unit]
+[unit : Unit, ■ : Unit]
 [] : List Void
 -- [3 : Fin 5, 3 : Z 5, 3 : Z5, 3 : ℤ 5, 3 : ℤ5]
 {} : Set Natural

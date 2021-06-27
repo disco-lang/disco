@@ -1,9 +1,9 @@
 import list
 
-type Tree a = Unit + (a * Tree * Tree)
+type Tree a = Unit + (a * Tree a * Tree a)
 
 treeFold : b * (a * b * b -> b) * Tree a -> b
-treeFold (z, f, left ()) = z
+treeFold (z, f, left(unit)) = z
 treeFold (z, f, right (a, l, r)) = f(a, treeFold(z,f,l), treeFold(z,f,r))
 
 sumTree : Tree Nat -> Nat

@@ -35,5 +35,5 @@ addStreams (a,s) (b,t) = (a+b, addStreams s t)
 type Lst = Unit + N * Lst
 
 takeStream : N -> Stream -> Lst
-takeStream 0     _     = left ()
+takeStream 0     _     = left(unit)
 takeStream (n+1) (x,s) = right (x, takeStream n s)

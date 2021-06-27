@@ -19,11 +19,11 @@ q x =
 type S = Unit + Char × S
 
 len : S -> N
-len (left ())      = 0
-len (right (_, s)) = 1 + len s
+len (left(unit))  = 0
+len (right(_, s)) = 1 + len s
 
 type P a = a + (P a) * (P a)
 
 height : P a -> N
-height (left _) = 0
-height (right (l, r)) = 1 + (height l) max (height r)
+height (left(_)) = 0
+height (right(l, r)) = 1 + (height l) max (height r)

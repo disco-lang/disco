@@ -1,7 +1,7 @@
 Loading demo.disco...
 Loaded.
 {} : Set (Map (Set ℕ) (Map (Set ℕ) (Graph (Set ℕ))))
-right(()) : P (Set ℕ) + Unit
+right(■) : P (Set ℕ) + Unit
 [1, 2 : ℕ, 3]
 TAbs_ Lam () (<[PVar_ () x]> TAscr_ () (TVar_ () 0@0) (Forall (<[]> TyAtom (ABase N))))
 λx. x : ℕ

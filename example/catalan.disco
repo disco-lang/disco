@@ -6,7 +6,7 @@ type BT = Unit + BT*BT
 
 -- Generate the list of all binary tree shapes of a given size.
 treesOfSize : N -> List BT
-treesOfSize(0)   = [left ()]
+treesOfSize(0)   = [left(■)]
 treesOfSize(k+1) =
   [ right (l,r) | x <- [0 .. k], l <- treesOfSize(x), r <- treesOfSize(k .- x) ]
 

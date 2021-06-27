@@ -6,7 +6,7 @@ right(16)
 right(4)
 right(1)
 right(1)
-left(())
+left(■)
 right(0)
 right(0)
 right(1)
@@ -15,12 +15,12 @@ right(1)
 []
 [<Bool → Bool>, <Bool → Bool>, <Bool → Bool>, <Bool → Bool>]
 [left(false, false), left(false, true), left(true, false), left(true, true), right(false), right(true)]
-[left(()), right(false), right(true)]
+[left(■), right(false), right(true)]
 []
 [[]]
 [[]]
 [false, true]
-[[], [()], [(), ()], [(), (), ()], [(), (), (), ()]]
+[[], [■], [■, ■], [■, ■, ■], [■, ■, ■, ■]]
 [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 [(0, 0), (0, 1), (1, 0), (0, 2), (1, 1), (2, 0)]
 []
@@ -29,7 +29,7 @@ right(1)
 []
 [<Void → Void>]
 right(1)
-left(())
+left(■)
 right(1)
 right(2)
 right(4)

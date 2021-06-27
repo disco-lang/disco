@@ -90,7 +90,8 @@ the ``Tree`` type polymorphic:
 ::
 
    Disco> :load example/tydefs-poly.disco
-   Disco> t = right (1, right (3, left (), left ()), right (5, left (), left ())) : Tree N
+   Disco> leaf = left(unit)
+   Disco> t = right (1, right (3, leaf, leaf), right (5, leaf, leaf)) : Tree N
    Disco> sumTree(t)
    9
    Disco> flattenTree(t)

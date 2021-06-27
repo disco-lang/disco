@@ -230,15 +230,23 @@ checkDefn
   :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
   => TermDefn -> m Defn
 checkDefn (TermDefn x clauses) = do
+
+  -- Check that all clauses have the same number of patterns
+  checkNumPats clauses
+
+  -- Get the declared type signature of x
   Forall sig <- lookupTy x
-  ((acs, ty'), theta) <- solve $ do
-    checkNumPats clauses
-    (nms, ty) <- unbind sig
-    aclauses <- forAll nms $ mapM (checkClause ty) clauses
+  (nms, ty) <- unbind sig
+
+  -- Try to decompose the type into a chain of arrows like pty1 ->
+  -- pty2 -> pty3 -> ... -> bodyTy, according to the number of
+  -- patterns, and lazily unrolling type definitions along the way.
+  (patTys, bodyTy) <- decomposeDefnTy (numPats (head clauses)) ty
+
+  ((acs, _), theta) <- solve $ do
+    aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
     return (aclauses, ty)
 
-  let defnTy = applySubst theta ty'
-      (patTys, bodyTy) = decomposeDefnTy (numPats (head clauses)) defnTy
   return $ applySubst theta (Defn (coerce x) patTys bodyTy acs)
   where
     numPats = length . fst . unsafeUnbind
@@ -252,31 +260,25 @@ checkDefn (TermDefn x clauses) = do
                -- patterns don't match across different clauses
       | otherwise = return ()
 
+    -- | Check a clause of a definition against a list of pattern types and a body type.
     checkClause
       :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Type -> Bind [Pattern] Term -> m Clause
-    checkClause ty clause = do
+      => [Type] -> Type -> Bind [Pattern] Term -> m Clause
+    checkClause patTys bodyTy clause = do
       (pats, body) <- unbind clause
-      (aps, at) <- go pats ty body
+
+      -- At this point we know that every clause has the same number of patterns,
+      -- which is the same as the length of the list patTys.  So we can just use
+      -- zipWithM to check all the patterns.
+      (ctxs, aps) <- unzip <$> zipWithM checkPattern pats patTys
+      at  <- extends @"tyctx" (joinCtxs ctxs) $ check body bodyTy
       return $ bind aps at
 
-    go
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => [Pattern] -> Type -> Term -> m ([APattern], ATerm)
-    go [] ty body = do
-      at <- check body ty
-      return ([], at)
-    go (p:ps) (TyUser name args) body = do
-      ty <- lookupTyDefn name args
-      go (p:ps) ty body
-    go (p:ps) (ty1 :->: ty2) body = do
-      (ctx, apt) <- checkPattern p ty1
-      (apts, at) <- extends @"tyctx" ctx $ go ps ty2 body
-      return (apt:apts, at)
-    go _ _ _ = throw @"tcerr" NumPatterns   -- XXX include more info
-
-    decomposeDefnTy 0 ty = ([], ty)
-    decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) (decomposeDefnTy (n-1) ty2)
+    -- Decompose a type that must be of the form t1 -> t2 -> ... -> tn -> t{n+1}.
+    decomposeDefnTy :: Has '[Rd "tydefctx", Th "tcerr"] m => Int -> Type -> m ([Type], Type)
+    decomposeDefnTy 0 ty = return ([], ty)
+    decomposeDefnTy n (TyUser name args) = lookupTyDefn name args >>= decomposeDefnTy n
+    decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) <$> decomposeDefnTy (n-1) ty2
     decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
 
 --------------------------------------------------

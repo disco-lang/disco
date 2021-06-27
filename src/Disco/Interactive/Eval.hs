@@ -20,8 +20,8 @@ import           Capability.State
 import           Control.Lens               (view)
 import           Control.Monad.Except
 import qualified Data.IntMap                as IM
-import           Data.List                  (intercalate)
 
+import           Disco.AST.Generic          (selectSide)
 import           Disco.Capability
 import           Disco.Eval
 import           Disco.Interactive.Commands
@@ -30,9 +30,11 @@ import           Disco.Util
 import           Disco.Value
 
 showVal :: Int -> Value -> String
-showVal 0 _            = "_"
-showVal _ (VNum _ r)   = show r
-showVal k (VCons i vs) = "K" ++ show i ++ " [" ++ intercalate ", " (map (showVal (k-1)) vs) ++ "]"
+showVal 0 _           = "_"
+showVal _ (VNum _ r)  = show r
+showVal _ VUnit       = "()"
+showVal k (VInj s v)  = selectSide s "L" "R" ++ showVal (k-1) v
+showVal k (VPair u v) = "(" ++ showVal k u ++ ", " ++ showVal k v ++ ")"
 showVal _ (VConst op) = show op
 showVal _ VClos{}     = "<closure>"
 showVal _ VPAp{}      = "<pap>"

@@ -43,6 +43,7 @@ module Disco.Enumerate
        where
 
 import qualified Data.Enumeration.Invertible as E
+import           Disco.AST.Generic           (Side (..))
 import           Disco.Types
 import           Disco.Value
 
@@ -52,14 +53,14 @@ enumVoid :: ValueEnumeration
 enumVoid = E.void
 
 enumUnit :: ValueEnumeration
-enumUnit = E.singleton (VCons 0 [])
+enumUnit = E.singleton VUnit
 
 enumBool :: ValueEnumeration
-enumBool = E.mapE toV fromV $ E.finiteList [0, 1]
+enumBool = E.mapE toV fromV $ E.finiteList [L, R]
   where
-    toV i = VCons i []
-    fromV (VCons i []) = i
-    fromV _            = error "enumBool.fromV: value isn't a bool"
+    toV i = VInj i VUnit
+    fromV (VInj i VUnit) = i
+    fromV _              = error "enumBool.fromV: value isn't a bool"
 
 -- | Unsafely extract the numeric value of a @Value@
 --   (assumed to be a VNum).
@@ -98,10 +99,10 @@ enumSet e = E.mapE toV fromV (E.finiteSubsetOf e)
 enumList :: ValueEnumeration -> ValueEnumeration
 enumList e = E.mapE toV fromV (E.listOf e)
   where
-    toV = foldr (\h t -> VCons 1 [h, t]) (VCons 0 [])
-    fromV (VCons 1 [h, t]) = h : fromV t
-    fromV (VCons 0 [])     = []
-    fromV _                = error "enumList.fromV: value isn't a list"
+    toV = foldr VCons VNil
+    fromV (VCons h t) = h : fromV t
+    fromV VNil        = []
+    fromV _           = error "enumList.fromV: value isn't a list"
 
 enumFunction :: ValueEnumeration -> ValueEnumeration -> ValueEnumeration
 enumFunction xs ys =
@@ -118,18 +119,18 @@ enumFunction xs ys =
 enumProd :: ValueEnumeration -> ValueEnumeration -> ValueEnumeration
 enumProd xs ys = E.mapE toV fromV $ (E.><) xs ys
   where
-    toV (x, y) = VCons 0 [x, y]
-    fromV (VCons 0 [x, y]) = (x, y)
-    fromV _                = error "enumProd.fromV: value isn't a pair"
+    toV (x, y)        = VPair x y
+    fromV (VPair x y) = (x, y)
+    fromV _           = error "enumProd.fromV: value isn't a pair"
 
 enumSum :: ValueEnumeration -> ValueEnumeration -> ValueEnumeration
 enumSum xs ys = E.mapE toV fromV $ (E.<+>) xs ys
   where
-    toV (Left x)  = VCons 0 [x]
-    toV (Right y) = VCons 1 [y]
-    fromV (VCons 0 [x]) = Left x
-    fromV (VCons 1 [y]) = Right y
-    fromV _             = error "enumSum.fromV: value isn't a sum"
+    toV (Left x)  = VInj L x
+    toV (Right y) = VInj R y
+    fromV (VInj L x) = Left x
+    fromV (VInj R y) = Right y
+    fromV _          = error "enumSum.fromV: value isn't a sum"
 
 enumType :: Type -> ValueEnumeration
 enumType TyVoid     = enumVoid

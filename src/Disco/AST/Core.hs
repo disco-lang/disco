@@ -33,6 +33,7 @@ module Disco.AST.Core
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.AST.Generic                (Side)
 import           Disco.AST.Surface                (Telescope)
 import           Disco.Types
 
@@ -64,13 +65,20 @@ data Core where
   -- | A function constant.
   CConst :: Op -> Core
 
-  -- | A saturated constructor application.  For example, false and
-  --   true are represented by @CCons 0 []@ and @CCons 1 []@,
-  --   respectively; a pair is represented by @CCons 0 [c1, c2]@.
-  --   Note we do not need to remember which type the constructor came
-  --   from; if the program typechecked then we will never end up
-  --   comparing constructors from different types.
-  CCons :: Int -> [Core] -> Core
+  -- | The unit value.
+  CUnit :: Core
+
+  -- | An injection into a sum type, i.e. a value together with a tag
+  --   indicating which element of a sum type we are in.  For example,
+  --   false is represented by @CSum L CUnit@; @right(v)@ is
+  --   represented by @CSum R v@.  Note we do not need to remember
+  --   which type the constructor came from; if the program
+  --   typechecked then we will never end up comparing constructors
+  --   from different types.
+  CInj :: Side -> Core -> Core
+
+  -- | A pair of values.
+  CPair :: Core -> Core -> Core
 
   -- | A rational number.
   CNum  :: RationalDisplay -> Rational -> Core
@@ -289,9 +297,21 @@ data CPattern where
   -- | A wildcard pattern @_@, which matches anything.
   CPWild :: CPattern
 
-  -- | A cons-pattern.  @CPCons i pats@ matches @CCons j xs@ if @i ==
-  --   j@.
-  CPCons :: Int -> [Name Core] -> CPattern
+  -- | The unit pattern.
+  CPUnit :: CPattern
+
+  -- | An injection into a sum type, with no argument (i.e. the
+  --   argument is a unit value).  We could use CPInj with a fresh
+  --   variable that we know will bind to the unit value; this pattern
+  --   is thus just an optimization to avoid introducing a useless
+  --   variable.
+  CPTag  :: Side -> CPattern
+
+  -- | An injection into a sum type.
+  CPInj  :: Side -> Name Core -> CPattern
+
+  -- | A pair.
+  CPPair :: Name Core -> Name Core -> CPattern
 
   -- | A natural number pattern.
   CPNat  :: Integer -> CPattern

@@ -394,13 +394,14 @@ allocate v = do
 --   amount of space: some are OK as they are; for others, we turn
 --   them into an indirection and allocate a new memory cell for them.
 mkSimple :: Has '[Sc "nextloc", St "mem"] m => Value -> m Value
-mkSimple v@VNum{}       = return v
-mkSimple v@(VCons _ []) = return v
-mkSimple v@VConst{}     = return v
-mkSimple v@VClos{}      = return v
-mkSimple v@VType{}      = return v
-mkSimple v@VIndir{}     = return v
-mkSimple v              = VIndir <$> allocate v
+mkSimple v@VNum{}         = return v
+mkSimple v@VUnit{}        = return v
+mkSimple v@(VInj _ VUnit) = return v
+mkSimple v@VConst{}       = return v
+mkSimple v@VClos{}        = return v
+mkSimple v@VType{}        = return v
+mkSimple v@VIndir{}       = return v
+mkSimple v                = VIndir <$> allocate v
 
 -- | Delay a @Disco Value@ computation by packaging it into a
 --   @VDelay@ constructor along with the current environment.
@@ -422,11 +423,13 @@ delay' vs imv = do
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
 mkValue :: Has '[Rd "env", Sc "nextloc", St "mem"] m => Core -> m Value
-mkValue (CConst op)  = return $ VConst op
-mkValue (CCons i cs) = VCons i <$> mapM mkValue cs
-mkValue (CNum d r)   = return $ VNum d r
-mkValue (CType ty)   = return $ VType ty
-mkValue c            = VIndir <$> (allocate . VThunk c =<< getEnv)
+mkValue (CConst op)   = return $ VConst op
+mkValue CUnit         = return VUnit
+mkValue (CInj s v)    = VInj s <$> mkValue v
+mkValue (CPair v1 v2) = VPair <$> mkValue v1 <*> mkValue v2
+mkValue (CNum d r)    = return $ VNum d r
+mkValue (CType ty)    = return $ VType ty
+mkValue c             = VIndir <$> (allocate . VThunk c =<< getEnv)
 
 -- | Deallocate any memory cells which are no longer referred to by
 --   any top-level binding.
@@ -449,7 +452,8 @@ class Reachable v where
   reachable :: Has '[St "mem", HasState "reachables" IntSet] m => v -> m ()
 
 instance Reachable Value where
-  reachable (VCons _ vs)    = reachable vs
+  reachable (VInj _ v)      = reachable v
+  reachable (VPair v1 v2)   = reachable v1 >> reachable v2
   reachable (VClos _ e)     = reachable e
   reachable (VPAp v vs)     = reachable (v:vs)
   reachable (VThunk _ e)    = reachable e

@@ -304,8 +304,8 @@ uatomToEither (UV v) = Right v
 data Con where
   -- | Function type constructor, @T1 -> T2@.
   CArr  :: Con
-  -- | Pair type constructor, @T1 * T2@.
-  CPair :: Con
+  -- | Product type constructor, @T1 * T2@.
+  CProd :: Con
   -- | Sum type constructor, @T1 + T2@.
   CSum  :: Con
 
@@ -346,7 +346,7 @@ pattern CBag = CContainer (ABase CtrBag)
 pattern CSet :: Con
 pattern CSet = CContainer (ABase CtrSet)
 
-{-# COMPLETE CArr, CPair, CSum, CList, CBag, CSet, CGraph, CMap, CUser #-}
+{-# COMPLETE CArr, CProd, CSum, CList, CBag, CSet, CGraph, CMap, CUser #-}
 
 ----------------------------------------
 -- Types
@@ -446,7 +446,7 @@ pattern (:->:) ty1 ty2 = TyCon CArr [ty1, ty2]
 infixr 7 :*:
 
 pattern (:*:) :: Type -> Type -> Type
-pattern (:*:) ty1 ty2 = TyCon CPair [ty1, ty2]
+pattern (:*:) ty1 ty2 = TyCon CProd [ty1, ty2]
 
 infixr 6 :+:
 

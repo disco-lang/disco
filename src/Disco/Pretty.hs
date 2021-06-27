@@ -44,10 +44,12 @@ import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
                                                    string2Name, unembed)
 
 import           Disco.AST.Core
+import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
 import           Disco.Capability
 import           Disco.Eval                       (topTyDefs)
-import           Disco.Interpret.Core             (mapToSet, rnfV, whnfV)
+import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
+                                                   whnfV)
 import           Disco.Module
 import           Disco.Pretty.Monadic
 import           Disco.Pretty.Prec
@@ -394,18 +396,17 @@ prettyWHNF out (TyUser nm args) v = do
   case M.lookup nm tymap of
     Just (TyDefBody _ body) -> prettyWHNF out (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
-prettyWHNF out TyUnit          (VCons 0 []) = out "()"
+prettyWHNF out TyUnit          VUnit        = out "()"
 prettyWHNF out TyProp          _            = prettyPlaceholder out TyProp
-prettyWHNF out TyBool          (VCons i []) = out $ map toLower (show (toEnum i :: Bool))
+prettyWHNF out TyBool          (VInj s _)   = out $ map toLower (show (selectSide s False True))
 prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
 prettyWHNF out (TyList TyC)    v            = prettyString out v
 prettyWHNF out (TyList ty)     v            = prettyList out ty v
 prettyWHNF out ty@(_ :*: _)    v            = out "(" >> prettyTuple out ty v >> out ")"
-prettyWHNF out (ty1 :+: ty2) (VCons i [v])
-  = case i of
-      0 -> out "left"  >> prettyValueWithP out ty1 v
-      1 -> out "right" >> prettyValueWithP out ty2 v
-      _ -> error "Impossible! Constructor for sum is neither 0 nor 1 in prettyWHNF"
+prettyWHNF out (ty1 :+: ty2) (VInj s v)
+  = case s of
+      L -> out "left"  >> prettyValueWithP out ty1 v
+      R -> out "right" >> prettyValueWithP out ty2 v
 prettyWHNF out _ (VNum d r)
   | denominator r == 1 = out $ show (numerator r)
   | otherwise          = case d of
@@ -465,33 +466,26 @@ prettyString out str = out "\"" >> go str >> out "\""
 
     go :: MonadDisco m => Value -> m ()
     go v = do
-      v' <- whnfV v
-      case v' of
-        (VCons 0 []) -> return ()
-        (VCons 1 [hd, tl]) -> do
-          hd' <- whnfV hd
-          out (toChar hd')
-          go tl
-        v'' -> error $ "Impossible! Value that's not a string in prettyString: " ++ show v''
+      whnfList v (return ()) $ \hd tl -> do
+        hd' <- whnfV hd
+        out (toChar hd')
+        go tl
 
 -- | Pretty-print a list with elements of a given type, assuming the
 --   list has already been reduced to WHNF.
 prettyList :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
 prettyList out ty v = out "[" >> go v
   where
-    go (VCons 0 []) = out "]"
-    go (VCons 1 [hd, tl]) = do
+    go w = whnfList w (out "]") $ \hd tl -> do
       prettyValueWith out ty hd
       tlWHNF <- whnfV tl
       case tlWHNF of
-        VCons 1 _ -> out ", "
-        _         -> return ()
+        VInj R _ -> out ", "
+        _        -> return ()
       go tlWHNF
 
-    go v' = error $ "Impossible! Value that's not a list (or not in WHNF) in prettyList: " ++ show v'
-
 prettyTuple :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyTuple out (ty1 :*: ty2) (VCons 0 [v1, v2]) = do
+prettyTuple out (ty1 :*: ty2) (VPair v1 v2) = do
   prettyValueWith out ty1 v1
   out ", "
   whnfV v2 >>= prettyTuple out ty2

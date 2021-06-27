@@ -55,7 +55,6 @@ module Disco.AST.Desugared
        , pattern DPInj
        , pattern DPNat
        , pattern DPFrac
-       , pattern DPCons
        , pattern DPNil
 
        , DProperty
@@ -213,11 +212,11 @@ type instance X_PSub     DS = Void
 type instance X_PNeg     DS = Void
 type instance X_PFrac    DS = Void
 
--- In the desugared language, constructor patterns (DPPair, DPInj,
--- DPCons) can only contain variables, not nested patterns.  This
--- means that the desugaring phase has to make explicit the order of
--- matching by exploding nested patterns into sequential guards, which
--- makes the interpreter simpler.
+-- In the desugared language, constructor patterns (DPPair, DPInj) can
+-- only contain variables, not nested patterns.  This means that the
+-- desugaring phase has to make explicit the order of matching by
+-- exploding nested patterns into sequential guards, which makes the
+-- interpreter simpler.
 
 type instance X_Pattern  DS =
   Either
@@ -225,11 +224,8 @@ type instance X_Pattern  DS =
     (Either
       (Embed Type, Side, Name DTerm)         -- DPInj
       (Either
-        (Embed Type, Name DTerm, Name DTerm) -- DPCons
-        (Either
-          (Embed Type, Name DTerm, Name DTerm) -- DPFrac
-          (Embed Type)                         -- DNil
-        )
+        (Embed Type, Name DTerm, Name DTerm) -- DPFrac
+        (Embed Type)                         -- DNil
       )
     )
 
@@ -267,23 +263,18 @@ pattern DPNat ty n <- PNat_ (unembed -> ty) n
   where
     DPNat ty n = PNat_ (embed ty) n
 
-pattern DPCons :: Type -> Name DTerm -> Name DTerm -> DPattern
-pattern DPCons ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2))))
-  where
-    DPCons ty x1 x2 = XPattern_ (Right (Right (Left (embed ty, x1, x2))))
-
 pattern DPFrac :: Type -> Name DTerm -> Name DTerm -> DPattern
-pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (Right (Left (unembed -> ty, x1, x2)))))
+pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2))))
   where
-    DPFrac ty x1 x2 = XPattern_ (Right (Right (Right (Left (embed ty, x1, x2)))))
+    DPFrac ty x1 x2 = XPattern_ (Right (Right (Left (embed ty, x1, x2))))
 
 pattern DPNil :: Type -> DPattern
-pattern DPNil ty <- XPattern_ (Right (Right (Right (Right (unembed -> ty)))))
+pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
   where
-    DPNil ty = XPattern_ (Right (Right (Right (Right (embed ty)))))
+    DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
-    DPNat, DPFrac, DPNil, DPCons #-}
+    DPNat, DPFrac, DPNil #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -320,4 +311,3 @@ instance HasType DPattern where
   getType (DPNat ty _)    = ty
   getType (DPFrac ty _ _) = ty
   getType (DPNil ty)      = ty
-  getType (DPCons ty _ _) = ty

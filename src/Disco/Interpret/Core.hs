@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE PatternSynonyms          #-}
 {-# LANGUAGE RankNTypes               #-}
 {-# LANGUAGE TupleSections            #-}
 {-# LANGUAGE TypeApplications         #-}
@@ -31,7 +32,7 @@ module Disco.Interpret.Core
        , rnf, rnfV
 
          -- ** Weak head reduction
-       , whnf, whnfV
+       , whnf, whnfV, whnfList
 
          -- * Container utilities
        , valuesToBag, valuesToSet, valuesToMap, mapToSet
@@ -83,6 +84,7 @@ import           Math.NumberTheory.Primes                (factorise, unPrime)
 import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 import           Disco.AST.Core
+import           Disco.AST.Generic                       (Side (..), selectSide)
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
 import           Disco.Capability
@@ -142,10 +144,15 @@ loadDefs cenv = do
 vnum :: Rational -> Value
 vnum = VNum mempty
 
+-- | A convenience function for creating a default @VNum@ value with a
+--   default (@Fractional@) flag.
+vint :: Integer -> Value
+vint = vnum . (% 1)
+
 -- | Turn any instance of @Enum@ into a @Value@, by creating a
 --   constructor with an index corresponding to the enum value.
 mkEnum :: Enum e => e -> Value
-mkEnum e = VCons (fromEnum e) []
+mkEnum e = VInj (toEnum $ fromEnum e) VUnit
 
 --------------------------------------------------
 -- Reduced normal form
@@ -162,21 +169,24 @@ rnf c = whnf c >>= rnfV
 --   constructors as much as possible.
 rnfV :: MonadDisco m => Value -> m Value
 
--- The value is a constructor: keep the constructor and recursively
+-- The value is an injection: keep the tag and recursively
 -- reduce all its contents.
-rnfV (VCons i vs) = VCons i <$> mapM rnfV vs
+rnfV (VInj s v)    = VInj s <$> rnfV v
+
+-- The value is a pair: recursively reduce its contents.
+rnfV (VPair v1 v2) = VPair <$> rnfV v1 <*> rnfV v2
 
 -- If the value is a thunk (i.e. unevaluated expression), a delayed
 -- computation, or an indirection (i.e. a pointer to a value), reduce
 -- it one step using 'whnfV' and then recursively continue reducing
 -- the result.
-rnfV v@VThunk{}   = whnfV v >>= rnfV
-rnfV v@VDelay{}   = whnfV v >>= rnfV
-rnfV v@VIndir{}   = whnfV v >>= rnfV
+rnfV v@VThunk{}    = whnfV v >>= rnfV
+rnfV v@VDelay{}    = whnfV v >>= rnfV
+rnfV v@VIndir{}    = whnfV v >>= rnfV
 
 -- Otherwise, the value is already in reduced normal form (for
 -- example, it could be a number or a function).
-rnfV v            = return v
+rnfV v             = return v
 
 --------------------------------------------------
 -- Weak head normal form (WHNF)
@@ -199,12 +209,13 @@ whnfV (VDelay imv _ e)      = withEnv e imv >>= whnfV
 -- have to be re-evaluated the next time loc is referenced.
 whnfV (VIndir loc)          = whnfIndir loc
 
--- If it is a cons, all well and good, it is already in WHNF---but at
--- the same time make sure that any subparts are either simple
--- constants or are turned into indirections to new memory cells.
--- This way, when the subparts are eventually evaluated, the new
--- memory cells can be updated with their result.
-whnfV (VCons i vs)          = VCons i <$> mapM mkSimple vs
+-- If it is an injection or a pair, all well and good, it is already
+-- in WHNF---but at the same time make sure that any subparts are
+-- either simple constants or are turned into indirections to new
+-- memory cells.  This way, when the subparts are eventually
+-- evaluated, the new memory cells can be updated with their result.
+whnfV (VInj s v)            = VInj s <$> mkSimple v
+whnfV (VPair v1 v2)         = VPair <$> mkSimple v1 <*> mkSimple v2
 
 -- Arity 0 functions can be boiled down to their core values
 whnfV (VConst op)
@@ -232,6 +243,26 @@ whnfIndir loc = do
       return v'                                   -- Finally, return the value.
 
 
+-- | Reduce a list to WHNF.  Note that in the case of a cons, this
+--   actually requires two calls to whnfV --- one to evaluate the
+--   injection at its head, and one to evaluate the pair inside it.
+--
+--   For convenience, this is written in a sort of
+--   continuation-passing/fold style: in addition to the 'Value' to be
+--   reduced, it takes two arguments representing the desired result
+--   if it is the empty list, and the desired continuation if it is a
+--   cons with a given head and tail.
+whnfList :: MonadDisco m => Value -> m a -> (Value -> Value -> m a) -> m a
+whnfList v nil cons = whnfV v >>= \case
+  VNil -> nil
+  VInj R p -> whnfV p >>= \case
+    VPair hd tl -> cons hd tl
+    v'          -> whnfListError $ VInj R v'
+  v' -> whnfListError v'
+
+  where
+    whnfListError z = error $ "Impossible! whnfList on non-list value " ++ show z
+
 -- | Reduce a Core expression to weak head normal form.  This is where
 --   the real work of interpreting happens.  Most rules are
 --   uninteresting except for function application and case.
@@ -251,11 +282,15 @@ whnf (CVar x) = do
       -- if the program already typechecked.
 
 -- Function constants don't reduce in and of themselves. Map & Graph's empty constructors are exceptions because they have arity 0
-whnf (CConst x)       = return $ VConst x
+whnf (CConst x)     = return $ VConst x
 
--- A constructor is already in WHNF, so just turn its contents into
+-- Unit value is already in WHNF.
+whnf CUnit          = return VUnit
+
+-- Injections and pairs are already in WHNF, so just turn their contents into
 -- thunks to be evaluated later when they are demanded.
-whnf (CCons i cs)   = VCons i <$> mapM mkValue cs
+whnf (CInj s c)     = VInj s <$> mkValue c
+whnf (CPair c1 c2)  = VPair <$> mkValue c1 <*> mkValue c2
 
 -- A number is in WHNF, just turn it into a VNum.
 whnf (CNum d n)     = return $ VNum d n
@@ -384,18 +419,29 @@ checkGuards ((unembed -> c, p) : gs) = do
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.
 match :: MonadDisco m => Value -> CPattern -> m (Maybe Env)
-match v (CPVar x)     = return $ Just (M.singleton (coerce x) v)
-match _ CPWild        = ok
-match v (CPCons i xs) = do
-  VCons j vs <- whnfV v
-  if i == j then return (Just . M.fromList $ zip xs vs) else noMatch
-match v (CPNat n)     = do
+match v (CPVar x)      = return $ Just (M.singleton (coerce x) v)
+match _ CPWild         = ok
+match v CPUnit         = whnfV v >> ok
+    -- Matching the unit value is guaranteed to succeed without
+    -- binding anything, but we still need to reduce in case v throws
+    -- an error.
+
+match v (CPTag s)      = do
+  VInj t _ <- whnfV v
+  if s == t then ok else noMatch
+match v (CPInj s x)    = do
+  VInj t v' <- whnfV v
+  if s == t then return (Just $ M.singleton x v') else noMatch
+match v (CPPair x1 x2) = do
+  VPair v1 v2 <- whnfV v
+  return . Just . M.fromList $ [(x1,v1), (x2,v2)]
+match v (CPNat n)      = do
   VNum _ m <- whnfV v
   if m == n % 1 then ok else noMatch
-match v (CPFrac x y) = do
+match v (CPFrac x y)   = do
   VNum _ r <- whnfV v
-  return . Just . M.fromList $ [ (x, vnum (numerator   r % 1))
-                               , (y, vnum (denominator r % 1))
+  return . Just . M.fromList $ [ (x, vint (numerator   r))
+                               , (y, vint (denominator r))
                                ]
 
 -- | Convenience function: successfully match with no bindings.
@@ -413,25 +459,20 @@ noMatch = pure Nothing
 --------------------------------------------------
 -- Utilities
 
-
 -- | Convert a Haskell list of Values into a Value representing a
 --   disco list.
 toDiscoList :: MonadDisco m => [Value] -> m Value
-toDiscoList []       = return $ VCons 0 []
+toDiscoList []       = return VNil
 toDiscoList (x : xs) = do
   xv  <- mkSimple x
   xsv <- mkSimple =<< delay (toDiscoList xs)
-  return $ VCons 1 [xv, xsv]
-
+  return $ VCons xv xsv
 
 -- | Convert a Value representing a disco list into a Haskell list of
 --   Values.  Strict in the spine of the list.
 fromDiscoList :: MonadDisco m => Value -> m [Value]
 fromDiscoList v =
-  whnfV v >>= \case
-    VCons 0 _       -> return []
-    VCons 1 [x, xs] -> (x:) <$> fromDiscoList xs
-    v'              -> error $ "Impossible!  fromDiscoList on non-list value " ++ show v'
+  whnfList v (return []) (\x xs -> (x:) <$> fromDiscoList xs)
 
 -- | A lazy foldr on lists represented as 'Value's.  The entire
 --   function is wrapped in a call to 'delay', so it does not actually
@@ -440,26 +481,20 @@ fromDiscoList v =
 --   Value@ just results in a 'VDelay'; forcing that @VDelay@ with
 --   'whnf' will then cause the foldr to actually start executing.
 vfoldr :: MonadDisco m => (forall m'. MonadDisco m' => Value -> Value -> m' Value) -> Value -> Value -> m Value
-vfoldr f z xs = delay' [z,xs] $ do
-  xs' <- whnfV xs
-  case xs' of
-    VCons 0 []      -> return z
-    VCons 1 [vh,vt] -> do
-      r <- vfoldr f z vt
-      f vh r
-    _               -> error $ "Impossible! Got " ++ show xs' ++ " in vfoldr"
+vfoldr f z xs = delay' [z,xs] $
+  whnfList xs (return z) $ \vh vt -> f vh =<< vfoldr f z vt
 
 -- | Lazy append on 'Value' lists, implemented via 'vfoldr'.
 vappend :: MonadDisco m => Value -> Value -> m Value
-vappend xs ys = vfoldr (\h t -> return $ VCons 1 [h,t]) ys xs
+vappend xs ys = vfoldr (\h t -> return $ VCons h t) ys xs
 
 -- | Lazy concat on 'Value' lists, implemented via 'vfoldr'.
 vconcat :: MonadDisco m => Value -> m Value
-vconcat = vfoldr vappend (VCons 0 [])
+vconcat = vfoldr vappend VNil
 
 -- | Lazy map on 'Value' lists, implemented via 'vfoldr'.
 vmap :: MonadDisco m => (forall m'. MonadDisco m' => Value -> m' Value) -> Value -> m Value
-vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons 1 [h', t]) (VCons 0 [])
+vmap f = vfoldr (\h t -> f h >>= \h' -> return $ VCons h' t) VNil
 
 --------------------------------------------------
 -- Polynomial sequences [a,b,c,d .. e]
@@ -568,8 +603,8 @@ valuesToSet ty = fmap (VBag . map (second (const 1))) . countValues ty
 valuesToMap :: MonadDisco m => [Value] -> m Value
 valuesToMap l = VMap . M.fromList <$> mapM simpleKey l
   where
-    simpleKey (VCons 0 [k,v]) = (,v) <$> toSimpleValue k
-    simpleKey v'              = error $ "unexpected value " ++ show v' ++ " in simpleKey"
+    simpleKey (VPair k v) = (,v) <$> toSimpleValue k
+    simpleKey v'          = error $ "unexpected value " ++ show v' ++ " in simpleKey"
 
 -- | Generic function for merging two sorted, count-annotated lists of
 --   type @[(a,Integer)]@ a la merge sort, using the given comparison
@@ -650,7 +685,7 @@ listToBag ty v = do
 -- | Convert a map to a set of pairs.
 mapToSet :: MonadDisco m => Type -> Type -> Value -> m Value
 mapToSet tyk tyv (VMap val) = do
-  vcs <- countValues (tyk :*: tyv) . map (\(k,v) -> VCons 0 [fromSimpleValue k,v]) $ M.toList val
+  vcs <- countValues (tyk :*: tyv) . map (\(k,v) -> VPair (fromSimpleValue k) v) $ M.toList val
   return $ VBag $ (map . fmap) (const 1) vcs
 mapToSet _ _ v' = error $ "unexpected value " ++ show v' ++ " in mapToSet"
 
@@ -662,8 +697,8 @@ setToMap (VBag cs) = do
   return . VMap . M.fromList $ kvs'
 
   where
-    convertAssoc (VCons 0 [k, v]) = (,v) <$> toSimpleValue k
-    convertAssoc v                = error $ "unexpected value " ++ show v ++ " in setToMap.convertAssoc"
+    convertAssoc (VPair k v) = (,v) <$> toSimpleValue k
+    convertAssoc v           = error $ "unexpected value " ++ show v ++ " in setToMap.convertAssoc"
 setToMap v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
 
 -- | Convert a bag to a set of pairs, with each element paired with
@@ -671,7 +706,7 @@ setToMap v' = error $ "unexpected value " ++ show v' ++ " in setToMap"
 primBagCounts :: MonadDisco m => Value -> m Value
 primBagCounts b = do
   VBag cs <- whnfV b
-  return $ VBag (map (\(x,n) -> (VCons 0 [x, vnum (n%1)], 1)) cs)
+  return $ VBag (map (\(x,n) -> (VPair x (vint n), 1)) cs)
 
 -- | Take a set of pairs consisting of values paired with a natural
 --   number count, and convert to a bag.  Note the counts need not be
@@ -684,7 +719,7 @@ primBagFromCounts ty b = do
 
   where
     getCount (cnt, k) = do
-      VCons 0 [x,nv] <- whnfV cnt
+      VPair x nv <- whnfV cnt
       VNum _ n <- whnfV nv
       return (x, numerator n * k)
 
@@ -723,7 +758,7 @@ primEachSet ty f xs = do
 primReduceList :: MonadDisco m => Value -> Value -> Value -> m Value
 primReduceList f z xs = do
   f' <- whnfV f
-  vfoldr (\a b -> whnfApp f' [VCons 0 [a,b]]) z xs
+  vfoldr (\a b -> whnfApp f' [VPair a b]) z xs
 
 -- | Reduce a bag (or set) according to a given combining function and
 --   base case value.
@@ -732,7 +767,7 @@ primReduceBag f z b = do
   f' <- whnfV f
   VBag cts <- whnfV b
   xs <- toDiscoList $ concatMap (\(x,n) -> replicate (fromIntegral n) x) cts
-  vfoldr (\a r -> whnfApp f' [VCons 0 [a,r]]) z xs
+  vfoldr (\a r -> whnfApp f' [VPair a r]) z xs
 
   -- XXX this is super inefficient! (1) should have some sharing so
   -- replicated elements of bag aren't recomputed; (2) shouldn't have
@@ -746,13 +781,13 @@ primReduceBag f z b = do
 primFilterList :: MonadDisco m => Value -> Value -> m Value
 primFilterList p xs = do
   p' <- whnfV p
-  vfoldr (filterOne p') (VCons 0 []) xs
+  vfoldr (filterOne p') VNil xs
 
   where
     filterOne :: MonadDisco m => Value -> Value -> Value -> m Value
     filterOne p' a as = do
       b <- testPredicate p' a
-      if b then return $ VCons 1 [a, as] else return as
+      if b then return $ VCons a as else return as
 
 -- | Filter a bag (or set) according to a given predicate.
 primFilterBag :: MonadDisco m => Value -> Value -> m Value
@@ -765,8 +800,8 @@ testPredicate :: MonadDisco m => Value -> Value -> m Bool
 testPredicate p' x = do
   b <- whnfApp p' [x]
   case b of
-    VCons 0 [] -> return False
-    _          -> return True
+    VInj L _ -> return False
+    _        -> return True
 
 --------------------------------------------------
 -- Join
@@ -795,7 +830,7 @@ primMerge ty m b1 b2 = do
 
   where
     mkMergeFun m' i j = do
-      VNum _ r <- whnfApp m' [VCons 0 [vnum (i%1), vnum (j%1)]]
+      VNum _ r <- whnfApp m' [VPair (vint i) (vint j)]
       return (numerator r)
 
 ------------------------------------------------------------
@@ -805,7 +840,7 @@ primMerge ty m b1 b2 = do
 ctrSize :: MonadDisco m => Value -> m Value
 ctrSize v = do
   VBag xs <- whnfV v
-  return $ vnum (fromIntegral $ sum (map snd xs))
+  return $ vint (sum (map snd xs))
 
 -- | Compute the power set/bag of a set/bag.
 power :: MonadDisco m => Type -> Value -> m Value
@@ -837,13 +872,9 @@ bagElem ty x b = do
 -- | Test whether a given value is an element of a list.
 listElem :: MonadDisco m => Type -> Value -> Value -> m Value
 listElem ty x xs = do
-  xs' <- whnfV xs
-  case xs' of
-    VCons 0 _      -> return $ mkEnum False
-    VCons 1 [y,ys] -> do
-      eq <- decideEqFor ty x y
-      if eq then return $ mkEnum True else listElem ty x ys
-    v -> error $ "Impossible! Non-list value " ++ show v ++ " in listElem"
+  whnfList xs (return $ mkEnum False) $ \y ys -> do
+    eq <- decideEqFor ty x y
+    if eq then return $ mkEnum True else listElem ty x ys
 
 ------------------------------------------------------------
 -- Constant evaluation
@@ -1005,15 +1036,15 @@ arity1 name _ vs = error $ arityError name vs
 --   of arguments; throw an error if the wrong number of arguments are
 --   given.
 arity2 :: String -> (Value -> Value -> r) -> ([Value] -> r)
-arity2 _ f [VCons 0 [v1,v2]] = f v1 v2
-arity2 name _ vs             = error $ arityError name vs
+arity2 _ f [VPair v1 v2] = f v1 v2
+arity2 name _ vs         = error $ arityError name vs
 
 -- | Convert an arity-3 function to the right shape to accept a tuple
 --   of arguments; throw an error if the wrong number of arguments are
 --   given.
 arity3 :: String -> (Value -> Value -> Value -> r) -> ([Value] -> r)
-arity3 _ f [VCons 0 [v1, VCons 0 [v2,v3]]] = f v1 v2 v3
-arity3 name _ vs                           = error $ arityError name vs
+arity3 _ f [VPair v1 (VPair v2 v3)] = f v1 v2 v3
+arity3 name _ vs                    = error $ arityError name vs
 
 -- | Construct an error message for reporting an incorrect arity.
 arityError :: String -> [Value] -> String
@@ -1080,14 +1111,14 @@ modExp n v1 v2 = do
     Nothing -> throw @"err" DivByZero
     Just a  ->
       case powSomeMod a b of
-        SomeMod v' -> return $ vnum (getVal v' % 1)
+        SomeMod v' -> return $ vint (getVal v')
         InfMod {}  -> error "Impossible, got InfMod in modExp"
 
 -- | Perform a count on the number of values for the given type.
 countOp :: MonadDisco m => Value -> m Value
 countOp (VType ty) = case countType ty of
-  Just num -> return $ VCons 1 [vnum (num % 1)]
-  Nothing  -> return $ VCons 0 [VCons 0 []]
+  Just num -> return $ VInj R (vint num)
+  Nothing  -> return VNil
 countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 -- | Perform an enumeration of the values of a given type.
@@ -1137,7 +1168,7 @@ divOp m n = return $ vnum (m / n)
 modOp :: Has '[Th "err"] m => Rational -> Rational -> m Value
 modOp m n
   | n == 0    = throw @"err" DivByZero
-  | otherwise = return $ vnum ((numerator m `mod` numerator n) % 1)
+  | otherwise = return $ vint (numerator m `mod` numerator n)
                 -- This is safe since if the program typechecks, mod will only ever be
                 -- called on integral things.
 
@@ -1153,12 +1184,12 @@ multinomOp :: MonadDisco m => Value -> Value -> m Value
 multinomOp v1 v2 = do
   VNum _ n <- whnfV v1
   ks       <- rnfV  v2
-  return . vnum $ multinomial (numerator n) (asList ks) % 1
+  return . vint $ multinomial (numerator n) (asList ks)
   where
     asList :: Value -> [Integer]
-    asList (VCons 0 _)              = []
-    asList (VCons 1 [VNum _ k, ks]) = numerator k : asList ks
-    asList v                        = error $ "multinomOp.asList " ++ show v
+    asList (VInj L _)                     = []
+    asList (VInj R (VPair (VNum _ k) ks)) = numerator k : asList ks
+    asList v                              = error $ "multinomOp.asList " ++ show v
 
     multinomial :: Integer -> [Integer] -> Integer
     multinomial _ []     = 1
@@ -1201,8 +1232,8 @@ primCrash v = do
 valueToString :: MonadDisco m => Value -> m String
 valueToString = fmap toString . rnfV
   where
-    toString (VCons 0 _)              = ""
-    toString (VCons 1 [VNum _ c, cs]) = chr (fromIntegral $ numerator c) : toString cs
+    toString (VInj L _)                     = ""
+    toString (VInj R (VPair (VNum _ c) cs)) = chr (fromIntegral $ numerator c) : toString cs
     toString _ = "Impossible: valueToString.toString, non-list"
 
 ------------------------------------------------------------
@@ -1240,10 +1271,10 @@ valueToString = fmap toString . rnfV
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
 ensureProp :: Monad m => Value -> m ValProp
-ensureProp (VProp p)    = return p
-ensureProp (VCons 0 []) = return $ VPDone (TestResult False TestBool emptyTestEnv)
-ensureProp (VCons 1 []) = return $ VPDone (TestResult True TestBool emptyTestEnv)
-ensureProp _            = error "ensureProp: non-prop value"
+ensureProp (VProp p)  = return p
+ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
+ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
+ensureProp _          = error "ensureProp: non-prop value"
 
 failTestOnError :: Has '[Ct "err"] m => m ValProp -> m ValProp
 failTestOnError m = catch @"err" m $ \e ->
@@ -1275,7 +1306,7 @@ primHolds v = resultToBool =<< testProperty Exhaustive v
   where
     resultToBool :: Has '[Th "err"] m => TestResult -> m Value
     resultToBool (TestResult _ (TestRuntimeError e) _) = throw @"err" e
-    resultToBool (TestResult b _ _) = return $ VCons (fromEnum b) []
+    resultToBool (TestResult b _ _)                    = return $ mkEnum b
 
 -- | Invert a prop, keeping its evidence or its suspended search.
 primNotProp :: MonadDisco m => Value -> m Value
@@ -1327,8 +1358,8 @@ decideEqFor :: MonadDisco m => Type -> Value -> Value -> m Bool
 decideEqFor (ty1 :*: ty2) v1 v2 = do
 
   -- First, reduce both values to WHNF, which will produce pairs.
-  VCons 0 [v11, v12] <- whnfV v1
-  VCons 0 [v21, v22] <- whnfV v2
+  VPair v11 v12 <- whnfV v1
+  VPair v21 v22 <- whnfV v2
 
   -- Now decide equality of the first components.
   b1 <- decideEqFor ty1 v11 v21
@@ -1346,16 +1377,16 @@ decideEqFor (ty1 :+: ty2) v1 v2 = do
 
   -- Reduce both values to WHNF, which will produce constructors
   -- (either inl or inr) with one argument.
-  VCons i1 [v1'] <- whnfV v1
-  VCons i2 [v2'] <- whnfV v2
+  VInj s1 v1' <- whnfV v1
+  VInj s2 v2' <- whnfV v2
 
   -- Check whether the constructors are the same.
-  case i1 == i2 of
+  case s1 == s2 of
     -- If not, the values are not equal.
     False -> return False
     -- If so, decide equality for the contained values at whichever
     -- type is appropriate.
-    True  -> decideEqFor ([ty1, ty2] !! i1) v1' v2'
+    True  -> decideEqFor (selectSide s1 ty1 ty2) v1' v2'
 
 -- To decide equality at an arrow type, (ty1 -> ty2):
 decideEqFor (ty1 :->: ty2) v1 v2 = do
@@ -1376,21 +1407,24 @@ decideEqFor (ty1 :->: ty2) v1 v2 = do
 decideEqFor (TyList elTy) v1 v2 = do
   -- Reduce both values to WHNF; will be either nil with no arguments
   -- or cons with two.
-  VCons c1 l1 <- whnfV v1
-  VCons c2 l2 <- whnfV v2
+  VInj c1 l1 <- whnfV v1
+  VInj c2 l2 <- whnfV v2
 
   case (c1,c2) of
-    (0,0) -> return True      -- Both are nil.
-    (1,1) -> do               -- Both are cons.
+    (L,L) -> return True      -- Both are nil.
+    (R,R) -> do               -- Both are cons.
+
+      VPair h1 t1 <- whnfV l1
+      VPair h2 t2 <- whnfV l2
 
       -- Check head equality.
-      heq <- decideEqFor elTy (l1 !! 0) (l2 !! 0)
+      heq <- decideEqFor elTy h1 h2
       case heq of
 
         -- If heads are unequal, so are lists.
         False -> return False
         -- Otherwise, check tails for equality.
-        True  -> decideEqFor (TyList elTy) (l1 !! 1) (l2 !! 1)
+        True  -> decideEqFor (TyList elTy) t1 t2
 
     -- Different constructors => unequal.
     _     -> return False
@@ -1426,10 +1460,10 @@ bagEquality ty ((x,n1):xs) ((y,n2):ys) = do
 --   know the values are in RNF.  This means the result doesn't need
 --   to be in the @Disco@ monad, because no evaluation needs to happen.
 decideEqForRnf :: Type -> Value -> Value -> Bool
-decideEqForRnf (ty1 :*: ty2) (VCons 0 [v11, v12]) (VCons 0 [v21, v22])
+decideEqForRnf (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22)
   = decideEqForRnf ty1 v11 v21 && decideEqForRnf ty2 v12 v22
-decideEqForRnf (ty1 :+: ty2) (VCons i1 [v1']) (VCons i2 [v2'])
-  = i1 == i2 && decideEqForRnf ([ty1, ty2] !! i1) v1' v2'
+decideEqForRnf (ty1 :+: ty2) (VInj s1 v1') (VInj s2 v2')
+  = s1 == s2 && decideEqForRnf (selectSide s1 ty1 ty2) v1' v2'
 decideEqForRnf (ty1 :->: ty2) (VFun f1) (VFun f2)
   = all (\v -> decideEqForRnf ty2 (f1 v) (f2 v)) (enumerateType ty1)
 decideEqForRnf _ v1 v2 = primValEq v1 v2
@@ -1465,9 +1499,10 @@ decideEqForClosures ty2 clos1 clos2 = go
 -- | Decide whether two values of a primitive type (Void, Unit, Bool,
 --   N, Z, Q, Zn) are equal.
 primValEq :: Value -> Value -> Bool
-primValEq (VCons i []) (VCons j []) = i == j
-primValEq (VNum _ n1)  (VNum _ n2)  = n1 == n2
-primValEq v1 v2                     = error $ "primValEq on non-primitive values " ++ show v1 ++ " and " ++ show v2
+primValEq VUnit VUnit                   = True
+primValEq (VInj i VUnit) (VInj j VUnit) = i == j
+primValEq (VNum _ n1)  (VNum _ n2)      = n1 == n2
+primValEq v1 v2                         = error $ "primValEq on non-primitive values " ++ show v1 ++ " and " ++ show v2
 
 ------------------------------------------------------------
 -- Comparison testing
@@ -1485,8 +1520,8 @@ decideOrdFor :: MonadDisco m => Type -> Value -> Value -> m Ordering
 decideOrdFor (ty1 :*: ty2) v1 v2 = do
 
   -- Reduce both pairs to WHNF
-  VCons 0 [v11, v12] <- whnfV v1
-  VCons 0 [v21, v22] <- whnfV v2
+  VPair v11 v12 <- whnfV v1
+  VPair v21 v22 <- whnfV v2
 
   -- Decide the ordering of the first pair components.
   o1 <- decideOrdFor ty1 v11 v21
@@ -1504,13 +1539,13 @@ decideOrdFor (ty1 :*: ty2) v1 v2 = do
 decideOrdFor (ty1 :+: ty2) v1 v2 = do
 
   -- Reduce to WHNF
-  VCons i1 [v1'] <- whnfV v1
-  VCons i2 [v2'] <- whnfV v2
+  VInj s1 v1' <- whnfV v1
+  VInj s2 v2' <- whnfV v2
 
   -- Compare the constructors
-  case compare i1 i2 of
+  case compare s1 s2 of
     -- Only compare the contents if the constructors are equal
-    EQ -> decideOrdFor ([ty1, ty2] !! i1) v1' v2'
+    EQ -> decideOrdFor (selectSide s1 ty1 ty2) v1' v2'
 
     -- Otherwise return the ordering of the constructors
     o  -> return o
@@ -1538,10 +1573,14 @@ decideOrdFor (TyList ty) v1 v2 = do
 
   -- Lexicographic ordering
   case (l1, l2) of
-    (VCons 0 _, VCons 0 _) -> return EQ   -- Both empty list
-    (VCons 0 _, VCons 1 _) -> return LT   -- Empty < cons
-    (VCons 1 _, VCons 0 _) -> return GT   -- Cons > empty
-    (VCons 1 [x1, l1'], VCons 1 [x2, l2']) -> do
+    (VInj L _, VInj L _) -> return EQ   -- Both empty list
+    (VInj L _, VInj R _) -> return LT   -- Empty < cons
+    (VInj R _, VInj L _) -> return GT   -- Cons > empty
+    (VInj R p1, VInj R p2) -> do
+
+      VPair x1 l1' <- whnfV p1
+      VPair x2 l2' <- whnfV p2
+
       o <- decideOrdFor ty x1 x2
       case o of
         EQ -> decideOrdFor (TyList ty) l1' l2'
@@ -1648,8 +1687,9 @@ decideOrdForClosures ty2 clos1 clos2 = go
 -- | Decide the ordering of two values of a primitive type (Void,
 --   Unit, Bool, N, Z, Q).
 primValOrd :: Value -> Value -> Ordering
-primValOrd (VCons i []) (VCons j []) = compare i j
-primValOrd (VNum _ n1)  (VNum _ n2)  = compare n1 n2
+primValOrd VUnit VUnit                   = EQ
+primValOrd (VInj i VUnit) (VInj j VUnit) = compare i j
+primValOrd (VNum _ n1)  (VNum _ n2)      = compare n1 n2
 primValOrd v1           v2
   = error $ "primValOrd: impossible! (got " ++ show v1 ++ ", " ++ show v2 ++ ")"
 
@@ -1661,17 +1701,21 @@ toSimpleValue :: MonadDisco m => Value -> m SimpleValue
 toSimpleValue v = do
     v' <- whnfV v
     case v' of
-        VNum d n   -> return $ SNum d n
-        VCons a xs -> SCons a <$> mapM toSimpleValue xs
-        VBag bs    -> SBag <$> mapM (\(a,b) -> (,b) <$> toSimpleValue a) bs
-        VType t    -> return $ SType t
-        t          -> error $ "A non-simple value was passed as simple" ++ show t
+        VNum d n    -> return $ SNum d n
+        VUnit       -> return SUnit
+        VInj s v1   -> SInj s <$> toSimpleValue v1
+        VPair v1 v2 -> SPair <$> toSimpleValue v1 <*> toSimpleValue v2
+        VBag bs     -> SBag <$> mapM (\(a,b) -> (,b) <$> toSimpleValue a) bs
+        VType t     -> return $ SType t
+        t           -> error $ "A non-simple value was passed as simple" ++ show t
 
 fromSimpleValue :: SimpleValue -> Value
-fromSimpleValue (SNum d n)   = VNum d n
-fromSimpleValue (SCons a xs) = VCons a $ map fromSimpleValue xs
-fromSimpleValue (SBag bs)    = VBag $ map (first fromSimpleValue) bs
-fromSimpleValue (SType t)    = VType t
+fromSimpleValue (SNum d n)    = VNum d n
+fromSimpleValue SUnit         = VUnit
+fromSimpleValue (SInj s v)    = VInj s (fromSimpleValue v)
+fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
+fromSimpleValue (SBag bs)     = VBag $ map (first fromSimpleValue) bs
+fromSimpleValue (SType t)     = VType t
 
 ------------------------------------------------------------
 -- OEIS
@@ -1686,16 +1730,15 @@ oeisLookup v = do
     let hvs = toHaskellList vs
     case lookupSequence hvs of
       Just result -> parseResult result
-      Nothing     -> return leftUnit
+      Nothing     -> return VNil
   where
     parseResult r = do
           let seqNum = getCatalogNum $ catalogNums r
           l <- toDiscoList $ toVal ("https://oeis.org/" ++ seqNum)
-          return $ VCons 1 [l] -- right "https://oeis.org/foo"
+          return $ VInj R l -- right "https://oeis.org/foo"
     getCatalogNum []    = error "No catalog info"
     getCatalogNum (n:_) = n
-    toVal = map (\c -> vnum (toInteger (ord c) % 1))
-    leftUnit = VCons 0 [VCons 0 []]
+    toVal = map (vint . toInteger . ord)
 
 -- | Extends a Disco integer list with data from a known OEIS sequence.
 --   Returns a list of integers upon success, otherwise the original list (unmodified).
@@ -1704,7 +1747,7 @@ oeisExtend v = do
     vs <- fromDiscoList v
     let xs = toHaskellList vs
     let newseq = extendSequence xs
-    toDiscoList $ map (vnum . (%1)) newseq
+    toDiscoList $ map vint newseq
 
 ------------------------------------------------------------
 -- Graph Utilities
@@ -1775,7 +1818,5 @@ mapLookup k m = do
     VMap m' <- whnfV m
     k' <- toSimpleValue k
     case M.lookup k' m' of
-        Just v' -> return $ VCons 1 [v']
-        _       -> return leftUnit
-    where
-    leftUnit = VCons 0 [VCons 0 []]
+        Just v' -> return $ VInj R v'
+        _       -> return VNil

@@ -31,6 +31,7 @@ import           Disco.Syntax.Prims
 import           Disco.Types
 import           Disco.Util
 
+import           Data.Bool                        (bool)
 import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
@@ -65,8 +66,8 @@ compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
 compileDTerm :: Has '[Fresh] m => DTerm -> m Core
 compileDTerm (DTVar _ x)   = return $ CVar (coerce x)
 compileDTerm (DTPrim ty x) = compilePrim ty x
-compileDTerm DTUnit        = return $ CCons 0 []
-compileDTerm (DTBool _ b)  = return $ CCons (fromEnum b) []
+compileDTerm DTUnit        = return CUnit
+compileDTerm (DTBool _ b)  = return $ CInj (bool L R b) CUnit
 compileDTerm (DTChar c)    = return $ CNum Fraction (toInteger (fromEnum c) % 1)
 compileDTerm (DTNat _ n)   = return $ CNum Fraction (n % 1)   -- compileNat ty n
 compileDTerm (DTRat r)     = return $ CNum Decimal r
@@ -97,14 +98,14 @@ compileDTerm term@(DTAbs q _ _) = do
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
 compileDTerm (DTApp _ (DTPrim _ (PrimBOp Cons)) (DTPair _ t1 t2))
-  = CCons 1 <$> mapM compileDTerm [t1, t2]
+  = CInj R <$> (CPair <$> compileDTerm t1 <*> compileDTerm t2)
 
 -- Special cases for left and right, which also compile to constructor applications.
 compileDTerm (DTApp _ (DTPrim _ PrimLeft) t)
-  = CCons 0 <$> mapM compileDTerm [t]
+  = CInj L <$> compileDTerm t
 
 compileDTerm (DTApp _ (DTPrim _ PrimRight) t)
-  = CCons 1 <$> mapM compileDTerm [t]
+  = CInj R <$> compileDTerm t
 
 compileDTerm (DTApp _ t1 t2)
   = appChain t1 [t2]
@@ -113,7 +114,7 @@ compileDTerm (DTApp _ t1 t2)
     appChain t1' ts               = CApp <$> compileDTerm t1' <*> mapM compileArg ts
 
 compileDTerm (DTPair _ t1 t2)
-  = CCons 0 <$> mapM compileDTerm [t1,t2]
+  = CPair <$> compileDTerm t1 <*> compileDTerm t2
 
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
@@ -125,7 +126,7 @@ compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CT
       , Count     ==> OCount
       ]
 
-compileDTerm (DTNil _)        = return $ CCons 0 []
+compileDTerm (DTNil _)        = return $ CInj L CUnit
 
 compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 
@@ -160,15 +161,15 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
-  return $ CAbs $ bind [hd, tl] $ CCons 1 [CVar hd, CVar tl]
+  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar hd) (CVar tl))
 
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CCons 0 [CVar a]
+  return $ CAbs $ bind [a] $ CInj L (CVar a)
 
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CCons 1 [CVar a]
+  return $ CAbs $ bind [a] $ CInj R (CVar a)
 
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
@@ -281,19 +282,18 @@ compileGuard (DGPat (unembed -> d) dpat) =
 -- Patterns
 ------------------------------------------------------------
 
--- | Compile a desugared pattern.  Turns all constructors into CPCons.
+-- | Compile a desugared pattern.
 compilePattern :: DPattern -> CPattern
 compilePattern (DPVar _ x)      = CPVar (coerce x)
 compilePattern (DPWild _)       = CPWild
-compilePattern DPUnit           = CPCons 0 []
-compilePattern (DPBool b)       = CPCons (fromEnum b) []
+compilePattern DPUnit           = CPUnit
+compilePattern (DPBool b)       = CPTag (toEnum . fromEnum $ b)
 compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
-compilePattern (DPPair _ x1 x2) = CPCons 0 (map coerce [x1,x2])
-compilePattern (DPInj _ s x)    = CPCons (fromEnum s) [coerce x]
+compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
+compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
 compilePattern (DPNat _ n)      = CPNat n
 compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
-compilePattern (DPNil _)        = CPCons 0 []
-compilePattern (DPCons _ x1 x2) = CPCons 1 (map coerce [x1, x2])
+compilePattern (DPNil _)        = CPTag L
 
 ------------------------------------------------------------
 -- Unary and binary operators

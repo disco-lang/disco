@@ -1021,7 +1021,7 @@ typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
-      (m,ms)    <- ensureConstrMode2 CPair mode (Left $ TTup (t:ts))
+      (m,ms)    <- ensureConstrMode2 CProd mode (Left $ TTup (t:ts))
       at        <- typecheck      m  t
       (ty, ats) <- typecheckTuple ms ts
       return (getType at :*: ty, at : ats)
@@ -1255,7 +1255,7 @@ checkPattern (PTup tup) tupTy = do
       (ctx, apt) <- checkPattern p ty
       return [(ctx, apt)]
     checkTuplePat (p:ps) ty = do
-      (ty1, ty2) <- ensureConstr2 CPair ty (Right $ PTup (p:ps))
+      (ty1, ty2) <- ensureConstr2 CProd ty (Right $ PTup (p:ps))
       (ctx, apt) <- checkPattern p ty1
       rest <- checkTuplePat ps ty2
       return ((ctx, apt) : rest)

@@ -68,11 +68,11 @@ data Variance = Co | Contra
 --   and only if @S2 <: S1@ and @T1 <: T2@.
 arity :: Con -> [Variance]
 arity CArr           = [Contra, Co]
-arity CPair          = [Co, Co]
+arity CProd          = [Co, Co]
 arity CSum           = [Co, Co]
 arity (CContainer _) = [Co]
-arity (CMap)         = [Contra, Co]
-arity (CGraph)       = [Co]
+arity CMap           = [Contra, Co]
+arity CGraph         = [Co]
 arity (CUser _)      = error "Impossible! arity CUser"
   -- CUsers should always be replaced by their definitions before arity
   -- is called.
@@ -183,7 +183,7 @@ qualRulesMap = M.fromList
   [ CArr  ==> M.fromList
     [ QCmp ==> [Nothing, Just QCmp]
     ]
-  , CPair ==> M.fromList
+  , CProd ==> M.fromList
     [ QCmp ==> [Just QCmp, Just QCmp],
       QSimple ==> [Just QSimple, Just QSimple]
     ]
@@ -227,7 +227,7 @@ qualRulesMap = M.fromList
   --   , QSub ==> [Nothing, Just QSub]  -- ditto for subtraction
   --   , QDiv ==> [Nothing, Just QDiv]  -- and division
   --   ]
-  -- , CPair ==> M.fromList
+  -- , CProd ==> M.fromList
   --   [ QNum ==> [Just QNum, Just QNum] -- (a,b) can be +, * iff a and b can
   --   , QSub ==> [Just QSub, Just QSub] -- etc.
   --   , QDiv ==> [Just QDiv, Just QDiv]

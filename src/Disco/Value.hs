@@ -25,7 +25,7 @@
 module Disco.Value
   ( -- * Values
 
-    Value(.., VFun, VDelay)
+    Value(.., VFun, VDelay), pattern VNil, pattern VCons
   , SimpleValue(..)
 
     -- * Props & testing
@@ -49,6 +49,7 @@ import           Capability.Error
 import           Capability.Reader
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
+import           Disco.AST.Generic                (Side (..))
 import           Disco.Capability
 import           Disco.Context
 import           Disco.Error
@@ -64,12 +65,14 @@ data Value where
   --   fractional values should be diplayed.
   VNum   :: RationalDisplay -> Rational -> Value
 
-  -- | A constructor with arguments.  The Int indicates which
-  --   constructor it is.  For example, False is represented by
-  --   @VCons 0 []@, and True by @VCons 1 []@.  A pair is
-  --   represented by @VCons 0 [v1, v2]@, and @inr v@ by @VCons 1
-  --   [v]@.
-  VCons  :: Int -> [Value] -> Value
+  -- | The unit value.
+  VUnit :: Value
+
+  -- | An injection into a sum type.
+  VInj :: Side -> Value -> Value
+
+  -- | A pair of values.
+  VPair :: Value -> Value -> Value
 
   -- | A built-in function constant.
   VConst :: Op -> Value
@@ -135,6 +138,14 @@ data Value where
   VType :: Type -> Value
   deriving Show
 
+-- | Convenient pattern for the empty list.
+pattern VNil :: Value
+pattern VNil      = VInj L VUnit
+
+-- | Convenient pattern for list cons.
+pattern VCons :: Value -> Value -> Value
+pattern VCons h t = VInj R (VPair h t)
+
 -- | Values which can be used as keys in a map, i.e. those for which a
 --   Haskell Ord instance can be easily created.  These should always
 --   be of a type for which the QSimple qualifier can be constructed.
@@ -146,7 +157,9 @@ data Value where
 --   of graphs or maps of maps, or the like.
 data SimpleValue where
   SNum   :: RationalDisplay -> Rational -> SimpleValue
-  SCons  :: Int -> [SimpleValue] -> SimpleValue
+  SUnit  :: SimpleValue
+  SInj   :: Side -> SimpleValue -> SimpleValue
+  SPair  :: SimpleValue -> SimpleValue -> SimpleValue
   SBag   :: [(SimpleValue, Integer)] -> SimpleValue
   SType  :: Type -> SimpleValue
   deriving (Show, Eq, Ord)

@@ -682,10 +682,18 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         ]
 
     desugarMatch dt (APCons ty p1 p2) = do
+      y <- fresh (string2Name "y")
       (x1, gs1) <- varForPat p1
       (x2, gs2) <- varForPat p2
+
+      let eltTy = getType p1
+          unrolledTy = eltTy :*: ty
       fmap concat . sequence $
-        [ mkMatch dt $ DPCons ty x1 x2, return gs1, return gs2 ]
+        [ mkMatch dt (DPInj ty R y)
+        , mkMatch (DTVar unrolledTy y) (DPPair unrolledTy x1 x2)
+        , return gs1
+        , return gs2
+        ]
 
     desugarMatch dt (APList ty []) = mkMatch dt (DPNil ty)
     desugarMatch dt (APList ty ps) =

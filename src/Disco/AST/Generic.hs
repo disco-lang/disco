@@ -54,7 +54,7 @@ module Disco.AST.Generic
 
          -- * Utility types
 
-       , Side (..), selectSide
+       , Side (..), selectSide, fromSide
        , Container (..)
        , Ellipsis (..)
 
@@ -212,7 +212,7 @@ fromTelescope = foldTelescope (:) []
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
-  deriving (Show, Eq, Enum, Generic)
+  deriving (Show, Eq, Ord, Enum, Bounded, Generic)
 
 instance Alpha Side
 instance Subst t Side
@@ -222,6 +222,10 @@ instance Subst t Side
 selectSide :: Side -> a -> a -> a
 selectSide L a _ = a
 selectSide R _ b = b
+
+-- | Convert a 'Side' to a boolean.
+fromSide :: Side -> Bool
+fromSide s = selectSide s False True
 
 -- | An enumeration of the different kinds of containers in disco:
 --   lists, bags, and sets.

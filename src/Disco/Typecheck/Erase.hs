@@ -131,4 +131,3 @@ eraseDPattern (DPInj _ s x)    = PInj s (PVar (coerce x))
 eraseDPattern (DPNat _ n)      = PNat n
 eraseDPattern (DPFrac _ x1 x2) = PFrac (PVar (coerce x1)) (PVar (coerce x2))
 eraseDPattern (DPNil _)        = PList []
-eraseDPattern (DPCons _ x1 x2) = PCons (PVar (coerce x1)) (PVar (coerce x2))

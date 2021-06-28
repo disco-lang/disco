@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds                #-}
 {-# LANGUAGE FlexibleContexts         #-}
 {-# LANGUAGE MultiParamTypeClasses    #-}
+{-# LANGUAGE MultiWayIf               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE ScopedTypeVariables      #-}
 {-# LANGUAGE TypeApplications         #-}
@@ -136,16 +137,25 @@ makeTyDefnCtx tydefs = do
     (x:_) -> throw @"tcerr" (DuplicateTyDefns x)
     []    -> return . M.fromList $ map convert tydefs
 
--- | Check the validity of a type definition: make sure it is not
---   directly cyclic (i.e. ensure it is a "productive" definition),
---   and also make sure it does not use any polymorphic recursion
---   (polymorphic recursion isn't allowed at the moment since it can
---   make the subtyping checker diverge), nor any unbound type
---   variables or undefined types.
+-- | Check the validity of a type definition.
 checkTyDefn :: Has '[Rd "tydefctx", Th "tcerr"] m => TypeDefn -> m ()
-checkTyDefn defn@(TypeDefn x args _) = do
+checkTyDefn defn@(TypeDefn x args body) = do
+
+  -- First, make sure the body is a valid type, i.e. everything inside
+  -- it is well-kinded.
+  checkTypeValid body
+
+  -- Now make sure it is not directly cyclic (i.e. ensure it is a
+  -- "productive" definition).
   _ <- checkCyclicTy (TyUser x (map (TyVar . string2Name) args)) S.empty
+
+  -- Make sure it does not use any unbound type variables or undefined
+  -- types.
   checkUnboundVars defn
+
+  -- Make sure it does not use any polymorphic recursion (polymorphic
+  -- recursion isn't allowed at the moment since it can make the
+  -- subtyping checker diverge).
   checkPolyRec defn
 
 -- | Check if a given type is cyclic. A type 'ty' is cyclic if:
@@ -328,10 +338,9 @@ checkTypeValid :: Has '[Rd "tydefctx", Th "tcerr"] m => Type -> m ()
 checkTypeValid (TyAtom _)    = return ()
 checkTypeValid (TyCon c tys) = do
   k <- conArity c
-  case () of
-    _ | n < k     -> throw @"tcerr" (NotEnoughArgs c)
-      | n > k     -> throw @"tcerr" (TooManyArgs c)
-      | otherwise -> mapM_ checkTypeValid tys
+  if | n < k     -> throw @"tcerr" (NotEnoughArgs c)
+     | n > k     -> throw @"tcerr" (TooManyArgs c)
+     | otherwise -> mapM_ checkTypeValid tys
   where
     n = length tys
 

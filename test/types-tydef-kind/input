@@ -1,0 +1,2 @@
+-- See issue #295.  Make sure we kind-check type definitions.
+:load test/types-tydef-kind/types-tydef-kind.disco

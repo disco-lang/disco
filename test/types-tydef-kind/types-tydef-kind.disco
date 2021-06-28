@@ -1,0 +1,5 @@
+type Foo a = a + Foo
+
+type Bar = Bar + Foo
+
+type Zip = Unit + Graph

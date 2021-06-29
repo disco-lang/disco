@@ -892,14 +892,14 @@ solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         fromVar _      = error "Impossible! UB but uisVar."
 
     go :: RelMap -> SolveM (Substitution BaseTy)
-    go relMap = case as of
+    go relMap = traceShowM relMap >> case as of
 
       -- No variables left that have base type constraints.
       []    -> return idS
 
       -- Solve one variable at a time.  See below.
-      (a:_) ->
-
+      (a:_) -> do
+        traceM $ "Solving for " ++ show a
         case solveVar a of
           Nothing       -> do
             traceM $ "Couldn't solve for " ++ show a
@@ -916,7 +916,8 @@ solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
           -- anything (indeed, some variables might not be keys if
           -- they have an empty sort), so it doesn't matter if old
           -- variables hang around in it.
-          Just s ->
+          Just s -> do
+            traceShowM s
             (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) $ relMap)
 
       where
@@ -965,24 +966,37 @@ solveGraph vm g = (atomToTypeSubst . unifyWCC) <$> go topRelMap
         solveVar v =
           case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . (lkup "solveGraph.solveVar" relMap)) of
             -- No sub- or supertypes; the only way this can happen is
-            -- if it has a nontrivial sort.  We just pick a type that
-            -- inhabits the sort.
+            -- if it has a nontrivial sort.
+            --
+            -- Traytel et al. don't seem to have a rule saying what to
+            -- do in this case (see Fig. 16 on p. 16 of their long
+            -- version).  We used to just pick a type that inhabits
+            -- the sort, but this is wrong; see
+            -- https://github.com/disco-lang/disco/issues/192.
+            --
+            -- For now, let's assume that any situation in which we
+            -- have no base sub- or supertypes but we do have
+            -- nontrivial sorts means that we are dealing with numeric
+            -- types; so we can just call N a base subtype and go from there.
+
             ([], []) ->
-              Just (coerce v |-> pickSortBaseTy (getSort vm v))
+              -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
+              (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
+                (varRels (lkup "solveVar none, rels" relMap (v,SubTy)))
 
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->
-              -- trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
+              -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
               (coerce v |->) <$> glbBySort vm relMap bsupers (getSort vm v)
                 (varRels (lkup "solveVar bsupers, rels" relMap (v,SuperTy)))
 
             -- Only subtypes.  Just assign a to their sup.
             ([], bsubs)   ->
-              -- trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
-              -- trace ("sortmap: " ++ show vm) $
-              -- trace ("relmap: " ++ show relMap) $
-              -- trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
-              -- trace ("relvars: " ++ show (varRels (relMap ! (v,Sub)))) $
+              -- Debug.trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
+              -- Debug.trace ("sortmap: " ++ show vm) $
+              -- Debug.trace ("relmap: " ++ show relMap) $
+              -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
+              -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
               (coerce v |->) <$> lubBySort vm relMap bsubs (getSort vm v)
                 (varRels (lkup "solveVar bsubs, rels" relMap (v,SubTy)))
 

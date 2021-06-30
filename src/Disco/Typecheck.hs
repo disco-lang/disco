@@ -1514,11 +1514,15 @@ getEltTy c ty = do
 --   constructor, and a list of fresh type variables is returned whose
 --   count matches the arity of the provided constructor.
 ensureConstr
-  :: forall m. Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: forall m. Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Type -> Either Term Pattern -> m [Type]
 ensureConstr c ty targ = matchConTy c ty
   where
     matchConTy :: Con -> Type -> m [Type]
+
+    -- expand type definitions lazily
+    matchConTy c (TyUser name args) = lookupTyDefn name args >>= matchConTy c
+
     matchConTy c1 (TyCon c2 tys) = do
       matchCon c1 c2
       return tys
@@ -1551,7 +1555,7 @@ ensureConstr c ty targ = matchConTy c ty
 --   argument type out, and throws an error if we get any other
 --   number.
 ensureConstr1
-  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Type -> Either Term Pattern -> m Type
 ensureConstr1 c ty targ = do
   tys <- ensureConstr c ty targ
@@ -1565,7 +1569,7 @@ ensureConstr1 c ty targ = do
 --   argument types out, and throws an error if we get any other
 --   number.
 ensureConstr2
-  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Type -> Either Term Pattern -> m (Type, Type)
 ensureConstr2 c ty targ  = do
   tys <- ensureConstr c ty targ
@@ -1580,7 +1584,7 @@ ensureConstr2 c ty targ  = do
 --   'Check'; otherwise it generates an appropriate number of copies
 --   of 'Infer'.
 ensureConstrMode
-  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Mode -> Either Term Pattern -> m [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
@@ -1588,7 +1592,7 @@ ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
 -- | A variant of 'ensureConstrMode' that expects to get a single
 --   'Mode' and throws an error if it encounters any other number.
 ensureConstrMode1
-  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Mode -> Either Term Pattern -> m Mode
 ensureConstrMode1 c m targ = do
   ms <- ensureConstrMode c m targ
@@ -1601,7 +1605,7 @@ ensureConstrMode1 c m targ = do
 -- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
 --   and throws an error if it encounters any other number.
 ensureConstrMode2
-  :: Has '[Wr "constraints", Th "tcerr", Fresh] m
+  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
   => Con -> Mode -> Either Term Pattern -> m (Mode, Mode)
 ensureConstrMode2 c m targ = do
   ms <- ensureConstrMode c m targ

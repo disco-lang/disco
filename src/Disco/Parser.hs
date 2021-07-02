@@ -71,7 +71,7 @@ import           Control.Monad.State
 import           Data.Char                               (isDigit)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
-import           Data.Maybe                              (catMaybes)
+import           Data.Maybe                              (catMaybes, fromMaybe)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
@@ -439,7 +439,7 @@ parseTyDefn = label "type defintion" $ do
   reserved "type"
   indented $ do
     name <- parseTyDef
-    args <- many parseTyVarName
+    args <- fromMaybe [] <$> optional (parens $ parseTyVarName `sepBy1` comma)
     _ <- symbol "="
     TypeDefn name args <$> parseType
 
@@ -928,7 +928,7 @@ parseAtomicType = label "type" $
   <|> TyZ    <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
   <|> TyF    <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
   <|> TyQ    <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
-  <|> TyCon  <$> parseCon <*> pure []
+  <|> TyCon  <$> parseCon <*> (fromMaybe [] <$> optional (parens (parseType `sepBy1` comma)))
   <|> TyVar  <$> parseTyVar
   <|> parens parseType
 
@@ -961,8 +961,7 @@ parsePolyTy = closeType <$> parseType
 parseType :: Parser Type
 parseType = makeExprParser parseAtomicType table
   where
-    table = [ [ InfixL (return tyApp) ]
-            , [ infixR "*" (:*:)
+    table = [ [ infixR "*" (:*:)
               , infixR "×" (:*:) ]
             , [ infixR "+" (:+:)
               , infixR "⊎" (:+:)
@@ -973,11 +972,6 @@ parseType = makeExprParser parseAtomicType table
             ]
 
     infixR name fun = InfixR (reservedOp name >> return fun)
-
-    tyApp (TyCon c args) t2 = TyCon c (args ++ [t2])
-    tyApp t1 t2             = error $ show t1 ++ " can't be applied to " ++ show t2
-      -- XXX make this a proper error!!
-      -- Might need to rethink AST design.
 
 parseTyOp :: Parser TyOp
 parseTyOp =

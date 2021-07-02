@@ -9,6 +9,6 @@ dummy = unit
 !!! setSize {1} == 1
 !!! setSize {1..10} == 10
 !!! setSize {1,1,1,2,3} == 3
-!!! ∀ s : Set N. setSize s == setSize (s ∪ s)
-setSize : Set N -> N
+!!! ∀ s : Set(N). setSize s == setSize (s ∪ s)
+setSize : Set(N) -> N
 setSize s = reduce(~+~, 0, each (\x.1, bag s))

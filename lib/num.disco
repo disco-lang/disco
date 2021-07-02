@@ -37,7 +37,7 @@ lg : N -> N
 lg x = log (2,x)
 
 ||| Compute the prime factorization of the given natural number.
-factor : N -> Bag N
+factor : N -> Bag(N)
 factor = $factor
 
 even : Z -> Bool

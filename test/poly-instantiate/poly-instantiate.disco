@@ -1,3 +1,3 @@
-foldr : (a -> r -> r) -> r -> List a -> r
+foldr : (a -> r -> r) -> r -> List(a) -> r
 foldr _ z [] = z
 foldr f z (a :: as) = f a (foldr f z as)

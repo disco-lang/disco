@@ -1,6 +1,6 @@
 {1, 2}
-{} union {1, 2} : Set ℕ
-{2, -3} union {1 / 2} : Set ℚ
+{} union {1, 2} : Set(ℕ)
+{2, -3} union {1 / 2} : Set(ℚ)
 {1, 2, 3}
 {4}
 {}
@@ -13,12 +13,12 @@ true
 {{}, {1}}
 {{}, {{}}}
 {{}, {{}}, {{}, {{}}}, {{{}}}}
-power(power(power({}))) : Set (Set (Set (Set ℕ)))
+power(power(power({}))) : Set(Set(Set(Set(ℕ))))
 {{}, {"hi"}, {"hi", "there"}, {"there"}}
 ⟅1, 2⟆
 ⟅1, 2⟆
-bag([]) union bag([1, 2]) : Bag ℕ
-bag([2, -3]) union bag([1 / 2]) : Bag ℚ
+bag([]) union bag([1, 2]) : Bag(ℕ)
+bag([2, -3]) union bag([1 / 2]) : Bag(ℚ)
 ⟅1, 2 # 5, 3⟆
 ⟅4⟆
 ⟅⟆

@@ -4,7 +4,7 @@ Crash "nope"
 7
 let x : ℕ = crash("nope") in 3 + x : ℕ
 Crash "nope"
-crash : List Char → a
+crash : List(Char) → a
 1
 Crash "nope"
 (λx : ℕ. 1)(crash("nope")) : ℕ

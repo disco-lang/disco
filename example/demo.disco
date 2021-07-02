@@ -1,7 +1,7 @@
 f : Z -> Z
 f x = x - 3
 
-sum : List Z -> Z
+sum : List(Z) -> Z
 sum []      = 0
 sum (x::xs) = x + sum xs
 
@@ -22,8 +22,8 @@ len : S -> N
 len (left(unit))  = 0
 len (right(_, s)) = 1 + len s
 
-type P a = a + (P a) * (P a)
+type P(a) = a + P(a) * P(a)
 
-height : P a -> N
+height : P(a) -> N
 height (left(_)) = 0
 height (right(l, r)) = 1 + (height l) max (height r)

@@ -8,7 +8,7 @@ pand(p, q) = forall and_side : Unit + Unit. {?
     q otherwise
   ?}
 
-all : List Prop -> Prop
+all : List(Prop) -> Prop
 all ps = reduce(pand, true, ps)
 
 ||| 'or' for propositions.
@@ -23,7 +23,7 @@ por(p, q) = exists or_side : Unit + Unit. {?
     q otherwise
   ?}
 
-any : List Prop -> Prop
+any : List(Prop) -> Prop
 any ps = reduce(por, false, ps)
 
 ||| Assert that a proposition holds on some number in a range.

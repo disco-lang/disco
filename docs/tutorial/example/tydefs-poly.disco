@@ -1,13 +1,13 @@
 import list
 
-type Tree a = Unit + (a * Tree a * Tree a)
+type Tree(a) = Unit + (a * Tree(a) * Tree(a))
 
-treeFold : b * (a * b * b -> b) * Tree a -> b
+treeFold : b * (a * b * b -> b) * Tree(a) -> b
 treeFold (z, f, left(unit)) = z
 treeFold (z, f, right (a, l, r)) = f(a, treeFold(z,f,l), treeFold(z,f,r))
 
-sumTree : Tree Nat -> Nat
+sumTree : Tree(Nat) -> Nat
 sumTree(t) = treeFold(0, \(a,l,r). a+l+r, t)
 
-flattenTree : Tree a -> List a
+flattenTree : Tree(a) -> List(a)
 flattenTree(t) = treeFold([], \(a,l,r). append(l, append([a], r)), t)

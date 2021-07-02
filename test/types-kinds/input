@@ -1,5 +1,5 @@
-3 : List N N
-3 : (List N) Z
-3 : List (List N)
-3 : (List List) N
-:type \x:List N N.x == x
+3 : List(N,N)
+3 : List(N,Z)
+3 : List(List(N))
+3 : (List(List,N))
+:type \x:List(N,N).x == x

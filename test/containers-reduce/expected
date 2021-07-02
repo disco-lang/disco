@@ -4,7 +4,7 @@ Running tests...
   dummy: OK
   setSize: OK
 Loaded.
-reduce : (a × a → a) × a × List a → a
+reduce : (a × a → a) × a × List(a) → a
 reduce(~+~, 0, [1 .. 10]) : ℕ
 55
 60

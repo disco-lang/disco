@@ -1,6 +1,6 @@
 :load example/demo.disco
-:pretty {} : Set (Map (Set ℕ) (Map (Set (N)) ((Graph (Set N)))))
-:pretty right(■) : P (Set N) + Unit
+:pretty {} : Set(Map(Set(ℕ), Map(Set((N)), ((Graph (Set(N)))))))
+:pretty right(■) : P (Set(N)) + Unit
 :pretty [1, 2 : N, 3]
 :parse \x. x : N
 :pretty \x. (x : ℕ)

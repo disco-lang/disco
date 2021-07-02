@@ -1,4 +1,4 @@
-foo : List N + Bool -> N
+foo : List(N) + Bool -> N
 foo x =
   {? n     when x is left (n :: _),
      0     when x is left [],

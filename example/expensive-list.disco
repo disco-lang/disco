@@ -15,7 +15,7 @@
 
 import list
 
-expensiveList : List N
+expensiveList : List(N)
 expensiveList = each(expensiveId, [0 ..])
 
 expensiveId : N -> N

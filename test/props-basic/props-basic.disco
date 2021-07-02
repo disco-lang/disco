@@ -16,21 +16,21 @@ foo n = 2n + 1
 ||| Reverse a list.
 !!! reverse [3,6,7] == [7,6,3]
 !!! ∀ a:N, b:N. reverse [a,b] == [b,a]
-!!! ∀ xs:List N. reverse (reverse xs) == xs
+!!! ∀ xs:List(N). reverse (reverse xs) == xs
 
-reverse : List a -> List a
+reverse : List(a) -> List(a)
 reverse = revHelper []
 
-revHelper : List a -> List a -> List a
+revHelper : List(a) -> List(a) -> List(a)
 revHelper rev [] = rev
 revHelper rev (x :: xs) = revHelper (x :: rev) xs
 
-toBin : N -> List Bool
+toBin : N -> List(Bool)
 toBin 0 = []
 toBin 1 = []
 toBin n = {? false if 2 divides n, true otherwise ?} :: toBin (n // 2)
 
-fromBin : List Bool -> N
+fromBin : List(Bool) -> N
 fromBin [] = 1
 fromBin (false :: bs) = 2 (fromBin bs)
 fromBin (true  :: bs) = 2 (fromBin bs) + 1
@@ -47,9 +47,9 @@ plusIsoR n =
 
 !!! ∀ v:Void. 2 == 3    -- this is true!
 !!! ∀ u:Unit. u == u    -- there is only one Unit value
-!!! ∀ l:List Void. l == l
-!!! ∀ l:List Unit. l == reverse l
-!!! ∀ bs : List Bool. toBin (fromBin bs) == bs
+!!! ∀ l:List(Void). l == l
+!!! ∀ l:List(Unit). l == reverse l
+!!! ∀ bs : List(Bool). toBin (fromBin bs) == bs
 !!! ∀ q : F. q >= 0
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0
 !!! ∀ bs : Bool * Bool. {? b1 when bs is (b1,b2) if b2, false otherwise ?}

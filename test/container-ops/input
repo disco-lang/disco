@@ -16,7 +16,7 @@ power (power (power {}))
 :type power (power (power {}))
 power {"hi", "there"}
 bag [] union bag [1,2]
-bag [] union bag [1,2] : Bag N
+bag [] union bag [1,2] : Bag(N)
 :type bag [] union bag [1,2]
 :type bag [2,-3] union bag [1/2]
 bag [1,2,2] union bag [2,2,2,3]

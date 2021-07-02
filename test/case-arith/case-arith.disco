@@ -1,3 +1,5 @@
+import list
+
 f1 : N -> N
 f1 (x + 1) = x
 f1 0       = 0
@@ -40,13 +42,9 @@ expandTree (a/b) = (a/b, expandTree (a/(a+b)), expandTree ((a+b)/b))
 cwTree : Tree
 cwTree = expandTree 1
 
-append : List a -> List a -> List a
-append []      ys = ys
-append (x::xs) ys = x :: append xs ys
-
-inorder : N -> Tree -> List F
+inorder : N -> Tree -> List(F)
 inorder 0     (x,_,_) = [x]
-inorder (n+1) (x,l,r) = append (inorder n l) (x :: inorder n r)
+inorder (n+1) (x,l,r) = append(inorder n l, x :: inorder n r)
 
 numerator : Q -> Z
 numerator (p/q) = p

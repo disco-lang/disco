@@ -63,7 +63,7 @@ import           Disco.Value
 withPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
 withPA pa = mparens pa . setPA pa
 
-setPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
+setPA :: HasReader' "pa" m => PA -> m a -> m a
 setPA = local @"pa" . const
 
 lt :: HasReader' "pa" m => m Doc -> m Doc
@@ -80,39 +80,43 @@ mparens pa doc = do
 --------------------------------------------------
 
 prettyTy :: HasReader' "pa" m => Type -> m Doc
-prettyTy (TyVar v)        = text (show v)
-prettyTy TyVoid           = text "Void"
-prettyTy TyUnit           = text "Unit"
-prettyTy TyBool           = text "Bool"
-prettyTy TyProp           = text "Prop"
-prettyTy TyC              = text "Char"
+prettyTy (TyAtom a)      = prettyTyAtom a
 prettyTy (ty1 :->: ty2)   = withPA tarrPA $
   lt (prettyTy ty1) <+> text "→" <+> rt (prettyTy ty2)
 prettyTy (ty1 :*: ty2)    = withPA tmulPA $
   lt (prettyTy ty1) <+> text "×" <+> rt (prettyTy ty2)
 prettyTy (ty1 :+: ty2)    = withPA taddPA $
   lt (prettyTy ty1) <+> text "+" <+> rt (prettyTy ty2)
-prettyTy TyN              = text "ℕ"
-prettyTy TyZ              = text "ℤ"
-prettyTy TyQ              = text "ℚ"
-prettyTy TyF              = text "𝔽"
--- prettyTy (TyFin n)        = text "ℤ" <> (integer n)
-prettyTy (TyList ty)      = withPA tfunPA $
-  text "List" <+> rt (prettyTy ty)
-prettyTy (TyBag ty)       = withPA tfunPA $
-  text "Bag" <+> rt (prettyTy ty)
-prettyTy (TySet ty)       = withPA tfunPA $
-  text "Set" <+> rt (prettyTy ty)
-prettyTy (TyContainer (AVar (U c)) ty) = withPA tfunPA $
-  text (show c) <+> rt (prettyTy ty)
-prettyTy (TyUser name [])   = text name
-prettyTy (TyUser name args) = withPA tfunPA $
-  hsep (text name : map (rt . prettyTy) args)
-prettyTy (TySkolem n)     = text "%" <> prettyName n
-prettyTy (TyGraph ty)     = withPA tfunPA $
-  text "Graph" <+> rt (prettyTy ty)
-prettyTy (TyMap k v)      =  withPA tfunPA $
-  hsep [text "Map", rt (prettyTy k), rt (prettyTy v)]
+prettyTy (TyCon c [])  = prettyTyCon c
+prettyTy (TyCon c tys) = do
+  ds <- setPA initPA $ punctuate (text ",") (map prettyTy tys)
+  prettyTyCon c <> parens (hsep ds)
+
+prettyTyAtom :: HasReader' "pa" m => Atom -> m Doc
+prettyTyAtom (AVar (U v)) = prettyName v
+prettyTyAtom (AVar (S v)) = text "$" <> prettyName v
+prettyTyAtom (ABase b)    = prettyBaseTy b
+
+prettyBaseTy :: Monad m => BaseTy -> m Doc
+prettyBaseTy Void = text "Void"
+prettyBaseTy Unit = text "Unit"
+prettyBaseTy B    = text "Bool"
+prettyBaseTy P    = text "Prop"
+prettyBaseTy N    = text "ℕ"
+prettyBaseTy Z    = text "ℤ"
+prettyBaseTy Q    = text "ℚ"
+prettyBaseTy F    = text "𝔽"
+prettyBaseTy C    = text "Char"
+prettyBaseTy b    = error $ "Impossible: got " ++ show b ++ " in prettyBaseTy"
+
+prettyTyCon :: Monad m => Con -> m Doc
+prettyTyCon CMap      = text "Map"
+prettyTyCon CGraph    = text "Graph"
+prettyTyCon (CUser s) = text s
+prettyTyCon CList     = text "List"
+prettyTyCon CBag      = text "Bag"
+prettyTyCon CSet      = text "Set"
+prettyTyCon c         = error $ "Impossible: got Con " ++ show c ++ " in prettyTyCon"
 
 prettyPolyTy :: (LFresh m, HasReader' "pa" m) => PolyType -> m Doc
 prettyPolyTy (Forall bnd) = lunbind bnd $
@@ -120,7 +124,12 @@ prettyPolyTy (Forall bnd) = lunbind bnd $
 
 prettyTyDef :: HasReader' "pa" m => String -> TyDefBody -> m Doc
 prettyTyDef tyName (TyDefBody ps body)
-  = text tyName <+> hsep (map text ps) <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
+  = text tyName <> prettyArgs ps <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
+  where
+    prettyArgs [] = empty
+    prettyArgs _  = do
+        ds <- punctuate (text ",") (map text ps)
+        parens (hsep ds)
 
 --------------------------------------------------
 

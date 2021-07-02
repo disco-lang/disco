@@ -22,7 +22,7 @@ expecting '''
 
 ' '
 "Disco"
-"Disco" : List Char
+"Disco" : List(Char)
 "Di sco"
 "'"
 "\n"

@@ -1,17 +1,17 @@
-search : N -> Graph N -> N -> Bool * Set N
+search : N -> Graph(N) -> N -> Bool * Set(N)
 search target g pos = {?
                             (search' target g pos {}) if (contains g pos),
                             (False, {}) otherwise
                          ?}
 
-search' : N -> Graph N -> N -> Set N -> Bool * Set N
+search' : N -> Graph(N) -> N -> Set(N) -> Bool * Set(N)
 search' target g pos visited = {?
             (True, visited union {pos})                if (pos == target && contains g pos),
             (False,visited)                            if                          pos ∈ visited,
             sequence target g pos (list (neighbors g pos)) (visited union {pos})        otherwise
             ?}
 
-sequence : N -> Graph N -> N -> List N -> Set N -> Bool * Set N
+sequence : N -> Graph(N) -> N -> List(N) -> Set(N) -> Bool * Set(N)
 sequence target g pos [] visited = (False, visited)
 sequence target g pos (a::as) visited =
     {? {?
@@ -20,28 +20,28 @@ sequence target g pos (a::as) visited =
         ?} when search' target g a visited is (successful, v')
     ?}
 
-searchDAG : N -> Graph N -> N -> Bool
+searchDAG : N -> Graph(N) -> N -> Bool
 searchDAG target g pos = (pos == target && contains g pos) || (true ∈ (each (searchDAG target g, neighbors g pos)))
 
-contains : Graph N -> N -> Bool
+contains : Graph(N) -> N -> Bool
 contains g a = {?
             True when lookup (a,summary g) is right _,
             False                             otherwise
                ?}
 
-neighbors : Graph N -> N ->  Set N
+neighbors : Graph(N) -> N ->  Set(N)
 neighbors g pos = {?
             s when lookup (pos, summary g) is right s,
             {}                              otherwise
                   ?}
 
-vertices : Graph N -> List N
+vertices : Graph(N) -> List(N)
 vertices g = each ((\(k,_). k), (list (mapToSet (summary g))))
 
-topsort : Graph N -> Unit + List N * Set N
+topsort : Graph(N) -> Unit + List(N) * Set(N)
 topsort g = downstream g (vertices g) {} {} []
 
-searchFrom' : Graph N -> N -> Set N -> Set N -> List N -> Unit + List N * Set N
+searchFrom' : Graph(N) -> N -> Set(N) -> Set(N) -> List(N) -> Unit + List(N) * Set(N)
 searchFrom' g pos visited locked stack = {?
             left(unit)                                              if  pos ∈ locked,
             right (stack, visited)                                  if  pos ∈ visited,
@@ -49,7 +49,7 @@ searchFrom' g pos visited locked stack = {?
             left(unit)        otherwise
             ?}
 
-downstream : Graph N -> List N -> Set N -> Set N -> List N -> Unit + List N * Set N
+downstream : Graph(N) -> List(N) -> Set(N) -> Set(N) -> List(N) -> Unit + List(N) * Set(N)
 downstream g [] visited locked stack = right (stack, visited)
 downstream g (a::as) visited locked stack =
     {?

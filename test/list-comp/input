@@ -2,7 +2,7 @@ import list
 import num
 
 [x | x in [1,2,3]]
-[x | x in [1,2,3], y in ([] : List Q)]
+[x | x in [1,2,3], y in ([] : List(Q))]
 [x+y+z | z in [1,2,3], x in [z,z+1], y in [10,20,30]]
 [(a,b,c) | a in [1..15], b in [a..15], c in [b..15], a^2 + b^2 == c^2]
 [g | a in [1], b in [a], c in [b], d in [c], e in [d], f in [e], g in [f]]

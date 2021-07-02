@@ -1,6 +1,6 @@
-f : Nat -> List Nat
+f : Nat -> List(Nat)
 f n =
   let x : Nat = n//2,
       y : Nat = x + 3,
-      z : List Nat = [3,x,y]
+      z : List(Nat) = [3,x,y]
   in  n :: z

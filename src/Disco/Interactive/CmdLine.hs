@@ -148,6 +148,22 @@ discoMain = do
           | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
               liftIO $ putStrLn "Goodbye!"
               return ()
+          | ":{" `isPrefixOf` input -> do
+              multiLineLoop []
+              loop
           | otherwise -> do
               withCtrlC (return ()) $ (lift . handleCMD $ input)
               loop
+
+
+    multiLineLoop :: [String] -> InputT (Disco) ()
+    multiLineLoop ls = do
+      minput <- withCtrlC (return $ Nothing) (getInputLine "Disco| ")
+      case minput of
+        Nothing -> return ()
+        Just input
+          | ":}" `isPrefixOf` input -> do
+              withCtrlC (return ()) $ (lift . handleCMD $ (unlines (reverse ls)))
+              return ()
+          | otherwise -> do
+              multiLineLoop (input:ls)

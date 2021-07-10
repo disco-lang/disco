@@ -21,7 +21,7 @@
 
 module Disco.Parser
        ( -- * Parser type and utilities
-         Parser, runParser, withExts
+         Parser, runParser, withExts, indented, thenIndented
 
          -- * Lexer
 
@@ -66,7 +66,7 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
-                                                          use, (.=))
+                                                          use, (%~), (&), (.=))
 import           Control.Monad.State
 import           Data.Char                               (isDigit)
 import           Data.List                               (find, intercalate)
@@ -90,48 +90,66 @@ import           Disco.Types
 -- Some of the basic setup code for the parser taken from
 -- https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
 
+-- | Currently required indent level.
+data IndentMode where
+  NoIndent   :: IndentMode   -- ^ Don't require indent.
+  ThenIndent :: IndentMode   -- ^ Parse one token without
+                             --   indent, then switch to @Indent@.
+  Indent     :: IndentMode   -- ^ Require everything to be indented at
+                             --   least one space.
+
 -- | Extra custom state for the parser.
 data ParserState = ParserState
-  { _indentLevel :: Maybe Pos  -- ^ When this is @Just p@, everything
-                               --   should be indented more than column
-                               --   @p@.
-  , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
-                               --   (some of which may affect parsing).
+  { _indentMode  :: IndentMode  -- ^ Currently required level of indentation.
+  , _enabledExts :: Set Ext      -- ^ Set of enabled language extensions
+                                 --   (some of which may affect parsing).
   }
-
 
 makeLenses ''ParserState
 
 initParserState :: ParserState
-initParserState = ParserState Nothing S.empty
+initParserState = ParserState NoIndent S.empty
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
---   of state to keep track of the current indentation level.  For now
---   we have no custom errors.
+--   of state to keep track of the current indentation level and
+--   language extensions.  For now we have no custom errors.
 type Parser = StateT ParserState (MP.Parsec Void String)
 
 -- | Run a parser from the initial state.
 runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
 runParser = MP.runParser . flip evalStateT initParserState
 
+-- | Run a parser under a specified 'IndentMode'.
+withIndentMode :: IndentMode -> Parser a -> Parser a
+withIndentMode m p = do
+  indentMode .= m
+  res <- p
+  indentMode .= NoIndent
+  return res
+
 -- | @indented p@ is just like @p@, except that every token must not
 --   start in the first column.
 indented :: Parser a -> Parser a
-indented p = do
-  indentLevel .= Just pos1
-  res <- p
-  indentLevel .= Nothing
-  return res
+indented = withIndentMode Indent
+
+-- | @indented p@ is just like @p@, except that every token after the
+--   first must not start in the first column.
+thenIndented :: Parser a -> Parser a
+thenIndented = withIndentMode ThenIndent
 
 -- | @requireIndent p@ possibly requires @p@ to be indented, depending
---   on the current '_indentLevel'.  Used in the definition of
+--   on the current '_indentMode'.  Used in the definition of
 --   'lexeme' and 'symbol'.
 requireIndent :: Parser a -> Parser a
 requireIndent p = do
-  l <- use indentLevel
+  l <- use indentMode
   case l of
-    Just pos -> L.indentGuard sc GT pos >> p
-    _        -> p
+    ThenIndent -> do
+      a <- p
+      indentMode .= Indent
+      return a
+    Indent     -> L.indentGuard sc GT pos1 >> p
+    NoIndent   -> p
 
 -- | Locally set the enabled extensions within a subparser.
 withExts :: Set Ext -> Parser a -> Parser a

@@ -56,7 +56,7 @@ lineParser allCommands
   <|> try (SomeREPL Nop <$ (sc <* eof))
   <|> try ((SomeREPL . Using) <$> (reserved "using" *> parseExtName))
   <|> try ((SomeREPL . Import) <$> parseImport)
-  <|> try ((SomeREPL . Eval) <$> term)
+  <|> try ((SomeREPL . Eval) <$> thenIndented term)
   <|> (SomeREPL <$> letParser)
 
 parseLine :: [SomeREPLCommand] -> ExtSet -> String -> Either String SomeREPLExpr

@@ -71,7 +71,7 @@ import           Control.Monad.State
 import           Data.Char                               (isDigit)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
-import           Data.Maybe                              (catMaybes, fromMaybe)
+import           Data.Maybe                              (fromMaybe)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
@@ -333,6 +333,18 @@ ident = string2Name <$> identifier letterChar
 ------------------------------------------------------------
 -- Parser
 
+-- | Results from parsing a block of top-level things.
+data TLResults = TLResults
+  { _tlDecls :: [Decl]
+  , _tlDocs  :: [(Name Term, [DocThing])]
+  , _tlTerms :: [Term]
+  }
+
+emptyTLResults :: TLResults
+emptyTLResults = TLResults [] [] []
+
+makeLenses ''TLResults
+
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
 wholeModule :: Parser Module
@@ -350,14 +362,19 @@ parseModule = do
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
-      groupTLs _ [] = []
+      groupTLs :: [DocThing] -> [TopLevel] -> TLResults
+      groupTLs _ [] = emptyTLResults
       groupTLs revDocs (TLDoc doc : rest)
         = groupTLs (doc : revDocs) rest
       groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
-        = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
+        = groupTLs [] rest
+          & tlDecls %~ (decl :)
+          & tlDocs  %~ ((x, reverse revDocs) :)
       groupTLs _ (TLDecl defn : rest)
-        = (defn, Nothing) : groupTLs [] rest
+        = groupTLs [] rest
+          & tlDecls %~ (defn :)
+      groupTLs _ (TLExpr t : rest)
+        = groupTLs [] rest & tlTerms %~ (t:)
 
       defnGroups :: [Decl] -> [Decl]
       defnGroups []                = []
@@ -372,9 +389,9 @@ parseModule = do
               (ts, ds2') = matchDefn ds2
           matchDefn ds2 = ([], ds2)
 
-      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
+      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList docs)
         where
-          (decls, docs) = unzip $ groupTLs [] tls
+          TLResults decls docs terms = groupTLs [] tls
 
 -- | Parse an extension.
 parseExtension :: Parser Ext
@@ -402,7 +419,8 @@ parseModuleName = lexeme $
 parseTopLevel :: Parser TopLevel
 parseTopLevel = L.nonIndented sc $
       TLDoc  <$> parseDocThing
-  <|> TLDecl <$> parseDecl
+  <|> TLDecl <$> try parseDecl
+  <|> TLExpr <$> thenIndented parseTerm
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@

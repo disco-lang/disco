@@ -1521,7 +1521,7 @@ ensureConstr c ty targ = matchConTy c ty
     matchConTy :: Con -> Type -> m [Type]
 
     -- expand type definitions lazily
-    matchConTy c (TyUser name args) = lookupTyDefn name args >>= matchConTy c
+    matchConTy c1 (TyUser name args) = lookupTyDefn name args >>= matchConTy c1
 
     matchConTy c1 (TyCon c2 tys) = do
       matchCon c1 c2

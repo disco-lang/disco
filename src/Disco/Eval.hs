@@ -66,6 +66,7 @@ module Disco.Eval
        , parseDiscoModule
        , typecheckDisco
        , loadDiscoModule
+       , loadParsedDiscoModule
 
        )
        where
@@ -535,9 +536,19 @@ loadDiscoModule resolver m =
     withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
       loadDiscoModule' resolver S.empty m
 
+-- | Like 'loadDiscoModule', but start with an already parsed 'Module'
+--   instead of loading a module from disk by name.  Used for
+--   e.g. modules entered at the REPL prompt.
+loadParsedDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> Module -> m ModuleInfo
+loadParsedDiscoModule resolver m =
+  fmap fst $
+    withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
+      loadParsedDiscoModule' resolver S.empty "" m
+
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
---   any imported module more than once.
+--   any imported module more than once.  Resolve the module, load and
+--   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule' ::
   Has '[Th "err", MonadIO, HasState "modmap" (M.Map ModName ModuleInfo)] m =>
   Resolver -> S.Set ModName -> ModName ->
@@ -551,12 +562,22 @@ loadDiscoModule' resolver inProcess modName  = do
       file <- resolveModule resolver modName
              >>= maybe (throw @"err" $ ModuleNotFound modName) return
       io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      cm@(Module _ mns _ _) <- parseDiscoModule file
+      cm <- parseDiscoModule file
+      loadParsedDiscoModule' resolver (S.insert modName inProcess) modName cm
 
-      -- mis only contains the module info from direct imports.
-      mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
-      imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
-      m  <- typecheckDisco tyctx tydefns (checkModule cm)
-      m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
-      modify @"modmap" (M.insert modName m')
-      return m'
+-- | Recursively load an already-parsed Disco module while keeping
+--   track of an extra Map from module names to 'ModuleInfo' records,
+--   to avoid loading any imported module more than once.  Recursively
+--   load all its imports, then typecheck it.
+loadParsedDiscoModule' ::
+  Has '[Th "err", MonadIO, HasState "modmap" (M.Map ModName ModuleInfo)] m =>
+  Resolver -> S.Set ModName -> ModName -> Module ->
+  m ModuleInfo
+loadParsedDiscoModule' resolver inProcess modName cm@(Module _ mns _ _ _) = do
+  -- mis only contains the module info from direct imports.
+  mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
+  imports@(ModuleInfo _ _ tyctx tydefns _ _) <- adaptError TypeCheckErr $ combineModuleInfo mis
+  m  <- typecheckDisco tyctx tydefns (checkModule cm)
+  m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
+  modify @"modmap" (M.insert modName m')
+  return m'

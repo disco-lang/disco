@@ -92,6 +92,8 @@ inferTelescope inferOne tel = do
 -- Modules
 ------------------------------------------------------------
 
+-- XXX should not need a Wr "constraints" capability!
+
 -- | Check all the types and extract all relevant info (docs,
 --   properties, types) from a module, returning a 'ModuleInfo' record
 --   on success.  This function does not handle imports at all; see
@@ -99,7 +101,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
   => Module -> m ModuleInfo
-checkModule (Module _ _ m docs) = do
+checkModule (Module _ _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
@@ -113,7 +115,8 @@ checkModule (Module _ _ m docs) = do
         (x:_) -> throw @"tcerr" $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- checkProperties docs
-          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
+          aterms <- mapM inferTop terms
+          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -236,6 +239,9 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 
 --------------------------------------------------
 -- Top-level definitions
+
+-- XXX checkDefn should not need a Wr "constraints" capability.  See
+-- comments on 'solve' and 'withConstraint'.
 
 -- | Type check a top-level definition.
 checkDefn
@@ -374,6 +380,9 @@ check
   => Term -> Type -> m ATerm
 check t ty = typecheck (Check ty) t
 
+-- XXX checkPolyTy should not need a Wr "constraints" capability.  See
+-- comments on 'solve' and 'withConstraint'.
+
 -- | Check that a term has the given polymorphic type.
 checkPolyTy
   :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
@@ -395,6 +404,9 @@ infer
   :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
   => Term -> m ATerm
 infer = typecheck Infer
+
+-- XXX inferTop should not need a Wr "constraints" capability.  See
+-- comments on 'solve' and 'withConstraint'.
 
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting

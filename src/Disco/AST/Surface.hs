@@ -131,6 +131,7 @@ data Module = Module
   , modImports :: [ModName]     -- ^ Module imports
   , modDecls   :: [Decl]        -- ^ Declarations
   , modDocs    :: Ctx Term Docs -- ^ Documentation
+  , modTerms   :: [Term]        -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
 

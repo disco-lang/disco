@@ -52,15 +52,15 @@ fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 
 lineParser :: [SomeREPLCommand] -> Parser SomeREPLExpr
 lineParser allCommands
-  =   (commandParser allCommands)
+  =   commandParser allCommands
   <|> try (SomeREPL Nop <$ (sc <* eof))
-  <|> try ((SomeREPL . Using) <$> (reserved "using" *> parseExtName))
-  <|> try ((SomeREPL . Import) <$> parseImport)
-  <|> try ((SomeREPL . Eval) <$> thenIndented term)
+  <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
+  <|> try (SomeREPL . Import <$> parseImport)
+  <|> try (SomeREPL . Eval <$> parseModule )
   <|> (SomeREPL <$> letParser)
 
 parseLine :: [SomeREPLCommand] -> ExtSet -> String -> Either String SomeREPLExpr
 parseLine allCommands exts s =
-  case (runParser (withExts exts (lineParser allCommands)) "" s) of
+  case runParser (withExts exts (lineParser allCommands)) "" s of
     Left  e -> Left $ errorBundlePretty e
     Right l -> Right l

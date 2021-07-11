@@ -232,11 +232,20 @@ censor = censor_ (proxy# @tag)
 forAll :: Has '[Wr "constraints"] m => [Name Type] -> m a -> m a
 forAll nms = censor @"constraints" (CAll . bind nms)
 
+-- XXX This should not have a Wr "constraints" capability!  It should
+-- be local to the inner monad! Something like
+--
+--   (Has '[Wr "constraints"] m' => m' a) -> m (a, Constraint)
+--
+-- but with more stuff to say that otherwise m and m' have the same capabilities otherwise.
+
 -- | Run a computation that generates constraint, returning the
 --   generated 'Constraint' along with the output, and reset the
 --   'Constraint' of the resulting computation to 'mempty'.
 withConstraint :: Has '[Wr "constraints"] m => m a -> m (a, Constraint)
 withConstraint = censor @"constraints" (const mempty) . listen @"constraints"
+
+-- XXX This should not have a Wr "constraints" capability. See comment on withConstraint.
 
 -- | Run a computation and solve its generated constraint, returning
 --   the resulting substitution (or failing with an error).  The

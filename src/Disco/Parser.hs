@@ -389,7 +389,7 @@ parseModule = do
               (ts, ds2') = matchDefn ds2
           matchDefn ds2 = ([], ds2)
 
-      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList docs)
+      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList docs) terms
         where
           TLResults decls docs terms = groupTLs [] tls
 

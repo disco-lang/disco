@@ -37,7 +37,7 @@ data REPLExpr :: CmdTag -> * where
   Using     :: Ext -> REPLExpr 'CUsing             -- Enable an extension
   Let       :: Name Term -> Term -> REPLExpr 'CLet -- Toplevel let-expression: for the REPL
   TypeCheck :: Term -> REPLExpr 'CTypeCheck        -- Typecheck a term
-  Eval      :: Term -> REPLExpr 'CEval             -- Evaluate a term
+  Eval      :: Module -> REPLExpr 'CEval           -- Evaluate some code
   TestProp  :: Term -> REPLExpr 'CTestProp         -- Run a property test
   ShowDefn  :: Name Term -> REPLExpr 'CShowDefn    -- Show a variable's definition
   Parse     :: Term -> REPLExpr 'CParse            -- Show the parsed AST

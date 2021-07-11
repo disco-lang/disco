@@ -44,8 +44,9 @@ import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
 import           Disco.Parser                     (Parser, ident, parseExtName,
-                                                   parseImport, reserved,
-                                                   reservedOp, sc, term)
+                                                   parseImport, parseModule,
+                                                   reserved, reservedOp, sc,
+                                                   term)
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Syntax.Operators
@@ -191,27 +192,38 @@ evalCmd =
       category = User,
       cmdtype = BuiltIn,
       action = handleEval,
-      parser = Eval <$> term
+      parser = Eval <$> parseModule
     }
 
 handleEval :: (Has '[St "top"] m, MonadDisco m) => REPLExpr 'CEval -> m ()
-handleEval (Eval t) = do
+handleEval (Eval m) = do
   ctx   <- gets @"top" (view topCtx)
   tymap <- gets @"top" (view topTyDefs)
-  case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
-    Left e   -> iprint e    -- XXX pretty-print
-    Right (at,_) ->
-      let ty = getType at
-          c  = compileTerm at
-      in do
-        v <- withTopEnv $ do
-          cv <- mkValue c
-          prettyValue ty cv
-          return cv
-        modify @"top" $
-          (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
-          (topEnv %~ M.insert (string2Name "it") v)
-        garbageCollect
+
+  mi <- checkModule m   -- XXX need to create a local Reader "tyctx" capability for this!
+  return ()
+
+  -- XXX change this to typecheck a module, get the resulting ModuleInfo,
+  -- then add stuff from it to the current context
+  -- case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
+  --   Left e   -> iprint e    -- XXX pretty-print
+  --   Right (at,_) -> evalTerm at
+
+-- XXX call this for every top-level term from handleEval
+evalTerm :: (Has '[St "top"] m, MonadDisco m) => ATerm -> m ()
+evalTerm at = do
+  v <- withTopEnv $ do
+    cv <- mkValue c
+    prettyValue ty cv
+    return cv
+  modify @"top" $
+    (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
+    (topEnv %~ M.insert (string2Name "it") v)
+  garbageCollect
+  where
+    ty = getType at
+    c  = compileTerm at
+
 
 helpCmd :: REPLCommand 'CHelp
 helpCmd =
@@ -310,7 +322,7 @@ handleLoadWrapper (Load fp) =  void (handleLoad fp)
 handleLoad :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => FilePath -> m Bool
 handleLoad fp = catchAndPrintErrors False $ do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
+  m@(ModuleInfo _ props _ _ _ _) <- loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- withTopEnv $ runAllTests props
   put @"lastfile" $ Just fp
@@ -545,7 +557,7 @@ setLoadedModule mi = do
 
 populateCurrentModuleInfo :: Has '[St "top", Rd "env", Sc "nextloc", St "mem"] m => m ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds <- gets @"top" (view topModInfo)
+  ModuleInfo docs _ tys tyds tmds _tms <- gets @"top" (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   modify @"top" $
     (topDocs   .~ docs) .

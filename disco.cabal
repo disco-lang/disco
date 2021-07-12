@@ -274,11 +274,23 @@ source-repository head
   location: git://github.com/disco-lang/disco.git
 
 library
+  ghc-options:         -flate-specialise -fspecialise-aggressively
+  default-extensions:  DataKinds
+                       FlexibleContexts
+                       GADTs
+                       LambdaCase
+                       PolyKinds
+                       RankNTypes
+                       ScopedTypeVariables
+                       TypeApplications
+                       TypeOperators
+                       TypeFamilies
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
                        Disco.Extensions
                        Disco.Capability
+                       Disco.Effects.Fresh
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic
@@ -344,6 +356,7 @@ library
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
                        capability >= 0.4 && < 0.5,
+                       polysemy >= 1.4.0.0 && < 1.6,
                        lens >= 4.14 && < 5.1,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.13,

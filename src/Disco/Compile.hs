@@ -18,8 +18,6 @@
 module Disco.Compile
        where
 
-import           Unbound.Generics.LocallyNameless
-
 import           Disco.AST.Core
 import           Disco.AST.Desugared
 import           Disco.AST.Generic
@@ -36,7 +34,11 @@ import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
-import           Disco.Capability
+
+import           Disco.Effects.Fresh
+import           Polysemy                         (Member, Sem)
+import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
+                                                   string2Name, unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -45,17 +47,17 @@ import           Disco.Capability
 -- | Compile a typechecked term ('ATerm') directly to a 'Core' term,
 --   by desugaring and then compiling.
 compileTerm :: ATerm -> Core
-compileTerm = runFreshM . compileDTerm . runDSM . desugarTerm
+compileTerm = runFresh . compileDTerm . runDesugar . desugarTerm
 
 -- | Compile a typechecked definition ('Defn') directly to a 'Core' term,
 --   by desugaring and then compiling.
 compileDefn :: Defn -> Core
-compileDefn = runFreshM . compileDTerm . runDSM . desugarDefn
+compileDefn = runFresh . compileDTerm . runDesugar . desugarDefn
 
 -- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
 --   by desugaring and then compilling.
 compileProperty :: AProperty -> Core
-compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
+compileProperty = runFresh . compileDTerm . runDesugar . desugarProperty
 
 ------------------------------------------------------------
 -- Compiling terms
@@ -63,7 +65,7 @@ compileProperty = runFreshM . compileDTerm . runDSM . desugarProperty
 
 -- | Compile a typechecked, desugared 'DTerm' to an untyped 'Core'
 --   term.
-compileDTerm :: Has '[Fresh] m => DTerm -> m Core
+compileDTerm :: Member Fresh r => DTerm -> Sem r Core
 compileDTerm (DTVar _ x)   = return $ CVar (coerce x)
 compileDTerm (DTPrim ty x) = compilePrim ty x
 compileDTerm DTUnit        = return CUnit
@@ -82,7 +84,7 @@ compileDTerm term@(DTAbs q _ _) = do
 
   where
     -- Gather nested abstractions with the same quantifier.
-    unbindDeep :: Has '[Fresh] m => DTerm -> m ([Name DTerm], [Type], DTerm)
+    unbindDeep :: Member Fresh r => DTerm -> Sem r ([Name DTerm], [Type], DTerm)
     unbindDeep (DTAbs q' ty l) | q == q' = do
       (name, inner) <- unbind l
       (names, tys, body) <- unbindDeep inner
@@ -135,7 +137,7 @@ compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 -- | Compile a natural number. A separate function is needed in
 --   case the number is of a finite type, in which case we must
 --   mod it by its type.
--- compileNat :: Has '[Fresh] m => Type -> Integer -> m Core
+-- compileNat :: Member Fresh r => Type -> Integer -> Sem r Core
 -- compileNat (TyFin n) x = return $ CNum Fraction ((x `mod` n) % 1)
 -- compileNat _         x = return $ CNum Fraction (x % 1)
 
@@ -143,14 +145,14 @@ compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 
 -- | Compile a DTerm which will be an argument to a function,
 --   packaging it up along with the strictness of its type.
-compileArg :: Has '[Fresh] m => DTerm -> m (Strictness, Core)
+compileArg :: Member Fresh r => DTerm -> Sem r (Strictness, Core)
 compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
 -- | Compile a primitive.  Typically primitives turn into a
 --   corresponding function constant in the core language, but
 --   sometimes the particular constant it turns into may depend on the
 --   type.
-compilePrim :: Has '[Fresh] m => Type -> Prim -> m Core
+compilePrim :: Member Fresh r => Type -> Prim -> Sem r Core
 
 compilePrim (argTy :->: _) (PrimUOp uop) = return $ compileUOp argTy uop
 compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
@@ -266,13 +268,13 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 
 -- | Compile a desugared branch.  This does very little actual work, just
 --   translating directly from one AST to another.
-compileBranch :: Has '[Fresh] m => DBranch -> m CBranch
+compileBranch :: Member Fresh r => DBranch -> Sem r CBranch
 compileBranch b = do
   (gs, d) <- unbind b
   bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
 
 -- | Compile a desugared guard.
-compileGuard :: Has '[Fresh] m => DGuard -> m (Embed Core, CPattern)
+compileGuard :: Member Fresh r => DGuard -> Sem r (Embed Core, CPattern)
 compileGuard (DGPat (unembed -> d) dpat) =
   (,)
     <$> (embed <$> compileDTerm d)

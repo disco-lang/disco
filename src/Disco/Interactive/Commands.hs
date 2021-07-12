@@ -154,7 +154,7 @@ handleDesugar (Desugar t) = do
   ctx <- gets @"top" (view topCtx)
   s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
         Left e       -> return.show $ e
-        Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
+        Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
   iputStrLn s
 
 docCmd :: REPLCommand 'CDoc

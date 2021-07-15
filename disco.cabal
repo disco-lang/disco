@@ -302,7 +302,7 @@ library
                        Disco.Module
                        Disco.Parser
                        Disco.Pretty
-                       Disco.Pretty.Monadic
+                       Disco.Pretty.DSL
                        Disco.Pretty.Prec
                        Disco.Property
                        Disco.Desugar

@@ -22,7 +22,7 @@
 -- TODO: the calls to 'error' should be replaced with logging/error capabilities.
 
 module Disco.Pretty
-  ( module Disco.Pretty.Monadic
+  ( module Disco.Pretty.DSL
   , module Disco.Pretty
   )
   where
@@ -37,11 +37,14 @@ import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
-import           Capability.Reader
-import           Capability.State
+import           Disco.Effects.LFresh
+import           Polysemy
+import           Polysemy.Output
+import           Polysemy.Reader
+
 import           Text.PrettyPrint                 (Doc)
-import           Unbound.Generics.LocallyNameless (Bind, LFresh, Name, lunbind,
-                                                   string2Name, unembed)
+import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
+                                                   unembed)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                (selectSide)
@@ -51,7 +54,7 @@ import           Disco.Eval                       (topTyDefs)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
                                                    whnfV)
 import           Disco.Module
-import           Disco.Pretty.Monadic
+import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -60,26 +63,48 @@ import           Disco.Types
 import           Disco.Util
 import           Disco.Value
 
-withPA :: HasReader' "pa" m => PA -> m Doc -> m Doc
+------------------------------------------------------------
+-- Utilities for handling precedence and associativity
+
+-- | Convenience function combining 'setPA' and 'mparens', since we
+--   often want to simultaneously indicate what the precedence and
+--   associativity of a term is, and optionally surround it with
+--   parentheses depending on the precedence and associativity of its
+--   parent.
+withPA :: Member (Reader PA) r => PA -> Sem r Doc -> Sem r Doc
 withPA pa = mparens pa . setPA pa
 
-setPA :: HasReader' "pa" m => PA -> m a -> m a
-setPA = local @"pa" . const
+-- | Locally set the precedence and associativity within a
+--   subcomputation.
+setPA :: Member (Reader PA) r => PA -> Sem r a -> Sem r a
+setPA = local . const
 
-lt :: HasReader' "pa" m => m Doc -> m Doc
-lt = local @"pa" (\(PA p _) -> PA p InL)
+-- | Mark a subcomputation as pretty-printing a term on the left of an
+--   operator (so parentheses can be inserted appropriately, depending
+--   on the associativity).
+lt :: Member (Reader PA) r => Sem r Doc -> Sem r Doc
+lt = local (\(PA p _) -> PA p InL)
 
-rt :: HasReader' "pa" m => m Doc -> m Doc
-rt = local @"pa" (\(PA p _) -> PA p InR)
+-- | Mark a subcomputation as pretty-printing a term on the right of
+--   an operator (so parentheses can be inserted appropriately,
+--   depending on the associativity).
+rt :: Member (Reader PA) r => Sem r Doc -> Sem r Doc
+rt = local (\(PA p _) -> PA p InR)
 
-mparens :: HasReader' "pa" m => PA -> m Doc -> m Doc
+-- | Optionally surround a pretty-printed term with parentheses,
+--   depending on its precedence and associativity (given as the 'PA'
+--   argument) and that of its context (given by the ambient 'Reader
+--   PA' effect).
+mparens :: Member (Reader PA) r => PA -> Sem r Doc -> Sem r Doc
 mparens pa doc = do
-  parentPA <- ask @"pa"
+  parentPA <- ask
   (if pa < parentPA then parens else id) doc
 
---------------------------------------------------
+------------------------------------------------------------
+-- Pretty-printing for types
 
-prettyTy :: HasReader' "pa" m => Type -> m Doc
+-- | Pretty-print a type.
+prettyTy :: Member (Reader PA) r => Type -> Sem r Doc
 prettyTy (TyAtom a)      = prettyTyAtom a
 prettyTy (ty1 :->: ty2)   = withPA tarrPA $
   lt (prettyTy ty1) <+> text "→" <+> rt (prettyTy ty2)
@@ -92,12 +117,14 @@ prettyTy (TyCon c tys) = do
   ds <- setPA initPA $ punctuate (text ",") (map prettyTy tys)
   prettyTyCon c <> parens (hsep ds)
 
-prettyTyAtom :: HasReader' "pa" m => Atom -> m Doc
+-- | Pretty-print an atomic type, i.e. a type variable or base type.
+prettyTyAtom :: Member (Reader PA) r => Atom -> Sem r Doc
 prettyTyAtom (AVar (U v)) = prettyName v
 prettyTyAtom (AVar (S v)) = text "$" <> prettyName v
 prettyTyAtom (ABase b)    = prettyBaseTy b
 
-prettyBaseTy :: Monad m => BaseTy -> m Doc
+-- | Pretty-print a base type.
+prettyBaseTy :: BaseTy -> Sem r Doc
 prettyBaseTy Void = text "Void"
 prettyBaseTy Unit = text "Unit"
 prettyBaseTy B    = text "Bool"
@@ -109,7 +136,8 @@ prettyBaseTy F    = text "𝔽"
 prettyBaseTy C    = text "Char"
 prettyBaseTy b    = error $ "Impossible: got " ++ show b ++ " in prettyBaseTy"
 
-prettyTyCon :: Monad m => Con -> m Doc
+-- | Pretty-print a type constructor.
+prettyTyCon :: Con -> Sem r Doc
 prettyTyCon CMap      = text "Map"
 prettyTyCon CGraph    = text "Graph"
 prettyTyCon (CUser s) = text s
@@ -118,11 +146,14 @@ prettyTyCon CBag      = text "Bag"
 prettyTyCon CSet      = text "Set"
 prettyTyCon c         = error $ "Impossible: got Con " ++ show c ++ " in prettyTyCon"
 
-prettyPolyTy :: (LFresh m, HasReader' "pa" m) => PolyType -> m Doc
+-- | Pretty-print a polytype.  Note that we never explicitly print
+--   @forall@; quantification is implicit, as in Haskell.
+prettyPolyTy :: Members '[LFresh, Reader PA] r => PolyType -> Sem r Doc
 prettyPolyTy (Forall bnd) = lunbind bnd $
   \(_, body) -> prettyTy body
 
-prettyTyDef :: HasReader' "pa" m => String -> TyDefBody -> m Doc
+-- | Pretty-print a type definition.
+prettyTyDef :: Member (Reader PA) r => String -> TyDefBody -> Sem r Doc
 prettyTyDef tyName (TyDefBody ps body)
   = text tyName <> prettyArgs ps <+> text "=" <+> prettyTy (body (map (TyVar . string2Name) ps))
   where
@@ -131,17 +162,24 @@ prettyTyDef tyName (TyDefBody ps body)
         ds <- punctuate (text ",") (map text ps)
         parens (hsep ds)
 
---------------------------------------------------
+------------------------------------------------------------
+-- Pretty-printing for surface-syntax terms
+--
+-- The functions in this section are used to pretty-print surface
+-- syntax, for example, when printing the source code definition of a
+-- term (e.g. via the :doc REPL command).
 
-prettyName :: HasReader' "pa" m => Name a -> m Doc
+-- | Pretty-print a variable name.
+prettyName :: Member (Reader PA) r => Name a -> Sem r Doc
 prettyName = text . show
 
--- Pretty-print a term with guaranteed parentheses.
-prettyTermP :: (LFresh m, HasReader' "pa" m) => Term -> m Doc
+-- | Pretty-print a term with guaranteed parentheses.
+prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
 prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
 prettyTermP t        = withPA initPA $ prettyTerm t
 
-prettyTerm :: (LFresh m, HasReader' "pa" m) => Term -> m Doc
+-- | Pretty-print a term.
+prettyTerm :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
 prettyTerm (TVar x)      = prettyName x
 prettyTerm (TPrim (PrimUOp uop)) = case M.lookup uop uopMap of
   Just (OpInfo (UOpF Pre _) (syn:_) _)  -> text syn <> text "~"
@@ -234,76 +272,95 @@ prettyTerm (TTyOp op ty)  = withPA funPA $
   prettyTyOp op <+> prettyTy ty
 prettyTerm TWild = text "_"
 
-prettySide :: HasReader' "pa" m => Side -> m Doc
+-- | Pretty-print a side, i.e. @left@ or @right@ injection.
+prettySide :: Member (Reader PA) r => Side -> Sem r Doc
 prettySide L = text "left"
 prettySide R = text "right"
 
-containerDelims :: HasReader' "pa" m => Container -> (m Doc -> m Doc)
+-- | Print appropriate delimiters for a container literal.
+containerDelims :: Member (Reader PA) r => Container -> (Sem r Doc -> Sem r Doc)
 containerDelims ListContainer = brackets
 containerDelims BagContainer  = bag
 containerDelims SetContainer  = braces
 
-prettyTyOp :: HasReader' "pa" m => TyOp -> m Doc
+prettyTyOp :: Member (Reader PA) r => TyOp -> Sem r Doc
 prettyTyOp Enumerate = text "enumerate"
 prettyTyOp Count     = text "count"
 
-prettyUOp :: HasReader' "pa" m => UOp -> m Doc
+-- | Pretty-print a unary operator, by looking up its concrete syntax
+--   in the 'uopMap'.
+prettyUOp :: Member (Reader PA) r => UOp -> Sem r Doc
 prettyUOp op =
   case M.lookup op uopMap of
     Just (OpInfo _ (syn:_) _) ->
       text $ syn ++ (if all isAlpha syn then " " else "")
     _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
 
-prettyBOp :: HasReader' "pa" m => BOp -> m Doc
+-- | Pretty-print a binary operator, by looking up its concrete syntax
+--   in the 'bopMap'.
+prettyBOp :: Member (Reader PA) r => BOp -> Sem r Doc
 prettyBOp op =
   case M.lookup op bopMap of
     Just (OpInfo _ (syn:_) _) -> text syn
     _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
-prettyBranches :: (LFresh m, HasReader' "pa" m) => [Branch] -> m Doc
+-- | Pretty-print the branches of a case expression.
+prettyBranches :: Members '[LFresh, Reader PA] r => [Branch] -> Sem r Doc
 prettyBranches []     = error "Empty branches are disallowed."
 prettyBranches (b:bs) =
   prettyBranch False b
   $+$
   foldr (($+$) . prettyBranch True) empty bs
 
-prettyBranch :: (LFresh m, HasReader' "pa" m) => Bool -> Branch -> m Doc
+-- | Pretty-print a single branch in a case expression.
+prettyBranch :: Members '[LFresh, Reader PA] r => Bool -> Branch -> Sem r Doc
 prettyBranch com br = lunbind br $ \(gs,t) ->
   (if com then (text "," <+>) else id) (prettyTerm t <+> prettyGuards gs)
 
-prettyGuards :: (LFresh m, HasReader' "pa" m) => Telescope Guard -> m Doc
+-- | Pretty-print the guards in a single branch of a case expression.
+prettyGuards :: Members '[LFresh, Reader PA] r => Telescope Guard -> Sem r Doc
 prettyGuards TelEmpty                     = text "otherwise"
 prettyGuards (fromTelescope -> gs)
   = foldr (\g r -> prettyGuard g <+> r) (text "") gs
 
-prettyGuard :: (LFresh m, HasReader' "pa" m) => Guard -> m Doc
+-- | Pretty-print one guard in a branch of a case expression.
+prettyGuard :: Members '[LFresh, Reader PA] r => Guard -> Sem r Doc
 prettyGuard (GBool et)  = text "if" <+> prettyTerm (unembed et)
 prettyGuard (GPat et p) = text "when" <+> prettyTerm (unembed et) <+> text "is" <+> prettyPattern p
 prettyGuard (GLet b)    = text "let" <+> prettyBinding b
 
-prettyBinding :: (LFresh m, HasReader' "pa" m) => Binding -> m Doc
+-- | Pretty-print a binding, i.e. a pairing of a name (with optional
+--   type annotation) and term.
+prettyBinding :: Members '[LFresh, Reader PA] r => Binding -> Sem r Doc
 prettyBinding (Binding Nothing x (unembed -> t))
   = hsep [prettyName x, text "=", prettyTerm t]
 prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
   = hsep [prettyName x, text ":", prettyPolyTy ty, text "=", prettyTerm t]
 
-prettyQuals :: (LFresh m, HasReader' "pa" m) => Telescope Qual -> m Doc
+-- | Pretty-print the qualifiers in a comprehension.
+prettyQuals :: Members '[LFresh, Reader PA] r => Telescope Qual -> Sem r Doc
 prettyQuals (fromTelescope -> qs) = do
   ds <- punctuate (text ",") (map prettyQual qs)
   hsep ds
 
-prettyQual :: (LFresh m, HasReader' "pa" m) => Qual -> m Doc
+-- | Pretty-print a single qualifier in a comprehension.
+prettyQual :: Members '[LFresh, Reader PA] r => Qual -> Sem r Doc
 prettyQual (QBind x (unembed -> t))
   = hsep [prettyName x, text "in", prettyTerm t]
 prettyQual (QGuard (unembed -> t))
   = prettyTerm t
 
--- Print out a pattern with guaranteed parentheses.
-prettyPatternP :: (LFresh m, HasReader' "pa" m) => Pattern -> m Doc
+-- | Pretty-print a pattern with guaranteed parentheses.
+prettyPatternP :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
 prettyPatternP p@PTup{} = setPA initPA $ prettyPattern p
 prettyPatternP p        = withPA initPA $ prettyPattern p
 
-prettyPattern :: (LFresh m, HasReader' "pa" m) => Pattern -> m Doc
+-- We could probably alternatively write a function to turn a pattern
+-- back into a term, and pretty-print that instead of the below.
+-- Unsure whether it would be worth it.
+
+-- | Pretty-print a pattern.
+prettyPattern :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
 prettyPattern (PVar x)          = prettyName x
 prettyPattern PWild             = text "_"
 prettyPattern (PAscr p ty)      = withPA ascrPA $
@@ -339,166 +396,163 @@ prettyPattern (PFrac p1 p2)     = withPA (getPA Div) $
   lt (prettyPattern p1) <+> text "/" <+> rt (prettyPattern p2)
 
 ------------------------------------------------------------
+-- Pretty-printing top-level declarations
 
 -- prettyModule :: Module -> Doc
 -- prettyModule = foldr ($+$) empty . map prettyDecl
 
-prettyDecl :: (LFresh m, HasReader' "pa" m) => Decl -> m Doc
+-- | Pretty-print a declaration.
+prettyDecl :: Members '[LFresh, Reader PA] r => Decl -> Sem r Doc
 prettyDecl (DType  (TypeDecl x ty)) = prettyName x <+> text ":" <+> prettyPolyTy ty
 prettyDecl (DTyDef (TypeDefn x args body))
   = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> prettyTy body
 prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
 
-prettyDefn :: (LFresh m, HasReader' "pa" m) => Defn -> m Doc
+-- | Pretty-print a definition.
+prettyDefn :: Members '[LFresh, Reader PA] r => Defn -> Sem r Doc
 prettyDefn (Defn x patTys ty clauses) = vcat $
   prettyTyDecl x (foldr (:->:) ty patTys)
   :
   map (prettyClause x . eraseClause) clauses
 
-prettyClause :: (LFresh m, HasReader' "pa" m) => Name a -> Bind [Pattern] Term -> m Doc
+-- | Pretty-print a single clause in a definition.
+prettyClause :: Members '[LFresh, Reader PA] r => Name a -> Bind [Pattern] Term -> Sem r Doc
 prettyClause x b
   = withPA funPA . lunbind b $ \(ps, t) ->
       prettyName x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (prettyTerm t)
 
-prettyProperty :: (LFresh m, HasReader' "pa" m) => Property -> m Doc
+-- | Pretty-print a property.
+prettyProperty :: Members '[LFresh, Reader PA] r => Property -> Sem r Doc
 prettyProperty = prettyTerm
 
-prettyTyDecl :: HasReader' "pa" m => Name t -> Type -> m Doc
+-- | Pretty-print a type declaration.
+prettyTyDecl :: Member (Reader PA) r => Name t -> Type -> Sem r Doc
 prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
-
-------------------------------------------------------------
 
 ------------------------------------------------------------
 -- Pretty-printing values
 ------------------------------------------------------------
 
--- XXX This needs to be refactored so (1) we don't have to plumb the
--- output callback around everywhere, and (2) to properly take
--- associativity/precedence etc. into account.
-
 -- | Pretty-printing of values, with output interleaved lazily with
---   evaluation.  This version actually prints the values on the console, followed
---   by a newline.  For a more general version, see 'prettyValueWith'.
-prettyValue :: (Has '[St "top"] m, MonadDisco m) => Type -> Value -> m ()
-prettyValue ty v = do
-  prettyValueWith (\s -> iputStr s >> io (hFlush stdout)) ty v
-  iputStrLn ""
+--   evaluation.
+prettyValue :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyValue ty v = prettyV ty v >> output "\n"
 
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  Takes a continuation that specifies how the output
 --   should be processed (which will be called many times as the
 --   output is produced incrementally).
-prettyValueWith :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyValueWith k ty = whnfV >=> prettyWHNF k ty
+prettyV :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyV ty = whnfV >=> prettyWHNF ty
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyValueWithP :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyValueWithP k ty@(_ :*: _) v = prettyValueWith k ty v
-prettyValueWithP k ty           v = k "(" >> prettyValueWith k ty v >> k ")"
+prettyVP :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyVP ty@(_ :*: _) v = prettyVP ty v
+prettyVP ty           v = output "(" >> prettyVP ty v >> output ")"
 
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
-prettyWHNF :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyWHNF out (TyUser nm args) v = do
-  tymap <- gets @"top" (view topTyDefs)
+prettyWHNF :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyWHNF (TyUser nm args) v = do
+  tymap <- gets (view topTyDefs)
   case M.lookup nm tymap of
-    Just (TyDefBody _ body) -> prettyWHNF out (body args) v
+    Just (TyDefBody _ body) -> prettyWHNF (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
-prettyWHNF out TyUnit          VUnit        = out "■"
-prettyWHNF out TyProp          _            = prettyPlaceholder out TyProp
-prettyWHNF out TyBool          (VInj s _)   = out $ map toLower (show (selectSide s False True))
-prettyWHNF out TyC             (VNum _ c)   = out (show $ chr (fromIntegral (numerator c)))
-prettyWHNF out (TyList TyC)    v            = prettyString out v
-prettyWHNF out (TyList ty)     v            = prettyList out ty v
-prettyWHNF out ty@(_ :*: _)    v            = out "(" >> prettyTuple out ty v >> out ")"
-prettyWHNF out (ty1 :+: ty2) (VInj s v)
+prettyWHNF TyUnit          VUnit        = output "■"
+prettyWHNF TyProp          _            = prettyPlaceholder TyProp
+prettyWHNF TyBool          (VInj s _)   = output $ map toLower (show (selectSide s False True))
+prettyWHNF TyC             (VNum _ c)   = output (show $ chr (fromIntegral (numerator c)))
+prettyWHNF (TyList TyC)    v            = prettyString v
+prettyWHNF (TyList ty)     v            = prettyList ty v
+prettyWHNF ty@(_ :*: _)    v            = output "(" >> prettyTuple ty v >> output ")"
+prettyWHNF (ty1 :+: ty2) (VInj s v)
   = case s of
-      L -> out "left"  >> prettyValueWithP out ty1 v
-      R -> out "right" >> prettyValueWithP out ty2 v
-prettyWHNF out _ (VNum d r)
-  | denominator r == 1 = out $ show (numerator r)
+      L -> output "left"  >> prettyVP ty1 v
+      R -> output "right" >> prettyVP ty2 v
+prettyWHNF _ (VNum d r)
+  | denominator r == 1 = output $ show (numerator r)
   | otherwise          = case d of
-      Fraction -> out $ show (numerator r) ++ "/" ++ show (denominator r)
-      Decimal  -> out $ prettyDecimal r
+      Fraction -> output $ show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> output $ prettyDecimal r
 
-prettyWHNF out ty@(_ :->: _) _ = prettyPlaceholder out ty
+prettyWHNF ty@(_ :->: _) _ = prettyPlaceholder ty
 
-prettyWHNF out (TySet t) (VBag xs) =
-  out "{" >> prettySequence out t (map fst xs) ", " >> out "}"
-prettyWHNF out (TyBag t) (VBag xs) = prettyBag out t xs
+prettyWHNF (TySet t) (VBag xs) =
+  output "{" >> prettySequence t (map fst xs) ", " >> output "}"
+prettyWHNF (TyBag t) (VBag xs) = prettyBag t xs
 
-prettyWHNF out (TyGraph a) (VGraph _ adj) = prettyWHNF out (TyMap a (TySet a)) =<< rnfV adj
-prettyWHNF out (TyMap k v) (VMap m)
-  | M.null m = out "emptyMap"
+prettyWHNF (TyGraph a) (VGraph _ adj) = prettyWHNF (TyMap a (TySet a)) =<< rnfV adj
+prettyWHNF (TyMap k v) (VMap m)
+  | M.null m = output "emptyMap"
   | otherwise = do
-      out "map("
-      prettyWHNF out (TySet (k :*: v)) =<< mapToSet k v (VMap m)
-      out ")"
+      output "map("
+      prettyWHNF (TySet (k :*: v)) =<< mapToSet k v (VMap m)
+      output ")"
 
-prettyWHNF _ ty v = error $
+prettyWHNF ty v = error $
   "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
 
-prettyPlaceholder :: MonadDisco m => (String -> m ()) -> Type -> m ()
-prettyPlaceholder out ty = do
-  out "<"
+prettyPlaceholder :: Member (Output String) r => Type -> Sem r ()
+prettyPlaceholder ty = do
+  output "<"
   tyStr <- renderDoc (prettyTy ty)
-  out tyStr
-  out ">"
+  output tyStr
+  output ">"
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> [Value] -> String -> m ()
-prettySequence out _ []     _   = out ""
-prettySequence out t [x]    _   = prettyValueWith out t x
-prettySequence out t (x:xs) del = prettyValueWith out t x >> out del >> prettySequence out t xs del
+prettySequence :: Member (Output String) r => Type -> [Value] -> String -> Sem r ()
+prettySequence _ []     _   = output ""
+prettySequence t [x]    _   = prettyV t x
+prettySequence t (x:xs) del = prettyV t x >> output del >> prettySequence t xs del
 
-prettyBag :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> [(Value, Integer)] -> m ()
-prettyBag out _ []         = out "⟅⟆"
-prettyBag out t vs
-  | all ((==1) . snd) vs   = out "⟅" >> prettySequence out t (map fst vs) ", " >> out "⟆"
-  | otherwise              = out "⟅" >> prettyCounts vs >> out "⟆"
+prettyBag :: Member (Output String) r => Type -> [(Value, Integer)] -> Sem r ()
+prettyBag _ []         = output "⟅⟆"
+prettyBag t vs
+  | all ((==1) . snd) vs   = output "⟅" >> prettySequence t (map fst vs) ", " >> output "⟆"
+  | otherwise              = output "⟅" >> prettyCounts vs >> output "⟆"
 
   where
     prettyCounts []      = error "Impossible! prettyCounts []"
     prettyCounts [v]     = prettyCount v
-    prettyCounts (v:vs') = prettyCount v >> out ", " >> prettyCounts vs'
+    prettyCounts (v:vs') = prettyCount v >> output ", " >> prettyCounts vs'
 
-    prettyCount (v,1) = prettyValueWith out t v
-    prettyCount (v,n) = prettyValueWith out t v >> out (" # " ++ show n)
+    prettyCount (v,1) = prettyV t v
+    prettyCount (v,n) = prettyV t v >> output (" # " ++ show n)
 
-prettyString :: forall m. MonadDisco m => (String -> m ()) -> Value -> m ()
-prettyString out str = out "\"" >> go str >> out "\""
+prettyString :: Member (Output String) r => Value -> Sem r ()
+prettyString str = output "\"" >> go str >> output "\""
   where
     toChar :: Value -> String
     toChar (VNum _ c) = drop 1 . reverse . drop 1 . reverse . show $ [chr (fromIntegral (numerator c))]
     toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
 
-    go :: MonadDisco m => Value -> m ()
+    go :: Member (Output String) r => Value -> Sem r ()
     go v = do
       whnfList v (return ()) $ \hd tl -> do
         hd' <- whnfV hd
-        out (toChar hd')
+        output (toChar hd')
         go tl
 
 -- | Pretty-print a list with elements of a given type, assuming the
 --   list has already been reduced to WHNF.
-prettyList :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyList out ty v = out "[" >> go v
+prettyList :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyList ty v = output "[" >> go v
   where
-    go w = whnfList w (out "]") $ \hd tl -> do
-      prettyValueWith out ty hd
+    go w = whnfList w (output "]") $ \hd tl -> do
+      prettyV ty hd
       tlWHNF <- whnfV tl
       case tlWHNF of
-        VInj R _ -> out ", "
+        VInj R _ -> output ", "
         _        -> return ()
       go tlWHNF
 
-prettyTuple :: (Has '[St "top"] m, MonadDisco m) => (String -> m ()) -> Type -> Value -> m ()
-prettyTuple out (ty1 :*: ty2) (VPair v1 v2) = do
-  prettyValueWith out ty1 v1
-  out ", "
-  whnfV v2 >>= prettyTuple out ty2
-prettyTuple out ty v = prettyValueWith out ty v
+prettyTuple :: Member (Output String) r => Type -> Value -> Sem r ()
+prettyTuple (ty1 :*: ty2) (VPair v1 v2) = do
+  prettyV ty1 v1
+  output ", "
+  whnfV v2 >>= prettyTuple ty2
+prettyTuple ty v = prettyV ty v
 
 --------------------------------------------------
 -- Pretty-printing decimals

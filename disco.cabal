@@ -291,6 +291,7 @@ library
                        Disco.Extensions
                        Disco.Capability
                        Disco.Effects.Fresh
+                       Disco.Effects.LFresh
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic

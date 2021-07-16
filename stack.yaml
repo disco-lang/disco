@@ -15,6 +15,7 @@ extra-deps:
   - oeis-0.3.10
   - capability-0.4.0.0@sha256:d86d85a1691ef0165c77c47ea72eac75c99d21fb82947efe8b2f758991cf1837,3345
   - polysemy-1.5.0.0@sha256:7edb723e7f703fe273a40e43fe33f6e8f7659fe60759e8698def1481262d314d,6246
+  - polysemy-plugin-0.4.0.0
 
 # Override default flag values for local packages and extra-deps
 flags: {}

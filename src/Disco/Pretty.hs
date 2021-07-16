@@ -49,7 +49,6 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
 import           Disco.AST.Core
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
-import           Disco.Capability
 import           Disco.Eval                       (topTyDefs)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
                                                    whnfV)

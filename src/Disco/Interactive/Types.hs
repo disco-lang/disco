@@ -23,7 +23,7 @@ module Disco.Interactive.Types
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
-import           Disco.Eval                       (Disco)
+import           Disco.Eval
 import           Disco.Extensions
 import           Disco.Parser
 

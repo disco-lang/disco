@@ -44,10 +44,12 @@ module Disco.Eval
 
          -- * Lenses for top-level info record
 
+       , TopInfo
        , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs
 
          -- * Running things
 
+       , DiscoEffects
        , runDisco
        , runTCM, runTCMWith
 

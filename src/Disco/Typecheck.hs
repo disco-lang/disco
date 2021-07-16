@@ -103,7 +103,7 @@ inferTelescope inferOne tel = do
 --   on success.  This function does not handle imports at all; see
 --   'recCheckMod'.
 checkModule
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Module -> Sem r ModuleInfo
 checkModule (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
@@ -245,7 +245,7 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 
 -- | Type check a top-level definition.
 checkDefn
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => TermDefn -> Sem r Defn
 checkDefn (TermDefn x clauses) = do
 
@@ -305,7 +305,7 @@ checkDefn (TermDefn x clauses) = do
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
   M.mapKeys coerce . M.filter (not.null)
@@ -316,7 +316,7 @@ checkProperties docs =
 
 -- | Check the types of the terms embedded in a property.
 checkProperty
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Property -> Sem r AProperty
 checkProperty prop = do
   (at, theta) <- solve $ check prop TyProp

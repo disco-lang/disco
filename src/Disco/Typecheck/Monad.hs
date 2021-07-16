@@ -82,31 +82,6 @@ instance Monoid TCError where
   mappend = (<>)
 
 ------------------------------------------------------------
--- Running
-------------------------------------------------------------
-
--- | Run a typechecking computation, providing it with local
---   (initially empty) contexts for variable types and type
---   definitions.
-runTCM
-  :: Sem (Reader TyCtx ': Reader TyDefCtx ': r) a
-  -> Sem r a
-runTCM
-  = runReader @TyDefCtx M.empty
-  . runReader @TyCtx emptyCtx
-
--- | Run a typechecking computation, providing it with local contexts
---   (initialized to the provided arguments) for variable types and
---   type definitions.
-runTCMWith
-  :: TyCtx -> TyDefCtx
-  -> Sem (Reader TyCtx ': Reader TyDefCtx ': r) a
-  -> Sem r a
-runTCMWith tyCtx tyDefCtx
-  = runReader tyDefCtx
-  . runReader tyCtx
-
-------------------------------------------------------------
 -- Constraints
 ------------------------------------------------------------
 

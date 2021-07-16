@@ -47,11 +47,11 @@ import           Disco.Typecheck                  (containerTy)
 import           Disco.Types
 
 import           Disco.Effects.Fresh
-import           Polysemy                         (Embed, Member, Sem, runM)
+import           Polysemy                         (Embed, Member, Sem)
 import           Unbound.Generics.LocallyNameless (Bind, FreshM, Name, bind,
-                                                   contFreshM, embed,
-                                                   name2String, string2Name,
-                                                   unembed, unrebind)
+                                                   embed, name2String,
+                                                   string2Name, unembed,
+                                                   unrebind)
 
 ------------------------------------------------------------
 -- Running desugaring computations

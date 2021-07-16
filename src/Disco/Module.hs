@@ -22,14 +22,16 @@ import           GHC.Generics                     (Generic)
 
 import           Control.Lens                     (makeLenses)
 import           Control.Monad                    (filterM, foldM)
-import           Control.Monad.Except             (MonadError, throwError)
 import           Control.Monad.IO.Class           (MonadIO (..))
 import           Data.Coerce                      (coerce)
 import qualified Data.Map                         as M
 import           System.Directory                 (doesFileExist)
 import           System.FilePath                  (replaceExtension, (</>))
 
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless (Bind, Name, Subst)
+
+import           Polysemy
+import           Polysemy.Error
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -85,14 +87,14 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx
 --   joining their doc, type, type definition, and term contexts. The property context
 --   of the new module is the obtained from the second module. If threre are any duplicate
 --   type definitions or term definitions, a Typecheck error is thrown.
-combineModuleInfo :: (MonadError TCError m) => [ModuleInfo] -> m ModuleInfo
-combineModuleInfo mis = foldM combineMods emptyModuleInfo mis
-  where combineMods :: (MonadError TCError m) => ModuleInfo -> ModuleInfo -> m ModuleInfo
+combineModuleInfo :: Member (Error TCError) r => [ModuleInfo] -> Sem r ModuleInfo
+combineModuleInfo = foldM combineMods emptyModuleInfo
+  where combineMods :: Member (Error TCError) r => ModuleInfo -> ModuleInfo -> Sem r ModuleInfo
         combineMods (ModuleInfo d1 _ ty1 tyd1 tm1) (ModuleInfo d2 p2 ty2 tyd2 tm2) =
           case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
             ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2)
-            (x:_, _) -> throwError $ DuplicateTyDefns (coerce x)
-            (_, y:_) -> throwError $ DuplicateDefns (coerce y)
+            (x:_, _) -> throw $ DuplicateTyDefns (coerce x)
+            (_, y:_) -> throw $ DuplicateDefns (coerce y)
 
 ------------------------------------------------------------
 -- Module resolution
@@ -123,7 +125,7 @@ withStdlib r            = r
 --   directory (lib), and then in the directory passed in to
 --   resolveModule.  Returns Nothing if no module with the given name
 --   could be found.
-resolveModule :: MonadIO m => Resolver -> ModName -> m (Maybe FilePath)
+resolveModule :: Member (Embed IO) r => Resolver -> ModName -> Sem r (Maybe FilePath)
 resolveModule resolver modname = do
   datadir <- liftIO getDataDir
   let searchPath =

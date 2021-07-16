@@ -1,4 +1,9 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveFoldable             #-}
+{-# LANGUAGE DeriveFunctor              #-}
+{-# LANGUAGE DeriveTraversable          #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PatternSynonyms            #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,8 +31,13 @@ module Disco.Value
   -- * Environments
 
   , Env, extendEnv, extendsEnv, getEnv, withEnv
+
+  -- * Memory
+
+  , Cell(..), mkCell, Loc, Memory
   ) where
 
+import           Data.IntMap.Lazy                 (IntMap)
 import           Data.IntSet                      (IntSet)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
@@ -37,11 +47,11 @@ import           Algebra.Graph                    (Graph)
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
-import           Disco.Capability
 import           Disco.Context
 import           Disco.Error
 import           Disco.Types
 
+import           Disco.Effects
 import           Disco.Effects.LFresh
 import           Polysemy
 import           Polysemy.Error
@@ -54,35 +64,35 @@ import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
 
 -- | The type of values produced by the interpreter. The parameter @r@
 --   is an effect row listing the effects needed to evaluate such values.
-data Value r where
+data Value where
   -- | A numeric value, which also carries a flag saying how
   --   fractional values should be diplayed.
-  VNum  :: RationalDisplay -> Rational -> Value r
+  VNum  :: RationalDisplay -> Rational -> Value
 
   -- | The unit value.
-  VUnit :: Value r
+  VUnit :: Value
 
   -- | An injection into a sum type.
-  VInj :: Side -> Value r -> Value r
+  VInj :: Side -> Value -> Value
 
   -- | A pair of values.
-  VPair :: Value r -> Value r -> Value r
+  VPair :: Value -> Value -> Value
 
   -- | A built-in function constant.
-  VConst :: Op -> Value r
+  VConst :: Op -> Value
 
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClos  :: Bind [Name Core] Core -> Env r -> Value r
+  VClos  :: Bind [Name Core] Core -> Env -> Value
 
   -- | A partial application, i.e. an application of a thing to some
   --   arguments which is still waiting for more.  Invariant: the
   --   thing being applied is in WHNF.
-  VPAp   :: Value r -> [Value r] -> Value r
+  VPAp   :: Value -> [Value] -> Value
 
   -- | A thunk, i.e. an unevaluated core expression together with
   --   its environment.
-  VThunk :: Core -> Env r -> Value r
+  VThunk :: Core -> Env -> Value
 
   -- | An indirection, i.e. a pointer to an entry in the value table.
   --   This is how we get graph reduction.  When we create a thunk, we
@@ -90,7 +100,7 @@ data Value r where
   --   The VIndir can get copied but all the copies refer to the same
   --   thunk, which will only be evaluated once, the first time the
   --   value is demanded.
-  VIndir :: Int -> Value r
+  VIndir :: Int -> Value
 
   -- | A literal function value.  @VFun@ is only used when
   --   enumerating function values in order to decide comparisons at
@@ -102,42 +112,42 @@ data Value r where
   --   We assume that all @VFun@ values are /strict/, that is, their
   --   arguments should be fully evaluated to RNF before being
   --   passed to the function.
-  VFun_   :: ValFun r -> Value r
+  VFun_   :: ValFun -> Value
 
   -- | A proposition.
-  VProp   :: ValProp r -> Value r
+  VProp   :: ValProp -> Value
 
   -- | A @Value@ computation which can be run later, along with
   --   the environment in which it should run, and a set of referenced
   --   memory locations that should not be garbage collected.
-  VDelay_  :: ValDelay r -> IntSet -> Env r -> Value r
+  VDelay_  :: ValDelay -> IntSet -> Env -> Value
 
   -- | A literal bag, containing a finite list of (perhaps only
   --   partially evaluated) values, each paired with a count.  This is
   --   also used to represent sets (with the invariant that all counts
   --   are equal to 1).
-  VBag :: [(Value r, Integer)] -> Value r
+  VBag :: [(Value, Integer)] -> Value
 
   -- | A Graph in the algebraic repesentation. The stored value is an indirection to the graph's adjacency map representation.
-  VGraph :: Graph SimpleValue -> Value r -> Value r
+  VGraph :: Graph SimpleValue -> Value -> Value
 
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
-  VMap :: Map SimpleValue (Value r) -> Value r
+  VMap :: Map SimpleValue Value -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
-  VType :: Type -> Value r
+  VType :: Type -> Value
   deriving Show
 
 -- | Convenient pattern for the empty list.
-pattern VNil :: Value r
+pattern VNil :: Value
 pattern VNil      = VInj L VUnit
 
 -- | Convenient pattern for list cons.
-pattern VCons :: Value r -> Value r -> Value r
+pattern VCons :: Value -> Value -> Value
 pattern VCons h t = VInj R (VPair h t)
 
 -- | Values which can be used as keys in a map, i.e. those for which a
@@ -161,23 +171,25 @@ data SimpleValue where
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValFun r = ValFun (Value r -> Value r)
+newtype ValFun = ValFun (Value -> Value)
 
-instance Show (ValFun r) where
+instance Show ValFun where
   show _ = "<fun>"
 
-pattern VFun :: (Value r -> Value r) -> Value r
+pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
 
 -- | A @ValDelay@ is just a @Sem r Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay r = ValDelay (Sem r (Value r))
+newtype ValDelay = ValDelay (forall r. Members (DiscoEffects' Env Memory IErr) r => Sem r Value)
 
-instance Show (ValDelay r) where
+instance Show ValDelay where
   show _ = "<delay>"
 
-pattern VDelay :: Sem r (Value r) -> IntSet -> Env r -> Value r
+pattern VDelay
+  :: (forall r. Members (DiscoEffects' Env Memory IErr) r => Sem r Value)
+  -> IntSet -> Env -> Value
 pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
 
 ------------------------------------------------------------
@@ -213,13 +225,13 @@ newtype TestVars = TestVars [(String, Type, Name Core)]
   deriving newtype (Show, Semigroup, Monoid)
 
 -- | A variable assignment found during a test.
-newtype TestEnv r = TestEnv [(String, Type, Value r)]
+newtype TestEnv = TestEnv [(String, Type, Value)]
   deriving newtype (Show, Semigroup, Monoid)
 
-emptyTestEnv :: TestEnv r
+emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: Members '[Reader (Env r), Error IErr] r => TestVars -> Sem r (TestEnv r)
+getTestEnv :: Members '[Reader Env, Error IErr] r => TestVars -> Sem r TestEnv
 getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
@@ -229,7 +241,7 @@ getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
-data TestReason_ r a
+data TestReason_ a
   = TestBool
     -- ^ The prop evaluated to a boolean.
   | TestEqual Type a a
@@ -237,32 +249,32 @@ data TestReason_ r a
     --   compared and also their type (which is needed for printing).
   | TestNotFound SearchType
     -- ^ The search didn't find any examples/counterexamples.
-  | TestFound (TestResult r)
+  | TestFound TestResult
     -- ^ The search found an example/counterexample.
   | TestRuntimeError IErr
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
   deriving (Show, Functor, Foldable, Traversable)
 
-type TestReason r = TestReason_ r (Value r)
+type TestReason = TestReason_ Value
 
 -- | The possible outcomes of a proposition.
-data TestResult r = TestResult Bool (TestReason r) (TestEnv r)
+data TestResult = TestResult Bool TestReason TestEnv
   deriving Show
 
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
-data ValProp r
-  = VPDone (TestResult r)
+data ValProp
+  = VPDone TestResult
     -- ^ A prop that has already either succeeded or failed.
-  | VPSearch SearchMotive [Type] (Value r) (TestEnv r)
+  | VPSearch SearchMotive [Type] Value TestEnv
     -- ^ A pending search.
   deriving Show
 
-extendPropEnv :: TestEnv r -> ValProp r -> ValProp r
+extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g <> e))
 extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g <> e)
 
-extendResultEnv :: TestEnv r -> TestResult r -> TestResult r
+extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
 
 ------------------------------------------------------------
@@ -270,24 +282,45 @@ extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
 ------------------------------------------------------------
 
 -- | An environment is a mapping from names to values.
-type Env r  = Ctx Core (Value r)
+type Env  = Ctx Core Value
 
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extendEnv :: Members '[Reader (Env r), LFresh] r => Name Core -> Value r -> Sem r a -> Sem r a
+extendEnv :: Members '[Reader Env, LFresh] r => Name Core -> Value -> Sem r a -> Sem r a
 extendEnv x v = avoid [AnyName x] . extend x v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Members '[Reader (Env r), LFresh] r => Env r -> Sem r a -> Sem r a
+extendsEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
 extendsEnv e' = avoid (map AnyName (names e')) . extends e'
 
 -- | Get the current environment.
-getEnv :: Member (Reader (Env r)) r => Sem r (Env r)
+getEnv :: Member (Reader Env) r => Sem r Env
 getEnv = ask
 
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Member (Reader (Env r)) r => Env r -> Sem r a -> Sem r a
+withEnv :: Member (Reader Env) r => Env -> Sem r a -> Sem r a
 withEnv = local . const
+
+------------------------------------------------------------
+-- Memory cells
+------------------------------------------------------------
+
+-- | A memory cell holds a value, along with a flag recording whether
+--   the value has been reduced to WHNF.
+data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
+  deriving (Show)
+
+-- | Create a memory cell from a value, with the WHNF flag initially
+--   set to false.
+mkCell :: Value -> Cell
+mkCell v = Cell v False
+
+-- | A location in memory is represented by an @Int@.
+type Loc = Int
+
+-- | Memory is a collection of cells indexed by location.
+type Memory = IntMap Cell
+

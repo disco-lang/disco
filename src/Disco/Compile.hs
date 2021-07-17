@@ -29,6 +29,7 @@ import           Disco.Syntax.Prims
 import           Disco.Types
 import           Disco.Util
 
+import           Control.Monad                    ((<=<))
 import           Data.Bool                        (bool)
 import           Data.Coerce
 import           Data.Map                         ((!))
@@ -36,7 +37,7 @@ import qualified Data.Map                         as M
 import           Data.Ratio
 
 import           Disco.Effects.Fresh
-import           Polysemy                         (Member, Sem)
+import           Polysemy                         (Member, Sem, run)
 import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
                                                    string2Name, unembed)
 
@@ -44,20 +45,25 @@ import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
 -- Convenience operations
 ------------------------------------------------------------
 
+-- | Utility function to desugar and compile a thing, given a
+--   desugaring function for it.
+compileThing :: (a -> Sem '[Fresh] DTerm) -> a -> Core
+compileThing desugarThing = run . runFresh . (compileDTerm <=< desugarThing)
+
 -- | Compile a typechecked term ('ATerm') directly to a 'Core' term,
 --   by desugaring and then compiling.
 compileTerm :: ATerm -> Core
-compileTerm = runFresh . compileDTerm . runDesugar . desugarTerm
+compileTerm = compileThing desugarTerm
 
 -- | Compile a typechecked definition ('Defn') directly to a 'Core' term,
 --   by desugaring and then compiling.
 compileDefn :: Defn -> Core
-compileDefn = runFresh . compileDTerm . runDesugar . desugarDefn
+compileDefn = compileThing desugarDefn
 
 -- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
 --   by desugaring and then compilling.
 compileProperty :: AProperty -> Core
-compileProperty = runFresh . compileDTerm . runDesugar . desugarProperty
+compileProperty = compileThing desugarProperty
 
 ------------------------------------------------------------
 -- Compiling terms

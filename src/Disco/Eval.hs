@@ -1,6 +1,3 @@
-{-# OPTIONS_GHC -fno-warn-orphans     #-}
-  -- For MonadFail instance; see below.
-
 {-# LANGUAGE ConstraintKinds            #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -50,7 +47,7 @@ module Disco.Eval
          -- * Running things
 
        , DiscoEffects
-       , runDisco
+       , Disco, runDisco
        , runTCM, runTCMWith
 
          -- ** Messages
@@ -150,6 +147,8 @@ initTopInfo = TopInfo
 
 type DiscoEffects = DiscoEffects' Env Memory IErr
 
+type Disco a = Sem DiscoEffects a
+
 -- -- | The various pieces of state tracked by the 'Disco' monad.
 -- data DiscoState r = DiscoState
 --   { topInfo     :: IORef (TopInfo)
@@ -209,7 +208,7 @@ type DiscoEffects = DiscoEffects' Env Memory IErr
 
 -- | Run a top-level Disco computation, starting in the empty
 --   environment.
-runDisco :: Sem (Embed IO ': DiscoEffects) a -> IO (Either IErr a)
+runDisco :: Disco a -> IO (Either IErr a)
 runDisco d = undefined
   -- s <- initDiscoState
   -- flip CMC.catch (return . Left)

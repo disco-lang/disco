@@ -18,7 +18,9 @@ module Disco.Effects where
 import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
 import           Polysemy.Error
+import           Polysemy.Fail
+import           Polysemy.Random
 import           Polysemy.Reader
 import           Polysemy.State
 
-type DiscoEffects' env m e = '[Reader env, State m, Counter, Error e, LFresh]
+type DiscoEffects' env m e = '[Reader env, State m, Counter, Random, Fail, Error e, LFresh]

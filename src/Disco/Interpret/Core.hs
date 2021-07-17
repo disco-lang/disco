@@ -70,12 +70,13 @@ import qualified Data.Map                                as M
 import           Data.Ratio
 
 import           Disco.Effects.Counter
+import           Disco.Effects.LFresh
 import           Polysemy                                hiding (Embed)
 import           Polysemy.Error
 import           Polysemy.Reader
 import           Polysemy.State
 
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless        (Embed, unembed)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Math.Combinatorics.Exact.Binomial       (choose)
@@ -1790,8 +1791,8 @@ directlyReduceSummary ty = toDiscoAdjMap ty . reifyGraph
 -- Lookup the stored adjacency map from the indirection stored in this graph
 graphSummary :: Members DiscoEffects r => Value -> Sem r Value
 graphSummary g = do
-    VGraph _ adj <- whnfV g
-    whnfV adj
+  VGraph _ adj <- whnfV g
+  whnfV adj
 
 graphVertex :: Members DiscoEffects r => Type -> SimpleValue -> Sem r Value
 graphVertex a v = newGraph a $ Vertex v
@@ -1814,14 +1815,14 @@ graphConnect a g h = do
 
 mapInsert :: Members DiscoEffects r => Value -> Value -> Value -> Sem r Value
 mapInsert k v m = do
-    VMap m' <- whnfV m
-    k' <- toSimpleValue k
-    return $ VMap $ M.insert k' v m'
+  VMap m' <- whnfV m
+  k' <- toSimpleValue k
+  return $ VMap $ M.insert k' v m'
 
 mapLookup :: Members DiscoEffects r => Value -> Value -> Sem r Value
 mapLookup k m = do
-    VMap m' <- whnfV m
-    k' <- toSimpleValue k
-    case M.lookup k' m' of
-        Just v' -> return $ VInj R v'
-        _       -> return VNil
+  VMap m' <- whnfV m
+  k' <- toSimpleValue k
+  case M.lookup k' m' of
+    Just v' -> return $ VInj R v'
+    _       -> return VNil

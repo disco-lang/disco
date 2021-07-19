@@ -9,7 +9,7 @@ TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () 
 TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 TAbs_ Lam () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 8
-Unsolvable NoWeakUnifier
+TypeCheckErr (Unsolvable NoWeakUnifier)
 8
 8
 8

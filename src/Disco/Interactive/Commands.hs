@@ -350,7 +350,7 @@ parseCmd = REPLCommand
   }
 
 handleParse :: Member (Output String) r => REPLExpr 'CParse -> Sem r ()
-handleParse (Parse t) = printout t
+handleParse (Parse t) = printoutLn t
 
 
 prettyCmd :: REPLCommand 'CPretty
@@ -494,7 +494,7 @@ handleRNF (RNF t) = do
   let c  = compileTerm at
   inputToState . withTopEnv $ do
     cv <- mkValue c >>= rnfV
-    printout cv
+    printoutLn cv
 
 
 memCmd :: REPLCommand 'CMem
@@ -591,7 +591,7 @@ prettyFailureReason prop (TestRuntimeError e) = do
   output     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   outputLn dp
-  output     "    " >> printout e
+  output     "    " >> printoutLn e
 prettyFailureReason prop (TestFound (TestResult _ r _)) = do
   prettyFailureReason prop r
 prettyFailureReason prop (TestNotFound Exhaustive) = do

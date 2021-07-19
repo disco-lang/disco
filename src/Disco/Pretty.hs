@@ -445,9 +445,9 @@ prettyV ty = whnfV >=> prettyWHNF ty
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyVP :: Member (Output String) r => Type -> Value -> Sem r ()
-prettyVP ty@(_ :*: _) v = prettyVP ty v
-prettyVP ty           v = output "(" >> prettyVP ty v >> output ")"
+prettyVP :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
+prettyVP ty@(_ :*: _) v = prettyV ty v
+prettyVP ty           v = output "(" >> prettyV ty v >> output ")"
 
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.

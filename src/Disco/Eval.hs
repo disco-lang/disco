@@ -180,7 +180,7 @@ type DiscoEffects = AppendEffects EvalEffects TopEffects
 outputErrors :: Show e => Member (Output String) r => Sem (Error e ': r) () -> Sem r ()
 outputErrors m = do
   e <- runError m
-  either (outputLn . show) return e
+  either printoutLn return e
 
 -- | XXX
 inputSettings :: H.Settings IO

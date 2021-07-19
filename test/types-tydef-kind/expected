@@ -1,2 +1,2 @@
 Loading types-tydef-kind.disco...
-NotEnoughArgs (CUser "Foo")
+TypeCheckErr (NotEnoughArgs (CUser "Foo"))

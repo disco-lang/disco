@@ -332,8 +332,14 @@ getEnv = ask
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Member (Reader Env) r => Env -> Sem r a -> Sem r a
-withEnv = local . const
+withEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
+withEnv e = avoid (map AnyName (names e)) . local (const e)
+
+-- The below code seems to work too, but I don't understand why.  Seems like
+-- we should have to avoid names bound in the environment currently in use.
+
+-- withEnv = local . const
+
 
 ------------------------------------------------------------
 -- Memory cells

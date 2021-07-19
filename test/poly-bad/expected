@@ -1,6 +1,6 @@
-Unsolvable NoWeakUnifier
-Unsolvable NoUnify
-Unsolvable NoWeakUnifier
-Unsolvable NoWeakUnifier
-Unsolvable NoUnify
-Unsolvable NoUnify
+TypeCheckErr (Unsolvable NoWeakUnifier)
+TypeCheckErr (Unsolvable NoUnify)
+TypeCheckErr (Unsolvable NoWeakUnifier)
+TypeCheckErr (Unsolvable NoWeakUnifier)
+TypeCheckErr (Unsolvable NoUnify)
+TypeCheckErr (Unsolvable NoUnify)

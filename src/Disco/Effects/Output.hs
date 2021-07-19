@@ -14,6 +14,7 @@ module Disco.Effects.Output
   ( module Polysemy.Output
   , outputLn
   , printout
+  , printoutLn
   )
   where
 
@@ -27,3 +28,7 @@ outputLn s = output s >> output "\n"
 -- | Output an item after calling @show@ on it.
 printout :: (Show a, Member (Output String) r) => a -> Sem r ()
 printout = output . show
+
+-- | Output an item after calling @show@ on it, followed by a newline.
+printoutLn :: (Show a, Member (Output String) r) => a -> Sem r ()
+printoutLn = outputLn . show

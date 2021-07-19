@@ -47,6 +47,8 @@ data REPLExpr :: CmdTag -> * where
   Ann       :: Term -> REPLExpr 'CAnn              -- Show type-annotated typechecked term
   Desugar   :: Term -> REPLExpr 'CDesugar          -- Show a desugared term
   Compile   :: Term -> REPLExpr 'CCompile          -- Show a compiled term
+  RNF       :: Term -> REPLExpr 'CRNF
+  Mem       :: REPLExpr 'CMem
   Import    :: String -> REPLExpr 'CImport         -- Import a library module.
   Load      :: FilePath -> REPLExpr 'CLoad         -- Load a file.
   Reload    :: REPLExpr 'CReload                   -- Reloads the most recently loaded file.
@@ -91,7 +93,7 @@ data REPLCommand (c :: CmdTag) = REPLCommand
   }
 
 data CmdTag = CUsing | CLet | CTypeCheck | CEval | CShowDefn
-  | CParse | CPretty | CAnn | CDesugar | CCompile | CImport | CLoad
+  | CParse | CPretty | CAnn | CDesugar | CCompile | CRNF | CMem | CImport | CLoad
   | CReload | CDoc | CNop | CHelp | CNames | CTestProp
   deriving (Show, Eq, Typeable)
 

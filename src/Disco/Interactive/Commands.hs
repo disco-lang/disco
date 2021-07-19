@@ -85,11 +85,13 @@ discoCommands =
   , SomeCmd importCmd
   , SomeCmd letCmd
   , SomeCmd loadCmd
+  , SomeCmd memCmd
   , SomeCmd namesCmd
   , SomeCmd nopCmd
   , SomeCmd parseCmd
   , SomeCmd prettyCmd
   , SomeCmd reloadCmd
+  , SomeCmd rnfCmd
   , SomeCmd showDefnCmd
   , SomeCmd typeCheckCmd
   , SomeCmd testPropCmd
@@ -476,9 +478,43 @@ usingCmd = REPLCommand
 handleUsing :: Member (State TopInfo) r => REPLExpr 'CUsing -> Sem r ()
 handleUsing (Using e) = modify @TopInfo $ (extSet %~ addExtension e)
 
--- ------------------------------------------
--- --- Util functions
--- ------------------------------------------
+rnfCmd :: REPLCommand 'CRNF
+rnfCmd = REPLCommand
+  { name = "rnf"
+  , helpcmd = "rnf <expr>"
+  , shortHelp = "Reduce an expression to RNF"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleRNF
+  , parser = RNF <$> term
+  }
+
+handleRNF :: Members (State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CRNF -> Sem r ()
+handleRNF (RNF t) = do
+  (at, _) <- inputToState . typecheckDisco $ inferTop t
+  let c  = compileTerm at
+  inputToState . withTopEnv $ do
+    cv <- mkValue c >>= rnfV
+    printout cv
+
+
+memCmd :: REPLCommand 'CMem
+memCmd = REPLCommand
+  { name = "mem"
+  , helpcmd = "mem"
+  , shortHelp = "Show the contents of memory"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleMem
+  , parser = return Mem
+  }
+
+handleMem :: Members '[State Memory, Output String] r => REPLExpr 'CMem -> Sem r ()
+handleMem Mem = showMemory
+
+------------------------------------------
+--- Util functions
+------------------------------------------
 
 fileNotFound :: Member (Output String) r => FilePath -> IOException -> Sem r ()
 fileNotFound file _ = outputLn $ "File not found: " ++ file

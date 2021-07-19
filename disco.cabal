@@ -290,10 +290,10 @@ library
                        Disco.Syntax.Prims
                        Disco.Extensions
                        Disco.Capability
-                       Disco.Effects
                        Disco.Effects.Counter
                        Disco.Effects.Fresh
                        Disco.Effects.LFresh
+                       Disco.Effects.Output
                        Disco.Effects.Random
                        Disco.AST.Core
                        Disco.AST.Desugared
@@ -360,7 +360,7 @@ library
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
                        capability >= 0.4 && < 0.5,
-                       polysemy >= 1.4.0.0 && < 1.6,
+                       polysemy >= 1.6.0.0 && < 1.7,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.8,
                        lens >= 4.14 && < 5.1,

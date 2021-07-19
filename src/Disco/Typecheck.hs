@@ -406,7 +406,7 @@ infer = typecheck Infer
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
 inferTop
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Term -> Sem r (ATerm, PolyType)
 inferTop t = do
 

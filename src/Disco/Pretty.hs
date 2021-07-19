@@ -49,8 +49,7 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
 import           Disco.AST.Core
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
-import           Disco.Eval                       (DiscoEffects, TopInfo,
-                                                   topTyDefs)
+import           Disco.Eval                       (TopInfo, topTyDefs)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
                                                    whnfV)
 import           Disco.Module
@@ -434,14 +433,14 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.
-prettyValue :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> Value -> Sem r ()
+prettyValue :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyValue ty v = prettyV ty v >> output "\n"
 
 -- | Pretty-printing of values, with output interleaved lazily with
 --   evaluation.  Takes a continuation that specifies how the output
 --   should be processed (which will be called many times as the
 --   output is produced incrementally).
-prettyV :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> Value -> Sem r ()
+prettyV :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyV ty = whnfV >=> prettyWHNF ty
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
@@ -452,7 +451,7 @@ prettyVP ty           v = output "(" >> prettyVP ty v >> output ")"
 
 -- | Pretty-print a value which is already guaranteed to be in weak
 --   head normal form.
-prettyWHNF :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> Value -> Sem r ()
+prettyWHNF :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyWHNF (TyUser nm args) v = do
   tymap <- inputs (view topTyDefs)
   case M.lookup nm tymap of
@@ -500,12 +499,12 @@ prettyPlaceholder ty = do
   output ">"
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> [Value] -> String -> Sem r ()
+prettySequence :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> [Value] -> String -> Sem r ()
 prettySequence _ []     _   = output ""
 prettySequence t [x]    _   = prettyV t x
 prettySequence t (x:xs) del = prettyV t x >> output del >> prettySequence t xs del
 
-prettyBag :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> [(Value, Integer)] -> Sem r ()
+prettyBag :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> [(Value, Integer)] -> Sem r ()
 prettyBag _ []         = output "⟅⟆"
 prettyBag t vs
   | all ((==1) . snd) vs   = output "⟅" >> prettySequence t (map fst vs) ", " >> output "⟆"
@@ -519,14 +518,14 @@ prettyBag t vs
     prettyCount (v,1) = prettyV t v
     prettyCount (v,n) = prettyV t v >> output (" # " ++ show n)
 
-prettyString :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Value -> Sem r ()
+prettyString :: Members (Input TopInfo ': Output String ': EvalEffects) r => Value -> Sem r ()
 prettyString str = output "\"" >> go str >> output "\""
   where
     toChar :: Value -> String
     toChar (VNum _ c) = drop 1 . reverse . drop 1 . reverse . show $ [chr (fromIntegral (numerator c))]
     toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
 
-    go :: Members (Output String ': DiscoEffects) r => Value -> Sem r ()
+    go :: Members (Output String ': EvalEffects) r => Value -> Sem r ()
     go v = do
       whnfList v (return ()) $ \hd tl -> do
         hd' <- whnfV hd
@@ -535,7 +534,7 @@ prettyString str = output "\"" >> go str >> output "\""
 
 -- | Pretty-print a list with elements of a given type, assuming the
 --   list has already been reduced to WHNF.
-prettyList :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> Value -> Sem r ()
+prettyList :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyList ty v = output "[" >> go v
   where
     go w = whnfList w (output "]") $ \hd tl -> do
@@ -546,7 +545,7 @@ prettyList ty v = output "[" >> go v
         _        -> return ()
       go tlWHNF
 
-prettyTuple :: Members (Input TopInfo ': Output String ': DiscoEffects) r => Type -> Value -> Sem r ()
+prettyTuple :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyTuple (ty1 :*: ty2) (VPair v1 v2) = do
   prettyV ty1 v1
   output ", "

@@ -15,19 +15,24 @@
 
 module Disco.Interactive.Eval where
 
-import           Capability.Error
-import           Capability.State
 import           Control.Lens               (view)
 import           Control.Monad.Except
 import qualified Data.IntMap                as IM
 
 import           Disco.AST.Generic          (selectSide)
-import           Disco.Capability
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Interactive.Parser   (parseLine)
 import           Disco.Util
 import           Disco.Value
+
+import           Disco.Effects.Output
+import           Disco.Extensions           (ExtSet)
+import           Polysemy
+import           Polysemy.Error
+import           Polysemy.Input
+import           Polysemy.Output
+import           Polysemy.State
 
 showVal :: Int -> Value -> String
 showVal 0 _           = "_"
@@ -48,20 +53,20 @@ showVal _ VProp{}     = "<prop>"
 showVal _ VGraph{}    = "<graph>"
 showVal _ VMap{}      = "<map>"
 
-printMem :: Has '[St "top", St "mem", MonadIO] m => m ()
+printMem :: Members '[Input TopInfo, State Memory, Output String] r => Sem r ()
 printMem = do
-  env <- gets @"top" (view topEnv)
-  mem <- get @"mem"
+  env <- inputs (view topEnv)
+  mem <- get @Memory
 
-  io $ print env
+  printout env
 
   forM_ (IM.assocs mem) $ \(k, Cell v _) ->
-    io $ putStrLn $ show k ++ ": " ++ showVal 3 v
+    outputLn $ show k ++ ": " ++ showVal 3 v
 
-handleCMD :: String -> Disco ()
+handleCMD :: Members DiscoEffects r => String -> Sem r ()
 handleCMD "" = return ()
 handleCMD s = do
-    exts <- get @"exts"
+    exts <- gets @TopInfo (view extSet)
     case parseLine discoCommands exts s of
-      Left msg -> io $ putStrLn msg
-      Right l -> catch @"err" (dispatch discoCommands l) (io . print  {- XXX pretty-print error -})
+      Left msg -> outputLn msg
+      Right l -> catch (dispatch discoCommands l) (printout  {- XXX pretty-print error -})

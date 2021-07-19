@@ -29,7 +29,6 @@ data MessageLevel
   = Info
   | Warning
   | Error
-  | Panic
   | Debug
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 

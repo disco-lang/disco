@@ -42,17 +42,20 @@ module Disco.Eval
          -- * Lenses for top-level info record
 
        , TopInfo
-       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs
+       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs, extSet, lastFile
 
          -- * Running things
 
-       , DiscoEffects
-       , Disco, runDisco
+       , runDisco
        , runTCM, runTCMWith
 
+       , DiscoEffects
+       , inputToState
+
          -- ** Messages
-       , emitMessage, info, warning, err, panic, debug
-       , catchAsMessage
+       -- , emitMessage, info, warning, err, panic, debug
+
+       , outputErrors
 
          -- ** Memory/environment utilities
        , allocate, delay, delay', mkValue, mkSimple
@@ -65,15 +68,20 @@ module Disco.Eval
        )
        where
 
-import           Disco.Effects
 import           Disco.Effects.Counter
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
 import           Polysemy
+import           Polysemy.Embed
 import           Polysemy.Error
-import           Polysemy.Output
+import           Polysemy.Fail
+import           Polysemy.Input
+import           Polysemy.Random
 import           Polysemy.Reader
 import           Polysemy.State
 
-import           Control.Monad                    (forM_, when)
+import           Control.Monad                    (forM_, void, when)
+import           Control.Monad.IO.Class           (liftIO)
 import           Data.Bifunctor
 import qualified Data.IntMap                      as IntMap
 import           Data.IntSet                      (IntSet)
@@ -94,14 +102,14 @@ import           Disco.Context
 import           Disco.Effects.Fresh
 import           Disco.Error
 import           Disco.Extensions
-import           Disco.Messages
 import           Disco.Module
 import           Disco.Parser
 import           Disco.Typecheck                  (checkModule)
 import           Disco.Typecheck.Monad
 import           Disco.Types
-import           Disco.Util
 import           Disco.Value
+
+import qualified System.Console.Haskeline         as H
 
 ------------------------------------------------------------
 -- Disco monad state
@@ -131,6 +139,12 @@ data TopInfo = TopInfo
 
   , _topDocs    :: Ctx Term Docs
     -- ^ Top-level documentation.
+
+  , _extSet     :: ExtSet
+    -- ^ Currently enabled language extensions.
+
+  , _lastFile   :: Maybe FilePath
+    -- ^ The most recent file which was :loaded by the user.
   }
   deriving (Generic)
 
@@ -143,11 +157,20 @@ initTopInfo = TopInfo
   , _topTyDefs  = M.empty
   , _topDocs    = emptyCtx
   , _topEnv     = emptyCtx
+  , _extSet     = defaultExts
+  , _lastFile   = Nothing
   }
 
-type DiscoEffects = DiscoEffects' Env Memory IErr
+-- XXX move to Disco.Effects.State or Disco.Effects.Util or something like that
+inputToState :: forall s r a. Member (State s) r => Sem (Input s ': r) a -> Sem r a
+inputToState = interpret (\case { Input -> get @s })
 
-type Disco a = Sem DiscoEffects a
+type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
+  AppendEffects '[] s = s
+  AppendEffects (e ': r) s = e ': AppendEffects r s
+
+type TopEffects = '[Input TopInfo, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
+type DiscoEffects = AppendEffects EvalEffects TopEffects
 
 -- -- | The various pieces of state tracked by the 'Disco' monad.
 -- data DiscoState r = DiscoState
@@ -206,10 +229,45 @@ type Disco a = Sem DiscoEffects a
 -- Running top-level Disco computations
 ------------------------------------------------------------
 
+-- XXX for now!
+outputErrors :: Show e => Member (Output String) r => Sem (Error e ': r) () -> Sem r ()
+outputErrors m = do
+  e <- runError m
+  either (outputLn . show) return e
+
+inputSettings :: H.Settings IO
+inputSettings = H.defaultSettings
+  { H.historyFile = Just ".disco_history" }
+
 -- | Run a top-level Disco computation, starting in the empty
 --   environment.
-runDisco :: Disco a -> IO (Either IErr a)
-runDisco d = undefined
+runDisco :: (forall r. Members DiscoEffects r => Sem r ()) -> IO ()
+runDisco
+  = void
+  . H.runInputT inputSettings
+  . runFinal @(H.InputT IO)
+  . embedToFinal
+  . runEmbedded @_ @(H.InputT IO) liftIO
+  . runOutputSem (embed . putStr)
+  . stateToIO initTopInfo
+  . inputToState
+  . runLFresh
+  . runRandomIO
+  . runCounter
+  . stateToIO IntMap.empty
+  . outputErrors
+  . failToError Panic
+  . runReader emptyCtx
+
+  -- . runRandomIO
+  -- . runCounter
+  -- . stateToIO IntMap.empty
+  -- . runReader emptyCtx
+  -- . embedToFinal @(H.InputT IO)
+  -- . runEmbedded liftIO
+  -- . runOutputSem (embed . putStr)
+  -- . stateToIO initTopInfo
+
   -- s <- initDiscoState
   -- flip CMC.catch (return . Left)
   --   . fmap Right
@@ -228,24 +286,14 @@ makeLenses ''TopInfo
 -- Messages
 ------------------------------------------------------------
 
-emitMessage :: Member (Output (Message IErr)) r => MessageLevel -> MessageBody IErr -> Sem r ()
-emitMessage lev body = output $ Message lev body
+-- emitMessage :: Member (Output (Message IErr)) r => MessageLevel -> MessageBody IErr -> Sem r ()
+-- emitMessage lev body = output $ Message lev body
 
-info, warning, err, panic, debug :: Member (Output (Message IErr)) r => MessageBody IErr -> Sem r ()
-info    = emitMessage Info
-warning = emitMessage Warning
-err     = emitMessage Error
-panic   = emitMessage Panic
-debug   = emitMessage Debug
-
--- | Run a computation; if it throws an exception, catch it and turn
---   it into a message.
-catchAsMessage :: Member (Output (Message IErr)) r => Sem (Error TCError ': r) () -> Sem r ()
-catchAsMessage m = do
-  res <- runError m
-  case res of
-    Left tce -> err (Item (TypeCheckErr tce))
-    Right _  -> pure ()
+-- info, warning, err, debug :: Member (Output (Message IErr)) r => MessageBody IErr -> Sem r ()
+-- info    = emitMessage Info
+-- warning = emitMessage Warning
+-- err     = emitMessage Error
+-- debug   = emitMessage Debug
 
 ------------------------------------------------------------
 -- Memory/environment utilities
@@ -254,9 +302,9 @@ catchAsMessage m = do
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
-withTopEnv :: Member (State TopInfo) r => Sem (Reader Env ': r) a -> Sem r a
+withTopEnv :: Member (Input TopInfo) r => Sem (Reader Env ': r) a -> Sem r a
 withTopEnv m = do
-  e <- gets (view topEnv)
+  e <- inputs (view topEnv)
   runReader e m
 
 -- | Allocate a new memory cell for the given value, and return its
@@ -283,13 +331,13 @@ mkSimple v                = VIndir <$> allocate v
 
 -- | Delay a @Disco Value@ computation by packaging it into a
 --   @VDelay@ constructor along with the current environment.
-delay :: Members DiscoEffects r => (forall r'. Members DiscoEffects r' => Sem r' Value) -> Sem r Value
+delay :: Members EvalEffects r => (forall r'. Members EvalEffects r' => Sem r' Value) -> Sem r Value
 delay = delay' []
 
 -- | Like 'delay', but also specify a set of values which will be
 --   needed during the delayed computation, to prevent any memory
 --   referenced by the values from being garbage collected.
-delay' :: Members DiscoEffects r => [Value] -> (forall r'. Members DiscoEffects r' => Sem r' Value) -> Sem r Value
+delay' :: Members EvalEffects r => [Value] -> (forall r'. Members EvalEffects r' => Sem r' Value) -> Sem r Value
 delay' vs imv = do
   ls <- getReachable vs
   VDelay imv ls <$> getEnv
@@ -385,7 +433,7 @@ showMemory = get >>= (mapM_ showCell . IntMap.assocs)
 --   fails.
 parseDiscoModule :: Members '[Error IErr, Embed IO] r => FilePath -> Sem r Module
 parseDiscoModule file = do
-  str <- io $ readFile file
+  str <- liftIO $ readFile file
   fromEither . first ParseErr $ runParser wholeModule file str
 
 --------------------------------------------------
@@ -417,12 +465,12 @@ runTCMWith tyCtx tyDefCtx
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.
 typecheckDisco
-  :: Members '[State TopInfo, Error IErr] r
+  :: Members '[Input TopInfo, Error IErr] r
   => Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a
   -> Sem r a
 typecheckDisco tcm = do
-  tyctx  <- gets (view topCtx)
-  tydefs <- gets (view topTyDefs)
+  tyctx  <- inputs (view topCtx)
+  tydefs <- inputs (view topTyDefs)
   runTCMWith tyctx tydefs tcm
 
 -- | Recursively loads a given module by first recursively loading and
@@ -434,7 +482,7 @@ typecheckDisco tcm = do
 --   If the given directory is Just, it will only load a module from
 --   the specific given directory.  If it is Nothing, then it will look for
 --   the module in the current directory or the standard library.
-loadDiscoModule :: Members '[Error IErr, Embed IO] r => Resolver -> ModName -> Sem r ModuleInfo
+loadDiscoModule :: Members '[Output String, Error IErr, Embed IO] r => Resolver -> ModName -> Sem r ModuleInfo
 loadDiscoModule resolver m =
   evalState M.empty $ loadDiscoModule' resolver S.empty m
 
@@ -442,7 +490,7 @@ loadDiscoModule resolver m =
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once.
 loadDiscoModule'
-  :: Members '[Error IErr, Embed IO, State (M.Map ModName ModuleInfo)] r
+  :: Members '[Output String, Error IErr, Embed IO, State (M.Map ModName ModuleInfo)] r
   => Resolver -> S.Set ModName -> ModName
   -> Sem r ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
@@ -453,7 +501,7 @@ loadDiscoModule' resolver inProcess modName  = do
     Nothing -> do
       file <- resolveModule resolver modName
              >>= maybe (throw $ ModuleNotFound modName) return
-      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
+      outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- parseDiscoModule file
 
       -- mis only contains the module info from direct imports.

@@ -62,6 +62,9 @@ data IErr where
   -- | Trying to count an infinite type.
   InfiniteTy    :: Type      -> IErr
 
+  -- | XXX
+  Panic         :: String    -> IErr
+
   -- | User-generated crash.
   Crash         :: String    -> IErr
 

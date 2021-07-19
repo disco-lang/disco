@@ -35,6 +35,10 @@ module Disco.Value
   -- * Memory
 
   , Cell(..), mkCell, Loc, Memory
+
+  -- * Evaluation effects
+
+  , EvalEffects
   ) where
 
 import           Data.IntMap.Lazy                 (IntMap)
@@ -51,12 +55,24 @@ import           Disco.Context
 import           Disco.Error
 import           Disco.Types
 
-import           Disco.Effects
+import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
+import           Disco.Effects.Random
 import           Polysemy
 import           Polysemy.Error
+import           Polysemy.Fail
 import           Polysemy.Reader
+import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
+
+------------------------------------------------------------
+-- Evaluation effects
+------------------------------------------------------------
+
+-- Get rid of Reader Env --- should be dispatched locally?
+type EvalEffects = [Reader Env, Fail, Error IErr, State Memory, Counter, Random, LFresh]
+  -- XXX write about order.
+  -- memory, counter etc. should not be reset by errors.
 
 ------------------------------------------------------------
 -- Values
@@ -182,13 +198,13 @@ pattern VFun f = VFun_ (ValFun f)
 -- | A @ValDelay@ is just a @Sem r Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (forall r. Members (DiscoEffects' Env Memory IErr) r => Sem r Value)
+newtype ValDelay = ValDelay (forall r. Members EvalEffects r => Sem r Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
 
 pattern VDelay
-  :: (forall r. Members (DiscoEffects' Env Memory IErr) r => Sem r Value)
+  :: (forall r. Members EvalEffects r => Sem r Value)
   -> IntSet -> Env -> Value
 pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
 

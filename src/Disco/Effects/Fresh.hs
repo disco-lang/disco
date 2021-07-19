@@ -27,7 +27,7 @@ import           Unbound.Generics.LocallyNameless.Name
 -- | Fresh name generation effect, supporting raw generation of fresh
 --   names, and opening binders with automatic freshening.
 data Fresh m a where
-  Fresh  :: U.Name x -> Fresh m (U.Name x)
+  Fresh  :: Name x -> Fresh m (Name x)
 
 makeSem ''Fresh
 
@@ -81,7 +81,7 @@ absorbFresh :: Member Fresh r => (U.Fresh (Sem r) => Sem r a) -> Sem r a
 absorbFresh = absorbWithSem @U.Fresh @Action (FreshDict fresh) (Sub Dict)
 {-# INLINEABLE absorbFresh #-}
 
-newtype FreshDict m = FreshDict { fresh_ :: forall x. U.Name x -> m (U.Name x) }
+newtype FreshDict m = FreshDict { fresh_ :: forall x. Name x -> m (Name x) }
 
 -- | Wrapper for a monadic action with phantom type parameter for reflection.
 --   Locally defined so that the instance we are going to build with reflection

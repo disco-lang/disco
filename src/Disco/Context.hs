@@ -1,4 +1,3 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE MagicHash           #-}

@@ -20,6 +20,8 @@ module Disco.Interactive.Types
   withoutBuiltins)
   where
 
+import           Polysemy
+import           Polysemy.Error
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
@@ -84,7 +86,7 @@ data REPLCommand (c :: CmdTag) = REPLCommand
   , shortHelp :: String
   , category  :: REPLCommandCategory
   , cmdtype   :: REPLCommandType
-  , action    :: REPLExpr c -> Disco ()
+  , action    :: REPLExpr c -> (forall r. Members (Error IErr ': DiscoEffects) r => Sem r ())
   , parser    :: Parser (REPLExpr c)
   }
 

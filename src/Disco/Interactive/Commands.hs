@@ -50,9 +50,6 @@ import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
-import           Disco.Typecheck.Monad
-import           Disco.Types
-import           Disco.Util
 import           Disco.Value
 
 import           Text.Megaparsec                  hiding (State, runParser)

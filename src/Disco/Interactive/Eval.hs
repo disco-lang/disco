@@ -23,15 +23,12 @@ import           Disco.AST.Generic          (selectSide)
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Interactive.Parser   (parseLine)
-import           Disco.Util
 import           Disco.Value
 
 import           Disco.Effects.Output
-import           Disco.Extensions           (ExtSet)
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Input
-import           Polysemy.Output
 import           Polysemy.State
 
 showVal :: Int -> Value -> String

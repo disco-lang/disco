@@ -25,11 +25,9 @@ module Disco.Interactive.CmdLine
 
   ) where
 
-import           Control.Monad                          (unless, when)
-import           Control.Monad.Catch                    (MonadCatch,
-                                                         SomeException, catch)
+import           Control.Monad                          (unless)
+import           Control.Monad.Catch                    (MonadCatch, catch)
 import           Control.Monad.IO.Class                 (MonadIO (..))
-import           Control.Monad.Trans.Class              (MonadTrans (..))
 import           Data.Foldable                          (forM_)
 import           Data.List                              (isPrefixOf)
 import           Data.Maybe                             (isJust)
@@ -42,12 +40,10 @@ import           System.Console.Haskeline               as H
 import           Disco.Eval
 import           Disco.Interactive.Commands             (handleLoad, loadFile)
 import           Disco.Interactive.Eval
-import           Disco.Util
 
 import           Polysemy
 import           Polysemy.ConstraintAbsorber.MonadCatch
-import           Polysemy.Error                         (Error, mapError)
-import           Polysemy.Final
+import           Polysemy.Error                         (mapError)
 
 ------------------------------------------------------------
 -- Command-line options parser

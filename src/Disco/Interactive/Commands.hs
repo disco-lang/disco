@@ -239,7 +239,7 @@ importCmd = REPLCommand
   }
 
 handleImport
-  :: Members '[Error IErr, State TopInfo, Reader Env, Counter, State Memory, Output String, Embed IO] r
+  :: Members '[Error IErr, State TopInfo, Reader Env, Counter, State Memory, Output String, Output Debug, Embed IO] r
   => REPLExpr 'CImport -> Sem r ()
 handleImport (Import modName) = do
   mi <- loadDiscoModule FromCwdOrStdlib modName
@@ -257,7 +257,7 @@ letCmd = REPLCommand
   , parser = letParser
   }
 
-handleLet :: Members '[Error IErr, State TopInfo, State Memory, Counter, Reader Env, Output String] r => REPLExpr 'CLet -> Sem r ()
+handleLet :: Members '[Error IErr, State TopInfo, State Memory, Counter, Reader Env, Output String, Output Debug] r => REPLExpr 'CLet -> Sem r ()
 handleLet (Let x t) = do
   (at, sig) <- inputToState . typecheckDisco $ inferTop t
   let c = compileTerm at
@@ -526,7 +526,7 @@ loadFile file = do
     Left e  -> fileNotFound file e >> return Nothing
     Right s -> return (Just s)
 
-addModule :: Members '[State TopInfo, Reader Env, Counter, State Memory, Error IErr] r => ModuleInfo -> Sem r ()
+addModule :: Members '[State TopInfo, Reader Env, Counter, State Memory, Error IErr, Output Debug] r => ModuleInfo -> Sem r ()
 addModule mi = do
   curMI <- gets @TopInfo (view topModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
@@ -535,12 +535,12 @@ addModule mi = do
 -- | Add information from ModuleInfo to the Disco monad. This includes updating the
 --   Disco monad with new term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
-setLoadedModule :: Members '[State TopInfo, Reader Env, Counter, State Memory] r => ModuleInfo -> Sem r ()
+setLoadedModule :: Members '[State TopInfo, Reader Env, Counter, State Memory, Output Debug] r => ModuleInfo -> Sem r ()
 setLoadedModule mi = do
   modify @TopInfo $ topModInfo .~ mi
   populateCurrentModuleInfo
 
-populateCurrentModuleInfo :: Members '[State TopInfo, Reader Env, Counter, State Memory] r => Sem r ()
+populateCurrentModuleInfo :: Members '[State TopInfo, Reader Env, Counter, State Memory, Output Debug] r => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds <- gets @TopInfo (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds

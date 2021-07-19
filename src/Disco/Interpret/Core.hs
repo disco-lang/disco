@@ -73,6 +73,7 @@ import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
 import           Polysemy                                hiding (Embed)
 import           Polysemy.Error
+import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
 
@@ -115,7 +116,7 @@ import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
 loadDefs
-  :: Members '[Reader Env, Counter, State Memory, State TopInfo] r
+  :: Members '[Reader Env, Counter, State Memory, State TopInfo, Output Debug] r
   => Ctx Core Core -> Sem r ()
 loadDefs cenv = do
 
@@ -204,7 +205,9 @@ whnfV :: Members EvalEffects r => Value -> Sem r Value
 
 -- If the value is a thunk, use its stored environment and evaluate
 -- the expression to WHNF.
-whnfV (VThunk c e)          = withEnv e $ whnf c
+whnfV v@(VThunk c e)          = do
+  debug $ "whnfV " ++ show v
+  withEnv e $ whnf c
 
 -- If it is a delayed computation, we can't delay any longer: run it
 -- in its stored environment and reduce the result to WHNF.
@@ -239,14 +242,17 @@ whnfV v                     = return v
 --   not need to be re-evaluated later.
 whnfIndir :: Members EvalEffects r => Loc -> Sem r Value
 whnfIndir loc = do
+  debug $ "whnfIndir " ++ show loc
   m <- get @Memory                   -- Get the memory map
   let c = m ! loc                   -- Look up the given location and reduce it to WHNF
   case c of
     Cell v True  -> return v        -- Already evaluated, just return it
     Cell v False -> do
-      v' <- whnfV v                               -- Needs to be reduced
-      modify @Memory $ IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
-      return v'                                   -- Finally, return the value.
+      v' <- whnfV v                         -- Needs to be reduced
+      debug $ "  -> " ++ show v'
+      modify @Memory
+        $ IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
+      return v'                             -- Finally, return the value.
 
 
 -- | Reduce a list to WHNF.  Note that in the case of a cons, this
@@ -312,7 +318,9 @@ whnf (CType ty)     = return $ VType ty
 -- Interesting cases! (application, case)
 
 -- To reduce an application:
-whnf (CApp c cs)    = do
+whnf t@(CApp c cs)    = do
+
+  debug $ "whnf " ++ show t
 
   -- First reduce the function to WHNF...
   v <- whnf c
@@ -1361,7 +1369,9 @@ eqOp ty v1 v2 = mkEnum <$> decideEqFor ty v1 v2
 decideEqFor :: Members EvalEffects r => Type -> Value -> Value -> Sem r Bool
 
 -- To decide equality at a pair type:
-decideEqFor (ty1 :*: ty2) v1 v2 = do
+decideEqFor ty@(ty1 :*: ty2) v1 v2 = do
+
+  debug $ "decideEqFor " ++ show ty ++ " " ++ show v1 ++ " " ++ show v2
 
   -- First, reduce both values to WHNF, which will produce pairs.
   VPair v11 v12 <- whnfV v1
@@ -1379,7 +1389,9 @@ decideEqFor (ty1 :*: ty2) v1 v2 = do
     True  -> decideEqFor ty2 v12 v22
 
 -- To decide equality at a sum type:
-decideEqFor (ty1 :+: ty2) v1 v2 = do
+decideEqFor ty@(ty1 :+: ty2) v1 v2 = do
+
+  debug $ "decideEqFor " ++ show ty ++ " " ++ show v1 ++ " " ++ show v2
 
   -- Reduce both values to WHNF, which will produce constructors
   -- (either inl or inr) with one argument.
@@ -1410,11 +1422,14 @@ decideEqFor (ty1 :->: ty2) v1 v2 = do
   decideEqForClosures ty2 clos1 clos2 ty1s
 
 -- To decide equality at a list type, [elTy]:
-decideEqFor (TyList elTy) v1 v2 = do
+decideEqFor ty@(TyList elTy) v1 v2 = do
+
   -- Reduce both values to WHNF; will be either nil with no arguments
   -- or cons with two.
-  VInj c1 l1 <- whnfV v1
-  VInj c2 l2 <- whnfV v2
+  v1'@(VInj c1 l1) <- whnfV v1
+  v2'@(VInj c2 l2) <- whnfV v2
+
+  debug $ "decideEqFor " ++ show ty ++ ": " ++ show v1' ++ ", " ++ show v2'
 
   case (c1,c2) of
     (L,L) -> return True      -- Both are nil.
@@ -1451,8 +1466,9 @@ decideEqFor ty@TyMap{} m1 m2 = (==EQ) <$> decideOrdFor ty m1 m2
 
 -- For any other type (Void, Unit, Bool, N, Z, Q), we can just decide
 -- by looking at the values reduced to WHNF.
-decideEqFor _ v1 v2 = primValEq <$> whnfV v1 <*> whnfV v2
-
+decideEqFor ty v1 v2 = do
+  debug $ "decideEqFor fallthrough @ " ++ show ty ++ ": " ++ show v1 ++ ", " ++ show v2
+  primValEq <$> whnfV v1 <*> whnfV v2
 
 bagEquality :: Members EvalEffects r => Type -> [(Value, Integer)] -> [(Value, Integer)] -> Sem r Bool
 bagEquality _ [] [] = return True

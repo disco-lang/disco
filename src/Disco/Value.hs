@@ -38,7 +38,10 @@ module Disco.Value
 
   -- * Evaluation effects
 
+  , Debug(..)
+  , debug
   , EvalEffects
+
   ) where
 
 import           Data.IntMap.Lazy                 (IntMap)
@@ -61,6 +64,7 @@ import           Disco.Effects.Random
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Fail
+import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
@@ -69,10 +73,21 @@ import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
 -- Evaluation effects
 ------------------------------------------------------------
 
+newtype Debug = Debug { unDebug :: String }
+
+debug :: Member (Output Debug) r => String -> Sem r ()
+debug = output . Debug
+
 -- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error IErr, State Memory, Counter, Random, LFresh]
+type EvalEffects = [Reader Env, Fail, Error IErr, State Memory, Counter, Random, LFresh, Output Debug]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
+
+  -- XXX combine State Memory and Counter into a Memory effect?
+
+  -- XXX add some kind of proper logging effect(s)
+    -- With tags so we can filter on log messages we want??
+    -- Just make my own message logging effect.
 
 ------------------------------------------------------------
 -- Values

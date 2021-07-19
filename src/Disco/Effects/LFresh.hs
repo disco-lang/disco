@@ -36,9 +36,11 @@ data LFresh m a where
 makeSem ''LFresh
 
 runLFresh :: Sem (LFresh ': r) a -> Sem r a
-runLFresh
-  = runReader S.empty
-  . reinterpretH @_ @(Reader (Set AnyName)) \case
+runLFresh = runReader S.empty . runLFresh'
+
+runLFresh' :: Sem (LFresh ': r) a -> Sem (Reader (Set AnyName) ': r) a
+runLFresh'
+  = reinterpretH @_ @(Reader (Set AnyName)) \case
       Lfresh nm -> do
         let s = name2String nm
         used <- ask
@@ -46,7 +48,7 @@ runLFresh
                        (map (makeName s) [0..]))
       Avoid names m -> do
         m' <- runT m
-        raise (local (S.union (S.fromList names)) (runLFresh m'))
+        raise (subsume (runLFresh' (local (S.union (S.fromList names)) m')))
       GetAvoids  -> ask >>= pureT
 
   -- Much of the above code copied from
@@ -62,6 +64,19 @@ runLFresh
   -- below, just impementing the 'LFresh' effect itself means we can
   -- then reuse other things from unbound-generics that depend on a
   -- Fresh constraint, such as the 'lunbind' function below.
+
+  -- NOTE: originally, there was a single function runLFresh which
+  -- called reinterpretH and then immediately dispatched the Reader
+  -- (Set AnyName) effect.  However, since runLFresh is recursive,
+  -- this means that the recursive calls were running with a
+  -- completely *separate* Reader effect that started over from the
+  -- empty set! This meant that LFresh basically never changed any
+  -- names, leading to all sorts of name clashes and crashes.
+  --
+  -- Instead, we need to organize things as above: runLFresh' is
+  -- recursive, and keeps the Reader effect (using 'subsume' to squash
+  -- the duplicated Reader effects together).  Then a top-level
+  -- runLFresh function finally runs the Reader effect.
 
 --------------------------------------------------
 -- Other functions

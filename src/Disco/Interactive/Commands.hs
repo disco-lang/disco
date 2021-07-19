@@ -430,16 +430,15 @@ handleTest (TestProp t) = do
 
 
 typeCheckCmd :: REPLCommand 'CTypeCheck
-typeCheckCmd =
-    REPLCommand {
-        name = "type",
-        helpcmd = ":type <term>",
-        shortHelp = "Typecheck a term",
-        category = Dev,
-        cmdtype = ShellCmd,
-        action = handleTypeCheck,
-        parser = parseTypeCheck
-        }
+typeCheckCmd = REPLCommand
+  { name = "type"
+  , helpcmd = ":type <term>"
+  , shortHelp = "Typecheck a term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleTypeCheck
+  , parser = parseTypeCheck
+  }
 
 handleTypeCheck :: Members '[Error IErr, Input TopInfo, LFresh, Output String] r => REPLExpr 'CTypeCheck -> Sem r ()
 handleTypeCheck (TypeCheck t) = do

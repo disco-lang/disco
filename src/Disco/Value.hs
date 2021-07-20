@@ -58,15 +58,14 @@ import           Disco.Context
 import           Disco.Error
 import           Disco.Types
 
-import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
+import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Reader
-import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
 
 ------------------------------------------------------------
@@ -79,7 +78,7 @@ debug :: Member (Output Debug) r => String -> Sem r ()
 debug = output . Debug
 
 -- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error IErr, State Memory, Counter, Random, LFresh, Output Debug]
+type EvalEffects = [Reader Env, Fail, Error IErr, Store Cell, Random, LFresh, Output Debug]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
 

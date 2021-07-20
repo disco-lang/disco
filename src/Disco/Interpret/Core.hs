@@ -64,13 +64,11 @@ import           Control.Monad                           (filterM, (>=>))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
 import           Data.Coerce                             (coerce)
-import           Data.IntMap.Lazy                        ((!))
-import qualified Data.IntMap.Lazy                        as IntMap
 import qualified Data.Map                                as M
 import           Data.Ratio
 
-import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
+import           Disco.Effects.Store
 import           Polysemy                                hiding (Embed)
 import           Polysemy.Error
 import           Polysemy.Output
@@ -116,12 +114,12 @@ import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
 loadDefs
-  :: Members '[Reader Env, Counter, State Memory, State TopInfo, Output Debug] r
+  :: Members '[Reader Env, Store Cell, State TopInfo, Output Debug] r
   => Ctx Core Core -> Sem r ()
 loadDefs cenv = do
 
   -- Clear out any leftover memory.
-  put @Memory IntMap.empty
+  clearStore
 
   -- Take the environment mapping names to definitions, and turn
   -- each one into an indirection to a thunk stored in memory.
@@ -135,7 +133,7 @@ loadDefs cenv = do
   -- For now we know that the only things we have stored in memory
   -- are the thunks we just made, so just iterate through them and
   -- replace their environments.
-  modify @Memory $ IntMap.map (replaceThunkEnv env)
+  mapStore (replaceThunkEnv env)
 
   -- Finally, set the top-level environment to the one we just
   -- created.
@@ -243,16 +241,14 @@ whnfV v                     = return v
 whnfIndir :: Members EvalEffects r => Loc -> Sem r Value
 whnfIndir loc = do
   debug $ "whnfIndir " ++ show loc
-  m <- get @Memory                   -- Get the memory map
-  let c = m ! loc                   -- Look up the given location and reduce it to WHNF
+  Just c <- lookupStore loc
   case c of
-    Cell v True  -> return v        -- Already evaluated, just return it
+    Cell v True  -> return v          -- Already evaluated, just return it
     Cell v False -> do
-      v' <- whnfV v                         -- Needs to be reduced
+      v' <- whnfV v                   -- Needs to be reduced
       debug $ "  -> " ++ show v'
-      modify @Memory
-        $ IntMap.insert loc (Cell v' True)  -- Update memory with the reduced value
-      return v'                             -- Finally, return the value.
+      insertStore loc (Cell v' True)  -- Update memory with the reduced value
+      return v'                       -- Finally, return the value.
 
 
 -- | Reduce a list to WHNF.  Note that in the case of a cons, this

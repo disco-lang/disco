@@ -56,9 +56,9 @@ import           Text.Megaparsec                  hiding (State, runParser)
 import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
                                                    string2Name)
 
-import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
+import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Error                   (Error, mapError)
 import           Polysemy.Input
@@ -239,7 +239,7 @@ importCmd = REPLCommand
   }
 
 handleImport
-  :: Members '[Error IErr, State TopInfo, Reader Env, Counter, State Memory, Output String, Output Debug, Embed IO] r
+  :: Members '[Error IErr, State TopInfo, Reader Env, Store Cell, Output String, Output Debug, Embed IO] r
   => REPLExpr 'CImport -> Sem r ()
 handleImport (Import modName) = do
   mi <- loadDiscoModule FromCwdOrStdlib modName
@@ -257,7 +257,7 @@ letCmd = REPLCommand
   , parser = letParser
   }
 
-handleLet :: Members '[Error IErr, State TopInfo, State Memory, Counter, Reader Env, Output String, Output Debug] r => REPLExpr 'CLet -> Sem r ()
+handleLet :: Members '[Error IErr, State TopInfo, Store Cell, Reader Env, Output String, Output Debug] r => REPLExpr 'CLet -> Sem r ()
 handleLet (Let x t) = do
   (at, sig) <- inputToState . typecheckDisco $ inferTop t
   let c = compileTerm at
@@ -508,7 +508,7 @@ memCmd = REPLCommand
   , parser = return Mem
   }
 
-handleMem :: Members '[State Memory, Output String] r => REPLExpr 'CMem -> Sem r ()
+handleMem :: Members '[Store Cell, Output String] r => REPLExpr 'CMem -> Sem r ()
 handleMem Mem = showMemory
 
 ------------------------------------------
@@ -525,7 +525,7 @@ loadFile file = do
     Left e  -> fileNotFound file e >> return Nothing
     Right s -> return (Just s)
 
-addModule :: Members '[State TopInfo, Reader Env, Counter, State Memory, Error IErr, Output Debug] r => ModuleInfo -> Sem r ()
+addModule :: Members '[State TopInfo, Reader Env, Store Cell, Error IErr, Output Debug] r => ModuleInfo -> Sem r ()
 addModule mi = do
   curMI <- gets @TopInfo (view topModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
@@ -534,12 +534,12 @@ addModule mi = do
 -- | Add information from ModuleInfo to the Disco monad. This includes updating the
 --   Disco monad with new term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
-setLoadedModule :: Members '[State TopInfo, Reader Env, Counter, State Memory, Output Debug] r => ModuleInfo -> Sem r ()
+setLoadedModule :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r => ModuleInfo -> Sem r ()
 setLoadedModule mi = do
   modify @TopInfo $ topModInfo .~ mi
   populateCurrentModuleInfo
 
-populateCurrentModuleInfo :: Members '[State TopInfo, Reader Env, Counter, State Memory, Output Debug] r => Sem r ()
+populateCurrentModuleInfo :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds <- gets @TopInfo (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds

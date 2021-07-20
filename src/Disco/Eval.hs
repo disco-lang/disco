@@ -68,9 +68,9 @@ module Disco.Eval
        )
        where
 
-import           Disco.Effects.Counter
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
+import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Error
@@ -83,7 +83,6 @@ import           Polysemy.State
 import           Control.Monad                    (forM_, void, when)
 import           Control.Monad.IO.Class           (liftIO)
 import           Data.Bifunctor
-import qualified Data.IntMap                      as IntMap
 import           Data.IntSet                      (IntSet)
 import qualified Data.IntSet                      as IntSet
 import qualified Data.Map                         as M
@@ -203,8 +202,7 @@ runDisco
   . ignoreOutput @Debug   -- non-debugging mode
   . runLFresh
   . runRandomIO
-  . runCounter
-  . stateToIO IntMap.empty
+  . runStore
   . outputErrors
   . failToError Panic
   . runReader emptyCtx
@@ -242,17 +240,16 @@ withTopEnv m = do
 
 -- | Allocate a new memory cell for the given value, and return its
 --   'Loc'.
-allocate :: Members '[Counter, State Memory, Output Debug] r => Value -> Sem r Loc
+allocate :: Members '[Store Cell, Output Debug] r => Value -> Sem r Loc
 allocate v = do
-  loc <- next
+  loc <- new (mkCell v)
   debug $ "allocating " ++ show v ++ " at location " ++ show loc
-  modify $ IntMap.insert loc (mkCell v)
   return loc
 
 -- | Turn a value into a "simple" value which takes up a constant
 --   amount of space: some are OK as they are; for others, we turn
 --   them into an indirection and allocate a new memory cell for them.
-mkSimple :: Members '[Counter, State Memory, Output Debug] r => Value -> Sem r Value
+mkSimple :: Members '[Store Cell, Output Debug] r => Value -> Sem r Value
 mkSimple v@VNum{}         = return v
 mkSimple v@VUnit{}        = return v
 mkSimple v@(VInj _ VUnit) = return v
@@ -281,7 +278,7 @@ delay' vs imv = do
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkValue :: Members '[Reader Env, Counter, State Memory, Output Debug] r => Core -> Sem r Value
+mkValue :: Members '[Reader Env, Store Cell, Output Debug] r => Core -> Sem r Value
 mkValue (CConst op)   = return $ VConst op
 mkValue CUnit         = return VUnit
 mkValue (CInj s v)    = VInj s <$> mkValue v
@@ -292,21 +289,20 @@ mkValue c             = VIndir <$> (allocate . VThunk c =<< getEnv)
 
 -- | Deallocate any memory cells which are no longer referred to by
 --   any top-level binding.
-garbageCollect :: Members '[State TopInfo, State Memory] r => Sem r ()
+garbageCollect :: Members '[State TopInfo, Store Cell] r => Sem r ()
 garbageCollect = do
   env  <- gets @TopInfo (view topEnv)
   keep <- getReachable env
-  modify @Memory $ \mem ->
-    IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep)
+  keepKeys keep
 
 -- | Get the set of memory locations reachable from a set of values.
-getReachable :: (Reachable v, Members '[State Memory] r) => v -> Sem r IntSet
+getReachable :: (Reachable v, Members '[Store Cell] r) => v -> Sem r IntSet
 getReachable = execState IntSet.empty . reachable
 
 class Reachable v where
   -- | @reachable v@ marks the memory locations reachable from the
   --   values stored in @v@.
-  reachable :: Members '[State Memory, State IntSet] r => v -> Sem r ()
+  reachable :: Members '[Store Cell, State IntSet] r => v -> Sem r ()
 
 instance Reachable Value where
   reachable (VInj _ v)      = reachable v
@@ -344,13 +340,13 @@ instance Reachable Loc where
       True -> return ()
       False -> do
         modify $ IntSet.insert l
-        mem <- get @Memory
-        case IntMap.lookup l mem of
+        mc <- lookupStore l
+        case mc of
           Nothing         -> return ()
           Just (Cell v _) -> reachable v
 
-showMemory :: Members '[State Memory, Output String] r => Sem r ()
-showMemory = get >>= (mapM_ showCell . IntMap.assocs)
+showMemory :: Members '[Store Cell, Output String] r => Sem r ()
+showMemory = assocsStore >>= mapM_ showCell
   where
     showCell :: Member (Output String) r => (Int, Cell) -> Sem r ()
     showCell (i, Cell v b) = output $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)

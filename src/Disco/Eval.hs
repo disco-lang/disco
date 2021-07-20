@@ -32,7 +32,7 @@ module Disco.Eval
 
          -- * Memory
 
-         Cell(..), mkCell, Loc, Memory, showMemory, garbageCollect
+         Cell(..), mkCell, Loc, showMemory, garbageCollect
        , withTopEnv
 
          -- * Errors

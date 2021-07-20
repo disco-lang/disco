@@ -32,9 +32,9 @@ module Disco.Value
 
   , Env, extendEnv, extendsEnv, getEnv, withEnv
 
-  -- * Memory
+  -- * Memory store
 
-  , Cell(..), mkCell, Loc, Memory
+  , Cell(..), mkCell, Loc
 
   -- * Evaluation effects
 
@@ -44,7 +44,6 @@ module Disco.Value
 
   ) where
 
-import           Data.IntMap.Lazy                 (IntMap)
 import           Data.IntSet                      (IntSet)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
@@ -81,8 +80,6 @@ debug = output . Debug
 type EvalEffects = [Reader Env, Fail, Error IErr, Store Cell, Random, LFresh, Output Debug]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
-
-  -- XXX combine State Memory and Counter into a Memory effect?
 
   -- XXX add some kind of proper logging effect(s)
     -- With tags so we can filter on log messages we want??
@@ -356,7 +353,3 @@ mkCell v = Cell v False
 
 -- | A location in memory is represented by an @Int@.
 type Loc = Int
-
--- | Memory is a collection of cells indexed by location.
-type Memory = IntMap Cell
-

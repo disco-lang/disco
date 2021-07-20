@@ -17,7 +17,6 @@ module Disco.Interactive.Eval where
 
 import           Control.Lens               (view)
 import           Control.Monad.Except
-import qualified Data.IntMap                as IM
 
 import           Disco.AST.Generic          (selectSide)
 import           Disco.Eval
@@ -26,6 +25,7 @@ import           Disco.Interactive.Parser   (parseLine)
 import           Disco.Value
 
 import           Disco.Effects.Output
+import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Input
@@ -50,14 +50,14 @@ showVal _ VProp{}     = "<prop>"
 showVal _ VGraph{}    = "<graph>"
 showVal _ VMap{}      = "<map>"
 
-printMem :: Members '[Input TopInfo, State Memory, Output String] r => Sem r ()
+printMem :: Members '[Input TopInfo, Store Cell, Output String] r => Sem r ()
 printMem = do
   env <- inputs (view topEnv)
-  mem <- get @Memory
 
   printout env
 
-  forM_ (IM.assocs mem) $ \(k, Cell v _) ->
+  as <- assocsStore
+  forM_ as $ \(k, Cell v _) ->
     outputLn $ show k ++ ": " ++ showVal 3 v
 
 handleCMD :: Members DiscoEffects r => String -> Sem r ()

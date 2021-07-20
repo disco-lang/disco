@@ -289,7 +289,6 @@ library
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
                        Disco.Extensions
-                       Disco.Capability
                        Disco.Effects.Counter
                        Disco.Effects.Fresh
                        Disco.Effects.LFresh
@@ -336,18 +335,6 @@ library
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
 
-  other-extensions:
-                       GADTs
-                       RankNTypes
-                       TypeFamilies
-                       ViewPatterns
-                       FlexibleContexts
-                       FlexibleInstances
-                       MultiParamTypeClasses
-                       NondecreasingIndentation
-                       TemplateHaskell
-                       UndecidableInstances
-
   build-depends:       base >=4.8 && <4.16,
                        filepath,
                        directory,
@@ -359,7 +346,6 @@ library
                        transformers >= 0.4 && < 0.6,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       capability >= 0.4 && < 0.5,
                        polysemy >= 1.6.0.0 && < 1.7,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.8,

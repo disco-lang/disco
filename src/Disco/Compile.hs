@@ -1,4 +1,3 @@
-{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE ViewPatterns  #-}
 

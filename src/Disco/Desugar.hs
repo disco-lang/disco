@@ -1,12 +1,5 @@
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE FlexibleInstances        #-}
-{-# LANGUAGE GADTs                    #-}
-{-# LANGUAGE LambdaCase               #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
-{-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections            #-}
-{-# LANGUAGE UndecidableInstances     #-}
-{-# LANGUAGE ViewPatterns             #-}
+{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE ViewPatterns  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,8 +9,8 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Desugaring the typechecked surface language to the untyped core
--- language.
+-- Desugaring the typechecked surface language to a (still typed)
+-- simpler language.
 --
 -----------------------------------------------------------------------------
 

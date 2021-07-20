@@ -1,5 +1,4 @@
 {-# LANGUAGE BlockArguments             #-}
-{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell            #-}
 
@@ -11,8 +10,8 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Polysemy effect for local fresh name generation, via the
--- unbound-generics library.
+-- Polysemy effect for local fresh name generation, compatible with
+-- the unbound-generics library.
 --
 -----------------------------------------------------------------------------
 
@@ -35,6 +34,8 @@ data LFresh m a where
 
 makeSem ''LFresh
 
+-- | Dispatch an 'LFresh' effect via a 'Reader' effect to keep track
+--   of a set of in-scope names.
 runLFresh :: Sem (LFresh ': r) a -> Sem r a
 runLFresh = runReader S.empty . runLFresh'
 
@@ -81,7 +82,13 @@ runLFresh'
 --------------------------------------------------
 -- Other functions
 
-lunbind :: (Member LFresh r, U.Alpha p, U.Alpha t) => U.Bind p t -> ((p,t) -> Sem r c) -> Sem r c
+-- | Open a binder, automatically freshening the names of the bound
+--   variables, and providing the opened pattern and term to the
+--   provided continuation.  The bound variables are also added to the
+--   set of in-scope variables within in the continuation.
+lunbind
+  :: (Member LFresh r, U.Alpha p, U.Alpha t)
+  => U.Bind p t -> ((p,t) -> Sem r c) -> Sem r c
 lunbind b k = absorbLFresh (U.lunbind b k)
 
 ------------------------------------------------------------
@@ -117,7 +124,8 @@ instance ( Monad m
 
 ----------------------------------------------------------------------
 -- Old code I don't want to delete because I spent so much time
--- banging my head against it
+-- banging my head against it.  It wasn't wasted, though, since I used
+-- some of my hard-earned knowledge to write runLFresh' above.
 
 -- -- | Dispatch the local fresh name generation effect in an effect stack
 -- --   containing the 'LFreshM' monad from @unbound-generics@.

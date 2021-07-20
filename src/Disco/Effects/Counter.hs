@@ -1,5 +1,4 @@
 {-# LANGUAGE BlockArguments  #-}
-{-# LANGUAGE GADTs           #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
@@ -19,20 +18,24 @@ module Disco.Effects.Counter where
 import           Polysemy
 import           Polysemy.State
 
--- | Counter effect.
 data Counter m a where
-  -- | Return the next available int.
-  Next  :: Counter m Int
+
+  -- | Return the next integer in sequence.
+  Next  :: Counter m Integer
 
 makeSem ''Counter
 
--- | Dispatch a counter effect, starting the counter from zero.
-runCounter :: Sem (Counter ': r) a -> Sem r a
-runCounter
-  = evalState (0 :: Int)
+-- | Dispatch a counter effect, starting the counter from the given
+--   Integer.
+runCounter' :: Integer -> Sem (Counter ': r) a -> Sem r a
+runCounter' i
+  = evalState i
   . reinterpret \case
       Next -> do
         n <- get
         put (n+1)
         return n
 
+-- | Dispatch a counter effect, starting the counter from zero.
+runCounter :: Sem (Counter ': r) a -> Sem r a
+runCounter = runCounter' 0

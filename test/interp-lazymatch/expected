@@ -1,7 +1,7 @@
-NonExhaustive
+EvalErr NonExhaustive
 2
 2
-DivByZero
+EvalErr DivByZero
 Loading bomb.disco...
 Loaded.
 2

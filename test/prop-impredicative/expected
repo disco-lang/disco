@@ -1,6 +1,6 @@
 Loading prop-impredicative.disco...
 Loaded.
-NoSearch (TyAtom (ABase P))
-NoSearch (TyAtom (ABase P))
-NoSearch (TyCon CArr [TyAtom (ABase N),TyAtom (ABase P)])
-NoSearch (TyCon CArr [TyCon (CContainer (ABase CtrList)) [TyAtom (ABase P)],TyAtom (ABase N)])
+TypeCheckErr (NoSearch (TyAtom (ABase P)))
+TypeCheckErr (NoSearch (TyAtom (ABase P)))
+TypeCheckErr (NoSearch (TyCon CArr [TyAtom (ABase N),TyAtom (ABase P)]))
+TypeCheckErr (NoSearch (TyCon CArr [TyCon (CContainer (ABase CtrList)) [TyAtom (ABase P)],TyAtom (ABase N)]))

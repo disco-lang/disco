@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Operators

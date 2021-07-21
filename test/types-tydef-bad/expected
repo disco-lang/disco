@@ -1,2 +1,2 @@
 Loading types-tydef-bad.disco...
-NotTyDef "Flerb"
+TypeCheckErr (NotTyDef "Flerb")

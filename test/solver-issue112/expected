@@ -1,3 +1,3 @@
 Loading diag-iso-bad.disco...
-Unsolvable NoUnify
-Unsolvable NoUnify
+TypeCheckErr (Unsolvable NoUnify)
+TypeCheckErr (Unsolvable NoUnify)

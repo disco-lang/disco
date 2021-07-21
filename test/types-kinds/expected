@@ -1,5 +1,5 @@
-TooManyArgs (CContainer (ABase CtrList))
-TooManyArgs (CContainer (ABase CtrList))
-Unsolvable NoWeakUnifier
-TooManyArgs (CContainer (ABase CtrList))
-TooManyArgs (CContainer (ABase CtrList))
+TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
+TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
+TypeCheckErr (Unsolvable NoWeakUnifier)
+TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
+TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))

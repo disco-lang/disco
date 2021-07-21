@@ -1,22 +1,5 @@
-{-# OPTIONS_GHC -fno-warn-orphans     #-}
-  -- For MonadFail instance; see below.
-
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DeriveTraversable          #-}
-{-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE FlexibleInstances          #-}
-{-# LANGUAGE GADTs                      #-}
-{-# LANGUAGE GeneralisedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE TypeInType                 #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,116 +9,109 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- The top-level Disco monad and associated capabilities.
+-- Top-level evaluation utilities.
 --
 -----------------------------------------------------------------------------
 
 module Disco.Eval
        (
+         -- * Effects
+
+         DiscoEffects
+
+         -- * Top-level info record and associated lenses
+
+       , TopInfo
+       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs, extSet, lastFile
 
          -- * Memory
 
-         Cell(..), mkCell, Loc, Memory, showMemory, garbageCollect
-       , withTopEnv
-
-         -- * Errors
-
-       , IErr(..)
-
-         -- * Disco monad state
-
-       , DiscoState(..), initDiscoState
-
-         -- * Lenses for top-level info record
-
-       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs
-
-         -- * Disco monad
-
-       , Disco, MonadDisco, runDisco
-
-         -- ** Messages
-       , emitMessage, info, warning, err, panic, debug
-       , catchAsMessage, catchAndPrintErrors
-
-         -- ** Memory/environment utilities
+       , Cell(..), mkCell, Loc, showMemory, garbageCollect
        , allocate, delay, delay', mkValue, mkSimple
 
-         -- ** Top level phases
-       , adaptError
+         -- * Running things
+
+       , runDisco
+       , runTCM, runTCMWith
+       , withTopEnv
        , parseDiscoModule
        , typecheckDisco
+
+         -- * Loading modules
+
        , loadDiscoModule
+       , loadFile
+       , addModule
+       , setLoadedModule
+       , populateCurrentModuleInfo
+       , loadDefs
 
        )
        where
 
-import           Capability.Error
-import           Capability.Reader
-import           Capability.Sink                  (HasSink)
-import           Capability.Source
-import           Capability.State
-import           Capability.Writer
-import           Control.Monad                    (forM_, when)
-import qualified Control.Monad.Catch              as CMC
-import qualified Control.Monad.Fail               as Fail
-import           Control.Monad.IO.Class           (MonadIO, liftIO)
-import           Control.Monad.Reader             (ReaderT (..))
-import qualified Control.Monad.Reader             as CMR
-import           Data.IORef                       (IORef, newIORef)
-import           Data.IntMap.Lazy                 (IntMap)
-import qualified Data.IntMap.Lazy                 as IntMap
-import           Data.IntSet                      (IntSet)
-import qualified Data.IntSet                      as IntSet
-import qualified Data.Map                         as M
-import qualified Data.Sequence                    as Seq
-import qualified Data.Set                         as S
-import           GHC.Generics                     (Generic)
-import           System.FilePath                  ((-<.>))
+import           Control.Exception        (SomeException, handle)
+import           Control.Lens             (makeLenses, view, (.~))
+import           Control.Monad            (forM_, void, when)
+import           Control.Monad.IO.Class   (liftIO)
+import           Data.Bifunctor
+import           Data.Coerce
+import           Data.IntSet              (IntSet)
+import qualified Data.IntSet              as IntSet
+import qualified Data.Map                 as M
+import qualified Data.Set                 as S
+import           System.FilePath          ((-<.>))
 import           Text.Printf
 
-import           Control.Lens                     (makeLenses, view)
-import           Text.Megaparsec                  hiding (runParser)
-import           Unbound.Generics.LocallyNameless
+import qualified System.Console.Haskeline as H
+
+import           Disco.Effects.Error
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.Embed
+import           Polysemy.Fail
+import           Polysemy.Random
+import           Polysemy.Reader
+import           Polysemy.State
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Capability
+import           Disco.Compile
 import           Disco.Context
+import           Disco.Effects.Fresh
 import           Disco.Error
 import           Disco.Extensions
-import           Disco.Messages
 import           Disco.Module
 import           Disco.Parser
-import           Disco.Typecheck                  (checkModule)
+import           Disco.Typecheck          (checkModule)
 import           Disco.Typecheck.Monad
 import           Disco.Types
-import           Disco.Util
 import           Disco.Value
 
 ------------------------------------------------------------
--- Memory cells
+-- Top-level effects
 ------------------------------------------------------------
 
--- | A memory cell holds a value, along with a flag recording whether
---   the value has been reduced to WHNF.
-data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
-  deriving (Show)
+-- | Append two effect rows.
+type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
+  AppendEffects '[] s = s
+  AppendEffects (e ': r) s = e ': AppendEffects r s
+  -- Didn't seem like this already existed in @polysemy@, though I
+  -- might have missed it.  Of course we could also use a polymorphic
+  -- version from somewhere --- it is just type-level list append.
+  -- However, just manually implementing it here seems easier.
 
--- | Create a memory cell from a value, with the WHNF flag initially
---   set to false.
-mkCell :: Value -> Cell
-mkCell v = Cell v False
+-- | Effects needed at the top level.
+type TopEffects = '[Error DiscoError, Input TopInfo, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
 
--- | A location in memory is represented by an @Int@.
-type Loc = Int
-
--- | Memory is a collection of cells indexed by location.
-type Memory = IntMap Cell
+-- | All effects needed for the top level + interpretation.
+type DiscoEffects = AppendEffects EvalEffects TopEffects
 
 ------------------------------------------------------------
--- Disco monad state
+-- Top level info record
 ------------------------------------------------------------
 
 -- | A record of information about the current top-level environment.
@@ -162,8 +138,13 @@ data TopInfo = TopInfo
 
   , _topDocs    :: Ctx Term Docs
     -- ^ Top-level documentation.
+
+  , _extSet     :: ExtSet
+    -- ^ Currently enabled language extensions.
+
+  , _lastFile   :: Maybe FilePath
+    -- ^ The most recent file which was :loaded by the user.
   }
-  deriving (Generic)
 
 -- | The initial (empty) record of top-level info.
 initTopInfo :: TopInfo
@@ -174,200 +155,42 @@ initTopInfo = TopInfo
   , _topTyDefs  = M.empty
   , _topDocs    = emptyCtx
   , _topEnv     = emptyCtx
+  , _extSet     = defaultExts
+  , _lastFile   = Nothing
   }
 
--- | The various pieces of state tracked by the 'Disco' monad.
-data DiscoState = DiscoState
-  { topInfo     :: IORef TopInfo
-    -- ^ Information about the current top-level environment
-    --   (definitions, types, documentation, etc.).
-
-  , localEnv    :: Env
-    -- ^ Local environment used during evaluation of expressions.
-
-  , memory      :: IORef Memory
-    -- ^ A memory is a mapping from "locations" (uniquely generated
-    --   identifiers) to values, along with a flag saying whether the
-    --   value has been evaluated yet.  It also keeps track of the
-    --   next unused location.  We keep track of a memory during
-    --   evaluation, and can create new memory locations to store
-    --   things that should only be evaluated once.
-
-  , nextLoc     :: IORef Loc
-    -- ^ The next available (unused) memory location.
-
-  , messageLog  :: IORef (MessageLog IErr)
-    -- ^ A stream of messages generated by the system.
-
-  , lastFile    :: IORef (Maybe FilePath)
-    -- ^ The most recent file which was :loaded by the user.
-
-  , enabledExts :: IORef ExtSet
-    -- ^ The set of language extensions currently enabled in the REPL.
-    --   Note this affects only expressions entered at the REPL
-    --   prompt, not modules loaded into the REPL; each module
-    --   specifies its own extensions.
-  }
-  deriving (Generic)
-
--- | The initial state for the @Disco@ monad.
-initDiscoState :: IO DiscoState
-initDiscoState = do
-  topInfoRef    <- newIORef initTopInfo
-  memoryRef     <- newIORef IntMap.empty
-  nextLocRef    <- newIORef 0
-  messageLogRef <- newIORef emptyMessageLog
-  lastFileRef   <- newIORef Nothing
-  extsRef       <- newIORef defaultExts
-  return $ DiscoState
-    { topInfo       = topInfoRef
-    , localEnv      = emptyCtx
-    , memory        = memoryRef
-    , nextLoc       = nextLocRef
-    , messageLog    = messageLogRef
-    , lastFile      = lastFileRef
-    , enabledExts   = extsRef
-    }
-
-------------------------------------------------------------
--- Disco monad
-------------------------------------------------------------
-
--- | We concretely use a monad based on the ReaderT IO design pattern
---   (https://www.fpcomplete.com/blog/2017/06/readert-design-pattern/).
-type DiscoM = ReaderT DiscoState (LFreshMT IO)
-
--- | The main concrete Disco monad, together with a bunch of
---   associated capabilities it provides, using the capability library
---   (https://hackage.haskell.org/package/capability).
-newtype Disco a = Disco { unDisco :: DiscoM a }
-  deriving newtype (Functor, Applicative, Monad, LFresh, MonadIO, CMR.MonadReader DiscoState, MonadFail, CMC.MonadThrow, CMC.MonadCatch, CMC.MonadMask)
-
-  -- Top-level info record state
-  deriving (HasState "top" TopInfo, HasSource "top" TopInfo, HasSink "top" TopInfo) via
-    (ReaderIORef
-    (Rename "topInfo"
-    (Field "topInfo" ()
-    (MonadReader DiscoM))))
-
-  -- Environment reader (for tracking local bindings during evaluation)
-  deriving (HasReader "env" Env, HasSource "env" Env) via
-    (Rename "localEnv"
-    (Field "localEnv" ()
-    (MonadReader DiscoM)))
-
-  -- Throwing & catching errors
-  deriving (HasThrow "err" IErr, HasCatch "err" IErr) via
-    (SafeExceptions IErr DiscoM)
-
-  -- Message log
-  deriving (HasWriter "msg" (MessageLog IErr), HasSink "msg" (MessageLog IErr)) via
-    (WriterLog
-    (ReaderIORef
-    (Rename "messageLog"
-    (Field "messageLog" ()
-    (MonadReader DiscoM)))))
-
-  -- Read/write memory
-  deriving (HasState "mem" Memory, HasSource "mem" Memory, HasSink "mem" Memory) via
-    (ReaderIORef
-    (Rename "memory"
-    (Field "memory" ()
-    (MonadReader DiscoM))))
-
-  -- Next free memory location
-  deriving (HasSource "nextloc" Loc) via
-    (Counter
-    (ReaderIORef
-    (Rename "nextLoc"
-    (Field "nextLoc" ()
-    (MonadReader DiscoM)))))
-
-  -- Enabled extensions
-  deriving (HasState "exts" ExtSet, HasSource "exts" ExtSet, HasSink "exts" ExtSet) via
-    (ReaderIORef
-    (Rename "enabledExts"
-    (Field "enabledExts" ()
-    (MonadReader DiscoM))))
-
-  -- Last file loaded in the REPL
-  deriving (HasState "lastfile" (Maybe FilePath), HasSource "lastfile" (Maybe FilePath), HasSink "lastfile" (Maybe FilePath)) via
-    (ReaderIORef
-    (Rename "lastFile"
-    (Field "lastFile" ()
-    (MonadReader DiscoM))))
-
-newtype Counter m a = Counter (m a)
-  deriving newtype (Functor, Applicative, Monad, MonadIO)
-
-instance (Monad m, HasState tag Loc m) => HasSource (tag :: k) Loc (Counter m) where
-  await_ tag = Counter $ state_ tag $ \i -> (i,i+1)
-
-type instance TypeOf _ "err"      = IErr
-type instance TypeOf _ "msg"      = MessageLog IErr
-type instance TypeOf _ "mem"      = Memory
-type instance TypeOf _ "nextloc"  = Loc
-type instance TypeOf _ "top"      = TopInfo
-type instance TypeOf _ "exts"     = ExtSet
-type instance TypeOf _ "lastfile" = Maybe FilePath
-
-------------------------------------------------------------
--- Some needed instances.
-
--- This was introduced in unbound-generics-0.4.1.  Once we start
--- building with that version, this orphan instance can be removed
--- (and we can also remove the -fno-warn-orphans flag).
-instance MonadFail m => MonadFail (LFreshMT m) where
-  fail = LFreshMT . Fail.fail
+makeLenses ''TopInfo
 
 ------------------------------------------------------------
 -- Running top-level Disco computations
 ------------------------------------------------------------
 
--- | Run a computation in the @Disco@ monad, starting in the empty
---   environment.
-runDisco :: Disco a -> IO (Either IErr a)
-runDisco d = do
-  s <- initDiscoState
-  flip CMC.catch (return . Left)
-    . fmap Right
-    . runLFreshMT
-    . flip CMR.runReaderT s
-    . unDisco
-    $ d
+-- | Settings for running the 'InputT' monad from @haskeline@.  Just
+--   uses the defaults and sets the history file to @.disco_history@.
+inputSettings :: H.Settings IO
+inputSettings = H.defaultSettings
+  { H.historyFile = Just ".disco_history" }
 
-------------------------------------------------------------
--- Lenses
-------------------------------------------------------------
-
-makeLenses ''TopInfo
-
-------------------------------------------------------------
--- Messages
-------------------------------------------------------------
-
-emitMessage :: Has '[Wr "msg"] m => MessageLevel -> MessageBody IErr -> m ()
-emitMessage lev body = tell @"msg" $ Seq.singleton (Message lev body)
-
-info, warning, err, panic, debug :: Has '[Wr "msg"] m => MessageBody IErr -> m ()
-info    = emitMessage Info
-warning = emitMessage Warning
-err     = emitMessage Error
-panic   = emitMessage Panic
-debug   = emitMessage Debug
-
--- | Run a @Disco@ computation; if it throws an exception, catch it
---   and turn it into a message.
-catchAsMessage :: Has '[Ct "err", Wr "msg"] m => m () -> m ()
-catchAsMessage m = catch @"err" m (err . Item)
-
--- XXX eventually we should get rid of this and replace with catchAsMessage
-catchAndPrintErrors :: Has '[Ct "err", MonadIO] m => a -> m a -> m a
-catchAndPrintErrors a m = catch @"err" m (\e -> handler e >> return a)
-  where
-    handler (ParseErr e)     = iputStrLn $ errorBundlePretty e
-    handler (TypeCheckErr e) = iprint e
-    handler e                = iprint e
+-- | Run a top-level computation.
+runDisco :: (forall r. Members DiscoEffects r => Sem r ()) -> IO ()
+runDisco
+  = void
+  . H.runInputT inputSettings
+  . runFinal @(H.InputT IO)
+  . embedToFinal
+  . runEmbedded @_ @(H.InputT IO) liftIO
+  . runOutputSem (embed . putStr)  -- Handle Output String via printing to console
+  . stateToIO initTopInfo    -- Run State TopInfo via an IORef
+  . inputToState             -- Dispatch Input TopInfo effect via State effect
+  . outputErrors             -- For now, just output top-level errors
+  -- . runOutputSem (embed . putStrLn . unDebug)   -- debugging mode
+  . ignoreOutput @Debug      -- non-debugging mode: ignore Debug output
+  . runLFresh                -- Generate locally fresh names
+  . runRandomIO              -- Generate randomness via IO
+  . runStore                 -- Keep track of current memory store
+  . mapError EvalErr         -- Embed runtime errors into top-level error type
+  . failToError Panic        -- Turn pattern-match failures into a Panic error
+  . runReader emptyCtx       -- Keep track of current Env
 
 ------------------------------------------------------------
 -- Memory/environment utilities
@@ -376,24 +199,23 @@ catchAndPrintErrors a m = catch @"err" m (\e -> handler e >> return a)
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
-withTopEnv :: Has '[Rd "env", St "top"] m => m a -> m a
+withTopEnv :: Member (Input TopInfo) r => Sem (Reader Env ': r) a -> Sem r a
 withTopEnv m = do
-  env <- gets @"top" (view topEnv)
-  withEnv env m
+  e <- inputs (view topEnv)
+  runReader e m
 
 -- | Allocate a new memory cell for the given value, and return its
---   'Loc'.
-allocate :: Has '[Sc "nextloc", St "mem"] m => Value -> m Loc
+--   location.
+allocate :: Members '[Store Cell, Output Debug] r => Value -> Sem r Loc
 allocate v = do
-  loc <- await @"nextloc"
-  -- io $ putStrLn $ "allocating " ++ show v ++ " at location " ++ show loc
-  modify @"mem" $ IntMap.insert loc (mkCell v)
+  loc <- new (mkCell v)
+  debug $ "allocating " ++ show v ++ " at location " ++ show loc
   return loc
 
 -- | Turn a value into a "simple" value which takes up a constant
 --   amount of space: some are OK as they are; for others, we turn
 --   them into an indirection and allocate a new memory cell for them.
-mkSimple :: Has '[Sc "nextloc", St "mem"] m => Value -> m Value
+mkSimple :: Members '[Store Cell, Output Debug] r => Value -> Sem r Value
 mkSimple v@VNum{}         = return v
 mkSimple v@VUnit{}        = return v
 mkSimple v@(VInj _ VUnit) = return v
@@ -403,15 +225,15 @@ mkSimple v@VType{}        = return v
 mkSimple v@VIndir{}       = return v
 mkSimple v                = VIndir <$> allocate v
 
--- | Delay a @Disco Value@ computation by packaging it into a
---   @VDelay@ constructor along with the current environment.
-delay :: MonadDisco m => (forall m'. MonadDisco m' => m' Value) -> m Value
+-- | Delay a computation by packaging it into a @VDelay@ constructor
+--   along with the current environment.
+delay :: Members EvalEffects r => (forall r'. Members EvalEffects r' => Sem r' Value) -> Sem r Value
 delay = delay' []
 
 -- | Like 'delay', but also specify a set of values which will be
 --   needed during the delayed computation, to prevent any memory
 --   referenced by the values from being garbage collected.
-delay' :: MonadDisco m => [Value] -> (forall m'. MonadDisco m' => m' Value) -> m Value
+delay' :: Members EvalEffects r => [Value] -> (forall r'. Members EvalEffects r' => Sem r' Value) -> Sem r Value
 delay' vs imv = do
   ls <- getReachable vs
   VDelay imv ls <$> getEnv
@@ -422,7 +244,7 @@ delay' vs imv = do
 --   current environment.  The thunk is stored in a new location in
 --   memory, and the returned value consists of an indirection
 --   referring to its location.
-mkValue :: Has '[Rd "env", Sc "nextloc", St "mem"] m => Core -> m Value
+mkValue :: Members '[Reader Env, Store Cell, Output Debug] r => Core -> Sem r Value
 mkValue (CConst op)   = return $ VConst op
 mkValue CUnit         = return VUnit
 mkValue (CInj s v)    = VInj s <$> mkValue v
@@ -431,94 +253,124 @@ mkValue (CNum d r)    = return $ VNum d r
 mkValue (CType ty)    = return $ VType ty
 mkValue c             = VIndir <$> (allocate . VThunk c =<< getEnv)
 
--- | Deallocate any memory cells which are no longer referred to by
---   any top-level binding.
-garbageCollect :: Has '[St "top", St "mem", MonadIO] m => m ()
+-- | Deallocate any memory cells which are no longer recursively
+--   referenced by any top-level binding.
+garbageCollect :: Members '[State TopInfo, Store Cell] r => Sem r ()
 garbageCollect = do
-  env  <- gets @"top" (view topEnv)
+  env  <- gets @TopInfo (view topEnv)
   keep <- getReachable env
-  modify @"mem" $ \mem -> IntMap.withoutKeys mem (IntMap.keysSet mem `IntSet.difference` keep)
+  keepKeys keep
 
 -- | Get the set of memory locations reachable from a set of values.
-getReachable :: (Reachable v, Has '[St "mem", MonadIO] m) => v -> m IntSet
-getReachable v =
-  fmap snd $
-    withLocalState @_ @"reachables" @IntSet @'[St "mem"] IntSet.empty $
-      reachable v
+getReachable :: (Reachable v, Members '[Store Cell] r) => v -> Sem r IntSet
+getReachable = execState IntSet.empty . mark
 
 class Reachable v where
-  -- | @reachable v@ marks the memory locations reachable from the
-  --   values stored in @v@.
-  reachable :: Has '[St "mem", HasState "reachables" IntSet] m => v -> m ()
+  -- | @mark v@ marks the memory locations reachable from the values
+  --   stored in @v@.
+  mark :: Members '[Store Cell, State IntSet] r => v -> Sem r ()
 
 instance Reachable Value where
-  reachable (VInj _ v)      = reachable v
-  reachable (VPair v1 v2)   = reachable v1 >> reachable v2
-  reachable (VClos _ e)     = reachable e
-  reachable (VPAp v vs)     = reachable (v:vs)
-  reachable (VThunk _ e)    = reachable e
-  reachable (VIndir l)      = reachable l
-  reachable (VDelay _ ls e) = (modify @"reachables" $ IntSet.union ls) >> reachable e
-  reachable (VBag vs)       = reachable (map fst vs)
-  reachable (VProp p)       = reachable p
-  reachable (VGraph _ adj)  = reachable adj
+  mark (VInj _ v)      = mark v
+  mark (VPair v1 v2)   = mark v1 >> mark v2
+  mark (VClos _ e)     = mark e
+  mark (VPAp v vs)     = mark (v:vs)
+  mark (VThunk _ e)    = mark e
+  mark (VIndir l)      = mark l
+  mark (VDelay _ ls e) = (modify @IntSet $ IntSet.union ls) >> mark e
+  mark (VBag vs)       = mark (map fst vs)
+  mark (VProp p)       = mark p
+  mark (VGraph _ adj)  = mark adj
     -- A graph can only contain SimpleValues, which by def contain no indirection.
     -- However its buffered adjacency map can.
-  reachable (VMap m)        = reachable (M.elems m)
-  reachable _               = return ()
+  mark (VMap m)        = mark (M.elems m)
+  mark _               = return ()
 
 instance Reachable Env where
-  reachable = reachable . M.elems
+  mark = mark . M.elems
 
 instance Reachable v => Reachable [v] where
-  reachable = mapM_ reachable
+  mark = mapM_ mark
 
 instance Reachable ValProp where
-  reachable (VPDone (TestResult _ r vs)) = mapM_ reachable r >> reachable vs
-  reachable (VPSearch _ _ v vs)          = reachable v >> reachable vs
+  mark (VPDone (TestResult _ r vs)) = mapM_ mark r >> mark vs
+  mark (VPSearch _ _ v vs)          = mark v >> mark vs
 
 instance Reachable TestEnv where
-  reachable (TestEnv te) = forM_ te $ \(_, _, v) -> reachable v
+  mark (TestEnv te) = forM_ te $ \(_, _, v) -> mark v
 
 instance Reachable Loc where
-  reachable l = do
-    reach <- get @"reachables"
+  mark l = do
+    reach <- get @IntSet
     case IntSet.member l reach of
       True -> return ()
       False -> do
-        modify @"reachables" $ IntSet.insert l
-        mem <- get @"mem"
-        case IntMap.lookup l mem of
+        modify $ IntSet.insert l
+        mc <- lookupStore l
+        case mc of
           Nothing         -> return ()
-          Just (Cell v _) -> reachable v
+          Just (Cell v _) -> mark v
 
-showMemory :: Has '[St "mem", MonadIO] m => m ()
-showMemory = get @"mem" >>= (mapM_ showCell . IntMap.assocs)
+-- | Show the current contents of memory, for debugging purposes.
+showMemory :: Members '[Store Cell, Output String] r => Sem r ()
+showMemory = assocsStore >>= mapM_ showCell
   where
-    showCell :: MonadIO m => (Int, Cell) -> m ()
-    showCell (i, Cell v b) = liftIO $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
+    showCell :: Member (Output String) r => (Int, Cell) -> Sem r ()
+    showCell (i, Cell v b) = output $ printf "%3d%s %s\n" i (if b then "!" else " ") (show v)
 
 ------------------------------------------------------------
 -- High-level disco phases
 ------------------------------------------------------------
 
--- | Utility function: given an 'Either', wrap a 'Left' in the given
---   function and throw it as a 'Disco' error, or return a 'Right'.
-adaptError :: Has '[Th "err"] m => (e -> IErr) -> Either e a -> m a
-adaptError f = either (throw @"err" . f) return
+--------------------------------------------------
+-- Parsing
 
 -- | Parse a module from a file, re-throwing a parse error if it
 --   fails.
-parseDiscoModule :: Has '[Th "err", MonadIO] m => FilePath -> m Module
+parseDiscoModule :: Members '[Error DiscoError, Embed IO] r => FilePath -> Sem r Module
 parseDiscoModule file = do
-  str <- io $ readFile file
-  adaptError ParseErr $ runParser wholeModule file str
+  str <- liftIO $ readFile file
+  fromEither . first ParseErr $ runParser wholeModule file str
+
+--------------------------------------------------
+-- Type checking
+
+-- | Run a typechecking computation, providing it with local
+--   (initially empty) contexts for variable types and type
+--   definitions.
+runTCM
+  :: Member (Error DiscoError) r
+  => Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a
+  -> Sem r a
+runTCM = runTCMWith emptyCtx M.empty
+
+-- | Run a typechecking computation, providing it with local contexts
+--   (initialized to the provided arguments) for variable types and
+--   type definitions.
+runTCMWith
+  :: Member (Error DiscoError) r
+  => TyCtx -> TyDefCtx
+  -> Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a
+  -> Sem r a
+runTCMWith tyCtx tyDefCtx
+  = mapError TypeCheckErr
+  . runFresh
+  . runReader @TyDefCtx tyDefCtx
+  . runReader @TyCtx tyCtx
 
 -- | Run a typechecking computation, re-throwing a wrapped error if it
 --   fails.
-typecheckDisco :: Has '[Th "err"] m => TyCtx -> TyDefCtx -> TCM a -> m a
-typecheckDisco tyctx tydefs tcm =
-  adaptError TypeCheckErr $ evalTCM (withTyDefns tydefs . extends @"tyctx" tyctx $ tcm)
+typecheckDisco
+  :: Members '[Input TopInfo, Error DiscoError] r
+  => Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a
+  -> Sem r a
+typecheckDisco tcm = do
+  tyctx  <- inputs (view topCtx)
+  tydefs <- inputs (view topTyDefs)
+  runTCMWith tyctx tydefs tcm
+
+--------------------------------------------------
+-- Loading
 
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
@@ -526,37 +378,115 @@ typecheckDisco tyctx tydefs tcm =
 --   and then typechecking the parent module in an environment with
 --   access to this map. This is really just a depth-first search.
 --
---   If the given directory is Just, it will only load a module from
---   the specific given directory.  If it is Nothing, then it will look for
---   the module in the current directory or the standard library.
-loadDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> ModName -> m ModuleInfo
+--   The 'Resolver' argument specifies where to look for imported
+--   modules.
+loadDiscoModule :: Members '[Output String, Error DiscoError, Embed IO] r => Resolver -> ModName -> Sem r ModuleInfo
 loadDiscoModule resolver m =
-  fmap fst $
-    withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
-      loadDiscoModule' resolver S.empty m
+  evalState M.empty $ loadDiscoModule' resolver S.empty m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once.
-loadDiscoModule' ::
-  Has '[Th "err", MonadIO, HasState "modmap" (M.Map ModName ModuleInfo)] m =>
-  Resolver -> S.Set ModName -> ModName ->
-  m ModuleInfo
+loadDiscoModule'
+  :: Members '[Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
+  => Resolver -> S.Set ModName -> ModName
+  -> Sem r ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
-  when (S.member modName inProcess) (throw @"err" $ CyclicImport modName)
-  modMap <- get @"modmap"
+  when (S.member modName inProcess) (throw $ CyclicImport modName)
+  modMap <- get
   case M.lookup modName modMap of
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule resolver modName
-             >>= maybe (throw @"err" $ ModuleNotFound modName) return
-      io . putStrLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
+             >>= maybe (throw $ ModuleNotFound modName) return
+      outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm@(Module _ mns _ _) <- parseDiscoModule file
 
       -- mis only contains the module info from direct imports.
       mis <- mapM (loadDiscoModule' (withStdlib resolver) (S.insert modName inProcess)) mns
-      imports@(ModuleInfo _ _ tyctx tydefns _) <- adaptError TypeCheckErr $ combineModuleInfo mis
-      m  <- typecheckDisco tyctx tydefns (checkModule cm)
-      m' <- adaptError TypeCheckErr $ combineModuleInfo [imports, m]
-      modify @"modmap" (M.insert modName m')
+      imports@(ModuleInfo _ _ tyctx tydefns _) <- mapError TypeCheckErr $ combineModuleInfo mis
+      m  <- runTCMWith tyctx tydefns (checkModule cm)
+      m' <- mapError TypeCheckErr $ combineModuleInfo [imports, m]
+      modify (M.insert modName m')
       return m'
+
+-- | Try loading the contents of a file from the filesystem, emitting
+--   an error if it's not found.
+loadFile :: Members '[Output String, Embed IO] r => FilePath -> Sem r (Maybe String)
+loadFile file = do
+  res <- liftIO $ handle @SomeException (return . Left) (Right <$> readFile file)
+  case res of
+    Left _  -> outputLn ("File not found: " ++ file) >> return Nothing
+    Right s -> return (Just s)
+
+-- | Add things from the given module to the set of currently loaded
+--   things.
+addModule
+  :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output Debug] r
+  => ModuleInfo -> Sem r ()
+addModule mi = do
+  curMI <- gets @TopInfo (view topModInfo)
+  mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
+  setLoadedModule mi'
+
+-- | Set the given 'ModuleInfo' record as the currently loaded
+--   module. This also includes updating the top-level state with new
+--   term definitions, documentation, types, and type definitions.
+--   Replaces any previously loaded module.
+setLoadedModule
+  :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
+  => ModuleInfo -> Sem r ()
+setLoadedModule mi = do
+  modify @TopInfo $ topModInfo .~ mi
+  populateCurrentModuleInfo
+
+-- | Populate various pieces of the top-level info record (docs, type
+--   context, type and term definitions) from the 'ModuleInfo' record
+--   corresponding to the currently loaded module, and load all the
+--   definitions into the current top-level environment.
+populateCurrentModuleInfo
+  :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
+  => Sem r ()
+populateCurrentModuleInfo = do
+  ModuleInfo docs _ tys tyds tmds <- gets @TopInfo (view topModInfo)
+  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
+  modify @TopInfo $
+    (topDocs   .~ docs) .
+    (topCtx    .~ tys)  .
+    (topTyDefs .~ tyds) .
+    (topDefs   .~ tmds)
+  loadDefs cdefns
+  return ()
+
+-- | Load a top-level environment of (potentially recursive)
+--   core language definitions into memory.
+loadDefs
+  :: Members '[Reader Env, Store Cell, State TopInfo, Output Debug] r
+  => Ctx Core Core -> Sem r ()
+loadDefs cenv = do
+
+  -- Clear out any leftover memory.
+  clearStore
+
+  -- Take the environment mapping names to definitions, and turn
+  -- each one into an indirection to a thunk stored in memory.
+  env <- traverse mkValue cenv
+
+  -- Top-level definitions are allowed to be recursive, so each
+  -- one of those thunks should actually have the environment
+  -- 'env' as its environment, so all the top-level definitions
+  -- can mutually refer to each other.
+  --
+  -- For now we know that the only things we have stored in memory
+  -- are the thunks we just made, so just iterate through them and
+  -- replace their environments.
+  mapStore (replaceThunkEnv env)
+
+  -- Finally, set the top-level environment to the one we just
+  -- created.
+  modify @TopInfo (topEnv .~ env)
+
+  where
+    replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b
+    replaceThunkEnv _ c                     = c
+

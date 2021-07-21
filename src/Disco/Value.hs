@@ -1,14 +1,9 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveFoldable             #-}
-{-# LANGUAGE DeriveFunctor              #-}
+
+
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PatternSynonyms            #-}
-{-# LANGUAGE RankNTypes                 #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeFamilies               #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -36,6 +31,17 @@ module Disco.Value
   -- * Environments
 
   , Env, extendEnv, extendsEnv, getEnv, withEnv
+
+  -- * Memory store
+
+  , Cell(..), mkCell, Loc
+
+  -- * Evaluation effects
+
+  , Debug(..)
+  , debug
+  , EvalEffects
+
   ) where
 
 import           Data.IntSet                      (IntSet)
@@ -43,27 +49,52 @@ import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
 import           Algebra.Graph                    (Graph)
-import           Unbound.Generics.LocallyNameless
 
-import           Capability.Error
-import           Capability.Reader
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
-import           Disco.Capability
 import           Disco.Context
 import           Disco.Error
 import           Disco.Types
+
+import           Disco.Effects.LFresh
+import           Disco.Effects.Random
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.Error
+import           Polysemy.Fail
+import           Polysemy.Output
+import           Polysemy.Reader
+import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
+
+------------------------------------------------------------
+-- Evaluation effects
+------------------------------------------------------------
+
+newtype Debug = Debug { unDebug :: String }
+
+debug :: Member (Output Debug) r => String -> Sem r ()
+debug = output . Debug
+
+-- Get rid of Reader Env --- should be dispatched locally?
+type EvalEffects = [Reader Env, Fail, Error EvalError, Store Cell, Random, LFresh, Output Debug]
+  -- XXX write about order.
+  -- memory, counter etc. should not be reset by errors.
+
+  -- XXX add some kind of proper logging effect(s)
+    -- With tags so we can filter on log messages we want??
+    -- Just make my own message logging effect.
 
 ------------------------------------------------------------
 -- Values
 ------------------------------------------------------------
 
--- | The type of values produced by the interpreter.
+-- | The type of values produced by the interpreter. The parameter @r@
+--   is an effect row listing the effects needed to evaluate such values.
 data Value where
   -- | A numeric value, which also carries a flag saying how
   --   fractional values should be diplayed.
-  VNum   :: RationalDisplay -> Rational -> Value
+  VNum  :: RationalDisplay -> Rational -> Value
 
   -- | The unit value.
   VUnit :: Value
@@ -113,7 +144,7 @@ data Value where
   -- | A proposition.
   VProp   :: ValProp -> Value
 
-  -- | A @Disco Value@ computation which can be run later, along with
+  -- | A @Value@ computation which can be run later, along with
   --   the environment in which it should run, and a set of referenced
   --   memory locations that should not be garbage collected.
   VDelay_  :: ValDelay -> IntSet -> Env -> Value
@@ -175,15 +206,17 @@ instance Show ValFun where
 pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
 
--- | A @ValDelay@ is just a @Disco Value@ computation.  It is a
+-- | A @ValDelay@ is just a @Sem r Value@ computation.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and
 --   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (forall m. MonadDisco m => m Value)
+newtype ValDelay = ValDelay (forall r. Members EvalEffects r => Sem r Value)
 
 instance Show ValDelay where
   show _ = "<delay>"
 
-pattern VDelay :: (forall m. MonadDisco m => m Value) -> IntSet -> Env -> Value
+pattern VDelay
+  :: (forall r. Members EvalEffects r => Sem r Value)
+  -> IntSet -> Env -> Value
 pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
 
 ------------------------------------------------------------
@@ -225,12 +258,12 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: Has '[HasReader "env" Env, HasThrow "err" IErr] m => TestVars -> m TestEnv
+getTestEnv :: Members '[Reader Env, Error EvalError] r => TestVars -> Sem r TestEnv
 getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> throw @"err" (UnboundError name)
+    Nothing -> throw (UnboundError name)
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
@@ -245,7 +278,7 @@ data TestReason_ a
     -- ^ The search didn't find any examples/counterexamples.
   | TestFound TestResult
     -- ^ The search found an example/counterexample.
-  | TestRuntimeError IErr
+  | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
   deriving (Show, Functor, Foldable, Traversable)
@@ -278,24 +311,45 @@ extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
 -- | An environment is a mapping from names to values.
 type Env  = Ctx Core Value
 
-type instance TypeOf _ "env" = Env
-
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
-extendEnv :: Has '[Rd "env", LFresh] m => Name Core -> Value -> m a -> m a
-extendEnv x v = avoid [AnyName x] . extend @"env" x v
+extendEnv :: Members '[Reader Env, LFresh] r => Name Core -> Value -> Sem r a -> Sem r a
+extendEnv x v = avoid [AnyName x] . extend x v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Has '[Rd "env", LFresh] m => Env -> m a -> m a
-extendsEnv e' = avoid (map AnyName (names e')) . extends @"env" e'
+extendsEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
+extendsEnv e' = avoid (map AnyName (names e')) . extends e'
 
 -- | Get the current environment.
-getEnv :: Has '[Rd "env"] m => m Env
-getEnv = ask @"env"
+getEnv :: Member (Reader Env) r => Sem r Env
+getEnv = ask
 
 -- | Run a @Disco@ computation with a /replaced/ (not extended)
 --   environment.  This is used for evaluating things such as closures
 --   and thunks that come with their own environment.
-withEnv :: Has '[Rd "env"] m => Env -> m a -> m a
-withEnv = local @"env" . const
+withEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
+withEnv e = avoid (map AnyName (names e)) . local (const e)
+
+-- The below code seems to work too, but I don't understand why.  Seems like
+-- we should have to avoid names bound in the environment currently in use.
+
+-- withEnv = local . const
+
+
+------------------------------------------------------------
+-- Memory cells
+------------------------------------------------------------
+
+-- | A memory cell holds a value, along with a flag recording whether
+--   the value has been reduced to WHNF.
+data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
+  deriving (Show)
+
+-- | Create a memory cell from a value, with the WHNF flag initially
+--   set to false.
+mkCell :: Value -> Cell
+mkCell v = Cell v False
+
+-- | A location in memory is represented by an @Int@.
+type Loc = Int

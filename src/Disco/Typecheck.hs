@@ -1,11 +1,5 @@
-{-# LANGUAGE DataKinds                #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE MultiParamTypeClasses    #-}
 {-# LANGUAGE MultiWayIf               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE ScopedTypeVariables      #-}
-{-# LANGUAGE TypeApplications         #-}
-{-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -22,8 +16,6 @@
 
 module Disco.Typecheck where
 
-import           Capability.Reader
-
 import           Control.Arrow                           ((&&&))
 import           Control.Monad.Except
 import           Data.Bifunctor                          (first)
@@ -35,13 +27,21 @@ import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 import           Prelude                                 hiding (lookup)
 
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
+                                                          bind, embed,
+                                                          name2String,
+                                                          string2Name, substs,
+                                                          unembed)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Capability.Error
+import           Disco.Effects.Fresh
+import           Polysemy                                hiding (embed)
+import           Polysemy.Error
+import           Polysemy.Reader
+import           Polysemy.Writer
+
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Capability
 import           Disco.Context
 import           Disco.Module
 import           Disco.Subst                             (applySubst)
@@ -75,8 +75,8 @@ containerToCon SetContainer  = CSet
 --   context is then added to the overall context when inferring
 --   subsequent items in the telescope.
 inferTelescope
-  :: (Alpha b, Alpha tyb, Has '[Rd "tyctx"] m)
-  => (b -> m (tyb, TyCtx)) -> Telescope b -> m (Telescope tyb, TyCtx)
+  :: (Alpha b, Alpha tyb, Member (Reader TyCtx) r)
+  => (b -> Sem r (tyb, TyCtx)) -> Telescope b -> Sem r (Telescope tyb, TyCtx)
 inferTelescope inferOne tel = do
   (tel1, ctx) <- go (fromTelescope tel)
   return (toTelescope tel1, ctx)
@@ -84,7 +84,7 @@ inferTelescope inferOne tel = do
     go []     = return ([], emptyCtx)
     go (b:bs) = do
       (tyb, ctx) <- inferOne b
-      extends @"tyctx" ctx $ do
+      extends ctx $ do
       (tybs, ctx') <- go bs
       return (tyb:tybs, ctx `joinCtx` ctx')
 
@@ -97,20 +97,20 @@ inferTelescope inferOne tel = do
 --   on success.  This function does not handle imports at all; see
 --   'recCheckMod'.
 checkModule
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Module -> m ModuleInfo
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Module -> Sem r ModuleInfo
 checkModule (Module _ _ m docs) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
     tyCtx     <- makeTyCtx typeDecls
-    extends @"tyctx" tyCtx $ do
+    extends tyCtx $ do
       mapM_ checkTyDefn tydefs
       adefns <- mapM checkDefn defns
       let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
       let dups = filterDups . map getDefnName $ adefns
       case dups of
-        (x:_) -> throw @"tcerr" $ DuplicateDefns (coerce x)
+        (x:_) -> throw $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- checkProperties docs
           return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
@@ -123,9 +123,9 @@ checkModule (Module _ _ m docs) = do
 -- | Turn a list of type definitions into a 'TyDefCtx', checking
 --   for duplicate names among the definitions and also any type
 --   definitions already in the context.
-makeTyDefnCtx :: Has '[Rd "tydefctx", Th "tcerr"] m => [TypeDefn] -> m TyDefCtx
+makeTyDefnCtx :: Members '[Reader TyDefCtx, Error TCError] r => [TypeDefn] -> Sem r TyDefCtx
 makeTyDefnCtx tydefs = do
-  oldTyDefs <- ask @"tydefctx"
+  oldTyDefs <- ask @TyDefCtx
   let oldNames = M.keys oldTyDefs
       newNames = map (\(TypeDefn x _ _) -> x) tydefs
       dups = filterDups $ newNames ++ oldNames
@@ -134,11 +134,11 @@ makeTyDefnCtx tydefs = do
         = (x, TyDefBody args (flip substs body . zip (map string2Name args)))
 
   case dups of
-    (x:_) -> throw @"tcerr" (DuplicateTyDefns x)
+    (x:_) -> throw (DuplicateTyDefns x)
     []    -> return . M.fromList $ map convert tydefs
 
 -- | Check the validity of a type definition.
-checkTyDefn :: Has '[Rd "tydefctx", Th "tcerr"] m => TypeDefn -> m ()
+checkTyDefn :: Members '[Reader TyDefCtx, Error TCError] r => TypeDefn -> Sem r ()
 checkTyDefn defn@(TypeDefn x args body) = do
 
   -- First, make sure the body is a valid type, i.e. everything inside
@@ -170,10 +170,10 @@ checkTyDefn defn@(TypeDefn x args body) = do
 --
 --   The function returns the set of TyDefs encountered during
 --   expansion if the TyDef is not cyclic.
-checkCyclicTy :: Has '[Rd "tydefctx", Th "tcerr"] m => Type -> Set String -> m (Set String)
+checkCyclicTy :: Members '[Reader TyDefCtx, Error TCError] r => Type -> Set String -> Sem r (Set String)
 checkCyclicTy (TyUser name args) set = do
   case S.member name set of
-    True -> throw @"tcerr" $ CyclicTyDef name
+    True -> throw $ CyclicTyDef name
     False -> do
       ty <- lookupTyDefn name args
       checkCyclicTy ty (S.insert name set)
@@ -182,12 +182,12 @@ checkCyclicTy _ set = return set
 
 -- | Ensure that a type definition does not use any unbound type
 --   variables or undefined types.
-checkUnboundVars :: Has '[Rd "tydefctx", Th "tcerr"] m => TypeDefn -> m ()
+checkUnboundVars :: Members '[Reader TyDefCtx, Error TCError] r => TypeDefn -> Sem r ()
 checkUnboundVars (TypeDefn _ args body) = go body
   where
     go (TyAtom (AVar (U x)))
       | name2String x `elem` args = return ()
-      | otherwise                 = throw @"tcerr" $ UnboundTyVar x
+      | otherwise                 = throw $ UnboundTyVar x
     go (TyAtom _)        = return ()
     go (TyUser name tys) = lookupTyDefn name tys >> mapM_ go tys
     go (TyCon _ tys)     = mapM_ go tys
@@ -196,12 +196,12 @@ checkUnboundVars (TypeDefn _ args body) = go body
 --   type, keep expanding its definition recursively, ensuring that
 --   any recursive references to the defined type have only type variables
 --   as arguments.
-checkPolyRec :: Has '[Th "tcerr"] m => TypeDefn -> m ()
+checkPolyRec :: Member (Error TCError) r => TypeDefn -> Sem r ()
 checkPolyRec (TypeDefn name args body) = go body
   where
     go (TyCon (CUser x) tys)
       | x == name && not (all isTyVar tys) =
-        throw @"tcerr" $ NoPolyRec name args tys
+        throw $ NoPolyRec name args tys
       | otherwise = return ()
     go (TyCon _ tys) = mapM_ go tys
     go _             = return ()
@@ -219,11 +219,11 @@ filterDups = map head . filter ((>1) . length) . group . sort
 -- | Given a list of type declarations, first check that there are no
 --   duplicate type declarations, and that the types are well-formed;
 --   then create a type context containing the given declarations.
-makeTyCtx :: Has '[Rd "tydefctx", Th "tcerr"] m => [TypeDecl] -> m TyCtx
+makeTyCtx :: Members '[Reader TyDefCtx, Error TCError] r => [TypeDecl] -> Sem r TyCtx
 makeTyCtx decls = do
   let dups = filterDups . map (\(TypeDecl x _) -> x) $ decls
   case dups of
-    (x:_) -> throw @"tcerr" (DuplicateDecls x)
+    (x:_) -> throw (DuplicateDecls x)
     []    -> do
       checkCtx declCtx
       return declCtx
@@ -231,7 +231,7 @@ makeTyCtx decls = do
     declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
 
 -- | Check that all the types in a context are valid.
-checkCtx :: Has '[Rd "tydefctx", Th "tcerr"] m => TyCtx -> m ()
+checkCtx :: Members '[Reader TyDefCtx, Error TCError] r => TyCtx -> Sem r ()
 checkCtx = mapM_ checkPolyTyValid . M.elems
 
 --------------------------------------------------
@@ -239,8 +239,8 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 
 -- | Type check a top-level definition.
 checkDefn
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => TermDefn -> m Defn
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => TermDefn -> Sem r Defn
 checkDefn (TermDefn x clauses) = do
 
   -- Check that all clauses have the same number of patterns
@@ -266,16 +266,16 @@ checkDefn (TermDefn x clauses) = do
     checkNumPats []     = return ()   -- This can't happen, but meh
     checkNumPats [_]    = return ()
     checkNumPats (c:cs)
-      | all ((==0) . numPats) (c:cs) = throw @"tcerr" (DuplicateDefns x)
-      | not (all ((== numPats c) . numPats) cs) = throw @"tcerr" NumPatterns
+      | all ((==0) . numPats) (c:cs) = throw (DuplicateDefns x)
+      | not (all ((== numPats c) . numPats) cs) = throw NumPatterns
                -- XXX more info, this error actually means # of
                -- patterns don't match across different clauses
       | otherwise = return ()
 
     -- | Check a clause of a definition against a list of pattern types and a body type.
     checkClause
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => [Type] -> Type -> Bind [Pattern] Term -> m Clause
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => [Type] -> Type -> Bind [Pattern] Term -> Sem r Clause
     checkClause patTys bodyTy clause = do
       (pats, body) <- unbind clause
 
@@ -283,11 +283,11 @@ checkDefn (TermDefn x clauses) = do
       -- which is the same as the length of the list patTys.  So we can just use
       -- zipWithM to check all the patterns.
       (ctxs, aps) <- unzip <$> zipWithM checkPattern pats patTys
-      at  <- extends @"tyctx" (joinCtxs ctxs) $ check body bodyTy
+      at  <- extends (joinCtxs ctxs) $ check body bodyTy
       return $ bind aps at
 
     -- Decompose a type that must be of the form t1 -> t2 -> ... -> tn -> t{n+1}.
-    decomposeDefnTy :: Has '[Rd "tydefctx", Th "tcerr"] m => Int -> Type -> m ([Type], Type)
+    decomposeDefnTy :: Members '[Reader TyDefCtx, Error TCError] r => Int -> Type -> Sem r ([Type], Type)
     decomposeDefnTy 0 ty = return ([], ty)
     decomposeDefnTy n (TyUser name args) = lookupTyDefn name args >>= decomposeDefnTy n
     decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) <$> decomposeDefnTy (n-1) ty2
@@ -299,8 +299,8 @@ checkDefn (TermDefn x clauses) = do
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Ctx Term Docs -> m (Ctx ATerm [AProperty])
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
   M.mapKeys coerce . M.filter (not.null)
     <$> (traverse . traverse) checkProperty properties
@@ -310,8 +310,8 @@ checkProperties docs =
 
 -- | Check the types of the terms embedded in a property.
 checkProperty
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Property -> m AProperty
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Property -> Sem r AProperty
 checkProperty prop = do
   (at, theta) <- solve $ check prop TyProp
   -- XXX do we need to default container variables here?
@@ -326,7 +326,7 @@ checkProperty prop = do
 --------------------------------------------------
 
 -- | Check that a sigma type is a valid type.  See 'checkTypeValid'.
-checkPolyTyValid :: Has '[Rd "tydefctx", Th "tcerr"] m => PolyType -> m ()
+checkPolyTyValid :: Members '[Reader TyDefCtx, Error TCError] r => PolyType -> Sem r ()
 checkPolyTyValid (Forall b) = do
   let (_, ty) = unsafeUnbind b
   checkTypeValid ty
@@ -334,23 +334,23 @@ checkPolyTyValid (Forall b) = do
 -- | Disco doesn't need kinds per se, since all types must be fully
 --   applied.  But we do need to check that every type is applied to
 --   the correct number of arguments.
-checkTypeValid :: Has '[Rd "tydefctx", Th "tcerr"] m => Type -> m ()
+checkTypeValid :: Members '[Reader TyDefCtx, Error TCError] r => Type -> Sem r ()
 checkTypeValid (TyAtom _)    = return ()
 checkTypeValid (TyCon c tys) = do
   k <- conArity c
-  if | n < k     -> throw @"tcerr" (NotEnoughArgs c)
-     | n > k     -> throw @"tcerr" (TooManyArgs c)
+  if | n < k     -> throw (NotEnoughArgs c)
+     | n > k     -> throw (TooManyArgs c)
      | otherwise -> mapM_ checkTypeValid tys
   where
     n = length tys
 
-conArity :: Has '[Rd "tydefctx", Th "tcerr"] m => Con -> m Int
+conArity :: Members '[Reader TyDefCtx, Error TCError] r => Con -> Sem r Int
 conArity (CContainer _) = return 1
 conArity CGraph = return 1
 conArity (CUser name)    = do
-  d <- ask @"tydefctx"
+  d <- ask @TyDefCtx
   case M.lookup name d of
-    Nothing               -> throw @"tcerr" (NotTyDef name)
+    Nothing               -> throw (NotTyDef name)
     Just (TyDefBody as _) -> return (length as)
 conArity _              = return 2  -- (->, *, +, map)
 
@@ -370,14 +370,14 @@ data Mode = Infer | Check Type
 --   This function is provided for convenience; it simply calls
 --   'typecheck' with an appropriate 'Mode'.
 check
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Term -> Type -> m ATerm
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Term -> Type -> Sem r ATerm
 check t ty = typecheck (Check ty) t
 
 -- | Check that a term has the given polymorphic type.
 checkPolyTy
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Term -> PolyType -> m ATerm
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Term -> PolyType -> Sem r ATerm
 checkPolyTy t (Forall sig) = do
   (as, tau) <- unbind sig
   (at, cst) <- withConstraint $ check t tau
@@ -392,16 +392,16 @@ checkPolyTy t (Forall sig) = do
 --   This function is provided for convenience; it simply calls
 --   'typecheck' with an appropriate 'Mode'.
 infer
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Term -> m ATerm
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Term -> Sem r ATerm
 infer = typecheck Infer
 
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
 inferTop
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Term -> m (ATerm, PolyType)
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Term -> Sem r (ATerm, PolyType)
 inferTop t = do
 
   -- Run inference on the term and try to solve the resulting
@@ -432,8 +432,8 @@ inferTop t = do
 --   cases, and allows all the checking and inference code related to
 --   a given AST node to be placed together.
 typecheck
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Mode -> Term -> m ATerm
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Mode -> Term -> Sem r ATerm
 
 -- ~~~~ Note [Pattern coverage]
 -- In several places we have clauses like
@@ -480,7 +480,7 @@ typecheck mode (TParens t) = typecheck mode t
 --
 -- Note this is also where unbound identifiers may possibly be turned
 -- into primitives if the name matches.
-typecheck Infer (TVar x) = catch @"tcerr" checkVar checkPrim
+typecheck Infer (TVar x) = catch checkVar checkPrim
   where
     checkVar = do
       Forall sig <- lookupTy x
@@ -492,10 +492,10 @@ typecheck Infer (TVar x) = catch @"tcerr" checkVar checkPrim
       case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
         -- If so, infer the type of the prim instead.
         (prim:_) -> typecheck Infer (TPrim prim)
-        _        -> throw @"tcerr" (Unbound x)
+        _        -> throw (Unbound x)
 
     -- For any other error, just rethrow.
-    checkPrim e = throw @"tcerr" e
+    checkPrim e = throw e
 
 --------------------------------------------------
 -- Primitives
@@ -505,7 +505,7 @@ typecheck Infer (TPrim prim) = do
   return $ ATPrim ty prim
 
   where
-    inferPrim :: Has '[Wr "constraints", Fresh] m => Prim -> m Type
+    inferPrim :: Members '[Writer Constraint, Fresh] r => Prim -> Sem r Type
 
     ----------------------------------------
     -- Left/right
@@ -888,7 +888,7 @@ typecheck Infer             (TString cs) = return $ ATString cs
 typecheck Infer             (TNat n)     = return $ ATNat TyN n
 typecheck Infer             (TRat r)     = return $ ATRat r
 
-typecheck _                 TWild        = throw @"tcerr" NoTWild
+typecheck _                 TWild        = throw NoTWild
 
 --------------------------------------------------
 -- Abstractions (lambdas and quantifiers)
@@ -924,7 +924,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
 
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
-  extends @"tyctx" ctx $
+  extends ctx $
     ATAbs Lam checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
 
   where
@@ -942,8 +942,8 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
     -- we can use to extend when checking the body, a list of the typed
     -- patterns, and the result type of the function.
     checkArgs
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => [Pattern] -> Type -> Term -> m (TyCtx, [APattern], Type)
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => [Pattern] -> Type -> Term -> Sem r (TyCtx, [APattern], Type)
 
     -- If we're all out of arguments, the remaining checking type is the
     -- result, and there are no variables to bind in the context.
@@ -987,11 +987,11 @@ typecheck Infer (TAbs q lam)    = do
     -- concrete type from annotations inside tuples.
     forM_ (map getType typedPats) $ \ty ->
       unless (isSearchable ty) $
-        throw @"tcerr" $ NoSearch ty
+        throw $ NoSearch ty
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.
-  extends @"tyctx" (joinCtxs pCtxs) $ do
+  extends (joinCtxs pCtxs) $ do
     case q of
       -- For lambdas, infer the type of the body, and return an appropriate
       -- function type.
@@ -1005,7 +1005,9 @@ typecheck Infer (TAbs q lam)    = do
         at <- check t TyProp
         return $ ATAbs q TyProp (bind typedPats at)
   where
-    getAscrOrFresh :: Has '[Rd "tydefctx", Th "tcerr", Fresh] m => Pattern -> m Type
+    getAscrOrFresh
+      :: Members '[Reader TyDefCtx, Error TCError, Fresh] r
+      => Pattern -> Sem r Type
     getAscrOrFresh (PAscr _ ty) = checkTypeValid ty >> pure ty
     getAscrOrFresh _            = freshTy
 
@@ -1032,8 +1034,8 @@ typecheck Infer (TApp t t')   = do
 typecheck mode1 (TTup tup) = uncurry ATTup <$> typecheckTuple mode1 tup
   where
     typecheckTuple
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Mode -> [Term] -> m (Type, [ATerm])
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Mode -> [Term] -> Sem r (Type, [ATerm])
     typecheckTuple _    []     = error "Impossible! typecheckTuple []"
     typecheckTuple mode [t]    = (getType &&& (:[])) <$> typecheck mode t
     typecheckTuple mode (t:ts) = do
@@ -1050,8 +1052,8 @@ typecheck Infer (TChain t ls) =
 
   where
     inferChain
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Term -> [Link] -> m [ALink]
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Term -> [Link] -> Sem r [ALink]
     inferChain _  [] = return []
     inferChain t1 (TLink op t2 : links) = do
       at2 <- infer t2
@@ -1092,8 +1094,8 @@ typecheck mode t@(TContainer c xs ell)  = do
 
   where
     typecheckEllipsis
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Mode -> Maybe (Ellipsis Term) -> m (Maybe (Ellipsis ATerm))
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Mode -> Maybe (Ellipsis Term) -> Sem r (Maybe (Ellipsis ATerm))
     typecheckEllipsis _ Nothing           = return Nothing
     typecheckEllipsis _ (Just Forever)    = return $ Just Forever
     typecheckEllipsis m (Just (Until tm)) = Just . Until <$> typecheck m tm
@@ -1103,7 +1105,7 @@ typecheck mode tcc@(TContainerComp c bqt) = do
   eltMode <- ensureConstrMode1 (containerToCon c) mode (Left tcc)
   (qs, t)   <- unbind bqt
   (aqs, cx) <- inferTelescope inferQual qs
-  extends @"tyctx" cx $ do
+  extends cx $ do
     at <- typecheck eltMode t
     let resTy = case mode of
           Infer    -> containerTy c (getType at)
@@ -1112,8 +1114,8 @@ typecheck mode tcc@(TContainerComp c bqt) = do
 
   where
     inferQual
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Qual -> m (AQual, TyCtx)
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Qual -> Sem r (AQual, TyCtx)
     inferQual (QBind x (unembed -> t))  = do
       at <- infer t
       ty <- ensureConstr1 (containerToCon c) (getType at) (Left t)
@@ -1134,7 +1136,7 @@ typecheck mode (TLet l) = do
   (as, ctx) <- inferTelescope inferBinding bs
 
   -- ...then check/infer the body under an extended context.
-  extends @"tyctx" ctx $ do
+  extends ctx $ do
     at2 <- typecheck mode t2
     return $ ATLet (getType at2) (bind as at2)
 
@@ -1146,8 +1148,8 @@ typecheck mode (TLet l) = do
     -- determines whether we use inference or checking mode for the
     -- body.
     inferBinding
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Binding -> m (ABinding, TyCtx)
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Binding -> Sem r (ABinding, TyCtx)
     inferBinding (Binding mty x (unembed -> t)) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
@@ -1158,7 +1160,7 @@ typecheck mode (TLet l) = do
 -- Case
 
 -- Check/infer a case expression.
-typecheck _    (TCase []) = throw @"tcerr" EmptyCase
+typecheck _    (TCase []) = throw EmptyCase
 typecheck mode (TCase bs) = do
   bs' <- mapM typecheckBranch bs
   resTy <- case mode of
@@ -1171,20 +1173,20 @@ typecheck mode (TCase bs) = do
 
   where
     typecheckBranch
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Branch -> m ABranch
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Branch -> Sem r ABranch
     typecheckBranch b = do
       (gs, t) <- unbind b
       (ags, ctx) <- inferTelescope inferGuard gs
-      extends @"tyctx" ctx $
+      extends ctx $
         bind ags <$> typecheck mode t
 
     -- Infer the type of a guard, returning the type-annotated guard
     -- along with a context of types for any variables bound by the
     -- guard.
     inferGuard
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => Guard -> m (AGuard, TyCtx)
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => Guard -> Sem r (AGuard, TyCtx)
     inferGuard (GBool (unembed -> t)) = do
       at <- check t TyBool
       return (AGBool (embed at), emptyCtx)
@@ -1224,8 +1226,8 @@ typecheck (Check ty) t = do
 -- | Check that a pattern has the given type, and return a context of
 --   pattern variables bound in the pattern along with their types.
 checkPattern
-  :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-  => Pattern -> Type -> m (TyCtx, APattern)
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Pattern -> Type -> Sem r (TyCtx, APattern)
 
 checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
@@ -1264,8 +1266,8 @@ checkPattern (PTup tup) tupTy = do
 
   where
     checkTuplePat
-      :: Has '[Rd "tyctx", Rd "tydefctx", Wr "constraints", Th "tcerr", Ct "tcerr", Fresh] m
-      => [Pattern] -> Type -> m [(TyCtx, APattern)]
+      :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+      => [Pattern] -> Type -> Sem r [(TyCtx, APattern)]
     checkTuplePat [] _   = error "Impossible! checkTuplePat []"
     checkTuplePat [p] ty = do     -- (:[]) <$> check t ty
       (ctx, apt) <- checkPattern p ty
@@ -1356,7 +1358,7 @@ checkPattern (PFrac p q) ty = do
 -- | Given an input type @ty@, return a type which represents the
 --   output type of the absolute value function, and generate
 --   appropriate constraints.
-cPos :: Has '[Wr "constraints", Fresh] m => Type -> m Type
+cPos :: Members '[Writer Constraint, Fresh] r => Type -> Sem r Type
 cPos ty = do
   constraint $ CQual QNum ty   -- The input type has to be numeric.
   case ty of
@@ -1385,7 +1387,7 @@ cPos ty = do
 -- | Given an input type @ty@, return a type which represents the
 --   output type of the floor or ceiling functions, and generate
 --   appropriate constraints.
-cInt :: Has '[Wr "constraints", Fresh] m => Type -> m Type
+cInt :: Members '[Writer Constraint, Fresh] r => Type -> Sem r Type
 cInt ty = do
   constraint $ CQual QNum ty
   case ty of
@@ -1415,7 +1417,7 @@ cInt ty = do
 -- | Given input types to the exponentiation operator, return a type
 --   which represents the output type, and generate appropriate
 --   constraints.
-cExp :: Has '[Wr "constraints", Fresh] m => Type -> Type -> m Type
+cExp :: Members '[Writer Constraint, Fresh] r => Type -> Type -> Sem r Type
 cExp ty1 TyN = do
   constraint $ CQual QNum ty1
   return ty1
@@ -1472,18 +1474,18 @@ isKnownSubBase b1 b2 = (b1,b2) `elem` basePairs
 --   This saves work in the constraint solver, makes it easier to
 --   generate good error messages, and even sometimes saves us the
 --   indignity of exponential time complexity in the constraint solver.
-lub :: (Has '[Wr "constraints", Th "tcerr", Fresh] m) => Type -> Type -> m Type
+lub :: Members '[Writer Constraint, Error TCError, Fresh] r => Type -> Type -> Sem r Type
 lub ty1 ty2
   | isKnownSub ty1 ty2 = return ty2
   | isKnownSub ty2 ty1 = return ty1
 lub TyF TyZ = return TyQ
 lub TyZ TyF = return TyQ
-lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throw @"tcerr" $ NoLub ty1 ty2
+lub ty1@(TyAtom (ABase _)) ty2@(TyAtom (ABase _)) = throw $ NoLub ty1 ty2
 
 -- Would make sense eventually to add this case, but we would need a glb function too
 -- lub ty1@(TyCon c1 ts) ty2@(TyCon c2 t2)
 --   | c1 == c2  = ...  -- need glb here for contravariant arguments
---   | otherwise = throw @"tcerr" $ NoLub ty1 ty2
+--   | otherwise = throw $ NoLub ty1 ty2
 
 -- Fallback case: generate a fresh type variable and constrain both input types
 -- to be subtypes of it
@@ -1499,7 +1501,7 @@ lub ty1 ty2 = do
 -- | Get the argument (element) type of a (known) container type.  Returns a
 --   fresh variable with a suitable constraint if the given type is
 --   not literally a container type.
-getEltTy :: Has '[Wr "constraints", Fresh] m => Container -> Type -> m Type
+getEltTy :: Members '[Writer Constraint, Fresh] r => Container -> Type -> Sem r Type
 getEltTy _ (TyContainer _ e) = return e
 getEltTy c ty = do
   eltTy <- freshTy
@@ -1514,11 +1516,11 @@ getEltTy c ty = do
 --   constructor, and a list of fresh type variables is returned whose
 --   count matches the arity of the provided constructor.
 ensureConstr
-  :: forall m. Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Type -> Either Term Pattern -> m [Type]
+  :: forall r. Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Type -> Either Term Pattern -> Sem r [Type]
 ensureConstr c ty targ = matchConTy c ty
   where
-    matchConTy :: Con -> Type -> m [Type]
+    matchConTy :: Con -> Type -> Sem r [Type]
 
     -- expand type definitions lazily
     matchConTy c1 (TyUser name args) = lookupTyDefn name args >>= matchConTy c1
@@ -1538,7 +1540,7 @@ ensureConstr c ty targ = matchConTy c ty
     --   unifying container variables if we are matching two container
     --   types; otherwise, simply ensure that the constructors are
     --   equal.  Throw a 'matchError' if they do not match.
-    matchCon :: Con -> Con -> m ()
+    matchCon :: Con -> Con -> Sem r ()
     matchCon c1 c2                            | c1 == c2 = return ()
     matchCon (CContainer v@(AVar (U _))) (CContainer ctr2) =
       constraint $ CEq (TyAtom v) (TyAtom ctr2)
@@ -1546,17 +1548,17 @@ ensureConstr c ty targ = matchConTy c ty
       constraint $ CEq (TyAtom ctr1) (TyAtom v)
     matchCon _ _                              = matchError
 
-    matchError :: m a
+    matchError :: Sem r a
     matchError = case targ of
-      Left term -> throw @"tcerr" (NotCon c term ty)
-      Right pat -> throw @"tcerr" (PatternType pat ty)
+      Left term -> throw (NotCon c term ty)
+      Right pat -> throw (PatternType pat ty)
 
 -- | A variant of ensureConstr that expects to get exactly one
 --   argument type out, and throws an error if we get any other
 --   number.
 ensureConstr1
-  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Type -> Either Term Pattern -> m Type
+  :: Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Type -> Either Term Pattern -> Sem r Type
 ensureConstr1 c ty targ = do
   tys <- ensureConstr c ty targ
   case tys of
@@ -1569,8 +1571,8 @@ ensureConstr1 c ty targ = do
 --   argument types out, and throws an error if we get any other
 --   number.
 ensureConstr2
-  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Type -> Either Term Pattern -> m (Type, Type)
+  :: Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Type -> Either Term Pattern -> Sem r (Type, Type)
 ensureConstr2 c ty targ  = do
   tys <- ensureConstr c ty targ
   case tys of
@@ -1584,16 +1586,16 @@ ensureConstr2 c ty targ  = do
 --   'Check'; otherwise it generates an appropriate number of copies
 --   of 'Infer'.
 ensureConstrMode
-  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Mode -> Either Term Pattern -> m [Mode]
+  :: Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Mode -> Either Term Pattern -> Sem r [Mode]
 ensureConstrMode c Infer      _  = return $ map (const Infer) (arity c)
 ensureConstrMode c (Check ty) tp = map Check <$> ensureConstr c ty tp
 
 -- | A variant of 'ensureConstrMode' that expects to get a single
 --   'Mode' and throws an error if it encounters any other number.
 ensureConstrMode1
-  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Mode -> Either Term Pattern -> m Mode
+  :: Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Mode -> Either Term Pattern -> Sem r Mode
 ensureConstrMode1 c m targ = do
   ms <- ensureConstrMode c m targ
   case ms of
@@ -1605,8 +1607,8 @@ ensureConstrMode1 c m targ = do
 -- | A variant of 'ensureConstrMode' that expects to get two 'Mode's
 --   and throws an error if it encounters any other number.
 ensureConstrMode2
-  :: Has '[Rd "tydefctx", Wr "constraints", Th "tcerr", Fresh] m
-  => Con -> Mode -> Either Term Pattern -> m (Mode, Mode)
+  :: Members '[Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
+  => Con -> Mode -> Either Term Pattern -> Sem r (Mode, Mode)
 ensureConstrMode2 c m targ = do
   ms <- ensureConstrMode c m targ
   case ms of
@@ -1618,7 +1620,7 @@ ensureConstrMode2 c m targ = do
 -- | Ensure that two types are equal:
 --     1. Do nothing if they are literally equal
 --     2. Generate an equality constraint otherwise
-ensureEq :: Has '[Wr "constraints"] m => Type -> Type -> m ()
+ensureEq :: Member (Writer Constraint) r => Type -> Type -> Sem r ()
 ensureEq ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise  = constraint $ CEq ty1 ty2

@@ -6,8 +6,7 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Expression type and parser for things entered at an interactive disco
--- prompt.
+-- Definition of the command-line REPL interface for Disco.
 --
 -----------------------------------------------------------------------------
 
@@ -25,8 +24,9 @@ module Disco.Interactive.CmdLine
 
   ) where
 
+import           Control.Lens                           (view)
 import           Control.Monad                          (unless)
-import           Control.Monad.Catch                    (MonadCatch, catch)
+import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))
 import           Data.Foldable                          (forM_)
 import           Data.List                              (isPrefixOf)
@@ -39,12 +39,13 @@ import           System.Console.Haskeline               as H
 
 import           Disco.Error
 import           Disco.Eval
-import           Disco.Interactive.Commands             (handleLoad)
-import           Disco.Interactive.Eval
+import           Disco.Interactive.Commands
 
+import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.ConstraintAbsorber.MonadCatch
-import           Polysemy.Error                         (mapError)
+import           Polysemy.Error
+import           Polysemy.State
 
 ------------------------------------------------------------
 -- Command-line options parser
@@ -121,7 +122,7 @@ discoMain = do
 
   where
 
-    -- These types used to involve InputT Disco, but now uses Final
+    -- These types used to involve InputT Disco, but we now use Final
     -- (InputT IO) in the list of effects.  see
     -- https://github.com/polysemy-research/polysemy/issues/395 for
     -- inspiration.
@@ -131,8 +132,8 @@ discoMain = do
       liftIO $ print e
       act
 
-    withCtrlC :: (MonadIO m, MonadCatch m) => m a -> m a -> m a
-    withCtrlC resume act = catch act (ctrlC resume)
+    withCtrlC :: (MonadIO m, CMC.MonadCatch m) => m a -> m a -> m a
+    withCtrlC resume act = CMC.catch act (ctrlC resume)
 
     loop :: Members DiscoEffects r => Sem r ()
     loop = do
@@ -144,6 +145,19 @@ discoMain = do
               liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> do
-              -- XXX
-              mapError (undefined @_ @(SomeException -> DiscoError)) $ absorbMonadCatch $ withCtrlC (return ()) (handleCMD input)
+              mapError @_ @DiscoError (Panic . show) $
+                absorbMonadCatch $
+                withCtrlC (return ()) $
+                handleCMD input
               loop
+
+-- | Parse and run the command corresponding to some REPL input.
+handleCMD :: Members DiscoEffects r => String -> Sem r ()
+handleCMD "" = return ()
+handleCMD s = do
+  exts <- gets @TopInfo (view extSet)
+  case parseLine discoCommands exts s of
+    Left msg -> outputLn msg
+    Right l  -> catch @DiscoError (dispatch discoCommands l) printoutLn
+                -- The above has to be catch, not outputErrors, because
+                -- the latter won't resume afterwards.

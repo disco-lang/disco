@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Typecheck.Constraints

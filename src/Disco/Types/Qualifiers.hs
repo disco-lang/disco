@@ -1,4 +1,14 @@
-{-# LANGUAGE DeriveGeneric #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Types.Qualifiers
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Type qualifiers and sorts.
+--
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Types.Qualifiers where
 

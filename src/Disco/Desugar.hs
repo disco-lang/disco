@@ -1,6 +1,3 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ViewPatterns  #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Desugar

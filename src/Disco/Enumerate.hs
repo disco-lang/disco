@@ -1,5 +1,4 @@
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE TupleSections            #-}
 
 -----------------------------------------------------------------------------
 -- |

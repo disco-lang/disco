@@ -1,11 +1,5 @@
-{-# LANGUAGE DataKinds                 #-}
 {-# LANGUAGE DerivingVia               #-}
-{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
-{-# LANGUAGE TypeApplications          #-}
-{-# LANGUAGE TypeFamilies              #-}
-{-# LANGUAGE ViewPatterns              #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -37,9 +31,9 @@ import qualified Data.Map                         as M
 import           Data.Ratio
 
 import           Disco.Effects.LFresh
+import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Input
-import           Polysemy.Output
 import           Polysemy.Reader
 
 import           Text.PrettyPrint                 (Doc)
@@ -49,15 +43,17 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
 import           Disco.AST.Core
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
+import           Disco.AST.Typed
 import           Disco.Eval                       (TopInfo, topTyDefs)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
                                                    whnfV)
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
+import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck.Erase            (eraseClause)
+import           Disco.Typecheck.Erase            (eraseClause, eraseProperty)
 import           Disco.Types
 import           Disco.Value
 
@@ -605,3 +601,74 @@ digitalExpansion b n d = digits
     longDivStep (_, r) = (b*r) `divMod` d
     res       = tail $ iterate longDivStep (0,n)
     digits    = first (map fst) (findRep res)
+
+------------------------------------------------------------
+-- Pretty-printing for test results
+------------------------------------------------------------
+
+-- XXX redo with message framework, with proper support for indentation etc.
+prettyTestFailure :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+prettyTestFailure _    (TestResult True _ _)    = return ()
+prettyTestFailure prop (TestResult False r env) = do
+  prettyFailureReason prop r
+  prettyTestEnv "    Counterexample:" env
+
+prettyTestResult :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
+prettyTestResult prop (TestResult _ r _)   = do
+    dp <- renderDoc $ prettyProperty (eraseProperty prop)
+    output       "  - Test passed: " >> outputLn dp
+    prettySuccessReason r
+
+prettySuccessReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => TestReason -> Sem r ()
+prettySuccessReason (TestFound (TestResult _ _ vs)) = do
+  prettyTestEnv "    Found example:" vs
+prettySuccessReason (TestNotFound Exhaustive) = do
+  outputLn     "    No counterexamples exist."
+prettySuccessReason (TestNotFound (Randomized n m)) = do
+  output       "    Checked "
+  output (show (n + m))
+  outputLn " possibilities without finding a counterexample."
+prettySuccessReason _ = return ()
+
+prettyFailureReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestReason -> Sem r ()
+prettyFailureReason prop TestBool = do
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  output     "  - Test is false: " >> outputLn dp
+prettyFailureReason prop (TestEqual ty v1 v2) = do
+  output     "  - Test result mismatch for: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  output     "    - Left side:  " >> prettyValue ty v2
+  output     "    - Right side: " >> prettyValue ty v1
+prettyFailureReason prop (TestRuntimeError e) = do
+  output     "  - Test failed: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  output     "    " >> printoutLn e
+prettyFailureReason prop (TestFound (TestResult _ r _)) = do
+  prettyFailureReason prop r
+prettyFailureReason prop (TestNotFound Exhaustive) = do
+  output     "  - No example exists: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  outputLn   "    All possible values were checked."
+prettyFailureReason prop (TestNotFound (Randomized n m)) = do
+  output     "  - No example was found: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
+
+prettyTestEnv :: Members (Output String ': Input TopInfo ': EvalEffects) r => String -> TestEnv -> Sem r ()
+prettyTestEnv _ (TestEnv []) = return ()
+prettyTestEnv s (TestEnv vs) = do
+  outputLn s
+  mapM_ prettyBind vs
+  where
+    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
+    prettyBind (x, ty, v) = do
+      output "      "
+      output x
+      output (replicate (maxNameLen - length x) ' ')
+      output " = "
+      prettyValue ty v

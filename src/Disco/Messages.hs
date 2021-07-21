@@ -1,5 +1,4 @@
-{-# LANGUAGE DeriveFunctor    #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 -----------------------------------------------------------------------------
 -- |

@@ -1,12 +1,4 @@
-{-# LANGUAGE DataKinds                #-}
-{-# LANGUAGE FlexibleContexts         #-}
-{-# LANGUAGE LambdaCase               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE PatternSynonyms          #-}
-{-# LANGUAGE RankNTypes               #-}
-{-# LANGUAGE TupleSections            #-}
-{-# LANGUAGE TypeApplications         #-}
-{-# LANGUAGE ViewPatterns             #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,8 +8,8 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- A big-step interpreter for the desugared, untyped Disco core
--- language.
+-- A big-step, call-by-need interpreter for the desugared, untyped
+-- Disco core language.
 --
 -----------------------------------------------------------------------------
 
@@ -38,6 +30,7 @@ module Disco.Interpret.Core
 
          -- * Property testing
        , testProperty
+       , runTest
 
          -- * Equality testing and enumeration
        , eqOp, primValEq
@@ -65,11 +58,6 @@ import           Data.Coerce                             (coerce)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
-import           Disco.Effects.LFresh
-import           Disco.Effects.Store
-import           Polysemy                                hiding (Embed)
-import           Polysemy.Error
-
 import           Unbound.Generics.LocallyNameless        (Embed, unembed)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
@@ -82,10 +70,17 @@ import           Math.NumberTheory.Moduli.Class          (SomeMod (..), getVal,
 import           Math.NumberTheory.Primes                (factorise, unPrime)
 import           Math.NumberTheory.Primes.Testing        (isPrime)
 
+import           Disco.Effects.LFresh
+import           Disco.Effects.Store
+import           Polysemy                                hiding (Embed)
+import           Polysemy.Error
+
 import           Disco.AST.Core
 import           Disco.AST.Generic                       (Side (..), selectSide)
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
+import           Disco.AST.Typed                         (AProperty)
+import           Disco.Compile                           (compileProperty)
 import           Disco.Context
 import           Disco.Enumerate
 import           Disco.Error
@@ -1313,6 +1308,11 @@ testProperty initialSt v = whnfV v >>= ensureProp >>= checkProp
           | testIsOk r == wantsSuccess =
             return $ TestResult whenFound (TestFound r) e'
           | otherwise                  = go (xs, st)
+
+runTest :: Members EvalEffects r => Int -> AProperty -> Sem r TestResult
+runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
+  where
+    n' = fromIntegral (n `div` 2)
 
 ------------------------------------------------------------
 -- Equality testing

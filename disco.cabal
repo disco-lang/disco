@@ -276,16 +276,20 @@ source-repository head
 library
   ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
   default-extensions:  DataKinds
+                       DeriveGeneric
                        FlexibleContexts
                        FlexibleInstances
                        GADTs
                        LambdaCase
+                       MultiParamTypeClasses
                        PolyKinds
                        RankNTypes
                        ScopedTypeVariables
+                       TupleSections
                        TypeApplications
                        TypeOperators
                        TypeFamilies
+                       ViewPatterns
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
@@ -330,10 +334,7 @@ library
                        Disco.Types.Qualifiers
                        Disco.Types.Rules
                        Disco.Util
-                       Disco.Interactive.Eval
-                       Disco.Interactive.Parser
                        Disco.Interactive.CmdLine
-                       Disco.Interactive.Types
                        Disco.Interactive.Commands
 
   other-modules:       Paths_disco

@@ -1,8 +1,3 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Prims

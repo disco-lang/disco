@@ -1,10 +1,4 @@
-{-# LANGUAGE GADTs           #-}
-{-# LANGUAGE MultiWayIf      #-}
-{-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TupleSections   #-}
-{-# LANGUAGE TypeFamilies    #-}
-{-# LANGUAGE ViewPatterns    #-}
 
 -----------------------------------------------------------------------------
 -- |

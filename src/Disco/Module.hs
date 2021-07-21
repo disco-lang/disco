@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -11,8 +8,8 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- The 'ModuleInfo' record representing a disco module, and various
--- functions to manipulate, load, and check modules.
+-- The 'ModuleInfo' record representing a disco module, and functions
+-- to resolve the location of a module on disk.
 --
 -----------------------------------------------------------------------------
 

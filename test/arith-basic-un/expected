@@ -15,7 +15,7 @@
 2/3
 2/3
 -6
-Overflow
+EvalErr Overflow
 -9
 -~ : ℤ → ℤ
 -3 : ℤ

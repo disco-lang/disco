@@ -24,8 +24,7 @@
 module Disco.Interpret.Core
        (
          -- * Evaluation
-         loadDefs
-       , vnum
+         vnum, vint
        , mkEnum
 
          -- ** Full reduction
@@ -59,7 +58,6 @@ module Disco.Interpret.Core
        where
 
 import           Control.Arrow                           ((***))
-import           Control.Lens                            ((.~))
 import           Control.Monad                           (filterM, (>=>))
 import           Data.Bifunctor                          (first, second)
 import           Data.Char
@@ -71,9 +69,6 @@ import           Disco.Effects.LFresh
 import           Disco.Effects.Store
 import           Polysemy                                hiding (Embed)
 import           Polysemy.Error
-import           Polysemy.Output
-import           Polysemy.Reader
-import           Polysemy.State
 
 import           Unbound.Generics.LocallyNameless        (Embed, unembed)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
@@ -93,6 +88,7 @@ import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
 import           Disco.Context
 import           Disco.Enumerate
+import           Disco.Error
 import           Disco.Eval
 import           Disco.Property
 import           Disco.Types
@@ -108,41 +104,8 @@ import qualified Algebra.Graph.AdjacencyMap              as AdjMap
 
 
 ------------------------------------------------------------
--- Evaluation
+-- Utilities
 ------------------------------------------------------------
-
--- | Load a top-level environment of (potentially recursive)
---   core language definitions into memory.
-loadDefs
-  :: Members '[Reader Env, Store Cell, State TopInfo, Output Debug] r
-  => Ctx Core Core -> Sem r ()
-loadDefs cenv = do
-
-  -- Clear out any leftover memory.
-  clearStore
-
-  -- Take the environment mapping names to definitions, and turn
-  -- each one into an indirection to a thunk stored in memory.
-  env <- traverse mkValue cenv
-
-  -- Top-level definitions are allowed to be recursive, so each
-  -- one of those thunks should actually have the environment
-  -- 'env' as its environment, so all the top-level definitions
-  -- can mutually refer to each other.
-  --
-  -- For now we know that the only things we have stored in memory
-  -- are the thunks we just made, so just iterate through them and
-  -- replace their environments.
-  mapStore (replaceThunkEnv env)
-
-  -- Finally, set the top-level environment to the one we just
-  -- created.
-  modify @TopInfo (topEnv .~ env)
-
-  where
-    replaceThunkEnv e (Cell (VThunk c _) b) = Cell (VThunk c e) b
-    replaceThunkEnv _ c                     = c
-
 
 -- | A convenience function for creating a default @VNum@ value with a
 --   default (@Fractional@) flag.
@@ -1167,7 +1130,7 @@ ceilOp n  = ceiling n % 1
 
 -- | Perform a division. Throw a division by zero error if the second
 --   argument is 0.
-divOp :: Member (Error IErr) r => Rational -> Rational -> Sem r Value
+divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
 divOp _ 0 = throw DivByZero
 divOp m n = return $ vnum (m / n)
 
@@ -1175,7 +1138,7 @@ divOp m n = return $ vnum (m / n)
 --   second argument is zero.  Although this function takes two
 --   'Rational' arguments, note that if the disco program typechecks
 --   then the arguments must in fact be integers.
-modOp :: Member (Error IErr) r => Rational -> Rational -> Sem r Value
+modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
 modOp m n
   | n == 0    = throw DivByZero
   | otherwise = return $ vint (numerator m `mod` numerator n)
@@ -1208,7 +1171,7 @@ multinomOp v1 v2 = do
       | otherwise = choose n k * multinomial (n-k) ks
 
 -- | Factorial.  The argument will always be a natural number.
-fact :: Member (Error IErr) r => Rational -> Sem r Rational
+fact :: Member (Error EvalError) r => Rational -> Sem r Rational
 fact (numerator -> n)
   | n > fromIntegral (maxBound :: Int) = throw Overflow
   | otherwise = return $ factorial (fromIntegral n) % 1
@@ -1223,7 +1186,7 @@ primIsPrime _                         = error "impossible!  primIsPrime on non-V
 -- | Semantics of the @$factor@ prim: turn a natural number into its
 --   bag of prime factors.  Crash if called on 0, which does not have
 --   a prime factorization.
-primFactor :: Member (Error IErr) r => Value -> Sem r Value
+primFactor :: Member (Error EvalError) r => Value -> Sem r Value
 primFactor (VNum d (numerator -> n)) =
   case n of
     0 -> throw (Crash "0 has no prime factorization!")
@@ -1286,7 +1249,7 @@ ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _          = error "ensureProp: non-prop value"
 
-failTestOnError :: Member (Error IErr) r => Sem r ValProp -> Sem r ValProp
+failTestOnError :: Member (Error EvalError) r => Sem r ValProp -> Sem r ValProp
 failTestOnError m = catch m $ \e ->
   return $ VPDone (TestResult False (TestRuntimeError e) emptyTestEnv)
 
@@ -1314,7 +1277,7 @@ shouldEqOp t x y = toProp <$> decideEqFor t x y
 primHolds :: Members EvalEffects r => Value -> Sem r Value
 primHolds v = resultToBool =<< testProperty Exhaustive v
   where
-    resultToBool :: Member (Error IErr) r => TestResult -> Sem r Value
+    resultToBool :: Member (Error EvalError) r => TestResult -> Sem r Value
     resultToBool (TestResult _ (TestRuntimeError e) _) = throw e
     resultToBool (TestResult b _ _)                    = return $ mkEnum b
 

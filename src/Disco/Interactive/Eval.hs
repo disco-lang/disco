@@ -19,6 +19,7 @@ import           Control.Lens               (view)
 import           Control.Monad.Except
 
 import           Disco.AST.Generic          (selectSide)
+import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Interactive.Parser   (parseLine)
@@ -66,4 +67,6 @@ handleCMD s = do
     exts <- gets @TopInfo (view extSet)
     case parseLine discoCommands exts s of
       Left msg -> outputLn msg
-      Right l -> catch (dispatch discoCommands l) (printout  {- XXX pretty-print error -})
+      Right l  -> catch @DiscoError (dispatch discoCommands l) printoutLn
+                  -- The above has to be catch, not outputErrors, because
+                  -- the latter won't resume afterwards.

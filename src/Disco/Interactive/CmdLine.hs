@@ -37,8 +37,9 @@ import           System.Exit                            (exitFailure,
 import qualified Options.Applicative                    as O
 import           System.Console.Haskeline               as H
 
+import           Disco.Error
 import           Disco.Eval
-import           Disco.Interactive.Commands             (handleLoad, loadFile)
+import           Disco.Interactive.Commands             (handleLoad)
 import           Disco.Interactive.Eval
 
 import           Polysemy
@@ -120,8 +121,10 @@ discoMain = do
 
   where
 
-    -- XXX Change to use Final (InputT IO) in the list of effects
-    -- see https://github.com/polysemy-research/polysemy/issues/395
+    -- These types used to involve InputT Disco, but now uses Final
+    -- (InputT IO) in the list of effects.  see
+    -- https://github.com/polysemy-research/polysemy/issues/395 for
+    -- inspiration.
 
     ctrlC :: MonadIO m => m a -> SomeException -> m a
     ctrlC act e = do
@@ -141,5 +144,6 @@ discoMain = do
               liftIO $ putStrLn "Goodbye!"
               return ()
           | otherwise -> do
-              mapError (undefined @_ @(SomeException -> IErr)) $ absorbMonadCatch $ withCtrlC (return ()) (handleCMD input)
+              -- XXX
+              mapError (undefined @_ @(SomeException -> DiscoError)) $ absorbMonadCatch $ withCtrlC (return ()) (handleCMD input)
               loop

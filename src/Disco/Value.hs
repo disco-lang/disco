@@ -77,7 +77,7 @@ debug :: Member (Output Debug) r => String -> Sem r ()
 debug = output . Debug
 
 -- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error IErr, Store Cell, Random, LFresh, Output Debug]
+type EvalEffects = [Reader Env, Fail, Error EvalError, Store Cell, Random, LFresh, Output Debug]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
 
@@ -258,7 +258,7 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: Members '[Reader Env, Error IErr] r => TestVars -> Sem r TestEnv
+getTestEnv :: Members '[Reader Env, Error EvalError] r => TestVars -> Sem r TestEnv
 getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   value <- M.lookup name <$> getEnv
   case value of
@@ -278,7 +278,7 @@ data TestReason_ a
     -- ^ The search didn't find any examples/counterexamples.
   | TestFound TestResult
     -- ^ The search found an example/counterexample.
-  | TestRuntimeError IErr
+  | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
   deriving (Show, Functor, Foldable, Traversable)

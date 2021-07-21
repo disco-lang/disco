@@ -277,6 +277,7 @@ library
   ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
   default-extensions:  DataKinds
                        FlexibleContexts
+                       FlexibleInstances
                        GADTs
                        LambdaCase
                        PolyKinds
@@ -290,7 +291,9 @@ library
                        Disco.Syntax.Prims
                        Disco.Extensions
                        Disco.Effects.Counter
+                       Disco.Effects.Error
                        Disco.Effects.Fresh
+                       Disco.Effects.Input
                        Disco.Effects.LFresh
                        Disco.Effects.Output
                        Disco.Effects.Random

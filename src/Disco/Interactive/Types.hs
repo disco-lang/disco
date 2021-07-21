@@ -7,6 +7,7 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 --
+--
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE DataKinds          #-}
@@ -21,7 +22,6 @@ module Disco.Interactive.Types
   where
 
 import           Polysemy
-import           Polysemy.Error
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Surface
@@ -88,7 +88,7 @@ data REPLCommand (c :: CmdTag) = REPLCommand
   , shortHelp :: String
   , category  :: REPLCommandCategory
   , cmdtype   :: REPLCommandType
-  , action    :: REPLExpr c -> (forall r. Members (Error IErr ': DiscoEffects) r => Sem r ())
+  , action    :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ())
   , parser    :: Parser (REPLExpr c)
   }
 

@@ -21,8 +21,7 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Exception                (IOException, handle)
-import           Control.Lens                     (view, (%~), (.~))
+import           Control.Lens                     (view, (%~), (?~))
 import           Control.Monad.Except
 import           Data.Coerce
 import           Data.List                        (sortBy)
@@ -35,6 +34,7 @@ import           Disco.AST.Typed
 import           Disco.Compile
 import           Disco.Context
 import           Disco.Desugar
+import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
 import           Disco.Interactive.Parser
@@ -56,19 +56,19 @@ import           Text.Megaparsec                  hiding (State, runParser)
 import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
                                                    string2Name)
 
+import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
 import           Disco.Effects.Store
 import           Polysemy
-import           Polysemy.Error                   (Error, mapError)
-import           Polysemy.Input
 import           Polysemy.Reader
 import           Polysemy.State
 
 dispatch :: Members DiscoEffects r => [SomeREPLCommand] -> SomeREPLExpr -> Sem r ()
 dispatch [] _ = return ()
 dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
-  Just e' -> outputErrors @IErr $ action c e'
+  Just e' -> outputErrors @DiscoError $ action c e'
   Nothing -> dispatch cs r
 
 -- Resolution of REPL commands searches this list _in order_, which means
@@ -113,7 +113,7 @@ annCmd = REPLCommand
   , parser = Ann <$> term
   }
 
-handleAnn :: Members '[Error IErr, Input TopInfo, Output String] r => REPLExpr 'CAnn -> Sem r ()
+handleAnn :: Members '[Error DiscoError, Input TopInfo, Output String] r => REPLExpr 'CAnn -> Sem r ()
 handleAnn (Ann t) = do
   (at, _) <- typecheckDisco $ inferTop t
   outputLn (show at)
@@ -129,7 +129,7 @@ compileCmd = REPLCommand
   , parser = Compile <$> term
   }
 
-handleCompile :: Members '[Error IErr, Input TopInfo, Output String] r => REPLExpr 'CCompile -> Sem r ()
+handleCompile :: Members '[Error DiscoError, Input TopInfo, Output String] r => REPLExpr 'CCompile -> Sem r ()
 handleCompile (Compile t) = do
   (at, _) <- typecheckDisco $ inferTop t
   outputLn . show . compileTerm $ at
@@ -145,7 +145,7 @@ desugarCmd = REPLCommand
   , parser = Desugar <$> term
   }
 
-handleDesugar :: Members '[Error IErr, Input TopInfo, LFresh, Output String] r => REPLExpr 'CDesugar -> Sem r ()
+handleDesugar :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r => REPLExpr 'CDesugar -> Sem r ()
 handleDesugar (Desugar t) = do
   (at, _) <- typecheckDisco $ inferTop t
   s <- renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
@@ -186,7 +186,7 @@ evalCmd = REPLCommand
   , parser = Eval <$> term
   }
 
-handleEval :: Members (State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CEval -> Sem r ()
+handleEval :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval t) = do
   (at, polyTy) <- inputToState . typecheckDisco $ inferTop t
   let ty = getType at
@@ -239,7 +239,7 @@ importCmd = REPLCommand
   }
 
 handleImport
-  :: Members '[Error IErr, State TopInfo, Reader Env, Store Cell, Output String, Output Debug, Embed IO] r
+  :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output String, Output Debug, Embed IO] r
   => REPLExpr 'CImport -> Sem r ()
 handleImport (Import modName) = do
   mi <- loadDiscoModule FromCwdOrStdlib modName
@@ -257,7 +257,7 @@ letCmd = REPLCommand
   , parser = letParser
   }
 
-handleLet :: Members '[Error IErr, State TopInfo, Store Cell, Reader Env, Output String, Output Debug] r => REPLExpr 'CLet -> Sem r ()
+handleLet :: Members '[Error DiscoError, State TopInfo, Store Cell, Reader Env, Output String, Output Debug] r => REPLExpr 'CLet -> Sem r ()
 handleLet (Let x t) = do
   (at, sig) <- inputToState . typecheckDisco $ inferTop t
   let c = compileTerm at
@@ -283,17 +283,17 @@ loadCmd = REPLCommand
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
-handleLoadWrapper :: Members (State TopInfo ': Output String ': Embed IO ': EvalEffects) r => REPLExpr 'CLoad -> Sem r ()
+handleLoadWrapper :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r => REPLExpr 'CLoad -> Sem r ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
-handleLoad :: Members (State TopInfo ': Output String ': Embed IO ': EvalEffects) r => FilePath -> Sem r Bool
+handleLoad :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r => FilePath -> Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
   m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- inputToState . withTopEnv $ runAllTests props
-  modify @TopInfo (lastFile .~ Just fp)
-  outputLn $ "Loaded."
+  modify @TopInfo (lastFile ?~ fp)
+  outputLn "Loaded."
   garbageCollect
   return t
 
@@ -379,7 +379,7 @@ reloadCmd = REPLCommand
   , parser = return Reload
   }
 
-handleReload :: Members (State TopInfo ': Output String ': Embed IO ': EvalEffects) r => REPLExpr 'CReload -> Sem r ()
+handleReload :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r => REPLExpr 'CReload -> Sem r ()
 handleReload Reload = do
   file <- gets (view lastFile)
   case file of
@@ -420,7 +420,7 @@ testPropCmd = REPLCommand
   , parser = TestProp <$> term
   }
 
-handleTest :: Members (State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CTestProp -> Sem r ()
+handleTest :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CTestProp -> Sem r ()
 handleTest (TestProp t) = do
   at <- inputToState . typecheckDisco $ checkProperty t
   inputToState . withTopEnv $ do
@@ -440,7 +440,7 @@ typeCheckCmd = REPLCommand
   , parser = parseTypeCheck
   }
 
-handleTypeCheck :: Members '[Error IErr, Input TopInfo, LFresh, Output String] r => REPLExpr 'CTypeCheck -> Sem r ()
+handleTypeCheck :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r => REPLExpr 'CTypeCheck -> Sem r ()
 handleTypeCheck (TypeCheck t) = do
   (_, sig) <- typecheckDisco $ inferTop t
   s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
@@ -488,7 +488,7 @@ rnfCmd = REPLCommand
   , parser = RNF <$> term
   }
 
-handleRNF :: Members (State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CRNF -> Sem r ()
+handleRNF :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r => REPLExpr 'CRNF -> Sem r ()
 handleRNF (RNF t) = do
   (at, _) <- inputToState . typecheckDisco $ inferTop t
   let c  = compileTerm at
@@ -514,42 +514,6 @@ handleMem Mem = showMemory
 ------------------------------------------
 --- Util functions
 ------------------------------------------
-
-fileNotFound :: Member (Output String) r => FilePath -> IOException -> Sem r ()
-fileNotFound file _ = outputLn $ "File not found: " ++ file
-
-loadFile :: Members '[Output String, Embed IO] r => FilePath -> Sem r (Maybe String)
-loadFile file = do
-  res <- liftIO $ handle (return . Left) (Right <$> readFile file)
-  case res of
-    Left e  -> fileNotFound file e >> return Nothing
-    Right s -> return (Just s)
-
-addModule :: Members '[State TopInfo, Reader Env, Store Cell, Error IErr, Output Debug] r => ModuleInfo -> Sem r ()
-addModule mi = do
-  curMI <- gets @TopInfo (view topModInfo)
-  mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  setLoadedModule mi'
-
--- | Add information from ModuleInfo to the Disco monad. This includes updating the
---   Disco monad with new term definitions, documentation, types, and type definitions.
---   Replaces any previously loaded module.
-setLoadedModule :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r => ModuleInfo -> Sem r ()
-setLoadedModule mi = do
-  modify @TopInfo $ topModInfo .~ mi
-  populateCurrentModuleInfo
-
-populateCurrentModuleInfo :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r => Sem r ()
-populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds <- gets @TopInfo (view topModInfo)
-  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
-  modify @TopInfo $
-    (topDocs   .~ docs) .
-    (topCtx    .~ tys)  .
-    (topTyDefs .~ tyds) .
-    (topDefs   .~ tmds)
-  loadDefs cdefns
-  return ()
 
 -- XXX redo with message framework, with proper support for indentation etc.
 -- XXX move it to Pretty or Property or something

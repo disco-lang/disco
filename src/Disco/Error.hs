@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GADTs              #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Error
@@ -10,63 +6,63 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Type for collecting all potential Disco errors at the top level.
+-- Type for collecting all potential Disco errors at the top level,
+-- and a type for runtime errors.
 --
 -----------------------------------------------------------------------------
 
-module Disco.Error (IErr(..)) where
+module Disco.Error (DiscoError(..), EvalError(..)) where
 
-import           Control.Exception                (Exception)
 import qualified Data.Void
 import           Disco.AST.Core                   (Core)
-import           Disco.AST.Surface
+import           Disco.AST.Surface                (ModName)
 import           Disco.Typecheck.Monad            (TCError)
-import           Disco.Types                      (Type)
 import           Text.Megaparsec                  (ParseErrorBundle)
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless (Name)
 
-------------------------------------------------------------
--- Errors
-------------------------------------------------------------
-
--- | Errors that can be generated during interpreting.
-data IErr where
+-- | Top-level error type for Disco.
+data DiscoError where
 
   -- | Module not found.
-  ModuleNotFound :: ModName -> IErr
+  ModuleNotFound :: ModName -> DiscoError
 
   -- | Cyclic import encountered.
-  CyclicImport :: ModName -> IErr
+  CyclicImport :: ModName -> DiscoError
 
   -- | Error encountered during typechecking.
-  TypeCheckErr :: TCError -> IErr
+  TypeCheckErr :: TCError -> DiscoError
 
   -- | Error encountered during parsing.
-  ParseErr :: ParseErrorBundle String Data.Void.Void -> IErr
+  ParseErr :: ParseErrorBundle String Data.Void.Void -> DiscoError
 
-  -- | An unbound name.
-  UnboundError  :: Name Core -> IErr
+  -- | Error encountered at runtime.
+  EvalErr :: EvalError -> DiscoError
 
-  -- | Division by zero.
-  DivByZero     ::              IErr
-
-  -- | Underflow, e.g. (2 - 3 : Nat)
-  Underflow     ::              IErr
-
-  -- | Overflow, e.g. (2^66)!
-  Overflow      ::              IErr
-
-  -- | Non-exhaustive case analysis.
-  NonExhaustive ::              IErr
-
-  -- | Trying to count an infinite type.
-  InfiniteTy    :: Type      -> IErr
-
-  -- | XXX
-  Panic         :: String    -> IErr
-
-  -- | User-generated crash.
-  Crash         :: String    -> IErr
+  -- | Something that shouldn't happen; indicates the presence of a
+  --   bug.
+  Panic         :: String    -> DiscoError
 
   deriving Show
-  deriving anyclass Exception
+
+-- | Errors that can be generated at runtime.
+data EvalError where
+
+  -- | An unbound name.
+  UnboundError  :: Name Core -> EvalError
+
+  -- | Division by zero.
+  DivByZero     ::              EvalError
+
+  -- | Underflow, e.g. (2 - 3 : Nat)
+  Underflow     ::              EvalError
+
+  -- | Overflow, e.g. (2^66)!
+  Overflow      ::              EvalError
+
+  -- | Non-exhaustive case analysis.
+  NonExhaustive ::              EvalError
+
+  -- | User-generated crash.
+  Crash         :: String    -> EvalError
+
+  deriving Show

@@ -228,9 +228,9 @@ lineParser allCommands
 
   -- Then try some other built-in command forms.
   <|> try (SomeREPL Nop <$ (sc <* eof))
-  <|> try ((SomeREPL . Using) <$> (reserved "using" *> parseExtName))
-  <|> try ((SomeREPL . Import) <$> parseImport)
-  <|> try ((SomeREPL . Eval) <$> term)
+  <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
+  <|> try (SomeREPL . Import <$> parseImport)
+  <|> try (SomeREPL . Eval <$> term)
   <|> (SomeREPL <$> letParser)
 
 -- | Given a list of available REPL commands and the currently enabled
@@ -334,7 +334,7 @@ handleDoc (Doc x) = do
     Nothing -> outputLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
-      outputLn $ p
+      outputLn p
       case M.lookup x docs of
         Just (DocString ss : _) -> outputLn $ "\n" ++ unlines ss
         _                       -> return ()
@@ -547,7 +547,7 @@ handleNames Names = do
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
     showFn (x, ty) = do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
-      outputLn $ p
+      outputLn p
 
 ------------------------------------------------------------
 -- nop

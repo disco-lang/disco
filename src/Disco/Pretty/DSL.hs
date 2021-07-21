@@ -1,5 +1,5 @@
 {-# LANGUAGE DerivingVia                #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 
 -----------------------------------------------------------------------------
 -- |

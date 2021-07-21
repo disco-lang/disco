@@ -1,6 +1,6 @@
 {-# LANGUAGE ConstraintKinds      #-}
-{-# LANGUAGE DeriveFoldable       #-}
-{-# LANGUAGE DeriveFunctor        #-}
+
+
 {-# LANGUAGE DeriveTraversable    #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE UndecidableInstances #-}

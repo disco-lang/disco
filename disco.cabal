@@ -274,11 +274,34 @@ source-repository head
   location: git://github.com/disco-lang/disco.git
 
 library
+  ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
+  default-extensions:  DataKinds
+                       DeriveGeneric
+                       FlexibleContexts
+                       FlexibleInstances
+                       GADTs
+                       LambdaCase
+                       MultiParamTypeClasses
+                       PolyKinds
+                       RankNTypes
+                       ScopedTypeVariables
+                       TupleSections
+                       TypeApplications
+                       TypeOperators
+                       TypeFamilies
+                       ViewPatterns
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
                        Disco.Extensions
-                       Disco.Capability
+                       Disco.Effects.Counter
+                       Disco.Effects.Error
+                       Disco.Effects.Fresh
+                       Disco.Effects.Input
+                       Disco.Effects.LFresh
+                       Disco.Effects.Output
+                       Disco.Effects.Random
+                       Disco.Effects.Store
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic
@@ -289,7 +312,7 @@ library
                        Disco.Module
                        Disco.Parser
                        Disco.Pretty
-                       Disco.Pretty.Monadic
+                       Disco.Pretty.DSL
                        Disco.Pretty.Prec
                        Disco.Property
                        Disco.Desugar
@@ -311,26 +334,11 @@ library
                        Disco.Types.Qualifiers
                        Disco.Types.Rules
                        Disco.Util
-                       Disco.Interactive.Eval
-                       Disco.Interactive.Parser
                        Disco.Interactive.CmdLine
-                       Disco.Interactive.Types
                        Disco.Interactive.Commands
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
-
-  other-extensions:
-                       GADTs
-                       RankNTypes
-                       TypeFamilies
-                       ViewPatterns
-                       FlexibleContexts
-                       FlexibleInstances
-                       MultiParamTypeClasses
-                       NondecreasingIndentation
-                       TemplateHaskell
-                       UndecidableInstances
 
   build-depends:       base >=4.8 && <4.16,
                        filepath,
@@ -343,7 +351,9 @@ library
                        transformers >= 0.4 && < 0.6,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       capability >= 0.4 && < 0.5,
+                       polysemy >= 1.6.0.0 && < 1.7,
+                       polysemy-plugin >= 0.4 && < 0.5,
+                       polysemy-zoo >= 0.7 && < 0.8,
                        lens >= 4.14 && < 5.1,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.13,
@@ -352,6 +362,7 @@ library
                        haskeline >=0.8 && <0.9,
                        exceptions >= 0.10 && < 0.11,
                        QuickCheck >= 2.9 && < 2.15,
+                       splitmix >= 0.1 && < 0.2,
                        fgl >= 5.5 && < 5.8,
                        optparse-applicative >= 0.12 && < 0.17,
                        oeis >= 0.3.10,

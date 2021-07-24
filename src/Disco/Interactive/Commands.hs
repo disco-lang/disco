@@ -1,6 +1,5 @@
-{-# LANGUAGE DataKinds        #-}
-{-# LANGUAGE GADTs            #-}
-{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE KindSignatures     #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -10,6 +9,9 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
+-- Defining and dispatching all commands/functionality available at
+-- the REPL prompt.
+--
 -----------------------------------------------------------------------------
 
 module Disco.Interactive.Commands
@@ -17,200 +19,350 @@ module Disco.Interactive.Commands
     dispatch,
     discoCommands,
     handleLoad,
-    loadFile
+    loadFile,
+    parseLine
   ) where
 
-import           Capability.State
 import           Control.Arrow                    ((&&&))
-import           Control.Exception                (IOException, handle)
-import           Control.Lens                     (view, (%~), (.~))
+import           Control.Lens                     (view, (%~), (?~))
 import           Control.Monad.Except
+import           Data.Char                        (isSpace)
 import           Data.Coerce
-import           Data.List                        (sortBy)
+import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
 import           Data.Typeable
 import           System.FilePath                  (splitFileName)
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Capability
 import           Disco.Compile
 import           Disco.Context
 import           Disco.Desugar
+import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
-import           Disco.Interactive.Parser
-import           Disco.Interactive.Types
 import           Disco.Interpret.Core
 import           Disco.Module
 import           Disco.Parser                     (Parser, ident, parseExtName,
                                                    parseImport, parseModule,
-                                                   reserved, reservedOp, sc,
-                                                   term)
+                                                   reserved, reservedOp,
+                                                   runParser, sc, symbol, term,
+                                                   withExts)
 import           Disco.Pretty
 import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
-import           Disco.Typecheck.Monad
-import           Disco.Types
-import           Disco.Util
 import           Disco.Value
-import           Text.Megaparsec                  hiding (runParser)
-import           Unbound.Generics.LocallyNameless
 
-dispatch :: [SomeREPLCommand] -> SomeREPLExpr -> Disco ()
+import           Text.Megaparsec                  hiding (State, runParser)
+import qualified Text.Megaparsec.Char             as C
+import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
+                                                   string2Name)
+
+import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.Reader
+import           Polysemy.State
+
+------------------------------------------------------------
+-- REPL expression type
+------------------------------------------------------------
+
+-- | Data type to represent things typed at the Disco REPL.  Each
+--   constructor has a singleton type to facilitate dispatch.
+data REPLExpr :: CmdTag -> * where
+  Using     :: Ext -> REPLExpr 'CUsing             -- Enable an extension
+  Let       :: Name Term -> Term -> REPLExpr 'CLet -- Toplevel let-expression: for the REPL
+  TypeCheck :: Term -> REPLExpr 'CTypeCheck        -- Typecheck a term
+  Eval      :: Term -> REPLExpr 'CEval             -- Evaluate a term
+  TestProp  :: Term -> REPLExpr 'CTestProp         -- Run a property test
+  ShowDefn  :: Name Term -> REPLExpr 'CShowDefn    -- Show a variable's definition
+  Parse     :: Term -> REPLExpr 'CParse            -- Show the parsed AST
+  Pretty    :: Term -> REPLExpr 'CPretty           -- Pretty-print a term
+  Ann       :: Term -> REPLExpr 'CAnn              -- Show type-annotated typechecked term
+  Desugar   :: Term -> REPLExpr 'CDesugar          -- Show a desugared term
+  Compile   :: Term -> REPLExpr 'CCompile          -- Show a compiled term
+  RNF       :: Term -> REPLExpr 'CRNF
+  Mem       :: REPLExpr 'CMem
+  Import    :: String -> REPLExpr 'CImport         -- Import a library module.
+  Load      :: FilePath -> REPLExpr 'CLoad         -- Load a file.
+  Reload    :: REPLExpr 'CReload                   -- Reloads the most recently loaded file.
+  Doc       :: Name Term -> REPLExpr 'CDoc         -- Show documentation.
+  Nop       :: REPLExpr 'CNop                      -- No-op, e.g. if the user
+                                                   -- just enters a comment
+  Help      :: REPLExpr 'CHelp
+  Names     :: REPLExpr 'CNames
+
+deriving instance Show (REPLExpr c)
+
+-- | An existential wrapper around any REPL expression.
+data SomeREPLExpr where
+  SomeREPL :: Typeable c => REPLExpr c -> SomeREPLExpr
+
+------------------------------------------------------------
+-- REPL command types
+------------------------------------------------------------
+
+data REPLCommandCategory =
+    User    -- ^ REPL commands for everyday users
+  | Dev     -- ^ REPL commands for developers working on Disco
+  deriving (Eq, Show)
+
+data REPLCommandType =
+    BuiltIn   -- ^ Things that don't start with a colon, e.g. let, import, using, eval
+              --   XXX these should eventually go away.
+  | ShellCmd  -- ^ Things that start with a colon, e.g. :help, :names, :load...
+  deriving (Eq, Show)
+
+-- | Tags used at the type level to denote each REPL command.
+data CmdTag = CUsing | CLet | CTypeCheck | CEval | CShowDefn
+  | CParse | CPretty | CAnn | CDesugar | CCompile | CRNF | CMem | CImport | CLoad
+  | CReload | CDoc | CNop | CHelp | CNames | CTestProp
+  deriving (Show, Eq, Typeable)
+
+------------------------------------------------------------
+-- REPL command info record
+------------------------------------------------------------
+
+-- | Data type to represent all the information about a single REPL
+--   command.
+data REPLCommand (c :: CmdTag) = REPLCommand
+  { name      :: String    -- ^ Name of the command
+  , helpcmd   :: String    -- ^ Help text showing how to use the command, e.g. ":ann <term>"
+  , shortHelp :: String    -- ^ Short free-form text explaining the command.
+                           --   We could also consider adding long help text as well.
+  , category  :: REPLCommandCategory  -- ^ Is the command for users or devs?
+  , cmdtype   :: REPLCommandType      -- ^ Is it a built-in command or colon command?
+  , action    :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ())
+                                      -- ^ The action to execute,
+                                      -- given the input to the
+                                      -- command.
+  , parser    :: Parser (REPLExpr c) -- ^ Parser for the command argument(s).
+  }
+
+-- | An existential wrapper around any REPL command info record.
+data SomeREPLCommand where
+  SomeCmd :: Typeable c => REPLCommand c -> SomeREPLCommand
+
+------------------------------------------------------------
+-- REPL command lists
+------------------------------------------------------------
+
+type REPLCommands = [SomeREPLCommand]
+
+-- | Filter out commands that don't start with ':' (ex: "let" vs ":load")
+withoutBuiltins :: REPLCommands -> REPLCommands
+withoutBuiltins = filter (\(SomeCmd rc) -> cmdtype rc /= BuiltIn)
+
+-- | Given a list of REPL commands and something typed at the REPL,
+--   pick the first command with a matching type-level tag and run its
+--   associated action.
+dispatch :: Members DiscoEffects r => REPLCommands -> SomeREPLExpr -> Sem r ()
 dispatch [] _ = return ()
 dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
-  Just e' -> action c e'
+  Just e' -> outputErrors @DiscoError $ action c e'
   Nothing -> dispatch cs r
 
--- Resolution of REPL commands searches this list _in order_, which means
--- ambiguous command prefixes (e.g. :t for :type) are resolved to the first
--- matching command.
-discoCommands :: [SomeREPLCommand]
+-- | The list of all commands that can be used at the REPL.
+--   Resolution of REPL commands searches this list /in order/, which
+--   means ambiguous command prefixes (e.g. :t for :type) are resolved
+--   to the first matching command.
+discoCommands :: REPLCommands
 discoCommands =
-  [
-    SomeCmd annCmd,
-    SomeCmd compileCmd,
-    SomeCmd desugarCmd,
-    SomeCmd docCmd,
-    SomeCmd evalCmd,
-    SomeCmd helpCmd,
-    SomeCmd importCmd,
-    SomeCmd letCmd,
-    SomeCmd loadCmd,
-    SomeCmd namesCmd,
-    SomeCmd nopCmd,
-    SomeCmd parseCmd,
-    SomeCmd prettyCmd,
-    SomeCmd reloadCmd,
-    SomeCmd showDefnCmd,
-    SomeCmd typeCheckCmd,
-    SomeCmd testPropCmd,
-    SomeCmd usingCmd
+  [ SomeCmd annCmd
+  , SomeCmd compileCmd
+  , SomeCmd desugarCmd
+  , SomeCmd docCmd
+  , SomeCmd evalCmd
+  , SomeCmd helpCmd
+  , SomeCmd importCmd
+  , SomeCmd letCmd
+  , SomeCmd loadCmd
+  , SomeCmd memCmd
+  , SomeCmd namesCmd
+  , SomeCmd nopCmd
+  , SomeCmd parseCmd
+  , SomeCmd prettyCmd
+  , SomeCmd reloadCmd
+  , SomeCmd rnfCmd
+  , SomeCmd showDefnCmd
+  , SomeCmd typeCheckCmd
+  , SomeCmd testPropCmd
+  , SomeCmd usingCmd
   ]
 
-------------------------------------------
--- Commands
-------------------------------------------
+------------------------------------------------------------
+-- Parsing
+------------------------------------------------------------
+
+-- | Parse one of the colon commands in the given list of commands.
+commandParser :: REPLCommands -> Parser SomeREPLExpr
+commandParser allCommands
+  = (symbol ":" *> many C.lowerChar) >>= parseCommandArgs allCommands
+
+-- | Given a list of available commands and a string seen after a
+--   colon, return a parser for its arguments.
+parseCommandArgs ::  REPLCommands -> String -> Parser SomeREPLExpr
+parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
+  where
+    badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
+
+    parsers
+      = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc))
+      $ withoutBuiltins allCommands     -- filter out commands that don't start with ':'
+
+-- | Parse a file name.
+fileParser :: Parser FilePath
+fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
+
+-- | A parser for something entered at the REPL prompt.
+lineParser :: REPLCommands -> Parser SomeREPLExpr
+lineParser allCommands
+  -- First try parsing a colon command.
+  =   commandParser allCommands
+
+  -- Then try some other built-in command forms.
+  <|> try (SomeREPL Nop <$ (sc <* eof))
+  <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
+  <|> try (SomeREPL . Import <$> parseImport)
+  <|> try (SomeREPL . Eval <$> parseModule)
+  <|> (SomeREPL <$> letParser)
+
+-- | Given a list of available REPL commands and the currently enabled
+--   extensions, parse a string entered at the REPL prompt, returning
+--   either a parse error message or a parsed REPL expression.
+parseLine :: REPLCommands -> ExtSet -> String -> Either String SomeREPLExpr
+parseLine allCommands exts s =
+  case runParser (withExts exts (lineParser allCommands)) "" s of
+    Left  e -> Left $ errorBundlePretty e
+    Right l -> Right l
+
+--------------------------------------------------------------------------------
+-- The commands!
+--------------------------------------------------------------------------------
+
+------------------------------------------------------------
+-- :ann
 
 annCmd :: REPLCommand 'CAnn
-annCmd =
-    REPLCommand {
-      name = "ann",
-      helpcmd = ":ann",
-      shortHelp = "Show type-annotated typechecked term",
-      category = Dev,
-      cmdtype = ShellCmd,
-      action = handleAnn,
-      parser = Ann <$> term
-    }
+annCmd = REPLCommand
+  { name = "ann"
+  , helpcmd = ":ann"
+  , shortHelp = "Show type-annotated typechecked term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleAnn
+  , parser = Ann <$> term
+  }
 
-handleAnn :: Has '[St "top", MonadIO] m => REPLExpr 'CAnn -> m ()
+handleAnn
+  :: Members '[Error DiscoError, Input TopInfo, Output String] r
+  => REPLExpr 'CAnn -> Sem r ()
 handleAnn (Ann t) = do
-    ctx   <- gets @"top" (view topCtx)
-    tymap <- gets @"top" (view topTyDefs)
-    s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
-        Left  e       -> return . show $ e
-        Right (at, _) -> return . show $ at
-    iputStrLn s
+  (at, _) <- typecheckDisco $ inferTop t
+  outputLn (show at)
+
+------------------------------------------------------------
+-- :compile
 
 compileCmd :: REPLCommand 'CCompile
-compileCmd =
-    REPLCommand {
-      name = "compile",
-      helpcmd = ":compile",
-      shortHelp = "Show a compiled term",
-      category = Dev,
-      cmdtype = ShellCmd,
-      action = handleCompile,
-      parser = Compile <$> term
-    }
+compileCmd = REPLCommand
+  { name = "compile"
+  , helpcmd = ":compile"
+  , shortHelp = "Show a compiled term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleCompile
+  , parser = Compile <$> term
+  }
 
-handleCompile :: Has '[St "top", MonadIO] m => REPLExpr 'CCompile -> m ()
+handleCompile
+  :: Members '[Error DiscoError, Input TopInfo, Output String] r
+  => REPLExpr 'CCompile -> Sem r ()
 handleCompile (Compile t) = do
-  ctx <- gets @"top" (view topCtx)
-  s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
-        Left e       -> return . show $ e
-        Right (at,_) -> return . show . compileTerm $ at
-  iputStrLn s
+  (at, _) <- typecheckDisco $ inferTop t
+  outputLn . show . compileTerm $ at
 
+------------------------------------------------------------
+-- :desugar
 
 desugarCmd :: REPLCommand 'CDesugar
-desugarCmd =
-    REPLCommand {
-      name = "desugar",
-      helpcmd = ":desugar",
-      shortHelp = "Show a desugared term",
-      category = Dev,
-      cmdtype = ShellCmd,
-      action = handleDesugar,
-      parser = Desugar <$> term
-    }
+desugarCmd = REPLCommand
+  { name = "desugar"
+  , helpcmd = ":desugar"
+  , shortHelp = "Show a desugared term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleDesugar
+  , parser = Desugar <$> term
+  }
 
-handleDesugar :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CDesugar -> m ()
+handleDesugar
+  :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r
+  => REPLExpr 'CDesugar -> Sem r ()
 handleDesugar (Desugar t) = do
-  ctx <- gets @"top" (view topCtx)
-  s <- case evalTCM (extends @"tyctx" ctx $ inferTop t) of
-        Left e       -> return.show $ e
-        Right (at,_) -> renderDoc . prettyTerm . eraseDTerm . runDSM . desugarTerm $ at
-  iputStrLn s
+  (at, _) <- typecheckDisco $ inferTop t
+  s <- renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
+  outputLn s
+
+------------------------------------------------------------
+-- :doc
 
 docCmd :: REPLCommand 'CDoc
-docCmd =
-    REPLCommand {
-      name = "doc",
-      helpcmd = ":doc <term>",
-      shortHelp = "Show documentation",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleDoc,
-      parser = Doc <$> (sc *> ident)
-    }
+docCmd = REPLCommand
+  { name = "doc"
+  , helpcmd = ":doc <term>"
+  , shortHelp = "Show documentation"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleDoc
+  , parser = Doc <$> (sc *> ident)
+  }
 
-handleDoc :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CDoc -> m ()
+handleDoc
+  :: Members '[Input TopInfo, LFresh, Output String] r
+  => REPLExpr 'CDoc -> Sem r ()
 handleDoc (Doc x) = do
-  ctx  <- gets @"top" (view topCtx)
-  docs <- gets @"top" (view topDocs)
+  ctx  <- inputs @TopInfo (view topCtx)
+  docs <- inputs @TopInfo (view topDocs)
   case M.lookup x ctx of
-    Nothing -> io . putStrLn $ "No documentation found for " ++ show x ++ "."
+    Nothing -> outputLn $ "No documentation found for " ++ show x ++ "."
     Just ty -> do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
-      io . putStrLn $ p
+      outputLn p
       case M.lookup x docs of
-        Just (DocString ss : _) -> io . putStrLn $ "\n" ++ unlines ss
+        Just (DocString ss : _) -> outputLn $ "\n" ++ unlines ss
         _                       -> return ()
 
+------------------------------------------------------------
+-- eval
+
 evalCmd :: REPLCommand 'CEval
-evalCmd =
-    REPLCommand {
-      name = "eval",
-      helpcmd = "<term>",
-      shortHelp = "Evaluate a term",
-      category = User,
-      cmdtype = BuiltIn,
-      action = handleEval,
-      parser = Eval <$> parseModule
-    }
+evalCmd = REPLCommand
+  { name      = "eval"
+  , helpcmd   = "<code>"
+  , shortHelp = "Evaluate a block of code"
+  , category  = User
+  , cmdtype   = BuiltIn
+  , action    = handleEval
+  , parser    = Eval <$> term
+  }
 
-handleEval :: (Has '[St "top"] m, MonadDisco m) => REPLExpr 'CEval -> m ()
+handleEval
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
+  => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = do
-  ctx   <- gets @"top" (view topCtx)
-  tymap <- gets @"top" (view topTyDefs)
-
-  mi <- checkModule m   -- XXX need to create a local Reader "tyctx" capability for this!
-  return ()
+  checkModule m
 
   -- XXX change this to typecheck a module, get the resulting ModuleInfo,
   -- then add stuff from it to the current context
-  -- case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t) of
-  --   Left e   -> iprint e    -- XXX pretty-print
-  --   Right (at,_) -> evalTerm at
 
--- XXX call this for every top-level term from handleEval
-evalTerm :: (Has '[St "top"] m, MonadDisco m) => ATerm -> m ()
 evalTerm at = do
   v <- withTopEnv $ do
     cv <- mkValue c
@@ -224,25 +376,27 @@ evalTerm at = do
     ty = getType at
     c  = compileTerm at
 
+------------------------------------------------------------
+-- :help
 
 helpCmd :: REPLCommand 'CHelp
 helpCmd =
-    REPLCommand {
-      name = "help",
-      helpcmd = ":help",
-      shortHelp = "Show help",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleHelp,
-      parser = return Help
-    }
+  REPLCommand
+  { name = "help"
+  , helpcmd = ":help"
+  , shortHelp = "Show help"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleHelp
+  , parser = return Help
+  }
 
-handleHelp :: MonadIO m => REPLExpr 'CHelp -> m ()
+handleHelp :: Member (Output String) r => REPLExpr 'CHelp -> Sem r ()
 handleHelp Help = do
-  iputStrLn "Commands available from the prompt:\n"
+  outputLn "Commands available from the prompt:\n"
   let maxlen = longestCmd discoCommands
-  mapM_ (\(SomeCmd c) -> iputStrLn $ showCmd c maxlen) $  sortedList discoCommands
-  iputStrLn ""
+  mapM_ (\(SomeCmd c) -> outputLn $ showCmd c maxlen) $  sortedList discoCommands
+  outputLn ""
   where
     sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
@@ -252,252 +406,303 @@ handleHelp Help = do
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
 
+------------------------------------------------------------
+-- import
+
 importCmd :: REPLCommand 'CImport
-importCmd =
-    REPLCommand {
-      name = "import",
-      helpcmd = ":import <module>",
-      shortHelp = "Import a library module",
-      category = User,
-      cmdtype = BuiltIn,
-      action = handleImport,
-      parser = Import <$> parseImport
-    }
+importCmd = REPLCommand
+  { name = "import"
+  , helpcmd = ":import <module>"
+  , shortHelp = "Import a library module"
+  , category = User
+  , cmdtype = BuiltIn
+  , action = handleImport
+  , parser = Import <$> parseImport
+  }
 
 handleImport
-  :: Has '[St "top", Rd "env", Sc "nextloc", St "mem", Th "err", Ct "err", MonadIO] m
-  => REPLExpr 'CImport -> m ()
-handleImport (Import modName) = catchAndPrintErrors () $ do
+  :: Members
+       '[ Error DiscoError, State TopInfo, Reader Env
+        , Store Cell, Output String, Output Debug, Embed IO]
+       r
+  => REPLExpr 'CImport -> Sem r ()
+handleImport (Import modName) = do
   mi <- loadDiscoModule FromCwdOrStdlib modName
   addModule mi
 
+------------------------------------------------------------
+-- let
 
 letCmd :: REPLCommand 'CLet
-letCmd =
-    REPLCommand {
-      name = "let",
-      helpcmd = "<variable> = <expression>",
-      shortHelp = "Temporarily define a variable (until the next :load)",
-      category = User,
-      cmdtype = BuiltIn,
-      action = handleLet,
-      parser = letParser
-    }
+letCmd = REPLCommand
+  { name = "let"
+  , helpcmd = "<variable> = <expression>"
+  , shortHelp = "Temporarily define a variable (until the next :load)"
+  , category = User
+  , cmdtype = BuiltIn
+  , action = handleLet
+  , parser = letParser
+  }
 
-handleLet :: Has '[St "top", St "mem", Sc "nextloc", Rd "env", MonadIO] m => REPLExpr 'CLet -> m ()
+handleLet
+  :: Members
+       '[ Error DiscoError, State TopInfo, Store Cell, Reader Env
+        , Output String, Output Debug]
+       r
+  => REPLExpr 'CLet -> Sem r ()
 handleLet (Let x t) = do
-  ctx   <- gets @"top" (view topCtx)
-  tymap <- gets @"top" (view topTyDefs)
-  let mat = evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t)
-  case mat of
-    Left e -> io.print $ e   -- XXX pretty print
-    Right (at, sig) -> do
-      let c = compileTerm at
-      thnk <- withTopEnv (mkValue c)
-      modify @"top" $
-        (topCtx  %~ M.insert x sig) .
-          -- XXX ability to define more complex things at REPL prompt, with patterns etc.
-        (topDefs %~ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])) .
-        (topEnv  %~ M.insert (coerce x) thnk)
+  (at, sig) <- inputToState . typecheckDisco $ inferTop t
+  let c = compileTerm at
+  thnk <- inputToState . withTopEnv $ mkValue c
+  modify @TopInfo $
+    (topCtx  %~ M.insert x sig) .
+      -- XXX ability to define more complex things at REPL prompt, with patterns etc.
+    (topDefs %~ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])) .
+    (topEnv  %~ M.insert (coerce x) thnk)
+
+letParser :: Parser (REPLExpr 'CLet)
+letParser = Let
+  <$> ident
+  <*> (symbol "=" *> term)
+
+------------------------------------------------------------
+-- :load
 
 loadCmd :: REPLCommand 'CLoad
-loadCmd =
-    REPLCommand {
-      name = "load",
-      helpcmd = ":load <filename>",
-      shortHelp = "Load a file",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleLoadWrapper,
-      parser = Load <$> fileParser
-    }
+loadCmd = REPLCommand
+  { name = "load"
+  , helpcmd = ":load <filename>"
+  , shortHelp = "Load a file"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleLoadWrapper
+  , parser = Load <$> fileParser
+  }
 
 -- | Parses, typechecks, and loads a module by first recursively loading any imported
 --   modules by calling loadDiscoModule. If no errors are thrown, any tests present
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
-handleLoadWrapper :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => REPLExpr 'CLoad -> m ()
+handleLoadWrapper
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  => REPLExpr 'CLoad -> Sem r ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
-handleLoad :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => FilePath -> m Bool
-handleLoad fp = catchAndPrintErrors False $ do
+handleLoad
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  => FilePath -> Sem r Bool
+handleLoad fp = do
   let (directory, modName) = splitFileName fp
   m@(ModuleInfo _ props _ _ _ _) <- loadDiscoModule (FromDir directory) modName
   setLoadedModule m
-  t <- withTopEnv $ runAllTests props
-  put @"lastfile" $ Just fp
-  io . putStrLn $ "Loaded."
+  t <- inputToState . withTopEnv $ runAllTests props
+  modify @TopInfo (lastFile ?~ fp)
+  outputLn "Loaded."
   garbageCollect
   return t
 
+-- XXX Return a structured summary of the results, not a Bool;
+-- separate out results generation and pretty-printing, & move this
+-- somewhere else.
+runAllTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Ctx ATerm [AProperty] -> Sem r Bool  -- (Ctx ATerm [TestResult])
+runAllTests aprops
+  | M.null aprops = return True
+  | otherwise     = do
+      outputLn "Running tests..."
+      and <$> mapM (uncurry runTests) (M.assocs aprops)
+
+  where
+    numSamples :: Int
+    numSamples = 50   -- XXX make this configurable somehow
+
+    runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Name ATerm -> [AProperty] -> Sem r Bool
+    runTests n props = do
+      output ("  " ++ name2String n ++ ":")
+      results <- traverse (sequenceA . (id &&& runTest numSamples)) props
+      let failures = filter (not . testIsOk . snd) results
+      case null failures of
+        True  -> outputLn " OK"
+        False -> do
+          outputLn ""
+          forM_ failures (uncurry prettyTestFailure)
+      return (null failures)
+
+------------------------------------------------------------
+-- :names
 
 namesCmd :: REPLCommand 'CNames
-namesCmd =
-    REPLCommand {
-      name = "names",
-      helpcmd = ":names",
-      shortHelp = "Show all names in current scope",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleNames,
-      parser = return Names
-    }
+namesCmd = REPLCommand
+  { name = "names"
+  , helpcmd = ":names"
+  , shortHelp = "Show all names in current scope"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleNames
+  , parser = return Names
+  }
 
 -- | Show names and types for each item in the top-level context.
-handleNames :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CNames -> m ()
+handleNames
+  :: Members '[Input TopInfo, LFresh, Output String] r
+  => REPLExpr 'CNames -> Sem r ()
 handleNames Names = do
-  ctx   <- gets @"top" (view topCtx)
-  tyDef <- gets @"top" (view topTyDefs)
+  ctx   <- inputs @TopInfo (view topCtx)
+  tyDef <- inputs @TopInfo (view topTyDefs)
   mapM_ showTyDef $ M.toList tyDef
   mapM_ showFn $ M.toList ctx
   where
-      showTyDef (nm, body) = do
-        p <- renderDoc (prettyTyDef nm body)
-        io . putStrLn $ p
-      showFn (x, ty) = do
-        p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
-        io . putStrLn $ p
+    showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
+    showFn (x, ty) = do
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+      outputLn p
 
+------------------------------------------------------------
+-- nop
 
 nopCmd :: REPLCommand 'CNop
-nopCmd =
-    REPLCommand {
-      name = "nop",
-      helpcmd = "",
-      shortHelp = "No-op, e.g. if the user just enters a comment",
-      category = Dev,
-      cmdtype = BuiltIn,
-      action = handleNop,
-      parser = Nop <$ (sc <* eof)
-    }
+nopCmd = REPLCommand
+  { name = "nop"
+  , helpcmd = ""
+  , shortHelp = "No-op, e.g. if the user just enters a comment"
+  , category = Dev
+  , cmdtype = BuiltIn
+  , action = handleNop
+  , parser = Nop <$ (sc <* eof)
+  }
 
-handleNop :: Applicative m => REPLExpr 'CNop -> m ()
+handleNop :: REPLExpr 'CNop -> Sem r ()
 handleNop Nop = pure ()
 
+------------------------------------------------------------
+-- :parse
 
 parseCmd :: REPLCommand 'CParse
-parseCmd =
-    REPLCommand {
-      name = "parse",
-      helpcmd = ":parse <expr>",
-      shortHelp = "Show the parsed AST",
-      category = Dev,
-      cmdtype = ShellCmd,
-      action = handleParse,
-      parser = Parse <$> term
-    }
+parseCmd = REPLCommand
+  { name = "parse"
+  , helpcmd = ":parse <expr>"
+  , shortHelp = "Show the parsed AST"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleParse
+  , parser = Parse <$> term
+  }
 
-handleParse :: MonadIO m => REPLExpr 'CParse -> m ()
-handleParse (Parse t) = iprint t
+handleParse :: Member (Output String) r => REPLExpr 'CParse -> Sem r ()
+handleParse (Parse t) = printoutLn t
 
+------------------------------------------------------------
+-- :pretty
 
 prettyCmd :: REPLCommand 'CPretty
-prettyCmd =
-    REPLCommand {
-      name = "pretty",
-      helpcmd = ":pretty <expr>",
-      shortHelp = "Pretty-print a term",
-      category = Dev,
-      cmdtype = ShellCmd,
-      action = handlePretty,
-      parser = Pretty <$> term
-    }
+prettyCmd = REPLCommand
+  { name = "pretty"
+  , helpcmd = ":pretty <expr>"
+  , shortHelp = "Pretty-print a term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handlePretty
+  , parser = Pretty <$> term
+  }
 
-handlePretty :: Has '[MonadIO, LFresh] m => REPLExpr 'CPretty -> m ()
-handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= iputStrLn
+handlePretty :: Members '[LFresh, Output String] r => REPLExpr 'CPretty -> Sem r ()
+handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= outputLn
 
+------------------------------------------------------------
+-- :reload
 
 reloadCmd :: REPLCommand 'CReload
-reloadCmd =
-    REPLCommand {
-      name = "reload",
-      helpcmd = ":reload",
-      shortHelp = "Reloads the most recently loaded file",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleReload,
-      parser = return Reload
-    }
+reloadCmd = REPLCommand
+  { name = "reload"
+  , helpcmd = ":reload"
+  , shortHelp = "Reloads the most recently loaded file"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleReload
+  , parser = return Reload
+  }
 
-handleReload :: (Has '[St "top", St "lastfile"] m, MonadDisco m) => REPLExpr 'CReload -> m ()
+handleReload
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  => REPLExpr 'CReload -> Sem r ()
 handleReload Reload = do
-      file <- get @"lastfile"
-      case file of
-        Nothing -> iputStrLn "No file to reload."
-        Just f  -> void (handleLoad f)
+  file <- gets (view lastFile)
+  case file of
+    Nothing -> outputLn "No file to reload."
+    Just f  -> void (handleLoad f)
 
+------------------------------------------------------------
+-- :defn
 
 showDefnCmd :: REPLCommand 'CShowDefn
-showDefnCmd =
-    REPLCommand {
-      name = "defn",
-      helpcmd = ":defn <var>",
-      shortHelp = "Show a variable's definition",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleShowDefn,
-      parser = ShowDefn <$> (sc *> ident)
-    }
+showDefnCmd = REPLCommand
+  { name = "defn"
+  , helpcmd = ":defn <var>"
+  , shortHelp = "Show a variable's definition"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleShowDefn
+  , parser = ShowDefn <$> (sc *> ident)
+  }
 
-handleShowDefn :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CShowDefn -> m ()
+handleShowDefn
+  :: Members '[Input TopInfo, LFresh, Output String] r
+  => REPLExpr 'CShowDefn -> Sem r ()
 handleShowDefn (ShowDefn x) = do
-  defns   <- gets @"top" (view topDefs)
-  tyDefns <- gets @"top" (view topTyDefs)
+  let name2s = name2String x
+  defns   <- inputs @TopInfo (view topDefs)
+  tyDefns <- inputs @TopInfo (view topTyDefs)
   s <- case M.lookup (coerce x) defns of
-          Just d  -> renderDoc $ prettyDefn d
-          Nothing -> case M.lookup name2s tyDefns of
-            Just t  -> renderDoc $ prettyTyDef name2s t
-            Nothing -> return $ "No definition for " ++ show x
-  iputStrLn s
-  where
-    name2s = name2String x
+         Just d  -> renderDoc $ prettyDefn d
+         Nothing -> case M.lookup name2s tyDefns of
+           Just t  -> renderDoc $ prettyTyDef name2s t
+           Nothing -> return $ "No definition for " ++ show x
+  outputLn s
 
+------------------------------------------------------------
+-- :test
 
 testPropCmd :: REPLCommand 'CTestProp
-testPropCmd =
-    REPLCommand {
-      name = "test",
-      helpcmd = ":test <property>",
-      shortHelp = "Test a property using random examples",
-      category = User,
-      cmdtype = ShellCmd,
-      action = handleTest,
-      parser = TestProp <$> term
-    }
+testPropCmd = REPLCommand
+  { name = "test"
+  , helpcmd = ":test <property>"
+  , shortHelp = "Test a property using random examples"
+  , category = User
+  , cmdtype = ShellCmd
+  , action = handleTest
+  , parser = TestProp <$> term
+  }
 
-handleTest :: (Has '[St "top"] m, MonadDisco m) => REPLExpr 'CTestProp -> m ()
+handleTest
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
+  => REPLExpr 'CTestProp -> Sem r ()
 handleTest (TestProp t) = do
-  ctx   <- gets @"top" (view topCtx)
-  tymap <- gets @"top" (view topTyDefs)
-  case evalTCM (extends @"tyctx" ctx $ withTyDefns tymap $ checkProperty t) of
-    Left e   -> iprint e    -- XXX pretty-print
-    Right at -> do
-      withTopEnv $ do
-        r <- runTest 100 at   -- XXX make configurable
-        prettyTestResult at r
-      garbageCollect
+  at <- inputToState . typecheckDisco $ checkProperty t
+  inputToState . withTopEnv $ do
+    r <- runTest 100 at   -- XXX make configurable
+    prettyTestResult at r
+  garbageCollect
 
+------------------------------------------------------------
+-- :type
 
 typeCheckCmd :: REPLCommand 'CTypeCheck
-typeCheckCmd =
-    REPLCommand {
-        name = "type",
-        helpcmd = ":type <term>",
-        shortHelp = "Typecheck a term",
-        category = Dev,
-        cmdtype = ShellCmd,
-        action = handleTypeCheck,
-        parser = parseTypeCheck
-        }
+typeCheckCmd = REPLCommand
+  { name = "type"
+  , helpcmd = ":type <term>"
+  , shortHelp = "Typecheck a term"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleTypeCheck
+  , parser = parseTypeCheck
+  }
 
-handleTypeCheck :: Has '[St "top", MonadIO, LFresh] m => REPLExpr 'CTypeCheck -> m ()
+handleTypeCheck
+  :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r
+  => REPLExpr 'CTypeCheck -> Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  ctx   <- gets @"top" (view topCtx)
-  tymap <- gets @"top" (view topTyDefs)
-  s <- case evalTCM $ extends @"tyctx" ctx $ withTyDefns tymap $ inferTop t of
-        Left e        -> return.show $ e    -- XXX pretty-print
-        Right (_,sig) -> renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
-  iputStrLn s
+  (_, sig) <- typecheckDisco $ inferTop t
+  s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
+  outputLn s
 
 parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
 parseTypeCheck = TypeCheck <$>
@@ -516,154 +721,60 @@ parseNakedOp = sc *> choice (map mkOpParser (concat opTable))
     mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((TPrim (PrimUOp op) <$) . reservedOp) syns)
     mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((TPrim (PrimBOp op) <$) . reservedOp) syns)
 
+------------------------------------------------------------
+-- using
+
 usingCmd :: REPLCommand 'CUsing
-usingCmd =
-    REPLCommand {
-        name = "using",
-        helpcmd = "using <extension>",
-        shortHelp = "Enable an extension",
-        category = User,
-        cmdtype = BuiltIn,
-        action = handleUsing,
-        parser = Using <$> (reserved "using" *> parseExtName)
-        }
+usingCmd = REPLCommand
+  { name = "using"
+  , helpcmd = "using <extension>"
+  , shortHelp = "Enable an extension"
+  , category = User
+  , cmdtype = BuiltIn
+  , action = handleUsing
+  , parser = Using <$> (reserved "using" *> parseExtName)
+  }
 
-handleUsing :: Has '[St "exts"] m => REPLExpr 'CUsing -> m ()
-handleUsing (Using e) = modify @"exts" $ addExtension e
+handleUsing :: Member (State TopInfo) r => REPLExpr 'CUsing -> Sem r ()
+handleUsing (Using e) = modify @TopInfo $ (extSet %~ addExtension e)
 
-------------------------------------------
---- Util functions
-------------------------------------------
+------------------------------------------------------------
+-- :rnf
 
-fileNotFound :: MonadIO m => FilePath -> IOException -> m ()
-fileNotFound file _ = iputStrLn $ "File not found: " ++ file
+rnfCmd :: REPLCommand 'CRNF
+rnfCmd = REPLCommand
+  { name = "rnf"
+  , helpcmd = "rnf <expr>"
+  , shortHelp = "Reduce an expression to RNF"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleRNF
+  , parser = RNF <$> term
+  }
 
-loadFile :: MonadIO m => FilePath -> m (Maybe String)
-loadFile file = io $ handle (\e -> fileNotFound file e >> return Nothing) (Just <$> readFile file)
+handleRNF
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
+  => REPLExpr 'CRNF -> Sem r ()
+handleRNF (RNF t) = do
+  (at, _) <- inputToState . typecheckDisco $ inferTop t
+  let c  = compileTerm at
+  inputToState . withTopEnv $ do
+    cv <- mkValue c >>= rnfV
+    printoutLn cv
 
-addModule :: Has '[St "top", Rd "env", Sc "nextloc", St "mem", Th "err"] m => ModuleInfo -> m ()
-addModule mi = do
-  curMI <- gets @"top" (view topModInfo)
-  mi' <- adaptError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  setLoadedModule mi'
+------------------------------------------------------------
+-- :mem
 
--- | Add information from ModuleInfo to the Disco monad. This includes updating the
---   Disco monad with new term definitions, documentation, types, and type definitions.
---   Replaces any previously loaded module.
-setLoadedModule :: Has '[St "top", Rd "env", Sc "nextloc", St "mem"] m => ModuleInfo -> m ()
-setLoadedModule mi = do
-  modify @"top" $ topModInfo .~ mi
-  populateCurrentModuleInfo
+memCmd :: REPLCommand 'CMem
+memCmd = REPLCommand
+  { name = "mem"
+  , helpcmd = "mem"
+  , shortHelp = "Show the contents of memory"
+  , category = Dev
+  , cmdtype = ShellCmd
+  , action = handleMem
+  , parser = return Mem
+  }
 
-populateCurrentModuleInfo :: Has '[St "top", Rd "env", Sc "nextloc", St "mem"] m => m ()
-populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds _tms <- gets @"top" (view topModInfo)
-  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
-  modify @"top" $
-    (topDocs   .~ docs) .
-    (topCtx    .~ tys)  .
-    (topTyDefs .~ tyds) .
-    (topDefs   .~ tmds)
-  loadDefs cdefns
-  return ()
-
--- XXX redo with message framework, with proper support for indentation etc.
--- XXX move it to Pretty or Property or something
-prettyTestFailure :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestResult -> m ()
-prettyTestFailure _    (TestResult True _ _)    = return ()
-prettyTestFailure prop (TestResult False r env) = do
-  prettyFailureReason prop r
-  prettyTestEnv "    Counterexample:" env
-
-prettyTestResult :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestResult -> m ()
-prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
-prettyTestResult prop (TestResult _ r _)   = do
-    dp <- renderDoc $ prettyProperty (eraseProperty prop)
-    iputStr       "  - Test passed: " >> iputStrLn dp
-    prettySuccessReason r
-
-prettySuccessReason :: (Has '[St "top"] m, MonadDisco m) => TestReason -> m ()
-prettySuccessReason (TestFound (TestResult _ _ vs)) = do
-  prettyTestEnv "    Found example:" vs
-prettySuccessReason (TestNotFound Exhaustive) = do
-  iputStrLn     "    No counterexamples exist."
-prettySuccessReason (TestNotFound (Randomized n m)) = do
-  iputStr       "    Checked "
-  iputStr (show (n + m))
-  iputStrLn " possibilities without finding a counterexample."
-prettySuccessReason _ = return ()
-
-prettyFailureReason :: (Has '[St "top"] m, MonadDisco m) => AProperty -> TestReason -> m ()
-prettyFailureReason prop TestBool = do
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStr     "  - Test is false: " >> iputStrLn dp
-prettyFailureReason prop (TestEqual ty v1 v2) = do
-  iputStr     "  - Test result mismatch for: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStrLn dp
-  iputStr     "    - Left side:  " >> prettyValue ty v2
-  iputStr     "    - Right side: " >> prettyValue ty v1
-prettyFailureReason prop (TestRuntimeError e) = do
-  iputStr     "  - Test failed: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStrLn dp
-  iputStr     "    " >> iprint e
-prettyFailureReason prop (TestFound (TestResult _ r _)) = do
-  prettyFailureReason prop r
-prettyFailureReason prop (TestNotFound Exhaustive) = do
-  iputStr     "  - No example exists: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStrLn dp
-  iputStrLn   "    All possible values were checked."
-prettyFailureReason prop (TestNotFound (Randomized n m)) = do
-  iputStr     "  - No example was found: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  iputStrLn dp
-  iputStr     "    Checked " >> iputStr (show (n + m)) >> iputStrLn " possibilities."
-
-prettyTestEnv :: (Has '[St "top"] m, MonadDisco m) => String -> TestEnv -> m ()
-prettyTestEnv _ (TestEnv []) = return ()
-prettyTestEnv s (TestEnv vs) = do
-  iputStrLn s
-  mapM_ prettyBind vs
-  where
-    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
-    prettyBind (x, ty, v) = do
-      iputStr "      "
-      iputStr x
-      iputStr (replicate (maxNameLen - length x) ' ')
-      iputStr " = "
-      prettyValue ty v
-
-runTest :: MonadDisco m => Int -> AProperty -> m TestResult
-runTest n p = testProperty (Randomized n' n') =<< mkValue (compileProperty p)
-  where
-    n' = fromIntegral (n `div` 2)
-
--- XXX Return a structured summary of the results, not a Bool;
--- separate out results generation and pretty-printing.  Then move it
--- to the Property module.
-runAllTests :: (Has '[St "top"] m, MonadDisco m) => Ctx ATerm [AProperty] -> m Bool  -- (Ctx ATerm [TestResult])
-runAllTests aprops
-  | M.null aprops = return True
-  | otherwise     = do
-      io $ putStrLn "Running tests..."
-      and <$> mapM (uncurry runTests) (M.assocs aprops)
-      -- XXX eventually this should be moved into Disco.Property and
-      -- use a logging framework?
-
-  where
-    numSamples :: Int
-    numSamples = 50   -- XXX make this configurable somehow
-
-    runTests :: (Has '[St "top"] m, MonadDisco m) => Name ATerm -> [AProperty] -> m Bool
-    runTests n props = do
-      iputStr ("  " ++ name2String n ++ ":")
-      results <- traverse (sequenceA . (id &&& runTest numSamples)) props
-      let failures = filter (not . testIsOk . snd) results
-      case null failures of
-        True  -> iputStrLn " OK"
-        False -> do
-          iputStrLn ""
-          forM_ failures (uncurry prettyTestFailure)
-      return (null failures)
+handleMem :: Members '[Store Cell, Output String] r => REPLExpr 'CMem -> Sem r ()
+handleMem Mem = showMemory

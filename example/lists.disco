@@ -9,7 +9,7 @@ foldr f z (x::xs) = f x (foldr f z xs)
 
 ||| Append two lists into a single list.
 
-!!!   append ([], [])          == ([] : List(N))
+!!!   append ([], [])          == []
 !!!   append ([1,2,3],[])      == [1,2,3]
 !!!   append ([1,2,3],[4,5,6]) == [1,2,3,4,5,6]
 !!!   ∀      xs : List(N). append ([], xs) == xs

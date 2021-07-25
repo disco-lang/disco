@@ -101,7 +101,7 @@ filterExcept ms = do
   es <- mapM reifyExcept $ ms
   case partitionEithers es of
     (e:_, []) -> throwError e
-    (_, as)     -> return as
+    (_, as)   -> return as
 
 --------------------------------------------------
 -- Simple constraints

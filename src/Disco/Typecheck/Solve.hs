@@ -98,7 +98,7 @@ reifyExcept m = (Right <$> m) `catchError` (return . Left)
 
 filterExcept :: MonadError e m => [m a] -> m [a]
 filterExcept ms = do
-  es <- mapM reifyExcept $ ms
+  es <- mapM reifyExcept ms
   case partitionEithers es of
     (e:_, []) -> throwError e
     (_, as)   -> return as
@@ -785,12 +785,11 @@ dirtypesBySort vm relMap dir t s x
        exists (dirtypes (other dir) t') $ \t'' ->
 
           -- t'' has the sort beta is supposed to have, and
-         (hasSort t'' (getSort vm beta)) &&
+         hasSort t'' (getSort vm beta) &&
 
           -- t'' is a supertype of every base type predecessor of beta.
-         (forAll (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir))) $ \u ->
-            isDirB dir t'' u
-         ))
+         forAll (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir))) (\u ->
+            isDirB dir t'' u))
 
     -- The above comments are written assuming dir = Super; of course,
     -- if dir = Sub then just swap "super" and "sub" everywhere.

@@ -1,1 +1,3 @@
-File not found: test/types-rec/input
+Loading types-rec.disco...
+Loaded.
+TypeCheckErr (Unsolvable NoUnify)

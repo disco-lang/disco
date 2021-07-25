@@ -29,8 +29,8 @@ import           Data.List                        (find, foldl', intersect,
                                                    partition)
 import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
-import           Data.Maybe                       (catMaybes, fromJust,
-                                                   fromMaybe)
+import           Data.Maybe                       (fromJust, fromMaybe,
+                                                   mapMaybe)
 import           Data.Monoid                      (First (..))
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
@@ -101,7 +101,7 @@ filterExcept ms = do
   es <- mapM reifyExcept $ ms
   case partitionEithers es of
     (e:_, []) -> throwError e
-    (_, as)     -> return as
+    (_, as)   -> return as
 
 --------------------------------------------------
 -- Simple constraints
@@ -611,7 +611,7 @@ simplify tyDefns origVM cs
       -- the types being substituted for those vars.
 
       let tySorts :: [(Type, Sort)]
-          tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (flip lookupVM vm) . swap) $ Subst.toList s'
+          tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (`lookupVM` vm) . swap) $ Subst.toList s'
 
           tyQualList :: [(Type, Qualifier)]
           tyQualList = concatMap (sequenceA . second S.toList) tySorts

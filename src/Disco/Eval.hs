@@ -381,18 +381,20 @@ typecheckDisco tcm = do
 --
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
-loadDiscoModule :: Members '[Output String, Error DiscoError, Embed IO] r => Resolver -> ModName -> Sem r ModuleInfo
+loadDiscoModule
+  :: Members '[Output String, Error DiscoError, Embed IO] r
+  => Resolver -> ModName -> Sem r ModuleInfo
 loadDiscoModule resolver m =
   evalState M.empty $ loadDiscoModule' resolver S.empty m
 
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
 --   instead of loading a module from disk by name.  Used for
---   e.g. modules entered at the REPL prompt.
-loadParsedDiscoModule :: Has '[Th "err", MonadIO] m => Resolver -> Module -> m ModuleInfo
-loadParsedDiscoModule resolver m =
-  fmap fst $
-    withLocalState @_ @"modmap" @(M.Map ModName ModuleInfo) @'[Th "err"] M.empty $
-      loadParsedDiscoModule' resolver S.empty "" m
+--   e.g. blocks/modules entered at the REPL prompt.
+loadParsedDiscoModule
+  :: Members '[Output String, Error DiscoError, Embed IO] r
+  => Resolver -> ModName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule resolver modName m =
+  evalState M.empty $ loadParsedDiscoModule' resolver S.empty modName m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
@@ -409,18 +411,25 @@ loadDiscoModule' resolver inProcess modName  = do
     Just mi -> return mi
     Nothing -> do
       file <- resolveModule resolver modName
-             >>= maybe (throw @"err" $ ModuleNotFound modName) return
+              >>= maybe (throw $ ModuleNotFound modName) return
       outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm <- parseDiscoModule file
       loadParsedDiscoModule' resolver (S.insert modName inProcess) modName cm
+
+-- XXX problem: loadParsedDiscoModule', below, runs checkModule in a
+-- context where only things in that module and its direct imports are
+-- in scope.  However, when we get a 'module' as a block that was
+-- entered at the REPL, we want a way to ensure that everything
+-- currently at the top level is also in scope.
+-- Pass some extra parameters?
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
 --   to avoid loading any imported module more than once.  Recursively
 --   load all its imports, then typecheck it.
-loadParsedDiscoModule' ::
-  Resolver -> S.Set ModName -> ModName -> Module ->
-  Sem r ModuleInfo
+loadParsedDiscoModule'
+  :: Members '[Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
+  => Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' resolver inProcess modName cm@(Module _ mns _ _ _) = do
   -- mis only contains the module info from direct imports.
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
@@ -438,6 +447,16 @@ loadFile file = do
   case res of
     Left _  -> outputLn ("File not found: " ++ file) >> return Nothing
     Right s -> return (Just s)
+
+-- XXX This is recompiling + re-adding everything every time a new
+-- module is added.  Can we do this more efficiently?  Only add new
+-- stuff incrementally.  But we still have to check there are no
+-- conflicts?  Or do we?  Actually, maybe not!  New stuff when being
+-- entered as a block should override/shadow anything previous.  Need
+-- a new function that does something similar to
+-- populateCurrentmoduleinfo but adds instead of completely replaces
+-- (but does in fact override anything with the same name).  loadDefs
+-- is the tricky bit.
 
 -- | Add things from the given module to the set of currently loaded
 --   things.
@@ -468,7 +487,7 @@ populateCurrentModuleInfo
   :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
   => Sem r ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds <- gets @TopInfo (view topModInfo)
+  ModuleInfo docs _ tys tyds tmds _ <- gets @TopInfo (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   modify @TopInfo $
     (topDocs   .~ docs) .
@@ -476,7 +495,6 @@ populateCurrentModuleInfo = do
     (topTyDefs .~ tyds) .
     (topDefs   .~ tmds)
   loadDefs cdefns
-  return ()
 
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.

@@ -23,6 +23,8 @@ module Disco.Interactive.Commands
     parseLine
   ) where
 
+import           Debug.Trace
+
 import           Control.Arrow                    ((&&&))
 import           Control.Lens                     (view, (%~), (?~))
 import           Control.Monad.Except
@@ -32,6 +34,20 @@ import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
 import           Data.Typeable
 import           System.FilePath                  (splitFileName)
+
+import           Text.Megaparsec                  hiding (State, runParser)
+import qualified Text.Megaparsec.Char             as C
+import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
+                                                   string2Name)
+
+import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.Reader
+import           Polysemy.State
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -54,21 +70,8 @@ import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
+import           Disco.Types                      (toPolyType)
 import           Disco.Value
-
-import           Text.Megaparsec                  hiding (State, runParser)
-import qualified Text.Megaparsec.Char             as C
-import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
-                                                   string2Name)
-
-import           Disco.Effects.Error              hiding (try)
-import           Disco.Effects.Input
-import           Disco.Effects.LFresh
-import           Disco.Effects.Output
-import           Disco.Effects.Store
-import           Polysemy
-import           Polysemy.Reader
-import           Polysemy.State
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -80,7 +83,7 @@ data REPLExpr :: CmdTag -> * where
   Using     :: Ext -> REPLExpr 'CUsing             -- Enable an extension
   Let       :: Name Term -> Term -> REPLExpr 'CLet -- Toplevel let-expression: for the REPL
   TypeCheck :: Term -> REPLExpr 'CTypeCheck        -- Typecheck a term
-  Eval      :: Term -> REPLExpr 'CEval             -- Evaluate a term
+  Eval      :: Module -> REPLExpr 'CEval           -- Evaluate a block
   TestProp  :: Term -> REPLExpr 'CTestProp         -- Run a property test
   ShowDefn  :: Name Term -> REPLExpr 'CShowDefn    -- Show a variable's definition
   Parse     :: Term -> REPLExpr 'CParse            -- Show the parsed AST
@@ -229,10 +232,10 @@ lineParser allCommands
 
   -- Then try some other built-in command forms.
   <|> try (SomeREPL Nop <$ (sc <* eof))
-  <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
-  <|> try (SomeREPL . Import <$> parseImport)
-  <|> try (SomeREPL . Eval <$> parseModule)
-  <|> (SomeREPL <$> letParser)
+  -- <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
+  -- <|> try (SomeREPL . Import <$> parseImport)
+  <|> try (SomeREPL . Eval <$> (parseModule <* eof))
+  -- <|> (SomeREPL <$> letParser)
 
 -- | Given a list of available REPL commands and the currently enabled
 --   extensions, parse a string entered at the REPL prompt, returning
@@ -351,27 +354,34 @@ evalCmd = REPLCommand
   , category  = User
   , cmdtype   = BuiltIn
   , action    = handleEval
-  , parser    = Eval <$> term
+  , parser    = Eval <$> parseModule
   }
 
 handleEval
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
-handleEval (Eval m) = do
-  checkModule m
+handleEval (Eval m) = inputToState $ do
+  -- XXX when calling loadParsedDiscoModule here we need a way to tell it to use
+  -- stuff currently in scope at the top level when type checking the module.
+  mi@(ModuleInfo _ _ _ _ _ tms) <- loadParsedDiscoModule FromCwdOrStdlib "" m
+  addModule mi
+  forM_ tms (evalTerm . fst)
+  -- garbageCollect
 
-  -- XXX change this to typecheck a module, get the resulting ModuleInfo,
-  -- then add stuff from it to the current context
-
+evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  v <- withTopEnv $ do
+  te <- gets @TopInfo (view topEnv)
+  traceShowM te
+  v <- inputToState . withTopEnv $ do
+    e <- getEnv
+    traceShowM e
     cv <- mkValue c
     prettyValue ty cv
     return cv
-  modify @"top" $
+  modify @TopInfo $
     (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
     (topEnv %~ M.insert (string2Name "it") v)
-  garbageCollect
+  return v
   where
     ty = getType at
     c  = compileTerm at

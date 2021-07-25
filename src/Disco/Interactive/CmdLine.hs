@@ -156,13 +156,15 @@ discoMain = do
 
     multiLineLoop :: Members DiscoEffects r => [String] -> Sem r ()
     multiLineLoop ls = do
-      minput <- withCtrlC (return Nothing) (getInputLine "Disco| ")
+      minput <- embedFinal $ withCtrlC (return Nothing) (getInputLine "Disco| ")
       case minput of
         Nothing -> return ()
         Just input
           | ":}" `isPrefixOf` input -> do
-              withCtrlC (return ()) (lift . handleCMD $ unlines (reverse ls))
-              return ()
+              mapError @_ @DiscoError (Panic . show) $
+                absorbMonadCatch $
+                withCtrlC (return ()) $
+                handleCMD (unlines (reverse ls))
           | otherwise -> do
               multiLineLoop (input:ls)
 

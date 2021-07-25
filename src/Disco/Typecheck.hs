@@ -99,7 +99,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Module -> Sem r ModuleInfo
-checkModule (Module _ _ m docs) = do
+checkModule (Module _ _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
@@ -238,9 +238,6 @@ checkCtx = mapM_ checkPolyTyValid . M.elems
 --------------------------------------------------
 -- Top-level definitions
 
--- XXX checkDefn should not need a Wr "constraints" capability.  See
--- comments on 'solve' and 'withConstraint'.
-
 -- | Type check a top-level definition.
 checkDefn
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
@@ -251,7 +248,9 @@ checkDefn (TermDefn x clauses) = do
   checkNumPats clauses
 
   -- Get the declared type signature of x
-  Forall sig <- lookupTy x
+  Forall sig <- catch (lookupTy x) (\_ -> throw $ NoType x)
+    -- If x isn't in the context, it's because no type was declared for it, so
+    -- rethrow a more informative error.
   (nms, ty) <- unbind sig
 
   -- Try to decompose the type into a chain of arrows like pty1 ->

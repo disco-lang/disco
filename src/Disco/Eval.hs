@@ -331,7 +331,7 @@ showMemory = assocsStore >>= mapM_ showCell
 parseDiscoModule :: Members '[Error DiscoError, Embed IO] r => FilePath -> Sem r Module
 parseDiscoModule file = do
   str <- liftIO $ readFile file
-  fromEither . first ParseErr $ runParser (wholeModule False) file str
+  fromEither . first ParseErr $ runParser (wholeModule Standalone) file str
 
 --------------------------------------------------
 -- Type checking
@@ -398,7 +398,7 @@ loadParsedDiscoModule
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
   => Resolver -> ModName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule resolver modName m =
-  evalState M.empty $ loadParsedDiscoModule' True resolver S.empty modName m
+  evalState M.empty $ loadParsedDiscoModule' REPL resolver S.empty modName m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
@@ -418,7 +418,7 @@ loadDiscoModule' resolver inProcess modName  = do
               >>= maybe (throw $ ModuleNotFound modName) return
       outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm <- parseDiscoModule file
-      loadParsedDiscoModule' False resolver (S.insert modName inProcess) modName cm
+      loadParsedDiscoModule' Standalone resolver (S.insert modName inProcess) modName cm
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
@@ -430,18 +430,17 @@ loadDiscoModule' resolver inProcess modName  = do
 --   typecheck it.
 loadParsedDiscoModule'
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
-  => Bool -> Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule' useTopCtx resolver inProcess modName cm@(Module _ mns _ _ _) = do
+  => LoadingMode -> Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule' mode resolver inProcess modName cm@(Module _ mns _ _ _) = do
   -- mis only contains the module info from direct imports.
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo mis
+  imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo Standalone mis
   topTyCtx   <- inputs (view topCtx)
   topTyDefns <- inputs (view topTyDefs)
-  m  <- runTCMWith
-          ((if useTopCtx then joinCtx topTyCtx else id) tyctx)
-          ((if useTopCtx then M.union topTyDefns else id) tydefns)
-          (checkModule cm)
-  m' <- mapError TypeCheckErr $ combineModuleInfo [imports, m]
+  let tyctx'   = case mode of { Standalone -> tyctx   ; REPL -> joinCtx topTyCtx tyctx }
+  let tydefns' = case mode of { Standalone -> tydefns ; REPL -> M.union topTyDefns tydefns }
+  m  <- runTCMWith tyctx' tydefns' $ checkModule cm
+  m' <- mapError TypeCheckErr $ combineModuleInfo mode [imports, m]
   modify (M.insert modName m')
   return m'
 
@@ -468,10 +467,10 @@ loadFile file = do
 --   things.
 addModule
   :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output Debug] r
-  => ModuleInfo -> Sem r ()
-addModule mi = do
+  => LoadingMode -> ModuleInfo -> Sem r ()
+addModule mode mi = do
   curMI <- gets @TopInfo (view topModInfo)
-  mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
+  mi' <- mapError TypeCheckErr $ combineModuleInfo mode [curMI, mi]
   setLoadedModule mi'
 
 -- | Set the given 'ModuleInfo' record as the currently loaded

@@ -64,6 +64,7 @@ import           Control.Lens                            (makeLenses, toListOf,
                                                           (.=))
 import           Control.Monad.State
 import           Data.Char                               (isDigit)
+import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (fromMaybe)
@@ -72,9 +73,9 @@ import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 import           Data.Void
 
-import           Data.Foldable                           (asum)
 import           Disco.AST.Surface
 import           Disco.Extensions
+import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -351,18 +352,22 @@ makeLenses ''TLResults
 
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
-wholeModule :: Bool -> Parser Module
-wholeModule useTopExts = between sc eof (parseModule useTopExts)
+wholeModule :: LoadingMode -> Parser Module
+wholeModule = between sc eof . parseModule
 
 -- | Parse an entire module (a list of declarations ended by
 --   semicolons).  The Bool parameter says whether to include or
 --   replace any language extensions enabled at the top level.  We
 --   include them when parsing a module entered at the REPL, and
 --   replace them when parsing a standalone module.
-parseModule :: Bool -> Parser Module
-parseModule useTopExts = do
+parseModule :: LoadingMode -> Parser Module
+parseModule mode = do
   exts     <- S.fromList <$> many parseExtension
-  (if useTopExts then withAdditionalExts else withExts) exts $ do
+  let extFun = case mode of
+        Standalone -> withExts
+        REPL       -> withAdditionalExts
+
+  extFun exts $ do
     imports  <- many parseImport
     topLevel <- many parseTopLevel
     let theMod = mkModule exts imports topLevel

@@ -387,8 +387,6 @@ loadDiscoModule
 loadDiscoModule resolver m =
   evalState M.empty $ loadDiscoModule' resolver S.empty m
 
--- XXX need to be able to override previous definitions when entered at the REPL?
-
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
 --   instead of loading a module from disk by name.  Also, check it in
 --   a context that includes the current top-level context (unlike a

@@ -778,7 +778,7 @@ dirtypesBySort vm relMap dir t s x
       hasSort t' s &&
 
       -- for all variables beta \in x,
-      (forAll x $ \beta ->
+      forAll x (\beta ->
 
         -- there is at least one type t'' which is a subtype of t'
         -- which would be a valid solution for beta, that is,

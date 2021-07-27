@@ -377,9 +377,6 @@ check
   => Term -> Type -> Sem r ATerm
 check t ty = typecheck (Check ty) t
 
--- XXX checkPolyTy should not need a Wr "constraints" capability.  See
--- comments on 'solve' and 'withConstraint'.
-
 -- | Check that a term has the given polymorphic type.
 checkPolyTy
   :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
@@ -401,9 +398,6 @@ infer
   :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
   => Term -> Sem r ATerm
 infer = typecheck Infer
-
--- XXX inferTop should not need a Wr "constraints" capability.  See
--- comments on 'solve' and 'withConstraint'.
 
 -- | Top-level type inference algorithm: infer a (polymorphic) type
 --   for a term by running type inference, solving the resulting

@@ -96,8 +96,8 @@ data IndentMode where
 -- | Extra custom state for the parser.
 data ParserState = ParserState
   { _indentMode  :: IndentMode  -- ^ Currently required level of indentation.
-  , _enabledExts :: Set Ext      -- ^ Set of enabled language extensions
-                                 --   (some of which may affect parsing).
+  , _enabledExts :: Set Ext     -- ^ Set of enabled language extensions
+                                --   (some of which may affect parsing).
   }
 
 makeLenses ''ParserState
@@ -115,7 +115,7 @@ instance ShowErrorComponent DiscoParseError where
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
---   language extensions.  For now we have no custom errors.
+--   language extensions, and some custom error messages.
 type Parser = StateT ParserState (MP.Parsec DiscoParseError String)
 
 -- | Run a parser from the initial state.
@@ -366,10 +366,10 @@ wholeModule :: LoadingMode -> Parser Module
 wholeModule = between sc eof . parseModule
 
 -- | Parse an entire module (a list of declarations ended by
---   semicolons).  The Bool parameter says whether to include or
---   replace any language extensions enabled at the top level.  We
---   include them when parsing a module entered at the REPL, and
---   replace them when parsing a standalone module.
+--   semicolons).  The 'LoadingMode' parameter tells uw whether to
+--   include or replace any language extensions enabled at the top
+--   level.  We include them when parsing a module entered at the
+--   REPL, and replace them when parsing a standalone module.
 parseModule :: LoadingMode -> Parser Module
 parseModule mode = do
   exts     <- S.fromList <$> many parseExtension

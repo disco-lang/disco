@@ -1,0 +1,11 @@
+let succ : N -> N = λ x : N. fold (inr x) in
+let zero : N = fold (inl unit) in
+letrec zeros : Rec l. Lazy (N * l) =
+  delay y. <zero, zeros> in
+letrec take : N -> (Rec l. Lazy (N * l)) -> (Rec l. (Unit + N * l)) =
+  λk:N. λs:(Rec l. Lazy (N * l)).
+    case unfold k
+    { inl z  -> inl unit
+    | inr k' -> inr <fst (force s), take k' (snd (force s))>
+    } in
+take (succ (succ (succ zero))) zeros

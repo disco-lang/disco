@@ -30,7 +30,7 @@ import           Data.List                        (find, foldl', intersect,
 import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
 import           Data.Maybe                       (catMaybes, fromJust,
-                                                   fromMaybe)
+                                                   fromMaybe, mapMaybe)
 import           Data.Monoid                      (First (..))
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S

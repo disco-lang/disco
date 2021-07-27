@@ -15,7 +15,7 @@
 
 module Disco.Parser
        ( -- * Parser type and utilities
-         Parser, runParser, withExts, indented, thenIndented
+         DiscoParseError(..), Parser, runParser, withExts, indented, thenIndented
 
          -- * Lexer
 
@@ -71,7 +71,6 @@ import           Data.Maybe                              (fromMaybe)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
-import           Data.Void
 
 import           Disco.AST.Surface
 import           Disco.Extensions
@@ -106,13 +105,21 @@ makeLenses ''ParserState
 initParserState :: ParserState
 initParserState = ParserState NoIndent S.empty
 
+data DiscoParseError
+  = ReservedVarName String
+  deriving (Show, Eq, Ord)
+
+instance ShowErrorComponent DiscoParseError where
+  showErrorComponent (ReservedVarName x) = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
+  errorComponentLen (ReservedVarName x) = length x
+
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
 --   language extensions.  For now we have no custom errors.
-type Parser = StateT ParserState (MP.Parsec Void String)
+type Parser = StateT ParserState (MP.Parsec DiscoParseError String)
 
 -- | Run a parser from the initial state.
-runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
+runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String DiscoParseError) a
 runParser = MP.runParser . flip evalStateT initParserState
 
 -- | Run a parser under a specified 'IndentMode'.
@@ -327,9 +334,12 @@ identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
-    check x = if x `elem` reservedWords
-                then fail $ "keyword \"" ++ x ++ "\" cannot be used as an identifier"
-                else return x
+    check x
+      | x `elem` reservedWords = do
+          -- back up to beginning of bad token to report correct position
+          updateParserState (\s -> s { stateOffset = stateOffset s - length x })
+          customFailure $ ReservedVarName x
+      | otherwise = return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)

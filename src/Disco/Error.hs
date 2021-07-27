@@ -13,12 +13,13 @@
 
 module Disco.Error (DiscoError(..), EvalError(..)) where
 
-import qualified Data.Void
-import           Disco.AST.Core                   (Core)
-import           Disco.AST.Surface                (ModName)
-import           Disco.Typecheck.Monad            (TCError)
 import           Text.Megaparsec                  (ParseErrorBundle)
 import           Unbound.Generics.LocallyNameless (Name)
+
+import           Disco.AST.Core                   (Core)
+import           Disco.AST.Surface                (ModName)
+import           Disco.Parser
+import           Disco.Typecheck.Monad            (TCError)
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -33,7 +34,7 @@ data DiscoError where
   TypeCheckErr :: TCError -> DiscoError
 
   -- | Error encountered during parsing.
-  ParseErr :: ParseErrorBundle String Data.Void.Void -> DiscoError
+  ParseErr :: ParseErrorBundle String DiscoParseError -> DiscoError
 
   -- | Error encountered at runtime.
   EvalErr :: EvalError -> DiscoError

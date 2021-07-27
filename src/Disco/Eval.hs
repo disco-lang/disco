@@ -420,12 +420,10 @@ loadDiscoModule' resolver inProcess modName  = do
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
---   to avoid loading any imported module more than once.  Include
---   top-level type context or not depending on the boolean
---   parameter. True means we are loading something entered at the
---   top-level REPL prompt; False means we are loading a standalone
---   module from disk.  Recursively load all its imports, then
---   typecheck it.
+--   to avoid loading any imported module more than once.  Typecheck
+--   it in the context of the top-level type context iff the
+--   'LoadingMode' parameter is 'REPL'.  Recursively load all its
+--   imports, then typecheck it.
 loadParsedDiscoModule'
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
   => LoadingMode -> Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo

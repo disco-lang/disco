@@ -23,8 +23,6 @@ module Disco.Interactive.Commands
     parseLine
   ) where
 
-import           Debug.Trace
-
 import           Control.Arrow                    ((&&&))
 import           Control.Lens                     (view, (%~), (?~))
 import           Control.Monad.Except
@@ -32,6 +30,7 @@ import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
+import qualified Data.Set                         as S
 import           Data.Typeable
 import           System.FilePath                  (splitFileName)
 
@@ -60,9 +59,9 @@ import           Disco.Extensions
 import           Disco.Interpret.Core
 import           Disco.Module
 import           Disco.Parser                     (Parser, ident, parseExtName,
-                                                   parseImport, parseModule,
-                                                   reserved, reservedOp,
-                                                   runParser, sc, symbol, term,
+                                                   parseImport, reserved,
+                                                   reservedOp, runParser, sc,
+                                                   symbol, term, wholeModule,
                                                    withExts)
 import           Disco.Pretty
 import           Disco.Property
@@ -234,7 +233,7 @@ lineParser allCommands
   <|> try (SomeREPL Nop <$ (sc <* eof))
   -- <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
   -- <|> try (SomeREPL . Import <$> parseImport)
-  <|> try (SomeREPL . Eval <$> (parseModule <* eof))
+  <|> try (SomeREPL . Eval <$> wholeModule True)
   -- <|> (SomeREPL <$> letParser)
 
 -- | Given a list of available REPL commands and the currently enabled
@@ -354,27 +353,22 @@ evalCmd = REPLCommand
   , category  = User
   , cmdtype   = BuiltIn
   , action    = handleEval
-  , parser    = Eval <$> parseModule
+  , parser    = Eval <$> wholeModule True
   }
 
 handleEval
   :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = inputToState $ do
-  -- XXX when calling loadParsedDiscoModule here we need a way to tell it to use
-  -- stuff currently in scope at the top level when type checking the module.
-  mi@(ModuleInfo _ _ _ _ _ tms) <- loadParsedDiscoModule FromCwdOrStdlib "" m
+  mi@(ModuleInfo _ _ _ _ _ tms exts) <- loadParsedDiscoModule FromCwdOrStdlib "" m
+  modify @TopInfo (extSet %~ S.union exts)
   addModule mi
   forM_ tms (evalTerm . fst)
   -- garbageCollect
 
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  te <- gets @TopInfo (view topEnv)
-  traceShowM te
   v <- inputToState . withTopEnv $ do
-    e <- getEnv
-    traceShowM e
     cv <- mkValue c
     prettyValue ty cv
     return cv
@@ -437,7 +431,7 @@ handleImport
        r
   => REPLExpr 'CImport -> Sem r ()
 handleImport (Import modName) = do
-  mi <- loadDiscoModule FromCwdOrStdlib modName
+  mi <- inputToState $ loadDiscoModule FromCwdOrStdlib modName
   addModule mi
 
 ------------------------------------------------------------
@@ -503,7 +497,7 @@ handleLoad
   => FilePath -> Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _ _) <- loadDiscoModule (FromDir directory) modName
+  m@(ModuleInfo _ props _ _ _ _ _) <- inputToState $ loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- inputToState . withTopEnv $ runAllTests props
   modify @TopInfo (lastFile ?~ fp)

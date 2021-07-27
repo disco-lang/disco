@@ -60,7 +60,8 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
-                                                          use, (%~), (&), (.=))
+                                                          use, (%=), (%~), (&),
+                                                          (.=))
 import           Control.Monad.State
 import           Data.Char                               (isDigit)
 import           Data.List                               (find, intercalate)
@@ -150,6 +151,15 @@ withExts :: Set Ext -> Parser a -> Parser a
 withExts exts p = do
   oldExts <- use enabledExts
   enabledExts .= exts
+  a <- p
+  enabledExts .= oldExts
+  return a
+
+-- | Locally enable some additional extensions within a subparser.
+withAdditionalExts :: Set Ext -> Parser a -> Parser a
+withAdditionalExts exts p = do
+  oldExts <- use enabledExts
+  enabledExts %= S.union exts
   a <- p
   enabledExts .= oldExts
   return a
@@ -341,16 +351,18 @@ makeLenses ''TLResults
 
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
-wholeModule :: Parser Module
-wholeModule = between sc eof parseModule
+wholeModule :: Bool -> Parser Module
+wholeModule useTopExts = between sc eof (parseModule useTopExts)
 
 -- | Parse an entire module (a list of declarations ended by
---   semicolons).
-parseModule :: Parser Module
-parseModule = do
+--   semicolons).  The Bool parameter says whether to include or
+--   replace any language extensions enabled at the top level.  We
+--   include them when parsing a module entered at the REPL, and
+--   replace them when parsing a standalone module.
+parseModule :: Bool -> Parser Module
+parseModule useTopExts = do
   exts     <- S.fromList <$> many parseExtension
-  withExts exts $ do   -- REPLACE any existing extension set with the extensions
-                       -- explicitly specified by the module.
+  (if useTopExts then withAdditionalExts else withExts) exts $ do
     imports  <- many parseImport
     topLevel <- many parseTopLevel
     let theMod = mkModule exts imports topLevel

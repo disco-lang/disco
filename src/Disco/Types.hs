@@ -1,6 +1,4 @@
 {-# LANGUAGE PatternSynonyms      #-}
-
-
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}

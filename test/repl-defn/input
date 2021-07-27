@@ -1,3 +1,4 @@
+x : N
 x = 5
 x
 :type x

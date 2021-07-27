@@ -22,6 +22,7 @@ import           Control.Monad                    (filterM, foldM)
 import           Control.Monad.IO.Class           (MonadIO (..))
 import           Data.Coerce                      (coerce)
 import qualified Data.Map                         as M
+import qualified Data.Set                         as S
 import           System.Directory                 (doesFileExist)
 import           System.FilePath                  (replaceExtension, (</>))
 
@@ -33,6 +34,7 @@ import           Polysemy.Error
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
+import           Disco.Extensions
 import           Disco.Typecheck.Monad            (TCError (..), TyCtx)
 import           Disco.Types
 
@@ -74,12 +76,13 @@ data ModuleInfo = ModuleInfo
   , _modTydefs   :: TyDefCtx
   , _modTermdefs :: Ctx ATerm Defn
   , _modTerms    :: [(ATerm, PolyType)]
+  , _modExts     :: ExtSet
   }
 
 makeLenses ''ModuleInfo
 
 emptyModuleInfo :: ModuleInfo
-emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx []
+emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
 
 -- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos are merged by
 --   joining their doc, type, type definition, and term contexts. The property context
@@ -88,9 +91,9 @@ emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx []
 combineModuleInfo :: Member (Error TCError) r => [ModuleInfo] -> Sem r ModuleInfo
 combineModuleInfo = foldM combineMods emptyModuleInfo
   where combineMods :: Member (Error TCError) r => ModuleInfo -> ModuleInfo -> Sem r ModuleInfo
-        combineMods (ModuleInfo d1 _ ty1 tyd1 tm1 tms1) (ModuleInfo d2 p2 ty2 tyd2 tm2 tms2) =
+        combineMods (ModuleInfo d1 _ ty1 tyd1 tm1 tms1 es1) (ModuleInfo d2 p2 ty2 tyd2 tm2 tms2 es2) =
           case (M.keys $ M.intersection tyd1 tyd2, M.keys $ M.intersection tm1 tm2) of
-            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) (tms1 ++ tms2)
+            ([],[]) -> return $ ModuleInfo (joinCtx d1 d2) p2 (joinCtx ty1 ty2) (M.union tyd1 tyd2) (joinCtx tm1 tm2) (tms1 ++ tms2) (es1 `S.union` es2)
             (x:_, _) -> throw $ DuplicateTyDefns (coerce x)
             (_, y:_) -> throw $ DuplicateDefns (coerce y)
 

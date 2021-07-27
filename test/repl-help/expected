@@ -2,7 +2,7 @@ Commands available from the prompt:
 
 :defn <var>                Show a variable's definition
 :doc <term>                Show documentation
-<term>                     Evaluate a term
+<code>                     Evaluate a block of code
 :help                      Show help
 :import <module>           Import a library module
 <variable> = <expression>  Temporarily define a variable (until the next :load)

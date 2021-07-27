@@ -99,7 +99,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Module -> Sem r ModuleInfo
-checkModule (Module _ _ m docs terms) = do
+checkModule (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
@@ -114,7 +114,7 @@ checkModule (Module _ _ m docs terms) = do
         [] -> do
           aprops <- checkProperties docs
           aterms <- mapM inferTop terms
-          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms
+          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 

@@ -331,7 +331,7 @@ showMemory = assocsStore >>= mapM_ showCell
 parseDiscoModule :: Members '[Error DiscoError, Embed IO] r => FilePath -> Sem r Module
 parseDiscoModule file = do
   str <- liftIO $ readFile file
-  fromEither . first ParseErr $ runParser wholeModule file str
+  fromEither . first ParseErr $ runParser (wholeModule False) file str
 
 --------------------------------------------------
 -- Type checking
@@ -382,26 +382,30 @@ typecheckDisco tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule
-  :: Members '[Output String, Error DiscoError, Embed IO] r
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
   => Resolver -> ModName -> Sem r ModuleInfo
 loadDiscoModule resolver m =
   evalState M.empty $ loadDiscoModule' resolver S.empty m
 
+-- XXX need to be able to override previous definitions when entered at the REPL?
+
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
---   instead of loading a module from disk by name.  Used for
---   e.g. blocks/modules entered at the REPL prompt.
+--   instead of loading a module from disk by name.  Also, check it in
+--   a context that includes the current top-level context (unlike a
+--   module loaded from disk).  Used for e.g. blocks/modules entered
+--   at the REPL prompt.
 loadParsedDiscoModule
-  :: Members '[Output String, Error DiscoError, Embed IO] r
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
   => Resolver -> ModName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule resolver modName m =
-  evalState M.empty $ loadParsedDiscoModule' resolver S.empty modName m
+  evalState M.empty $ loadParsedDiscoModule' True resolver S.empty modName m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
-  :: Members '[Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
   => Resolver -> S.Set ModName -> ModName
   -> Sem r ModuleInfo
 loadDiscoModule' resolver inProcess modName  = do
@@ -414,27 +418,29 @@ loadDiscoModule' resolver inProcess modName  = do
               >>= maybe (throw $ ModuleNotFound modName) return
       outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
       cm <- parseDiscoModule file
-      loadParsedDiscoModule' resolver (S.insert modName inProcess) modName cm
-
--- XXX problem: loadParsedDiscoModule', below, runs checkModule in a
--- context where only things in that module and its direct imports are
--- in scope.  However, when we get a 'module' as a block that was
--- entered at the REPL, we want a way to ensure that everything
--- currently at the top level is also in scope.
--- Pass some extra parameters?
+      loadParsedDiscoModule' False resolver (S.insert modName inProcess) modName cm
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
---   to avoid loading any imported module more than once.  Recursively
---   load all its imports, then typecheck it.
+--   to avoid loading any imported module more than once.  Include
+--   top-level type context or not depending on the boolean
+--   parameter. True means we are loading something entered at the
+--   top-level REPL prompt; False means we are loading a standalone
+--   module from disk.  Recursively load all its imports, then
+--   typecheck it.
 loadParsedDiscoModule'
-  :: Members '[Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
-  => Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule' resolver inProcess modName cm@(Module _ mns _ _ _) = do
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
+  => Bool -> Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule' useTopCtx resolver inProcess modName cm@(Module _ mns _ _ _) = do
   -- mis only contains the module info from direct imports.
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  imports@(ModuleInfo _ _ tyctx tydefns _ _) <- mapError TypeCheckErr $ combineModuleInfo mis
-  m  <- runTCMWith tyctx tydefns (checkModule cm)
+  imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo mis
+  topTyCtx   <- inputs (view topCtx)
+  topTyDefns <- inputs (view topTyDefs)
+  m  <- runTCMWith
+          ((if useTopCtx then joinCtx topTyCtx else id) tyctx)
+          ((if useTopCtx then M.union topTyDefns else id) tydefns)
+          (checkModule cm)
   m' <- mapError TypeCheckErr $ combineModuleInfo [imports, m]
   modify (M.insert modName m')
   return m'
@@ -487,7 +493,7 @@ populateCurrentModuleInfo
   :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
   => Sem r ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds _ <- gets @TopInfo (view topModInfo)
+  ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   modify @TopInfo $
     (topDocs   .~ docs) .

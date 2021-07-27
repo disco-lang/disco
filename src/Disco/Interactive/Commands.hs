@@ -195,7 +195,8 @@ discoCommands =
 
 builtinCommandParser :: REPLCommands -> Parser SomeREPLExpr
 builtinCommandParser
-  = foldr (<|>) empty . map (\(SomeCmd rc) -> SomeREPL <$> try (parser rc)) . byCmdType BuiltIn
+  = foldr ((<|>) . (\(SomeCmd rc) -> SomeREPL <$> try (parser rc))) empty
+  . byCmdType BuiltIn
 
 -- | Parse one of the colon commands in the given list of commands.
 commandParser :: REPLCommands -> Parser SomeREPLExpr

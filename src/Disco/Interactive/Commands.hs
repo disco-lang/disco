@@ -161,7 +161,7 @@ byCmdType ty = filter (\(SomeCmd rc) -> cmdtype rc == ty)
 dispatch :: Members DiscoEffects r => REPLCommands -> SomeREPLExpr -> Sem r ()
 dispatch [] _ = return ()
 dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
-  Just e' -> outputErrors @DiscoError $ action c e'
+  Just e' -> outputDiscoErrors $ action c e'
   Nothing -> dispatch cs r
 
 -- | The list of all commands that can be used at the REPL.

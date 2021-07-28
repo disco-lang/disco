@@ -183,7 +183,7 @@ runDisco
   . runOutputSem (embed . putStr)  -- Handle Output String via printing to console
   . stateToIO initTopInfo    -- Run State TopInfo via an IORef
   . inputToState             -- Dispatch Input TopInfo effect via State effect
-  . outputErrors             -- For now, just output top-level errors
+  . outputDiscoErrors        -- Output any top-level errors
   -- . runOutputSem (embed . putStrLn . unDebug)   -- debugging mode
   . ignoreOutput @Debug      -- non-debugging mode: ignore Debug output
   . runLFresh                -- Generate locally fresh names

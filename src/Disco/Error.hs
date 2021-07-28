@@ -11,10 +11,15 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Error (DiscoError(..), EvalError(..)) where
+module Disco.Error (DiscoError(..), EvalError(..), outputDiscoErrors) where
 
-import           Text.Megaparsec                  (ParseErrorBundle)
+import           Text.Megaparsec                  (ParseErrorBundle,
+                                                   errorBundlePretty)
 import           Unbound.Generics.LocallyNameless (Name)
+
+import           Disco.Effects.Output
+import           Polysemy
+import           Polysemy.Error
 
 import           Disco.AST.Core                   (Core)
 import           Disco.AST.Surface                (ModName)
@@ -67,3 +72,12 @@ data EvalError where
   Crash         :: String    -> EvalError
 
   deriving Show
+
+outputDiscoErrors :: Member (Output String) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors m = do
+  e <- runError m
+  either (outputLn . prettyDiscoError) return e
+
+prettyDiscoError :: DiscoError -> String
+prettyDiscoError (ParseErr pe) = errorBundlePretty pe
+prettyDiscoError e             = show e  -- for now!

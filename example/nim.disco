@@ -1,0 +1,66 @@
+import list
+
+I : Bool
+I = true
+
+O : Bool
+O = false
+
+||| Convert a natural number into a list of bits, with the *least*
+||| significant bit first.
+
+!!! toBinary 0 == ([] : List(Bool))
+!!! toBinary 1 == ([I] : List(Bool))
+!!! toBinary 2 == ([O,I] : List(Bool))
+!!! toBinary 534 == ([O,I,I,O,I,O,O,O,O,I] : List(Bool))
+toBinary : N -> List(Bool)
+toBinary 0 = []
+toBinary n =
+  {? O :: toBinary (n // 2)   if 2 divides n
+  ,  I :: toBinary (n // 2)   otherwise
+  ?}
+
+||| Convert a list of bits (with the least significant bit first) back
+||| into a natural number.  Left inverse of toBinary.
+
+!!! fromBinary [O,O,I,I] == 12
+!!! fromBinary [O,O,O,O] == 0
+!!! ∀ n : N. fromBinary (toBinary n) == n
+
+fromBinary : List(Bool) -> N
+fromBinary []           = 0
+fromBinary (false :: b) = 2 * fromBinary b
+fromBinary (true  :: b) = 1 + 2 * fromBinary b
+
+xorB : Bool * Bool -> Bool
+xorB = ~/=~
+
+xor : List(Bool) * List(Bool) -> List(Bool)
+xor([], bs) = bs
+xor(bs, []) = bs
+xor(a::as, b::bs) = (xorB(a,b)) :: xor(as, bs)
+
+xorN : N*N -> N
+xorN(a, b) = fromBinary (xor(toBinary a, toBinary b))
+
+nimSum : List(N) -> N
+nimSum ns = fromBinary(reduce(xor, [], each(toBinary, ns)))
+
+xorPile : N -> List(N) -> List(N)
+xorPile _ [] = []
+xorPile x (n :: ns)
+  = {? xorN(x, n) :: ns    if xorN(x, n) < n
+    ,  n :: xorPile x ns   otherwise
+    ?}
+
+||| Perform the optimal nim move, or report that the position is a
+||| losing position.
+
+!!! nimMove [1,5,8] == (right [1,5,4] : Unit + List(N))
+nimMove : List(N) -> Unit + List(N)
+nimMove ls =
+  let s   = nimSum ls
+    , ls' = xorPile s ls
+  in  {? left unit   if ls == ls'
+      ,  right ls'   otherwise
+      ?}

@@ -125,12 +125,13 @@ data Module = Module
   , modImports :: [ModName]     -- ^ Module imports
   , modDecls   :: [Decl]        -- ^ Declarations
   , modDocs    :: Ctx Term Docs -- ^ Documentation
+  , modTerms   :: [Term]        -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
-data TopLevel = TLDoc DocThing | TLDecl Decl
+data TopLevel = TLDoc DocThing | TLDecl Decl | TLExpr Term
 deriving instance ForallTerm Show  UD => Show TopLevel
 
 -- | A module to be imported.

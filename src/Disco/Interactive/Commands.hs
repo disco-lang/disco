@@ -30,8 +30,22 @@ import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
+import qualified Data.Set                         as S
 import           Data.Typeable
 import           System.FilePath                  (splitFileName)
+
+import           Text.Megaparsec                  hiding (State, runParser)
+import qualified Text.Megaparsec.Char             as C
+import           Unbound.Generics.LocallyNameless (Name, name2String,
+                                                   string2Name)
+
+import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.State
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -43,31 +57,17 @@ import           Disco.Eval
 import           Disco.Extensions
 import           Disco.Interpret.Core
 import           Disco.Module
-import           Disco.Parser                     (Parser, ident, parseExtName,
-                                                   parseImport, reserved,
-                                                   reservedOp, runParser, sc,
-                                                   symbol, term, withExts)
-import           Disco.Pretty
+import           Disco.Parser                     (Parser, ident, reservedOp,
+                                                   runParser, sc, symbol, term,
+                                                   wholeModule, withExts)
+import           Disco.Pretty                     hiding (empty)
 import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
+import           Disco.Types                      (toPolyType)
 import           Disco.Value
-
-import           Text.Megaparsec                  hiding (State, runParser)
-import qualified Text.Megaparsec.Char             as C
-import           Unbound.Generics.LocallyNameless (Name, bind, name2String,
-                                                   string2Name)
-
-import           Disco.Effects.Error              hiding (try)
-import           Disco.Effects.Input
-import           Disco.Effects.LFresh
-import           Disco.Effects.Output
-import           Disco.Effects.Store
-import           Polysemy
-import           Polysemy.Reader
-import           Polysemy.State
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -76,10 +76,8 @@ import           Polysemy.State
 -- | Data type to represent things typed at the Disco REPL.  Each
 --   constructor has a singleton type to facilitate dispatch.
 data REPLExpr :: CmdTag -> * where
-  Using     :: Ext -> REPLExpr 'CUsing             -- Enable an extension
-  Let       :: Name Term -> Term -> REPLExpr 'CLet -- Toplevel let-expression: for the REPL
   TypeCheck :: Term -> REPLExpr 'CTypeCheck        -- Typecheck a term
-  Eval      :: Term -> REPLExpr 'CEval             -- Evaluate a term
+  Eval      :: Module -> REPLExpr 'CEval           -- Evaluate a block
   TestProp  :: Term -> REPLExpr 'CTestProp         -- Run a property test
   ShowDefn  :: Name Term -> REPLExpr 'CShowDefn    -- Show a variable's definition
   Parse     :: Term -> REPLExpr 'CParse            -- Show the parsed AST
@@ -89,7 +87,6 @@ data REPLExpr :: CmdTag -> * where
   Compile   :: Term -> REPLExpr 'CCompile          -- Show a compiled term
   RNF       :: Term -> REPLExpr 'CRNF
   Mem       :: REPLExpr 'CMem
-  Import    :: String -> REPLExpr 'CImport         -- Import a library module.
   Load      :: FilePath -> REPLExpr 'CLoad         -- Load a file.
   Reload    :: REPLExpr 'CReload                   -- Reloads the most recently loaded file.
   Doc       :: Name Term -> REPLExpr 'CDoc         -- Show documentation.
@@ -114,14 +111,13 @@ data REPLCommandCategory =
   deriving (Eq, Show)
 
 data REPLCommandType =
-    BuiltIn   -- ^ Things that don't start with a colon, e.g. let, import, using, eval
-              --   XXX these should eventually go away.
-  | ShellCmd  -- ^ Things that start with a colon, e.g. :help, :names, :load...
+    BuiltIn   -- ^ Things that don't start with a colon: eval and nop
+  | ColonCmd  -- ^ Things that start with a colon, e.g. :help, :names, :load...
   deriving (Eq, Show)
 
 -- | Tags used at the type level to denote each REPL command.
-data CmdTag = CUsing | CLet | CTypeCheck | CEval | CShowDefn
-  | CParse | CPretty | CAnn | CDesugar | CCompile | CRNF | CMem | CImport | CLoad
+data CmdTag = CTypeCheck | CEval | CShowDefn
+  | CParse | CPretty | CAnn | CDesugar | CCompile | CRNF | CMem | CLoad
   | CReload | CDoc | CNop | CHelp | CNames | CTestProp
   deriving (Show, Eq, Typeable)
 
@@ -155,9 +151,9 @@ data SomeREPLCommand where
 
 type REPLCommands = [SomeREPLCommand]
 
--- | Filter out commands that don't start with ':' (ex: "let" vs ":load")
-withoutBuiltins :: REPLCommands -> REPLCommands
-withoutBuiltins = filter (\(SomeCmd rc) -> cmdtype rc /= BuiltIn)
+-- | Keep only commands of a certain type.
+byCmdType :: REPLCommandType -> REPLCommands -> REPLCommands
+byCmdType ty = filter (\(SomeCmd rc) -> cmdtype rc == ty)
 
 -- | Given a list of REPL commands and something typed at the REPL,
 --   pick the first command with a matching type-level tag and run its
@@ -165,7 +161,7 @@ withoutBuiltins = filter (\(SomeCmd rc) -> cmdtype rc /= BuiltIn)
 dispatch :: Members DiscoEffects r => REPLCommands -> SomeREPLExpr -> Sem r ()
 dispatch [] _ = return ()
 dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
-  Just e' -> outputErrors @DiscoError $ action c e'
+  Just e' -> outputDiscoErrors $ action c e'
   Nothing -> dispatch cs r
 
 -- | The list of all commands that can be used at the REPL.
@@ -180,8 +176,6 @@ discoCommands =
   , SomeCmd docCmd
   , SomeCmd evalCmd
   , SomeCmd helpCmd
-  , SomeCmd importCmd
-  , SomeCmd letCmd
   , SomeCmd loadCmd
   , SomeCmd memCmd
   , SomeCmd namesCmd
@@ -193,12 +187,16 @@ discoCommands =
   , SomeCmd showDefnCmd
   , SomeCmd typeCheckCmd
   , SomeCmd testPropCmd
-  , SomeCmd usingCmd
   ]
 
 ------------------------------------------------------------
 -- Parsing
 ------------------------------------------------------------
+
+builtinCommandParser :: REPLCommands -> Parser SomeREPLExpr
+builtinCommandParser
+  = foldr ((<|>) . (\(SomeCmd rc) -> SomeREPL <$> try (parser rc))) empty
+  . byCmdType BuiltIn
 
 -- | Parse one of the colon commands in the given list of commands.
 commandParser :: REPLCommands -> Parser SomeREPLExpr
@@ -214,7 +212,7 @@ parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) .
 
     parsers
       = map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc))
-      $ withoutBuiltins allCommands     -- filter out commands that don't start with ':'
+      $ byCmdType ColonCmd allCommands
 
 -- | Parse a file name.
 fileParser :: Parser FilePath
@@ -223,15 +221,8 @@ fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
 -- | A parser for something entered at the REPL prompt.
 lineParser :: REPLCommands -> Parser SomeREPLExpr
 lineParser allCommands
-  -- First try parsing a colon command.
-  =   commandParser allCommands
-
-  -- Then try some other built-in command forms.
-  <|> try (SomeREPL Nop <$ (sc <* eof))
-  <|> try (SomeREPL . Using <$> (reserved "using" *> parseExtName))
-  <|> try (SomeREPL . Import <$> parseImport)
-  <|> try (SomeREPL . Eval <$> term)
-  <|> (SomeREPL <$> letParser)
+  =   builtinCommandParser allCommands
+  <|> commandParser allCommands
 
 -- | Given a list of available REPL commands and the currently enabled
 --   extensions, parse a string entered at the REPL prompt, returning
@@ -255,7 +246,7 @@ annCmd = REPLCommand
   , helpcmd = ":ann"
   , shortHelp = "Show type-annotated typechecked term"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleAnn
   , parser = Ann <$> term
   }
@@ -276,7 +267,7 @@ compileCmd = REPLCommand
   , helpcmd = ":compile"
   , shortHelp = "Show a compiled term"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleCompile
   , parser = Compile <$> term
   }
@@ -297,7 +288,7 @@ desugarCmd = REPLCommand
   , helpcmd = ":desugar"
   , shortHelp = "Show a desugared term"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleDesugar
   , parser = Desugar <$> term
   }
@@ -319,7 +310,7 @@ docCmd = REPLCommand
   , helpcmd = ":doc <term>"
   , shortHelp = "Show documentation"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleDoc
   , parser = Doc <$> (sc *> ident)
   }
@@ -344,30 +335,38 @@ handleDoc (Doc x) = do
 
 evalCmd :: REPLCommand 'CEval
 evalCmd = REPLCommand
-  { name = "eval"
-  , helpcmd = "<term>"
-  , shortHelp = "Evaluate a term"
-  , category = User
-  , cmdtype = BuiltIn
-  , action = handleEval
-  , parser = Eval <$> term
+  { name      = "eval"
+  , helpcmd   = "<code>"
+  , shortHelp = "Evaluate a block of code"
+  , category  = User
+  , cmdtype   = BuiltIn
+  , action    = handleEval
+  , parser    = Eval <$> wholeModule REPL
   }
 
 handleEval
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
-handleEval (Eval t) = do
-  (at, polyTy) <- inputToState . typecheckDisco $ inferTop t
-  let ty = getType at
-      c  = compileTerm at
+handleEval (Eval m) = inputToState $ do
+  mi@(ModuleInfo _ _ _ _ _ tms exts) <- loadParsedDiscoModule FromCwdOrStdlib "" m
+  modify @TopInfo (extSet %~ S.union exts)
+  addModule REPL mi
+  forM_ tms (evalTerm . fst)
+  -- garbageCollect
+
+evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
+evalTerm at = do
   v <- inputToState . withTopEnv $ do
     cv <- mkValue c
     prettyValue ty cv
     return cv
   modify @TopInfo $
-    (topCtx %~ M.insert (string2Name "it") polyTy) .
+    (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
     (topEnv %~ M.insert (string2Name "it") v)
-  garbageCollect
+  return v
+  where
+    ty = getType at
+    c  = compileTerm at
 
 ------------------------------------------------------------
 -- :help
@@ -379,7 +378,7 @@ helpCmd =
   , helpcmd = ":help"
   , shortHelp = "Show help"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleHelp
   , parser = return Help
   }
@@ -400,65 +399,6 @@ handleHelp Help = do
     padRight s maxsize = take maxsize (s ++ repeat ' ')
 
 ------------------------------------------------------------
--- import
-
-importCmd :: REPLCommand 'CImport
-importCmd = REPLCommand
-  { name = "import"
-  , helpcmd = ":import <module>"
-  , shortHelp = "Import a library module"
-  , category = User
-  , cmdtype = BuiltIn
-  , action = handleImport
-  , parser = Import <$> parseImport
-  }
-
-handleImport
-  :: Members
-       '[ Error DiscoError, State TopInfo, Reader Env
-        , Store Cell, Output String, Output Debug, Embed IO]
-       r
-  => REPLExpr 'CImport -> Sem r ()
-handleImport (Import modName) = do
-  mi <- loadDiscoModule FromCwdOrStdlib modName
-  addModule mi
-
-------------------------------------------------------------
--- let
-
-letCmd :: REPLCommand 'CLet
-letCmd = REPLCommand
-  { name = "let"
-  , helpcmd = "<variable> = <expression>"
-  , shortHelp = "Temporarily define a variable (until the next :load)"
-  , category = User
-  , cmdtype = BuiltIn
-  , action = handleLet
-  , parser = letParser
-  }
-
-handleLet
-  :: Members
-       '[ Error DiscoError, State TopInfo, Store Cell, Reader Env
-        , Output String, Output Debug]
-       r
-  => REPLExpr 'CLet -> Sem r ()
-handleLet (Let x t) = do
-  (at, sig) <- inputToState . typecheckDisco $ inferTop t
-  let c = compileTerm at
-  thnk <- inputToState . withTopEnv $ mkValue c
-  modify @TopInfo $
-    (topCtx  %~ M.insert x sig) .
-      -- XXX ability to define more complex things at REPL prompt, with patterns etc.
-    (topDefs %~ M.insert (coerce x) (Defn (coerce x) [] (getType at) [bind [] at])) .
-    (topEnv  %~ M.insert (coerce x) thnk)
-
-letParser :: Parser (REPLExpr 'CLet)
-letParser = Let
-  <$> ident
-  <*> (symbol "=" *> term)
-
-------------------------------------------------------------
 -- :load
 
 loadCmd :: REPLCommand 'CLoad
@@ -467,7 +407,7 @@ loadCmd = REPLCommand
   , helpcmd = ":load <filename>"
   , shortHelp = "Load a file"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleLoadWrapper
   , parser = Load <$> fileParser
   }
@@ -486,7 +426,7 @@ handleLoad
   => FilePath -> Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _) <- loadDiscoModule (FromDir directory) modName
+  m@(ModuleInfo _ props _ _ _ _ _) <- inputToState $ loadDiscoModule (FromDir directory) modName
   setLoadedModule m
   t <- inputToState . withTopEnv $ runAllTests props
   modify @TopInfo (lastFile ?~ fp)
@@ -529,7 +469,7 @@ namesCmd = REPLCommand
   , helpcmd = ":names"
   , shortHelp = "Show all names in current scope"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleNames
   , parser = return Names
   }
@@ -575,7 +515,7 @@ parseCmd = REPLCommand
   , helpcmd = ":parse <expr>"
   , shortHelp = "Show the parsed AST"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleParse
   , parser = Parse <$> term
   }
@@ -592,7 +532,7 @@ prettyCmd = REPLCommand
   , helpcmd = ":pretty <expr>"
   , shortHelp = "Pretty-print a term"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handlePretty
   , parser = Pretty <$> term
   }
@@ -609,7 +549,7 @@ reloadCmd = REPLCommand
   , helpcmd = ":reload"
   , shortHelp = "Reloads the most recently loaded file"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleReload
   , parser = return Reload
   }
@@ -632,7 +572,7 @@ showDefnCmd = REPLCommand
   , helpcmd = ":defn <var>"
   , shortHelp = "Show a variable's definition"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleShowDefn
   , parser = ShowDefn <$> (sc *> ident)
   }
@@ -660,7 +600,7 @@ testPropCmd = REPLCommand
   , helpcmd = ":test <property>"
   , shortHelp = "Test a property using random examples"
   , category = User
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleTest
   , parser = TestProp <$> term
   }
@@ -684,7 +624,7 @@ typeCheckCmd = REPLCommand
   , helpcmd = ":type <term>"
   , shortHelp = "Typecheck a term"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleTypeCheck
   , parser = parseTypeCheck
   }
@@ -715,23 +655,6 @@ parseNakedOp = sc *> choice (map mkOpParser (concat opTable))
     mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((TPrim (PrimBOp op) <$) . reservedOp) syns)
 
 ------------------------------------------------------------
--- using
-
-usingCmd :: REPLCommand 'CUsing
-usingCmd = REPLCommand
-  { name = "using"
-  , helpcmd = "using <extension>"
-  , shortHelp = "Enable an extension"
-  , category = User
-  , cmdtype = BuiltIn
-  , action = handleUsing
-  , parser = Using <$> (reserved "using" *> parseExtName)
-  }
-
-handleUsing :: Member (State TopInfo) r => REPLExpr 'CUsing -> Sem r ()
-handleUsing (Using e) = modify @TopInfo $ (extSet %~ addExtension e)
-
-------------------------------------------------------------
 -- :rnf
 
 rnfCmd :: REPLCommand 'CRNF
@@ -740,7 +663,7 @@ rnfCmd = REPLCommand
   , helpcmd = "rnf <expr>"
   , shortHelp = "Reduce an expression to RNF"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleRNF
   , parser = RNF <$> term
   }
@@ -764,7 +687,7 @@ memCmd = REPLCommand
   , helpcmd = "mem"
   , shortHelp = "Show the contents of memory"
   , category = Dev
-  , cmdtype = ShellCmd
+  , cmdtype = ColonCmd
   , action = handleMem
   , parser = return Mem
   }

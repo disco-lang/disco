@@ -23,7 +23,7 @@ import           Polysemy.Error
 -- | Run an error effect by simply printing out the errors, using an
 --   ambient output effect.  This is a stopgap for now, eventually
 --   intended to be replaced by something more sophisticated.
-outputErrors :: Show e => Member (Output String) r => Sem (Error e ': r) () -> Sem r ()
+outputErrors :: (Show e, Member (Output String) r) => Sem (Error e ': r) () -> Sem r ()
 outputErrors m = do
   e <- runError m
   either printoutLn return e

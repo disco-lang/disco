@@ -11,14 +11,20 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Error (DiscoError(..), EvalError(..)) where
+module Disco.Error (DiscoError(..), EvalError(..), outputDiscoErrors) where
 
-import qualified Data.Void
+import           Text.Megaparsec                  (ParseErrorBundle,
+                                                   errorBundlePretty)
+import           Unbound.Generics.LocallyNameless (Name)
+
+import           Disco.Effects.Output
+import           Polysemy
+import           Polysemy.Error
+
 import           Disco.AST.Core                   (Core)
 import           Disco.AST.Surface                (ModName)
+import           Disco.Parser
 import           Disco.Typecheck.Monad            (TCError)
-import           Text.Megaparsec                  (ParseErrorBundle)
-import           Unbound.Generics.LocallyNameless (Name)
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -33,7 +39,7 @@ data DiscoError where
   TypeCheckErr :: TCError -> DiscoError
 
   -- | Error encountered during parsing.
-  ParseErr :: ParseErrorBundle String Data.Void.Void -> DiscoError
+  ParseErr :: ParseErrorBundle String DiscoParseError -> DiscoError
 
   -- | Error encountered at runtime.
   EvalErr :: EvalError -> DiscoError
@@ -66,3 +72,12 @@ data EvalError where
   Crash         :: String    -> EvalError
 
   deriving Show
+
+outputDiscoErrors :: Member (Output String) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors m = do
+  e <- runError m
+  either (outputLn . prettyDiscoError) return e
+
+prettyDiscoError :: DiscoError -> String
+prettyDiscoError (ParseErr pe) = errorBundlePretty pe
+prettyDiscoError e             = show e  -- for now!

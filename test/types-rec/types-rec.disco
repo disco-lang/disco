@@ -2,3 +2,27 @@ type DoubleStream = N * N * DoubleStream
 
 cons : N * DoubleStream -> DoubleStream
 cons = \x.x
+
+-- Example from section 24.3 of PFPL
+
+type T1 = (T1 -> N) * (T1 -> Z)
+type T2 = (T2 -> Z) * (T2 -> Z)
+
+fst : a*b -> a
+fst(a,_) = a
+
+snd : a*b -> b
+snd(_,b) = b
+
+e : T1
+e = (\x:T1. 4, \x:T1. sqrt(fst(x)(x)))
+
+e' : T2
+e' = (\x:T2. -4, \x:T2. 0)
+
+-- If the system can (erroneously) derive T1 <: T2, then e : T2, and
+-- snd(e : T2)(e') would be well-typed but would reduce to sqrt(-4).
+-- The reason one might erroneously have T1 <: T2 is with a subtly
+-- wrong subtyping rule, where we use the same type variable to stand
+-- for recursive occurrences of both sides.  Fortunately Disco does
+-- not fall into this trap.

@@ -99,7 +99,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Module -> Sem r ModuleInfo
-checkModule (Module _ _ m docs) = do
+checkModule (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
@@ -113,7 +113,8 @@ checkModule (Module _ _ m docs) = do
         (x:_) -> throw $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- checkProperties docs
-          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx
+          aterms <- mapM inferTop terms
+          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -247,7 +248,9 @@ checkDefn (TermDefn x clauses) = do
   checkNumPats clauses
 
   -- Get the declared type signature of x
-  Forall sig <- lookupTy x
+  Forall sig <- catch (lookupTy x) (\_ -> throw $ NoType x)
+    -- If x isn't in the context, it's because no type was declared for it, so
+    -- rethrow a more informative error.
   (nms, ty) <- unbind sig
 
   -- Try to decompose the type into a chain of arrows like pty1 ->

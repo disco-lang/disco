@@ -15,7 +15,7 @@
 
 module Disco.Parser
        ( -- * Parser type and utilities
-         Parser, runParser, withExts
+         DiscoParseError(..), Parser, runParser, withExts, indented, thenIndented
 
          -- * Lexer
 
@@ -60,20 +60,21 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
-                                                          use, (.=))
+                                                          use, (%=), (%~), (&),
+                                                          (.=))
 import           Control.Monad.State
 import           Data.Char                               (isDigit)
+import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
-import           Data.Maybe                              (catMaybes, fromMaybe)
+import           Data.Maybe                              (fromMaybe)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
-import           Data.Void
 
-import           Data.Foldable                           (asum)
 import           Disco.AST.Surface
 import           Disco.Extensions
+import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -84,54 +85,89 @@ import           Disco.Types
 -- Some of the basic setup code for the parser taken from
 -- https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
 
+-- | Currently required indent level.
+data IndentMode where
+  NoIndent   :: IndentMode   -- ^ Don't require indent.
+  ThenIndent :: IndentMode   -- ^ Parse one token without
+                             --   indent, then switch to @Indent@.
+  Indent     :: IndentMode   -- ^ Require everything to be indented at
+                             --   least one space.
+
 -- | Extra custom state for the parser.
 data ParserState = ParserState
-  { _indentLevel :: Maybe Pos  -- ^ When this is @Just p@, everything
-                               --   should be indented more than column
-                               --   @p@.
-  , _enabledExts :: Set Ext    -- ^ Set of enabled language extensions
-                               --   (some of which may affect parsing).
+  { _indentMode  :: IndentMode  -- ^ Currently required level of indentation.
+  , _enabledExts :: Set Ext     -- ^ Set of enabled language extensions
+                                --   (some of which may affect parsing).
   }
-
 
 makeLenses ''ParserState
 
 initParserState :: ParserState
-initParserState = ParserState Nothing S.empty
+initParserState = ParserState NoIndent S.empty
+
+data DiscoParseError
+  = ReservedVarName String
+  deriving (Show, Eq, Ord)
+
+instance ShowErrorComponent DiscoParseError where
+  showErrorComponent (ReservedVarName x) = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
+  errorComponentLen (ReservedVarName x) = length x
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
---   of state to keep track of the current indentation level.  For now
---   we have no custom errors.
-type Parser = StateT ParserState (MP.Parsec Void String)
+--   of state to keep track of the current indentation level and
+--   language extensions, and some custom error messages.
+type Parser = StateT ParserState (MP.Parsec DiscoParseError String)
 
 -- | Run a parser from the initial state.
-runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String Void) a
+runParser :: Parser a -> FilePath -> String -> Either (ParseErrorBundle String DiscoParseError) a
 runParser = MP.runParser . flip evalStateT initParserState
+
+-- | Run a parser under a specified 'IndentMode'.
+withIndentMode :: IndentMode -> Parser a -> Parser a
+withIndentMode m p = do
+  indentMode .= m
+  res <- p
+  indentMode .= NoIndent
+  return res
 
 -- | @indented p@ is just like @p@, except that every token must not
 --   start in the first column.
 indented :: Parser a -> Parser a
-indented p = do
-  indentLevel .= Just pos1
-  res <- p
-  indentLevel .= Nothing
-  return res
+indented = withIndentMode Indent
+
+-- | @indented p@ is just like @p@, except that every token after the
+--   first must not start in the first column.
+thenIndented :: Parser a -> Parser a
+thenIndented = withIndentMode ThenIndent
 
 -- | @requireIndent p@ possibly requires @p@ to be indented, depending
---   on the current '_indentLevel'.  Used in the definition of
+--   on the current '_indentMode'.  Used in the definition of
 --   'lexeme' and 'symbol'.
 requireIndent :: Parser a -> Parser a
 requireIndent p = do
-  l <- use indentLevel
+  l <- use indentMode
   case l of
-    Just pos -> L.indentGuard sc GT pos >> p
-    _        -> p
+    ThenIndent -> do
+      a <- p
+      indentMode .= Indent
+      return a
+    Indent     -> L.indentGuard sc GT pos1 >> p
+    NoIndent   -> p
 
 -- | Locally set the enabled extensions within a subparser.
 withExts :: Set Ext -> Parser a -> Parser a
 withExts exts p = do
   oldExts <- use enabledExts
   enabledExts .= exts
+  a <- p
+  enabledExts .= oldExts
+  return a
+
+-- | Locally enable some additional extensions within a subparser.
+withAdditionalExts :: Set Ext -> Parser a -> Parser a
+withAdditionalExts exts p = do
+  oldExts <- use enabledExts
+  enabledExts %= S.union exts
   a <- p
   enabledExts .= oldExts
   return a
@@ -298,9 +334,12 @@ identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
-    check x = if x `elem` reservedWords
-                then fail $ "keyword \"" ++ x ++ "\" cannot be used as an identifier"
-                else return x
+    check x
+      | x `elem` reservedWords = do
+          -- back up to beginning of bad token to report correct position
+          updateParserState (\s -> s { stateOffset = stateOffset s - length x })
+          customFailure $ ReservedVarName x
+      | otherwise = return x
 
 -- | Parse an 'identifier' and turn it into a 'Name'.
 ident :: Parser (Name Term)
@@ -309,31 +348,54 @@ ident = string2Name <$> identifier letterChar
 ------------------------------------------------------------
 -- Parser
 
+-- | Results from parsing a block of top-level things.
+data TLResults = TLResults
+  { _tlDecls :: [Decl]
+  , _tlDocs  :: [(Name Term, [DocThing])]
+  , _tlTerms :: [Term]
+  }
+
+emptyTLResults :: TLResults
+emptyTLResults = TLResults [] [] []
+
+makeLenses ''TLResults
+
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
-wholeModule :: Parser Module
-wholeModule = between sc eof parseModule
+wholeModule :: LoadingMode -> Parser Module
+wholeModule = between sc eof . parseModule
 
 -- | Parse an entire module (a list of declarations ended by
---   semicolons).
-parseModule :: Parser Module
-parseModule = do
+--   semicolons).  The 'LoadingMode' parameter tells uw whether to
+--   include or replace any language extensions enabled at the top
+--   level.  We include them when parsing a module entered at the
+--   REPL, and replace them when parsing a standalone module.
+parseModule :: LoadingMode -> Parser Module
+parseModule mode = do
   exts     <- S.fromList <$> many parseExtension
-  withExts exts $ do   -- REPLACE any existing extension set with the extensions
-                       -- explicitly specified by the module.
+  let extFun = case mode of
+        Standalone -> withExts
+        REPL       -> withAdditionalExts
+
+  extFun exts $ do
     imports  <- many parseImport
     topLevel <- many parseTopLevel
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      groupTLs :: [DocThing] -> [TopLevel] -> [(Decl, Maybe (Name Term, [DocThing]))]
-      groupTLs _ [] = []
+      groupTLs :: [DocThing] -> [TopLevel] -> TLResults
+      groupTLs _ [] = emptyTLResults
       groupTLs revDocs (TLDoc doc : rest)
         = groupTLs (doc : revDocs) rest
       groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
-        = (decl, Just (x, reverse revDocs)) : groupTLs [] rest
+        = groupTLs [] rest
+          & tlDecls %~ (decl :)
+          & tlDocs  %~ ((x, reverse revDocs) :)
       groupTLs _ (TLDecl defn : rest)
-        = (defn, Nothing) : groupTLs [] rest
+        = groupTLs [] rest
+          & tlDecls %~ (defn :)
+      groupTLs _ (TLExpr t : rest)
+        = groupTLs [] rest & tlTerms %~ (t:)
 
       defnGroups :: [Decl] -> [Decl]
       defnGroups []                = []
@@ -348,9 +410,9 @@ parseModule = do
               (ts, ds2') = matchDefn ds2
           matchDefn ds2 = ([], ds2)
 
-      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList (catMaybes docs))
+      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList docs) terms
         where
-          (decls, docs) = unzip $ groupTLs [] tls
+          TLResults decls docs terms = groupTLs [] tls
 
 -- | Parse an extension.
 parseExtension :: Parser Ext
@@ -378,7 +440,8 @@ parseModuleName = lexeme $
 parseTopLevel :: Parser TopLevel
 parseTopLevel = L.nonIndented sc $
       TLDoc  <$> parseDocThing
-  <|> TLDecl <$> parseDecl
+  <|> TLDecl <$> try parseDecl
+  <|> TLExpr <$> thenIndented parseTerm
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@

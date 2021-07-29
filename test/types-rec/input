@@ -1,0 +1,2 @@
+:load test/types-rec/types-rec.disco
+snd(e : T2)(e')

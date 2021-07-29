@@ -29,8 +29,8 @@ import           Data.List                        (find, foldl', intersect,
                                                    partition)
 import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
-import           Data.Maybe                       (catMaybes, fromJust,
-                                                   fromMaybe, mapMaybe)
+import           Data.Maybe                       (fromJust, fromMaybe,
+                                                   mapMaybe)
 import           Data.Monoid                      (First (..))
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
@@ -98,10 +98,10 @@ reifyExcept m = (Right <$> m) `catchError` (return . Left)
 
 filterExcept :: MonadError e m => [m a] -> m [a]
 filterExcept ms = do
-  es <- mapM reifyExcept $ ms
+  es <- mapM reifyExcept ms
   case partitionEithers es of
     (e:_, []) -> throwError e
-    (_, as)     -> return as
+    (_, as)   -> return as
 
 --------------------------------------------------
 -- Simple constraints
@@ -135,7 +135,7 @@ makeLenses ''TyVarInfo
 
 -- | Create a 'TyVarInfo' given an 'Ilk' and a 'Sort'.
 mkTVI :: Ilk -> Sort -> TyVarInfo
-mkTVI i s = TVI (First (Just i)) s
+mkTVI = TVI . First . Just
 
 -- | We can learn different things about a type variable from
 --   different places; the 'Semigroup' instance allows combining
@@ -611,7 +611,7 @@ simplify tyDefns origVM cs
       -- the types being substituted for those vars.
 
       let tySorts :: [(Type, Sort)]
-          tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (flip lookupVM vm) . swap) $ Subst.toList s'
+          tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (`lookupVM` vm) . swap) $ Subst.toList s'
 
           tyQualList :: [(Type, Qualifier)]
           tyQualList = concatMap (sequenceA . second S.toList) tySorts
@@ -780,17 +780,16 @@ dirtypesBySort vm relMap dir t s x
       -- for all variables beta \in x,
       forAll x (\beta ->
 
-       -- there is at least one type t'' which is a subtype of t'
-       -- which would be a valid solution for beta, that is,
-       exists (dirtypes (other dir) t') $ \t'' ->
+        -- there is at least one type t'' which is a subtype of t'
+        -- which would be a valid solution for beta, that is,
+        exists (dirtypes (other dir) t') $ \t'' ->
 
           -- t'' has the sort beta is supposed to have, and
-         (hasSort t'' (getSort vm beta)) &&
+          hasSort t'' (getSort vm beta) &&
 
           -- t'' is a supertype of every base type predecessor of beta.
-         (forAll (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir))) $ \u ->
-            isDirB dir t'' u
-         ))
+          forAll (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir)))
+            (isDirB dir t''))
 
     -- The above comments are written assuming dir = Super; of course,
     -- if dir = Sub then just swap "super" and "sub" everywhere.

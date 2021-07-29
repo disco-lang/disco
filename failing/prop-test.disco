@@ -1,3 +1,0 @@
-!!! ∀ n : N, m : N. m == n
-dummy : Unit
-dummy = ()

@@ -144,12 +144,29 @@ discoMain = do
           | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
               liftIO $ putStrLn "Goodbye!"
               return ()
+          | ":{" `isPrefixOf` input -> do
+              multiLineLoop []
+              loop
           | otherwise -> do
               mapError @_ @DiscoError (Panic . show) $
                 absorbMonadCatch $
                 withCtrlC (return ()) $
                 handleCMD input
               loop
+
+    multiLineLoop :: Members DiscoEffects r => [String] -> Sem r ()
+    multiLineLoop ls = do
+      minput <- embedFinal $ withCtrlC (return Nothing) (getInputLine "Disco| ")
+      case minput of
+        Nothing -> return ()
+        Just input
+          | ":}" `isPrefixOf` input -> do
+              mapError @_ @DiscoError (Panic . show) $
+                absorbMonadCatch $
+                withCtrlC (return ()) $
+                handleCMD (unlines (reverse ls))
+          | otherwise -> do
+              multiLineLoop (input:ls)
 
 -- | Parse and run the command corresponding to some REPL input.
 handleCMD :: Members DiscoEffects r => String -> Sem r ()

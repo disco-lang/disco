@@ -1,0 +1,16 @@
+import list
+
+g : N -> N
+g(x) = x + 1
+
+-- each(g, f)
+
+3 + 17
+
+4
+  + 9
+  + 7
+  + 16
+
+f : List(N)
+f = [1,2,3]

@@ -47,6 +47,7 @@ type TyCtx = Ctx Term PolyType
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | NoType  (Name Term)    -- ^ No type is specified for a definition
   | NotCon Con Term Type   -- ^ The type of the term should have an
                            --   outermost constructor matching Con, but
                            --   it has type 'Type' instead

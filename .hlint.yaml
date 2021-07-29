@@ -58,6 +58,7 @@
 # - ignore: {name: Use const, within: SpecialModule} # Only within certain modules
 
 - ignore: {name: Use if}
+- ignore: {name: Use camelCase, within: Disco.AST.Generic}
 
 # Define some custom infix operators
 # - fixity: infixr 3 ~^#^~

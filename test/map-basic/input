@@ -8,6 +8,7 @@ emptyMap
 :type insert(1, 3, insert(4, 6, emptyMap))
 insert(1, 3, insert(4, 6, emptyMap))
 insert(1, 3, insert(1, 4, emptyMap))
+m : Map(N, N)
 m = insert(1, 3, insert(4, 6, emptyMap))
 :type lookup
 lookup(1,m)

@@ -272,19 +272,19 @@ whnf (CType ty)     = return $ VType ty
 -- Interesting cases! (application, case)
 
 -- To reduce an application:
-whnf t@(CApp c cs)    = do
+whnf t@(CApp c1 c2)    = do
 
   debug $ "whnf " ++ show t
 
   -- First reduce the function to WHNF...
-  v <- whnf c
+  v1 <- whnf c1
 
   -- Then either reduce each argument or turn it into a thunk,
   -- depending on the specified strictness.
-  vs <- mapM (uncurry whnfArg) cs
+  v2 <- uncurry whnfArg c2
 
   -- Finally, call 'whnfApp' to do the actual application.
-  whnfApp v vs
+  whnfApp v1 [v2]
 
 -- See 'whnfCase' for case reduction logic.
 whnf (CCase bs)     = whnfCase bs

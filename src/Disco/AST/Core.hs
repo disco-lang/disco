@@ -85,7 +85,7 @@ data Core where
   --   annotation.  The strictness is determined by the type of the
   --   application (which has been erased), and determines whether the
   --   argument should be evaluated before applying the function.
-  CApp  :: Core -> [(Strictness, Core)] -> Core
+  CApp  :: Core -> (Strictness, Core) -> Core
 
   -- | A case expression.
   CCase :: [CBranch] -> Core

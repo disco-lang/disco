@@ -97,7 +97,7 @@ compileDTerm term@(DTAbs q _ _) = do
     abstract xs body = CAbs (bind (map coerce xs) body)
 
     quantify :: Op -> Core -> Core
-    quantify op f = CApp (CConst op) [(Lazy, f)]
+    quantify op f = CApp (CConst op) (Lazy, f)
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -111,11 +111,7 @@ compileDTerm (DTApp _ (DTPrim _ PrimLeft) t)
 compileDTerm (DTApp _ (DTPrim _ PrimRight) t)
   = CInj R <$> compileDTerm t
 
-compileDTerm (DTApp _ t1 t2)
-  = appChain t1 [t2]
-  where
-    appChain (DTApp _ t1' t2') ts = appChain t1' (t2':ts)
-    appChain t1' ts               = CApp <$> compileDTerm t1' <*> mapM compileArg ts
+compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileArg t2
 
 compileDTerm (DTPair _ t1 t2)
   = CPair <$> compileDTerm t1 <*> compileDTerm t2
@@ -123,7 +119,7 @@ compileDTerm (DTPair _ t1 t2)
 compileDTerm (DTCase _ bs)
   = CCase <$> mapM compileBranch bs
 
-compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) [(Strict, CType ty)]
+compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) (Strict, CType ty)
   where
     tyOps = M.fromList
       [ Enumerate ==> OEnum

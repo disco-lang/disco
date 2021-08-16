@@ -21,7 +21,7 @@ module Disco.AST.Core
        , Op(..), opArity
 
          -- * Case expressions and patterns
-       , CBranch, CPattern(..), CQual(..)
+       , CBranch, CPattern(..)
        )
        where
 
@@ -271,17 +271,6 @@ opArity _               = 1
 -- | A branch, consisting of a list of guards and a term.
 type CBranch = Bind (Telescope (Embed Core, CPattern)) Core
 
--- | A single qualifier in a list comprehension.
-data CQual where
-
-  -- | A binding qualifier (i.e. @x <- t@)
-  CQBind   :: Name Core -> Embed Core -> CQual
-
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  CQGuard  :: Embed Core -> CQual
-
-  deriving (Show, Generic)
-
 -- | Core (desugared) patterns.  We only need variables, wildcards,
 --   natural numbers, and constructors.
 data CPattern where
@@ -320,4 +309,3 @@ instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op
 instance Alpha CPattern
-instance Alpha CQual

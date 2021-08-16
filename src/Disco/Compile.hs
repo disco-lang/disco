@@ -116,8 +116,7 @@ compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileArg t2
 compileDTerm (DTPair _ t1 t2)
   = CPair <$> compileDTerm t1 <*> compileDTerm t2
 
-compileDTerm (DTCase _ bs)
-  = CCase <$> mapM compileBranch bs
+compileDTerm (DTCase _ bs) = CApp <$> compileCase bs <*> pure (Strict, CUnit)
 
 compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) (Strict, CType ty)
   where
@@ -264,36 +263,66 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 -- Case expressions
 ------------------------------------------------------------
 
--- | Compile a desugared branch.  This does very little actual work, just
---   translating directly from one AST to another.
-compileBranch :: Member Fresh r => DBranch -> Sem r CBranch
-compileBranch b = do
-  (gs, d) <- unbind b
-  bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
+-- | Compile a case expression of type τ to a core language expression
+--   of type (Unit → τ).
+compileCase :: Member Fresh r => [DBranch] -> Sem r Core
+compileCase [] = return $ CAbs (bind [string2Name "_"] (CConst OMatchErr))
+  -- empty case ==>  λ _ . matcherr
 
--- | Compile a desugared guard.
-compileGuard :: Member Fresh r => DGuard -> Sem r (Embed Core, CPattern)
-compileGuard (DGPat (unembed -> d) dpat) =
-  (,)
-    <$> (embed <$> compileDTerm d)
-    <*> pure (compilePattern dpat)
+compileCase (b:bs) = do
+  c1 <- compileBranch b
+  c2 <- compileCase bs
+  return $ CAbs (bind [string2Name "_"] (CApp c1 (Strict,c2)))
+
+-- | Compile a branch of a case expression of type τ to a core
+--   language expression of type (Unit → τ) → τ.  The idea is that it
+--   takes a failure continuation representing the subsequent branches
+--   in the case expression.  If the branch succeeds, it just returns
+--   the associated expression of tyep τ; if it fails, it calls the
+--   continuation to proceed with the case analysis.
+compileBranch :: Member Fresh r => DBranch -> Sem r Core
+compileBranch b = do
+  (gs, e) <- unbind b
+  c <- compileDTerm e
+  k <- fresh (string2Name "k")   -- Fresh name for the failure continuation
+  bc <- compileGuards (fromTelescope gs) k c
+  return $ CAbs (bind [k] bc)
+
+compileGuards :: Member Fresh r => [DGuard] -> Name Core -> Core -> Sem r Core
+compileGuards [] _ e                                      = return e
+compileGuards (DGPat (unembed -> s) p : gs) k e = do
+  e' <- compileGuards gs k e
+  s' <- compileDTerm s
+  return $ compileMatch p s' k e'
+
+-- compileMatch takes a pattern, the compiled scrutinee, the name of
+-- the failure continuation, and a Core term representing the
+-- compilation of any guards which come after this one, and returns a
+-- Core expression of type τ that performs the match.
+compileMatch :: DPattern -> Core -> Name Core -> Core -> Core
+compileMatch (DPVar _ x) s _ e = CApp (CAbs (bind [coerce x] e)) (Strict, s)
+compileMatch (DPWild _) s _ e  = e  -- XXX lazy version, replace with strict one later (below)
+  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
+compileMatch DPUnit s _ e      = e       -- XXX
+  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
+compileMatch (DPBool b) s k e  = undefined
 
 ------------------------------------------------------------
 -- Patterns
 ------------------------------------------------------------
 
--- | Compile a desugared pattern.
-compilePattern :: DPattern -> CPattern
-compilePattern (DPVar _ x)      = CPVar (coerce x)
-compilePattern (DPWild _)       = CPWild
-compilePattern DPUnit           = CPUnit
-compilePattern (DPBool b)       = CPTag (toEnum . fromEnum $ b)
-compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
-compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
-compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
-compilePattern (DPNat _ n)      = CPNat n
-compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
-compilePattern (DPNil _)        = CPTag L
+-- -- | Compile a desugared pattern.
+-- compilePattern :: DPattern -> CPattern
+-- compilePattern (DPVar _ x)      = CPVar (coerce x)
+-- compilePattern (DPWild _)       = CPWild
+-- compilePattern DPUnit           = CPUnit
+-- compilePattern (DPBool b)       = CPTag (toEnum . fromEnum $ b)
+-- compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
+-- compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
+-- compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
+-- compilePattern (DPNat _ n)      = CPNat n
+-- compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
+-- compilePattern (DPNil _)        = CPTag L
 
 ------------------------------------------------------------
 -- Unary and binary operators

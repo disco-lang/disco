@@ -272,19 +272,19 @@ whnf (CType ty)     = return $ VType ty
 -- Interesting cases! (application, case)
 
 -- To reduce an application:
-whnf t@(CApp c cs)    = do
+whnf t@(CApp c1 c2)    = do
 
   debug $ "whnf " ++ show t
 
   -- First reduce the function to WHNF...
-  v <- whnf c
+  v1 <- whnf c1
 
   -- Then either reduce each argument or turn it into a thunk,
   -- depending on the specified strictness.
-  vs <- mapM (uncurry whnfArg) cs
+  v2 <- mkValue c2
 
   -- Finally, call 'whnfApp' to do the actual application.
-  whnfApp v vs
+  whnfApp v1 [v2]
 
 -- See 'whnfCase' for case reduction logic.
 whnf (CCase bs)     = whnfCase bs
@@ -295,12 +295,6 @@ whnf (CTest vars c) = whnfTest (TestVars vars) c
 ------------------------------------------------------------
 -- Function application
 ------------------------------------------------------------
-
--- | Turn a function argument into a Value according to its given
---   strictness: via 'whnf' if Strict, and as a 'Thunk' if not.
-whnfArg :: Members EvalEffects r => Strictness -> Core -> Sem r Value
-whnfArg Strict = whnf
-whnfArg Lazy   = mkValue
 
 -- | Find the arity of a function-like thing.  Note that the input
 --   must already be in WHNF.

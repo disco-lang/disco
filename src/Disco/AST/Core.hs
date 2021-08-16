@@ -1,4 +1,3 @@
-
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
@@ -85,7 +84,7 @@ data Core where
   --   annotation.  The strictness is determined by the type of the
   --   application (which has been erased), and determines whether the
   --   argument should be evaluated before applying the function.
-  CApp  :: Core -> [(Strictness, Core)] -> Core
+  CApp  :: Core -> Core -> Core
 
   -- | A case expression.
   CCase :: [CBranch] -> Core
@@ -97,6 +96,13 @@ data Core where
 
   -- | A type.
   CType :: Type -> Core
+
+  -- | Introduction form for a lazily evaluated value of type Lazy T
+  --   for some type T.
+  CDelay :: Bind (Name Core) Core -> Core
+
+  -- | Force evaluation of a lazy value.
+  CForce :: Core -> Core
 
   deriving (Show, Generic)
 

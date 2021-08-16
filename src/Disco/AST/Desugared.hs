@@ -44,7 +44,6 @@ module Disco.AST.Desugared
        , pattern DPVar
        , pattern DPWild
        , pattern DPUnit
-       , pattern DPBool
        , pattern DPChar
        , pattern DPPair
        , pattern DPInj
@@ -193,7 +192,7 @@ type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
 type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
-type instance X_PBool    DS = ()
+type instance X_PBool    DS = Void
 type instance X_PChar    DS = ()
 type instance X_PString  DS = Void
 type instance X_PTup     DS = Void
@@ -237,9 +236,6 @@ pattern DPWild ty <- PWild_ (unembed -> ty)
 pattern DPUnit :: DPattern
 pattern DPUnit = PUnit_ ()
 
-pattern DPBool :: Bool -> DPattern
-pattern DPBool  b = PBool_ () b
-
 pattern DPChar :: Char -> DPattern
 pattern DPChar  c = PChar_ () c
 
@@ -268,7 +264,7 @@ pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
   where
     DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
 
-{-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
+{-# COMPLETE DPVar, DPWild, DPUnit, DPChar, DPPair, DPInj,
     DPNat, DPFrac, DPNil #-}
 
 type instance X_QBind  DS = Void
@@ -299,7 +295,6 @@ instance HasType DPattern where
   getType (DPVar ty _)    = ty
   getType (DPWild ty)     = ty
   getType DPUnit          = TyUnit
-  getType (DPBool _)      = TyBool
   getType (DPChar _)      = TyC
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty

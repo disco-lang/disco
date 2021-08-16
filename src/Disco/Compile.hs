@@ -287,7 +287,6 @@ compilePattern :: DPattern -> CPattern
 compilePattern (DPVar _ x)      = CPVar (coerce x)
 compilePattern (DPWild _)       = CPWild
 compilePattern DPUnit           = CPUnit
-compilePattern (DPBool b)       = CPTag (toEnum . fromEnum $ b)
 compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
 compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
 compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)

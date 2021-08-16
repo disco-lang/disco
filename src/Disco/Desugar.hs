@@ -24,6 +24,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
+import           Data.Bool                        (bool)
 import           Data.Coerce
 import           Data.Maybe                       (fromMaybe, isJust)
 
@@ -601,10 +602,10 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   where
     desugarGuard :: Member Fresh r => AGuard -> Sem r [DGuard]
 
-    -- A Boolean guard is desugared to a pattern-match on @true@.
+    -- A Boolean guard is desugared to a pattern-match on @true = right(unit)@.
     desugarGuard (AGBool (unembed -> at)) = do
       dt <- desugarTerm at
-      mkMatch dt (DPBool True)
+      desugarMatch dt (APInj TyBool R APUnit)
 
     -- 'let x = t' is desugared to 'when t is x'.
     desugarGuard (AGLet (ABinding _ x (unembed -> at))) = do
@@ -640,7 +641,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     desugarMatch dt (APVar ty x)      = mkMatch dt (DPVar ty (coerce x))
     desugarMatch _  (APWild _)        = return []
     desugarMatch dt APUnit            = mkMatch dt DPUnit
-    desugarMatch dt (APBool b)        = mkMatch dt (DPBool b)
+    desugarMatch dt (APBool b)        = desugarMatch dt (APInj TyBool (bool L R b) APUnit)
     desugarMatch dt (APNat ty n)      = mkMatch dt (DPNat ty n)
     desugarMatch dt (APChar c)        = mkMatch dt (DPChar c)
     desugarMatch dt (APString s)      = desugarMatch dt (APList (TyList TyC) (map APChar s))

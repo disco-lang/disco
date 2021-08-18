@@ -293,19 +293,44 @@ compileGuards [] _ e                                      = return e
 compileGuards (DGPat (unembed -> s) p : gs) k e = do
   e' <- compileGuards gs k e
   s' <- compileDTerm s
-  return $ compileMatch p s' k e'
+  compileMatch p s' k e'
 
--- compileMatch takes a pattern, the compiled scrutinee, the name of
--- the failure continuation, and a Core term representing the
--- compilation of any guards which come after this one, and returns a
--- Core expression of type τ that performs the match.
-compileMatch :: DPattern -> Core -> Name Core -> Core -> Core
-compileMatch (DPVar _ x) s _ e = CApp (CAbs (bind [coerce x] e)) (Strict, s)
-compileMatch (DPWild _) s _ e  = e  -- XXX lazy version, replace with strict one later (below)
+-- | 'compileMatch' takes a pattern, the compiled scrutinee, the name
+--   of the failure continuation, and a Core term representing the
+--   compilation of any guards which come after this one, and returns
+--   a Core expression of type τ that performs the match.
+compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
+compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) (Strict, s)
+compileMatch (DPWild _) s _ e  = return e
+  -- XXX lazy version, replace with strict one later (below)
   -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
-compileMatch DPUnit s _ e      = e       -- XXX
+compileMatch DPUnit s _ e      = return e
+  -- XXX
   -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
-compileMatch (DPBool b) s k e  = undefined
+compileMatch (DPPair _ x1 x2) s _ e = do
+  y <- fresh (string2Name "y")
+
+  -- (\y. (\x1.\x2. e) (fst y) (snd y)) s
+  return $
+    CApp
+      (CAbs (bind [y]
+        (CApp
+          (CApp
+            (CAbs (bind [coerce x1, coerce x2] e))
+            (Strict, CProj L (CVar y)))
+          (Strict, CProj R (CVar y))
+        )
+      ))
+      (Strict, s)
+
+compileMatch (DPInj _ L x) s k e =
+  -- case s of {left x -> e; right _ -> k unit}
+  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit)))
+
+compileMatch (DPInj _ R x) s k e =
+  -- case s of {left _ -> k unit; right x -> e}
+  return $ CCase s (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit))) (bind (coerce x) e)
+
 
 ------------------------------------------------------------
 -- Patterns

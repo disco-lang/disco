@@ -254,8 +254,7 @@ pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
   where
     DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
 
-{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj,
-    DPFrac, DPNil #-}
+{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj, DPFrac, DPNil #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void

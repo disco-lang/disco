@@ -44,10 +44,8 @@ module Disco.AST.Desugared
        , pattern DPVar
        , pattern DPWild
        , pattern DPUnit
-       , pattern DPChar
        , pattern DPPair
        , pattern DPInj
-       , pattern DPNat
        , pattern DPFrac
        , pattern DPNil
 
@@ -193,11 +191,11 @@ type instance X_PWild    DS = Embed Type
 type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
 type instance X_PBool    DS = Void
-type instance X_PChar    DS = ()
+type instance X_PChar    DS = Void
 type instance X_PString  DS = Void
 type instance X_PTup     DS = Void
 type instance X_PInj     DS = Void
-type instance X_PNat     DS = Embed Type
+type instance X_PNat     DS = Void
 type instance X_PCons    DS = Void
 type instance X_PList    DS = Void
 type instance X_PAdd     DS = Void
@@ -236,9 +234,6 @@ pattern DPWild ty <- PWild_ (unembed -> ty)
 pattern DPUnit :: DPattern
 pattern DPUnit = PUnit_ ()
 
-pattern DPChar :: Char -> DPattern
-pattern DPChar  c = PChar_ () c
-
 pattern DPPair  :: Type -> Name DTerm -> Name DTerm -> DPattern
 pattern DPPair ty x1 x2 <- XPattern_ (Left (unembed -> ty, x1, x2))
   where
@@ -248,11 +243,6 @@ pattern DPInj  :: Type -> Side -> Name DTerm -> DPattern
 pattern DPInj ty s x <- XPattern_ (Right (Left (unembed -> ty, s, x)))
   where
     DPInj ty s x = XPattern_ (Right (Left (embed ty, s, x)))
-
-pattern DPNat  :: Type -> Integer -> DPattern
-pattern DPNat ty n <- PNat_ (unembed -> ty) n
-  where
-    DPNat ty n = PNat_ (embed ty) n
 
 pattern DPFrac :: Type -> Name DTerm -> Name DTerm -> DPattern
 pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2))))
@@ -264,8 +254,8 @@ pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
   where
     DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
 
-{-# COMPLETE DPVar, DPWild, DPUnit, DPChar, DPPair, DPInj,
-    DPNat, DPFrac, DPNil #-}
+{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj,
+    DPFrac, DPNil #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -295,9 +285,7 @@ instance HasType DPattern where
   getType (DPVar ty _)    = ty
   getType (DPWild ty)     = ty
   getType DPUnit          = TyUnit
-  getType (DPChar _)      = TyC
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
-  getType (DPNat ty _)    = ty
   getType (DPFrac ty _ _) = ty
   getType (DPNil ty)      = ty

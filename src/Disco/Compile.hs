@@ -316,10 +316,8 @@ compileMatch (DPBool b) s k e  = undefined
 -- compilePattern (DPVar _ x)      = CPVar (coerce x)
 -- compilePattern (DPWild _)       = CPWild
 -- compilePattern DPUnit           = CPUnit
--- compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
 -- compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
 -- compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
--- compilePattern (DPNat _ n)      = CPNat n
 -- compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
 -- compilePattern (DPNil _)        = CPTag L
 

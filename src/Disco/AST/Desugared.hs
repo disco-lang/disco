@@ -46,7 +46,6 @@ module Disco.AST.Desugared
        , pattern DPUnit
        , pattern DPPair
        , pattern DPInj
-       , pattern DPFrac
 
        , DProperty
        )
@@ -212,10 +211,7 @@ type instance X_PFrac    DS = Void
 type instance X_Pattern  DS =
   Either
     (Embed Type, Name DTerm, Name DTerm)     -- DPPair
-    (Either
-      (Embed Type, Side, Name DTerm)         -- DPInj
-      (Embed Type, Name DTerm, Name DTerm)   -- DPFrac
-    )
+    (Embed Type, Side, Name DTerm)           -- DPInj
 
 pattern DPVar :: Type -> Name DTerm -> DPattern
 pattern DPVar ty name <- PVar_ (unembed -> ty) name
@@ -236,16 +232,11 @@ pattern DPPair ty x1 x2 <- XPattern_ (Left (unembed -> ty, x1, x2))
     DPPair ty x1 x2 = XPattern_ (Left (embed ty, x1, x2))
 
 pattern DPInj  :: Type -> Side -> Name DTerm -> DPattern
-pattern DPInj ty s x <- XPattern_ (Right (Left (unembed -> ty, s, x)))
+pattern DPInj ty s x <- XPattern_ (Right (unembed -> ty, s, x))
   where
-    DPInj ty s x = XPattern_ (Right (Left (embed ty, s, x)))
+    DPInj ty s x = XPattern_ (Right (embed ty, s, x))
 
-pattern DPFrac :: Type -> Name DTerm -> Name DTerm -> DPattern
-pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (unembed -> ty, x1, x2)))
-  where
-    DPFrac ty x1 x2 = XPattern_ (Right (Right (embed ty, x1, x2)))
-
-{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj, DPFrac #-}
+{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -277,4 +268,3 @@ instance HasType DPattern where
   getType DPUnit          = TyUnit
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
-  getType (DPFrac ty _ _) = ty

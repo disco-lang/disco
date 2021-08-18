@@ -192,6 +192,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
+        | OFrac           -- ^ Turn a rational into a (num, denom) pair
 
         -- Propositions
         | OForall [Type]  -- ^ Universal quantification. Applied to a closure
@@ -270,34 +271,6 @@ opArity _               = 1
 -- opArity OCrash           = 1
 -- opArity OId              = 1
 
--- -- | A branch, consisting of a list of guards and a term.
--- type CBranch = Bind (Telescope (Embed Core, CPattern)) Core
-
--- -- | Core (desugared) patterns.  We only need variables, wildcards,
--- --   natural numbers, and constructors.
--- data CPattern where
-
---   -- | A variable pattern, which matches anything and binds the name.
---   CPVar  :: Name Core -> CPattern
-
---   -- | A wildcard pattern @_@, which matches anything.
---   CPWild :: CPattern
-
---   -- | The unit pattern.
---   CPUnit :: CPattern
-
---   -- | An injection into a sum type.
---   CPInj  :: Side -> Name Core -> CPattern
-
---   -- | A pair.
---   CPPair :: Name Core -> Name Core -> CPattern
-
---   -- | A fraction pattern, @x/y@.
---   CPFrac :: Name Core -> Name Core -> CPattern
-
---   deriving (Show, Generic)
-
 instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op
--- instance Alpha CPattern

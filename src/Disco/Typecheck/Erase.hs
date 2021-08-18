@@ -125,4 +125,3 @@ eraseDPattern (DPWild _)       = PWild
 eraseDPattern DPUnit           = PUnit
 eraseDPattern (DPPair _ x1 x2) = PTup (map (PVar . coerce) [x1,x2])
 eraseDPattern (DPInj _ s x)    = PInj s (PVar (coerce x))
-eraseDPattern (DPFrac _ x1 x2) = PFrac (PVar (coerce x1)) (PVar (coerce x2))

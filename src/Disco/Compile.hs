@@ -34,8 +34,8 @@ import           Data.Ratio
 
 import           Disco.Effects.Fresh
 import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name, unembed)
+import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
+                                                   unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -245,6 +245,7 @@ compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
+compilePrim _ PrimFrac    = return $ CConst OFrac
 
 compilePrim _ PrimCrash   = return $ CConst OCrash
 
@@ -330,20 +331,6 @@ compileMatch (DPInj _ L x) s k e =
 compileMatch (DPInj _ R x) s k e =
   -- case s of {left _ -> k unit; right x -> e}
   return $ CCase s (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit))) (bind (coerce x) e)
-
-
-------------------------------------------------------------
--- Patterns
-------------------------------------------------------------
-
--- -- | Compile a desugared pattern.
--- compilePattern :: DPattern -> CPattern
--- compilePattern (DPVar _ x)      = CPVar (coerce x)
--- compilePattern (DPWild _)       = CPWild
--- compilePattern DPUnit           = CPUnit
--- compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
--- compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
--- compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
 
 ------------------------------------------------------------
 -- Unary and binary operators

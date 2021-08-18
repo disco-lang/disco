@@ -297,9 +297,6 @@ data CPattern where
   -- | A pair.
   CPPair :: Name Core -> Name Core -> CPattern
 
-  -- | A natural number pattern.
-  CPNat  :: Integer -> CPattern
-
   -- | A fraction pattern, @x/y@.
   CPFrac :: Name Core -> Name Core -> CPattern
 

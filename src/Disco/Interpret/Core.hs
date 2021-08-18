@@ -403,9 +403,6 @@ match v (CPInj s x)    = do
 match v (CPPair x1 x2) = do
   VPair v1 v2 <- whnfV v
   return . Just . M.fromList $ [(x1,v1), (x2,v2)]
-match v (CPNat n)      = do
-  VNum _ m <- whnfV v
-  if m == n % 1 then ok else noMatch
 match v (CPFrac x y)   = do
   VNum _ r <- whnfV v
   return . Just . M.fromList $ [ (x, vint (numerator   r))

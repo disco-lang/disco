@@ -642,8 +642,8 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     desugarMatch _  (APWild _)        = return []
     desugarMatch dt APUnit            = mkMatch dt DPUnit
     desugarMatch dt (APBool b)        = desugarMatch dt (APInj TyBool (bool L R b) APUnit)
-    desugarMatch dt (APNat ty n)      = mkMatch dt (DPNat ty n)
-    desugarMatch dt (APChar c)        = mkMatch dt (DPChar c)
+    desugarMatch dt (APNat ty n)      = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTNat ty n)) (APBool True)
+    desugarMatch dt (APChar c)        = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTChar c)) (APBool True)
     desugarMatch dt (APString s)      = desugarMatch dt (APList (TyList TyC) (map APChar s))
     desugarMatch dt (APTup tupTy pat) = desugarTuplePats tupTy dt pat
       where

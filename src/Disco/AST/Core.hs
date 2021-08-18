@@ -286,13 +286,6 @@ opArity _               = 1
 --   -- | The unit pattern.
 --   CPUnit :: CPattern
 
---   -- | An injection into a sum type, with no argument (i.e. the
---   --   argument is a unit value).  We could use CPInj with a fresh
---   --   variable that we know will bind to the unit value; this pattern
---   --   is thus just an optimization to avoid introducing a useless
---   --   variable.
---   CPTag  :: Side -> CPattern
-
 --   -- | An injection into a sum type.
 --   CPInj  :: Side -> Name Core -> CPattern
 

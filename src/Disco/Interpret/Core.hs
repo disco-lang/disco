@@ -394,9 +394,6 @@ match v CPUnit         = whnfV v >> ok
     -- binding anything, but we still need to reduce in case v throws
     -- an error.
 
-match v (CPTag s)      = do
-  VInj t _ <- whnfV v
-  if s == t then ok else noMatch
 match v (CPInj s x)    = do
   VInj t v' <- whnfV v
   if s == t then return (Just $ M.singleton x v') else noMatch

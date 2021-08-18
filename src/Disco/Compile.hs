@@ -290,7 +290,6 @@ compilePattern (DPWild _)       = CPWild
 compilePattern DPUnit           = CPUnit
 compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
 compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
-compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
 
 ------------------------------------------------------------
 -- Unary and binary operators

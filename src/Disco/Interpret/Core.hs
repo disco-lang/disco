@@ -400,11 +400,6 @@ match v (CPInj s x)    = do
 match v (CPPair x1 x2) = do
   VPair v1 v2 <- whnfV v
   return . Just . M.fromList $ [(x1,v1), (x2,v2)]
-match v (CPFrac x y)   = do
-  VNum _ r <- whnfV v
-  return . Just . M.fromList $ [ (x, vint (numerator   r))
-                               , (y, vint (denominator r))
-                               ]
 
 -- | Convenience function: successfully match with no bindings.
 ok :: Applicative f => f (Maybe Env)

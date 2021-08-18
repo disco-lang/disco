@@ -291,9 +291,6 @@ data CPattern where
   -- | A pair.
   CPPair :: Name Core -> Name Core -> CPattern
 
-  -- | A fraction pattern, @x/y@.
-  CPFrac :: Name Core -> Name Core -> CPattern
-
   deriving (Show, Generic)
 
 instance Alpha RationalDisplay

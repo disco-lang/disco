@@ -686,7 +686,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         , return gs2
         ]
 
-    desugarMatch dt (APList ty []) = mkMatch dt (DPNil ty)
+    desugarMatch dt (APList ty []) = desugarMatch dt (APInj ty L APUnit)
     desugarMatch dt (APList ty ps) =
       desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
 

@@ -745,7 +745,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     varForPat :: Member Fresh r => APattern -> Sem r (Name DTerm, [DGuard])
     varForPat (APVar _ x) = return (coerce x, [])
     varForPat p           = do
-      x <- fresh (string2Name "x")
+      x <- fresh (string2Name "px")     -- changing this from x fixed a bug and I don't know why =(
       (x,) <$> desugarMatch (DTVar (getType p) x) p
 
     arithBinMatch

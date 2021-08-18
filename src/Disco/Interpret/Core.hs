@@ -387,7 +387,7 @@ checkGuards ((unembed -> c, p) : gs) = do
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.
 match :: Members EvalEffects r => Value -> CPattern -> Sem r (Maybe Env)
-match v (CPVar x)      = return $ Just (M.singleton (coerce x) v)
+match v (CPVar x)      = return $ Just (M.singleton x v)
 match _ CPWild         = ok
 match v CPUnit         = whnfV v >> ok
     -- Matching the unit value is guaranteed to succeed without

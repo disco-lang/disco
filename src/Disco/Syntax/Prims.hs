@@ -71,6 +71,7 @@ data Prim where
 
   PrimIsPrime    :: Prim        -- ^ Efficient primality test
   PrimFactor     :: Prim        -- ^ Factorization
+  PrimFrac       :: Prim        -- ^ Turn a rational into a pair (num, denom)
 
   PrimCrash      :: Prim        -- ^ Crash
 
@@ -158,6 +159,7 @@ primTable =
 
   , PrimInfo PrimIsPrime   "isPrime"        False
   , PrimInfo PrimFactor    "factor"         False
+  , PrimInfo PrimFrac      "frac"           False
 
   , PrimInfo PrimCrash     "crash"          False
 

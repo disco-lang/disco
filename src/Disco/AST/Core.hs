@@ -192,6 +192,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
+        | OFrac           -- ^ Turn a rational into a (num, denom) pair
 
         -- Propositions
         | OForall [Type]  -- ^ Universal quantification. Applied to a closure

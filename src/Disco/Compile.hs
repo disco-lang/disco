@@ -246,6 +246,7 @@ compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
+compilePrim _ PrimFrac    = return $ CConst OFrac
 
 compilePrim _ PrimCrash   = return $ CConst OCrash
 

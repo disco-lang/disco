@@ -749,6 +749,8 @@ typecheck Infer (TPrim prim) = do
     inferPrim PrimIsPrime = return $ TyN :->: TyBool
     inferPrim PrimFactor  = return $ TyN :->: TyBag TyN
 
+    inferPrim PrimFrac    = return $ TyQ :->: (TyZ :*: TyN)
+
     inferPrim (PrimBOp Divides) = do
       a <- freshTy
       constraint $ CQual QNum a

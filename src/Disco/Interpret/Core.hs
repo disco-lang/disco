@@ -872,6 +872,7 @@ whnfOp (OMDivides n)   = arity2 "modDiv"   $ modDivides n
 
 whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
 whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
+whnfOp OFrac           = arity1 "frac"      $ whnfV >=> primFrac
 
 --------------------------------------------------
 -- Combinatorics
@@ -1181,6 +1182,15 @@ primFactor (VNum d (numerator -> n)) =
     0 -> throw (Crash "0 has no prime factorization!")
     _ -> return . VBag $ map ((VNum d . (%1) . unPrime) *** fromIntegral) (factorise n)
 primFactor _                         = error "impossible! primFactor on non-VNum"
+
+-- | Semantics of the @$frac@ prim: turn a rational number into a pair
+--   of its numerator and denominator.
+primFrac :: Value -> Sem r Value
+primFrac (VNum d n) = return $ VPair (VNum d . (%1) $ p) (VNum d . (%1) $ q)
+  where
+    p = numerator n
+    q = denominator n
+primFrac _ = error "impossible! primFrac on non-VNum"
 
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.

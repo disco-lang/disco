@@ -113,7 +113,25 @@ lkup n (Mem _ m) = IntMap.lookup n m
 set :: Int -> Cell -> Mem -> Mem
 set n c (Mem nxt m) = Mem nxt (IntMap.insert n c m)
 
-data CESK = In Core Env Mem Cont | Out Value Mem Cont
+-- | The CESK machine has two basic kinds of states.
+data CESK
+  -- | The 'In' constructor represents the state when we are recursing
+  --   "into" a term.  There is a currently focused expression which
+  --   is to be evaluated in the given context.  Generally, evaluation
+  --   proceeds by pattern-matching on the focused expression and
+  --   either immediately turning it into a value (if it is simple),
+  --   or focusing on a subexpression and pushing a new frame on the
+  --   continuation stack indicating how to continue evaluating the
+  --   whole expression once finished with the subexpression.
+  = In Core Env Mem Cont
+
+  -- | The 'Out' constructor represents the state when we have
+  --   completed evaluating an expression and are now on our way back
+  --   "out" of the recursion.  Generally, evaluation proceeds by
+  --   pattern-matching on the top frame of the continuation stack
+  --   (and sometimes on the value as well), to see what is to be done
+  --   with the value.
+  | Out Value Mem Cont
 
 isFinal :: CESK -> Maybe Value
 isFinal (Out v _ []) = Just v

@@ -111,12 +111,12 @@ compileDTerm (DTApp _ (DTPrim _ PrimLeft) t)
 compileDTerm (DTApp _ (DTPrim _ PrimRight) t)
   = CInj R <$> compileDTerm t
 
-compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileArg t2
+compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileDTerm t2
 
 compileDTerm (DTPair _ t1 t2)
   = CPair <$> compileDTerm t1 <*> compileDTerm t2
 
-compileDTerm (DTCase _ bs) = CApp <$> compileCase bs <*> pure (Strict, CUnit)
+compileDTerm (DTCase _ bs) = CApp <$> compileCase bs <*> pure CUnit
 
 compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) (CType ty)
   where
@@ -139,11 +139,6 @@ compileDTerm (DTTest info t)  = CTest (coerce info) <$> compileDTerm t
 -- compileNat _         x = return $ CNum Fraction (x % 1)
 
 ------------------------------------------------------------
-
--- | Compile a DTerm which will be an argument to a function,
---   packaging it up along with the strictness of its type.
-compileArg :: Member Fresh r => DTerm -> Sem r (Strictness, Core)
-compileArg dt = (strictness (getType dt),) <$> compileDTerm dt
 
 -- | Compile a primitive.  Typically primitives turn into a
 --   corresponding function constant in the core language, but
@@ -265,21 +260,22 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 ------------------------------------------------------------
 
 -- | Compile a case expression of type τ to a core language expression
---   of type (Unit → τ).
+--   of type (Unit → τ), in order to delay evaluation until explicitly
+--   applying it to the unit value.
 compileCase :: Member Fresh r => [DBranch] -> Sem r Core
 compileCase [] = return $ CAbs (bind [string2Name "_"] (CConst OMatchErr))
-  -- empty case ==>  λ _ . matcherr
+  -- empty case ==>  λ _ . error
 
 compileCase (b:bs) = do
   c1 <- compileBranch b
   c2 <- compileCase bs
-  return $ CAbs (bind [string2Name "_"] (CApp c1 (Strict,c2)))
+  return $ CAbs (bind [string2Name "_"] (CApp c1 c2))
 
 -- | Compile a branch of a case expression of type τ to a core
 --   language expression of type (Unit → τ) → τ.  The idea is that it
 --   takes a failure continuation representing the subsequent branches
 --   in the case expression.  If the branch succeeds, it just returns
---   the associated expression of tyep τ; if it fails, it calls the
+--   the associated expression of type τ; if it fails, it calls the
 --   continuation to proceed with the case analysis.
 compileBranch :: Member Fresh r => DBranch -> Sem r Core
 compileBranch b = do
@@ -289,6 +285,12 @@ compileBranch b = do
   bc <- compileGuards (fromTelescope gs) k c
   return $ CAbs (bind [k] bc)
 
+-- | 'compileGuards' takes a list of guards, the name of the failure
+--   continuation of type (Unit → τ), and a Core term of type τ to
+--   return in the case of success, and compiles to an expression of
+--   type τ which evaluates the guards in sequence, ultimately
+--   returning the given expression if all guards succeed, or calling
+--   the failure continuation at any point if a guard fails.
 compileGuards :: Member Fresh r => [DGuard] -> Name Core -> Core -> Sem r Core
 compileGuards [] _ e                                      = return e
 compileGuards (DGPat (unembed -> s) p : gs) k e = do
@@ -299,38 +301,42 @@ compileGuards (DGPat (unembed -> s) p : gs) k e = do
 -- | 'compileMatch' takes a pattern, the compiled scrutinee, the name
 --   of the failure continuation, and a Core term representing the
 --   compilation of any guards which come after this one, and returns
---   a Core expression of type τ that performs the match.
+--   a Core expression of type τ that performs the match and either
+--   calls the failure continuation in the case of failure, or the
+--   rest of the guards in the case of success.
 compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
-compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) (Strict, s)
-compileMatch (DPWild _) s _ e  = return e
-  -- XXX lazy version, replace with strict one later (below)
-  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
-compileMatch DPUnit s _ e      = return e
-  -- XXX
-  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
+compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) s
+
+  -- Note in the below two cases that we can't just discard s since
+  -- that would result in a lazy semantics.  With an eager/strict
+  -- semantics, we have to make sure s gets evaluated even if its
+  -- value is then discarded.
+compileMatch (DPWild _) s _ e  = return $ CApp (CAbs (bind [string2Name "_"] e)) s
+compileMatch DPUnit s _ e      = return $ CApp (CAbs (bind [string2Name "_"] e)) s
+
 compileMatch (DPPair _ x1 x2) s _ e = do
   y <- fresh (string2Name "y")
 
-  -- (\y. (\x1.\x2. e) (fst y) (snd y)) s
+  -- {? e when s is (x1,x2) ?}   ==>   (\y. (\x1.\x2. e) (fst y) (snd y)) s
   return $
     CApp
       (CAbs (bind [y]
         (CApp
           (CApp
             (CAbs (bind [coerce x1, coerce x2] e))
-            (Strict, CProj L (CVar y)))
-          (Strict, CProj R (CVar y))
+            (CProj L (CVar y)))
+          (CProj R (CVar y))
         )
       ))
-      (Strict, s)
+      s
 
 compileMatch (DPInj _ L x) s k e =
-  -- case s of {left x -> e; right _ -> k unit}
-  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit)))
+  -- {? e when s is left(x) ?}   ==>   case s of {left x -> e; right _ -> k unit}
+  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar k) CUnit))
 
 compileMatch (DPInj _ R x) s k e =
-  -- case s of {left _ -> k unit; right x -> e}
-  return $ CCase s (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit))) (bind (coerce x) e)
+  -- {? e when s is right(x) ?}   ==>   case s of {left _ -> k unit; right x -> e}
+  return $ CCase s (bind (string2Name "_") (CApp (CVar k) CUnit)) (bind (coerce x) e)
 
 ------------------------------------------------------------
 -- Unary and binary operators

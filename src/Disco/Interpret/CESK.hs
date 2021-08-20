@@ -1,5 +1,3 @@
-{-# LANGUAGE NondecreasingIndentation #-}
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interpret.CESK
@@ -14,84 +12,158 @@
 
 module Disco.Interpret.CESK where
 
-import qualified Data.IntMap    as IntMap
-import qualified Data.Map       as M
+import           Data.IntMap                      (IntMap)
+import qualified Data.IntMap                      as IntMap
+import qualified Data.IntMap                      as IM
+import           Data.Map                         (Map, (!))
+import qualified Data.Map                         as M
 
 import           Polysemy
 import           Polysemy.Error
+import           Unbound.Generics.LocallyNameless (Bind, Name)
 
 import           Disco.AST.Core
+import           Disco.AST.Generic                (Side (..), selectSide)
+import           Disco.Effects.Fresh
+import           Disco.Error
+import           Disco.Types                      (Type)
 
+------------------------------------------------------------
+-- Values
+------------------------------------------------------------
+
+-- | Different types of values which can result from the evaluation
+--   process.
 data Value where
-  VConst   :: Op -> Value
-  VUnit    :: Value
-  VInj     :: Side -> Value -> Value
   VNum     :: RationalDisplay -> Rational -> Value
+  VConst   :: Op -> Value
+  VInj     :: Side -> Value -> Value
+  VUnit    :: Value
+  VPair    :: Value -> Value -> Value
   VClo     :: Env -> Bind [Name Core] Core -> Value
-  VNoMatch :: Value
-  VMatch   :: Env -> Value
   VType    :: Type -> Value
-  VCell    :: Int -> Value
+  VRef     :: Int -> Value
 
-data Frame
-  = FInj Side
-  | FPairL Env Core
-  | FPairR Value
-  | FArg Env Core
-  | FCase Env [CBranch]
-  | FBranch Env Core
-  | FMatch CPattern [(Embed Core, CPattern)]
-  | FForce
+------------------------------------------------------------
+-- Frames and continuations
+------------------------------------------------------------
 
+-- The CESK machine carries a current continuation explaining what to
+-- do with the value of the currently focused expression, once it has
+-- been fully evaluated.
+
+-- | A continuation is just a stack of frames.
 type Cont = [Frame]
 
+-- | A frame represents a single step of the context, explaining what
+--   to do with a value in that context (ultimately transforming it
+--   into another value, which may in turn be handed to the next frame
+--   in the continuation stack, and so on).
+--
+--   As an invariant, any 'Frame' containing unevaluated 'Core'
+--   expressions must also carry an 'Env' in which to evaluate them.
+data Frame
+  -- | Inject the value into a sum type.
+  = FInj Side
+
+  -- | Do a case analysis on the value.
+  | FCase Env (Bind (Name Core) Core) (Bind (Name Core) Core)
+
+  -- | Evaluate the right-hand value of a pair once we have finished
+  --   evaluating the left-hand side.
+  | FPairR Env Core
+
+  -- | Put the value into the right-hand side of a pair together with
+  --   this previously evaluated left-hand side.
+  | FPairL Value
+
+  -- | Project one or the other side of a pair.
+  | FProj Side
+
+  -- | Evaluate the argument of an application once we have finished
+  --   evaluating the function.
+  | FArg Env Core
+
+  -- | Apply a previously evaluated function to the value.
+  | FApp Value
+
+  -- | Force evaluation of the contents of a memory cell.
+  | FForce
+
+  -- | Update the contents of a memory cell with its evaluation.
+  | FUpdate Int
+
+------------------------------------------------------------
+-- Environment and memory
+------------------------------------------------------------
+
+-- | An 'Env' simply maps names to values.
 type Env = Map (Name Core) Value
 
+-- | 'Mem' represents a memory, containing 'Cell'
 data Mem = Mem { next :: Int, mu :: IntMap Cell }
-
 data Cell = Blackhole | E Env Core | V Value
 
-allocate :: Env -> Expr -> Mem -> (Mem, Int)
+allocate :: Env -> Core -> Mem -> (Mem, Int)
 allocate e t (Mem n m) = (Mem (n+1) (IntMap.insert n (E e t) m), n)
 
-data Control
-  = CnTerm Core
-  | CnBranch CBranch
-  | CnGuards [(Embed Core, CPattern)]
+lkup :: Int -> Mem -> Maybe Cell
+lkup n (Mem _ m) = IntMap.lookup n m
 
-data CESK = In Control Env Mem Cont | Out Value Mem Cont
+set :: Int -> Cell -> Mem -> Mem
+set n c (Mem nxt m) = Mem nxt (IntMap.insert n c m)
+
+data CESK = In Core Env Mem Cont | Out Value Mem Cont
 
 isFinal :: CESK -> Maybe Value
 isFinal (Out v _ []) = Just v
 isFinal _            = Nothing
 
 step :: Members '[Fresh, Error EvalError] r => CESK -> Sem r CESK
-step (In (CnTerm (CVar x)) e m k)      = return $ Out (e!x) m k
-step (In (CnTerm (CConst op)) e m k)   = return $ Out (VConst op) m k
-step (In (CnTerm CUnit) e m k)         = return $ Out VUnit m k
-step (In (CnTerm (CInj s c)) e m k)    = return $ In c e m (FInj s : k)
-step (In (CnTerm (CPair c1 c2)) e m k) = return $ In c1 e m (FPairL e c2 : k)
-step (In (CnTerm (CNum d r)) e m k)    = return $ Out (VNum d r) m k
-step (In (CnTerm (CAbs b)) e m k)      = return $ Out (VClo e b) m k
-step (In (CnTerm (CApp c1 c2)) e m k)  = return $ In c1 e m (FArg e c2 : k)
-step (In (CnTerm (CCase [])) e m k)    = throw NonExhaustive
-step (In (CnTerm (CCase (br:brs)) e m k)) = return $ In (CnBranch br) e m (FCase e brs : k)
-step (In (CnBranch br) e m k) = do
-  (gs, c) <- unbind br
-  return $ In (CnGuards (fromTelescope gs)) e m (FBranch e c : k)
-step (In (CnGuards []) e m k) = return $ Out (VMatch e) m k
-step (In (CnGuards ((unembed -> c, p) : gs)) e m k)
-  = return $ In c e m (FMatch p gs : k)
-step (In (CType ty) e m k) = return $ Out (VType ty) m k
-step (In (CDelay b) e m k) = do
+step (In (CVar x) e m k)                   = return $ Out (e!x) m k
+step (In (CNum d r) e m k)                 = return $ Out (VNum d r) m k
+step (In (CConst op) e m k)                = return $ Out (VConst op) m k
+step (In (CInj s c) e m k)                 = return $ In c e m (FInj s : k)
+step (In (CCase c b1 b2) e m k)            = return $ In c e m (FCase e b1 b2 : k)
+step (In CUnit e m k)                      = return $ Out VUnit m k
+step (In (CPair c1 c2) e m k)              = return $ In c1 e m (FPairR e c2 : k)
+step (In (CProj s c) e m k)                = return $ In c e m (FProj s : k)
+step (In (CAbs b) e m k)                   = return $ Out (VClo e b) m k
+step (In (CApp c1 c2) e m k)               = return $ In c1 e m (FArg e c2 : k)
+step (In (CType ty) e m k)                 = return $ Out (VType ty) m k
+step (In (CDelay b) e m k)                 = do
   (x, c) <- unbind b
-  let (m', loc) = allocate (M.insert x (VCell loc) e) c m
-  return $ Out (VCell loc) m' k
-step (In (CnTerm (EForce c)) e m k) = In (CnTerm c) e m (FForce : k)
+  let (m', loc) = allocate (M.insert x (VRef loc) e) c m
+  return $ Out (VRef loc) m' k
+step (In (CForce c) e m k)                 = return $ In c e m (FForce : k)
+step (Out v m (FInj s : k))                = return $ Out (VInj s v) m k
+step (Out (VInj L v) m (FCase e b1 _ : k)) = do
+  (x,c1) <- unbind b1
+  return $ In c1 (M.insert x v e) m k
+step (Out (VInj R v) m (FCase e _ b2 : k)) = do
+  (x,c2) <- unbind b2
+  return $ In c2 (M.insert x v e) m k
+step (Out v1 m (FPairR e c2 : k))          = return $ In c2 e m (FPairL v1 : k)
+step (Out v2 m (FPairL v1 : k))            = return $ Out (VPair v1 v2) m k
+step (Out (VPair v1 v2) m (FProj s : k))   = return $ Out (selectSide s v1 v2) m k
+step (Out v m (FArg e c2 : k))             = return $ In c2 e m (FApp v : k)
+step (Out v2 m (FApp (VClo e b) : k))      = do
+  -- Any closure we are evaluating here must have a single argument.
+  -- Multi-argument CAbs terms are only used for quantifiers.
+  (xs,c1) <- unbind b
+  let [x] = xs
+  return $ In c1 (M.insert x v2 e) m k
+step (Out v2 m (FApp (VConst op) : k))     = return $ Out (appConst op v2) m k
+step (Out (VRef n) m (FForce : k))         =
+  case lkup n m of
+    Nothing        -> undefined  -- XXX ?
+    Just (V v)     -> return $ Out v m k
+    Just (E e t)   -> return $ In t e (set n Blackhole m) (FUpdate n : k)
+    Just Blackhole -> error "Infinite loop detected!"  -- XXX make a real error
+step (Out v m (FUpdate n : k))             = return $ Out v (set n (V v) m) k
 
-step (Out v m (FInj s : k)) = Out (VInj s v) m k
-step (
-
+appConst :: Op -> Value -> Value
+appConst = undefined
 
 {-
 

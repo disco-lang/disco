@@ -334,6 +334,7 @@ library
                        Disco.Value
                        Disco.Error
                        Disco.Eval
+                       Disco.Interpret.CESK
                        Disco.Interpret.Core
                        Disco.Subst
                        Disco.Typecheck

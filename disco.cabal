@@ -102,14 +102,15 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/parse-280/capitalvars.disco
                      test/parse-280/expected
                      test/parse-280/input
-                     test/parse-283/expected
-                     test/parse-283/input
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
                      test/parse-quantifiers/expected
                      test/parse-quantifiers/input
+                     test/parse-top-term/expected
+                     test/parse-top-term/input
+                     test/parse-top-term/parse-top-term.disco
                      test/poly-bad/expected
                      test/poly-bad/input
                      test/poly-infer-sort/expected
@@ -234,6 +235,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-tuples/input
                      test/syntax-types/expected
                      test/syntax-types/input
+                     test/types-192/expected
+                     test/types-192/input
                      test/types-bind/expected
                      test/types-bind/input
                      test/types-char-string/expected
@@ -254,11 +257,21 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-rational/expected
                      test/types-rational/input
                      test/types-rec/expected
+                     test/types-rec/input
                      test/types-rec/types-rec.disco
                      test/types-squash/expected
                      test/types-squash/input
                      test/types-standalone-ops/expected
                      test/types-standalone-ops/input
+                     test/types-tydef-bad/expected
+                     test/types-tydef-bad/input
+                     test/types-tydef-bad/types-tydef-bad.disco
+                     test/types-tydef-kind/expected
+                     test/types-tydef-kind/input
+                     test/types-tydef-kind/types-tydef-kind.disco
+                     test/types-tydef-omega/expected
+                     test/types-tydef-omega/input
+                     test/types-tydef-omega/types-tydef-omega.disco
                      test/types-tydef-param/expected
                      test/types-tydef-param/input
                      test/types-tydef-param/types-tydef-param.disco

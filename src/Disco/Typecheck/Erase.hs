@@ -123,10 +123,5 @@ eraseDPattern :: DPattern -> Pattern
 eraseDPattern (DPVar _ x)      = PVar (coerce x)
 eraseDPattern (DPWild _)       = PWild
 eraseDPattern DPUnit           = PUnit
-eraseDPattern (DPBool b)       = PBool b
-eraseDPattern (DPChar c)       = PChar c
 eraseDPattern (DPPair _ x1 x2) = PTup (map (PVar . coerce) [x1,x2])
 eraseDPattern (DPInj _ s x)    = PInj s (PVar (coerce x))
-eraseDPattern (DPNat _ n)      = PNat n
-eraseDPattern (DPFrac _ x1 x2) = PFrac (PVar (coerce x1)) (PVar (coerce x2))
-eraseDPattern (DPNil _)        = PList []

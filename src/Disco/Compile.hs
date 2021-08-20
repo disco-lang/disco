@@ -34,8 +34,8 @@ import           Data.Ratio
 
 import           Disco.Effects.Fresh
 import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name, unembed)
+import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
+                                                   unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -111,17 +111,12 @@ compileDTerm (DTApp _ (DTPrim _ PrimLeft) t)
 compileDTerm (DTApp _ (DTPrim _ PrimRight) t)
   = CInj R <$> compileDTerm t
 
-compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileDTerm t2
-  -- = appChain t1 [t2]
-  -- where
-  --   appChain (DTApp _ t1' t2') ts = appChain t1' (t2':ts)
-  --   appChain t1' ts               = CApp <$> compileDTerm t1' <*> mapM compileArg ts
+compileDTerm (DTApp _ t1 t2) = CApp <$> compileDTerm t1 <*> compileArg t2
 
 compileDTerm (DTPair _ t1 t2)
   = CPair <$> compileDTerm t1 <*> compileDTerm t2
 
-compileDTerm (DTCase _ bs)
-  = CCase <$> mapM compileBranch bs
+compileDTerm (DTCase _ bs) = CApp <$> compileCase bs <*> pure (Strict, CUnit)
 
 compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) (CType ty)
   where
@@ -250,6 +245,7 @@ compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
+compilePrim _ PrimFrac    = return $ CConst OFrac
 
 compilePrim _ PrimCrash   = return $ CConst OCrash
 
@@ -268,36 +264,73 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 -- Case expressions
 ------------------------------------------------------------
 
--- | Compile a desugared branch.  This does very little actual work, just
---   translating directly from one AST to another.
-compileBranch :: Member Fresh r => DBranch -> Sem r CBranch
+-- | Compile a case expression of type τ to a core language expression
+--   of type (Unit → τ).
+compileCase :: Member Fresh r => [DBranch] -> Sem r Core
+compileCase [] = return $ CAbs (bind [string2Name "_"] (CConst OMatchErr))
+  -- empty case ==>  λ _ . matcherr
+
+compileCase (b:bs) = do
+  c1 <- compileBranch b
+  c2 <- compileCase bs
+  return $ CAbs (bind [string2Name "_"] (CApp c1 (Strict,c2)))
+
+-- | Compile a branch of a case expression of type τ to a core
+--   language expression of type (Unit → τ) → τ.  The idea is that it
+--   takes a failure continuation representing the subsequent branches
+--   in the case expression.  If the branch succeeds, it just returns
+--   the associated expression of tyep τ; if it fails, it calls the
+--   continuation to proceed with the case analysis.
+compileBranch :: Member Fresh r => DBranch -> Sem r Core
 compileBranch b = do
-  (gs, d) <- unbind b
-  bind <$> traverseTelescope compileGuard gs <*> compileDTerm d
+  (gs, e) <- unbind b
+  c <- compileDTerm e
+  k <- fresh (string2Name "k")   -- Fresh name for the failure continuation
+  bc <- compileGuards (fromTelescope gs) k c
+  return $ CAbs (bind [k] bc)
 
--- | Compile a desugared guard.
-compileGuard :: Member Fresh r => DGuard -> Sem r (Embed Core, CPattern)
-compileGuard (DGPat (unembed -> d) dpat) =
-  (,)
-    <$> (embed <$> compileDTerm d)
-    <*> pure (compilePattern dpat)
+compileGuards :: Member Fresh r => [DGuard] -> Name Core -> Core -> Sem r Core
+compileGuards [] _ e                                      = return e
+compileGuards (DGPat (unembed -> s) p : gs) k e = do
+  e' <- compileGuards gs k e
+  s' <- compileDTerm s
+  compileMatch p s' k e'
 
-------------------------------------------------------------
--- Patterns
-------------------------------------------------------------
+-- | 'compileMatch' takes a pattern, the compiled scrutinee, the name
+--   of the failure continuation, and a Core term representing the
+--   compilation of any guards which come after this one, and returns
+--   a Core expression of type τ that performs the match.
+compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
+compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) (Strict, s)
+compileMatch (DPWild _) s _ e  = return e
+  -- XXX lazy version, replace with strict one later (below)
+  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
+compileMatch DPUnit s _ e      = return e
+  -- XXX
+  -- CApp (CAbs (bind [string2Name "_"] e)) (Strict, s)
+compileMatch (DPPair _ x1 x2) s _ e = do
+  y <- fresh (string2Name "y")
 
--- | Compile a desugared pattern.
-compilePattern :: DPattern -> CPattern
-compilePattern (DPVar _ x)      = CPVar (coerce x)
-compilePattern (DPWild _)       = CPWild
-compilePattern DPUnit           = CPUnit
-compilePattern (DPBool b)       = CPTag (toEnum . fromEnum $ b)
-compilePattern (DPChar c)       = CPNat (toInteger $ fromEnum c)
-compilePattern (DPPair _ x1 x2) = CPPair (coerce x1) (coerce x2)
-compilePattern (DPInj _ s x)    = CPInj (toEnum . fromEnum $ s) (coerce x)
-compilePattern (DPNat _ n)      = CPNat n
-compilePattern (DPFrac _ x1 x2) = CPFrac (coerce x1) (coerce x2)
-compilePattern (DPNil _)        = CPTag L
+  -- (\y. (\x1.\x2. e) (fst y) (snd y)) s
+  return $
+    CApp
+      (CAbs (bind [y]
+        (CApp
+          (CApp
+            (CAbs (bind [coerce x1, coerce x2] e))
+            (Strict, CProj L (CVar y)))
+          (Strict, CProj R (CVar y))
+        )
+      ))
+      (Strict, s)
+
+compileMatch (DPInj _ L x) s k e =
+  -- case s of {left x -> e; right _ -> k unit}
+  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit)))
+
+compileMatch (DPInj _ R x) s k e =
+  -- case s of {left _ -> k unit; right x -> e}
+  return $ CCase s (bind (string2Name "_") (CApp (CVar k) (Strict, CUnit))) (bind (coerce x) e)
 
 ------------------------------------------------------------
 -- Unary and binary operators

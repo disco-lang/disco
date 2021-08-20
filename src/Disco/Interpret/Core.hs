@@ -58,7 +58,6 @@ import           Data.Coerce                             (coerce)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
-import           Unbound.Generics.LocallyNameless        (Embed, unembed)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Math.Combinatorics.Exact.Binomial       (choose)
@@ -72,13 +71,12 @@ import           Math.NumberTheory.Primes.Testing        (isPrime)
 
 import           Disco.Effects.LFresh
 import           Disco.Effects.Store
-import           Polysemy                                hiding (Embed)
+import           Polysemy
 import           Polysemy.Error
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                       (Side (..), selectSide)
-import           Disco.AST.Surface                       (Ellipsis (..),
-                                                          fromTelescope)
+import           Disco.AST.Surface                       (Ellipsis (..))
 import           Disco.AST.Typed                         (AProperty)
 import           Disco.Compile                           (compileProperty)
 import           Disco.Context
@@ -247,7 +245,10 @@ whnf (CVar x) = do
       -- We should never encounter an unbound variable at this stage
       -- if the program already typechecked.
 
--- Function constants don't reduce in and of themselves. Map & Graph's empty constructors are exceptions because they have arity 0
+-- A number is in WHNF, just turn it into a VNum.
+whnf (CNum d n)     = return $ VNum d n
+
+-- Constants don't reduce in and of themselves.
 whnf (CConst x)     = return $ VConst x
 
 -- Unit value is already in WHNF.
@@ -258,9 +259,6 @@ whnf CUnit          = return VUnit
 whnf (CInj s c)     = VInj s <$> mkValue c
 whnf (CPair c1 c2)  = VPair <$> mkValue c1 <*> mkValue c2
 
--- A number is in WHNF, just turn it into a VNum.
-whnf (CNum d n)     = return $ VNum d n
-
 -- A lambda abstraction is already in WHNF; just package it up as a
 -- closure with the current environment.
 whnf (CAbs b)       = VClos b <$> getEnv
@@ -269,7 +267,22 @@ whnf (CAbs b)       = VClos b <$> getEnv
 whnf (CType ty)     = return $ VType ty
 
 ------------------------------------------------------------
--- Interesting cases! (application, case)
+-- Interesting cases! (projection, case, application)
+
+-- Reduce a projection from a pair
+whnf (CProj s c)    = do
+  v <- whnf c
+  case v of
+    VPair v1 v2 -> whnfV (selectSide s v1 v2)
+    w           -> error $ "impossible! Non-VPair in whnf CProj: " ++ show w
+
+-- Reduce a case analysis
+whnf (CCase c l r)  = do
+  v <- whnf c
+  case v of
+    VInj L v' -> lunbind l $ \(xl, cl) -> extend xl v' (whnf cl)
+    VInj R v' -> lunbind r $ \(xr, cr) -> extend xr v' (whnf cr)
+    w         -> error $ "impossible! Non-VInj in whnf CCase: " ++ show w
 
 -- To reduce an application:
 whnf t@(CApp c1 c2)    = do
@@ -285,9 +298,6 @@ whnf t@(CApp c1 c2)    = do
 
   -- Finally, call 'whnfApp' to do the actual application.
   whnfApp v1 [v2]
-
--- See 'whnfCase' for case reduction logic.
-whnf (CCase bs)     = whnfCase bs
 
 -- Reduce under a test frame.
 whnf (CTest vars c) = whnfTest (TestVars vars) c
@@ -351,68 +361,6 @@ whnfAppExact (VFun _)    vs  =
   error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
 whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
-
-------------------------------------------------------------
--- Case analysis
-------------------------------------------------------------
-
--- | Reduce a case expression to weak head normal form.
-whnfCase :: Members EvalEffects r => [CBranch] -> Sem r Value
-whnfCase []     = throw NonExhaustive
-whnfCase (b:bs) = do
-  lunbind b $ \(gs, t) -> do
-  res <- checkGuards (fromTelescope gs)
-  case res of
-    Nothing -> whnfCase bs
-    Just e' -> extends e' $ whnf t
-
--- | Check a chain of guards on one branch of a case.  Returns
---   @Nothing@ if the guards fail to match, or a resulting environment
---   of bindings if they do match.
-checkGuards :: Members EvalEffects r => [(Embed Core, CPattern)] -> Sem r (Maybe Env)
-checkGuards [] = ok
-checkGuards ((unembed -> c, p) : gs) = do
-  v <- mkValue c
-  res <- match v p
-  case res of
-    Nothing -> return Nothing
-    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
-
--- | Match a value against a pattern, returning an environment of
---   bindings if the match succeeds.
-match :: Members EvalEffects r => Value -> CPattern -> Sem r (Maybe Env)
-match v (CPVar x)      = return $ Just (M.singleton (coerce x) v)
-match _ CPWild         = ok
-match v CPUnit         = whnfV v >> ok
-    -- Matching the unit value is guaranteed to succeed without
-    -- binding anything, but we still need to reduce in case v throws
-    -- an error.
-
-match v (CPTag s)      = do
-  VInj t _ <- whnfV v
-  if s == t then ok else noMatch
-match v (CPInj s x)    = do
-  VInj t v' <- whnfV v
-  if s == t then return (Just $ M.singleton x v') else noMatch
-match v (CPPair x1 x2) = do
-  VPair v1 v2 <- whnfV v
-  return . Just . M.fromList $ [(x1,v1), (x2,v2)]
-match v (CPNat n)      = do
-  VNum _ m <- whnfV v
-  if m == n % 1 then ok else noMatch
-match v (CPFrac x y)   = do
-  VNum _ r <- whnfV v
-  return . Just . M.fromList $ [ (x, vint (numerator   r))
-                               , (y, vint (denominator r))
-                               ]
-
--- | Convenience function: successfully match with no bindings.
-ok :: Applicative f => f (Maybe Env)
-ok = pure $ Just M.empty
-
--- | Convenience function: fail to match.
-noMatch :: Applicative f => f (Maybe Env)
-noMatch = pure Nothing
 
 ------------------------------------------------------------
 -- Lists
@@ -872,6 +820,7 @@ whnfOp (OMDivides n)   = arity2 "modDiv"   $ modDivides n
 
 whnfOp OIsPrime        = arity1 "isPrime"   $ fmap primIsPrime . whnfV
 whnfOp OFactor         = arity1 "factor"    $ whnfV >=> primFactor
+whnfOp OFrac           = arity1 "frac"      $ whnfV >=> primFrac
 
 --------------------------------------------------
 -- Combinatorics
@@ -1181,6 +1130,15 @@ primFactor (VNum d (numerator -> n)) =
     0 -> throw (Crash "0 has no prime factorization!")
     _ -> return . VBag $ map ((VNum d . (%1) . unPrime) *** fromIntegral) (factorise n)
 primFactor _                         = error "impossible! primFactor on non-VNum"
+
+-- | Semantics of the @$frac@ prim: turn a rational number into a pair
+--   of its numerator and denominator.
+primFrac :: Value -> Sem r Value
+primFrac (VNum d n) = return $ VPair (VNum d . (%1) $ p) (VNum d . (%1) $ q)
+  where
+    p = numerator n
+    q = denominator n
+primFrac _ = error "impossible! primFrac on non-VNum"
 
 -- | Semantics of the @$crash@ prim, which crashes with a
 --   user-supplied message.

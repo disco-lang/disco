@@ -19,8 +19,6 @@ module Disco.AST.Core
        , Core(..)
        , Op(..), opArity
 
-         -- * Case expressions and patterns
-       , CBranch, CPattern(..), CQual(..)
        )
        where
 
@@ -28,7 +26,6 @@ import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
-import           Disco.AST.Surface                (Telescope)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -56,11 +53,11 @@ data Core where
   -- | A variable.
   CVar   :: Name Core -> Core
 
-  -- | A function constant.
-  CConst :: Op -> Core
+  -- | A rational number.
+  CNum  :: RationalDisplay -> Rational -> Core
 
-  -- | The unit value.
-  CUnit :: Core
+  -- | A built-in constant.
+  CConst :: Op -> Core
 
   -- | An injection into a sum type, i.e. a value together with a tag
   --   indicating which element of a sum type we are in.  For example,
@@ -71,23 +68,23 @@ data Core where
   --   from different types.
   CInj :: Side -> Core -> Core
 
+  -- | A primitive case expression on a value of a sum type.
+  CCase :: Core -> Bind (Name Core) Core -> Bind (Name Core) Core -> Core
+
+  -- | The unit value.
+  CUnit :: Core
+
   -- | A pair of values.
   CPair :: Core -> Core -> Core
 
-  -- | A rational number.
-  CNum  :: RationalDisplay -> Rational -> Core
+  -- | A projection from a product type, i.e. @fst@ or @snd@.
+  CProj :: Side -> Core -> Core
 
   -- | An anonymous function.
   CAbs  :: Bind [Name Core] Core -> Core
 
-  -- | Function application, where each argument has a strictness
-  --   annotation.  The strictness is determined by the type of the
-  --   application (which has been erased), and determines whether the
-  --   argument should be evaluated before applying the function.
+  -- | Function application.
   CApp  :: Core -> Core -> Core
-
-  -- | A case expression.
-  CCase :: [CBranch] -> Core
 
   -- | A "test frame" under which a test case is run. Records the
   --   types and legible names of the variables that should
@@ -198,6 +195,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test
         | OFactor         -- ^ Factorization
+        | OFrac           -- ^ Turn a rational into a (num, denom) pair
 
         -- Propositions
         | OForall [Type]  -- ^ Universal quantification. Applied to a closure
@@ -209,6 +207,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OShouldEq Type  -- ^ Equality assertion, @=!=@
 
         -- Other primitives
+        | OMatchErr       -- ^ Error for non-exhaustive pattern match
         | OCrash          -- ^ Crash with a user-supplied message
         | OId             -- ^ No-op/identity function
         | OLookupSeq      -- ^ Lookup OEIS sequence
@@ -222,6 +221,7 @@ data Op = OAdd      -- ^ Addition (@+@)
 opArity :: Op -> Int
 opArity OEmptyMap       = 0
 opArity (OEmptyGraph _) = 0
+opArity OMatchErr       = 0
 opArity _               = 1
 
 -- opArity OAdd             = 2
@@ -274,56 +274,6 @@ opArity _               = 1
 -- opArity OCrash           = 1
 -- opArity OId              = 1
 
--- | A branch, consisting of a list of guards and a term.
-type CBranch = Bind (Telescope (Embed Core, CPattern)) Core
-
--- | A single qualifier in a list comprehension.
-data CQual where
-
-  -- | A binding qualifier (i.e. @x <- t@)
-  CQBind   :: Name Core -> Embed Core -> CQual
-
-  -- | A boolean guard qualfier (i.e. @x + y > 4@)
-  CQGuard  :: Embed Core -> CQual
-
-  deriving (Show, Generic)
-
--- | Core (desugared) patterns.  We only need variables, wildcards,
---   natural numbers, and constructors.
-data CPattern where
-
-  -- | A variable pattern, which matches anything and binds the name.
-  CPVar  :: Name Core -> CPattern
-
-  -- | A wildcard pattern @_@, which matches anything.
-  CPWild :: CPattern
-
-  -- | The unit pattern.
-  CPUnit :: CPattern
-
-  -- | An injection into a sum type, with no argument (i.e. the
-  --   argument is a unit value).  We could use CPInj with a fresh
-  --   variable that we know will bind to the unit value; this pattern
-  --   is thus just an optimization to avoid introducing a useless
-  --   variable.
-  CPTag  :: Side -> CPattern
-
-  -- | An injection into a sum type.
-  CPInj  :: Side -> Name Core -> CPattern
-
-  -- | A pair.
-  CPPair :: Name Core -> Name Core -> CPattern
-
-  -- | A natural number pattern.
-  CPNat  :: Integer -> CPattern
-
-  -- | A fraction pattern, @x/y@.
-  CPFrac :: Name Core -> Name Core -> CPattern
-
-  deriving (Show, Generic)
-
 instance Alpha RationalDisplay
 instance Alpha Core
 instance Alpha Op
-instance Alpha CPattern
-instance Alpha CQual

@@ -1,0 +1,11 @@
+using primitives
+:type $frac
+$frac 0
+$frac 1
+$frac 5
+$frac (-6)
+$frac (2/3)
+$frac (4/6)
+$frac (7/3)
+$frac (-1/8)
+$frac ((-1)/(-3))

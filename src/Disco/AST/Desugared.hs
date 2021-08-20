@@ -44,13 +44,8 @@ module Disco.AST.Desugared
        , pattern DPVar
        , pattern DPWild
        , pattern DPUnit
-       , pattern DPBool
-       , pattern DPChar
        , pattern DPPair
        , pattern DPInj
-       , pattern DPNat
-       , pattern DPFrac
-       , pattern DPNil
 
        , DProperty
        )
@@ -193,12 +188,12 @@ type instance X_PVar     DS = Embed Type
 type instance X_PWild    DS = Embed Type
 type instance X_PAscr    DS = Void
 type instance X_PUnit    DS = ()
-type instance X_PBool    DS = ()
-type instance X_PChar    DS = ()
+type instance X_PBool    DS = Void
+type instance X_PChar    DS = Void
 type instance X_PString  DS = Void
 type instance X_PTup     DS = Void
 type instance X_PInj     DS = Void
-type instance X_PNat     DS = Embed Type
+type instance X_PNat     DS = Void
 type instance X_PCons    DS = Void
 type instance X_PList    DS = Void
 type instance X_PAdd     DS = Void
@@ -216,13 +211,7 @@ type instance X_PFrac    DS = Void
 type instance X_Pattern  DS =
   Either
     (Embed Type, Name DTerm, Name DTerm)     -- DPPair
-    (Either
-      (Embed Type, Side, Name DTerm)         -- DPInj
-      (Either
-        (Embed Type, Name DTerm, Name DTerm) -- DPFrac
-        (Embed Type)                         -- DNil
-      )
-    )
+    (Embed Type, Side, Name DTerm)           -- DPInj
 
 pattern DPVar :: Type -> Name DTerm -> DPattern
 pattern DPVar ty name <- PVar_ (unembed -> ty) name
@@ -237,39 +226,17 @@ pattern DPWild ty <- PWild_ (unembed -> ty)
 pattern DPUnit :: DPattern
 pattern DPUnit = PUnit_ ()
 
-pattern DPBool :: Bool -> DPattern
-pattern DPBool  b = PBool_ () b
-
-pattern DPChar :: Char -> DPattern
-pattern DPChar  c = PChar_ () c
-
 pattern DPPair  :: Type -> Name DTerm -> Name DTerm -> DPattern
 pattern DPPair ty x1 x2 <- XPattern_ (Left (unembed -> ty, x1, x2))
   where
     DPPair ty x1 x2 = XPattern_ (Left (embed ty, x1, x2))
 
 pattern DPInj  :: Type -> Side -> Name DTerm -> DPattern
-pattern DPInj ty s x <- XPattern_ (Right (Left (unembed -> ty, s, x)))
+pattern DPInj ty s x <- XPattern_ (Right (unembed -> ty, s, x))
   where
-    DPInj ty s x = XPattern_ (Right (Left (embed ty, s, x)))
+    DPInj ty s x = XPattern_ (Right (embed ty, s, x))
 
-pattern DPNat  :: Type -> Integer -> DPattern
-pattern DPNat ty n <- PNat_ (unembed -> ty) n
-  where
-    DPNat ty n = PNat_ (embed ty) n
-
-pattern DPFrac :: Type -> Name DTerm -> Name DTerm -> DPattern
-pattern DPFrac ty x1 x2 <- XPattern_ (Right (Right (Left (unembed -> ty, x1, x2))))
-  where
-    DPFrac ty x1 x2 = XPattern_ (Right (Right (Left (embed ty, x1, x2))))
-
-pattern DPNil :: Type -> DPattern
-pattern DPNil ty <- XPattern_ (Right (Right (Right (unembed -> ty))))
-  where
-    DPNil ty = XPattern_ (Right (Right (Right (embed ty))))
-
-{-# COMPLETE DPVar, DPWild, DPUnit, DPBool, DPChar, DPPair, DPInj,
-    DPNat, DPFrac, DPNil #-}
+{-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj #-}
 
 type instance X_QBind  DS = Void
 type instance X_QGuard DS = Void
@@ -299,10 +266,5 @@ instance HasType DPattern where
   getType (DPVar ty _)    = ty
   getType (DPWild ty)     = ty
   getType DPUnit          = TyUnit
-  getType (DPBool _)      = TyBool
-  getType (DPChar _)      = TyC
   getType (DPPair ty _ _) = ty
   getType (DPInj ty _ _)  = ty
-  getType (DPNat ty _)    = ty
-  getType (DPFrac ty _ _) = ty
-  getType (DPNil ty)      = ty

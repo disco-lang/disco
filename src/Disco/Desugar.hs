@@ -24,6 +24,7 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
+import           Data.Bool                        (bool)
 import           Data.Coerce
 import           Data.Maybe                       (fromMaybe, isJust)
 
@@ -601,10 +602,10 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   where
     desugarGuard :: Member Fresh r => AGuard -> Sem r [DGuard]
 
-    -- A Boolean guard is desugared to a pattern-match on @true@.
+    -- A Boolean guard is desugared to a pattern-match on @true = right(unit)@.
     desugarGuard (AGBool (unembed -> at)) = do
       dt <- desugarTerm at
-      mkMatch dt (DPBool True)
+      desugarMatch dt (APInj TyBool R APUnit)
 
     -- 'let x = t' is desugared to 'when t is x'.
     desugarGuard (AGLet (ABinding _ x (unembed -> at))) = do
@@ -640,9 +641,9 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     desugarMatch dt (APVar ty x)      = mkMatch dt (DPVar ty (coerce x))
     desugarMatch _  (APWild _)        = return []
     desugarMatch dt APUnit            = mkMatch dt DPUnit
-    desugarMatch dt (APBool b)        = mkMatch dt (DPBool b)
-    desugarMatch dt (APNat ty n)      = mkMatch dt (DPNat ty n)
-    desugarMatch dt (APChar c)        = mkMatch dt (DPChar c)
+    desugarMatch dt (APBool b)        = desugarMatch dt (APInj TyBool (bool L R b) APUnit)
+    desugarMatch dt (APNat ty n)      = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTNat ty n)) (APBool True)
+    desugarMatch dt (APChar c)        = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTChar c)) (APBool True)
     desugarMatch dt (APString s)      = desugarMatch dt (APList (TyList TyC) (map APChar s))
     desugarMatch dt (APTup tupTy pat) = desugarTuplePats tupTy dt pat
       where
@@ -685,7 +686,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         , return gs2
         ]
 
-    desugarMatch dt (APList ty []) = mkMatch dt (DPNil ty)
+    desugarMatch dt (APList ty []) = desugarMatch dt (APInj ty L APUnit)
     desugarMatch dt (APList ty ps) =
       desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
 
@@ -706,12 +707,11 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     -- when dt is (p - t) ==> when dt is x0; let v = t; when x0 + v is p
     desugarMatch dt (APSub ty p t)  = arithBinMatch (const Nothing) (+.) dt ty p t
 
-    -- when dt is (p/q) ==> when dt is (x0/x1); when x0 is 0; when x1 is q
-    desugarMatch dt (APFrac ty p q) = do
-      (x1, g1) <- varForPat p
-      (x2, g2) <- varForPat q
-      fmap concat . sequence $
-        [ mkMatch dt $ DPFrac ty x1 x2, return g1, return g2 ]
+    -- when dt is (p/q) ==> when $frac(dt) is (p, q)
+    desugarMatch dt (APFrac _ p q)
+      = desugarMatch
+          (dtapp (DTPrim (TyQ :->: TyZ :*: TyN) PrimFrac) dt)
+          (APTup (TyZ :*: TyN) [p, q])
 
     -- when dt is (-p) ==> when dt is x0; if x0 < 0; when -x0 is p
     desugarMatch dt (APNeg ty p) = do
@@ -744,7 +744,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     varForPat :: Member Fresh r => APattern -> Sem r (Name DTerm, [DGuard])
     varForPat (APVar _ x) = return (coerce x, [])
     varForPat p           = do
-      x <- fresh (string2Name "x")
+      x <- fresh (string2Name "px")     -- changing this from x fixed a bug and I don't know why =(
       (x,) <$> desugarMatch (DTVar (getType p) x) p
 
     arithBinMatch

@@ -10,10 +10,13 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Interpret.CESK where
+module Disco.Interpret.CESK
+  ( CESK, runCESK, step, eval
+
+  , runTest
+  ) where
 
 import           Data.IntMap                      (IntMap)
-import qualified Data.IntMap                      as IntMap
 import qualified Data.IntMap                      as IM
 import           Data.Map                         (Map, (!))
 import qualified Data.Map                         as M
@@ -24,25 +27,10 @@ import           Unbound.Generics.LocallyNameless (Bind, Name)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..), selectSide)
+import           Disco.AST.Typed                  (AProperty)
 import           Disco.Effects.Fresh
 import           Disco.Error
-import           Disco.Types                      (Type)
-
-------------------------------------------------------------
--- Values
-------------------------------------------------------------
-
--- | Different types of values which can result from the evaluation
---   process.
-data Value where
-  VNum     :: RationalDisplay -> Rational -> Value
-  VConst   :: Op -> Value
-  VInj     :: Side -> Value -> Value
-  VUnit    :: Value
-  VPair    :: Value -> Value -> Value
-  VClo     :: Env -> Bind [Name Core] Core -> Value
-  VType    :: Type -> Value
-  VRef     :: Int -> Value
+import           Disco.Value
 
 ------------------------------------------------------------
 -- Frames and continuations
@@ -94,24 +82,33 @@ data Frame
   | FUpdate Int
 
 ------------------------------------------------------------
--- Environment and memory
+-- Memory
 ------------------------------------------------------------
 
--- | An 'Env' simply maps names to values.
-type Env = Map (Name Core) Value
-
--- | 'Mem' represents a memory, containing 'Cell'
+-- | 'Mem' represents a memory, containing 'Cell's
 data Mem = Mem { next :: Int, mu :: IntMap Cell }
 data Cell = Blackhole | E Env Core | V Value
 
+emptyMem :: Mem
+emptyMem = Mem 0 IM.empty
+
+-- | Allocate a new memory cell containing an unevaluated expression
+--   with the current environment.  Return the updated memory and the
+--   index of the allocated cell.
 allocate :: Env -> Core -> Mem -> (Mem, Int)
-allocate e t (Mem n m) = (Mem (n+1) (IntMap.insert n (E e t) m), n)
+allocate e t (Mem n m) = (Mem (n+1) (IM.insert n (E e t) m), n)
 
+-- | Look up the cell at a given index.
 lkup :: Int -> Mem -> Maybe Cell
-lkup n (Mem _ m) = IntMap.lookup n m
+lkup n (Mem _ m) = IM.lookup n m
 
+-- | Set the cell at a given index.
 set :: Int -> Cell -> Mem -> Mem
-set n c (Mem nxt m) = Mem nxt (IntMap.insert n c m)
+set n c (Mem nxt m) = Mem nxt (IM.insert n c m)
+
+------------------------------------------------------------
+-- The CESK machine
+------------------------------------------------------------
 
 -- | The CESK machine has two basic kinds of states.
 data CESK
@@ -133,27 +130,36 @@ data CESK
   --   with the value.
   | Out Value Mem Cont
 
+-- | Is the CESK machine in a final state?
 isFinal :: CESK -> Maybe Value
 isFinal (Out v _ []) = Just v
 isFinal _            = Nothing
 
+-- | Run a CESK machine to completion.
+runCESK :: Members '[Fresh, Error EvalError] r => CESK -> Sem r Value
+runCESK cesk = case isFinal cesk of
+  Just v  -> return v
+  Nothing -> step cesk >>= runCESK
+
+-- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError] r => CESK -> Sem r CESK
 step (In (CVar x) e m k)                   = return $ Out (e!x) m k
-step (In (CNum d r) e m k)                 = return $ Out (VNum d r) m k
-step (In (CConst op) e m k)                = return $ Out (VConst op) m k
+step (In (CNum d r) _ m k)                 = return $ Out (VNum d r) m k
+step (In (CConst op) _ m k)                = return $ Out (VConst op) m k
 step (In (CInj s c) e m k)                 = return $ In c e m (FInj s : k)
 step (In (CCase c b1 b2) e m k)            = return $ In c e m (FCase e b1 b2 : k)
-step (In CUnit e m k)                      = return $ Out VUnit m k
+step (In CUnit _ m k)                      = return $ Out VUnit m k
 step (In (CPair c1 c2) e m k)              = return $ In c1 e m (FPairR e c2 : k)
 step (In (CProj s c) e m k)                = return $ In c e m (FProj s : k)
 step (In (CAbs b) e m k)                   = return $ Out (VClo e b) m k
 step (In (CApp c1 c2) e m k)               = return $ In c1 e m (FArg e c2 : k)
-step (In (CType ty) e m k)                 = return $ Out (VType ty) m k
+step (In (CType ty) _ m k)                 = return $ Out (VType ty) m k
 step (In (CDelay b) e m k)                 = do
   (x, c) <- unbind b
   let (m', loc) = allocate (M.insert x (VRef loc) e) c m
   return $ Out (VRef loc) m' k
 step (In (CForce c) e m k)                 = return $ In c e m (FForce : k)
+
 step (Out v m (FInj s : k))                = return $ Out (VInj s v) m k
 step (Out (VInj L v) m (FCase e b1 _ : k)) = do
   (x,c1) <- unbind b1
@@ -181,7 +187,85 @@ step (Out (VRef n) m (FForce : k))         =
 step (Out v m (FUpdate n : k))             = return $ Out v (set n (V v) m) k
 
 appConst :: Op -> Value -> Value
-appConst = undefined
+appConst OAdd (VPair (VNum d1 x) (VNum d2 y)) = VNum (d1 <> d2) (x + y)
+-- appConst ONeg v                               = _wb
+-- appConst OSqrt v                              = _wc
+-- appConst OFloor v                             = _wd
+-- appConst OCeil v                              = _we
+-- appConst OAbs v                               = _wf
+-- appConst OMul v                               = _wg
+-- appConst ODiv v                               = _wh
+-- appConst OExp v                               = _wi
+-- appConst OMod v                               = _wj
+-- appConst ODivides v                           = _wk
+-- appConst OMultinom v                          = _wl
+-- appConst OFact v                              = _wm
+-- appConst (OEq ty) v                           = _wn
+-- appConst (OLt ty) v                           = _wo
+-- appConst OEnum v                              = _wp
+-- appConst OCount v                             = _wq
+-- appConst (OMDiv n) v                          = _wr
+-- appConst (OMExp n) v                          = _ws
+-- appConst (OMDivides n) v                      = _wt
+-- appConst OSize v                              = _wu
+-- appConst (OPower ty) v                        = _wv
+-- appConst (OBagElem ty) v                      = _ww
+-- appConst (OListElem ty) v                     = _wx
+-- appConst OEachList v                          = _wy
+-- appConst (OEachBag ty) v                      = _wz
+-- appConst (OEachSet ty) v                      = _wA
+-- appConst OReduceList v                        = _wB
+-- appConst OReduceBag v                         = _wC
+-- appConst OFilterList v                        = _wD
+-- appConst OFilterBag v                         = _wE
+-- appConst (OMerge ty) v                        = _wF
+-- appConst OConcat v                            = _wG
+-- appConst (OBagUnions ty) v                    = _wH
+-- appConst (OUnions ty) v                       = _wI
+-- appConst OSummary v                           = _wJ
+-- appConst (OEmptyGraph ty) v                   = _wK
+-- appConst (OVertex ty) v                       = _wL
+-- appConst (OOverlay ty) v                      = _wM
+-- appConst (OConnect ty) v                      = _wN
+-- appConst OEmptyMap v                          = _wO
+-- appConst OInsert v                            = _wP
+-- appConst OLookup v                            = _wQ
+-- appConst OForever v                           = _wR
+-- appConst OUntil v                             = _wS
+-- appConst OSetToList v                         = _wT
+-- appConst OBagToSet v                          = _wU
+-- appConst OBagToList v                         = _wV
+-- appConst (OListToSet ty) v                    = _wW
+-- appConst (OListToBag ty) v                    = _wX
+-- appConst OBagToCounts v                       = _wY
+-- appConst (OCountsToBag ty) v                  = _wZ
+-- appConst (OMapToSet ty ty') v                 = _w10
+-- appConst OSetToMap v                          = _w11
+-- appConst OIsPrime v                           = _w12
+-- appConst OFactor v                            = _w13
+-- appConst OFrac v                              = _w14
+-- appConst (OForall tys) v                      = _w15
+-- appConst (OExists tys) v                      = _w16
+-- appConst OHolds v                             = _w17
+-- appConst ONotProp v                           = _w18
+-- appConst (OShouldEq ty) v                     = _w19
+-- appConst OMatchErr v                          = _w1a
+-- appConst OCrash v                             = _w1b
+-- appConst OId v                                = _w1c
+-- appConst OLookupSeq v                         = _w1d
+-- appConst OExtendSeq v                         = _w1e
+
+------------------------------------------------------------
+-- Tests
+------------------------------------------------------------
+
+runTest :: Members EvalEffects r => Int -> AProperty -> Sem r TestResult
+runTest n p = undefined
+
+  -- testProperty (Randomized n' n') =<< mkValue (compileProperty p)
+  -- where
+  --   n' = fromIntegral (n `div` 2)
+
 
 {-
 
@@ -191,3 +275,10 @@ appConst = undefined
   CTest :: [(String, Type, Name Core)] -> Core -> Core
 
 -}
+
+------------------------------------------------------------
+-- XXX
+------------------------------------------------------------
+
+eval :: Members '[Error EvalError] r => Core -> Sem r Value
+eval c = runFresh $ runCESK (In c M.empty emptyMem [])

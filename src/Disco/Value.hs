@@ -20,7 +20,7 @@
 module Disco.Value
   ( -- * Values
 
-    Value(.., VFun, VDelay), pattern VNil, pattern VCons
+    Value(.., VNil, VCons, VFun)
   , SimpleValue(..)
 
     -- * Props & testing
@@ -32,10 +32,6 @@ module Disco.Value
 
   , Env, extendEnv, extendsEnv, getEnv, withEnv
 
-  -- * Memory store
-
-  , Cell(..), mkCell, Loc
-
   -- * Evaluation effects
 
   , Debug(..)
@@ -44,7 +40,6 @@ module Disco.Value
 
   ) where
 
-import           Data.IntSet                      (IntSet)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
@@ -59,7 +54,6 @@ import           Disco.Types
 
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
-import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Fail
@@ -77,7 +71,7 @@ debug :: Member (Output Debug) r => String -> Sem r ()
 debug = output . Debug
 
 -- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error EvalError, Store Cell, Random, LFresh, Output Debug]
+type EvalEffects = [Reader Env, Fail, Error EvalError, Random, LFresh, Output Debug]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
 
@@ -85,49 +79,39 @@ type EvalEffects = [Reader Env, Fail, Error EvalError, Store Cell, Random, LFres
     -- With tags so we can filter on log messages we want??
     -- Just make my own message logging effect.
 
-------------------------------------------------------------
--- Values
-------------------------------------------------------------
-
--- | The type of values produced by the interpreter. The parameter @r@
---   is an effect row listing the effects needed to evaluate such values.
+-- | Different types of values which can result from the evaluation
+--   process.
 data Value where
+
   -- | A numeric value, which also carries a flag saying how
   --   fractional values should be diplayed.
-  VNum  :: RationalDisplay -> Rational -> Value
-
-  -- | The unit value.
-  VUnit :: Value
-
-  -- | An injection into a sum type.
-  VInj :: Side -> Value -> Value
-
-  -- | A pair of values.
-  VPair :: Value -> Value -> Value
+  VNum     :: RationalDisplay -> Rational -> Value
 
   -- | A built-in function constant.
-  VConst :: Op -> Value
+  VConst   :: Op -> Value
+
+  -- | An injection into a sum type.
+  VInj     :: Side -> Value -> Value
+
+  -- | The unit value.
+  VUnit    :: Value
+
+  -- | A pair of values.
+  VPair    :: Value -> Value -> Value
 
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClos  :: Bind [Name Core] Core -> Env -> Value
+  VClo     :: Env -> Bind [Name Core] Core -> Value
 
-  -- | A partial application, i.e. an application of a thing to some
-  --   arguments which is still waiting for more.  Invariant: the
-  --   thing being applied is in WHNF.
-  VPAp   :: Value -> [Value] -> Value
+  -- | A disco type can be a value.  For now, there are only a very
+  --   limited number of places this could ever show up (in
+  --   particular, as an argument to @enumerate@ or @count@).
+  VType    :: Type -> Value
 
-  -- | A thunk, i.e. an unevaluated core expression together with
-  --   its environment.
-  VThunk :: Core -> Env -> Value
-
-  -- | An indirection, i.e. a pointer to an entry in the value table.
-  --   This is how we get graph reduction.  When we create a thunk, we
-  --   put it in a new entry in the value table, and return a VIndir.
-  --   The VIndir can get copied but all the copies refer to the same
-  --   thunk, which will only be evaluated once, the first time the
-  --   value is demanded.
-  VIndir :: Int -> Value
+  -- | A reference, i.e. a pointer to a memory cell.  This is used to
+  --   implement (optional, user-requested) laziness as well as
+  --   recursion.
+  VRef     :: Int -> Value
 
   -- | A literal function value.  @VFun@ is only used when
   --   enumerating function values in order to decide comparisons at
@@ -144,11 +128,6 @@ data Value where
   -- | A proposition.
   VProp   :: ValProp -> Value
 
-  -- | A @Value@ computation which can be run later, along with
-  --   the environment in which it should run, and a set of referenced
-  --   memory locations that should not be garbage collected.
-  VDelay_  :: ValDelay -> IntSet -> Env -> Value
-
   -- | A literal bag, containing a finite list of (perhaps only
   --   partially evaluated) values, each paired with a count.  This is
   --   also used to represent sets (with the invariant that all counts
@@ -163,10 +142,6 @@ data Value where
   --   property when the key type is finite.
   VMap :: Map SimpleValue Value -> Value
 
-  -- | A disco type can be a value.  For now, there are only a very
-  --   limited number of places this could ever show up (in
-  --   particular, as an argument to @enumerate@ or @count@).
-  VType :: Type -> Value
   deriving Show
 
 -- | Convenient pattern for the empty list.
@@ -205,19 +180,6 @@ instance Show ValFun where
 
 pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
-
--- | A @ValDelay@ is just a @Sem r Value@ computation.  It is a
---   @newtype@ just so we can have a custom @Show@ instance for it and
---   then derive a @Show@ instance for the rest of the @Value@ type.
-newtype ValDelay = ValDelay (forall r. Members EvalEffects r => Sem r Value)
-
-instance Show ValDelay where
-  show _ = "<delay>"
-
-pattern VDelay
-  :: (forall r. Members EvalEffects r => Sem r Value)
-  -> IntSet -> Env -> Value
-pattern VDelay m ls e = VDelay_ (ValDelay m) ls e
 
 ------------------------------------------------------------
 -- Propositions
@@ -335,21 +297,3 @@ withEnv e = avoid (map AnyName (names e)) . local (const e)
 -- we should have to avoid names bound in the environment currently in use.
 
 -- withEnv = local . const
-
-
-------------------------------------------------------------
--- Memory cells
-------------------------------------------------------------
-
--- | A memory cell holds a value, along with a flag recording whether
---   the value has been reduced to WHNF.
-data Cell = Cell { cellVal :: Value, cellIsWHNF :: Bool }
-  deriving (Show)
-
--- | Create a memory cell from a value, with the WHNF flag initially
---   set to false.
-mkCell :: Value -> Cell
-mkCell v = Cell v False
-
--- | A location in memory is represented by an @Int@.
-type Loc = Int

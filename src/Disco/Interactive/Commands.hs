@@ -43,7 +43,6 @@ import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
-import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.State
 
@@ -55,7 +54,7 @@ import           Disco.Desugar
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
-import           Disco.Interpret.Core
+import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
@@ -85,8 +84,6 @@ data REPLExpr :: CmdTag -> * where
   Ann       :: Term -> REPLExpr 'CAnn              -- Show type-annotated typechecked term
   Desugar   :: Term -> REPLExpr 'CDesugar          -- Show a desugared term
   Compile   :: Term -> REPLExpr 'CCompile          -- Show a compiled term
-  RNF       :: Term -> REPLExpr 'CRNF
-  Mem       :: REPLExpr 'CMem
   Load      :: FilePath -> REPLExpr 'CLoad         -- Load a file.
   Reload    :: REPLExpr 'CReload                   -- Reloads the most recently loaded file.
   Doc       :: Name Term -> REPLExpr 'CDoc         -- Show documentation.
@@ -117,7 +114,7 @@ data REPLCommandType =
 
 -- | Tags used at the type level to denote each REPL command.
 data CmdTag = CTypeCheck | CEval | CShowDefn
-  | CParse | CPretty | CAnn | CDesugar | CCompile | CRNF | CMem | CLoad
+  | CParse | CPretty | CAnn | CDesugar | CCompile | CLoad
   | CReload | CDoc | CNop | CHelp | CNames | CTestProp
   deriving (Show, Eq, Typeable)
 
@@ -177,13 +174,11 @@ discoCommands =
   , SomeCmd evalCmd
   , SomeCmd helpCmd
   , SomeCmd loadCmd
-  , SomeCmd memCmd
   , SomeCmd namesCmd
   , SomeCmd nopCmd
   , SomeCmd parseCmd
   , SomeCmd prettyCmd
   , SomeCmd reloadCmd
-  , SomeCmd rnfCmd
   , SomeCmd showDefnCmd
   , SomeCmd typeCheckCmd
   , SomeCmd testPropCmd
@@ -352,14 +347,13 @@ handleEval (Eval m) = inputToState $ do
   modify @TopInfo (extSet %~ S.union exts)
   addModule REPL mi
   forM_ tms (evalTerm . fst)
-  -- garbageCollect
 
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  v <- inputToState . withTopEnv $ do
-    cv <- mkValue c
-    prettyValue ty cv
-    return cv
+  v <- eval (compileTerm at)
+  s <- renderDoc $ prettyValue ty v
+  outputLn s
+
   modify @TopInfo $
     (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
     (topEnv %~ M.insert (string2Name "it") v)
@@ -431,7 +425,6 @@ handleLoad fp = do
   t <- inputToState . withTopEnv $ runAllTests props
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
-  garbageCollect
   return t
 
 -- XXX Return a structured summary of the results, not a Bool;
@@ -613,7 +606,6 @@ handleTest (TestProp t) = do
   inputToState . withTopEnv $ do
     r <- runTest 100 at   -- XXX make configurable
     prettyTestResult at r
-  garbageCollect
 
 ------------------------------------------------------------
 -- :type
@@ -654,43 +646,3 @@ parseNakedOp = sc *> choice (map mkOpParser (concat opTable))
     mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((TPrim (PrimUOp op) <$) . reservedOp) syns)
     mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((TPrim (PrimBOp op) <$) . reservedOp) syns)
 
-------------------------------------------------------------
--- :rnf
-
-rnfCmd :: REPLCommand 'CRNF
-rnfCmd = REPLCommand
-  { name = "rnf"
-  , helpcmd = "rnf <expr>"
-  , shortHelp = "Reduce an expression to RNF"
-  , category = Dev
-  , cmdtype = ColonCmd
-  , action = handleRNF
-  , parser = RNF <$> term
-  }
-
-handleRNF
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
-  => REPLExpr 'CRNF -> Sem r ()
-handleRNF (RNF t) = do
-  (at, _) <- inputToState . typecheckDisco $ inferTop t
-  let c  = compileTerm at
-  inputToState . withTopEnv $ do
-    cv <- mkValue c >>= rnfV
-    printoutLn cv
-
-------------------------------------------------------------
--- :mem
-
-memCmd :: REPLCommand 'CMem
-memCmd = REPLCommand
-  { name = "mem"
-  , helpcmd = "mem"
-  , shortHelp = "Show the contents of memory"
-  , category = Dev
-  , cmdtype = ColonCmd
-  , action = handleMem
-  , parser = return Mem
-  }
-
-handleMem :: Members '[Store Cell, Output String] r => REPLExpr 'CMem -> Sem r ()
-handleMem Mem = showMemory

@@ -18,6 +18,7 @@ module Disco.Interpret.CESK
   , runTest
   ) where
 
+import           Control.Arrow                      ((***))
 import           Data.IntMap                        (IntMap)
 import qualified Data.IntMap                        as IM
 import           Data.Map                           (Map, (!))
@@ -26,6 +27,8 @@ import           Data.Ratio
 
 import           Math.Combinatorics.Exact.Binomial  (choose)
 import           Math.Combinatorics.Exact.Factorial (factorial)
+import           Math.NumberTheory.Primes           (factorise, unPrime)
+import           Math.NumberTheory.Primes.Testing   (isPrime)
 
 import           Polysemy
 import           Polysemy.Error
@@ -207,6 +210,10 @@ arity2 f (VPair x y) = f x y
 arity2 f v           = error "arity2 on a non-pair!"  -- XXX
 
 appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
+
+--------------------------------------------------
+-- Arithmetic
+
 appConst OAdd   = numOp2 (+)
 appConst ONeg   = numOp1 negate
 appConst OSqrt  = numOp1 integerSqrt
@@ -231,13 +238,37 @@ appConst ODivides = numOp2' $ \m n -> return (enumv $ divides m n)
     divides 0 0 = True
     divides 0 _ = False
     divides x y = denominator (y / x) == 1
+
+--------------------------------------------------
+-- Number theory
+
+appConst OIsPrime = intOp1 (enumv . isPrime)
+appConst OFactor  = intOp1' primFactor
+  where
+    -- Semantics of the @$factor@ prim: turn a natural number into its
+    -- bag of prime factors.  Crash if called on 0, which does not have
+    -- a prime factorization.
+    primFactor :: Member (Error EvalError) r => Integer -> Sem r Value
+    primFactor 0 = throw (Crash "0 has no prime factorization!")
+    prinFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
+
+appConst OFrac    = numOp1' (return . primFrac)
+  where
+    -- Semantics of the @$frac@ prim: turn a rational number into a pair
+    -- of its numerator and denominator.
+    primFrac :: Rational -> Value
+    primFrac r = VPair (intv (numerator r)) (intv (denominator r))
+
+--------------------------------------------------
+-- Combinatorics
+
 appConst OMultinom                          = arity2 multinomOp
 appConst OFact                              = numOp1' factOp
   where
-    factOp :: Member (Error EvalError) r => Rational -> Sem r Rational
+    factOp :: Member (Error EvalError) r => Rational -> Sem r Value
     factOp (numerator -> n)
       | n > fromIntegral (maxBound :: Int) = throw Overflow
-      | otherwise = return $ factorial (fromIntegral n) % 1
+      | otherwise = return . intv $ factorial (fromIntegral n)
 appConst (OEq ty)                          = arity2 $ \v1 v2 -> enumv <$> valEq ty v1 v2
 appConst (OLt ty)                          = arity2 $ \v1 v2 -> enumv <$> valLt ty v1 v2
 appConst OEnum                             = return . enumOp
@@ -246,10 +277,14 @@ appConst OEnum                             = return . enumOp
     enumOp (VType ty) = listv id (enumerateType ty)
     enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v  -- XXX
 
--- appConst OCount                             = _wq
--- appConst (OMDiv n)                          = _wr
--- appConst (OMExp n)                          = _ws
--- appConst (OMDivides n)                      = _wt
+appConst OCount                             = return . countOp
+  where
+    countOp :: Value -> Value
+    countOp (VType ty) = case countType ty of
+      Just num -> VInj R (intv num)
+      Nothing  -> VNil
+    countOp v = error $ "Impossible! countOp on non-type " ++ show v
+
 -- appConst OSize                              = _wu
 -- appConst (OPower ty)                        = _wv
 -- appConst (OBagElem ty)                      = _ww
@@ -298,14 +333,22 @@ appConst OEnum                             = return . enumOp
 -- appConst OLookupSeq                         = _w1d
 -- appConst OExtendSeq                         = _w1e
 
+appConst c = error $ "Unimplemented: appConst " ++ show c
+
 --------------------------------------------------
 -- Arithmetic
 
-numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
-numOp1 f = numOp1' $ return . f
+intOp1 :: (Integer -> Value) -> Value -> Sem r Value
+intOp1 f = intOp1' (return . f)
 
-numOp1' :: (Rational -> Sem r Rational) -> Value -> Sem r Value
-numOp1' f (VNum d m) = VNum d <$> f m
+intOp1' :: (Integer -> Sem r Value) -> Value -> Sem r Value
+intOp1' f = f . vint
+
+numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
+numOp1 f = numOp1' $ return . ratv . f
+
+numOp1' :: (Rational -> Sem r Value) -> Value -> Sem r Value
+numOp1' f (VNum d m) = f m
 
 numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
 numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))

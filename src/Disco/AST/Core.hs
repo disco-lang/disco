@@ -132,11 +132,6 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OEnum     -- ^ Enumerate the values of a type.
         | OCount    -- ^ Count the values of a type.
 
-        -- Arithmetic operators with special runtime behavior for finite types
-        | OMDiv  Integer
-        | OMExp  Integer
-        | OMDivides Integer
-
         -- Container operations
         | OSize           -- ^ Size of two sets (@size@)
         | OPower Type     -- ^ Power set/bag of a given set/bag

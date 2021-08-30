@@ -432,7 +432,12 @@ prettyValue TyC (vchar -> c)                 = text [c]
 prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
   where
     prettyChar = drop 1 . reverse . drop 1 . reverse . show
-prettyValue (TyList ty) xs                   = prettyList ty xs
+prettyValue (TyList ty) (vlist id -> xs)     = do
+  ds <- punctuate (text ",") (map (prettyValue ty) xs)
+  brackets (hsep ds)
+prettyValue ty@(_ :*: _) v                   = parens (prettyTuple ty v)
+prettyValue (ty1 :+: _) (VInj L v)           = "left"  <> prettyVP ty1 v
+prettyValue (_ :+: ty2) (VInj R v)           = "right" <> prettyVP ty2 v
 prettyValue ty (VNum d r)
   | denominator r == 1                       = text $ show (numerator r)
   | otherwise                                = text $ case d of
@@ -452,10 +457,18 @@ prettyValue ty (VBag x0)      = undefined
 prettyValue ty (VGraph gr va) = undefined
 prettyValue ty (VMap map)     = undefined
 
-prettyList ty = undefined
+-- | Pretty-print a value with guaranteed parentheses.  Do nothing for
+--   tuples; add an extra set of parens for other values.
+prettyVP :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyVP ty@(_ :*: _) = prettyValue ty
+prettyVP ty           = parens . prettyValue ty
 
 prettyPlaceholder :: Members '[Reader PA] r => Type -> Sem r Doc
 prettyPlaceholder ty = "<" <> prettyTy ty <> ">"
+
+prettyTuple :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
+prettyTuple ty v                        = prettyValue ty v
 
 --------------------------------------------------
 -- Pretty-printing decimals

@@ -23,6 +23,14 @@ module Disco.Value
     Value(.., VNil, VCons, VFun)
   , SimpleValue(..)
 
+    -- ** Conversion
+
+  , ratv, vrat
+  , intv, vint
+  , vchar
+  , enumv
+  , listv, vlist
+
     -- * Props & testing
   , ValProp(..), TestResult(..), TestReason_(..), TestReason
   , SearchType(..), SearchMotive(.., SMExists, SMForall)
@@ -40,8 +48,10 @@ module Disco.Value
 
   ) where
 
+import           Data.Char                        (chr)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Ratio
 
 import           Algebra.Graph                    (Graph)
 
@@ -78,6 +88,10 @@ type EvalEffects = [Reader Env, Fail, Error EvalError, Random, LFresh, Output De
   -- XXX add some kind of proper logging effect(s)
     -- With tags so we can filter on log messages we want??
     -- Just make my own message logging effect.
+
+------------------------------------------------------------
+-- Value type
+------------------------------------------------------------
 
 -- | Different types of values which can result from the evaluation
 --   process.
@@ -180,6 +194,45 @@ instance Show ValFun where
 
 pattern VFun :: (Value -> Value) -> Value
 pattern VFun f = VFun_ (ValFun f)
+
+------------------------------------------------------------
+-- Converting to and from Value
+------------------------------------------------------------
+
+-- XXX write some comments about partiality
+
+-- | A convenience function for creating a default @VNum@ value with a
+--   default (@Fractional@) flag.
+ratv :: Rational -> Value
+ratv = VNum mempty
+
+vrat :: Value -> Rational
+vrat (VNum _ r) = r
+
+-- | A convenience function for creating a default @VNum@ value with a
+--   default (@Fractional@) flag.
+intv :: Integer -> Value
+intv = ratv . (% 1)
+
+vint :: Value -> Integer
+vint (VNum _ n) = numerator n
+
+vchar :: Value -> Char
+vchar (VNum _ n) = chr (fromIntegral (numerator n))
+
+-- | Turn any instance of @Enum@ into a @Value@, by creating a
+--   constructor with an index corresponding to the enum value.
+enumv :: Enum e => e -> Value
+enumv e = VInj (toEnum $ fromEnum e) VUnit
+
+listv :: (a -> Value) -> [a] -> Value
+listv _ []        = VNil
+listv eltv (a:as) = VCons (eltv a) (listv eltv as)
+
+vlist :: (Value -> a) -> Value -> [a]
+vlist _ VNil            = []
+vlist velt (VCons v vs) = velt v : vlist velt vs
+
 
 ------------------------------------------------------------
 -- Propositions
@@ -297,3 +350,7 @@ withEnv e = avoid (map AnyName (names e)) . local (const e)
 -- we should have to avoid names bound in the environment currently in use.
 
 -- withEnv = local . const
+
+------------------------------------------------------------
+-- Converting to and from Value
+------------------------------------------------------------

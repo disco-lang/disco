@@ -46,7 +46,7 @@ module Disco.Eval
        where
 
 import           Control.Exception        (SomeException, handle)
-import           Control.Lens             (makeLenses, view, (.~))
+import           Control.Lens             (makeLenses, view, (%~), (.~))
 import           Control.Monad            (void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
@@ -76,6 +76,7 @@ import           Disco.Context
 import           Disco.Effects.Fresh
 import           Disco.Error
 import           Disco.Extensions
+import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Parser
 import           Disco.Typecheck          (checkModule)
@@ -338,7 +339,7 @@ loadFile file = do
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addModule
-  :: Members '[Error DiscoError, State TopInfo, Reader Env, Output Debug] r
+  :: Members '[Error DiscoError, State TopInfo, Reader Env, Error EvalError] r
   => LoadingMode -> ModuleInfo -> Sem r ()
 addModule mode mi = do
   curMI <- gets @TopInfo (view topModInfo)
@@ -350,7 +351,7 @@ addModule mode mi = do
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setLoadedModule
-  :: Members '[State TopInfo, Reader Env, Output Debug] r
+  :: Members '[State TopInfo, Reader Env, Error EvalError] r
   => ModuleInfo -> Sem r ()
 setLoadedModule mi = do
   modify @TopInfo $ topModInfo .~ mi
@@ -361,7 +362,7 @@ setLoadedModule mi = do
 --   corresponding to the currently loaded module, and load all the
 --   definitions into the current top-level environment.
 populateCurrentModuleInfo
-  :: Members '[State TopInfo, Reader Env, Output Debug] r
+  :: Members '[State TopInfo, Reader Env, Error EvalError] r
   => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
@@ -376,6 +377,8 @@ populateCurrentModuleInfo = do
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
 loadDefs
-  :: Members '[Reader Env, State TopInfo, Output Debug] r
+  :: Members '[Reader Env, State TopInfo, Error EvalError] r
   => Ctx Core Core -> Sem r ()
-loadDefs = undefined
+loadDefs defs = do
+  newEnv <- mapM eval defs
+  modify @TopInfo $ topEnv %~ joinCtx newEnv

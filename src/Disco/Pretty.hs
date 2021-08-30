@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingVia               #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -24,7 +25,7 @@ module Disco.Pretty
 import           Prelude                          hiding ((<>))
 
 import           Data.Bifunctor
-import           Data.Char                        (isAlpha, toLower)
+import           Data.Char                        (chr, isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -38,6 +39,7 @@ import           Text.PrettyPrint                 (Doc)
 import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
                                                    unembed)
 
+import           Disco.AST.Core                   (RationalDisplay (..))
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -422,8 +424,38 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 -- Pretty-printing values
 ------------------------------------------------------------
 
-prettyValue :: Type -> Value -> Sem r Doc
-prettyValue ty v = undefined
+prettyValue :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyValue TyUnit VUnit                     = "■"
+prettyValue TyProp _                         = prettyPlaceholder TyProp
+prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
+prettyValue TyC (vchar -> c)                 = text [c]
+prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
+  where
+    prettyChar = drop 1 . reverse . drop 1 . reverse . show
+prettyValue (TyList ty) xs                   = prettyList ty xs
+prettyValue ty (VNum d r)
+  | denominator r == 1                       = text $ show (numerator r)
+  | otherwise                                = text $ case d of
+      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> prettyDecimal r
+
+prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
+
+prettyValue ty VUnit          = undefined
+prettyValue ty (VPair va va') = undefined
+prettyValue ty (VClo map bi)  = undefined
+prettyValue ty (VType ty')    = undefined
+prettyValue ty (VRef n)       = undefined
+prettyValue ty (VFun_ vf)     = undefined
+prettyValue ty (VProp vp)     = undefined
+prettyValue ty (VBag x0)      = undefined
+prettyValue ty (VGraph gr va) = undefined
+prettyValue ty (VMap map)     = undefined
+
+prettyList ty = undefined
+
+prettyPlaceholder :: Members '[Reader PA] r => Type -> Sem r Doc
+prettyPlaceholder ty = "<" <> prettyTy ty <> ">"
 
 --------------------------------------------------
 -- Pretty-printing decimals

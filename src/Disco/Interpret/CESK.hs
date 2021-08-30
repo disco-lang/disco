@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Interpret.CESK
@@ -16,21 +18,31 @@ module Disco.Interpret.CESK
   , runTest
   ) where
 
-import           Data.IntMap                      (IntMap)
-import qualified Data.IntMap                      as IM
-import           Data.Map                         (Map, (!))
-import qualified Data.Map                         as M
+import           Data.IntMap                        (IntMap)
+import qualified Data.IntMap                        as IM
+import           Data.Map                           (Map, (!))
+import qualified Data.Map                           as M
+import           Data.Ratio
+
+import           Math.Combinatorics.Exact.Binomial  (choose)
+import           Math.Combinatorics.Exact.Factorial (factorial)
 
 import           Polysemy
 import           Polysemy.Error
-import           Unbound.Generics.LocallyNameless (Bind, Name)
+import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 import           Disco.AST.Core
-import           Disco.AST.Generic                (Side (..), selectSide)
-import           Disco.AST.Typed                  (AProperty)
+import           Disco.AST.Generic                  (Side (..), selectSide)
+import           Disco.AST.Typed                    (AProperty)
 import           Disco.Effects.Fresh
+import           Disco.Enumerate
 import           Disco.Error
+import           Disco.Types                        hiding (V)
 import           Disco.Value
+
+------------------------------------------------------------
+-- Utilities
+------------------------------------------------------------
 
 ------------------------------------------------------------
 -- Frames and continuations
@@ -177,7 +189,7 @@ step (Out v2 m (FApp (VClo e b) : k))      = do
   (xs,c1) <- unbind b
   let [x] = xs
   return $ In c1 (M.insert x v2 e) m k
-step (Out v2 m (FApp (VConst op) : k))     = return $ Out (appConst op v2) m k
+step (Out v2 m (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure m <*> pure k
 step (Out (VRef n) m (FForce : k))         =
   case lkup n m of
     Nothing        -> undefined  -- XXX ?
@@ -186,74 +198,197 @@ step (Out (VRef n) m (FForce : k))         =
     Just Blackhole -> error "Infinite loop detected!"  -- XXX make a real error
 step (Out v m (FUpdate n : k))             = return $ Out v (set n (V v) m) k
 
-appConst :: Op -> Value -> Value
-appConst OAdd (VPair (VNum d1 x) (VNum d2 y)) = VNum (d1 <> d2) (x + y)
--- appConst ONeg v                               = _wb
--- appConst OSqrt v                              = _wc
--- appConst OFloor v                             = _wd
--- appConst OCeil v                              = _we
--- appConst OAbs v                               = _wf
--- appConst OMul v                               = _wg
--- appConst ODiv v                               = _wh
--- appConst OExp v                               = _wi
--- appConst OMod v                               = _wj
--- appConst ODivides v                           = _wk
--- appConst OMultinom v                          = _wl
--- appConst OFact v                              = _wm
--- appConst (OEq ty) v                           = _wn
--- appConst (OLt ty) v                           = _wo
--- appConst OEnum v                              = _wp
--- appConst OCount v                             = _wq
--- appConst (OMDiv n) v                          = _wr
--- appConst (OMExp n) v                          = _ws
--- appConst (OMDivides n) v                      = _wt
--- appConst OSize v                              = _wu
--- appConst (OPower ty) v                        = _wv
--- appConst (OBagElem ty) v                      = _ww
--- appConst (OListElem ty) v                     = _wx
--- appConst OEachList v                          = _wy
--- appConst (OEachBag ty) v                      = _wz
--- appConst (OEachSet ty) v                      = _wA
--- appConst OReduceList v                        = _wB
--- appConst OReduceBag v                         = _wC
--- appConst OFilterList v                        = _wD
--- appConst OFilterBag v                         = _wE
--- appConst (OMerge ty) v                        = _wF
--- appConst OConcat v                            = _wG
--- appConst (OBagUnions ty) v                    = _wH
--- appConst (OUnions ty) v                       = _wI
--- appConst OSummary v                           = _wJ
--- appConst (OEmptyGraph ty) v                   = _wK
--- appConst (OVertex ty) v                       = _wL
--- appConst (OOverlay ty) v                      = _wM
--- appConst (OConnect ty) v                      = _wN
--- appConst OEmptyMap v                          = _wO
--- appConst OInsert v                            = _wP
--- appConst OLookup v                            = _wQ
--- appConst OForever v                           = _wR
--- appConst OUntil v                             = _wS
--- appConst OSetToList v                         = _wT
--- appConst OBagToSet v                          = _wU
--- appConst OBagToList v                         = _wV
--- appConst (OListToSet ty) v                    = _wW
--- appConst (OListToBag ty) v                    = _wX
--- appConst OBagToCounts v                       = _wY
--- appConst (OCountsToBag ty) v                  = _wZ
--- appConst (OMapToSet ty ty') v                 = _w10
--- appConst OSetToMap v                          = _w11
--- appConst OIsPrime v                           = _w12
--- appConst OFactor v                            = _w13
--- appConst OFrac v                              = _w14
--- appConst (OForall tys) v                      = _w15
--- appConst (OExists tys) v                      = _w16
--- appConst OHolds v                             = _w17
--- appConst ONotProp v                           = _w18
--- appConst (OShouldEq ty) v                     = _w19
--- appConst OMatchErr v                          = _w1a
--- appConst OCrash v                             = _w1b
--- appConst OId v                                = _w1c
--- appConst OLookupSeq v                         = _w1d
--- appConst OExtendSeq v                         = _w1e
+------------------------------------------------------------
+-- Interpreting constants
+------------------------------------------------------------
+
+arity2 :: (Value -> Value -> a) -> Value -> a
+arity2 f (VPair x y) = f x y
+arity2 f v           = error "arity2 on a non-pair!"  -- XXX
+
+appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
+appConst OAdd   = numOp2 (+)
+appConst ONeg   = numOp1 negate
+appConst OSqrt  = numOp1 integerSqrt
+appConst OFloor = numOp1 $ (%1) . floor
+appConst OCeil  = numOp1 $ (%1) . ceiling
+appConst OAbs   = numOp1 abs
+appConst OMul   = numOp2 (*)
+appConst ODiv   = numOp2' divOp
+  where
+    divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
+    divOp _ 0 = throw DivByZero
+    divOp m n = return $ ratv (m / n)
+appConst OExp   = numOp2 $ \m n -> m ^^ numerator n
+appConst OMod   = numOp2' modOp
+  where
+    modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
+    modOp m n
+      | n == 0    = throw DivByZero
+      | otherwise = return $ intv (numerator m `mod` numerator n)
+appConst ODivides = numOp2' $ \m n -> return (enumv $ divides m n)
+  where
+    divides 0 0 = True
+    divides 0 _ = False
+    divides x y = denominator (y / x) == 1
+appConst OMultinom                          = arity2 multinomOp
+appConst OFact                              = numOp1' factOp
+  where
+    factOp :: Member (Error EvalError) r => Rational -> Sem r Rational
+    factOp (numerator -> n)
+      | n > fromIntegral (maxBound :: Int) = throw Overflow
+      | otherwise = return $ factorial (fromIntegral n) % 1
+appConst (OEq ty)                          = arity2 $ \v1 v2 -> enumv <$> valEq ty v1 v2
+appConst (OLt ty)                          = arity2 $ \v1 v2 -> enumv <$> valLt ty v1 v2
+appConst OEnum                             = return . enumOp
+  where
+    enumOp :: Value -> Value
+    enumOp (VType ty) = listv id (enumerateType ty)
+    enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v  -- XXX
+
+-- appConst OCount                             = _wq
+-- appConst (OMDiv n)                          = _wr
+-- appConst (OMExp n)                          = _ws
+-- appConst (OMDivides n)                      = _wt
+-- appConst OSize                              = _wu
+-- appConst (OPower ty)                        = _wv
+-- appConst (OBagElem ty)                      = _ww
+-- appConst (OListElem ty)                     = _wx
+-- appConst OEachList                          = _wy
+-- appConst (OEachBag ty)                      = _wz
+-- appConst (OEachSet ty)                      = _wA
+-- appConst OReduceList                        = _wB
+-- appConst OReduceBag                         = _wC
+-- appConst OFilterList                        = _wD
+-- appConst OFilterBag                         = _wE
+-- appConst (OMerge ty)                        = _wF
+-- appConst OConcat                            = _wG
+-- appConst (OBagUnions ty)                    = _wH
+-- appConst (OUnions ty)                       = _wI
+-- appConst OSummary                           = _wJ
+-- appConst (OEmptyGraph ty)                   = _wK
+-- appConst (OVertex ty)                       = _wL
+-- appConst (OOverlay ty)                      = _wM
+-- appConst (OConnect ty)                      = _wN
+-- appConst OEmptyMap                          = _wO
+-- appConst OInsert                            = _wP
+-- appConst OLookup                            = _wQ
+-- appConst OForever                           = _wR
+-- appConst OUntil                             = _wS
+-- appConst OSetToList                         = _wT
+-- appConst OBagToSet                          = _wU
+-- appConst OBagToList                         = _wV
+-- appConst (OListToSet ty)                    = _wW
+-- appConst (OListToBag ty)                    = _wX
+-- appConst OBagToCounts                       = _wY
+-- appConst (OCountsToBag ty)                  = _wZ
+-- appConst (OMapToSet ty ty')                 = _w10
+-- appConst OSetToMap                          = _w11
+-- appConst OIsPrime                           = _w12
+-- appConst OFactor                            = _w13
+-- appConst OFrac                              = _w14
+-- appConst (OForall tys)                      = _w15
+-- appConst (OExists tys)                      = _w16
+-- appConst OHolds                             = _w17
+-- appConst ONotProp                           = _w18
+-- appConst (OShouldEq ty)                     = _w19
+-- appConst OMatchErr                          = _w1a
+-- appConst OCrash                             = _w1b
+-- appConst OId                                = _w1c
+-- appConst OLookupSeq                         = _w1d
+-- appConst OExtendSeq                         = _w1e
+
+--------------------------------------------------
+-- Arithmetic
+
+numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
+numOp1 f = numOp1' $ return . f
+
+numOp1' :: (Rational -> Sem r Rational) -> Value -> Sem r Value
+numOp1' f (VNum d m) = VNum d <$> f m
+
+numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
+numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))
+
+numOp2' :: (Rational -> Rational -> Sem r Value) -> Value -> Sem r Value
+numOp2' (#)
+  = arity2 $ \(VNum d1 n1) (VNum d2 n2) -> do
+      res <- n1 # n2
+      case res of
+        VNum _ r -> return $ VNum (d1 <> d2) r
+        _        -> return res
+
+-- | Perform a square root operation. If the program typechecks,
+--   then the argument and output will really be Natural.
+integerSqrt :: Rational -> Rational
+integerSqrt n = integerSqrt' (numerator n) % 1
+
+-- | implementation of `integerSqrt'` taken from the Haskell wiki:
+--   https://wiki.haskell.org/Generic_number_type#squareRoot
+integerSqrt' :: Integer -> Integer
+integerSqrt' 0 = 0
+integerSqrt' 1 = 1
+integerSqrt' n =
+  let twopows = iterate (^!2) 2
+      (lowerRoot, lowerN) =
+        last $ takeWhile ((n>=) . snd) $ zip (1:twopows) twopows
+      newtonStep x = div (x + div n x) 2
+      iters = iterate newtonStep (integerSqrt' (div n lowerN ) * lowerRoot)
+      isRoot r = r^!2 <= n && n < (r+1)^!2
+  in  head $ dropWhile (not . isRoot) iters
+
+-- this operator is used for `integerSqrt'`
+(^!) :: Num a => a -> Int -> a
+(^!) x n = x^n
+
+-- | Multinomial coefficient.  The first argument is a number, the
+--   second is a list.
+multinomOp :: Value -> Value -> Sem r Value
+multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
+  where
+    multinomial :: Integer -> [Integer] -> Integer
+    multinomial _ []     = 1
+    multinomial n (k:ks)
+      | k > n     = 0
+      | otherwise = choose n k * multinomial (n-k) ks
+
+------------------------------------------------------------
+-- Comparison
+------------------------------------------------------------
+
+valEq :: Type -> Value -> Value -> Sem r Bool
+
+-- XXX make list a defined type
+valEq (TyList tyElt) v1 v2 = valEq (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
+
+valEq _ (VNum _ r1) (VNum _ r2) = return $ r1 == r2
+valEq (ty1 :+: _) (VInj L v1) (VInj L v2) = valEq ty1 v1 v2
+valEq (_ :+: ty2) (VInj R v1) (VInj R v2) = valEq ty2 v1 v2
+valEq _ VUnit VUnit = return True
+valEq (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22)
+  = (&&) <$> valEq ty1 v11 v21 <*> valEq ty2 v12 v22
+valEq _ (VType ty1) (VType ty2) = return $ ty1 == ty2
+valEq _ _ _ = return False
+
+-- VConst, VClo, VFun_
+-- VBag, VGraph, VMap
+
+valLt :: Type -> Value -> Value -> Sem r Bool
+valLt ty v1 v2 = (==LT) <$> valOrd ty v1 v2
+
+-- XXX combine valEq and valOrd ?
+valOrd :: Type -> Value -> Value -> Sem r Ordering
+valOrd (TyList tyElt) v1 v2 = valOrd (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
+valOrd _ (VNum _ r1) (VNum _ r2) = return $ compare r1 r2
+valOrd _ (VInj L _) (VInj R _) = return LT
+valOrd _ (VInj R _) (VInj L _) = return GT
+valOrd (ty1 :+: _) (VInj L v1) (VInj L v2) = valOrd ty1 v1 v2
+valOrd (_ :+: ty2) (VInj R v1) (VInj R v2) = valOrd ty2 v1 v2
+valOrd _ VUnit VUnit = return EQ
+valOrd (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22) =
+  (<>) <$> valOrd ty1 v11 v21 <*> valOrd ty2 v12 v22
+valOrd _ (VType ty1) (VType ty2) = return $ compare ty1 ty2
+valOrd _ _ _ = return EQ  -- XXX
 
 ------------------------------------------------------------
 -- Tests
@@ -270,7 +405,7 @@ runTest n p = undefined
 {-
 
   -- | A "test frame" under which a test case is run. Records the
-  --   types and legible names of the variables that should
+  --   types and legible names of theariables that should
   --   be reported to the user if the test fails.
   CTest :: [(String, Type, Name Core)] -> Core -> Core
 

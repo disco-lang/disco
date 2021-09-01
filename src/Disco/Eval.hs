@@ -28,7 +28,7 @@ module Disco.Eval
 
        , runDisco
        , runTCM, runTCMWith
-       , withTopEnv
+       , withTopEnv, inputTopEnv
        , parseDiscoModule
        , typecheckDisco
 
@@ -195,6 +195,12 @@ withTopEnv :: Member (Input TopInfo) r => Sem (Reader Env ': r) a -> Sem r a
 withTopEnv m = do
   e <- inputs (view topEnv)
   runReader e m
+
+-- | XXX
+inputTopEnv :: Member (Input TopInfo) r => Sem (Input Env ': r) a -> Sem r a
+inputTopEnv m = do
+  e <- inputs (view topEnv)
+  runInputConst e m
 
 ------------------------------------------------------------
 -- High-level disco phases
@@ -380,5 +386,8 @@ loadDefs
   :: Members '[Reader Env, State TopInfo, Error EvalError] r
   => Ctx Core Core -> Sem r ()
 loadDefs defs = do
-  newEnv <- mapM eval defs
+  -- XXX need to allow these to be recursive!
+  -- Do a big "fix" at the beginning?  I forget how I figured out that
+  -- could work...
+  newEnv <- inputToState . inputTopEnv $ mapM eval defs
   modify @TopInfo $ topEnv %~ joinCtx newEnv

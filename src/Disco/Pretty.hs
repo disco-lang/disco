@@ -428,10 +428,10 @@ prettyValue :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
 prettyValue TyUnit VUnit                     = "■"
 prettyValue TyProp _                         = prettyPlaceholder TyProp
 prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
-prettyValue TyC (vchar -> c)                 = text [c]
+prettyValue TyC (vchar -> c)                 = text (show c)
 prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
   where
-    prettyChar = drop 1 . reverse . drop 1 . reverse . show
+    prettyChar = drop 1 . reverse . drop 1 . reverse . show . (:[])
 prettyValue (TyList ty) (vlist id -> xs)     = do
   ds <- punctuate (text ",") (map (prettyValue ty) xs)
   brackets (hsep ds)
@@ -448,7 +448,7 @@ prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 
 prettyValue ty VUnit          = undefined
 prettyValue ty (VPair va va') = undefined
-prettyValue ty (VClo map bi)  = undefined
+prettyValue ty (VClo map xs bi) = undefined
 prettyValue ty (VType ty')    = undefined
 prettyValue ty (VRef n)       = undefined
 prettyValue ty (VFun_ vf)     = undefined

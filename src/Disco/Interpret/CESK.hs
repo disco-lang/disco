@@ -32,12 +32,13 @@ import           Math.NumberTheory.Primes.Testing   (isPrime)
 
 import           Polysemy
 import           Polysemy.Error
-import           Unbound.Generics.LocallyNameless   (Bind, Name)
+import           Unbound.Generics.LocallyNameless   (Bind, Name, bind)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Side (..), selectSide)
 import           Disco.AST.Typed                    (AProperty)
 import           Disco.Effects.Fresh
+import           Disco.Effects.Input
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Types                        hiding (V)
@@ -95,14 +96,15 @@ data Frame
 
   -- | Update the contents of a memory cell with its evaluation.
   | FUpdate Int
+  deriving Show
 
 ------------------------------------------------------------
 -- Memory
 ------------------------------------------------------------
 
 -- | 'Mem' represents a memory, containing 'Cell's
-data Mem = Mem { next :: Int, mu :: IntMap Cell }
-data Cell = Blackhole | E Env Core | V Value
+data Mem = Mem { next :: Int, mu :: IntMap Cell } deriving Show
+data Cell = Blackhole | E Env Core | V Value deriving Show
 
 emptyMem :: Mem
 emptyMem = Mem 0 IM.empty
@@ -144,6 +146,7 @@ data CESK
   --   (and sometimes on the value as well), to see what is to be done
   --   with the value.
   | Out Value Mem Cont
+  deriving Show
 
 -- | Is the CESK machine in a final state?
 isFinal :: CESK -> Maybe Value
@@ -156,9 +159,14 @@ runCESK cesk = case isFinal cesk of
   Just v  -> return v
   Nothing -> step cesk >>= runCESK
 
+(!!!) :: (Ord k, Show k) => Map k v -> k -> v
+m !!! k = case M.lookup k m of
+  Nothing -> error $ "variable not found in environment: " ++ show k
+  Just v  -> v
+
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError] r => CESK -> Sem r CESK
-step (In (CVar x) e m k)                   = return $ Out (e!x) m k
+step (In (CVar x) e m k)                   = return $ Out (e!!!x) m k
 step (In (CNum d r) _ m k)                 = return $ Out (VNum d r) m k
 step (In (CConst op) _ m k)                = return $ Out (VConst op) m k
 step (In (CInj s c) e m k)                 = return $ In c e m (FInj s : k)
@@ -166,7 +174,9 @@ step (In (CCase c b1 b2) e m k)            = return $ In c e m (FCase e b1 b2 : 
 step (In CUnit _ m k)                      = return $ Out VUnit m k
 step (In (CPair c1 c2) e m k)              = return $ In c1 e m (FPairR e c2 : k)
 step (In (CProj s c) e m k)                = return $ In c e m (FProj s : k)
-step (In (CAbs b) e m k)                   = return $ Out (VClo e b) m k
+step (In (CAbs b) e m k)                   = do
+  (xs, body) <- unbind b
+  return $ Out (VClo e xs body) m k
 step (In (CApp c1 c2) e m k)               = return $ In c1 e m (FArg e c2 : k)
 step (In (CType ty) _ m k)                 = return $ Out (VType ty) m k
 step (In (CDelay b) e m k)                 = do
@@ -186,12 +196,8 @@ step (Out v1 m (FPairR e c2 : k))          = return $ In c2 e m (FPairL v1 : k)
 step (Out v2 m (FPairL v1 : k))            = return $ Out (VPair v1 v2) m k
 step (Out (VPair v1 v2) m (FProj s : k))   = return $ Out (selectSide s v1 v2) m k
 step (Out v m (FArg e c2 : k))             = return $ In c2 e m (FApp v : k)
-step (Out v2 m (FApp (VClo e b) : k))      = do
-  -- Any closure we are evaluating here must have a single argument.
-  -- Multi-argument CAbs terms are only used for quantifiers.
-  (xs,c1) <- unbind b
-  let [x] = xs
-  return $ In c1 (M.insert x v2 e) m k
+step (Out v2 m (FApp (VClo e [x] b) : k))  = return $ In b (M.insert x v2 e) m k
+step (Out v2 m (FApp (VClo e (x:xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) m k
 step (Out v2 m (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure m <*> pure k
 step (Out (VRef n) m (FForce : k))         =
   case lkup n m of
@@ -269,8 +275,7 @@ appConst OFact                              = numOp1' factOp
     factOp (numerator -> n)
       | n > fromIntegral (maxBound :: Int) = throw Overflow
       | otherwise = return . intv $ factorial (fromIntegral n)
-appConst (OEq ty)                          = arity2 $ \v1 v2 -> enumv <$> valEq ty v1 v2
-appConst (OLt ty)                          = arity2 $ \v1 v2 -> enumv <$> valLt ty v1 v2
+
 appConst OEnum                             = return . enumOp
   where
     enumOp :: Value -> Value
@@ -285,10 +290,44 @@ appConst OCount                             = return . countOp
       Nothing  -> VNil
     countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
--- appConst OSize                              = _wu
+--------------------------------------------------
+-- Graphs
+
+--------------------------------------------------
+-- Maps
+
+--------------------------------------------------
+-- Comparison
+
+appConst (OEq ty)                          = arity2 $ \v1 v2 -> enumv <$> valEq ty v1 v2
+appConst (OLt ty)                          = arity2 $ \v1 v2 -> enumv <$> valLt ty v1 v2
+
+--------------------------------------------------
+-- Container operations
+
+appConst OSize                              = return . sizeOp
+  where
+    sizeOp (VBag xs) = intv (sum (map snd xs))
+
 -- appConst (OPower ty)                        = _wv
 -- appConst (OBagElem ty)                      = _ww
 -- appConst (OListElem ty)                     = _wx
+
+--------------------------------------------------
+-- Container conversions
+
+-- appConst OBagToSet                          = return .
+-- appConst OSetToList                         = _wT
+-- appConst OBagToList                         = _wV
+-- appConst (OListToSet ty)                    = _wW
+-- appConst (OListToBag ty)                    = _wX
+-- appConst OBagToCounts                       = _wY
+-- appConst (OCountsToBag ty)                  = _wZ
+-- appConst (OMapToSet ty ty')                 = _w10
+-- appConst OSetToMap                          = _w11
+
+--------------------------------------------------
+
 -- appConst OEachList                          = _wy
 -- appConst (OEachBag ty)                      = _wz
 -- appConst (OEachSet ty)                      = _wA
@@ -310,15 +349,6 @@ appConst OCount                             = return . countOp
 -- appConst OLookup                            = _wQ
 -- appConst OForever                           = _wR
 -- appConst OUntil                             = _wS
--- appConst OSetToList                         = _wT
--- appConst OBagToSet                          = _wU
--- appConst OBagToList                         = _wV
--- appConst (OListToSet ty)                    = _wW
--- appConst (OListToBag ty)                    = _wX
--- appConst OBagToCounts                       = _wY
--- appConst (OCountsToBag ty)                  = _wZ
--- appConst (OMapToSet ty ty')                 = _w10
--- appConst OSetToMap                          = _w11
 -- appConst OIsPrime                           = _w12
 -- appConst OFactor                            = _w13
 -- appConst OFrac                              = _w14
@@ -328,7 +358,9 @@ appConst OCount                             = return . countOp
 -- appConst ONotProp                           = _w18
 -- appConst (OShouldEq ty)                     = _w19
 -- appConst OMatchErr                          = _w1a
--- appConst OCrash                             = _w1b
+
+appConst OCrash                                = throw . Crash . vlist vchar
+
 -- appConst OId                                = _w1c
 -- appConst OLookupSeq                         = _w1d
 -- appConst OExtendSeq                         = _w1e
@@ -458,5 +490,7 @@ runTest n p = undefined
 -- XXX
 ------------------------------------------------------------
 
-eval :: Members '[Error EvalError] r => Core -> Sem r Value
-eval c = runFresh $ runCESK (In c M.empty emptyMem [])
+eval :: Members '[Error EvalError, Input Env] r => Core -> Sem r Value
+eval c = do
+  e <- input @Env
+  runFresh $ runCESK (In c e emptyMem [])

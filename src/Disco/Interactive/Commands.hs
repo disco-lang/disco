@@ -350,7 +350,7 @@ handleEval (Eval m) = inputToState $ do
 
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  v <- eval (compileTerm at)
+  v <- inputToState . inputTopEnv $ eval (compileTerm at)
   s <- renderDoc $ prettyValue ty v
   outputLn s
 

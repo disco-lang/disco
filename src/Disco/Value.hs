@@ -115,7 +115,7 @@ data Value where
 
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo     :: Env -> Bind [Name Core] Core -> Value
+  VClo     :: Env -> [Name Core] -> Core -> Value
 
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in

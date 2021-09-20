@@ -157,17 +157,8 @@ mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 -- Definition desugaring
 ------------------------------------------------------------
 
--- | Desugar a definition (of the form @f pat1 .. patn = term@, but
---   without the name @f@ of the thing being defined) into a core
---   language term.  Each pattern desugars to an anonymous function,
---   appropriately combined with a case expression for non-variable
---   patterns.
---
---   For example, @f n (x,y) = n*x + y@ desugars to something like
---
---   @
---     n -> p -> { n*x + y  when p = (x,y)
---   @
+-- | Desugar a definition (consisting of a collection of pattern
+--   clauses with bodies) into a core language term.
 desugarDefn :: Member Fresh r => Defn -> Sem r DTerm
 desugarDefn (Defn _ patTys bodyTy def) =
   desugarAbs Lam (foldr (:->:) bodyTy patTys) def

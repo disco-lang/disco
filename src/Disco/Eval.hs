@@ -372,7 +372,7 @@ populateCurrentModuleInfo
   => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
-  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
+  let cdefns = M.mapKeys coerce $ M.mapWithKey compileDefn tmds
   modify @TopInfo $
     (topDocs   .~ docs) .
     (topCtx    .~ tys)  .
@@ -387,7 +387,9 @@ loadDefs
   => Ctx Core Core -> Sem r ()
 loadDefs defs = do
   -- XXX need to allow these to be recursive!
-  -- Do a big "fix" at the beginning?  I forget how I figured out that
-  -- could work...
+  -- For single recursive things, we can take care of them during compile time.
+  --  f = body   compiles to   f = force (delay f. (subst f (force f) body))
+  --
+  -- For mutually recursive groups, we need some special support here.
   newEnv <- inputToState . inputTopEnv $ mapM eval defs
   modify @TopInfo $ topEnv %~ joinCtx newEnv

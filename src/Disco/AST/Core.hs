@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
@@ -22,6 +24,7 @@ module Disco.AST.Core
        )
        where
 
+import           Data.Coerce
 import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
@@ -31,7 +34,7 @@ import           Disco.Types
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Generic, Ord, Alpha)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -101,7 +104,22 @@ data Core where
   -- | Force evaluation of a lazy value.
   CForce :: Core -> Core
 
-  deriving (Show, Generic)
+  deriving (Show, Generic, Alpha)
+
+instance Subst Core Atom
+instance Subst Core Con
+instance Subst Core Var
+instance Subst Core Ilk
+instance Subst Core BaseTy
+instance Subst Core Type
+instance Subst Core Op
+instance Subst Core RationalDisplay
+instance Subst Core Rational where
+  subst _ _ = id
+  substs _  = id
+instance Subst Core Core where
+  isvar (CVar x) = Just (SubstName (coerce x))
+  isvar _        = Nothing
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
@@ -208,7 +226,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OLookupSeq      -- ^ Lookup OEIS sequence
         | OExtendSeq      -- ^ Extend a List via OEIS
 
-  deriving (Show, Generic)
+  deriving (Show, Generic, Alpha)
 
 -- | Get the arity (desired number of arguments) of a function
 --   constant.  A few constants have arity 0; everything else is
@@ -268,7 +286,3 @@ opArity _               = 1
 -- opArity OFactor          = 1
 -- opArity OCrash           = 1
 -- opArity OId              = 1
-
-instance Alpha RationalDisplay
-instance Alpha Core
-instance Alpha Op

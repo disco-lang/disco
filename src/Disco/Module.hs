@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
@@ -28,7 +29,7 @@ import qualified Data.Set                         as S
 import           System.Directory                 (doesFileExist)
 import           System.FilePath                  (replaceExtension, (</>))
 
-import           Unbound.Generics.LocallyNameless (Bind, Name, Subst)
+import           Unbound.Generics.LocallyNameless (Alpha, Bind, Name, Subst)
 
 import           Polysemy
 import           Polysemy.Error
@@ -63,7 +64,7 @@ data LoadingMode = REPL | Standalone
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
 data Defn  = Defn (Name ATerm) [Type] Type [Clause]
-  deriving (Show, Generic)
+  deriving (Show, Generic, Alpha)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete

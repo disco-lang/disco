@@ -31,11 +31,13 @@ import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
+import qualified Data.Set                         as S
+import           Data.Set.Lens                    (setOf)
 
 import           Disco.Effects.Fresh
 import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
-                                                   unembed)
+import           Unbound.Generics.LocallyNameless (Name, bind, fv, string2Name,
+                                                   subst, unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -53,8 +55,14 @@ compileTerm = compileThing desugarTerm
 
 -- | Compile a typechecked definition ('Defn') directly to a 'Core' term,
 --   by desugaring and then compiling.
-compileDefn :: Defn -> Core
-compileDefn = compileThing desugarDefn
+compileDefn :: Name ATerm -> Defn -> Core
+compileDefn x defn
+  | x `S.member` setOf fv defn = CForce (CDelay (bind x' (subst x' (CForce (CVar x')) cdefn)))
+  | otherwise = cdefn
+  where
+    x' :: Name Core
+    x' = coerce x
+    cdefn = compileThing desugarDefn defn
 
 -- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
 --   by desugaring and then compilling.

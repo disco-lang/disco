@@ -18,6 +18,8 @@ module Disco.Interpret.CESK
   , runTest
   ) where
 
+import           Debug.Trace
+
 import           Control.Arrow                      ((***))
 import           Data.IntMap                        (IntMap)
 import qualified Data.IntMap                        as IM
@@ -199,7 +201,8 @@ step (Out v m (FArg e c2 : k))             = return $ In c2 e m (FApp v : k)
 step (Out v2 m (FApp (VClo e [x] b) : k))  = return $ In b (M.insert x v2 e) m k
 step (Out v2 m (FApp (VClo e (x:xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) m k
 step (Out v2 m (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure m <*> pure k
-step (Out (VRef n) m (FForce : k))         =
+step (Out (VRef n) m (FForce : k))         = do
+  traceShowM (n, m, k)
   case lkup n m of
     Nothing        -> undefined  -- XXX ?
     Just (V v)     -> return $ Out v m k

@@ -345,7 +345,7 @@ loadFile file = do
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addModule
-  :: Members '[Error DiscoError, State TopInfo, Reader Env, Error EvalError] r
+  :: Members '[Error DiscoError, State TopInfo, Reader Env, Error EvalError, State Mem] r
   => LoadingMode -> ModuleInfo -> Sem r ()
 addModule mode mi = do
   curMI <- gets @TopInfo (view topModInfo)
@@ -357,7 +357,7 @@ addModule mode mi = do
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setLoadedModule
-  :: Members '[State TopInfo, Reader Env, Error EvalError] r
+  :: Members '[State TopInfo, Reader Env, Error EvalError, State Mem] r
   => ModuleInfo -> Sem r ()
 setLoadedModule mi = do
   modify @TopInfo $ topModInfo .~ mi
@@ -368,7 +368,7 @@ setLoadedModule mi = do
 --   corresponding to the currently loaded module, and load all the
 --   definitions into the current top-level environment.
 populateCurrentModuleInfo
-  :: Members '[State TopInfo, Reader Env, Error EvalError] r
+  :: Members '[State TopInfo, Reader Env, Error EvalError, State Mem] r
   => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
@@ -383,7 +383,7 @@ populateCurrentModuleInfo = do
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.
 loadDefs
-  :: Members '[Reader Env, State TopInfo, Error EvalError] r
+  :: Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r
   => Ctx Core Core -> Sem r ()
 loadDefs defs = do
   -- XXX need to allow these to be recursive!

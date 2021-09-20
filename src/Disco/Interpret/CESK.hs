@@ -13,7 +13,9 @@
 -----------------------------------------------------------------------------
 
 module Disco.Interpret.CESK
-  ( CESK, runCESK, step, eval
+  ( Mem
+
+  , CESK, runCESK, step, eval
 
   , runTest
   ) where
@@ -32,15 +34,17 @@ import           Math.Combinatorics.Exact.Factorial (factorial)
 import           Math.NumberTheory.Primes           (factorise, unPrime)
 import           Math.NumberTheory.Primes.Testing   (isPrime)
 
+import           Disco.Effects.Fresh
+import           Disco.Effects.Input
 import           Polysemy
 import           Polysemy.Error
+import           Polysemy.State
+
 import           Unbound.Generics.LocallyNameless   (Bind, Name, bind)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Side (..), selectSide)
 import           Disco.AST.Typed                    (AProperty)
-import           Disco.Effects.Fresh
-import           Disco.Effects.Input
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Types                        hiding (V)
@@ -114,16 +118,26 @@ emptyMem = Mem 0 IM.empty
 -- | Allocate a new memory cell containing an unevaluated expression
 --   with the current environment.  Return the updated memory and the
 --   index of the allocated cell.
-allocate :: Env -> Core -> Mem -> (Mem, Int)
-allocate e t (Mem n m) = (Mem (n+1) (IM.insert n (E e t) m), n)
+allocate :: Members '[State Mem] r => Env -> Core -> Sem r Int
+allocate e t = do
+  Mem n m <- get
+  put $ Mem (n+1) (IM.insert n (E e t) m)
+  return n
+
+-- | XXX
+allocateRec :: Members '[State Mem] r => Name Core -> Env -> Core -> Sem r Int
+allocateRec x e c = do
+  Mem n m <- get
+  put $ Mem (n+1) (IM.insert n (E (M.insert x (VRef n) e) c) m)
+  return n
 
 -- | Look up the cell at a given index.
-lkup :: Int -> Mem -> Maybe Cell
-lkup n (Mem _ m) = IM.lookup n m
+lkup :: Members '[State Mem] r => Int -> Sem r (Maybe Cell)
+lkup n = gets (IM.lookup n . mu)
 
 -- | Set the cell at a given index.
-set :: Int -> Cell -> Mem -> Mem
-set n c (Mem nxt m) = Mem nxt (IM.insert n c m)
+set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
+set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
 
 ------------------------------------------------------------
 -- The CESK machine
@@ -139,7 +153,7 @@ data CESK
   --   or focusing on a subexpression and pushing a new frame on the
   --   continuation stack indicating how to continue evaluating the
   --   whole expression once finished with the subexpression.
-  = In Core Env Mem Cont
+  = In Core Env Cont
 
   -- | The 'Out' constructor represents the state when we have
   --   completed evaluating an expression and are now on our way back
@@ -147,19 +161,21 @@ data CESK
   --   pattern-matching on the top frame of the continuation stack
   --   (and sometimes on the value as well), to see what is to be done
   --   with the value.
-  | Out Value Mem Cont
+  | Out Value Cont
   deriving Show
 
 -- | Is the CESK machine in a final state?
 isFinal :: CESK -> Maybe Value
-isFinal (Out v _ []) = Just v
-isFinal _            = Nothing
+isFinal (Out v []) = Just v
+isFinal _          = Nothing
 
 -- | Run a CESK machine to completion.
-runCESK :: Members '[Fresh, Error EvalError] r => CESK -> Sem r Value
+runCESK :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r Value
 runCESK cesk = case isFinal cesk of
-  Just v  -> return v
-  Nothing -> step cesk >>= runCESK
+  Just vm -> return vm
+  Nothing -> do
+    traceShowM cesk
+    step cesk >>= runCESK
 
 (!!!) :: (Ord k, Show k) => Map k v -> k -> v
 m !!! k = case M.lookup k m of
@@ -167,48 +183,52 @@ m !!! k = case M.lookup k m of
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
-step :: Members '[Fresh, Error EvalError] r => CESK -> Sem r CESK
-step (In (CVar x) e m k)                   = return $ Out (e!!!x) m k
-step (In (CNum d r) _ m k)                 = return $ Out (VNum d r) m k
-step (In (CConst op) _ m k)                = return $ Out (VConst op) m k
-step (In (CInj s c) e m k)                 = return $ In c e m (FInj s : k)
-step (In (CCase c b1 b2) e m k)            = return $ In c e m (FCase e b1 b2 : k)
-step (In CUnit _ m k)                      = return $ Out VUnit m k
-step (In (CPair c1 c2) e m k)              = return $ In c1 e m (FPairR e c2 : k)
-step (In (CProj s c) e m k)                = return $ In c e m (FProj s : k)
-step (In (CAbs b) e m k)                   = do
+step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
+step (In (CVar x) e k)                   = return $ Out (e!!!x) k
+step (In (CNum d r) _ k)                 = return $ Out (VNum d r) k
+step (In (CConst op) _ k)                = return $ Out (VConst op) k
+step (In (CInj s c) e k)                 = return $ In c e (FInj s : k)
+step (In (CCase c b1 b2) e k)            = return $ In c e (FCase e b1 b2 : k)
+step (In CUnit _ k)                      = return $ Out VUnit k
+step (In (CPair c1 c2) e k)              = return $ In c1 e (FPairR e c2 : k)
+step (In (CProj s c) e k)                = return $ In c e (FProj s : k)
+step (In (CAbs b) e k)                   = do
   (xs, body) <- unbind b
-  return $ Out (VClo e xs body) m k
-step (In (CApp c1 c2) e m k)               = return $ In c1 e m (FArg e c2 : k)
-step (In (CType ty) _ m k)                 = return $ Out (VType ty) m k
-step (In (CDelay b) e m k)                 = do
+  return $ Out (VClo e xs body) k
+step (In (CApp c1 c2) e k)               = return $ In c1 e (FArg e c2 : k)
+step (In (CType ty) _ k)                 = return $ Out (VType ty) k
+step (In (CDelay b) e k)                 = do
   (x, c) <- unbind b
-  let (m', loc) = allocate (M.insert x (VRef loc) e) c m
-  return $ Out (VRef loc) m' k
-step (In (CForce c) e m k)                 = return $ In c e m (FForce : k)
+  loc <- allocateRec x e c
+  return $ Out (VRef loc) k
+step (In (CForce c) e k)                 = return $ In c e (FForce : k)
 
-step (Out v m (FInj s : k))                = return $ Out (VInj s v) m k
-step (Out (VInj L v) m (FCase e b1 _ : k)) = do
+step (Out v (FInj s : k))                = return $ Out (VInj s v) k
+step (Out (VInj L v) (FCase e b1 _ : k)) = do
   (x,c1) <- unbind b1
-  return $ In c1 (M.insert x v e) m k
-step (Out (VInj R v) m (FCase e _ b2 : k)) = do
+  return $ In c1 (M.insert x v e) k
+step (Out (VInj R v) (FCase e _ b2 : k)) = do
   (x,c2) <- unbind b2
-  return $ In c2 (M.insert x v e) m k
-step (Out v1 m (FPairR e c2 : k))          = return $ In c2 e m (FPairL v1 : k)
-step (Out v2 m (FPairL v1 : k))            = return $ Out (VPair v1 v2) m k
-step (Out (VPair v1 v2) m (FProj s : k))   = return $ Out (selectSide s v1 v2) m k
-step (Out v m (FArg e c2 : k))             = return $ In c2 e m (FApp v : k)
-step (Out v2 m (FApp (VClo e [x] b) : k))  = return $ In b (M.insert x v2 e) m k
-step (Out v2 m (FApp (VClo e (x:xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) m k
-step (Out v2 m (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure m <*> pure k
-step (Out (VRef n) m (FForce : k))         = do
-  traceShowM (n, m, k)
-  case lkup n m of
+  return $ In c2 (M.insert x v e) k
+step (Out v1 (FPairR e c2 : k))          = return $ In c2 e (FPairL v1 : k)
+step (Out v2 (FPairL v1 : k))            = return $ Out (VPair v1 v2) k
+step (Out (VPair v1 v2) (FProj s : k))   = return $ Out (selectSide s v1 v2) k
+step (Out v (FArg e c2 : k))             = return $ In c2 e (FApp v : k)
+step (Out v2 (FApp (VClo e [x] b) : k))  = return $ In b (M.insert x v2 e) k
+step (Out v2 (FApp (VClo e (x:xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) k
+step (Out v2 (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure k
+step (Out (VRef n) (FForce : k))         = do
+  cell <- lkup n
+  case cell of
     Nothing        -> undefined  -- XXX ?
-    Just (V v)     -> return $ Out v m k
-    Just (E e t)   -> return $ In t e (set n Blackhole m) (FUpdate n : k)
+    Just (V v)     -> return $ Out v k
+    Just (E e t)   -> do
+      set n Blackhole
+      return $ In t e (FUpdate n : k)
     Just Blackhole -> error "Infinite loop detected!"  -- XXX make a real error
-step (Out v m (FUpdate n : k))             = return $ Out v (set n (V v) m) k
+step (Out v (FUpdate n : k))             = do
+  set n (V v)
+  return $ Out v k
 
 ------------------------------------------------------------
 -- Interpreting constants
@@ -493,7 +513,7 @@ runTest n p = undefined
 -- XXX
 ------------------------------------------------------------
 
-eval :: Members '[Error EvalError, Input Env] r => Core -> Sem r Value
+eval :: Members '[Error EvalError, Input Env, State Mem] r => Core -> Sem r Value
 eval c = do
   e <- input @Env
-  runFresh $ runCESK (In c e emptyMem [])
+  runFresh $ runCESK (In c e [])

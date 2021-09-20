@@ -411,12 +411,12 @@ loadCmd = REPLCommand
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r
   => REPLExpr 'CLoad -> Sem r ()
 handleLoadWrapper (Load fp) =  void (handleLoad fp)
 
 handleLoad
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r
   => FilePath -> Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp

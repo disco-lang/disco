@@ -548,7 +548,7 @@ reloadCmd = REPLCommand
   }
 
 handleReload
-  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r
   => REPLExpr 'CReload -> Sem r ()
 handleReload Reload = do
   file <- gets (view lastFile)

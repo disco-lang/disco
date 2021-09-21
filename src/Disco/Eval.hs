@@ -175,6 +175,7 @@ runDisco
   . runOutputSem (embed . putStr)  -- Handle Output String via printing to console
   . stateToIO initTopInfo    -- Run State TopInfo via an IORef
   . inputToState             -- Dispatch Input TopInfo effect via State effect
+  . runState emptyMem
   . outputDiscoErrors        -- Output any top-level errors
   -- . runOutputSem (embed . putStrLn . unDebug)   -- debugging mode
   . ignoreOutput @Debug      -- non-debugging mode: ignore Debug output
@@ -387,8 +388,10 @@ loadDefs
   => Ctx Core Core -> Sem r ()
 loadDefs defs = do
   -- XXX need to allow these to be recursive!
-  -- For single recursive things, we can take care of them during compile time.
-  --  f = body   compiles to   f = force (delay f. (subst f (force f) body))
+  --
+  -- Need to evaluate them in topsort order?
+  --
+  -- Seems to be something else going wrong too.
   --
   -- For mutually recursive groups, we need some special support here.
   newEnv <- inputToState . inputTopEnv $ mapM eval defs

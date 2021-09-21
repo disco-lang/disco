@@ -13,14 +13,10 @@
 -----------------------------------------------------------------------------
 
 module Disco.Interpret.CESK
-  ( Mem
-
-  , CESK, runCESK, step, eval
+  ( CESK, runCESK, step, eval
 
   , runTest
   ) where
-
-import           Debug.Trace
 
 import           Control.Arrow                      ((***))
 import           Data.IntMap                        (IntMap)
@@ -105,41 +101,6 @@ data Frame
   deriving Show
 
 ------------------------------------------------------------
--- Memory
-------------------------------------------------------------
-
--- | 'Mem' represents a memory, containing 'Cell's
-data Mem = Mem { next :: Int, mu :: IntMap Cell } deriving Show
-data Cell = Blackhole | E Env Core | V Value deriving Show
-
-emptyMem :: Mem
-emptyMem = Mem 0 IM.empty
-
--- | Allocate a new memory cell containing an unevaluated expression
---   with the current environment.  Return the updated memory and the
---   index of the allocated cell.
-allocate :: Members '[State Mem] r => Env -> Core -> Sem r Int
-allocate e t = do
-  Mem n m <- get
-  put $ Mem (n+1) (IM.insert n (E e t) m)
-  return n
-
--- | XXX
-allocateRec :: Members '[State Mem] r => Name Core -> Env -> Core -> Sem r Int
-allocateRec x e c = do
-  Mem n m <- get
-  put $ Mem (n+1) (IM.insert n (E (M.insert x (VRef n) e) c) m)
-  return n
-
--- | Look up the cell at a given index.
-lkup :: Members '[State Mem] r => Int -> Sem r (Maybe Cell)
-lkup n = gets (IM.lookup n . mu)
-
--- | Set the cell at a given index.
-set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
-set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
-
-------------------------------------------------------------
 -- The CESK machine
 ------------------------------------------------------------
 
@@ -173,9 +134,7 @@ isFinal _          = Nothing
 runCESK :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r Value
 runCESK cesk = case isFinal cesk of
   Just vm -> return vm
-  Nothing -> do
-    traceShowM cesk
-    step cesk >>= runCESK
+  Nothing -> step cesk >>= runCESK
 
 (!!!) :: (Ord k, Show k) => Map k v -> k -> v
 m !!! k = case M.lookup k m of

@@ -54,6 +54,7 @@ module Disco.Value
 import           Data.Char                        (chr)
 import           Data.IntMap                      (IntMap)
 import qualified Data.IntMap                      as IM
+import           Data.List                        (foldl')
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Ratio
@@ -75,7 +76,7 @@ import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
-import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
+import           Unbound.Generics.LocallyNameless (AnyName (..), Name)
 
 ------------------------------------------------------------
 -- Evaluation effects
@@ -373,20 +374,25 @@ emptyMem :: Mem
 emptyMem = Mem 0 IM.empty
 
 -- | Allocate a new memory cell containing an unevaluated expression
---   with the current environment.  Return the updated memory and the
---   index of the allocated cell.
+--   with the current environment.  Return the index of the allocated
+--   cell.
 allocate :: Members '[State Mem] r => Env -> Core -> Sem r Int
 allocate e t = do
   Mem n m <- get
   put $ Mem (n+1) (IM.insert n (E e t) m)
   return n
 
--- | XXX
-allocateRec :: Members '[State Mem] r => Name Core -> Env -> Core -> Sem r Int
-allocateRec x e c = do
+-- | Allocate new memory cells for a group of mutually recursive
+--   bindings, and return the indices of the allocate cells.
+allocateRec :: Members '[State Mem] r => Env -> [(Name Core, Core)] -> Sem r [Int]
+allocateRec e bs = do
   Mem n m <- get
-  put $ Mem (n+1) (IM.insert n (E (M.insert x (VRef n) e) c) m)
-  return n
+  let new = zip [n ..] bs
+      e' = foldl' (flip (\(i,(x,_)) -> M.insert x (VRef i))) e new
+      m' = foldl' (flip (\(i,(_,c)) -> IM.insert i (E e' c))) m new
+      n' = n + length bs
+  put $ Mem n' m'
+  return [n .. n'-1]
 
 -- | Look up the cell at a given index.
 lkup :: Members '[State Mem] r => Int -> Sem r (Maybe Cell)

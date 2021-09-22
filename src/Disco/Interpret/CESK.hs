@@ -19,9 +19,7 @@ module Disco.Interpret.CESK
   ) where
 
 import           Control.Arrow                      ((***))
-import           Data.IntMap                        (IntMap)
-import qualified Data.IntMap                        as IM
-import           Data.Map                           (Map, (!))
+import           Data.Map                           (Map)
 import qualified Data.Map                           as M
 import           Data.Ratio
 
@@ -36,7 +34,7 @@ import           Polysemy
 import           Polysemy.Error
 import           Polysemy.State
 
-import           Unbound.Generics.LocallyNameless   (Bind, Name, bind)
+import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Side (..), selectSide)
@@ -141,6 +139,10 @@ m !!! k = case M.lookup k m of
   Nothing -> error $ "variable not found in environment: " ++ show k
   Just v  -> v
 
+mkTuple :: [Value] -> Value
+mkTuple []     = VUnit
+mkTuple (v:vs) = VPair v (mkTuple vs)
+
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
 step (In (CVar x) e k)                   = return $ Out (e!!!x) k
@@ -157,9 +159,9 @@ step (In (CAbs b) e k)                   = do
 step (In (CApp c1 c2) e k)               = return $ In c1 e (FArg e c2 : k)
 step (In (CType ty) _ k)                 = return $ Out (VType ty) k
 step (In (CDelay b) e k)                 = do
-  (x, c) <- unbind b
-  loc <- allocateRec x e c
-  return $ Out (VRef loc) k
+  (xs, cs) <- unbind b
+  locs <- allocateRec e (zip xs cs)
+  return $ Out (mkTuple (map VRef locs)) k
 step (In (CForce c) e k)                 = return $ In c e (FForce : k)
 
 step (Out v (FInj s : k))                = return $ Out (VInj s v) k
@@ -188,6 +190,7 @@ step (Out (VRef n) (FForce : k))         = do
 step (Out v (FUpdate n : k))             = do
   set n (V v)
   return $ Out v k
+step c = error $ "step " ++ show c
 
 ------------------------------------------------------------
 -- Interpreting constants

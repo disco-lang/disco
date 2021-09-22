@@ -22,22 +22,26 @@ import           Disco.Desugar
 import           Disco.Module
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
+import qualified Disco.Typecheck.Graph            as G
 import           Disco.Types
 import           Disco.Util
 
+import           Control.Arrow                    ((&&&))
 import           Control.Monad                    ((<=<))
 import           Data.Bool                        (bool)
 import           Data.Coerce
 import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
+import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Set.Lens                    (setOf)
 
+import           Disco.Context                    (Ctx)
 import           Disco.Effects.Fresh
 import           Polysemy                         (Member, Sem, run)
 import           Unbound.Generics.LocallyNameless (Name, bind, fv, string2Name,
-                                                   subst, unembed)
+                                                   subst, substs, unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -53,21 +57,83 @@ compileThing desugarThing = run . runFresh . (compileDTerm <=< desugarThing)
 compileTerm :: ATerm -> Core
 compileTerm = compileThing desugarTerm
 
--- | Compile a typechecked definition ('Defn') directly to a 'Core' term,
---   by desugaring and then compiling.
-compileDefn :: Name ATerm -> Defn -> Core
-compileDefn x defn
-  | x `S.member` setOf fv defn = CForce (CDelay (bind x' (subst x' (CForce (CVar x')) cdefn)))
-  | otherwise = cdefn
+-- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
+--   by desugaring and then compilling.
+compileProperty :: AProperty -> Core
+compileProperty = compileThing desugarProperty
+
+------------------------------------------------------------
+-- Compiling definitions
+------------------------------------------------------------
+
+-- | Compile a context of typechecked definitions ('Defn') to a
+--   sequence of compiled 'Core' bindings, such that the body of each
+--   binding depends only on previous ones in the list.  First
+--   topologically sorts the definitions into mutually recursive
+--   groups, then compiles recursive definitions specially in terms of
+--   'delay' and 'force'.
+compileDefns :: Ctx ATerm Defn -> [(Name Core, Core)]
+compileDefns defs = run . runFresh $ do
+  let vars = M.keysSet defs
+
+      -- Get a list of pairs of the form (y,x) where x uses y in its definition.
+      -- We want them in the order (y,x) since y needs to be evaluated before x.
+      -- These will be the edges in our dependency graph.
+      deps = S.unions . map (\(x,body) -> S.map (,x) (setOf fv body)) . M.assocs $ defs
+
+      -- Do a topological sort of the condensation of the dependency
+      -- graph.  Each SCC corresponds to a group of mutually recursive
+      -- definitions; each such group depends only on groups that come
+      -- before it in the topsort.
+      defnGroups :: [Set (Name ATerm)]
+      defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
+
+  concat <$> mapM (compileDefnGroup . M.assocs . M.restrictKeys defs) defnGroups
+
+-- | XXX
+compileDefnGroup :: Member Fresh r => [(Name ATerm, Defn)] -> Sem r [(Name Core, Core)]
+compileDefnGroup [(x, defn)]
+
+  -- A recursive definition f = body compiles to
+  -- f = force (delay f. [force f / f] body).
+  | x `S.member` setOf fv defn
+  = return [(x', CForce (CProj L (CDelay (bind [x'] [subst x' (CForce (CVar x')) cdefn]))))]
+
+  -- A non-recursive definition just compiles simply.
+  | otherwise
+  = return [(x', cdefn)]
+
   where
     x' :: Name Core
     x' = coerce x
     cdefn = compileThing desugarDefn defn
 
--- | Compile a typechecked property ('AProperty') directly to a 'Core' term,
---   by desugaring and then compilling.
-compileProperty :: AProperty -> Core
-compileProperty = compileThing desugarProperty
+-- A group of mutually recursive definitions  {f = fbody, g = gbody, ...}
+-- compiles to
+--   { _grp = delay f g ... . (forceVars fbody, forceVars gbody, ...)
+--   , f = fst (force _grp)
+--   , g = snd (force _grp)
+--   , ...
+--   }
+--
+-- where forceVars is the substitution [force f / f, force g / g, ...]
+
+compileDefnGroup defs = do
+  grp <- fresh (string2Name "__grp")
+  let (vars, bodies) = unzip defs
+      vars' :: [Name Core]
+      vars' = coerce vars
+      forceVars :: [(Name Core, Core)]
+      forceVars = map (id &&& CForce . CVar) vars'
+      bodies' :: [Core]
+      bodies' = (map (substs forceVars . compileThing desugarDefn) bodies)
+  return $
+    (grp, CDelay (bind vars' bodies'))
+    : zip vars' (map (CForce . flip proj (CVar grp)) [0..])
+  where
+    proj :: Int -> Core -> Core
+    proj 0 = CProj L
+    proj n = proj (n-1) . CProj R
 
 ------------------------------------------------------------
 -- Compiling terms

@@ -98,8 +98,9 @@ data Core where
   CType :: Type -> Core
 
   -- | Introduction form for a lazily evaluated value of type Lazy T
-  --   for some type T.
-  CDelay :: Bind (Name Core) Core -> Core
+  --   for some type T.  We can have multiple bindings to multiple
+  --   terms to create a simple target for compiling mutual recursion.
+  CDelay :: Bind [Name Core] [Core] -> Core
 
   -- | Force evaluation of a lazy value.
   CForce :: Core -> Core

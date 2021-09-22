@@ -40,22 +40,23 @@ module Disco.Eval
        , addModule
        , setLoadedModule
        , populateCurrentModuleInfo
-       , loadDefs
+       , loadDef
 
        )
        where
 
-import           Control.Exception        (SomeException, handle)
-import           Control.Lens             (makeLenses, view, (%~), (.~))
-import           Control.Monad            (void, when)
-import           Control.Monad.IO.Class   (liftIO)
+import           Control.Exception                (SomeException, handle)
+import           Control.Lens                     (makeLenses, view, (%~), (.~))
+import           Control.Monad                    (void, when)
+import           Control.Monad.IO.Class           (liftIO)
 import           Data.Bifunctor
-import           Data.Coerce
-import qualified Data.Map                 as M
-import qualified Data.Set                 as S
-import           System.FilePath          ((-<.>))
+import qualified Data.Map                         as M
+import qualified Data.Set                         as S
+import           System.FilePath                  ((-<.>))
 
-import qualified System.Console.Haskeline as H
+import           Unbound.Generics.LocallyNameless (Name)
+
+import qualified System.Console.Haskeline         as H
 
 import           Disco.Effects.Error
 import           Disco.Effects.Input
@@ -79,7 +80,7 @@ import           Disco.Extensions
 import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Parser
-import           Disco.Typecheck          (checkModule)
+import           Disco.Typecheck                  (checkModule)
 import           Disco.Typecheck.Monad
 import           Disco.Types
 import           Disco.Value
@@ -119,14 +120,14 @@ data TopInfo = TopInfo
 
   , _topDefs    :: Ctx ATerm Defn
     -- ^ Environment of top-level surface syntax definitions.  Set by
-    --   'loadDefs' and by 'let' command at the REPL.
+    --   'loadDef' and by 'let' command at the REPL.
 
   , _topTyDefs  :: TyDefCtx
     -- ^ Environment of top-level type definitions.
 
   , _topEnv     :: Env
     -- ^ Top-level environment mapping names to values (which all
-    --   start as indirections to thunks).  Set by 'loadDefs'.
+    --   start as indirections to thunks).  Set by 'loadDef'.
     --   Use it when evaluating with 'withTopEnv'.
 
   , _topDocs    :: Ctx Term Docs
@@ -341,7 +342,8 @@ loadFile file = do
 -- a new function that does something similar to
 -- populateCurrentmoduleinfo but adds instead of completely replaces
 -- (but does in fact override anything with the same name).  loadDefs
--- is the tricky bit.
+-- is the tricky bit.  ETA: now that loadDefs is rewritten, maybe it's
+-- not tricky anymore.
 
 -- | Add things from the given module to the set of currently loaded
 --   things.
@@ -373,26 +375,51 @@ populateCurrentModuleInfo
   => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
-  let cdefns = M.mapKeys coerce $ M.mapWithKey compileDefn tmds
+  let cdefns = compileDefns tmds
   modify @TopInfo $
     (topDocs   .~ docs) .
     (topCtx    .~ tys)  .
     (topTyDefs .~ tyds) .
     (topDefs   .~ tmds)
-  loadDefs cdefns
+  mapM_ (uncurry loadDef) cdefns
 
--- | Load a top-level environment of (potentially recursive)
---   core language definitions into memory.
-loadDefs
+loadDef
   :: Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r
-  => Ctx Core Core -> Sem r ()
-loadDefs defs = do
-  -- XXX need to allow these to be recursive!
-  --
-  -- Need to evaluate them in topsort order?
-  --
-  -- Seems to be something else going wrong too.
-  --
-  -- For mutually recursive groups, we need some special support here.
-  newEnv <- inputToState . inputTopEnv $ mapM eval defs
-  modify @TopInfo $ topEnv %~ joinCtx newEnv
+  => Name Core -> Core -> Sem r ()
+loadDef x body = do
+  v <- inputToState . inputTopEnv $ eval body
+  modify @TopInfo $ topEnv %~ M.insert x v
+
+-- -- | Load a top-level environment of (potentially recursive)
+-- --   core language definitions into memory.
+-- loadDefs
+--   :: Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r
+--   => Ctx Core Core -> Sem r ()
+-- loadDefs defs = do
+
+--   let vars = M.keysSet defs
+
+--       -- Get a list of pairs of the form (y,x) where x uses y in its definition.
+--       -- We want them in the order (y,x) since y needs to be evaluated before x.
+--       -- These will be the edges in our dependency graph.
+--       deps = S.unions . map (\(x,body) -> S.map (,x) (setOf fv body)) . M.assocs $ defs
+
+--       -- Do a topological sort of the condensation of the dependency
+--       -- graph.  Each SCC corresponds to a group of mutually recursive
+--       -- definitions; each such group depends only on groups that come
+--       -- before it in the topsort.
+--       defnGroups :: [Set (Name Core)]
+--       defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
+
+--   -- Load the definition groups one by one in order of the topsort.
+--   mapM_ (loadDefGroup . M.restrictKeys defs) defnGroups
+
+-- -- | Load a mutually recursive group of definitions, adding them to
+-- --   the 'topEnv'.
+-- loadDefGroup
+--   :: Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r
+--   => Ctx Core Core -> Sem r ()
+-- loadDefGroup defs = do
+--   -- XXX For mutually recursive groups, we need some special support here!
+--   newEnv <- inputToState . inputTopEnv $ mapM eval defs
+--   modify @TopInfo $ topEnv %~ joinCtx newEnv

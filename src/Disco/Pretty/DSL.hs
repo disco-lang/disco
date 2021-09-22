@@ -10,6 +10,8 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Disco.Pretty.DSL where
 
 import           Control.Applicative hiding (empty)

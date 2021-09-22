@@ -87,6 +87,10 @@ wcc = P.map (S.map snd) . wccIDs
 wccIDs :: Ord a => Graph a -> [Set (G.Node, a)]
 wccIDs (G g _a2n n2a) = P.map (S.fromList . P.map (id &&& (n2a !))) (G.components g)
 
+-- | Do a topological sort on a DAG.
+topsort :: Graph a -> [a]
+topsort (G g _a2n _n2a) = G.topsort' g
+
 -- | A miscellaneous utility function to turn a @Graph Maybe@ into a
 --   @Maybe Graph@: the result is @Just@ iff all the vertices in the
 --   input graph are.

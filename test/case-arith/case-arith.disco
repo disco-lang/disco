@@ -34,20 +34,20 @@ Zabs : Z -> Z
 Zabs (-x) = x
 Zabs x    = x
 
-type Tree = F * Tree * Tree
+-- type Tree = F * Tree * Tree
 
-expandTree : F -> Tree
-expandTree (a/b) = (a/b, expandTree (a/(a+b)), expandTree ((a+b)/b))
+-- expandTree : F -> Tree
+-- expandTree (a/b) = (a/b, expandTree (a/(a+b)), expandTree ((a+b)/b))
 
-cwTree : Tree
-cwTree = expandTree 1
+-- cwTree : Tree
+-- cwTree = expandTree 1
 
-inorder : N -> Tree -> List(F)
-inorder 0     (x,_,_) = [x]
-inorder (n+1) (x,l,r) = append(inorder n l, x :: inorder n r)
+-- inorder : N -> Tree -> List(F)
+-- inorder 0     (x,_,_) = [x]
+-- inorder (n+1) (x,l,r) = append(inorder n l, x :: inorder n r)
 
-numerator : Q -> Z
-numerator (p/q) = p
+-- numerator : Q -> Z
+-- numerator (p/q) = p
 
-denominator : Q -> N
-denominator (p/q) = q
+-- denominator : Q -> N
+-- denominator (p/q) = q

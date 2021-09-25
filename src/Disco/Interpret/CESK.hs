@@ -139,10 +139,6 @@ m !!! k = case M.lookup k m of
   Nothing -> error $ "variable not found in environment: " ++ show k
   Just v  -> v
 
-mkTuple :: [Value] -> Value
-mkTuple []     = VUnit
-mkTuple (v:vs) = VPair v (mkTuple vs)
-
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
 step (In (CVar x) e k)                   = return $ Out (e!!!x) k
@@ -161,7 +157,7 @@ step (In (CType ty) _ k)                 = return $ Out (VType ty) k
 step (In (CDelay b) e k)                 = do
   (xs, cs) <- unbind b
   locs <- allocateRec e (zip xs cs)
-  return $ Out (mkTuple (map VRef locs)) k
+  return $ Out (foldr (VPair . VRef) VUnit locs) k
 step (In (CForce c) e k)                 = return $ In c e (FForce : k)
 
 step (Out v (FInj s : k))                = return $ Out (VInj s v) k
@@ -241,7 +237,7 @@ appConst OFactor  = intOp1' primFactor
     -- a prime factorization.
     primFactor :: Member (Error EvalError) r => Integer -> Sem r Value
     primFactor 0 = throw (Crash "0 has no prime factorization!")
-    prinFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
+    primFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
 
 appConst OFrac    = numOp1' (return . primFrac)
   where
@@ -284,8 +280,8 @@ appConst OCount                             = return . countOp
 --------------------------------------------------
 -- Comparison
 
-appConst (OEq ty)                          = arity2 $ \v1 v2 -> enumv <$> valEq ty v1 v2
-appConst (OLt ty)                          = arity2 $ \v1 v2 -> enumv <$> valLt ty v1 v2
+appConst (OEq ty)                          = arity2 $ \v1 v2 -> return $ enumv (valEq ty v1 v2)
+appConst (OLt ty)                          = arity2 $ \v1 v2 -> return $ enumv (valLt ty v1 v2)
 
 --------------------------------------------------
 -- Container operations
@@ -416,39 +412,39 @@ multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
 -- Comparison
 ------------------------------------------------------------
 
-valEq :: Type -> Value -> Value -> Sem r Bool
+valEq :: Type -> Value -> Value -> Bool
 
 -- XXX make list a defined type
 valEq (TyList tyElt) v1 v2 = valEq (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
 
-valEq _ (VNum _ r1) (VNum _ r2) = return $ r1 == r2
+valEq _ (VNum _ r1) (VNum _ r2) = r1 == r2
 valEq (ty1 :+: _) (VInj L v1) (VInj L v2) = valEq ty1 v1 v2
 valEq (_ :+: ty2) (VInj R v1) (VInj R v2) = valEq ty2 v1 v2
-valEq _ VUnit VUnit = return True
+valEq _ VUnit VUnit = True
 valEq (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22)
-  = (&&) <$> valEq ty1 v11 v21 <*> valEq ty2 v12 v22
-valEq _ (VType ty1) (VType ty2) = return $ ty1 == ty2
-valEq _ _ _ = return False
+  = valEq ty1 v11 v21 && valEq ty2 v12 v22
+valEq _ (VType ty1) (VType ty2) = ty1 == ty2
+valEq _ _ _ = False
 
 -- VConst, VClo, VFun_
 -- VBag, VGraph, VMap
 
-valLt :: Type -> Value -> Value -> Sem r Bool
-valLt ty v1 v2 = (==LT) <$> valOrd ty v1 v2
+valLt :: Type -> Value -> Value -> Bool
+valLt ty v1 v2 = valOrd ty v1 v2 == LT
 
 -- XXX combine valEq and valOrd ?
-valOrd :: Type -> Value -> Value -> Sem r Ordering
+valOrd :: Type -> Value -> Value -> Ordering
 valOrd (TyList tyElt) v1 v2 = valOrd (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
-valOrd _ (VNum _ r1) (VNum _ r2) = return $ compare r1 r2
-valOrd _ (VInj L _) (VInj R _) = return LT
-valOrd _ (VInj R _) (VInj L _) = return GT
+valOrd _ (VNum _ r1) (VNum _ r2) = compare r1 r2
+valOrd _ (VInj L _) (VInj R _) = LT
+valOrd _ (VInj R _) (VInj L _) = GT
 valOrd (ty1 :+: _) (VInj L v1) (VInj L v2) = valOrd ty1 v1 v2
 valOrd (_ :+: ty2) (VInj R v1) (VInj R v2) = valOrd ty2 v1 v2
-valOrd _ VUnit VUnit = return EQ
+valOrd _ VUnit VUnit = EQ
 valOrd (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22) =
-  (<>) <$> valOrd ty1 v11 v21 <*> valOrd ty2 v12 v22
-valOrd _ (VType ty1) (VType ty2) = return $ compare ty1 ty2
-valOrd _ _ _ = return EQ  -- XXX
+  valOrd ty1 v11 v21 <> valOrd ty2 v12 v22
+valOrd _ (VType ty1) (VType ty2) = compare ty1 ty2
+valOrd _ _ _ = EQ  -- XXX
 
 ------------------------------------------------------------
 -- Tests

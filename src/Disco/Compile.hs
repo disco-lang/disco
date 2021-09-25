@@ -255,8 +255,8 @@ compilePrim ty               PrimPower = compilePrimErr PrimPower ty
 compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
 compilePrim (TyBag _ :->: _)  PrimSet  = return $ CConst OBagToSet
 compilePrim (TyBag _ :->: _)  PrimList = return $ CConst OBagToList
-compilePrim (TyList a :->: _) PrimSet  = return $ CConst (OListToSet a)
-compilePrim (TyList a :->: _) PrimBag  = return $ CConst (OListToBag a)
+compilePrim (TyList _ :->: _) PrimSet  = return $ CConst OListToSet
+compilePrim (TyList _ :->: _) PrimBag  = return $ CConst OListToBag
 compilePrim _ p | p `elem` [PrimList, PrimBag, PrimSet] = return $ CConst OId
 
 compilePrim ty PrimList = compilePrimErr PrimList ty
@@ -264,10 +264,10 @@ compilePrim ty PrimBag  = compilePrimErr PrimBag ty
 compilePrim ty PrimSet  = compilePrimErr PrimSet ty
 
 compilePrim _ PrimB2C                 = return $ CConst OBagToCounts
-compilePrim (_ :->: TyBag ty) PrimC2B = return $ CConst (OCountsToBag ty)
+compilePrim (_ :->: TyBag _)  PrimC2B = return $ CConst OCountsToBag
 compilePrim ty PrimC2B                = compilePrimErr PrimC2B ty
 
-compilePrim (TyMap k v :->: _) PrimMapToSet = return $ CConst (OMapToSet k v)
+compilePrim (TyMap _ _ :->: _) PrimMapToSet = return $ CConst OMapToSet
 compilePrim (_ :->: TyMap _ _) PrimSetToMap = return $ CConst OSetToMap
 
 compilePrim ty PrimMapToSet = compilePrimErr PrimMapToSet ty

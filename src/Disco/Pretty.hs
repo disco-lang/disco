@@ -425,7 +425,7 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 ------------------------------------------------------------
 
 prettyValue :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
-prettyValue TyUnit VUnit                     = "■"
+prettyValue _      VUnit                     = "■"
 prettyValue TyProp _                         = prettyPlaceholder TyProp
 prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
 prettyValue TyC (vchar -> c)                 = text (show c)
@@ -446,14 +446,14 @@ prettyValue ty (VNum d r)
 
 prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 
-prettyValue ty VUnit          = undefined
-prettyValue ty (VPair va va') = undefined
+prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
+prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
+
 prettyValue ty (VClo map xs bi) = undefined
 prettyValue ty (VType ty')    = undefined
 prettyValue ty (VRef n)       = undefined
 prettyValue ty (VFun_ vf)     = undefined
 prettyValue ty (VProp vp)     = undefined
-prettyValue ty (VBag x0)      = undefined
 prettyValue ty (VGraph gr va) = undefined
 prettyValue ty (VMap map)     = undefined
 
@@ -469,6 +469,20 @@ prettyPlaceholder ty = "<" <> prettyTy ty <> ">"
 prettyTuple :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
 prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
 prettyTuple ty v                        = prettyValue ty v
+
+-- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
+prettySequence :: Members '[Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
+prettySequence ty del vs = hsep =<< punctuate (return del) (map (prettyValue ty) vs)
+
+-- | Pretty-print a literal bag value.
+prettyBag :: Members '[Reader PA] r => Type -> [(Value,Integer)] -> Sem r Doc
+prettyBag _ [] = bag empty
+prettyBag ty vs
+  | all ((==1) . snd) vs = bag $ prettySequence ty "," (map fst vs)
+  | otherwise            = bag $ hsep =<< punctuate (return ",") (map prettyCount vs)
+  where
+    prettyCount (v,1) = prettyValue ty v
+    prettyCount (v,n) = prettyValue ty v <+> "#" <+> text (show n)
 
 --------------------------------------------------
 -- Pretty-printing decimals

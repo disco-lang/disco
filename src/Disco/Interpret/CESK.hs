@@ -304,8 +304,10 @@ appConst = \case
 -- appConst OBagToSet                          = return .
 -- appConst OSetToList                         = _wT
 -- appConst OBagToList                         = _wV
--- appConst (OListToSet ty)                    = _wW
--- appConst (OListToBag ty)                    = _wX
+
+  OListToSet -> return . VBag . (map . fmap) (const 1) . countValues . vlist id
+  OListToBag -> return . VBag . countValues . vlist id
+
 -- appConst OBagToCounts                       = _wY
 -- appConst (OCountsToBag ty)                  = _wZ
 -- appConst (OMapToSet ty ty')                 = _w10
@@ -442,6 +444,53 @@ valOrd VUnit VUnit                     = EQ
 valOrd (VPair v11 v12) (VPair v21 v22) = valOrd v11 v21 <> valOrd v12 v22
 valOrd (VType ty1) (VType ty2)         = compare ty1 ty2
 valOrd _ _                             = EQ  -- XXX
+
+------------------------------------------------------------
+-- Normalizing bags/sets
+------------------------------------------------------------
+
+-- | Given a list of disco values, sort and collate them into a list
+--   pairing each unique value with its count.  Used to
+--   construct/normalize bags and sets.  Prerequisite: the values must
+--   be comparable.
+countValues :: [Value] -> [(Value, Integer)]
+countValues = sortNCount . map (,1)
+
+-- | Normalize a list of values where each value is paired with a
+--   count, but there could be duplicate values.  This function uses
+--   merge sort to sort the values, adding the counts of multiple
+--   instances of the same value.  Prerequisite: the values must be
+--   comparable.
+sortNCount :: [(Value, Integer)] -> [(Value, Integer)]
+sortNCount [] = []
+sortNCount [x] = [x]
+sortNCount xs = merge (+) valOrd (sortNCount firstHalf) (sortNCount secondHalf)
+  where
+    (firstHalf, secondHalf) = splitAt (length xs `div` 2) xs
+
+-- | Generic function for merging two sorted, count-annotated lists of
+--   type @[(a,Integer)]@ a la merge sort, using the given comparison
+--   function, and using the provided count combining function to
+--   decide what count to assign to each element of the output.  For
+--   example, @(+)@ corresponds to bag union; @min@ corresponds to
+--   intersection; and so on.
+merge
+  :: (Integer -> Integer -> Integer)
+  -> (a -> a -> Ordering)
+  -> [(a, Integer)] -> [(a, Integer)] -> [(a, Integer)]
+merge g cmp = go
+  where
+    go [] [] = []
+    go [] ((y,n):ys) = mergeCons y 0 n (go [] ys)
+    go ((x,n):xs) [] = mergeCons x n 0 (go xs [])
+    go ((x,n1):xs) ((y,n2): ys) = case cmp x y of
+      LT -> mergeCons x n1 0  (go xs ((y,n2):ys))
+      EQ -> mergeCons x n1 n2 (go xs ys)
+      GT -> mergeCons y 0 n2  (go ((x,n1):xs) ys)
+
+    mergeCons a m1 m2 zs = case g m1 m2 of
+      0 -> zs
+      n -> ((a,n):zs)
 
 ------------------------------------------------------------
 -- Tests

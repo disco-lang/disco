@@ -191,14 +191,12 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OSetToList      -- ^ set -> list conversion (sorted order).
         | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
         | OBagToList      -- ^ bag -> list conversion (sorted order).
-        | OListToSet Type -- ^ list -> set conversion (forget order, duplicates).
-                          --   Carries the element type.
-        | OListToBag Type -- ^ list -> bag conversion (forget order).
-                          --   Carries the element type.
+        | OListToSet      -- ^ list -> set conversion (forget order, duplicates).
+        | OListToBag      -- ^ list -> bag conversion (forget order).
         | OBagToCounts    -- ^ bag -> set of counts
-        | OCountsToBag Type  -- ^ set of counts -> bag
-        | OMapToSet Type Type -- ^ Map k v -> Set (k × v)
-        | OSetToMap           -- ^ Set (k × v) -> Map k v
+        | OCountsToBag    -- ^ set of counts -> bag
+        | OMapToSet       -- ^ Map k v -> Set (k × v)
+        | OSetToMap       -- ^ Set (k × v) -> Map k v
 
         -- Number theory primitives
         | OIsPrime        -- ^ Primality test

@@ -178,10 +178,7 @@ hasSort = all . hasQual
 --   that case one would just have to encode 'sortRules' directly.
 qualRulesMap :: Map Con (Map Qualifier [Maybe Qualifier])
 qualRulesMap = M.fromList
-  [ CArr  ==> M.fromList
-    [ QCmp ==> [Nothing, Just QCmp]
-    ]
-  , CProd ==> M.fromList
+  [ CProd ==> M.fromList
     [ QCmp ==> [Just QCmp, Just QCmp],
       QSimple ==> [Just QSimple, Just QSimple]
     ]

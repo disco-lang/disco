@@ -138,14 +138,8 @@ data Op = OAdd      -- ^ Addition (@+@)
         | ODivides  -- ^ Divisibility test (@|@)
         | OMultinom -- ^ Multinomial coefficient (@choose@)
         | OFact     -- ^ Factorial (@!@)
-        | OEq Type  -- ^ Equality test (@==@) at the given type.  At
-                    --   this point, typechecking has determined that
-                    --   the given type has decidable equality.  We
-                    --   need to know the type in order to perform the
-                    --   equality test.
-        | OLt Type  -- ^ Less than (@<@).  Similarly, typechecking has
-                    --   determined that the given type has a decidable
-                    --   ordering relation.
+        | OEq       -- ^ Equality test (@==@)
+        | OLt       -- ^ Less than (@<@)
 
         -- Type operators
         | OEnum     -- ^ Enumerate the values of a type.

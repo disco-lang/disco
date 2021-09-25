@@ -476,8 +476,7 @@ compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op
-  | op `elem` [Add, Mul, Div, Exp, Mod, Divides, Choose]
-  = CConst (regularOps ! op)
+  | op `M.member` regularOps = CConst (regularOps ! op)
   where
     regularOps = M.fromList
       [ Add     ==> OAdd
@@ -487,17 +486,11 @@ compileBOp _ _ _ op
       , Mod     ==> OMod
       , Divides ==> ODivides
       , Choose  ==> OMultinom
+      , Eq      ==> OEq
+      , Lt      ==> OLt
       ]
 
--- Eq and Lt need to remember the type of the things being compared so
--- it can work properly at runtime. (Eq and Lt are overloaded:
--- essentially instead of storing a dictionary here as Haskell might,
--- we just store the type itself, and compute the comparison function
--- in a type-directed way; see Disco.Interpret.Core.decideEqFor and
--- decideOrdFor.)
-compileBOp ty _ _ Eq = CConst (OEq ty)
-compileBOp ty _ _ Lt = CConst (OLt ty)
-
+-- XXX don't think this is true any more?
 -- Likewise, ShouldEq also needs to know the type at which the
 -- comparison is occurring.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)

@@ -43,7 +43,7 @@ data Qualifier
   = QNum       -- ^ Numeric, i.e. a semiring supporting + and *
   | QSub       -- ^ Subtractive, i.e. supports -
   | QDiv       -- ^ Divisive, i.e. supports /
-  | QCmp       -- ^ Comparable, i.e. supports ordering/comparison (see Note [QCmp])
+  | QCmp       -- ^ Comparable, i.e. supports decidable ordering/comparison (see Note [QCmp])
   | QEnum      -- ^ Enumerable, i.e. supports ellipsis notation [x .. y]
   | QBool      -- ^ Boolean, i.e. supports and, or, not (Bool or Prop)
   | QBasic     -- ^ Things that do not involve Prop.
@@ -53,6 +53,12 @@ data Qualifier
 instance Alpha Qualifier
 
 -- ~~~~ Note [QCmp]
+--
+-- XXX edit this!  I don't think we actually need type info for
+-- comparisons at runtime any more, if we disallow functions from
+-- being QCmp.  With the switch to eager semantics + disallowing
+-- function comparison, it's now the case that QCmp should mean
+-- *decidable* (terminating) comparison.
 --
 -- It used to be the case that every type in disco supported
 -- (semi-decidable) linear ordering, so in one sense the QCmp

@@ -196,80 +196,84 @@ arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
 arity2 f v           = error "arity2 on a non-pair!"  -- XXX
 
+
+-- XXX rewrite this to use a case instead of function clauses
 appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
+appConst = \case
 
 --------------------------------------------------
 -- Arithmetic
 
-appConst OAdd   = numOp2 (+)
-appConst ONeg   = numOp1 negate
-appConst OSqrt  = numOp1 integerSqrt
-appConst OFloor = numOp1 $ (%1) . floor
-appConst OCeil  = numOp1 $ (%1) . ceiling
-appConst OAbs   = numOp1 abs
-appConst OMul   = numOp2 (*)
-appConst ODiv   = numOp2' divOp
-  where
-    divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
-    divOp _ 0 = throw DivByZero
-    divOp m n = return $ ratv (m / n)
-appConst OExp   = numOp2 $ \m n -> m ^^ numerator n
-appConst OMod   = numOp2' modOp
-  where
-    modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
-    modOp m n
-      | n == 0    = throw DivByZero
-      | otherwise = return $ intv (numerator m `mod` numerator n)
-appConst ODivides = numOp2' $ \m n -> return (enumv $ divides m n)
-  where
-    divides 0 0 = True
-    divides 0 _ = False
-    divides x y = denominator (y / x) == 1
+  OAdd -> numOp2 (+)
+  ONeg -> numOp1 negate
+  OSqrt -> numOp1 integerSqrt
+  OFloor -> numOp1 $ (%1) . floor
+  OCeil -> numOp1 $ (%1) . ceiling
+  OAbs -> numOp1 abs
+  OMul -> numOp2 (*)
+  ODiv -> numOp2' divOp
+    where
+      divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
+      divOp _ 0 = throw DivByZero
+      divOp m n = return $ ratv (m / n)
+
+  OExp -> numOp2 $ \m n -> m ^^ numerator n
+  OMod -> numOp2' modOp
+    where
+      modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
+      modOp m n
+        | n == 0    = throw DivByZero
+        | otherwise = return $ intv (numerator m `mod` numerator n)
+  ODivides -> numOp2' $ \m n -> return (enumv $ divides m n)
+    where
+      divides 0 0 = True
+      divides 0 _ = False
+      divides x y = denominator (y / x) == 1
 
 --------------------------------------------------
 -- Number theory
 
-appConst OIsPrime = intOp1 (enumv . isPrime)
-appConst OFactor  = intOp1' primFactor
-  where
-    -- Semantics of the @$factor@ prim: turn a natural number into its
-    -- bag of prime factors.  Crash if called on 0, which does not have
-    -- a prime factorization.
-    primFactor :: Member (Error EvalError) r => Integer -> Sem r Value
-    primFactor 0 = throw (Crash "0 has no prime factorization!")
-    primFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
+  OIsPrime -> intOp1 (enumv . isPrime)
+  OFactor -> intOp1' primFactor
+    where
+      -- Semantics of the @$factor@ prim: turn a natural number into its
+      -- bag of prime factors.  Crash if called on 0, which does not have
+      -- a prime factorization.
+      primFactor :: Member (Error EvalError) r => Integer -> Sem r Value
+      primFactor 0 = throw (Crash "0 has no prime factorization!")
+      primFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
 
-appConst OFrac    = numOp1' (return . primFrac)
-  where
-    -- Semantics of the @$frac@ prim: turn a rational number into a pair
-    -- of its numerator and denominator.
-    primFrac :: Rational -> Value
-    primFrac r = VPair (intv (numerator r)) (intv (denominator r))
+  OFrac -> numOp1' (return . primFrac)
+    where
+      -- Semantics of the @$frac@ prim: turn a rational number into a pair
+      -- of its numerator and denominator.
+      primFrac :: Rational -> Value
+      primFrac r = VPair (intv (numerator r)) (intv (denominator r))
 
 --------------------------------------------------
 -- Combinatorics
 
-appConst OMultinom                          = arity2 multinomOp
-appConst OFact                              = numOp1' factOp
-  where
-    factOp :: Member (Error EvalError) r => Rational -> Sem r Value
-    factOp (numerator -> n)
-      | n > fromIntegral (maxBound :: Int) = throw Overflow
-      | otherwise = return . intv $ factorial (fromIntegral n)
+  OMultinom -> arity2 multinomOp
+  OFact -> numOp1' factOp
+    where
+      factOp :: Member (Error EvalError) r => Rational -> Sem r Value
+      factOp (numerator -> n)
+        | n > fromIntegral (maxBound :: Int) = throw Overflow
+        | otherwise = return . intv $ factorial (fromIntegral n)
 
-appConst OEnum                             = return . enumOp
-  where
-    enumOp :: Value -> Value
-    enumOp (VType ty) = listv id (enumerateType ty)
-    enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v  -- XXX
+  OEnum -> return . enumOp
+    where
+      enumOp :: Value -> Value
+      enumOp (VType ty) = listv id (enumerateType ty)
+      enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v  -- XXX
 
-appConst OCount                             = return . countOp
-  where
-    countOp :: Value -> Value
-    countOp (VType ty) = case countType ty of
-      Just num -> VInj R (intv num)
-      Nothing  -> VNil
-    countOp v = error $ "Impossible! countOp on non-type " ++ show v
+  OCount -> return . countOp
+    where
+      countOp :: Value -> Value
+      countOp (VType ty) = case countType ty of
+        Just num -> VInj R (intv num)
+        Nothing  -> VNil
+      countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 --------------------------------------------------
 -- Graphs
@@ -280,15 +284,15 @@ appConst OCount                             = return . countOp
 --------------------------------------------------
 -- Comparison
 
-appConst (OEq ty)                          = arity2 $ \v1 v2 -> return $ enumv (valEq ty v1 v2)
-appConst (OLt ty)                          = arity2 $ \v1 v2 -> return $ enumv (valLt ty v1 v2)
+  OEq -> arity2 $ \v1 v2 -> return $ enumv (valEq v1 v2)
+  OLt -> arity2 $ \v1 v2 -> return $ enumv (valLt v1 v2)
 
 --------------------------------------------------
 -- Container operations
 
-appConst OSize                              = return . sizeOp
-  where
-    sizeOp (VBag xs) = intv (sum (map snd xs))
+  OSize -> return . sizeOp
+    where
+      sizeOp (VBag xs) = intv (sum (map snd xs))
 
 -- appConst (OPower ty)                        = _wv
 -- appConst (OBagElem ty)                      = _ww
@@ -340,13 +344,13 @@ appConst OSize                              = return . sizeOp
 -- appConst (OShouldEq ty)                     = _w19
 -- appConst OMatchErr                          = _w1a
 
-appConst OCrash                                = throw . Crash . vlist vchar
+  OCrash -> throw . Crash . vlist vchar
 
 -- appConst OId                                = _w1c
 -- appConst OLookupSeq                         = _w1d
 -- appConst OExtendSeq                         = _w1e
 
-appConst c = error $ "Unimplemented: appConst " ++ show c
+  c -> error $ "Unimplemented: appConst " ++ show c
 
 --------------------------------------------------
 -- Arithmetic
@@ -412,39 +416,32 @@ multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
 -- Comparison
 ------------------------------------------------------------
 
-valEq :: Type -> Value -> Value -> Bool
-
--- XXX make list a defined type
-valEq (TyList tyElt) v1 v2 = valEq (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
-
-valEq _ (VNum _ r1) (VNum _ r2) = r1 == r2
-valEq (ty1 :+: _) (VInj L v1) (VInj L v2) = valEq ty1 v1 v2
-valEq (_ :+: ty2) (VInj R v1) (VInj R v2) = valEq ty2 v1 v2
-valEq _ VUnit VUnit = True
-valEq (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22)
-  = valEq ty1 v11 v21 && valEq ty2 v12 v22
-valEq _ (VType ty1) (VType ty2) = ty1 == ty2
-valEq _ _ _ = False
+valEq :: Value -> Value -> Bool
+valEq (VNum _ r1) (VNum _ r2)         = r1 == r2
+valEq (VInj L v1) (VInj L v2)         = valEq v1 v2
+valEq (VInj R v1) (VInj R v2)         = valEq v1 v2
+valEq VUnit VUnit                     = True
+valEq (VPair v11 v12) (VPair v21 v22) = valEq v11 v21 && valEq v12 v22
+valEq (VType ty1) (VType ty2)         = ty1 == ty2
+valEq _ _                             = False
 
 -- VConst, VClo, VFun_
 -- VBag, VGraph, VMap
 
-valLt :: Type -> Value -> Value -> Bool
-valLt ty v1 v2 = valOrd ty v1 v2 == LT
+valLt :: Value -> Value -> Bool
+valLt v1 v2 = valOrd v1 v2 == LT
 
 -- XXX combine valEq and valOrd ?
-valOrd :: Type -> Value -> Value -> Ordering
-valOrd (TyList tyElt) v1 v2 = valOrd (TyUnit :+: tyElt :*: TyList tyElt) v1 v2
-valOrd _ (VNum _ r1) (VNum _ r2) = compare r1 r2
-valOrd _ (VInj L _) (VInj R _) = LT
-valOrd _ (VInj R _) (VInj L _) = GT
-valOrd (ty1 :+: _) (VInj L v1) (VInj L v2) = valOrd ty1 v1 v2
-valOrd (_ :+: ty2) (VInj R v1) (VInj R v2) = valOrd ty2 v1 v2
-valOrd _ VUnit VUnit = EQ
-valOrd (ty1 :*: ty2) (VPair v11 v12) (VPair v21 v22) =
-  valOrd ty1 v11 v21 <> valOrd ty2 v12 v22
-valOrd _ (VType ty1) (VType ty2) = compare ty1 ty2
-valOrd _ _ _ = EQ  -- XXX
+valOrd :: Value -> Value -> Ordering
+valOrd (VNum _ r1) (VNum _ r2)         = compare r1 r2
+valOrd (VInj L _) (VInj R _)           = LT
+valOrd (VInj R _) (VInj L _)           = GT
+valOrd (VInj L v1) (VInj L v2)         = valOrd v1 v2
+valOrd (VInj R v1) (VInj R v2)         = valOrd v1 v2
+valOrd VUnit VUnit                     = EQ
+valOrd (VPair v11 v12) (VPair v21 v22) = valOrd v11 v21 <> valOrd v12 v22
+valOrd (VType ty1) (VType ty2)         = compare ty1 ty2
+valOrd _ _                             = EQ  -- XXX
 
 ------------------------------------------------------------
 -- Tests

@@ -37,7 +37,8 @@ import           Polysemy.State
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 import           Disco.AST.Core
-import           Disco.AST.Generic                  (Side (..), selectSide)
+import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
+                                                     selectSide)
 import           Disco.AST.Typed                    (AProperty)
 import           Disco.Enumerate
 import           Disco.Error
@@ -196,8 +197,6 @@ arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
 arity2 f v           = error "arity2 on a non-pair!"  -- XXX
 
-
--- XXX rewrite this to use a case instead of function clauses
 appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
 appConst = \case
 
@@ -254,6 +253,16 @@ appConst = \case
 -- Combinatorics
 
   OMultinom -> arity2 multinomOp
+    where
+      multinomOp :: Value -> Value -> Sem r Value
+      multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
+        where
+          multinomial :: Integer -> [Integer] -> Integer
+          multinomial _ []     = 1
+          multinomial n (k:ks)
+            | k > n     = 0
+            | otherwise = choose n k * multinomial (n-k) ks
+
   OFact -> numOp1' factOp
     where
       factOp :: Member (Error EvalError) r => Rational -> Sem r Value
@@ -276,10 +285,11 @@ appConst = \case
       countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
 --------------------------------------------------
--- Graphs
+-- Sequences
 
---------------------------------------------------
--- Maps
+  -- XXX have to get rid of Forever!  It is just an infinite loop...
+  OForever -> return . ellipsis Forever
+  OUntil -> arity2 $ \v1 -> return . ellipsis (Until v1)
 
 --------------------------------------------------
 -- Comparison
@@ -297,6 +307,17 @@ appConst = \case
 -- appConst (OPower ty)                        = _wv
 -- appConst (OBagElem ty)                      = _ww
 -- appConst (OListElem ty)                     = _wx
+-- appConst OEachList                          = _wy
+-- appConst (OEachBag ty)                      = _wz
+-- appConst (OEachSet ty)                      = _wA
+-- appConst OReduceList                        = _wB
+-- appConst OReduceBag                         = _wC
+-- appConst OFilterList                        = _wD
+-- appConst OFilterBag                         = _wE
+-- appConst (OMerge ty)                        = _wF
+-- appConst OConcat                            = _wG
+-- appConst (OBagUnions ty)                    = _wH
+-- appConst (OUnions ty)                       = _wI
 
 --------------------------------------------------
 -- Container conversions
@@ -314,18 +335,8 @@ appConst = \case
 -- appConst OSetToMap                          = _w11
 
 --------------------------------------------------
+-- Graph operations
 
--- appConst OEachList                          = _wy
--- appConst (OEachBag ty)                      = _wz
--- appConst (OEachSet ty)                      = _wA
--- appConst OReduceList                        = _wB
--- appConst OReduceBag                         = _wC
--- appConst OFilterList                        = _wD
--- appConst OFilterBag                         = _wE
--- appConst (OMerge ty)                        = _wF
--- appConst OConcat                            = _wG
--- appConst (OBagUnions ty)                    = _wH
--- appConst (OUnions ty)                       = _wI
 -- appConst OSummary                           = _wJ
 -- appConst (OEmptyGraph ty)                   = _wK
 -- appConst (OVertex ty)                       = _wL
@@ -334,11 +345,6 @@ appConst = \case
 -- appConst OEmptyMap                          = _wO
 -- appConst OInsert                            = _wP
 -- appConst OLookup                            = _wQ
--- appConst OForever                           = _wR
--- appConst OUntil                             = _wS
--- appConst OIsPrime                           = _w12
--- appConst OFactor                            = _w13
--- appConst OFrac                              = _w14
 -- appConst (OForall tys)                      = _w15
 -- appConst (OExists tys)                      = _w16
 -- appConst OHolds                             = _w17
@@ -403,17 +409,6 @@ integerSqrt' n =
 (^!) :: Num a => a -> Int -> a
 (^!) x n = x^n
 
--- | Multinomial coefficient.  The first argument is a number, the
---   second is a list.
-multinomOp :: Value -> Value -> Sem r Value
-multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
-  where
-    multinomial :: Integer -> [Integer] -> Integer
-    multinomial _ []     = 1
-    multinomial n (k:ks)
-      | k > n     = 0
-      | otherwise = choose n k * multinomial (n-k) ks
-
 ------------------------------------------------------------
 -- Comparison
 ------------------------------------------------------------
@@ -444,6 +439,50 @@ valOrd VUnit VUnit                     = EQ
 valOrd (VPair v11 v12) (VPair v21 v22) = valOrd v11 v21 <> valOrd v12 v22
 valOrd (VType ty1) (VType ty2)         = compare ty1 ty2
 valOrd _ _                             = EQ  -- XXX
+
+------------------------------------------------------------
+-- Polynomial sequences [a,b,c,d .. e]
+------------------------------------------------------------
+
+ellipsis :: Ellipsis Value -> Value -> Value
+ellipsis (fmap vrat -> end) (vlist vrat -> rs) = listv ratv $ enumEllipsis rs end
+
+enumEllipsis :: (Enum a, Num a, Ord a) => [a] -> Ellipsis a -> [a]
+enumEllipsis [] _          = error "Impossible! Disco.Interpret.CESK.enumEllipsis []"
+enumEllipsis [x] Forever   = [x ..]
+enumEllipsis [x] (Until y)
+  | x <= y    = [x .. y]
+  | otherwise = [x, pred x .. y]
+enumEllipsis xs Forever    = babbage xs
+enumEllipsis xs (Until y)
+  | d > 0     = takeWhile (<= y) nums
+  | d < 0     = takeWhile (>= y) nums
+  | otherwise = nums
+  where
+    d    = constdiff xs
+    nums = babbage xs
+
+-- | Extend a sequence infinitely by interpolating it as a polynomial
+--   sequence, via forward differences.  Essentially the same
+--   algorithm used by Babbage's famous Difference Engine.
+babbage :: Num a => [a] -> [a]
+babbage []     = []
+babbage [x]    = repeat x
+babbage (x:xs) = scanl (+) x (babbage (diff (x:xs)))
+
+-- | Compute the forward difference of the given sequence, that is,
+--   differences of consecutive pairs of elements.
+diff :: Num a => [a] -> [a]
+diff xs = zipWith (-) (tail xs) xs
+
+-- | Take forward differences until the result is constant, and return
+--   the constant.  The sign of the constant difference tells us the
+--   limiting behavior of the sequence.
+constdiff :: (Eq a, Num a) => [a] -> a
+constdiff [] = error "Impossible! Disco.Interpret.Core.constdiff []"
+constdiff (x:xs)
+  | all (==x) xs = x
+  | otherwise    = constdiff (diff (x:xs))
 
 ------------------------------------------------------------
 -- Normalizing bags/sets

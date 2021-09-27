@@ -70,14 +70,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
-                     test/interp-fibs/expected
-                     test/interp-fibs/fiblist.disco
-                     test/interp-fibs/input
-                     test/interp-gc/expected
-                     test/interp-gc/input
-                     test/interp-lazymatch/bomb.disco
-                     test/interp-lazymatch/expected
-                     test/interp-lazymatch/input
+                     test/interp-strictmatch/bomb.disco
+                     test/interp-strictmatch/expected
+                     test/interp-strictmatch/input
                      test/lib-oeis/expected
                      test/lib-oeis/input
                      test/list-comp/expected
@@ -125,8 +120,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-functions/input
                      test/pretty-issue258/expected
                      test/pretty-issue258/input
-                     test/pretty-lazy/expected
-                     test/pretty-lazy/input
                      test/pretty-lit/expected
                      test/pretty-lit/input
                      test/pretty-ops/expected

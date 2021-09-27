@@ -27,7 +27,7 @@ module Disco.Value
 
   , ratv, vrat
   , intv, vint
-  , vchar
+  , charv, vchar
   , enumv
   , listv, vlist
 
@@ -51,7 +51,7 @@ module Disco.Value
 
   ) where
 
-import           Data.Char                        (chr)
+import           Data.Char                        (chr, ord)
 import           Data.IntMap                      (IntMap)
 import qualified Data.IntMap                      as IM
 import           Data.List                        (foldl')
@@ -225,7 +225,10 @@ vint :: Value -> Integer
 vint (VNum _ n) = numerator n
 
 vchar :: Value -> Char
-vchar (VNum _ n) = chr (fromIntegral (numerator n))
+vchar = chr . fromIntegral . vint
+
+charv :: Char -> Value
+charv = intv . fromIntegral . ord
 
 -- | Turn any instance of @Enum@ into a @Value@, by creating a
 --   constructor with an index corresponding to the enum value.

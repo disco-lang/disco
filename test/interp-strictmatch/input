@@ -3,7 +3,7 @@
 {? x when [1,2,3/0] is [x,3,5], 2 otherwise ?}
 {? x when [1,2,3/0] is [x,2,5], 2 otherwise ?}
 
-:load test/interp-lazymatch/bomb.disco
+:load test/interp-strictmatch/bomb.disco
 {? 1 when (0, bomb 'a' ) is (x+1, 'a' ), 2 otherwise ?}
 {? 1 when (0, bomb true) is (x+1, true), 2 otherwise ?}
 {? 1 when (0, bomb unit) is (x+1, unit), 2 otherwise ?}

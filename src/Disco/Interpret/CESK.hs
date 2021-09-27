@@ -144,6 +144,7 @@ m !!! k = case M.lookup k m of
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
 step (In (CVar x) e k)                   = return $ Out (e!!!x) k
 step (In (CNum d r) _ k)                 = return $ Out (VNum d r) k
+step (In (CConst OMatchErr) _ k)         = throw NonExhaustive
 step (In (CConst op) _ k)                = return $ Out (VConst op) k
 step (In (CInj s c) e k)                 = return $ In c e (FInj s : k)
 step (In (CCase c b1 b2) e k)            = return $ In c e (FCase e b1 b2 : k)

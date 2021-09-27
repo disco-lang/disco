@@ -313,6 +313,7 @@ library
                        Disco.Effects.LFresh
                        Disco.Effects.Output
                        Disco.Effects.Random
+                       Disco.Effects.State
                        Disco.Effects.Store
                        Disco.AST.Core
                        Disco.AST.Desugared

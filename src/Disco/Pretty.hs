@@ -424,7 +424,14 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 -- Pretty-printing values
 ------------------------------------------------------------
 
-prettyValue :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyValue :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
+
+-- Lazily expand any user-defined types
+prettyValue (TyUser x args) v = do
+  tydefs <- input
+  let (TyDefBody _ body) = tydefs M.! x   -- This can't fail if typechecking succeeded
+  prettyValue (body args) v
+
 prettyValue _      VUnit                     = "■"
 prettyValue TyProp _                         = prettyPlaceholder TyProp
 prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
@@ -449,33 +456,35 @@ prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
 
-prettyValue ty (VClo map xs bi) = undefined
-prettyValue ty (VType ty')    = undefined
-prettyValue ty (VRef n)       = undefined
-prettyValue ty (VFun_ vf)     = undefined
-prettyValue ty (VProp vp)     = undefined
-prettyValue ty (VGraph gr va) = undefined
-prettyValue ty (VMap map)     = undefined
+prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
+
+-- prettyValue ty (VClo map xs bi) = undefined
+-- prettyValue ty (VType ty')    = undefined
+-- prettyValue ty (VRef n)       = undefined
+-- prettyValue ty (VFun_ vf)     = undefined
+-- prettyValue ty (VProp vp)     = undefined
+-- prettyValue ty (VGraph gr va) = undefined
+-- prettyValue ty (VMap map)     = undefined
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyVP :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyVP :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
 prettyVP ty@(_ :*: _) = prettyValue ty
 prettyVP ty           = parens . prettyValue ty
 
 prettyPlaceholder :: Members '[Reader PA] r => Type -> Sem r Doc
 prettyPlaceholder ty = "<" <> prettyTy ty <> ">"
 
-prettyTuple :: Members '[Reader PA] r => Type -> Value -> Sem r Doc
+prettyTuple :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
 prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
 prettyTuple ty v                        = prettyValue ty v
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: Members '[Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
+prettySequence :: Members '[Input TyDefCtx, Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
 prettySequence ty del vs = hsep =<< punctuate (return del) (map (prettyValue ty) vs)
 
 -- | Pretty-print a literal bag value.
-prettyBag :: Members '[Reader PA] r => Type -> [(Value,Integer)] -> Sem r Doc
+prettyBag :: Members '[Input TyDefCtx, Reader PA] r => Type -> [(Value,Integer)] -> Sem r Doc
 prettyBag _ [] = bag empty
 prettyBag ty vs
   | all ((==1) . snd) vs = bag $ prettySequence ty "," (map fst vs)

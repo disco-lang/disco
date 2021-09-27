@@ -1,4 +1,3 @@
-{-# LANGUAGE KindSignatures     #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -43,8 +42,8 @@ import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
+import           Disco.Effects.State
 import           Polysemy
-import           Polysemy.State
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -351,7 +350,7 @@ handleEval (Eval m) = inputToState $ do
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
   v <- inputToState . inputTopEnv $ eval (compileTerm at)
-  s <- renderDoc $ prettyValue ty v
+  s <- zoom topTyDefs . inputToState . renderDoc $ prettyValue ty v
   outputLn s
 
   modify @TopInfo $
@@ -360,7 +359,6 @@ evalTerm at = do
   return v
   where
     ty = getType at
-    c  = compileTerm at
 
 ------------------------------------------------------------
 -- :help

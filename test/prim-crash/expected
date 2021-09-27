@@ -1,11 +1,11 @@
 Loading prim.disco...
 EvalErr (Crash "nope")
 EvalErr (Crash "nope")
-7
+EvalErr (Crash "nope")
 let x : ℕ = crash("nope") in 3 + x : ℕ
 EvalErr (Crash "nope")
 crash : List(Char) → a
-1
+EvalErr (Crash "nope")
 EvalErr (Crash "nope")
 (λx : ℕ. 1)(crash("nope")) : ℕ
 EvalErr (Crash "nope")

@@ -141,6 +141,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-whnf/input
                      test/prim-crash/expected
                      test/prim-crash/input
+                     test/prim-frac/expected
+                     test/prim-frac/input
                      test/prim-sum/expected
                      test/prim-sum/input
                      test/prop-basic/expected
@@ -269,9 +271,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-tydef-kind/expected
                      test/types-tydef-kind/input
                      test/types-tydef-kind/types-tydef-kind.disco
-                     test/types-tydef-omega/expected
-                     test/types-tydef-omega/input
-                     test/types-tydef-omega/types-tydef-omega.disco
                      test/types-tydef-param/expected
                      test/types-tydef-param/input
                      test/types-tydef-param/types-tydef-param.disco

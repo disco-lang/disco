@@ -432,31 +432,31 @@ integerSqrt' n =
 ------------------------------------------------------------
 
 valEq :: Value -> Value -> Bool
-valEq (VNum _ r1) (VNum _ r2)         = r1 == r2
-valEq (VInj L v1) (VInj L v2)         = valEq v1 v2
-valEq (VInj R v1) (VInj R v2)         = valEq v1 v2
-valEq VUnit VUnit                     = True
-valEq (VPair v11 v12) (VPair v21 v22) = valEq v11 v21 && valEq v12 v22
-valEq (VType ty1) (VType ty2)         = ty1 == ty2
-valEq _ _                             = False
+valEq v1 v2 = valCmp v1 v2 == EQ
+
+valLt :: Value -> Value -> Bool
+valLt v1 v2 = valCmp v1 v2 == LT
+
+valCmp :: Value -> Value -> Ordering
+valCmp (VNum _ r1) (VNum _ r2)         = compare r1 r2
+valCmp (VInj L _) (VInj R _)           = LT
+valCmp (VInj R _) (VInj L _)           = GT
+valCmp (VInj L v1) (VInj L v2)         = valCmp v1 v2
+valCmp (VInj R v1) (VInj R v2)         = valCmp v1 v2
+valCmp VUnit VUnit                     = EQ
+valCmp (VPair v11 v12) (VPair v21 v22) = valCmp v11 v21 <> valCmp v12 v22
+valCmp (VType ty1) (VType ty2)         = compare ty1 ty2
+valCmp (VBag cs1) (VBag cs2)           = compareBags cs1 cs2
+valCmp v1 v2                           = error $ "valCmp " ++ show v1 ++ " " ++ show v2
+
+compareBags :: [(Value,Integer)] -> [(Value,Integer)] -> Ordering
+compareBags [] [] = EQ
+compareBags [] _  = LT
+compareBags _ []  = GT
+compareBags ((x,xn):xs) ((y,yn):ys) = valCmp x y <> compare xn yn <> compareBags xs ys
 
 -- VConst, VClo, VFun_
 -- VBag, VGraph, VMap
-
-valLt :: Value -> Value -> Bool
-valLt v1 v2 = valOrd v1 v2 == LT
-
--- XXX combine valEq and valOrd ?
-valOrd :: Value -> Value -> Ordering
-valOrd (VNum _ r1) (VNum _ r2)         = compare r1 r2
-valOrd (VInj L _) (VInj R _)           = LT
-valOrd (VInj R _) (VInj L _)           = GT
-valOrd (VInj L v1) (VInj L v2)         = valOrd v1 v2
-valOrd (VInj R v1) (VInj R v2)         = valOrd v1 v2
-valOrd VUnit VUnit                     = EQ
-valOrd (VPair v11 v12) (VPair v21 v22) = valOrd v11 v21 <> valOrd v12 v22
-valOrd (VType ty1) (VType ty2)         = compare ty1 ty2
-valOrd _ _                             = EQ  -- XXX
 
 ------------------------------------------------------------
 -- Polynomial sequences [a,b,c,d .. e]
@@ -541,7 +541,7 @@ countValues = sortNCount . map (,1)
 sortNCount :: [(Value, Integer)] -> [(Value, Integer)]
 sortNCount [] = []
 sortNCount [x] = [x]
-sortNCount xs = merge (+) valOrd (sortNCount firstHalf) (sortNCount secondHalf)
+sortNCount xs = merge (+) valCmp (sortNCount firstHalf) (sortNCount secondHalf)
   where
     (firstHalf, secondHalf) = splitAt (length xs `div` 2) xs
 

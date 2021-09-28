@@ -29,6 +29,7 @@ module Disco.Value
   , intv, vint
   , charv, vchar
   , enumv
+  , pairv, vpair
   , listv, vlist
 
     -- * Props & testing
@@ -215,6 +216,7 @@ ratv = VNum mempty
 
 vrat :: Value -> Rational
 vrat (VNum _ r) = r
+vrat v          = error $ "vrat " ++ show v
 
 -- | A convenience function for creating a default @VNum@ value with a
 --   default (@Fractional@) flag.
@@ -223,6 +225,7 @@ intv = ratv . (% 1)
 
 vint :: Value -> Integer
 vint (VNum _ n) = numerator n
+vint v          = error $ "vint " ++ show v
 
 vchar :: Value -> Char
 vchar = chr . fromIntegral . vint
@@ -235,6 +238,13 @@ charv = intv . fromIntegral . ord
 enumv :: Enum e => e -> Value
 enumv e = VInj (toEnum $ fromEnum e) VUnit
 
+pairv :: (a -> Value) -> (b -> Value) -> (a,b) -> Value
+pairv av bv (a,b) = VPair (av a) (bv b)
+
+vpair :: (Value -> a) -> (Value -> b) -> Value -> (a,b)
+vpair va vb (VPair a b) = (va a, vb b)
+vpair _ _ v             = error $ "vpair " ++ show v
+
 listv :: (a -> Value) -> [a] -> Value
 listv _ []        = VNil
 listv eltv (a:as) = VCons (eltv a) (listv eltv as)
@@ -242,6 +252,7 @@ listv eltv (a:as) = VCons (eltv a) (listv eltv as)
 vlist :: (Value -> a) -> Value -> [a]
 vlist _ VNil            = []
 vlist velt (VCons v vs) = velt v : vlist velt vs
+vlist _ v               = error $ "vlist " ++ show v
 
 
 ------------------------------------------------------------

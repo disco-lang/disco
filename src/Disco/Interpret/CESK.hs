@@ -39,6 +39,7 @@ import           Polysemy.State
 
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
+import           Data.Bifunctor                     (first, second)
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
@@ -334,8 +335,22 @@ appConst = \case
   OListToSet -> return . VBag . (map . fmap) (const 1) . countValues . vlist id
   OListToBag -> return . VBag . countValues . vlist id
 
--- appConst OBagToCounts                       = _wY
--- appConst (OCountsToBag ty)                  = _wZ
+  -- Bag a -> Set (a, N)
+  OBagToCounts -> \(VBag cs) -> return . VBag . map ((,1) . pairv id intv) $ cs
+
+  -- Bag (a, N) -> Bag a
+  --   Notionally this takes a set of pairs instead of a bag, but operationally we need to
+  --   be prepared for a bag, because of the way literal bags desugar, e.g.
+  --
+  --   Disco> :desugar let x = 3 in ⟅ 'a' # (2 + x), 'b', 'b' ⟆
+  --   (λx. bagFromCounts(bag(('a', 2 + x) :: ('b', 1) :: ('b', 1) :: [])))(3)
+
+  OCountsToBag -> \(VBag cs) ->
+    return . VBag . sortNCount
+    . map (second (uncurry (*)) . assoc . first (vpair id vint)) $ cs
+    where
+      assoc ((a,b),c) = (a,(b,c))
+
 -- appConst (OMapToSet ty ty')                 = _w10
 -- appConst OSetToMap                          = _w11
 

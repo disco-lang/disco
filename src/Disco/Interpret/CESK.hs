@@ -291,8 +291,6 @@ appConst = \case
 --------------------------------------------------
 -- Sequences
 
-  -- XXX have to get rid of Forever!  It is just an infinite loop...
-  OForever -> return . ellipsis Forever
   OUntil -> arity2 $ \v1 -> return . ellipsis (Until v1)
 
   OLookupSeq -> return . oeisLookup
@@ -454,11 +452,9 @@ ellipsis (fmap vrat -> end) (vlist vrat -> rs) = listv ratv $ enumEllipsis rs en
 
 enumEllipsis :: (Enum a, Num a, Ord a) => [a] -> Ellipsis a -> [a]
 enumEllipsis [] _          = error "Impossible! Disco.Interpret.CESK.enumEllipsis []"
-enumEllipsis [x] Forever   = [x ..]
 enumEllipsis [x] (Until y)
   | x <= y    = [x .. y]
   | otherwise = [x, pred x .. y]
-enumEllipsis xs Forever    = babbage xs
 enumEllipsis xs (Until y)
   | d > 0     = takeWhile (<= y) nums
   | d < 0     = takeWhile (>= y) nums

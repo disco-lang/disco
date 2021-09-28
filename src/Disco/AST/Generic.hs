@@ -232,11 +232,10 @@ instance Alpha Container
 instance Subst t Container
 
 -- | An ellipsis is an "omitted" part of a literal container (such as
---   a list or set), of the form @..@ or @.. t@.
+--   a list or set), of the form @.. t@.  We don't have open-ended
+--   ellipses since everything is evaluated eagerly and hence
+--   containers must be finite.
 data Ellipsis t where
-  -- | 'Forever' represents an open-ended ellipsis, as in @[3 ..]@.
-  Forever ::      Ellipsis t
-
   -- | 'Until' represents an ellipsis with a given endpoint, as in @[3 .. 20]@.
   Until   :: t -> Ellipsis t   -- @.. t@
   deriving (Show, Generic, Functor, Foldable, Traversable)

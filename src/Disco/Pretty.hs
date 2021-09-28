@@ -226,7 +226,6 @@ prettyTerm (TContainer c ts e)  = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyCount ts)
   let pe = case e of
              Nothing        -> []
-             Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
   containerDelims c (hsep (ds ++ pe))
   where

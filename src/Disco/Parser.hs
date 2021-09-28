@@ -670,11 +670,11 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
         _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
---   @.. [t]@.  Any number > 1 of dots may be used, just for fun.
+--   @.. t@.  Any number > 1 of dots may be used, just for fun.
 parseEllipsis :: Parser (Ellipsis Term)
 parseEllipsis = do
   _ <- ellipsis
-  maybe Forever Until <$> optional parseTerm
+  Until <$> parseTerm
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.

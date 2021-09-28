@@ -771,13 +771,8 @@ desugarContainer :: Member Fresh r => Type -> Container -> [(ATerm, Maybe ATerm)
 desugarContainer ty ListContainer es Nothing =
   foldr (dtbin ty (PrimBOp Cons)) (DTNil ty) <$> mapM (desugarTerm . fst) es
 
--- A list container with an ellipsis (@[x, y, z ..]@) desugars to
--- an application of the primitive 'forever' function...
-desugarContainer ty ListContainer es (Just Forever) =
-  dtapp (DTPrim (ty :->: ty) PrimForever) <$> desugarContainer ty ListContainer es Nothing
-
--- ... or @[x, y, z .. e]@ desugars to an application of the primitive
--- 'until' function.
+-- A list container with an ellipsis @[x, y, z .. e]@ desugars to an
+-- application of the primitive 'until' function.
 desugarContainer ty@(TyList _) ListContainer es (Just (Until t)) =
   dtbin ty PrimUntil
     <$> desugarTerm t

@@ -184,7 +184,6 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OLookup         -- ^ Map lookup
 
         -- Ellipses
-        | OForever        -- ^ Continue forever, @[x, y, z ..]@
         | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
 
         -- Container conversion

@@ -56,11 +56,6 @@ take(0, _)         = []
 take(_, [])        = []
 take(n+1, x :: xs) = x :: take(n, xs)
 
-||| Repeat the given element infinitely.
-!!!   take(3, repeat true) == [true, true, true]
-repeat : a → List(a)
-repeat x = x :: repeat x
-
 ||| The length of a list.
 !!!   length [true, false, true] == 3
 !!!   length(take(20, repeat true)) == 20

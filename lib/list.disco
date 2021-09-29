@@ -1,3 +1,5 @@
+using PercentNames
+
 ||| A right fold for lists.
 |||   foldr(f, z, [a,b,c]) = f(a, f(b, f(c, z)))
 
@@ -25,8 +27,11 @@ append(x::xs, ys) = x :: append(xs, ys)
 !!!   concat [[1,2],[3],[],[4,5,6]] == [1,2,3,4,5,6]
 
 concat : List(List(a)) → List(a)
-concat []      = []
-concat (l::ls) = append(l, concat ls)
+concat = concat%
+
+concat% : List(List(a)) → List(a)
+concat% []      = []
+concat% (l::ls) = append(l, concat% ls)
 
 ||| Apply a function to each element of a list, returning a new list
 ||| of the results.  Note, this is here just for illustration

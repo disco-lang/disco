@@ -206,6 +206,12 @@ appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
 appConst = \case
 
 --------------------------------------------------
+-- Basics
+
+  OCrash -> throw . Crash . vlist vchar
+  OId    -> return
+
+--------------------------------------------------
 -- Arithmetic
 
   OAdd -> numOp2 (+)
@@ -328,9 +334,9 @@ appConst = \case
 --------------------------------------------------
 -- Container conversions
 
--- appConst OBagToSet                          = return .
--- appConst OSetToList                         = _wT
--- appConst OBagToList                         = _wV
+  OBagToSet -> \(VBag cs) -> return . VBag . (map . second) (const 1) $ cs
+  OSetToList -> \(VBag cs) -> return . listv id . map fst $ cs
+  OBagToList -> \(VBag cs) -> return . listv id . concatMap (uncurry (flip (replicate . fromIntegral))) $ cs
 
   OListToSet -> return . VBag . (map . fmap) (const 1) . countValues . vlist id
   OListToBag -> return . VBag . countValues . vlist id
@@ -371,10 +377,6 @@ appConst = \case
 -- appConst ONotProp                           = _w18
 -- appConst (OShouldEq ty)                     = _w19
 -- appConst OMatchErr                          = _w1a
-
-  OCrash -> throw . Crash . vlist vchar
-
--- appConst OId                                = _w1c
 
   c -> error $ "Unimplemented: appConst " ++ show c
 

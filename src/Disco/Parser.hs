@@ -329,11 +329,13 @@ reservedWords =
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a given type of character and continuing with alphanumerics,
---   underscores, and apostrophes.
+--   underscores, and apostrophes. (And percent signs, if the
+--   'PercentNames' extension is enabled.)
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many identChar
+    identChar = alphaNumChar <|> oneOf "_'" <|> (ensureEnabled PercentNames *> char '%')
     check x
       | x `elem` reservedWords = do
           -- back up to beginning of bad token to report correct position

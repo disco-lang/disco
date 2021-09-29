@@ -23,6 +23,7 @@ type ExtSet = Set Ext
 -- | Enumeration of optional language extensions.
 data Ext
   = Primitives   -- ^ Allow primitives, i.e. @$prim@
+  | PercentNames -- ^ Allow the @%@ char to be used in identifier names
   | Randomness   -- ^ Allow randomness.  This is not implemented yet.
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 

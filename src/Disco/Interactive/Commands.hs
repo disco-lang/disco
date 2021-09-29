@@ -470,10 +470,11 @@ handleNames
   :: Members '[Input TopInfo, LFresh, Output String] r
   => REPLExpr 'CNames -> Sem r ()
 handleNames Names = do
+  pct   <- inputs @TopInfo ((PercentNames `S.member`) . view extSet)
   ctx   <- inputs @TopInfo (view topCtx)
   tyDef <- inputs @TopInfo (view topTyDefs)
   mapM_ showTyDef $ M.toList tyDef
-  mapM_ showFn $ M.toList ctx
+  mapM_ showFn . (if pct then id else filter (not . ('%' `elem`) . name2String . fst))$ M.toList ctx
   where
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
     showFn (x, ty) = do

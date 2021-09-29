@@ -318,7 +318,6 @@ compilePrim _ PrimFrac    = return $ CConst OFrac
 
 compilePrim _ PrimCrash   = return $ CConst OCrash
 
-compilePrim _ PrimForever = return $ CConst OForever
 compilePrim _ PrimUntil   = return $ CConst OUntil
 
 compilePrim _ PrimHolds   = return $ CConst OHolds

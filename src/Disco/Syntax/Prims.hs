@@ -75,7 +75,6 @@ data Prim where
 
   PrimCrash      :: Prim        -- ^ Crash
 
-  PrimForever    :: Prim        -- ^ @[x, y, z .. ]@
   PrimUntil      :: Prim        -- ^ @[x, y, z .. e]@
 
   PrimHolds      :: Prim        -- ^ Test whether a proposition holds
@@ -163,7 +162,6 @@ primTable =
 
   , PrimInfo PrimCrash     "crash"          False
 
-  , PrimInfo PrimForever   "forever"        False
   , PrimInfo PrimUntil     "until"          False
 
   , PrimInfo PrimHolds     "holds"          True

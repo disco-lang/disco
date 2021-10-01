@@ -58,7 +58,6 @@ take(n+1, x :: xs) = x :: take(n, xs)
 
 ||| The length of a list.
 !!!   length [true, false, true] == 3
-!!!   length(take(20, repeat true)) == 20
 length : List(a) → ℕ
 length [] = 0
 length (_::l) = 1 + length l

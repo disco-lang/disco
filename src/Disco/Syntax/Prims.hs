@@ -67,7 +67,6 @@ data Prim where
   PrimReduce     :: Prim        -- ^ Reduce operation for containers
   PrimFilter     :: Prim        -- ^ Filter operation for containers
   PrimJoin       :: Prim        -- ^ Monadic join for containers
-  PrimMerge      :: Prim        -- ^ Generic merge operation for bags/sets
 
   PrimIsPrime    :: Prim        -- ^ Efficient primality test
   PrimFactor     :: Prim        -- ^ Factorization
@@ -154,7 +153,6 @@ primTable =
   , PrimInfo PrimReduce    "reduce"         True
   , PrimInfo PrimFilter    "filter"         True
   , PrimInfo PrimJoin      "join"           False
-  , PrimInfo PrimMerge     "merge"          False
 
   , PrimInfo PrimIsPrime   "isPrime"        False
   , PrimInfo PrimFactor    "factor"         False

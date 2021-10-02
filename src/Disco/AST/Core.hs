@@ -29,6 +29,7 @@ import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
+import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -147,10 +148,10 @@ data Op = OAdd      -- ^ Addition (@+@)
 
         -- Container operations
         | OSize           -- ^ Size of two sets (@size@)
-        | OPower Type     -- ^ Power set/bag of a given set/bag
-                          --   (@power@). Carries the element type.
-        | OBagElem Type   -- ^ Set/bag element test.
-        | OListElem Type  -- ^ List element test.
+        | OPower          -- ^ Power set/bag of a given set/bag
+                          --   (@power@).
+        | OBagElem        -- ^ Set/bag element test.
+        | OListElem       -- ^ List element test.
 
         | OEachList       -- ^ Map a function over a list.
         | OEachBag Type   -- ^ Map a function over a bag.  Carries the
@@ -164,7 +165,7 @@ data Op = OAdd      -- ^ Addition (@+@)
         | OFilterList     -- ^ Filter a list.
         | OFilterBag      -- ^ Filter a bag.
 
-        | OMerge Type     -- ^ Merge two bags/sets.
+        | OMerge BOp      -- ^ Merge two bags/sets.
 
         | OConcat         -- ^ List concatenation.  (Perhaps in the
                           --   future this should get

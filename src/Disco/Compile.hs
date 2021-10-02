@@ -248,8 +248,8 @@ compilePrim _ PrimCeil  = return $ CConst OCeil
 compilePrim _ PrimAbs   = return $ CConst OAbs
 compilePrim _ PrimSize  = return $ CConst OSize
 
-compilePrim (TySet a :->: _) PrimPower = return $ CConst (OPower a)
-compilePrim (TyBag a :->: _) PrimPower = return $ CConst (OPower a)
+compilePrim (TySet _ :->: _) PrimPower = return $ CConst OPower
+compilePrim (TyBag _ :->: _) PrimPower = return $ CConst OPower
 compilePrim ty               PrimPower = compilePrimErr PrimPower ty
 
 compilePrim (TySet _ :->: _)  PrimList = return $ CConst OSetToList
@@ -307,10 +307,6 @@ compilePrim (_ :->: TyList _) PrimJoin = return $ CConst OConcat
 compilePrim (_ :->: TyBag  a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet  a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty                PrimJoin = compilePrimErr PrimJoin ty
-
-compilePrim (_ :*: TyBag a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim (_ :*: TySet a :*: _ :->: _) PrimMerge = return $ CConst (OMerge a)
-compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
 
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor  = return $ CConst OFactor
@@ -489,13 +485,23 @@ compileBOp _ _ _ op
       , Lt      ==> OLt
       ]
 
+--     mergeOp _         Inter = PrimBOp Min
+--     mergeOp _         Diff  = PrimBOp SSub
+--     mergeOp (TySet _) Union = PrimBOp Max
+--     mergeOp (TyBag _) Union = PrimBOp Add
+
+compileBOp _ _ _         Inter = CConst (OMerge Min)
+compileBOp _ _ _         Diff  = CConst (OMerge SSub)
+compileBOp _ _ (TySet _) Union = CConst (OMerge Max)
+compileBOp _ _ (TyBag _) Union = CConst (OMerge Add)
+
 -- XXX don't think this is true any more?
 -- Likewise, ShouldEq also needs to know the type at which the
 -- comparison is occurring.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
 
-compileBOp ty (TyList _) _ Elem = CConst (OListElem ty)
-compileBOp ty _ _          Elem = CConst (OBagElem  ty)
+compileBOp ty (TyList _) _ Elem = CConst OListElem
+compileBOp ty _ _          Elem = CConst OBagElem
 
 compileBOp ty1 ty2 resTy op
   = error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

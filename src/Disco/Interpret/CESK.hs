@@ -18,7 +18,12 @@ module Disco.Interpret.CESK
   , runTest
   ) where
 
+import           Debug.Trace
+
 import           Control.Arrow                      ((***))
+import           Control.Monad                      ((>=>))
+import           Data.Bifunctor                     (first, second)
+import           Data.List                          (find)
 import           Data.Map                           (Map)
 import qualified Data.Map                           as M
 import           Data.Ratio
@@ -39,13 +44,13 @@ import           Polysemy.State
 
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
-import           Data.Bifunctor                     (first, second)
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
 import           Disco.AST.Typed                    (AProperty)
 import           Disco.Enumerate
 import           Disco.Error
+import           Disco.Syntax.Operators             (BOp (..))
 import           Disco.Types                        hiding (V)
 import           Disco.Value
 
@@ -179,7 +184,7 @@ step (Out (VPair v1 v2) (FProj s : k))   = return $ Out (selectSide s v1 v2) k
 step (Out v (FArg e c2 : k))             = return $ In c2 e (FApp v : k)
 step (Out v2 (FApp (VClo e [x] b) : k))  = return $ In b (M.insert x v2 e) k
 step (Out v2 (FApp (VClo e (x:xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) k
-step (Out v2 (FApp (VConst op) : k))     = Out <$> appConst op v2 <*> pure k
+step (Out v2 (FApp (VConst op) : k))     = appConst k op v2
 step (Out (VRef n) (FForce : k))         = do
   cell <- lkup n
   case cell of
@@ -202,39 +207,43 @@ arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
 arity2 f v           = error "arity2 on a non-pair!"  -- XXX
 
-appConst :: Member (Error EvalError) r => Op -> Value -> Sem r Value
-appConst = \case
+arity3 :: (Value -> Value -> Value -> a) -> Value -> a
+arity3 f (VPair x (VPair y z)) = f x y z
+arity3 f v                     = error "arity3 on a non-triple!"
+
+appConst :: Member (Error EvalError) r => Cont -> Op -> Value -> Sem r CESK
+appConst k = \case
 
 --------------------------------------------------
 -- Basics
 
   OCrash -> throw . Crash . vlist vchar
-  OId    -> return
+  OId    -> out
 
 --------------------------------------------------
 -- Arithmetic
 
-  OAdd -> numOp2 (+)
-  ONeg -> numOp1 negate
-  OSqrt -> numOp1 integerSqrt
-  OFloor -> numOp1 $ (%1) . floor
-  OCeil -> numOp1 $ (%1) . ceiling
-  OAbs -> numOp1 abs
-  OMul -> numOp2 (*)
-  ODiv -> numOp2' divOp
+  OAdd -> numOp2 (+) >=> out
+  ONeg -> numOp1 negate >=> out
+  OSqrt -> numOp1 integerSqrt >=> out
+  OFloor -> numOp1 ((%1) . floor) >=> out
+  OCeil -> numOp1 ((%1) . ceiling) >=> out
+  OAbs -> numOp1 abs >=> out
+  OMul -> numOp2 (*) >=> out
+  ODiv -> numOp2' divOp >=> out
     where
       divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       divOp _ 0 = throw DivByZero
       divOp m n = return $ ratv (m / n)
 
-  OExp -> numOp2 $ \m n -> m ^^ numerator n
-  OMod -> numOp2' modOp
+  OExp -> (numOp2 $ \m n -> m ^^ numerator n) >=> out
+  OMod -> numOp2' modOp >=> out
     where
       modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       modOp m n
         | n == 0    = throw DivByZero
         | otherwise = return $ intv (numerator m `mod` numerator n)
-  ODivides -> numOp2' $ \m n -> return (enumv $ divides m n)
+  ODivides -> (numOp2' $ \m n -> return (enumv $ divides m n)) >=> out
     where
       divides 0 0 = True
       divides 0 _ = False
@@ -243,8 +252,8 @@ appConst = \case
 --------------------------------------------------
 -- Number theory
 
-  OIsPrime -> intOp1 (enumv . isPrime)
-  OFactor -> intOp1' primFactor
+  OIsPrime -> intOp1 (enumv . isPrime) >=> out
+  OFactor -> intOp1' primFactor >=> out
     where
       -- Semantics of the @$factor@ prim: turn a natural number into its
       -- bag of prime factors.  Crash if called on 0, which does not have
@@ -253,7 +262,7 @@ appConst = \case
       primFactor 0 = throw (Crash "0 has no prime factorization!")
       primFactor n = return . VBag $ map ((intv . unPrime) *** fromIntegral) (factorise n)
 
-  OFrac -> numOp1' (return . primFrac)
+  OFrac -> numOp1' (return . primFrac) >=> out
     where
       -- Semantics of the @$frac@ prim: turn a rational number into a pair
       -- of its numerator and denominator.
@@ -263,7 +272,7 @@ appConst = \case
 --------------------------------------------------
 -- Combinatorics
 
-  OMultinom -> arity2 multinomOp
+  OMultinom -> arity2 multinomOp >=> out
     where
       multinomOp :: Value -> Value -> Sem r Value
       multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
@@ -274,20 +283,20 @@ appConst = \case
             | k > n     = 0
             | otherwise = choose n k * multinomial (n-k) ks
 
-  OFact -> numOp1' factOp
+  OFact -> numOp1' factOp >=> out
     where
       factOp :: Member (Error EvalError) r => Rational -> Sem r Value
       factOp (numerator -> n)
         | n > fromIntegral (maxBound :: Int) = throw Overflow
         | otherwise = return . intv $ factorial (fromIntegral n)
 
-  OEnum -> return . enumOp
+  OEnum -> out . enumOp
     where
       enumOp :: Value -> Value
       enumOp (VType ty) = listv id (enumerateType ty)
       enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v  -- XXX
 
-  OCount -> return . countOp
+  OCount -> out . countOp
     where
       countOp :: Value -> Value
       countOp (VType ty) = case countType ty of
@@ -298,27 +307,38 @@ appConst = \case
 --------------------------------------------------
 -- Sequences
 
-  OUntil -> arity2 $ \v1 -> return . ellipsis (Until v1)
+  OUntil -> arity2 $ \v1 -> out . ellipsis (Until v1)
 
-  OLookupSeq -> return . oeisLookup
-  OExtendSeq -> return . oeisExtend
+  OLookupSeq -> out . oeisLookup
+  OExtendSeq -> out . oeisExtend
 
 --------------------------------------------------
 -- Comparison
 
-  OEq -> arity2 $ \v1 v2 -> return $ enumv (valEq v1 v2)
-  OLt -> arity2 $ \v1 v2 -> return $ enumv (valLt v1 v2)
+  OEq -> arity2 $ \v1 v2 -> out $ enumv (valEq v1 v2)
+  OLt -> arity2 $ \v1 v2 -> out $ enumv (valLt v1 v2)
 
 --------------------------------------------------
 -- Container operations
 
-  OSize -> return . sizeOp
+  OSize -> out . sizeOp
     where
       sizeOp (VBag xs) = intv (sum (map snd xs))
 
--- appConst (OPower ty)                        = _wv
--- appConst (OBagElem ty)                      = _ww
--- appConst (OListElem ty)                     = _wx
+  OPower -> \(VBag xs) -> out . VBag . sortNCount . map (first VBag) . choices $ xs
+    where
+      choices :: [(Value, Integer)] -> [([(Value, Integer)], Integer)]
+      choices [] = [([], 1)]
+      choices ((x, n) : xs) = xs' ++ concatMap (\k -> map (cons n (x,k)) xs') [1 .. n]
+        where
+          xs' = choices xs
+      cons n (x,k) (zs, m) = ((x,k):zs , choose n k * m)
+
+  OBagElem -> arity2 $ \x (VBag xs) ->
+    out . enumv . maybe False (const True) . find (valEq x) . map fst $ xs
+
+  OListElem -> arity2 $ \x -> out . enumv . maybe False (const True) . find (valEq x) . vlist id
+
 -- appConst OEachList                          = _wy
 -- appConst (OEachBag ty)                      = _wz
 -- appConst (OEachSet ty)                      = _wA
@@ -326,7 +346,14 @@ appConst = \case
 -- appConst OReduceBag                         = _wC
 -- appConst OFilterList                        = _wD
 -- appConst OFilterBag                         = _wE
--- OMerge -> \f (VBag xs) (VBag ys) ->
+  OMerge op -> arity2 $ \(VBag xs) (VBag ys) -> out . VBag $ merge (interpOp op) xs ys
+    where
+      interpOp Max  = max
+      interpOp Min  = min
+      interpOp Add  = (+)
+      interpOp SSub = \x y -> max 0 (x - y)
+      interpOp op   = error $ "unknown op in OMerge: " ++ show op
+
 -- appConst OConcat                            = _wG
 -- appConst (OBagUnions ty)                    = _wH
 -- appConst (OUnions ty)                       = _wI
@@ -334,15 +361,15 @@ appConst = \case
 --------------------------------------------------
 -- Container conversions
 
-  OBagToSet -> \(VBag cs) -> return . VBag . (map . second) (const 1) $ cs
-  OSetToList -> \(VBag cs) -> return . listv id . map fst $ cs
-  OBagToList -> \(VBag cs) -> return . listv id . concatMap (uncurry (flip (replicate . fromIntegral))) $ cs
+  OBagToSet -> \(VBag cs) -> out . VBag . (map . second) (const 1) $ cs
+  OSetToList -> \(VBag cs) -> out . listv id . map fst $ cs
+  OBagToList -> \(VBag cs) -> out . listv id . concatMap (uncurry (flip (replicate . fromIntegral))) $ cs
 
-  OListToSet -> return . VBag . (map . fmap) (const 1) . countValues . vlist id
-  OListToBag -> return . VBag . countValues . vlist id
+  OListToSet -> out . VBag . (map . fmap) (const 1) . countValues . vlist id
+  OListToBag -> out . VBag . countValues . vlist id
 
   -- Bag a -> Set (a, N)
-  OBagToCounts -> \(VBag cs) -> return . VBag . map ((,1) . pairv id intv) $ cs
+  OBagToCounts -> \(VBag cs) -> out . VBag . map ((,1) . pairv id intv) $ cs
 
   -- Bag (a, N) -> Bag a
   --   Notionally this takes a set of pairs instead of a bag, but operationally we need to
@@ -352,7 +379,7 @@ appConst = \case
   --   (λx. bagFromCounts(bag(('a', 2 + x) :: ('b', 1) :: ('b', 1) :: [])))(3)
 
   OCountsToBag -> \(VBag cs) ->
-    return . VBag . sortNCount
+    out . VBag . sortNCount
     . map (second (uncurry (*)) . assoc . first (vpair id vint)) $ cs
     where
       assoc ((a,b),c) = (a,(b,c))
@@ -379,6 +406,9 @@ appConst = \case
 -- appConst OMatchErr                          = _w1a
 
   c -> error $ "Unimplemented: appConst " ++ show c
+
+  where
+    out v = return $ Out v k
 
 --------------------------------------------------
 -- Arithmetic
@@ -543,7 +573,7 @@ countValues = sortNCount . map (,1)
 sortNCount :: [(Value, Integer)] -> [(Value, Integer)]
 sortNCount [] = []
 sortNCount [x] = [x]
-sortNCount xs = merge (+) valCmp (sortNCount firstHalf) (sortNCount secondHalf)
+sortNCount xs = merge (+) (sortNCount firstHalf) (sortNCount secondHalf)
   where
     (firstHalf, secondHalf) = splitAt (length xs `div` 2) xs
 
@@ -555,14 +585,13 @@ sortNCount xs = merge (+) valCmp (sortNCount firstHalf) (sortNCount secondHalf)
 --   intersection; and so on.
 merge
   :: (Integer -> Integer -> Integer)
-  -> (a -> a -> Ordering)
-  -> [(a, Integer)] -> [(a, Integer)] -> [(a, Integer)]
-merge g cmp = go
+  -> [(Value, Integer)] -> [(Value, Integer)] -> [(Value, Integer)]
+merge g = go
   where
     go [] [] = []
     go [] ((y,n):ys) = mergeCons y 0 n (go [] ys)
     go ((x,n):xs) [] = mergeCons x n 0 (go xs [])
-    go ((x,n1):xs) ((y,n2): ys) = case cmp x y of
+    go ((x,n1):xs) ((y,n2): ys) = case valCmp x y of
       LT -> mergeCons x n1 0  (go xs ((y,n2):ys))
       EQ -> mergeCons x n1 n2 (go xs ys)
       GT -> mergeCons y 0 n2  (go ((x,n1):xs) ys)

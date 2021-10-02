@@ -669,17 +669,6 @@ typecheck Infer (TPrim prim) = do
       a <- freshTy
       return $ TyContainer c (TyContainer c a) :->: TyContainer c a
 
-    -- merge : (N × N -> N) × c a × c a -> c a   (c = bag or set)
-    inferPrim PrimMerge = do
-      c <- freshAtom
-      a <- freshTy
-      constraint $ COr
-        [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
-        , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
-        ]
-      let ca = TyContainer c a
-      return $ (TyN :*: TyN :->: TyN) :*: ca :*: ca :->: ca
-
     inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
       a <- freshTy
       c <- freshAtom

@@ -307,8 +307,6 @@ bopDesugars _   _   _ bop = bop `elem`
   , Neq, Gt, Leq, Geq, Min, Max
   , IDiv
   , Sub, SSub
-  , Inter, Diff, Union
-  , Subset
   ]
 
 -- | Desugar a primitive binary operator at the given type.
@@ -436,37 +434,40 @@ desugarBinApp ty SSub t1 t2 = desugarTerm $
     -- if we add them in Z5 and then coerce to Nat, but 6 if we first
     -- coerce both and then add.
 
--- Intersection, difference, and union all desugar to an application
--- of 'merge' with an appropriate combining operation.
-desugarBinApp ty op t1 t2
-  | op `elem` [Inter, Diff, Union] = desugarTerm $
-    tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
-      [ ATPrim (TyN :*: TyN :->: TyN) (mergeOp ty op)
-      , t1
-      , t2
-      ]
-  where
-    mergeOp _         Inter = PrimBOp Min
-    mergeOp _         Diff  = PrimBOp SSub
-    mergeOp (TySet _) Union = PrimBOp Max
-    mergeOp (TyBag _) Union = PrimBOp Add
-    mergeOp _         _     = error $ "Impossible! mergeOp " ++ show ty ++ " " ++ show op
+-- -- Intersection, difference, and union all desugar to an application
+-- -- of 'merge' with an appropriate combining operation.
+-- desugarBinApp ty op t1 t2
+--   | op `elem` [Inter, Diff, Union] =
+--       dtapp _
 
--- A ⊆ B  <==>  (A ⊔ B = B)
---   where ⊔ denotes 'merge max'.
---   Note it is NOT union, since this doesn't work for bags.
---   e.g.  bag [1] union bag [1,2] =  bag [1,1,2] /= bag [1,2].
-desugarBinApp _ Subset t1 t2 = desugarTerm $
-  tapps (ATPrim (ty :*: ty :->: TyBool) (PrimBOp Eq))
-  [ tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
-    [ ATPrim (TyN :*: TyN :->: TyN) (PrimBOp Max)
-    , t1
-    , t2
-    ]
-  , t2   -- XXX sharing
-  ]
-  where
-    ty = getType t1
+--     -- desugarTerm $
+--     -- tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
+--     --   [ ATPrim (TyN :*: TyN :->: TyN) (mergeOp ty op)
+--     --   , t1
+--     --   , t2
+--     --   ]
+--   where
+--     mergeOp _         Inter = PrimBOp Min
+--     mergeOp _         Diff  = PrimBOp SSub
+--     mergeOp (TySet _) Union = PrimBOp Max
+--     mergeOp (TyBag _) Union = PrimBOp Add
+--     mergeOp _         _     = error $ "Impossible! mergeOp " ++ show ty ++ " " ++ show op
+
+-- -- A ⊆ B  <==>  (A ⊔ B = B)
+-- --   where ⊔ denotes 'merge max'.
+-- --   Note it is NOT union, since this doesn't work for bags.
+-- --   e.g.  bag [1] union bag [1,2] =  bag [1,1,2] /= bag [1,2].
+-- desugarBinApp _ Subset t1 t2 = desugarTerm $
+--   tapps (ATPrim (ty :*: ty :->: TyBool) (PrimBOp Eq))
+--   [ tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
+--     [ ATPrim (TyN :*: TyN :->: TyN) (PrimBOp Max)
+--     , t1
+--     , t2
+--     ]
+--   , t2   -- XXX sharing
+--   ]
+--   where
+--     ty = getType t1
 
 desugarBinApp ty bop t1 t2 = error $ "Impossible! desugarBinApp " ++ show ty ++ " " ++ show bop ++ " " ++ show t1 ++ " " ++ show t2
 

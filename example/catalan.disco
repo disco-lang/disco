@@ -1,4 +1,3 @@
-import list
 import oeis
 
 -- The type of binary tree shapes: empty tree, or a pair of subtrees.

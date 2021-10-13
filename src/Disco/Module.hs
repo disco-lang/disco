@@ -1,7 +1,9 @@
-{-# LANGUAGE DeriveAnyClass  #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Module
 -- Copyright   :  (c) 2019 disco team (see LICENSE)
@@ -11,37 +13,29 @@
 --
 -- The 'ModuleInfo' record representing a disco module, and functions
 -- to resolve the location of a module on disk.
---
------------------------------------------------------------------------------
-
 module Disco.Module where
 
-import           GHC.Generics                     (Generic)
-
-import           Control.Lens                     (makeLenses)
-import           Control.Monad                    (filterM, foldM)
-import           Control.Monad.IO.Class           (MonadIO (..))
-import           Data.Coerce                      (coerce)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Maybe                       (listToMaybe)
-import qualified Data.Set                         as S
-import           System.Directory                 (doesFileExist)
-import           System.FilePath                  (replaceExtension, (</>))
-
-import           Unbound.Generics.LocallyNameless (Alpha, Bind, Name, Subst)
-
-import           Polysemy
-import           Polysemy.Error
-
-import           Disco.AST.Surface
-import           Disco.AST.Typed
-import           Disco.Context
-import           Disco.Extensions
-import           Disco.Typecheck.Monad            (TCError (..), TyCtx)
-import           Disco.Types
-
-import           Paths_disco
+import Control.Lens (makeLenses)
+import Control.Monad (filterM, foldM)
+import Control.Monad.IO.Class (MonadIO (..))
+import Data.Coerce (coerce)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Maybe (listToMaybe)
+import qualified Data.Set as S
+import Disco.AST.Surface
+import Disco.AST.Typed
+import Disco.Context
+import Disco.Extensions
+import Disco.Typecheck.Monad (TCError (..), TyCtx)
+import Disco.Types
+import GHC.Generics (Generic)
+import Paths_disco
+import Polysemy
+import Polysemy.Error
+import System.Directory (doesFileExist)
+import System.FilePath (replaceExtension, (</>))
+import Unbound.Generics.LocallyNameless (Alpha, Bind, Name, Subst)
 
 ------------------------------------------------------------
 -- ModuleInfo and related types
@@ -63,7 +57,7 @@ data LoadingMode = REPL | Standalone
 --   @
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
-data Defn  = Defn (Name ATerm) [Type] Type [Clause]
+data Defn = Defn (Name ATerm) [Type] Type [Clause]
   deriving (Show, Generic, Alpha)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
@@ -78,13 +72,13 @@ instance Subst Type Defn
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _modDocs     :: Ctx Term Docs
-  , _modProps    :: Ctx ATerm [AProperty]
-  , _modTys      :: TyCtx
-  , _modTydefs   :: TyDefCtx
-  , _modTermdefs :: Ctx ATerm Defn
-  , _modTerms    :: [(ATerm, PolyType)]
-  , _modExts     :: ExtSet
+  { _modDocs :: Ctx Term Docs,
+    _modProps :: Ctx ATerm [AProperty],
+    _modTys :: TyCtx,
+    _modTydefs :: TyDefCtx,
+    _modTermdefs :: Ctx ATerm Defn,
+    _modTerms :: [(ATerm, PolyType)],
+    _modExts :: ExtSet
   }
 
 makeLenses ''ModuleInfo
@@ -106,26 +100,27 @@ combineModuleInfo mode = foldM combineMods emptyModuleInfo
     combineMods
       (ModuleInfo d1 _ ty1 tyd1 tm1 tms1 es1)
       (ModuleInfo d2 p2 ty2 tyd2 tm2 tms2 es2) =
-      case (findDups tyd1 tyd2, findDups tm1 tm2) of
-        (Nothing, Nothing) -> return $
-          ModuleInfo
-            (joinCtx d2 d1)
-            p2
-            (joinCtx ty2 ty1)
-            (M.union tyd2 tyd1)
-            (joinCtx tm2 tm1)
-            (tms1 ++ tms2)
-            (es1 `S.union` es2)
-        (Just x, _) -> throw $ DuplicateTyDefns (coerce x)
-        (_, Just y) -> throw $ DuplicateDefns (coerce y)
+        case (findDups tyd1 tyd2, findDups tm1 tm2) of
+          (Nothing, Nothing) ->
+            return $
+              ModuleInfo
+                (joinCtx d2 d1)
+                p2
+                (joinCtx ty2 ty1)
+                (M.union tyd2 tyd1)
+                (joinCtx tm2 tm1)
+                (tms1 ++ tms2)
+                (es1 `S.union` es2)
+          (Just x, _) -> throw $ DuplicateTyDefns (coerce x)
+          (_, Just y) -> throw $ DuplicateDefns (coerce y)
 
     findDups :: Ord k => Map k v -> Map k v -> Maybe k
     findDups m1 m2 = case mode of
       -- In standalone mode, we can't have any duplicate definitions.
       Standalone -> listToMaybe . M.keys $ M.intersection m1 m2
-
       -- In REPL mode, later definitions override earlier ones.
-      _          -> Nothing
+      _ -> Nothing
+
 ------------------------------------------------------------
 -- Module resolution
 ------------------------------------------------------------
@@ -133,9 +128,14 @@ combineModuleInfo mode = foldM combineMods emptyModuleInfo
 -- | A data type indicating where we should look for Disco modules to
 --   be loaded.
 data Resolver
-  = FromDir FilePath          -- ^ Load only from a specific directory     (:load)
-  | FromCwdOrStdlib           -- ^ Load from current working dir or stdlib (import at REPL)
-  | FromDirOrStdlib FilePath  -- ^ Load from specific dir or stdlib        (import in file)
+  = -- | Load only from the stdlib               (standard lib modules)
+    FromStdlib
+  | -- | Load only from a specific directory     (:load)
+    FromDir FilePath
+  | -- | Load from current working dir or stdlib (import at REPL)
+    FromCwdOrStdlib
+  | -- | Load from specific dir or stdlib        (import in file)
+    FromDirOrStdlib FilePath
 
 -- | Add the possibility of loading imports from the stdlib.  For
 --   example, this is what we want to do after a user loads a specific
@@ -145,7 +145,7 @@ data Resolver
 --   `:load`ed module).
 withStdlib :: Resolver -> Resolver
 withStdlib (FromDir fp) = FromDirOrStdlib fp
-withStdlib r            = r
+withStdlib r = r
 
 -- | Given (possibly) a directory and a module name, relavent
 --   directories are searched for the file containing the provided
@@ -160,11 +160,12 @@ resolveModule resolver modname = do
   datadir <- liftIO getDataDir
   let searchPath =
         case resolver of
-          FromDir dir         -> [dir]
-          FromCwdOrStdlib     -> [datadir, "."]
+          FromStdlib -> [datadir]
+          FromDir dir -> [dir]
+          FromCwdOrStdlib -> [datadir, "."]
           FromDirOrStdlib dir -> [datadir, dir]
   let fps = map (</> replaceExtension modname "disco") searchPath
   fexists <- liftIO $ filterM doesFileExist fps
   case fexists of
-    []     -> return Nothing
-    (fp:_) -> return $ Just fp
+    [] -> return Nothing
+    (fp : _) -> return $ Just fp

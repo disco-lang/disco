@@ -37,6 +37,7 @@ import           System.Exit                            (exitFailure,
 import qualified Options.Applicative                    as O
 import           System.Console.Haskeline               as H
 
+import Disco.Module(Resolver(..), LoadingMode(..))
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
@@ -105,6 +106,7 @@ discoMain = do
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
   runDisco $ do
+    loadDiscoModule True FromStdlib "list" >>= addModule Standalone
     case checkFile opts of
       Just file -> do
         res <- handleLoad file

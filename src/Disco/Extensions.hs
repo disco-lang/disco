@@ -1,30 +1,36 @@
------------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Extensions
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
 --
--- Optional extensions to the disco language.
---
------------------------------------------------------------------------------
-
 -- SPDX-License-Identifier: BSD-3-Clause
-
+--
+-- Optional extensions to the disco language.
 module Disco.Extensions
-  ( Ext(..), ExtSet, defaultExts, allExts, allExtsList, addExtension
+  ( Ext (..),
+    ExtSet,
+    defaultExts,
+    allExts,
+    allExtsList,
+    addExtension,
   )
-  where
+where
 
-import           Data.Set (Set)
+import Data.Set (Set)
 import qualified Data.Set as S
 
 type ExtSet = Set Ext
 
 -- | Enumeration of optional language extensions.
 data Ext
-  = Primitives   -- ^ Allow primitives, i.e. @$prim@
-  | PercentNames -- ^ Allow the @%@ char to be used in identifier names
-  | Randomness   -- ^ Allow randomness.  This is not implemented yet.
+  = -- | Allow primitives, i.e. @$prim@
+    Primitives
+  | -- | Allow the @%@ char to be used in identifier names
+    PercentNames
+  | -- | Don't automatically import standard library modules
+    NoStdLib
+  | -- | Allow randomness.  This is not implemented yet.
+    Randomness
   deriving (Eq, Ord, Show, Read, Enum, Bounded)
 
 -- | The default set of language extensions (currently, the empty set).

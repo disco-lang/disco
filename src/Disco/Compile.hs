@@ -161,15 +161,15 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
-  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar hd) (CVar tl))
+  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar (qlocal hd)) (CVar (qlocal tl)))
 
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj L (CVar a)
+  return $ CAbs $ bind [a] $ CInj L (CVar (qlocal a))
 
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj R (CVar a)
+  return $ CAbs $ bind [a] $ CInj R (CVar (qlocal a))
 
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty

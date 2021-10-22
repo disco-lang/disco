@@ -79,7 +79,7 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                       (Side (..), selectSide)
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
-import           Disco.AST.Typed                         (AProperty)
+import           Disco.AST.Typed                         (AProperty, QName (..))
 import           Disco.Compile                           (compileProperty)
 import           Disco.Context
 import           Disco.Enumerate
@@ -239,7 +239,7 @@ whnf :: Members EvalEffects r => Core -> Sem r Value
 
 -- To reduce a variable, look it up in the environment and reduce the
 -- result.
-whnf (CVar x) = do
+whnf (CVar (QName _ x)) = do    -- XXX look up entire QName once Env is fixed
   e <- getEnv
   case M.lookup (coerce x) e of
     Just v  -> whnfV v

@@ -50,6 +50,7 @@ module Disco.Eval
        )
        where
 
+import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
 import           Control.Lens             (makeLenses, view, (.~))
 import           Control.Monad            (forM_, void, when)
@@ -383,7 +384,7 @@ typecheckDisco tcm = do
 --   modules.
 loadDiscoModule
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
-  => Resolver -> ModName -> Sem r ModuleInfo
+  => Resolver -> FilePath -> Sem r ModuleInfo
 loadDiscoModule resolver m =
   evalState M.empty $ loadDiscoModule' resolver S.empty m
 
@@ -394,29 +395,30 @@ loadDiscoModule resolver m =
 --   at the REPL prompt.
 loadParsedDiscoModule
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
-  => Resolver -> ModName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule resolver modName m =
-  evalState M.empty $ loadParsedDiscoModule' REPL resolver S.empty modName m
+  => Resolver -> ModuleName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule resolver name m =
+  evalState M.empty $ loadParsedDiscoModule' REPL resolver S.empty name m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
-  => Resolver -> S.Set ModName -> ModName
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
+  => Resolver -> S.Set ModuleName -> FilePath
   -> Sem r ModuleInfo
-loadDiscoModule' resolver inProcess modName  = do
-  when (S.member modName inProcess) (throw $ CyclicImport modName)
+loadDiscoModule' resolver inProcess modPath  = do
+  (resolvedPath, prov) <- resolveModule resolver modPath
+                  >>= maybe (throw $ ModuleNotFound modPath) return
+  let name = Named prov modPath
+  when (S.member name inProcess) (throw $ CyclicImport name)
   modMap <- get
-  case M.lookup modName modMap of
+  case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
-      file <- resolveModule resolver modName
-              >>= maybe (throw $ ModuleNotFound modName) return
-      outputLn $ "Loading " ++ (modName -<.> "disco") ++ "..."
-      cm <- parseDiscoModule file
-      loadParsedDiscoModule' Standalone resolver (S.insert modName inProcess) modName cm
+      outputLn $ "Loading " ++ (modPath -<.> "disco") ++ "..."
+      cm <- parseDiscoModule resolvedPath
+      loadParsedDiscoModule' Standalone resolver (S.insert name inProcess) name cm
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
@@ -425,20 +427,19 @@ loadDiscoModule' resolver inProcess modName  = do
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModName ModuleInfo)] r
-  => LoadingMode -> Resolver -> S.Set ModName -> ModName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule' mode resolver inProcess modName cm@(Module _ mns _ _ _) = do
-  -- mis only contains the module info from direct imports.
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
+  => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo Standalone mis
+  let importMap = M.fromList $ map (view miName &&& id) mis
   topTyCtx   <- inputs (view topCtx)
   topTyDefns <- inputs (view topTyDefs)
-  let tyctx'   = case mode of { Standalone -> tyctx   ; REPL -> joinCtx topTyCtx tyctx }
-  let tydefns' = case mode of { Standalone -> tydefns ; REPL -> M.union topTyDefns tydefns }
-  m  <- runTCMWith tyctx' tydefns' $ checkModule cm
-  m' <- mapError TypeCheckErr $ combineModuleInfo mode [imports, m]
-  modify (M.insert modName m')
-  return m'
+  let tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
+  let tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
+  -- XXX NOTE, checkModule will now need to add stuff from imports to its context!
+  m  <- runTCMWith tyctx tydefns $ checkModule name importMap cm
+  modify (M.insert name m)
+  return m
 
 -- | Try loading the contents of a file from the filesystem, emitting
 --   an error if it's not found.
@@ -463,10 +464,10 @@ loadFile file = do
 --   things.
 addModule
   :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output Debug] r
-  => LoadingMode -> ModuleInfo -> Sem r ()
-addModule mode mi = do
+  => ModuleInfo -> Sem r ()
+addModule mi = do
   curMI <- gets @TopInfo (view topModInfo)
-  mi' <- mapError TypeCheckErr $ combineModuleInfo mode [curMI, mi]
+  mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
   setLoadedModule mi'
 
 -- | Set the given 'ModuleInfo' record as the currently loaded
@@ -488,7 +489,7 @@ populateCurrentModuleInfo
   :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
   => Sem r ()
 populateCurrentModuleInfo = do
-  ModuleInfo docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
+  ModuleInfo _ _ docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
   let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
   modify @TopInfo $
     (topDocs   .~ docs) .

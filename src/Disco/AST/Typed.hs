@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE PatternSynonyms #-}
 
 -----------------------------------------------------------------------------
@@ -15,8 +16,12 @@
 -----------------------------------------------------------------------------
 
 module Disco.AST.Typed
-       ( -- * Type-annotated terms
-       ATerm
+       ( -- * Names and provenance
+
+         ModuleProvenance(..), ModuleName(..), NameProvenance(..), QName(..), qlocal
+
+         -- * Type-annotated terms
+       , ATerm
        , pattern ATVar
        , pattern ATPrim
        , pattern ATLet
@@ -87,6 +92,7 @@ import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
 import           Data.Void
+import           GHC.Generics                            (Generic)
 
 import           Disco.AST.Generic
 import           Disco.Syntax.Operators
@@ -99,6 +105,40 @@ data TY
 
 type AProperty = Property_ TY
 
+------------------------------------------------------------
+-- Names and provenance
+------------------------------------------------------------
+
+-- | Where did a module come from?
+data ModuleProvenance
+  = Dir FilePath -- ^ From a particular directory (relative to cwd)
+  | Stdlib       -- ^ From the standard library
+  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+-- | The name of a module.
+data ModuleName
+  = REPLModule   -- ^ The special top-level "module" consisting of
+                 -- what has been entered at the REPL.
+  | Named ModuleProvenance String
+                 -- ^ A named module, with its name and provenance.
+  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+-- | Where did a name come from?
+data NameProvenance
+  = LocalName                    -- ^ The name is locally bound
+  | QualifiedName ModuleName     -- ^ The name is exported by the given module
+  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+-- | XXX
+data QName a = QName NameProvenance (Name a)
+  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+qlocal :: Name a -> QName a
+qlocal = QName LocalName
+
+------------------------------------------------------------
+
+
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever
 
@@ -109,7 +149,7 @@ type ATerm = Term_ TY
 
 type instance X_Binder          TY = [APattern]
 
-type instance X_TVar            TY = Type
+type instance X_TVar            TY = (Type, NameProvenance)
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
@@ -134,8 +174,13 @@ type instance X_TParens         TY = Void -- No more explicit parens
  -- terms it helps to be able to represent these in 'ATerm'.
 type instance X_Term TY = ([(String, Type, Name ATerm)], ATerm)
 
-pattern ATVar :: Type -> Name ATerm -> ATerm
-pattern ATVar ty name = TVar_ ty name
+pattern ATVar :: Type -> QName ATerm -> ATerm
+pattern ATVar ty qname <- (reassocQ -> Just (ty,qname)) where
+  ATVar ty (QName prov name) = TVar_ (ty,prov) name
+
+reassocQ :: ATerm -> Maybe (Type, QName ATerm)
+reassocQ (TVar_ (ty,prov) name) = Just (ty, QName prov name)
+reassocQ _                      = Nothing
 
 pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name

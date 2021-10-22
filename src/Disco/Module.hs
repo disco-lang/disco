@@ -1,4 +1,6 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -20,7 +22,7 @@ import           GHC.Generics                     (Generic)
 import           Control.Lens                     (makeLenses)
 import           Control.Monad                    (filterM, foldM)
 import           Control.Monad.IO.Class           (MonadIO (..))
-import           Data.Coerce                      (coerce)
+import           Data.Bifunctor                   (first)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Maybe                       (listToMaybe)
@@ -77,37 +79,40 @@ instance Subst Type Defn
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _modDocs     :: Ctx Term Docs
-  , _modProps    :: Ctx ATerm [AProperty]
-  , _modTys      :: TyCtx
-  , _modTydefs   :: TyDefCtx
-  , _modTermdefs :: Ctx ATerm Defn
-  , _modTerms    :: [(ATerm, PolyType)]
-  , _modExts     :: ExtSet
+  { _miName     :: ModuleName
+  , _miImports  :: Map ModuleName ModuleInfo
+  , _miDocs     :: Ctx Term Docs
+  , _miProps    :: Ctx ATerm [AProperty]
+  , _miTys      :: TyCtx
+  , _miTydefs   :: TyDefCtx
+  , _miTermdefs :: Ctx ATerm Defn
+  , _miTerms    :: [(ATerm, PolyType)]
+  , _miExts     :: ExtSet
   }
 
 makeLenses ''ModuleInfo
 
 emptyModuleInfo :: ModuleInfo
-emptyModuleInfo = ModuleInfo emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
+emptyModuleInfo = ModuleInfo REPLModule M.empty emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
 
 -- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos
 --   are merged by joining their doc, type, type definition, and term
---   contexts. The property context of the new module is the obtained
---   from the second module. If threre are any duplicate type
---   definitions or term definitions in Standalone mode, a Typecheck
---   error is thrown; in REPL mode, definitions from later modules
---   override earlier ones.
-combineModuleInfo :: Member (Error TCError) r => LoadingMode -> [ModuleInfo] -> Sem r ModuleInfo
-combineModuleInfo mode = foldM combineMods emptyModuleInfo
+--   contexts. The property context of the new module is the one
+--   obtained from the second module. The name of the new module is
+--   taken from the first. Definitions from later modules override
+--   earlier ones.  Note that this function should really only be used
+--   for the special top-level REPL module.
+combineModuleInfo :: Member (Error TCError) r => [ModuleInfo] -> Sem r ModuleInfo
+combineModuleInfo = foldM combineMods emptyModuleInfo
   where
     combineMods :: Member (Error TCError) r => ModuleInfo -> ModuleInfo -> Sem r ModuleInfo
     combineMods
-      (ModuleInfo d1 _ ty1 tyd1 tm1 tms1 es1)
-      (ModuleInfo d2 p2 ty2 tyd2 tm2 tms2 es2) =
-      case (findDups tyd1 tyd2, findDups tm1 tm2) of
-        (Nothing, Nothing) -> return $
+      (ModuleInfo n1 is1 d1 _ ty1 tyd1 tm1 tms1 es1)
+      (ModuleInfo _  is2 d2 p2 ty2 tyd2 tm2 tms2 es2) =
+        return $
           ModuleInfo
+            n1
+            (M.union is1 is2)
             (joinCtx d2 d1)
             p2
             (joinCtx ty2 ty1)
@@ -115,16 +120,7 @@ combineModuleInfo mode = foldM combineMods emptyModuleInfo
             (joinCtx tm2 tm1)
             (tms1 ++ tms2)
             (es1 `S.union` es2)
-        (Just x, _) -> throw $ DuplicateTyDefns (coerce x)
-        (_, Just y) -> throw $ DuplicateDefns (coerce y)
 
-    findDups :: Ord k => Map k v -> Map k v -> Maybe k
-    findDups m1 m2 = case mode of
-      -- In standalone mode, we can't have any duplicate definitions.
-      Standalone -> listToMaybe . M.keys $ M.intersection m1 m2
-
-      -- In REPL mode, later definitions override earlier ones.
-      _          -> Nothing
 ------------------------------------------------------------
 -- Module resolution
 ------------------------------------------------------------
@@ -146,24 +142,18 @@ withStdlib :: Resolver -> Resolver
 withStdlib (FromDir fp) = FromDirOrStdlib fp
 withStdlib r            = r
 
--- | Given (possibly) a directory and a module name, relavent
+-- | Given a module resolution mode and a raw module name, relavent
 --   directories are searched for the file containing the provided
---   module name. If a directory is provided, look only in the
---   specific given directory.  If the directory is @Nothing@, then
---   Disco searches for the module first in the standard library
---   directory (lib), and then in the directory passed in to
---   resolveModule.  Returns Nothing if no module with the given name
+--   module name.  Returns Nothing if no module with the given name
 --   could be found.
-resolveModule :: Member (Embed IO) r => Resolver -> ModName -> Sem r (Maybe FilePath)
+resolveModule :: Member (Embed IO) r => Resolver -> String -> Sem r (Maybe (FilePath, ModuleProvenance))
 resolveModule resolver modname = do
   datadir <- liftIO getDataDir
   let searchPath =
         case resolver of
-          FromDir dir         -> [dir]
-          FromCwdOrStdlib     -> [datadir, "."]
-          FromDirOrStdlib dir -> [datadir, dir]
-  let fps = map (</> replaceExtension modname "disco") searchPath
-  fexists <- liftIO $ filterM doesFileExist fps
-  case fexists of
-    []     -> return Nothing
-    (fp:_) -> return $ Just fp
+          FromDir dir         -> [(dir, Dir dir)]
+          FromCwdOrStdlib     -> [(datadir, Stdlib), (".", Dir ".")]
+          FromDirOrStdlib dir -> [(datadir, Stdlib), (dir, Dir dir)]
+  let fps = map (first (</> replaceExtension modname "disco")) searchPath
+  fexists <- liftIO $ filterM (doesFileExist . fst) fps
+  return $ listToMaybe fexists

@@ -30,6 +30,7 @@ import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
 import           Disco.AST.Surface                (Telescope)
+import           Disco.AST.Typed                  (QName (..))
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -55,7 +56,7 @@ instance Monoid RationalDisplay where
 data Core where
 
   -- | A variable.
-  CVar   :: Name Core -> Core
+  CVar   :: QName Core -> Core
 
   -- | A function constant.
   CConst :: Op -> Core

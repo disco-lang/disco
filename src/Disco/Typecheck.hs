@@ -21,6 +21,7 @@ import           Control.Monad.Except
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, sort)
+import           Data.Map                                (Map)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 import           Data.Set                                (Set)
@@ -94,12 +95,13 @@ inferTelescope inferOne tel = do
 
 -- | Check all the types and extract all relevant info (docs,
 --   properties, types) from a module, returning a 'ModuleInfo' record
---   on success.  This function does not handle imports at all; see
---   'recCheckMod'.
+--   on success.  This function does not handle imports at all; any
+--   imports should already be checked and passed in as the second
+--   argument.
 checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
-  => Module -> Sem r ModuleInfo
-checkModule (Module es _ m docs terms) = do
+  => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
+checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
@@ -114,7 +116,7 @@ checkModule (Module es _ m docs terms) = do
         [] -> do
           aprops <- checkProperties docs
           aterms <- mapM inferTop terms
-          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms es
+          return $ ModuleInfo name imports docs aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -488,7 +490,7 @@ typecheck Infer (TVar x) = catch checkVar checkPrim
     checkVar = do
       Forall sig <- lookupTy x
       (_, ty)    <- unbind sig
-      return $ ATVar ty (coerce x)
+      return $ ATVar ty (QName LocalName (coerce x))  -- XXX fix this, name provenance
 
     -- If the variable is not bound, check if it is an exposed primitive name.
     checkPrim (Unbound _) =

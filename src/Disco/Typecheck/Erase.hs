@@ -25,7 +25,7 @@ import           Disco.Module                            (Clause)
 
 -- | Erase all the type annotations from a term.
 erase :: ATerm -> Term
-erase (ATVar _ x)           = TVar (coerce x)
+erase (ATVar _ (QName _ x)) = TVar (coerce x)
 erase (ATPrim _ x)          = TPrim x
 erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)
   where (tel,at) = unsafeUnbind bs
@@ -95,7 +95,7 @@ eraseClause b = bind (map erasePattern ps) (erase t)
 -- DTerm erasure
 
 eraseDTerm :: DTerm -> Term
-eraseDTerm (DTVar _ x)      = TVar (coerce x)
+eraseDTerm (DTVar _ (QName _ x)) = TVar (coerce x)
 eraseDTerm (DTPrim _ x)     = TPrim x
 eraseDTerm DTUnit           = TUnit
 eraseDTerm (DTBool _ b)     = TBool b

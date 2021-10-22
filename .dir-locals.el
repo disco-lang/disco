@@ -1,1 +1,0 @@
-((nil . ((dante-methods . (stack)))))

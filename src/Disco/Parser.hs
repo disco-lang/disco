@@ -426,12 +426,12 @@ parseExtName = choice (map parseOneExt allExtsList) <?> "language extension name
     parseOneExt ext = ext <$ lexeme (string' (show ext) :: Parser String)
 
 -- | Parse an import, of the form @import <modulename>@.
-parseImport :: Parser ModName
+parseImport :: Parser String
 parseImport = L.nonIndented sc $
   reserved "import" *> parseModuleName
 
 -- | Parse the name of a module.
-parseModuleName :: Parser ModName
+parseModuleName :: Parser String
 parseModuleName = lexeme $
   intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 

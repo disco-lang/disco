@@ -24,7 +24,7 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, (%~), (?~))
+import           Control.Lens                     (view, (%~), (?~), (^.))
 import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
@@ -348,10 +348,10 @@ handleEval
   :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = inputToState $ do
-  mi@(ModuleInfo _ _ _ _ _ tms exts) <- loadParsedDiscoModule FromCwdOrStdlib "" m
-  modify @TopInfo (extSet %~ S.union exts)
-  addModule REPL mi
-  forM_ tms (evalTerm . fst)
+  mi <- loadParsedDiscoModule FromCwdOrStdlib REPLModule m
+  modify @TopInfo (extSet %~ S.union (mi ^. miExts))
+  addModule mi
+  forM_ (mi ^. miTerms) (evalTerm . fst)
   -- garbageCollect
 
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
@@ -426,9 +426,9 @@ handleLoad
   => FilePath -> Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _ _ _) <- inputToState $ loadDiscoModule (FromDir directory) modName
+  m <- inputToState $ loadDiscoModule (FromDir directory) modName
   setLoadedModule m
-  t <- inputToState . withTopEnv $ runAllTests props
+  t <- inputToState . withTopEnv $ runAllTests (m ^. miProps)
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
   garbageCollect

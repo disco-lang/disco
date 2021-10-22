@@ -22,7 +22,7 @@ import           Polysemy
 import           Polysemy.Error
 
 import           Disco.AST.Core                   (Core)
-import           Disco.AST.Surface                (ModName)
+import           Disco.AST.Typed                  (ModuleName)
 import           Disco.Parser
 import           Disco.Typecheck.Monad            (TCError)
 
@@ -30,10 +30,10 @@ import           Disco.Typecheck.Monad            (TCError)
 data DiscoError where
 
   -- | Module not found.
-  ModuleNotFound :: ModName -> DiscoError
+  ModuleNotFound :: String -> DiscoError
 
   -- | Cyclic import encountered.
-  CyclicImport :: ModName -> DiscoError
+  CyclicImport :: ModuleName -> DiscoError
 
   -- | Error encountered during typechecking.
   TypeCheckErr :: TCError -> DiscoError

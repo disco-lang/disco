@@ -14,25 +14,28 @@
 
 module Disco.Context
        (
-         Ctx, names, emptyCtx, singleCtx, joinCtx, joinCtxs
+         Ctx, names, emptyCtx, singleCtx, ctxForModule, joinCtx, joinCtxs
        , lookup, extend, extends
 
        ) where
 
-import           Prelude                          hiding (lookup)
-
+import           Control.Monad                    ((<=<))
 import qualified Data.Map                         as M
+import           Prelude                          hiding (lookup)
 
 import           Unbound.Generics.LocallyNameless (Name)
 
 import           Polysemy
 import           Polysemy.Reader
 
-import           Disco.AST.Typed                  (NameProvenance, QName (..))
+import           Disco.AST.Typed                  (ModuleName,
+                                                   NameProvenance (QualifiedName),
+                                                   QName (..))
 
 -- | A context maps qualified names to things.  In particular a @Ctx a
 --   b@ maps qualified names for @a@s to values of type @b@.
-type Ctx a b = M.Map NameProvenance (M.Map (Name a) b)
+newtype Ctx a b = Ctx { getCtx :: M.Map NameProvenance (M.Map (Name a) b) }
+  deriving (Eq, Show)
 
   -- Note that we implement a context as a nested map from
   -- NameProvenance to Name to b, rather than as a Map QName b.  They
@@ -42,37 +45,41 @@ type Ctx a b = M.Map NameProvenance (M.Map (Name a) b)
 
 -- | Return a list of the names defined by the context.
 names :: Ctx a b -> [Name a]
-names = concatMap M.keys . M.elems
+names = concatMap M.keys . M.elems . getCtx
 
 -- | The empty context.
 emptyCtx :: Ctx a b
-emptyCtx = M.empty
+emptyCtx = Ctx M.empty
 
 -- | A singleton context, mapping a qualified name to a thing.
 singleCtx :: QName a -> b -> Ctx a b
-singleCtx (QName p n) = M.singleton p . M.singleton n
+singleCtx (QName p n) = Ctx . M.singleton p . M.singleton n
 
--- | Join two contexts (left-biased, /i.e./ if the same name exists in
---   both contexts, the result will use the value from the first
---   context, and throw away the value from the second.).
+-- | Create a context for bindings from a single module.
+ctxForModule :: ModuleName -> [(Name a, b)] -> Ctx a b
+ctxForModule m = Ctx . M.singleton (QualifiedName m) . M.fromList
+
+-- | Join two contexts (left-biased, /i.e./ if the same qualified name
+--   exists in both contexts, the result will use the value from the
+--   first context, and throw away the value from the second.).
 joinCtx :: Ctx a b -> Ctx a b -> Ctx a b
-joinCtx = M.union
+joinCtx a b = joinCtxs [a,b]
 
 -- | Join a list of contexts (left-biased).
 joinCtxs :: [Ctx a b] -> Ctx a b
-joinCtxs = M.unions
+joinCtxs = Ctx . M.unionsWith M.union . map getCtx
 
 -- | Look up a name in a context.
 lookup :: Member (Reader (Ctx a b)) r => QName a -> Sem r (Maybe b)
-lookup x = M.lookup x <$> ask
+lookup (QName p n) = (M.lookup n <=< M.lookup p) . getCtx <$> ask
 
 -- | Run a computation under a context extended with a new binding.
 --   The new binding shadows any old binding for the same name.
-extend :: Member (Reader (Ctx a b)) r => Name a -> b -> Sem r c -> Sem r c
-extend x b = local (M.insert x b)
+extend :: Member (Reader (Ctx a b)) r => QName a -> b -> Sem r c -> Sem r c
+extend (QName p n) b = local (Ctx . M.insertWith M.union p (M.singleton n b) . getCtx)
 
 -- | Run a computation in a context extended with an additional
 --   context.  Bindings in the additional context shadow any bindings
 --   with the same names in the existing context.
 extends :: Member (Reader (Ctx a b)) r => Ctx a b -> Sem r c -> Sem r c
-extends ctx = local (joinCtx ctx)
+extends = local . joinCtx

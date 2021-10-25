@@ -48,6 +48,7 @@ type TyCtx = Ctx Term PolyType
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | UnboundQ (QName Term)  -- ^ Encountered an unbound qualified name?  Shouldn't happen?
   | NoType  (Name Term)    -- ^ No type is specified for a definition
   | NotCon Con Term Type   -- ^ The type of the term should have an
                            --   outermost constructor matching Con, but
@@ -123,12 +124,15 @@ solve m = do
 -- Contexts
 ------------------------------------------------------------
 
+-- XXX We also need a function to do name resolution.  It needs to
+-- take a list of modules in scope etc.
+
 -- | Look up the type of a variable in the context.  Throw an "unbound
 --   variable" error if it is not found.
 lookupTy ::
   Members '[Reader TyCtx, Error TCError] r
-  => Name Term -> Sem r PolyType
-lookupTy x = lookup x >>= maybe (throw (Unbound x)) return
+  => QName Term -> Sem r PolyType
+lookupTy x = lookup x >>= maybe (throw (UnboundQ x)) return
 
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error
 --   if it is not found.

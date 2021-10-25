@@ -109,7 +109,7 @@ checkModule name imports (Module es _ m docs terms) = do
     extends tyCtx $ do
       mapM_ checkTyDefn tydefs
       adefns <- mapM checkDefn defns
-      let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
+      let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)
       let dups = filterDups . map getDefnName $ adefns
       case dups of
         (x:_) -> throw $ DuplicateDefns (coerce x)
@@ -219,11 +219,12 @@ filterDups = map head . filter ((>1) . length) . group . sort
 --------------------------------------------------
 -- Type declarations
 
--- | Given a list of type declarations, first check that there are no
---   duplicate type declarations, and that the types are well-formed;
---   then create a type context containing the given declarations.
-makeTyCtx :: Members '[Reader TyDefCtx, Error TCError] r => [TypeDecl] -> Sem r TyCtx
-makeTyCtx decls = do
+-- | Given a list of type declarations from a module, first check that
+--   there are no duplicate type declarations, and that the types are
+--   well-formed; then create a type context containing the given
+--   declarations.
+makeTyCtx :: Members '[Reader TyDefCtx, Error TCError] r => ModuleName -> [TypeDecl] -> Sem r TyCtx
+makeTyCtx name decls = do
   let dups = filterDups . map (\(TypeDecl x _) -> x) $ decls
   case dups of
     (x:_) -> throw (DuplicateDecls x)
@@ -231,7 +232,7 @@ makeTyCtx decls = do
       checkCtx declCtx
       return declCtx
   where
-    declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
+    declCtx = ctxForModule name $ map (\(TypeDecl x ty) -> (x,ty)) decls
 
 -- | Check that all the types in a context are valid.
 checkCtx :: Members '[Reader TyDefCtx, Error TCError] r => TyCtx -> Sem r ()

@@ -1,3 +1,2 @@
 #!/bin/sh
-stack test --fast --file-watch --ghc-options='-Wall -Wincomplete-uni-patterns'\
-      --test-arguments '+RTS -N4 -RTS'
+stack test --fast --file-watch --test-arguments '+RTS -N30 -RTS'

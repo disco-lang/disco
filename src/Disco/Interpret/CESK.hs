@@ -21,42 +21,37 @@ module Disco.Interpret.CESK
   )
 where
 
-import Control.Arrow ((***))
-import Control.Monad ((>=>))
-import Data.Bifunctor (first, second)
-import Data.List (find)
-import Data.Map (Map)
-import qualified Data.Map as M
-import Data.Maybe (isJust)
-import Data.Ratio
-import Debug.Trace
-import Disco.AST.Core
-import Disco.AST.Generic
-  ( Ellipsis (..),
-    Side (..),
-    selectSide,
-  )
-import Disco.AST.Typed (AProperty)
-import Disco.Effects.Fresh
-import Disco.Effects.Input
-import Disco.Enumerate
-import Disco.Error
-import Disco.Syntax.Operators (BOp (..))
-import Disco.Types hiding (V)
-import Disco.Value
-import Math.Combinatorics.Exact.Binomial (choose)
-import Math.Combinatorics.Exact.Factorial (factorial)
-import Math.NumberTheory.Primes (factorise, unPrime)
-import Math.NumberTheory.Primes.Testing (isPrime)
-import Math.OEIS
-  ( catalogNums,
-    extendSequence,
-    lookupSequence,
-  )
-import Polysemy
-import Polysemy.Error
-import Polysemy.State
-import Unbound.Generics.LocallyNameless (Bind, Name)
+import           Control.Arrow                      ((***))
+import           Control.Monad                      ((>=>))
+import           Data.Bifunctor                     (first, second)
+import           Data.List                          (find)
+import           Data.Map                           (Map)
+import qualified Data.Map                           as M
+import           Data.Maybe                         (isJust)
+import           Data.Ratio
+import           Debug.Trace
+import           Disco.AST.Core
+import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
+                                                     selectSide)
+import           Disco.AST.Typed                    (AProperty)
+import           Disco.Effects.Fresh
+import           Disco.Effects.Input
+import           Disco.Enumerate
+import           Disco.Error
+import           Disco.Syntax.Operators             (BOp (..))
+import           Disco.Types                        hiding (V)
+import           Disco.Value
+import           Math.Combinatorics.Exact.Binomial  (choose)
+import           Math.Combinatorics.Exact.Factorial (factorial)
+import           Math.NumberTheory.Primes           (factorise, unPrime)
+import           Math.NumberTheory.Primes.Testing   (isPrime)
+import           Math.OEIS                          (catalogNums,
+                                                     extendSequence,
+                                                     lookupSequence)
+import           Polysemy
+import           Polysemy.Error
+import           Polysemy.State
+import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 ------------------------------------------------------------
 -- Utilities
@@ -131,7 +126,7 @@ data CESK
 -- | Is the CESK machine in a final state?
 isFinal :: CESK -> Maybe Value
 isFinal (Out v []) = Just v
-isFinal _ = Nothing
+isFinal _          = Nothing
 
 -- | Run a CESK machine to completion.
 runCESK :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r Value
@@ -142,7 +137,7 @@ runCESK cesk = case isFinal cesk of
 (!!!) :: (Ord k, Show k) => Map k v -> k -> v
 m !!! k = case M.lookup k m of
   Nothing -> error $ "variable not found in environment: " ++ show k
-  Just v -> v
+  Just v  -> v
 
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
@@ -199,11 +194,11 @@ step c = error $ "step " ++ show c
 
 arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
-arity2 f v = error "arity2 on a non-pair!" -- XXX
+arity2 f v           = error "arity2 on a non-pair!" -- XXX
 
 arity3 :: (Value -> Value -> Value -> a) -> Value -> a
 arity3 f (VPair x (VPair y z)) = f x y z
-arity3 f v = error "arity3 on a non-triple!"
+arity3 f v                     = error "arity3 on a non-triple!"
 
 appConst :: Member (Error EvalError) r => Cont -> Op -> Value -> Sem r CESK
 appConst k = \case
@@ -282,13 +277,13 @@ appConst k = \case
     where
       enumOp :: Value -> Value
       enumOp (VType ty) = listv id (enumerateType ty)
-      enumOp v = error $ "Impossible! enumOp on non-type " ++ show v -- XXX
+      enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v -- XXX
   OCount -> out . countOp
     where
       countOp :: Value -> Value
       countOp (VType ty) = case countType ty of
         Just num -> VInj R (intv num)
-        Nothing -> VNil
+        Nothing  -> VNil
       countOp v = error $ "Impossible! countOp on non-type " ++ show v
 
   --------------------------------------------------
@@ -319,8 +314,6 @@ appConst k = \case
   OBagElem -> arity2 $ \x (VBag xs) ->
     out . enumv . isJust . find (valEq x) . map fst $ xs
   OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
-  -- appConst (OEachBag ty)                      = _wz
-  -- each@Bag f = bagFromCounts . each@List (first f) . bagCounts
   -- appConst (OEachSet ty)                      = _wA
   -- each@Set f = set . each@List f . list
 
@@ -331,11 +324,11 @@ appConst k = \case
 
   OMerge op -> arity2 $ \(VBag xs) (VBag ys) -> out . VBag $ merge (interpOp op) xs ys
     where
-      interpOp Max = max
-      interpOp Min = min
-      interpOp Add = (+)
+      interpOp Max  = max
+      interpOp Min  = min
+      interpOp Add  = (+)
       interpOp SSub = \x y -> max 0 (x - y)
-      interpOp op = error $ "unknown op in OMerge: " ++ show op
+      interpOp op   = error $ "unknown op in OMerge: " ++ show op
 
   -- appConst OConcat                            = _wG
   -- appConst (OBagUnions ty)                    = _wH
@@ -414,7 +407,7 @@ numOp2' (#) =
     res <- n1 # n2
     case res of
       VNum _ r -> return $ VNum (d1 <> d2) r
-      _ -> return res
+      _        -> return res
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Natural.
@@ -494,8 +487,8 @@ enumEllipsis xs (Until y)
 --   sequence, via forward differences.  Essentially the same
 --   algorithm used by Babbage's famous Difference Engine.
 babbage :: Num a => [a] -> [a]
-babbage [] = []
-babbage [x] = repeat x
+babbage []       = []
+babbage [x]      = repeat x
 babbage (x : xs) = scanl (+) x (babbage (diff (x : xs)))
 
 -- | Compute the forward difference of the given sequence, that is,
@@ -525,7 +518,7 @@ oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSequence ns)
     parseResult r = VInj R (listv charv ("https://oeis.org/" ++ seqNum r))
     seqNum = getCatalogNum . catalogNums
 
-    getCatalogNum [] = error "No catalog info"
+    getCatalogNum []      = error "No catalog info"
     getCatalogNum (n : _) = n
 
 -- | Extends a Disco integer list with data from a known OEIS

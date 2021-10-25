@@ -25,7 +25,7 @@ module Disco.Interactive.CmdLine
   ) where
 
 import           Control.Lens                           (view)
-import           Control.Monad                          (unless)
+import           Control.Monad                          (unless, (>=>))
 import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))
 import           Data.Foldable                          (forM_)
@@ -37,10 +37,11 @@ import           System.Exit                            (exitFailure,
 import qualified Options.Applicative                    as O
 import           System.Console.Haskeline               as H
 
-import Disco.Module(Resolver(..), LoadingMode(..))
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
+import           Disco.Module                           (LoadingMode (..),
+                                                         Resolver (..))
 
 import           Disco.Effects.Output
 import           Polysemy
@@ -106,7 +107,7 @@ discoMain = do
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
   runDisco $ do
-    loadDiscoModule True FromStdlib "list" >>= addModule Standalone
+    forM_ standardModules $ loadDiscoModule True FromStdlib >=> addModule Standalone
     case checkFile opts of
       Just file -> do
         res <- handleLoad file

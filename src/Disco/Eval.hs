@@ -1,4 +1,4 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
 -----------------------------------------------------------------------------
@@ -38,6 +38,7 @@ module Disco.Eval
     typecheckDisco,
 
     -- * Loading modules
+    standardModules,
     loadDiscoModule,
     loadParsedDiscoModule,
     loadFile,
@@ -48,41 +49,41 @@ module Disco.Eval
   )
 where
 
-import Control.Exception (SomeException, handle)
-import Control.Lens (makeLenses, view, (%~), (.~))
-import Control.Monad (void, when)
-import Control.Monad.IO.Class (liftIO)
-import Data.Bifunctor
-import qualified Data.Map as M
-import qualified Data.Set as S
-import Disco.AST.Core
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.Compile
-import Disco.Context
-import Disco.Effects.Error
-import Disco.Effects.Fresh
-import Disco.Effects.Input
-import Disco.Effects.LFresh
-import Disco.Effects.Output
-import Disco.Error
-import Disco.Extensions
-import Disco.Interpret.CESK
-import Disco.Module
-import Disco.Parser
-import Disco.Typecheck (checkModule)
-import Disco.Typecheck.Monad
-import Disco.Types
-import Disco.Value
-import Polysemy
-import Polysemy.Embed
-import Polysemy.Fail
-import Polysemy.Random
-import Polysemy.Reader
-import Polysemy.State
-import qualified System.Console.Haskeline as H
-import System.FilePath ((-<.>))
-import Unbound.Generics.LocallyNameless (Name)
+import           Control.Exception                (SomeException, handle)
+import           Control.Lens                     (makeLenses, view, (%~), (.~))
+import           Control.Monad                    (void, when)
+import           Control.Monad.IO.Class           (liftIO)
+import           Data.Bifunctor
+import qualified Data.Map                         as M
+import qualified Data.Set                         as S
+import           Disco.AST.Core
+import           Disco.AST.Surface
+import           Disco.AST.Typed
+import           Disco.Compile
+import           Disco.Context
+import           Disco.Effects.Error
+import           Disco.Effects.Fresh
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Error
+import           Disco.Extensions
+import           Disco.Interpret.CESK
+import           Disco.Module
+import           Disco.Parser
+import           Disco.Typecheck                  (checkModule)
+import           Disco.Typecheck.Monad
+import           Disco.Types
+import           Disco.Value
+import           Polysemy
+import           Polysemy.Embed
+import           Polysemy.Fail
+import           Polysemy.Random
+import           Polysemy.Reader
+import           Polysemy.State
+import qualified System.Console.Haskeline         as H
+import           System.FilePath                  ((-<.>))
+import           Unbound.Generics.LocallyNameless (Name)
 
 ------------------------------------------------------------
 -- Top-level effects
@@ -115,24 +116,24 @@ data TopInfo = TopInfo
     --   about multiple physical modules.
     _topModInfo :: ModuleInfo,
     -- | All the modules which have been loaded so far.
-    _topModMap :: M.Map ModName ModuleInfo,
+    _topModMap  :: M.Map ModName ModuleInfo,
     -- | Top-level type environment.
-    _topCtx :: Ctx Term PolyType,
+    _topCtx     :: Ctx Term PolyType,
     -- | Environment of top-level surface syntax definitions.  Set by
     --   'loadDef' and by 'let' command at the REPL.
-    _topDefs :: Ctx ATerm Defn,
+    _topDefs    :: Ctx ATerm Defn,
     -- | Environment of top-level type definitions.
-    _topTyDefs :: TyDefCtx,
+    _topTyDefs  :: TyDefCtx,
     -- | Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDef'.
     --   Use it when evaluating with 'withTopEnv'.
-    _topEnv :: Env,
+    _topEnv     :: Env,
     -- | Top-level documentation.
-    _topDocs :: Ctx Term Docs,
+    _topDocs    :: Ctx Term Docs,
     -- | Currently enabled language extensions.
-    _extSet :: ExtSet,
+    _extSet     :: ExtSet,
     -- | The most recent file which was :loaded by the user.
-    _lastFile :: Maybe FilePath
+    _lastFile   :: Maybe FilePath
   }
 
 -- | The initial (empty) record of top-level info.
@@ -258,11 +259,9 @@ typecheckDisco tcm = do
 --------------------------------------------------
 -- Loading
 
--- XXX NEXT: load standard module(s) and add them to the Map before
--- loading other things
-
--- XXX should we save the map at the top level, so we don't have to
--- keep reloading things every time?
+-- | Standard library modules which should always be in scope.
+standardModules :: [String]
+standardModules = ["list"]
 
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
@@ -346,6 +345,8 @@ loadParsedDiscoModule' quiet mode resolver inProcess modName cm@(Module _ mns _ 
   imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo Standalone mis
   topTyCtx <- inputs (view topCtx)
   topTyDefns <- inputs (view topTyDefs)
+  -- Do we need to include any "standard" libraries here, like list?
+  -- How do we know which they are?
   let tyctx' = case mode of Standalone -> tyctx; REPL -> joinCtx topTyCtx tyctx
   let tydefns' = case mode of Standalone -> tydefns; REPL -> M.union topTyDefns tydefns
   m <- runTCMWith tyctx' tydefns' $ checkModule cm
@@ -359,7 +360,7 @@ loadFile :: Members '[Output String, Embed IO] r => FilePath -> Sem r (Maybe Str
 loadFile file = do
   res <- liftIO $ handle @SomeException (return . Left) (Right <$> readFile file)
   case res of
-    Left _ -> outputLn ("File not found: " ++ file) >> return Nothing
+    Left _  -> outputLn ("File not found: " ++ file) >> return Nothing
     Right s -> return (Just s)
 
 -- XXX This is recompiling + re-adding everything every time a new

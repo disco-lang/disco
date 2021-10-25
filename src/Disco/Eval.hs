@@ -325,6 +325,10 @@ loadDiscoModule' quiet resolver inProcess modName = do
       cm <- parseDiscoModule file
       loadParsedDiscoModule' quiet Standalone resolver (S.insert modName inProcess) modName cm
 
+-- | A list of standard library module names
+stdLib :: [ModName]
+stdLib = ["list"]
+
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
 --   to avoid loading any imported module more than once.  Typecheck
@@ -340,19 +344,33 @@ loadParsedDiscoModule' ::
   ModName ->
   Module ->
   Sem r ModuleInfo
-loadParsedDiscoModule' quiet mode resolver inProcess modName cm@(Module _ mns _ _ _) = do
+loadParsedDiscoModule' quiet mode resolver inProcess modName cm@(Module mexts mns _ _ _) = do
   mis <- mapM (loadDiscoModule' quiet (withStdlib resolver) inProcess) mns
   imports@(ModuleInfo _ _ tyctx tydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo Standalone mis
+
+  -- Load standard library modules too, unless the module has explicitly turned it off
+  stds <-
+    if NoStdLib `S.member` mexts
+      then return []
+      else mapM (loadDiscoModule' True FromStdlib inProcess) stdLib
+  library@(ModuleInfo _ _ libTyctx libTydefns _ _ _) <- mapError TypeCheckErr $ combineModuleInfo Standalone stds
+
   topTyCtx <- inputs (view topCtx)
   topTyDefns <- inputs (view topTyDefs)
-  -- Do we need to include any "standard" libraries here, like list?
-  -- How do we know which they are?
-  let tyctx' = case mode of Standalone -> tyctx; REPL -> joinCtx topTyCtx tyctx
-  let tydefns' = case mode of Standalone -> tydefns; REPL -> M.union topTyDefns tydefns
+  let tyctx' =
+        case mode of
+          Standalone -> joinCtx libTyctx tyctx
+          REPL       -> joinCtx topTyCtx (joinCtx libTyctx tyctx)
+  let tydefns' =
+        case mode of
+          Standalone -> tydefns `M.union` libTydefns
+          REPL       -> tydefns `M.union` libTydefns `M.union` topTyDefns
   m <- runTCMWith tyctx' tydefns' $ checkModule cm
-  m' <- mapError TypeCheckErr $ combineModuleInfo mode [imports, m]
-  modify (M.insert modName m')
-  return m'
+  -- It's OK if some things in std lib modules are already imported/defined
+  m' <- mapError TypeCheckErr $ combineModuleInfo REPL [library, m]
+  m'' <- mapError TypeCheckErr $ combineModuleInfo mode [imports, m']
+  modify (M.insert modName m'')
+  return m''
 
 -- | Try loading the contents of a file from the filesystem, emitting
 --   an error if it's not found.

@@ -41,6 +41,8 @@ import           Polysemy.Error
 import           Polysemy.Reader
 import           Polysemy.Writer
 
+import           Control.Monad.Trans.Maybe
+import qualified Data.Foldable                           as F
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context                           hiding (filter)
@@ -109,7 +111,7 @@ checkModule name imports (Module es _ m docs terms) = do
     tyCtx     <- makeTyCtx name typeDecls
     extends tyCtx $ do
       mapM_ checkTyDefn tydefs
-      adefns <- mapM checkDefn defns
+      adefns <- mapM (checkDefn name) defns
       let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)
       let dups = filterDups . map getDefnName $ adefns
       case dups of
@@ -481,28 +483,55 @@ typecheck mode (TParens t) = typecheck mode t
 --------------------------------------------------
 -- Variables
 
--- To infer the type of a variable, just look it up in the context.
+-- Resolve variable names and infer their types.
+--
+-- To infer the type of a variable, pick the first that succeeds:
+--   1. See if the variable name is bound locally.
+--   2. See if the variable name is bound in some in-scope module,
+--      throwing an ambiguity error if it is bound in multiple modules.
+--   3. See if we should convert it to a primitive.
+--
 -- We don't need a checking case; checking the type of a variable will
 -- fall through to this case.
---
--- Note this is also where unbound identifiers may possibly be turned
--- into primitives if the name matches.
-typecheck Infer (TVar x) = catch checkVar checkPrim
+typecheck Infer (TVar x) = do
+  mt <- runMaybeT . F.asum . map MaybeT $ [tryLocal, tryModule, tryPrim]
+  maybe (throw (Unbound x)) return $ mt
   where
-    checkVar = do
-      Forall sig <- lookupTy x
-      (_, ty)    <- unbind sig
-      return $ ATVar ty (QName LocalName (coerce x))  -- XXX fix this, name provenance
+    tryLocal, tryModule, tryPrim :: Members '[Reader TyCtx, Fresh] r => Sem r (Maybe ATerm)
+    tryLocal = do
+      mty <- Ctx.lookup (localName x)
+      case mty of
+        Just (Forall sig) -> do
+          (_, ty) <- unbind sig
+          return . Just $ ATVar ty (localName (coerce x))
+        Nothing -> return Nothing
 
-    -- If the variable is not bound, check if it is an exposed primitive name.
-    checkPrim (Unbound _) =
-      case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
-        -- If so, infer the type of the prim instead.
-        (prim:_) -> typecheck Infer (TPrim prim)
-        _        -> throw (Unbound x)
+    tryModule = do
+      bs <- Ctx.lookupAll x
+      case bs of
+        [(m,Forall sig)] -> do
+          (_, ty) <- unbind sig
+          return . Just $ ATVar ty (m .- coerce x)
+        []       -> return Nothing
+        _        -> undefined -- XXX ambiguity error
 
-    -- For any other error, just rethrow.
-    checkPrim e = throw e
+    tryPrim = undefined
+
+  -- where
+  --   checkVar = do
+  --     Forall sig <- lookupTy x
+  --     (_, ty)    <- unbind sig
+  --     return $ ATVar ty (QName LocalName (coerce x))  -- XXX fix this, name provenance
+
+  --   -- If the variable is not bound, check if it is an exposed primitive name.
+  --   checkPrim (Unbound _) =
+  --     case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
+  --       -- If so, infer the type of the prim instead.
+  --       (prim:_) -> typecheck Infer (TPrim prim)
+  --       _        -> throw (Unbound x)
+
+  --   -- For any other error, just rethrow.
+  --   checkPrim e = throw e
 
 --------------------------------------------------
 -- Primitives

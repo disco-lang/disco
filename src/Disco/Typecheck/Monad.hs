@@ -124,16 +124,6 @@ solve m = do
 -- Contexts
 ------------------------------------------------------------
 
--- XXX We also need a function to do name resolution.  It needs to
--- take a list of modules in scope etc.
-
--- | Look up the type of a variable in the context.  Throw an "unbound
---   variable" error if it is not found.
-lookupTy ::
-  Members '[Reader TyCtx, Error TCError] r
-  => QName Term -> Sem r PolyType
-lookupTy x = lookup x >>= maybe (throw (UnboundQ x)) return
-
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error
 --   if it is not found.
 lookupTyDefn ::

@@ -31,6 +31,7 @@ module Disco.Context
 
        -- * Query/conversion
        , lookup
+       , lookupAll
        , names
        , elems
 
@@ -109,6 +110,12 @@ extends = local . joinCtx
 -- | Look up a name in a context.
 lookup :: Member (Reader (Ctx a b)) r => QName a -> Sem r (Maybe b)
 lookup (QName p n) = (M.lookup n <=< M.lookup p) . getCtx <$> ask
+
+-- | Look up all the non-local bindings of a name in a context.
+lookupAll :: Member (Reader (Ctx a b)) r => Name a -> Sem r [(ModuleName, b)]
+lookupAll n = nonLocal . M.assocs . M.mapMaybe (M.lookup n) . getCtx <$> ask
+  where
+    nonLocal bs = [(m,b) | (QualifiedName m, b) <- bs]
 
 -- | Return a list of the names defined by the context.
 names :: Ctx a b -> [Name a]

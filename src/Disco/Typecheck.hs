@@ -43,7 +43,8 @@ import           Polysemy.Writer
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Context
+import           Disco.Context                           hiding (filter)
+import qualified Disco.Context                           as Ctx
 import           Disco.Module
 import           Disco.Subst                             (applySubst)
 import qualified Disco.Subst                             as Subst
@@ -105,7 +106,7 @@ checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
   tyDefnCtx <- makeTyDefnCtx tydefs
   withTyDefns tyDefnCtx $ do
-    tyCtx     <- makeTyCtx typeDecls
+    tyCtx     <- makeTyCtx name typeDecls
     extends tyCtx $ do
       mapM_ checkTyDefn tydefs
       adefns <- mapM checkDefn defns
@@ -236,22 +237,22 @@ makeTyCtx name decls = do
 
 -- | Check that all the types in a context are valid.
 checkCtx :: Members '[Reader TyDefCtx, Error TCError] r => TyCtx -> Sem r ()
-checkCtx = mapM_ checkPolyTyValid . M.elems
+checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 --------------------------------------------------
 -- Top-level definitions
 
--- | Type check a top-level definition.
+-- | Type check a top-level definition in the given module.
 checkDefn
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
-  => TermDefn -> Sem r Defn
-checkDefn (TermDefn x clauses) = do
+  => ModuleName -> TermDefn -> Sem r Defn
+checkDefn name (TermDefn x clauses) = do
 
   -- Check that all clauses have the same number of patterns
   checkNumPats clauses
 
   -- Get the declared type signature of x
-  Forall sig <- catch (lookupTy x) (\_ -> throw $ NoType x)
+  Forall sig <- catch (lookupTy (name .- x)) (\_ -> throw $ NoType x)
     -- If x isn't in the context, it's because no type was declared for it, so
     -- rethrow a more informative error.
   (nms, ty) <- unbind sig
@@ -308,11 +309,11 @@ checkProperties
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
-  M.mapKeys coerce . M.filter (not.null)
+  Ctx.coerceKeys . Ctx.filter (not.null)
     <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
-    properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
+    properties = fmap (\ds -> [p | DocProperty p <- ds]) docs
 
 -- | Check the types of the terms embedded in a property.
 checkProperty

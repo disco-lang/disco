@@ -18,7 +18,7 @@
 module Disco.AST.Typed
        ( -- * Names and provenance
 
-         ModuleProvenance(..), ModuleName(..), NameProvenance(..), QName(..), localName
+         ModuleProvenance(..), ModuleName(..), NameProvenance(..), QName(..), localName, (.-)
 
          -- * Type-annotated terms
        , ATerm
@@ -134,9 +134,13 @@ data NameProvenance
 data QName a = QName { qnameProvenance :: NameProvenance, qname :: Name a }
   deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
 
--- | Create a locally bound name.
+-- | Create a locally bound qualified name.
 localName :: Name a -> QName a
 localName = QName LocalName
+
+-- | Create a module-bound qualified name.
+(.-) :: ModuleName -> Name a -> QName a
+m .- x = QName (QualifiedName m) x
 
 ------------------------------------------------------------
 

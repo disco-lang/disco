@@ -28,21 +28,29 @@ import           Unbound.Generics.LocallyNameless (Name)
 import           Polysemy
 import           Polysemy.Reader
 
--- | A context maps names to things.  In particular a @Ctx a b@ maps
---   names for @a@s to values of type @b@.
-type Ctx a b = M.Map (Name a) b
+import           Disco.AST.Typed                  (NameProvenance, QName (..))
+
+-- | A context maps qualified names to things.  In particular a @Ctx a
+--   b@ maps qualified names for @a@s to values of type @b@.
+type Ctx a b = M.Map NameProvenance (M.Map (Name a) b)
+
+  -- Note that we implement a context as a nested map from
+  -- NameProvenance to Name to b, rather than as a Map QName b.  They
+  -- are isomorphic, but this way it is easier to do name resolution,
+  -- because given an (unqualified) Name, we can look it up in each
+  -- inner map corresponding to modules that are in scope.
 
 -- | Return a list of the names defined by the context.
 names :: Ctx a b -> [Name a]
-names = M.keys
+names = concatMap M.keys . M.elems
 
 -- | The empty context.
 emptyCtx :: Ctx a b
 emptyCtx = M.empty
 
--- | A singleton context, mapping a name to a thing.
-singleCtx :: Name a -> b -> Ctx a b
-singleCtx = M.singleton
+-- | A singleton context, mapping a qualified name to a thing.
+singleCtx :: QName a -> b -> Ctx a b
+singleCtx (QName p n) = M.singleton p . M.singleton n
 
 -- | Join two contexts (left-biased, /i.e./ if the same name exists in
 --   both contexts, the result will use the value from the first
@@ -55,7 +63,7 @@ joinCtxs :: [Ctx a b] -> Ctx a b
 joinCtxs = M.unions
 
 -- | Look up a name in a context.
-lookup :: Member (Reader (Ctx a b)) r => Name a -> Sem r (Maybe b)
+lookup :: Member (Reader (Ctx a b)) r => QName a -> Sem r (Maybe b)
 lookup x = M.lookup x <$> ask
 
 -- | Run a computation under a context extended with a new binding.

@@ -27,6 +27,7 @@ import           Data.Tuple                       (swap)
 import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
+import           Disco.AST.Typed                  (QName (..))
 import           Disco.Context
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints

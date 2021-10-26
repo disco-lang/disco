@@ -254,9 +254,9 @@ checkDefn name (TermDefn x clauses) = do
   checkNumPats clauses
 
   -- Get the declared type signature of x
-  Forall sig <- catch (lookupTy (name .- x)) (\_ -> throw $ NoType x)
+  Forall sig <- lookup (name .- x) >>= maybe (throw $ NoType x) return
     -- If x isn't in the context, it's because no type was declared for it, so
-    -- rethrow a more informative error.
+    -- throw an error.
   (nms, ty) <- unbind sig
 
   -- Try to decompose the type into a chain of arrows like pty1 ->
@@ -495,7 +495,7 @@ typecheck mode (TParens t) = typecheck mode t
 -- fall through to this case.
 typecheck Infer (TVar x) = do
   mt <- runMaybeT . F.asum . map MaybeT $ [tryLocal, tryModule, tryPrim]
-  maybe (throw (Unbound x)) return $ mt
+  maybe (throw (Unbound x)) return mt
   where
     tryLocal, tryModule, tryPrim :: Members '[Reader TyCtx, Fresh] r => Sem r (Maybe ATerm)
     tryLocal = do

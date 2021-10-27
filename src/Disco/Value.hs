@@ -1,5 +1,4 @@
 
-
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -46,17 +45,17 @@ module Disco.Value
 
 import           Data.IntSet                      (IntSet)
 import           Data.Map                         (Map)
-import qualified Data.Map                         as M
 
 import           Algebra.Graph                    (Graph)
 
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
-import           Disco.Context
+import           Disco.Context                    as Ctx
 import           Disco.Error
 import           Disco.Types
 
+import           Disco.AST.Typed                  (localName)
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
 import           Disco.Effects.Store
@@ -260,7 +259,7 @@ emptyTestEnv = TestEnv []
 
 getTestEnv :: Members '[Reader Env, Error EvalError] r => TestVars -> Sem r TestEnv
 getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
-  value <- M.lookup name <$> getEnv
+  value <- Ctx.lookup (localName name)
   case value of
     Just v  -> return (s, ty, v)
     Nothing -> throw (UnboundError name)
@@ -314,7 +313,7 @@ type Env  = Ctx Core Value
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
 extendEnv :: Members '[Reader Env, LFresh] r => Name Core -> Value -> Sem r a -> Sem r a
-extendEnv x v = avoid [AnyName x] . extend x v
+extendEnv x v = avoid [AnyName x] . extend (localName x) v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.

@@ -79,9 +79,9 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                       (Side (..), selectSide)
 import           Disco.AST.Surface                       (Ellipsis (..),
                                                           fromTelescope)
-import           Disco.AST.Typed                         (AProperty, QName (..))
+import           Disco.AST.Typed                         (AProperty)
 import           Disco.Compile                           (compileProperty)
-import           Disco.Context
+import           Disco.Context                           as Ctx
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Eval
@@ -239,9 +239,9 @@ whnf :: Members EvalEffects r => Core -> Sem r Value
 
 -- To reduce a variable, look it up in the environment and reduce the
 -- result.
-whnf (CVar (QName _ x)) = do    -- XXX look up entire QName once Env is fixed
-  e <- getEnv
-  case M.lookup (coerce x) e of
+whnf (CVar x) = do    -- XXX look up entire QName once Env is fixed
+  mv <- Ctx.lookup (coerce x)
+  case mv of
     Just v  -> whnfV v
     Nothing -> error $ "Impossible! Unbound variable while interpreting: " ++ show x
       -- We should never encounter an unbound variable at this stage
@@ -351,7 +351,7 @@ whnfApp f vs =
 --   arguments.
 whnfAppExact :: Members EvalEffects r => Value -> [Value] -> Sem r Value
 whnfAppExact (VClos b e) vs  =
-  lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
+  lunbind b $ \(xs,t) -> withEnv e $ extends (localCtx $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
 whnfAppExact (VFun _)    vs  =
   error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
@@ -382,12 +382,12 @@ checkGuards ((unembed -> c, p) : gs) = do
   res <- match v p
   case res of
     Nothing -> return Nothing
-    Just e  -> extends e (fmap (M.union e) <$> checkGuards gs)
+    Just e  -> extends e (fmap (joinCtx e) <$> checkGuards gs)
 
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.
 match :: Members EvalEffects r => Value -> CPattern -> Sem r (Maybe Env)
-match v (CPVar x)      = return $ Just (M.singleton x v)
+match v (CPVar x)      = return $ Just (localCtx [(x, v)])
 match _ CPWild         = ok
 match v CPUnit         = whnfV v >> ok
     -- Matching the unit value is guaranteed to succeed without
@@ -396,14 +396,14 @@ match v CPUnit         = whnfV v >> ok
 
 match v (CPInj s x)    = do
   VInj t v' <- whnfV v
-  if s == t then return (Just $ M.singleton x v') else noMatch
+  if s == t then return (Just $ localCtx [(x, v')]) else noMatch
 match v (CPPair x1 x2) = do
   VPair v1 v2 <- whnfV v
-  return . Just . M.fromList $ [(x1,v1), (x2,v2)]
+  return . Just . localCtx $ [(x1,v1), (x2,v2)]
 
 -- | Convenience function: successfully match with no bindings.
 ok :: Applicative f => f (Maybe Env)
-ok = pure $ Just M.empty
+ok = pure $ Just emptyCtx
 
 -- | Convenience function: fail to match.
 noMatch :: Applicative f => f (Maybe Env)

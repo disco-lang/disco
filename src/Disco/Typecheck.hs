@@ -26,7 +26,7 @@ import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
-import           Prelude                                 hiding (lookup)
+import           Prelude                                 as P hiding (lookup)
 
 import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
                                                           bind, embed,
@@ -113,13 +113,14 @@ checkModule name imports (Module es _ m docs terms) = do
       mapM_ checkTyDefn tydefs
       adefns <- mapM (checkDefn name) defns
       let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)
-      let dups = filterDups . map getDefnName $ adefns
+          docCtx = ctxForModule name docs
+          dups = filterDups . map getDefnName $ adefns
       case dups of
         (x:_) -> throw $ DuplicateDefns (coerce x)
         [] -> do
-          aprops <- checkProperties docs
+          aprops <- checkProperties docCtx
           aterms <- mapM inferTop terms
-          return $ ModuleInfo name imports docs aprops tyCtx tyDefnCtx defnCtx aterms es
+          return $ ModuleInfo name imports docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -311,7 +312,7 @@ checkProperties
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
-  Ctx.coerceKeys . Ctx.filter (not.null)
+  Ctx.coerceKeys . Ctx.filter (not . P.null)
     <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
@@ -505,7 +506,7 @@ typecheck Infer (TVar x) = do
     -- 2. See if the variable name is bound in some in-scope module,
     -- throwing an ambiguity error if it is bound in multiple modules.
     tryModule = do
-      bs <- Ctx.lookupAll x
+      bs <- Ctx.lookupNonLocal x
       case bs of
         [(m,Forall sig)] -> do
           (_, ty) <- unbind sig

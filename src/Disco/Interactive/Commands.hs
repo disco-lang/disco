@@ -32,6 +32,7 @@ import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
 import qualified Data.Set                         as S
 import           Data.Typeable
+import           Prelude                          as P
 import           System.FilePath                  (splitFileName)
 
 import           Text.Megaparsec                  hiding (State, runParser)
@@ -50,7 +51,7 @@ import           Polysemy.State
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
-import           Disco.Context
+import           Disco.Context                    as Ctx
 import           Disco.Desugar
 import           Disco.Error
 import           Disco.Eval
@@ -153,7 +154,7 @@ type REPLCommands = [SomeREPLCommand]
 
 -- | Keep only commands of a certain type.
 byCmdType :: REPLCommandType -> REPLCommands -> REPLCommands
-byCmdType ty = filter (\(SomeCmd rc) -> cmdtype rc == ty)
+byCmdType ty = P.filter (\(SomeCmd rc) -> cmdtype rc == ty)
 
 -- | Given a list of REPL commands and something typed at the REPL,
 --   pick the first command with a matching type-level tag and run its
@@ -321,12 +322,16 @@ handleDoc
 handleDoc (Doc x) = do
   ctx  <- inputs @TopInfo (view topCtx)
   docs <- inputs @TopInfo (view topDocs)
-  case M.lookup x ctx of
-    Nothing -> outputLn $ "No documentation found for " ++ show x ++ "."
-    Just ty -> do
+
+  case Ctx.lookupAll' x ctx of
+    []    -> outputLn $ "No documentation found for " ++ show x ++ "."
+    binds -> mapM_ (showDoc docs) binds
+
+  where
+    showDoc docMap (qn, ty) = do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
       outputLn p
-      case M.lookup x docs of
+      case Ctx.lookup' qn docMap of
         Just (DocString ss : _) -> outputLn $ "\n" ++ unlines ss
         _                       -> return ()
 
@@ -361,8 +366,8 @@ evalTerm at = do
     prettyValue ty cv
     return cv
   modify @TopInfo $
-    (topCtx %~ M.insert (string2Name "it") (toPolyType ty)) .
-    (topEnv %~ M.insert (string2Name "it") v)
+    (topCtx %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
+    (topEnv %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) v)
   return v
   where
     ty = getType at
@@ -393,7 +398,7 @@ handleHelp Help = do
     sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
-    filteredCommands cmds = filter (\(SomeCmd c) -> category c == User) cmds
+    filteredCommands cmds = P.filter (\(SomeCmd c) -> category c == User) cmds
     showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
@@ -439,26 +444,26 @@ handleLoad fp = do
 -- somewhere else.
 runAllTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Ctx ATerm [AProperty] -> Sem r Bool  -- (Ctx ATerm [TestResult])
 runAllTests aprops
-  | M.null aprops = return True
+  | Ctx.null aprops = return True
   | otherwise     = do
       outputLn "Running tests..."
-      and <$> mapM (uncurry runTests) (M.assocs aprops)
+      and <$> mapM (uncurry runTests) (Ctx.assocs aprops)
 
   where
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
-    runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Name ATerm -> [AProperty] -> Sem r Bool
-    runTests n props = do
+    runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => QName ATerm -> [AProperty] -> Sem r Bool
+    runTests (QName _ n) props = do
       output ("  " ++ name2String n ++ ":")
       results <- traverse (sequenceA . (id &&& runTest numSamples)) props
-      let failures = filter (not . testIsOk . snd) results
-      case null failures of
+      let failures = P.filter (not . testIsOk . snd) results
+      case P.null failures of
         True  -> outputLn " OK"
         False -> do
           outputLn ""
           forM_ failures (uncurry prettyTestFailure)
-      return (null failures)
+      return (P.null failures)
 
 ------------------------------------------------------------
 -- :names
@@ -481,11 +486,11 @@ handleNames
 handleNames Names = do
   ctx   <- inputs @TopInfo (view topCtx)
   tyDef <- inputs @TopInfo (view topTyDefs)
-  mapM_ showTyDef $ M.toList tyDef
-  mapM_ showFn $ M.toList ctx
+  mapM_ showTyDef $ M.assocs tyDef
+  mapM_ showFn $ Ctx.assocs ctx
   where
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
-    showFn (x, ty) = do
+    showFn (QName _ x, ty) = do
       p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
       outputLn p
 
@@ -584,11 +589,15 @@ handleShowDefn (ShowDefn x) = do
   let name2s = name2String x
   defns   <- inputs @TopInfo (view topDefs)
   tyDefns <- inputs @TopInfo (view topTyDefs)
-  s <- case M.lookup (coerce x) defns of
-         Just d  -> renderDoc $ prettyDefn d
-         Nothing -> case M.lookup name2s tyDefns of
-           Just t  -> renderDoc $ prettyTyDef name2s t
-           Nothing -> return $ "No definition for " ++ show x
+
+  let xdefs = Ctx.lookupAll' (coerce x) defns
+      mtydef = M.lookup name2s tyDefns
+
+  s <- renderDoc $ do
+    let ds = map (prettyDefn . snd) xdefs ++ maybe [] (pure . prettyTyDef name2s) mtydef
+    case ds of
+      [] -> text "No definition for" <+> prettyName x
+      _  -> vcat ds
   outputLn s
 
 ------------------------------------------------------------

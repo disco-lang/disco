@@ -56,7 +56,6 @@ import           Control.Lens             (makeLenses, view, (.~))
 import           Control.Monad            (forM_, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
-import           Data.Coerce
 import           Data.IntSet              (IntSet)
 import qualified Data.IntSet              as IntSet
 import qualified Data.Map                 as M
@@ -82,7 +81,7 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
-import           Disco.Context
+import           Disco.Context            as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Error
 import           Disco.Extensions
@@ -289,7 +288,7 @@ instance Reachable Value where
   mark _               = return ()
 
 instance Reachable Env where
-  mark = mark . M.elems
+  mark = mark . Ctx.elems
 
 instance Reachable v => Reachable [v] where
   mark = mapM_ mark
@@ -490,7 +489,7 @@ populateCurrentModuleInfo
   => Sem r ()
 populateCurrentModuleInfo = do
   ModuleInfo _ _ docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
-  let cdefns = M.mapKeys coerce $ fmap compileDefn tmds
+  let cdefns = Ctx.coerceKeys $ fmap compileDefn tmds
   modify @TopInfo $
     (topDocs   .~ docs) .
     (topCtx    .~ tys)  .

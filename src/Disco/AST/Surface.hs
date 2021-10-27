@@ -121,11 +121,11 @@ data UD
 
 -- | A module contains all the information from one disco source file.
 data Module = Module
-  { modExts    :: Set Ext       -- ^ Enabled extensions
-  , modImports :: [String]      -- ^ Module imports
-  , modDecls   :: [Decl]        -- ^ Declarations
-  , modDocs    :: Map (Name Term) Docs -- ^ Documentation
-  , modTerms   :: [Term]        -- ^ Top-level (bare) terms
+  { modExts    :: Set Ext             -- ^ Enabled extensions
+  , modImports :: [String]            -- ^ Module imports
+  , modDecls   :: [Decl]              -- ^ Declarations
+  , modDocs    :: [(Name Term, Docs)] -- ^ Documentation
+  , modTerms   :: [Term]              -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
 

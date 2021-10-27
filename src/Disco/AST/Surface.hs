@@ -105,11 +105,11 @@ module Disco.AST.Surface
        where
 
 import           Control.Lens                     (_1, _2, _3, (%~))
+import           Data.Map                         (Map)
 import           Data.Set                         (Set)
 import           Data.Void
 
 import           Disco.AST.Generic
-import           Disco.Context
 import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -124,7 +124,7 @@ data Module = Module
   { modExts    :: Set Ext       -- ^ Enabled extensions
   , modImports :: [String]      -- ^ Module imports
   , modDecls   :: [Decl]        -- ^ Declarations
-  , modDocs    :: Ctx Term Docs -- ^ Documentation
+  , modDocs    :: Map (Name Term) Docs -- ^ Documentation
   , modTerms   :: [Term]        -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module

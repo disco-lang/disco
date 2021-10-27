@@ -366,7 +366,7 @@ wholeModule :: LoadingMode -> Parser Module
 wholeModule = between sc eof . parseModule
 
 -- | Parse an entire module (a list of declarations ended by
---   semicolons).  The 'LoadingMode' parameter tells uw whether to
+--   semicolons).  The 'LoadingMode' parameter tells us whether to
 --   include or replace any language extensions enabled at the top
 --   level.  We include them when parsing a module entered at the
 --   REPL, and replace them when parsing a standalone module.

@@ -435,7 +435,7 @@ loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   topTyDefns <- inputs (view topTyDefs)
   let tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
   let tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
-  -- XXX NOTE, checkModule will now need to add stuff from imports to its context!
+
   m  <- runTCMWith tyctx tydefns $ checkModule name importMap cm
   modify (M.insert name m)
   return m

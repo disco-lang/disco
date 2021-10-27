@@ -126,7 +126,7 @@ extends = local . joinCtx
 
 -- | Check if a context is empty.
 null :: Ctx a b -> Bool
-null = M.null . getCtx
+null = all M.null . getCtx
 
 -- | Look up a qualified name in an ambient context.
 lookup :: Member (Reader (Ctx a b)) r => QName a -> Sem r (Maybe b)

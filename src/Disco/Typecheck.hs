@@ -17,6 +17,7 @@
 module Disco.Typecheck where
 
 import           Control.Arrow                           ((&&&))
+import           Control.Lens                            ((^..))
 import           Control.Monad.Except
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
@@ -105,14 +106,17 @@ checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
-
   -- XXX! turn the imports map into contexts which we can merge with the given ones
 
   let (typeDecls, defns, tydefs) = partitionDecls m
+      importTyCtx = joinCtxs (imports ^.. traverse . miTys)
+      -- XXX this isn't right, if multiple modules define the same type synonyms.
+      -- Need to use a normal Ctx for tydefs too.
+      importTyDefnCtx = M.unions (imports ^.. traverse . miTydefs)
   tyDefnCtx <- makeTyDefnCtx tydefs
-  withTyDefns tyDefnCtx $ do
+  withTyDefns (tyDefnCtx `M.union` importTyDefnCtx) $ do
     tyCtx     <- makeTyCtx name typeDecls
-    extends tyCtx $ do
+    extends importTyCtx $ extends tyCtx $ do
       mapM_ checkTyDefn tydefs
       adefns <- mapM (checkDefn name) defns
       let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)

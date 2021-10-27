@@ -105,7 +105,6 @@ module Disco.AST.Surface
        where
 
 import           Control.Lens                     (_1, _2, _3, (%~))
-import           Data.Map                         (Map)
 import           Data.Set                         (Set)
 import           Data.Void
 

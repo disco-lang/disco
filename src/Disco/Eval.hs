@@ -430,6 +430,9 @@ loadParsedDiscoModule'
   => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
+  -- XXX! Need to get imports from the top-level module info
+  -- XXX can we just combine a lot of stuff (topCtx, topTyDefs,
+  -- etc...) into a single top-level module info?
   let importMap = M.fromList $ map (view miName &&& id) mis
   topTyCtx   <- inputs (view topCtx)
   topTyDefns <- inputs (view topTyDefs)

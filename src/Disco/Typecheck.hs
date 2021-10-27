@@ -53,7 +53,7 @@ import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Monad
+import           Disco.Typecheck.Util
 import           Disco.Typecheck.Solve
 import           Disco.Types
 import           Disco.Types.Rules

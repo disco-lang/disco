@@ -89,7 +89,7 @@ import           Disco.Extensions
 import           Disco.Module
 import           Disco.Parser
 import           Disco.Typecheck          (checkModule)
-import           Disco.Typecheck.Monad
+import           Disco.Typecheck.Util
 import           Disco.Types
 import           Disco.Value
 

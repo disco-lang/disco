@@ -340,7 +340,7 @@ library
                        Disco.Typecheck.Constraints
                        Disco.Typecheck.Erase
                        Disco.Typecheck.Graph
-                       Disco.Typecheck.Monad
+                       Disco.Typecheck.Util
                        Disco.Typecheck.Solve
                        Disco.Typecheck.Unify
                        Disco.Types

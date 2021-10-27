@@ -39,7 +39,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Extensions
-import           Disco.Typecheck.Monad            (TCError (..), TyCtx)
+import           Disco.Typecheck.Util            (TCError (..), TyCtx)
 import           Disco.Types
 
 import           Paths_disco

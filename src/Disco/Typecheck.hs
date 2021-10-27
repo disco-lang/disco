@@ -298,7 +298,7 @@ checkDefn name (TermDefn x clauses) = do
     -- Decompose a type that must be of the form t1 -> t2 -> ... -> tn -> t{n+1}.
     decomposeDefnTy :: Members '[Reader TyDefCtx, Error TCError] r => Int -> Type -> Sem r ([Type], Type)
     decomposeDefnTy 0 ty = return ([], ty)
-    decomposeDefnTy n (TyUser name args) = lookupTyDefn name args >>= decomposeDefnTy n
+    decomposeDefnTy n (TyUser tyName args) = lookupTyDefn tyName args >>= decomposeDefnTy n
     decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) <$> decomposeDefnTy (n-1) ty2
     decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
 
@@ -1143,7 +1143,7 @@ typecheck mode tcc@(TContainerComp c bqt) = do
     inferQual (QBind x (unembed -> t))  = do
       at <- infer t
       ty <- ensureConstr1 (containerToCon c) (getType at) (Left t)
-      return (AQBind (coerce x) (embed at), singleCtx x (toPolyType ty))
+      return (AQBind (coerce x) (embed at), singleCtx (localName x) (toPolyType ty))
 
     inferQual (QGuard (unembed -> t))   = do
       at <- check t TyBool
@@ -1178,7 +1178,7 @@ typecheck mode (TLet l) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return (ABinding mty (coerce x) (embed at), singleCtx x (toPolyType $ getType at))
+      return (ABinding mty (coerce x) (embed at), singleCtx (localName x) (toPolyType $ getType at))
 
 --------------------------------------------------
 -- Case
@@ -1222,7 +1222,10 @@ typecheck mode (TCase bs) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toPolyType (getType at)))
+      return
+        ( AGLet (ABinding mty (coerce x) (embed at))
+        , singleCtx (localName x) (toPolyType (getType at))
+        )
 
 --------------------------------------------------
 -- Type ascription
@@ -1255,7 +1258,7 @@ checkPattern
 
 checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
-checkPattern (PVar x) ty = return (singleCtx x (toPolyType ty), APVar ty (coerce x))
+checkPattern (PVar x) ty = return (singleCtx (localName x) (toPolyType ty), APVar ty (coerce x))
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
 

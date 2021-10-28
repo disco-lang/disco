@@ -22,7 +22,7 @@ module Disco.Eval
          -- * Top-level info record and associated lenses
 
        , TopInfo
-       , topModInfo, topCtx, topDefs, topTyDefs, topEnv, topDocs, extSet, lastFile
+       , replModInfo, topEnv, lastFile
 
          -- * Memory
 
@@ -35,15 +35,15 @@ module Disco.Eval
        , runTCM, runTCMWith
        , withTopEnv
        , parseDiscoModule
-       , typecheckDisco
+       , typecheckTop
 
          -- * Loading modules
 
        , loadDiscoModule
        , loadParsedDiscoModule
        , loadFile
-       , addModule
-       , setLoadedModule
+       , addToREPLModule
+       , setREPLModule
        , populateCurrentModuleInfo
        , loadDefs
 
@@ -84,7 +84,6 @@ import           Disco.Compile
 import           Disco.Context            as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Error
-import           Disco.Extensions
 import           Disco.Module
 import           Disco.Parser
 import           Disco.Typecheck          (checkModule)
@@ -117,47 +116,25 @@ type DiscoEffects = AppendEffects EvalEffects TopEffects
 
 -- | A record of information about the current top-level environment.
 data TopInfo = TopInfo
-  { _topModInfo :: ModuleInfo
-    -- ^ Info about the top-level currently loaded module.  Due to
-    --   import statements this may actually be a combination of info
-    --   about multiple physical modules.
+  { _replModInfo :: ModuleInfo
+    -- ^ Info about the top-level module collecting stuff entered at
+    --   the REPL.
 
-  , _topCtx     :: Ctx Term PolyType
-    -- ^ Top-level type environment.
-
-  , _topDefs    :: Ctx ATerm Defn
-    -- ^ Environment of top-level surface syntax definitions.  Set by
-    --   'loadDefs' and by 'let' command at the REPL.
-
-  , _topTyDefs  :: TyDefCtx
-    -- ^ Environment of top-level type definitions.
-
-  , _topEnv     :: Env
+  , _topEnv      :: Env
     -- ^ Top-level environment mapping names to values (which all
     --   start as indirections to thunks).  Set by 'loadDefs'.
     --   Use it when evaluating with 'withTopEnv'.
 
-  , _topDocs    :: Ctx Term Docs
-    -- ^ Top-level documentation.
-
-  , _extSet     :: ExtSet
-    -- ^ Currently enabled language extensions.
-
-  , _lastFile   :: Maybe FilePath
+  , _lastFile    :: Maybe FilePath
     -- ^ The most recent file which was :loaded by the user.
   }
 
 -- | The initial (empty) record of top-level info.
 initTopInfo :: TopInfo
 initTopInfo = TopInfo
-  { _topModInfo = emptyModuleInfo
-  , _topCtx     = emptyCtx
-  , _topDefs    = emptyCtx
-  , _topTyDefs  = M.empty
-  , _topDocs    = emptyCtx
-  , _topEnv     = emptyCtx
-  , _extSet     = defaultExts
-  , _lastFile   = Nothing
+  { _replModInfo = emptyModuleInfo
+  , _topEnv      = emptyCtx
+  , _lastFile    = Nothing
   }
 
 makeLenses ''TopInfo
@@ -359,15 +336,15 @@ runTCMWith tyCtx tyDefCtx
   . runReader @TyDefCtx tyDefCtx
   . runReader @TyCtx tyCtx
 
--- | Run a typechecking computation, re-throwing a wrapped error if it
---   fails.
-typecheckDisco
+-- | Run a typechecking computation in the context of the top-level
+--   REPL module, re-throwing a wrapped error if it fails.
+typecheckTop
   :: Members '[Input TopInfo, Error DiscoError] r
   => Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a
   -> Sem r a
-typecheckDisco tcm = do
-  tyctx  <- inputs (view topCtx)
-  tydefs <- inputs (view topTyDefs)
+typecheckTop tcm = do
+  tyctx  <- inputs (view (replModInfo . miTys))
+  tydefs <- inputs (view (replModInfo . miTydefs))
   runTCMWith tyctx tydefs tcm
 
 --------------------------------------------------
@@ -430,12 +407,9 @@ loadParsedDiscoModule'
   => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  -- XXX! Need to get imports from the top-level module info
-  -- XXX can we just combine a lot of stuff (topCtx, topTyDefs,
-  -- etc...) into a single top-level module info?
   let importMap = M.fromList $ map (view miName &&& id) mis
-  topTyCtx   <- inputs (view topCtx)
-  topTyDefns <- inputs (view topTyDefs)
+  topTyCtx   <- inputs (view (replModInfo . miTys))
+  topTyDefns <- inputs (view (replModInfo . miTydefs))
   let tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
   let tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
 
@@ -464,23 +438,23 @@ loadFile file = do
 
 -- | Add things from the given module to the set of currently loaded
 --   things.
-addModule
+addToREPLModule
   :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output Debug] r
   => ModuleInfo -> Sem r ()
-addModule mi = do
-  curMI <- gets @TopInfo (view topModInfo)
+addToREPLModule mi = do
+  curMI <- gets @TopInfo (view replModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  setLoadedModule mi'
+  setREPLModule mi'
 
 -- | Set the given 'ModuleInfo' record as the currently loaded
 --   module. This also includes updating the top-level state with new
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
-setLoadedModule
+setREPLModule
   :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
   => ModuleInfo -> Sem r ()
-setLoadedModule mi = do
-  modify @TopInfo $ topModInfo .~ mi
+setREPLModule mi = do
+  modify @TopInfo $ replModInfo .~ mi
   populateCurrentModuleInfo
 
 -- | Populate various pieces of the top-level info record (docs, type
@@ -491,13 +465,8 @@ populateCurrentModuleInfo
   :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
   => Sem r ()
 populateCurrentModuleInfo = do
-  ModuleInfo _ _ docs _ tys tyds tmds _ _ <- gets @TopInfo (view topModInfo)
+  tmds <- gets @TopInfo (view (replModInfo . miTermdefs))
   let cdefns = Ctx.coerceKeys $ fmap compileDefn tmds
-  modify @TopInfo $
-    (topDocs   .~ docs) .
-    (topCtx    .~ tys)  .
-    (topTyDefs .~ tyds) .
-    (topDefs   .~ tmds)
   loadDefs cdefns
 
 -- | Load a top-level environment of (potentially recursive)

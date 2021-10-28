@@ -504,6 +504,9 @@ instance (Ord k, Subst t a) => Subst t (Map k a) where
 --   more complicated.
 data TyDefBody = TyDefBody [String] ([Type] -> Type)
 
+instance Show TyDefBody where
+  show _ = "<tydef>"
+
 -- | A 'TyDefCtx' is a mapping from type names to their corresponding
 --   definitions.
 type TyDefCtx = M.Map String TyDefBody

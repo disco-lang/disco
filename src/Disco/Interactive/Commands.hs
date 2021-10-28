@@ -48,6 +48,7 @@ import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.State
 
+import           Debug.Trace
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
@@ -256,7 +257,7 @@ handleAnn
   :: Members '[Error DiscoError, Input TopInfo, Output String] r
   => REPLExpr 'CAnn -> Sem r ()
 handleAnn (Ann t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   outputLn (show at)
 
 ------------------------------------------------------------
@@ -277,7 +278,7 @@ handleCompile
   :: Members '[Error DiscoError, Input TopInfo, Output String] r
   => REPLExpr 'CCompile -> Sem r ()
 handleCompile (Compile t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   outputLn . show . compileTerm $ at
 
 ------------------------------------------------------------
@@ -298,7 +299,7 @@ handleDesugar
   :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r
   => REPLExpr 'CDesugar -> Sem r ()
 handleDesugar (Desugar t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   s <- renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
   outputLn s
 
@@ -320,8 +321,8 @@ handleDoc
   :: Members '[Input TopInfo, LFresh, Output String] r
   => REPLExpr 'CDoc -> Sem r ()
 handleDoc (Doc x) = do
-  ctx  <- inputs @TopInfo (view topCtx)
-  docs <- inputs @TopInfo (view topDocs)
+  ctx  <- inputs @TopInfo (view (replModInfo . miTys))
+  docs <- inputs @TopInfo (view (replModInfo . miDocs))
 
   case Ctx.lookupAll' x ctx of
     []    -> outputLn $ "No documentation found for " ++ show x ++ "."
@@ -354,8 +355,8 @@ handleEval
   => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = inputToState $ do
   mi <- loadParsedDiscoModule FromCwdOrStdlib REPLModule m
-  modify @TopInfo (extSet %~ S.union (mi ^. miExts))
-  addModule mi
+  modify @TopInfo (replModInfo . miExts %~ S.union (mi ^. miExts))
+  addToREPLModule mi
   forM_ (mi ^. miTerms) (evalTerm . fst)
   -- garbageCollect
 
@@ -366,7 +367,7 @@ evalTerm at = do
     prettyValue ty cv
     return cv
   modify @TopInfo $
-    (topCtx %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
+    (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
     (topEnv %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) v)
   return v
   where
@@ -432,7 +433,7 @@ handleLoad
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
   m <- inputToState $ loadDiscoModule (FromDir directory) modName
-  setLoadedModule m
+  setREPLModule m
   t <- inputToState . withTopEnv $ runAllTests (m ^. miProps)
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
@@ -484,8 +485,8 @@ handleNames
   :: Members '[Input TopInfo, LFresh, Output String] r
   => REPLExpr 'CNames -> Sem r ()
 handleNames Names = do
-  ctx   <- inputs @TopInfo (view topCtx)
-  tyDef <- inputs @TopInfo (view topTyDefs)
+  ctx   <- inputs @TopInfo (view (replModInfo . miTys))
+  tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
   mapM_ showTyDef $ M.assocs tyDef
   mapM_ showFn $ Ctx.assocs ctx
   where
@@ -587,8 +588,8 @@ handleShowDefn
   => REPLExpr 'CShowDefn -> Sem r ()
 handleShowDefn (ShowDefn x) = do
   let name2s = name2String x
-  defns   <- inputs @TopInfo (view topDefs)
-  tyDefns <- inputs @TopInfo (view topTyDefs)
+  defns   <- inputs @TopInfo (view (replModInfo . miTermdefs))
+  tyDefns <- inputs @TopInfo (view (replModInfo . miTydefs))
 
   let xdefs = Ctx.lookupAll' (coerce x) defns
       mtydef = M.lookup name2s tyDefns
@@ -618,7 +619,7 @@ handleTest
   :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
   => REPLExpr 'CTestProp -> Sem r ()
 handleTest (TestProp t) = do
-  at <- inputToState . typecheckDisco $ checkProperty t
+  at <- inputToState . typecheckTop $ checkProperty t
   inputToState . withTopEnv $ do
     r <- runTest 100 at   -- XXX make configurable
     prettyTestResult at r
@@ -642,7 +643,7 @@ handleTypeCheck
   :: Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r
   => REPLExpr 'CTypeCheck -> Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- typecheckDisco $ inferTop t
+  (_, sig) <- typecheckTop $ inferTop t
   s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
   outputLn s
 
@@ -681,7 +682,7 @@ handleRNF
   :: Members (Error DiscoError ': State TopInfo ': Output String ': EvalEffects) r
   => REPLExpr 'CRNF -> Sem r ()
 handleRNF (RNF t) = do
-  (at, _) <- inputToState . typecheckDisco $ inferTop t
+  (at, _) <- inputToState . typecheckTop $ inferTop t
   let c  = compileTerm at
   inputToState . withTopEnv $ do
     cv <- mkValue c >>= rnfV

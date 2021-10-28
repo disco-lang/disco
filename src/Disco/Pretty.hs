@@ -44,7 +44,7 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Eval                       (TopInfo, topTyDefs)
+import           Disco.Eval                       (TopInfo, replModInfo)
 import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
                                                    whnfV)
 import           Disco.Module
@@ -449,7 +449,7 @@ prettyVP ty           v = output "(" >> prettyV ty v >> output ")"
 --   head normal form.
 prettyWHNF :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
 prettyWHNF (TyUser nm args) v = do
-  tymap <- inputs (view topTyDefs)
+  tymap <- inputs (view (replModInfo . miTydefs))
   case M.lookup nm tymap of
     Just (TyDefBody _ body) -> prettyWHNF (body args) v
     Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"

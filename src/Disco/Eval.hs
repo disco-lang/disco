@@ -407,19 +407,26 @@ loadParsedDiscoModule'
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
   => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
+
+  -- Recursively load any modules imported by this one, and build a
+  -- map with the results.
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  existingImports <- inputs (view (replModInfo . miImports))
-  let importMap = existingImports `M.union` M.fromList (map (view miName &&& id) mis)
-    -- XXX! don't just get miTys, those are only things directly defined in the module.
-    -- Also need to get everything exported by its imports.
-    -- We should include everything already in the imports for REPL module in the importMap.
-    -- However, this still doesn't handle e.g. type definitions in imports.
-    -- I guess checkModule needs to be updated to ensure that.
+  let modImports = M.fromList (map (view miName &&& id) mis)
+
+  -- Get context and type definitions from the REPL, in case we are in REPL mode.
+  topImports <- inputs (view (replModInfo . miImports))
   topTyCtx   <- inputs (view (replModInfo . miTys))
   topTyDefns <- inputs (view (replModInfo . miTydefs))
-  let tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
-  let tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
 
+  -- Choose the contexts to use based on mode: if we are loading a
+  -- standalone module, we should start it in an empty context.  If we
+  -- are loading something entered at the REPL, we need to include any
+  -- existing top-level REPL context.
+  let importMap = case mode of { Standalone -> modImports; REPL -> topImports <> modImports }
+      tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
+      tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
+
+  -- Typecheck (and resolve names in) the module.
   m  <- runTCMWith tyctx tydefns $ checkModule name importMap cm
   modify (M.insert name m)
   return m

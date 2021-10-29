@@ -373,6 +373,7 @@ loadParsedDiscoModule
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
   => Resolver -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule resolver name m =
+  -- XXX don't use M.empty --- use module map from repl module info in TopInfo?
   evalState M.empty $ loadParsedDiscoModule' REPL resolver S.empty name m
 
 -- | Recursively load a Disco module while keeping track of an extra
@@ -407,7 +408,13 @@ loadParsedDiscoModule'
   => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  let importMap = M.fromList $ map (view miName &&& id) mis
+  existingImports <- inputs (view (replModInfo . miImports))
+  let importMap = existingImports `M.union` M.fromList (map (view miName &&& id) mis)
+    -- XXX! don't just get miTys, those are only things directly defined in the module.
+    -- Also need to get everything exported by its imports.
+    -- We should include everything already in the imports for REPL module in the importMap.
+    -- However, this still doesn't handle e.g. type definitions in imports.
+    -- I guess checkModule needs to be updated to ensure that.
   topTyCtx   <- inputs (view (replModInfo . miTys))
   topTyDefns <- inputs (view (replModInfo . miTydefs))
   let tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }

@@ -16,8 +16,6 @@
 
 module Disco.Typecheck where
 
-import qualified Debug.Trace                             as DT
-
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            ((^..))
 import           Control.Monad.Except
@@ -108,7 +106,6 @@ checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
-  DT.traceShowM imports
   let (typeDecls, defns, tydefs) = partitionDecls m
       importTyCtx = joinCtxs (imports ^.. traverse . miTys)
       -- XXX this isn't right, if multiple modules define the same type synonyms.

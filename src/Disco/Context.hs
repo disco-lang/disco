@@ -80,6 +80,13 @@ newtype Ctx a b = Ctx { getCtx :: M.Map NameProvenance (M.Map (Name a) b) }
   -- because given an (unqualified) Name, we can look it up in each
   -- inner map corresponding to modules that are in scope.
 
+instance Semigroup (Ctx a b) where
+  (<>) = joinCtx
+
+instance Monoid (Ctx a b) where
+  mempty = emptyCtx
+  mappend = (<>)
+
 ------------------------------------------------------------
 -- Construction
 ------------------------------------------------------------

@@ -382,7 +382,7 @@ checkGuards ((unembed -> c, p) : gs) = do
   res <- match v p
   case res of
     Nothing -> return Nothing
-    Just e  -> extends e (fmap (joinCtx e) <$> checkGuards gs)
+    Just e  -> extends e (fmap (e <>) <$> checkGuards gs)
 
 -- | Match a value against a pattern, returning an environment of
 --   bindings if the match succeeds.

@@ -91,7 +91,7 @@ inferTelescope inferOne tel = do
       (tyb, ctx) <- inferOne b
       extends ctx $ do
       (tybs, ctx') <- go bs
-      return (tyb:tybs, ctx `joinCtx` ctx')
+      return (tyb:tybs, ctx <> ctx')
 
 ------------------------------------------------------------
 -- Modules
@@ -107,7 +107,7 @@ checkModule
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
-      importTyCtx = joinCtxs (imports ^.. traverse . miTys)
+      importTyCtx = mconcat (imports ^.. traverse . miTys)
       -- XXX this isn't right, if multiple modules define the same type synonyms.
       -- Need to use a normal Ctx for tydefs too.
       importTyDefnCtx = M.unions (imports ^.. traverse . miTydefs)
@@ -298,7 +298,7 @@ checkDefn name (TermDefn x clauses) = do
       -- which is the same as the length of the list patTys.  So we can just use
       -- zipWithM to check all the patterns.
       (ctxs, aps) <- unzip <$> zipWithM checkPattern pats patTys
-      at  <- extends (joinCtxs ctxs) $ check body bodyTy
+      at  <- extends (mconcat ctxs) $ check body bodyTy
       return $ bind aps at
 
     -- Decompose a type that must be of the form t1 -> t2 -> ... -> tn -> t{n+1}.
@@ -995,7 +995,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
 
       -- Pass the result type through, and put the pattern-bound variables
       -- in the returned context.
-      return (pCtx `joinCtx` ctx, pTyped : typedArgs, resTy)
+      return (pCtx <> ctx, pTyped : typedArgs, resTy)
 
 -- In inference mode, we handle lambdas as well as quantifiers (∀, ∃).
 typecheck Infer (TAbs q lam)    = do
@@ -1021,7 +1021,7 @@ typecheck Infer (TAbs q lam)    = do
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.
-  extends (joinCtxs pCtxs) $ do
+  extends (mconcat pCtxs) $ do
     case q of
       -- For lambdas, infer the type of the body, and return an appropriate
       -- function type.
@@ -1295,7 +1295,7 @@ checkPattern (PString s) ty = do
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy
   let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
+  return (mconcat ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
 
   where
     checkTuplePat
@@ -1344,13 +1344,13 @@ checkPattern p@(PCons p1 p2) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
-  return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
+  return (ctx1 <> ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
   listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APList (TyList tyl) aps)
+  return (mconcat ctxs, APList (TyList tyl) aps)
 
 checkPattern (PAdd s p t) ty = do
   constraint $ CQual QNum ty
@@ -1382,7 +1382,7 @@ checkPattern (PFrac p q) ty = do
   tyQ <- cPos tyP
   (ctx1, ap1) <- checkPattern p tyP
   (ctx2, ap2) <- checkPattern q tyQ
-  return (joinCtx ctx1 ctx2, APFrac ty ap1 ap2)
+  return (ctx1 <> ctx2, APFrac ty ap1 ap2)
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

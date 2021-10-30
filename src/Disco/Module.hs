@@ -113,14 +113,14 @@ combineModuleInfo = foldM combineMods emptyModuleInfo
         return $
           ModuleInfo
             n1
-            (M.union is1 is2)
-            (joinCtx d2 d1)
+            (is1 <> is2)
+            (d2 <> d1)
             p2
-            (joinCtx ty2 ty1)
-            (M.union tyd2 tyd1)
-            (joinCtx tm2 tm1)
-            (tms1 ++ tms2)
-            (es1 `S.union` es2)
+            (ty2 <> ty1)
+            (tyd2 <> tyd1)
+            (tm2 <> tm1)
+            (tms1 <> tms2)
+            (es1 <> es2)
 
 ------------------------------------------------------------
 -- Module resolution

@@ -52,7 +52,7 @@ module Disco.Eval
 
 import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
-import           Control.Lens             (makeLenses, view, (.~))
+import           Control.Lens             (makeLenses, toListOf, view, (.~))
 import           Control.Monad            (forM_, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
@@ -480,8 +480,10 @@ populateCurrentModuleInfo
   => Sem r ()
 populateCurrentModuleInfo = do
   tmds <- gets @TopInfo (view (replModInfo . miTermdefs))
+  imptmds <- gets @TopInfo (toListOf (replModInfo . miImports . traverse . miTermdefs))
   let cdefns = Ctx.coerceKeys $ fmap compileDefn tmds
-  loadDefs cdefns
+      impcdefns = map (Ctx.coerceKeys . fmap compileDefn) imptmds
+  loadDefs (cdefns <> mconcat impcdefns)
 
 -- | Load a top-level environment of (potentially recursive)
 --   core language definitions into memory.

@@ -344,8 +344,10 @@ typecheckTop
   -> Sem r a
 typecheckTop tcm = do
   tyctx  <- inputs (view (replModInfo . miTys))
+  imptyctx <- inputs (toListOf (replModInfo . miImports . traverse . miTys))
   tydefs <- inputs (view (replModInfo . miTydefs))
-  runTCMWith tyctx tydefs tcm
+  imptydefs <- inputs (toListOf (replModInfo . miImports . traverse . miTydefs))
+  runTCMWith (tyctx <> mconcat imptyctx) (tydefs <> mconcat imptydefs) tcm
 
 --------------------------------------------------
 -- Loading
@@ -411,7 +413,7 @@ loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   -- Recursively load any modules imported by this one, and build a
   -- map with the results.
   mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
-  let modImports = M.fromList (map (view miName &&& id) mis)
+  let modImps = M.fromList (map (view miName &&& id) mis)
 
   -- Get context and type definitions from the REPL, in case we are in REPL mode.
   topImports <- inputs (view (replModInfo . miImports))
@@ -422,7 +424,7 @@ loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
   -- standalone module, we should start it in an empty context.  If we
   -- are loading something entered at the REPL, we need to include any
   -- existing top-level REPL context.
-  let importMap = case mode of { Standalone -> modImports; REPL -> topImports <> modImports }
+  let importMap = case mode of { Standalone -> modImps; REPL -> topImports <> modImps }
       tyctx   = case mode of { Standalone -> emptyCtx ; REPL -> topTyCtx }
       tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
 

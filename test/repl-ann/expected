@@ -1,2 +1,2 @@
 Loading num.disco...
-TVar_ (TyCon CArr [TyAtom (ABase N),TyCon (CContainer (ABase CtrBag)) [TyAtom (ABase N)]]) factor
+TVar_ (TyCon CArr [TyAtom (ABase N),TyCon (CContainer (ABase CtrBag)) [TyAtom (ABase N)]],QualifiedName (Named Stdlib "num")) factor

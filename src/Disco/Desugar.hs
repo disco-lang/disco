@@ -62,6 +62,10 @@ runDesugar = run . runFresh1
 -- A tiny DSL for building certain ATerms, which is helpful for
 -- writing desugaring rules.
 
+-- Make a local ATVar.
+atVar :: Type -> Name ATerm -> ATerm
+atVar ty x = ATVar ty (QName LocalName x)
+
 tapp :: ATerm -> ATerm -> ATerm
 tapp t1 t2 = ATApp resTy t1 t2
   where
@@ -139,6 +143,9 @@ ctrSingleton ctr t = ATContainer (containerTy ctr (getType t)) ctr [(t, Nothing)
 -- Making DTerms
 ------------------------------------------------------------
 
+dtVar :: Type -> Name DTerm -> DTerm
+dtVar ty x = DTVar ty (QName LocalName x)
+
 dtapp :: DTerm -> DTerm -> DTerm
 dtapp t1 t2 = DTApp resTy t1 t2
   where
@@ -193,7 +200,7 @@ desugarAbs quant overallTy body = do
     mkBranch xs b ps = bind (mkGuards xs ps) b
 
     mkGuards :: [(Name ATerm, Type)] -> [APattern] -> Telescope AGuard
-    mkGuards xs ps = toTelescope $ zipWith AGPat (map (\(x,ty) -> embed (ATVar ty x)) xs) ps
+    mkGuards xs ps = toTelescope $ zipWith AGPat (map (\(x,ty) -> embed (atVar ty x)) xs) ps
 
     -- To make searches fairer, we lift up directly nested abstractions
     -- with the same quantifier when there's only a single clause. That
@@ -224,7 +231,7 @@ desugarAbs quant overallTy body = do
 
 -- | Desugar a typechecked term.
 desugarTerm :: Member Fresh r => ATerm -> Sem r DTerm
-desugarTerm (ATVar ty x)         = return $ DTVar ty (coerce x)
+desugarTerm (ATVar ty x) = return $ DTVar ty (coerce x)
 desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
   | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
 desugarTerm (ATPrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop))
@@ -234,7 +241,7 @@ desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
   body <- desugarTerm $
     tapp (ATPrim (TyBag cts :->: TyBag b) PrimC2B)
       (tapp (ATPrim (TyList cts :->: TyBag cts) PrimBag)
-        (ATVar (TyList cts) c)
+        (atVar (TyList cts) c)
       )
   return $ mkLambda ty [c] body
 
@@ -294,7 +301,7 @@ uopDesugars _ _         uop = uop == Not
 desugarPrimUOp :: Member Fresh r => Type -> Type -> UOp -> Sem r DTerm
 desugarPrimUOp argTy resTy op = do
   x <- fresh (string2Name "arg")
-  body <- desugarUnApp resTy op (ATVar argTy x)
+  body <- desugarUnApp resTy op (atVar argTy x)
   return $ mkLambda (argTy :->: resTy) [x] body
 
 -- | Test whether a given binary operator is one that needs to be
@@ -316,11 +323,11 @@ desugarPrimBOp ty1 ty2 resTy op = do
   x <- fresh (string2Name "arg1")
   y <- fresh (string2Name "arg2")
   let argsTy = ty1 :*: ty2
-  body <- desugarBinApp resTy op (ATVar ty1 x) (ATVar ty2 y)
+  body <- desugarBinApp resTy op (atVar ty1 x) (atVar ty2 y)
   return $ mkLambda (argsTy :->: resTy) [p] $
     DTCase resTy
     [ bind
-        (toTelescope [DGPat (embed (DTVar argsTy (coerce p))) (DPPair argsTy (coerce x) (coerce y))])
+        (toTelescope [DGPat (embed (dtVar argsTy (coerce p))) (DPPair argsTy (coerce x) (coerce y))])
         body
     ]
 
@@ -648,7 +655,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
             [APVar _ px2] -> return (coerce px2, [])
             _             -> do
               x <- fresh (string2Name "x")
-              (x,) <$> desugarTuplePats ty2 (DTVar ty2 x) ps
+              (x,) <$> desugarTuplePats ty2 (dtVar ty2 x) ps
           fmap concat . sequence $
             [ mkMatch t $ DPPair ty x1 x2
             , return gs1
@@ -673,7 +680,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
           unrolledTy = eltTy :*: ty
       fmap concat . sequence $
         [ mkMatch dt (DPInj ty R y)
-        , mkMatch (DTVar unrolledTy y) (DPPair unrolledTy x1 x2)
+        , mkMatch (dtVar unrolledTy y) (DPPair unrolledTy x1 x2)
         , return gs1
         , return gs2
         ]
@@ -712,10 +719,10 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       (x0, g1) <- varFor dt
 
       -- if x0 < 0
-      g2  <- desugarGuard $ AGBool (embed (ATVar ty (coerce x0) <. ATNat ty 0))
+      g2  <- desugarGuard $ AGBool (embed (atVar ty (coerce x0) <. ATNat ty 0))
 
       -- when -x0 is p
-      neg <- desugarTerm $ mkUn ty Neg (ATVar ty (coerce x0))
+      neg <- desugarTerm $ mkUn ty Neg (atVar ty (coerce x0))
       g3  <- desugarMatch neg p
 
       return (g1 ++ g2 ++ g3)
@@ -727,7 +734,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     varMatch dt x = mkMatch dt (DPVar (getType dt) x)
 
     varFor :: Member Fresh r => DTerm -> Sem r (Name DTerm, [DGuard])
-    varFor (DTVar _ x) = return (x, [])
+    varFor (DTVar _ (QName _ x)) = return (x, [])  -- XXX return a name + provenance??
     varFor dt          = do
       x <- fresh (string2Name "x")
       g <- varMatch dt x
@@ -737,7 +744,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
     varForPat (APVar _ x) = return (coerce x, [])
     varForPat p           = do
       x <- fresh (string2Name "px")     -- changing this from x fixed a bug and I don't know why =(
-      (x,) <$> desugarMatch (DTVar (getType p) x) p
+      (x,) <$> desugarMatch (dtVar (getType p) x) p
 
     arithBinMatch
       :: Member Fresh r
@@ -757,10 +764,10 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
         -- if x0 `cmp` v
         Just cmp ->
           desugarGuard $
-            AGBool (embed (ATVar ty (coerce x0) `cmp` ATVar (getType t) (coerce v)))
+            AGBool (embed (atVar ty (coerce x0) `cmp` atVar (getType t) (coerce v)))
 
       -- when x0 `inverse` v is p
-      inv <- desugarTerm (ATVar ty (coerce x0) `inverse` ATVar (getType t) (coerce v))
+      inv <- desugarTerm (atVar ty (coerce x0) `inverse` atVar (getType t) (coerce v))
       g4  <- desugarMatch inv p
 
       return (g1 ++ g2 ++ g3 ++ g4)

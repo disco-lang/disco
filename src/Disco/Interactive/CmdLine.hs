@@ -41,7 +41,7 @@ import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Module                           (LoadingMode (..),
-                                                         Resolver (..))
+                                                         Resolver (..), miExts)
 
 import           Disco.Effects.Output
 import           Polysemy
@@ -175,7 +175,7 @@ discoMain = do
 handleCMD :: Members DiscoEffects r => String -> Sem r ()
 handleCMD "" = return ()
 handleCMD s = do
-  exts <- gets @TopInfo (view extSet)
+  exts <- gets @TopInfo (view (replModInfo . miExts))
   case parseLine discoCommands exts s of
     Left msg -> outputLn msg
     Right l  -> catch @DiscoError (dispatch discoCommands l) printoutLn

@@ -1,9 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 
 -----------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Interpret.CESK
 -- Copyright   :  disco team and contributors
@@ -12,6 +9,8 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- CESK machine interpreter for Disco.
+-----------------------------------------------------------------------------
+
 module Disco.Interpret.CESK
   ( CESK,
     runCESK,
@@ -25,15 +24,15 @@ import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
 import           Data.List                          (find)
-import           Data.Map                           (Map)
 import qualified Data.Map                           as M
 import           Data.Maybe                         (isJust)
 import           Data.Ratio
-import           Debug.Trace
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
-import           Disco.AST.Typed                    (AProperty)
+import           Disco.AST.Typed                    (AProperty, QName,
+                                                     localName)
+import           Disco.Context                      as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Enumerate
@@ -134,16 +133,16 @@ runCESK cesk = case isFinal cesk of
   Just vm -> return vm
   Nothing -> step cesk >>= runCESK
 
-(!!!) :: (Ord k, Show k) => Map k v -> k -> v
-m !!! k = case M.lookup k m of
-  Nothing -> error $ "variable not found in environment: " ++ show k
+(!!!) :: Show a => Ctx a b -> QName a -> b
+ctx !!! x = case Ctx.lookup' x ctx of
+  Nothing -> error $ "variable not found in environment: " ++ show x
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
 step (In (CVar x) e k) = return $ Out (e !!! x) k
 step (In (CNum d r) _ k) = return $ Out (VNum d r) k
-step (In (CConst OMatchErr) _ k) = throw NonExhaustive
+step (In (CConst OMatchErr) _ _) = throw NonExhaustive
 step (In (CConst op) _ k) = return $ Out (VConst op) k
 step (In (CInj s c) e k) = return $ In c e (FInj s : k)
 step (In (CCase c b1 b2) e k) = return $ In c e (FCase e b1 b2 : k)
@@ -157,22 +156,22 @@ step (In (CApp c1 c2) e k) = return $ In c1 e (FArg e c2 : k)
 step (In (CType ty) _ k) = return $ Out (VType ty) k
 step (In (CDelay b) e k) = do
   (xs, cs) <- unbind b
-  locs <- allocateRec e (zip xs cs)
+  locs <- allocateRec e (zip (map localName xs) cs)
   return $ Out (foldr (VPair . VRef) VUnit locs) k
 step (In (CForce c) e k) = return $ In c e (FForce : k)
 step (Out v (FInj s : k)) = return $ Out (VInj s v) k
 step (Out (VInj L v) (FCase e b1 _ : k)) = do
   (x, c1) <- unbind b1
-  return $ In c1 (M.insert x v e) k
+  return $ In c1 (Ctx.insert (localName x) v e) k
 step (Out (VInj R v) (FCase e _ b2 : k)) = do
   (x, c2) <- unbind b2
-  return $ In c2 (M.insert x v e) k
+  return $ In c2 (Ctx.insert (localName x) v e) k
 step (Out v1 (FPairR e c2 : k)) = return $ In c2 e (FPairL v1 : k)
 step (Out v2 (FPairL v1 : k)) = return $ Out (VPair v1 v2) k
 step (Out (VPair v1 v2) (FProj s : k)) = return $ Out (selectSide s v1 v2) k
 step (Out v (FArg e c2 : k)) = return $ In c2 e (FApp v : k)
-step (Out v2 (FApp (VClo e [x] b) : k)) = return $ In b (M.insert x v2 e) k
-step (Out v2 (FApp (VClo e (x : xs) b) : k)) = return $ Out (VClo (M.insert x v2 e) xs b) k
+step (Out v2 (FApp (VClo e [x] b) : k)) = return $ In b (Ctx.insert (localName x) v2 e) k
+step (Out v2 (FApp (VClo e (x : xs) b) : k)) = return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
 step (Out v2 (FApp (VConst op) : k)) = appConst k op v2
 step (Out (VRef n) (FForce : k)) = do
   cell <- lkup n
@@ -194,11 +193,11 @@ step c = error $ "step " ++ show c
 
 arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
-arity2 f v           = error "arity2 on a non-pair!" -- XXX
+arity2 _f _v         = error "arity2 on a non-pair!" -- XXX
 
-arity3 :: (Value -> Value -> Value -> a) -> Value -> a
-arity3 f (VPair x (VPair y z)) = f x y z
-arity3 f v                     = error "arity3 on a non-triple!"
+-- arity3 :: (Value -> Value -> Value -> a) -> Value -> a
+-- arity3 f (VPair x (VPair y z)) = f x y z
+-- arity3 _f _v                     = error "arity3 on a non-triple!"
 
 appConst :: Member (Error EvalError) r => Cont -> Op -> Value -> Sem r CESK
 appConst k = \case
@@ -396,7 +395,7 @@ numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
 numOp1 f = numOp1' $ return . ratv . f
 
 numOp1' :: (Rational -> Sem r Value) -> Value -> Sem r Value
-numOp1' f (VNum d m) = f m
+numOp1' f (VNum _ m) = f m
 
 numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
 numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))

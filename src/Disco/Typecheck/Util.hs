@@ -1,19 +1,17 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Disco.Typecheck.Monad
+-- Module      :  Disco.Typecheck.Util
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
 -- License     :  BSD-style (see LICENSE)
 -- Maintainer  :  byorgey@gmail.com
 --
--- XXX change module name?
--- XXX update this comment
--- Definition of the TCM monad used during typechecking and related
--- capabilities + utilities.
+-- Definition of type contexts, type errors, and various utilities
+-- used during type checking.
 --
 -----------------------------------------------------------------------------
 
-module Disco.Typecheck.Monad where
+module Disco.Typecheck.Util where
 
 import           Disco.Effects.Fresh
 import           Polysemy
@@ -27,6 +25,7 @@ import           Data.Tuple                       (swap)
 import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
+import           Disco.AST.Typed                  (ModuleName, QName (..))
 import           Disco.Context
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
@@ -47,6 +46,8 @@ type TyCtx = Ctx Term PolyType
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
+  | UnboundQ (QName Term)  -- ^ Encountered an unbound qualified name?  Shouldn't happen?
+  | Ambiguous (Name Term) [ModuleName] -- ^ Encountered an ambiguous name.
   | NoType  (Name Term)    -- ^ No type is specified for a definition
   | NotCon Con Term Type   -- ^ The type of the term should have an
                            --   outermost constructor matching Con, but
@@ -121,13 +122,6 @@ solve m = do
 ------------------------------------------------------------
 -- Contexts
 ------------------------------------------------------------
-
--- | Look up the type of a variable in the context.  Throw an "unbound
---   variable" error if it is not found.
-lookupTy ::
-  Members '[Reader TyCtx, Error TCError] r
-  => Name Term -> Sem r PolyType
-lookupTy x = lookup x >>= maybe (throw (Unbound x)) return
 
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error
 --   if it is not found.

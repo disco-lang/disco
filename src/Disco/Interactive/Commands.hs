@@ -18,62 +18,56 @@ module Disco.Interactive.Commands
     discoCommands,
     handleLoad,
     loadFile,
-    parseLine,
-  )
-where
+    parseLine
+  ) where
 
-import Control.Arrow ((&&&))
-import Control.Lens (view, (%~), (?~))
-import Control.Monad.Except
-import Data.Char (isSpace)
-import Data.Coerce
-import Data.List (find, isPrefixOf, sortBy)
-import qualified Data.Map as M
-import qualified Data.Set as S
-import Data.Typeable
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.Compile
-import Disco.Context
-import Disco.Desugar
-import Disco.Effects.Error hiding (try)
-import Disco.Effects.Input
-import Disco.Effects.LFresh
-import Disco.Effects.Output
-import Disco.Effects.State
-import Disco.Error
-import Disco.Eval
-import Disco.Extensions
-import Disco.Interpret.CESK
-import Disco.Module
-import Disco.Parser
-  ( Parser,
-    ident,
-    reservedOp,
-    runParser,
-    sc,
-    symbol,
-    term,
-    wholeModule,
-    withExts,
-  )
-import Disco.Pretty hiding (empty)
-import Disco.Property
-import Disco.Syntax.Operators
-import Disco.Syntax.Prims (Prim (PrimBOp, PrimUOp))
-import Disco.Typecheck
-import Disco.Typecheck.Erase
-import Disco.Types (toPolyType)
-import Disco.Value
-import Polysemy
-import System.FilePath (splitFileName)
-import Text.Megaparsec hiding (State, runParser)
-import qualified Text.Megaparsec.Char as C
-import Unbound.Generics.LocallyNameless
-  ( Name,
-    name2String,
-    string2Name,
-  )
+import           Control.Arrow                    ((&&&))
+import           Control.Lens                     (view, (%~), (?~), (^.))
+import           Control.Monad.Except
+import           Data.Char                        (isSpace)
+import           Data.Coerce
+import           Data.List                        (find, isPrefixOf, sortBy)
+import qualified Data.Map                         as M
+import qualified Data.Set                         as S
+import           Data.Typeable
+import           Prelude                          as P
+import           System.FilePath                  (splitFileName)
+
+import           Text.Megaparsec                  hiding (State, runParser)
+import qualified Text.Megaparsec.Char             as C
+import           Unbound.Generics.LocallyNameless (Name, name2String,
+                                                   string2Name)
+
+import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Input
+import           Disco.Effects.LFresh
+import           Disco.Effects.Output
+import           Disco.Effects.Store
+import           Polysemy
+import           Polysemy.State
+
+import           Debug.Trace
+import           Disco.AST.Surface
+import           Disco.AST.Typed
+import           Disco.Compile
+import           Disco.Context                    as Ctx
+import           Disco.Desugar
+import           Disco.Error
+import           Disco.Eval
+import           Disco.Extensions
+import           Disco.Interpret.Core
+import           Disco.Module
+import           Disco.Parser                     (Parser, ident, reservedOp,
+                                                   runParser, sc, symbol, term,
+                                                   wholeModule, withExts)
+import           Disco.Pretty                     hiding (empty)
+import           Disco.Property
+import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
+import           Disco.Typecheck
+import           Disco.Typecheck.Erase
+import           Disco.Types                      (toPolyType)
+import           Disco.Value
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -150,22 +144,22 @@ data CmdTag
 --   command.
 data REPLCommand (c :: CmdTag) = REPLCommand
   { -- | Name of the command
-    name :: String,
+    name      :: String,
     -- | Help text showing how to use the command, e.g. ":ann <term>"
-    helpcmd :: String,
+    helpcmd   :: String,
     -- | Short free-form text explaining the command.
     --   We could also consider adding long help text as well.
     shortHelp :: String,
     -- | Is the command for users or devs?
-    category :: REPLCommandCategory,
+    category  :: REPLCommandCategory,
     -- | Is it a built-in command or colon command?
-    cmdtype :: REPLCommandType,
+    cmdtype   :: REPLCommandType,
     -- | The action to execute,
     -- given the input to the
     -- command.
-    action :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ()),
+    action    :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ()),
     -- | Parser for the command argument(s).
-    parser :: Parser (REPLExpr c)
+    parser    :: Parser (REPLExpr c)
   }
 
 -- | An existential wrapper around any REPL command info record.
@@ -180,7 +174,7 @@ type REPLCommands = [SomeREPLCommand]
 
 -- | Keep only commands of a certain type.
 byCmdType :: REPLCommandType -> REPLCommands -> REPLCommands
-byCmdType ty = filter (\(SomeCmd rc) -> cmdtype rc == ty)
+byCmdType ty = P.filter (\(SomeCmd rc) -> cmdtype rc == ty)
 
 -- | Given a list of REPL commands and something typed at the REPL,
 --   pick the first command with a matching type-level tag and run its
@@ -255,7 +249,7 @@ lineParser allCommands =
 parseLine :: REPLCommands -> ExtSet -> String -> Either String SomeREPLExpr
 parseLine allCommands exts s =
   case runParser (withExts exts (lineParser allCommands)) "" s of
-    Left e -> Left $ errorBundlePretty e
+    Left e  -> Left $ errorBundlePretty e
     Right l -> Right l
 
 --------------------------------------------------------------------------------
@@ -282,7 +276,7 @@ handleAnn ::
   REPLExpr 'CAnn ->
   Sem r ()
 handleAnn (Ann t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   outputLn (show at)
 
 ------------------------------------------------------------
@@ -305,7 +299,7 @@ handleCompile ::
   REPLExpr 'CCompile ->
   Sem r ()
 handleCompile (Compile t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   outputLn . show . compileTerm $ at
 
 ------------------------------------------------------------
@@ -328,7 +322,7 @@ handleDesugar ::
   REPLExpr 'CDesugar ->
   Sem r ()
 handleDesugar (Desugar t) = do
-  (at, _) <- typecheckDisco $ inferTop t
+  (at, _) <- typecheckTop $ inferTop t
   s <- renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
   outputLn s
 
@@ -352,41 +346,44 @@ handleDoc ::
   REPLExpr 'CDoc ->
   Sem r ()
 handleDoc (Doc x) = do
-  ctx <- inputs @TopInfo (view topCtx)
-  docs <- inputs @TopInfo (view topDocs)
-  case M.lookup x ctx of
-    Nothing -> outputLn $ "No documentation found for " ++ show x ++ "."
-    Just ty -> do
-      p <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+  ctx  <- inputs @TopInfo (view (replModInfo . miTys))
+  docs <- inputs @TopInfo (view (replModInfo . miDocs))
+
+  case Ctx.lookupAll' x ctx of
+    []    -> outputLn $ "No documentation found for " ++ show x ++ "."
+    binds -> mapM_ (showDoc docs) binds
+
+  where
+    showDoc docMap (qn, ty) = do
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
       outputLn p
-      case M.lookup x docs of
+      case Ctx.lookup' qn docMap of
         Just (DocString ss : _) -> outputLn $ "\n" ++ unlines ss
-        _ -> return ()
+        _                       -> return ()
 
 ------------------------------------------------------------
 -- eval
 
 evalCmd :: REPLCommand 'CEval
-evalCmd =
-  REPLCommand
-    { name = "eval",
-      helpcmd = "<code>",
-      shortHelp = "Evaluate a block of code",
-      category = User,
-      cmdtype = BuiltIn,
-      action = handleEval,
-      parser = Eval <$> wholeModule REPL
-    }
+evalCmd = REPLCommand
+  { name      = "eval"
+  , helpcmd   = "<code>"
+  , shortHelp = "Evaluate a block of code"
+  , category  = User
+  , cmdtype   = BuiltIn
+  , action    = handleEval
+  , parser    = Eval <$> wholeModule REPL
+  }
 
-handleEval ::
-  Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r =>
-  REPLExpr 'CEval ->
-  Sem r ()
-handleEval (Eval m) = do
-  mi@(ModuleInfo _ _ _ _ _ tms exts) <- loadParsedDiscoModule False FromCwdOrStdlib "" m
-  modify @TopInfo (extSet %~ S.union exts)
-  addModule REPL mi
-  forM_ tms (evalTerm . fst)
+handleEval
+  :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
+  => REPLExpr 'CEval -> Sem r ()
+handleEval (Eval m) = inputToState $ do
+  mi <- loadParsedDiscoModule FromCwdOrStdlib REPLModule m
+  modify @TopInfo (replModInfo . miExts %~ S.union (mi ^. miExts))
+  addToREPLModule mi
+  forM_ (mi ^. miTerms) (evalTerm . fst)
+  -- garbageCollect
 
 evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
@@ -395,8 +392,8 @@ evalTerm at = do
   outputLn s
 
   modify @TopInfo $
-    (topCtx %~ M.insert (string2Name "it") (toPolyType ty))
-      . (topEnv %~ M.insert (string2Name "it") v)
+    (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
+    (topEnv %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) v)
   return v
   where
     ty = getType at
@@ -426,7 +423,7 @@ handleHelp Help = do
     sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
-    filteredCommands cmds = filter (\(SomeCmd c) -> category c == User) cmds
+    filteredCommands cmds = P.filter (\(SomeCmd c) -> category c == User) cmds
     showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
@@ -462,9 +459,9 @@ handleLoad ::
   Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
-  m@(ModuleInfo _ props _ _ _ _ _) <- loadDiscoModule False (FromDir directory) modName
-  setLoadedModule m
-  t <- inputToState . withTopEnv $ runAllTests props
+  m <- inputToState $ loadDiscoModule False (FromDir directory) modName
+  setREPLModule m
+  t <- inputToState . withTopEnv $ runAllTests (m ^. miProps)
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
   return t
@@ -474,24 +471,26 @@ handleLoad fp = do
 -- somewhere else.
 runAllTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
 runAllTests aprops
-  | M.null aprops = return True
-  | otherwise = do
-    outputLn "Running tests..."
-    and <$> mapM (uncurry runTests) (M.assocs aprops)
+  | Ctx.null aprops = return True
+  | otherwise     = do
+      outputLn "Running tests..."
+      and <$> mapM (uncurry runTests) (Ctx.assocs aprops)
+
   where
     numSamples :: Int
-    numSamples = 50 -- XXX make this configurable somehow
-    runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => Name ATerm -> [AProperty] -> Sem r Bool
-    runTests n props = do
+    numSamples = 50   -- XXX make this configurable somehow
+
+    runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => QName ATerm -> [AProperty] -> Sem r Bool
+    runTests (QName _ n) props = do
       output ("  " ++ name2String n ++ ":")
       results <- traverse (sequenceA . (id &&& runTest numSamples)) props
-      let failures = filter (not . testIsOk . snd) results
-      case null failures of
-        True -> outputLn " OK"
+      let failures = P.filter (not . testIsOk . snd) results
+      case P.null failures of
+        True  -> outputLn " OK"
         False -> do
           outputLn ""
           forM_ failures (uncurry prettyTestFailure)
-      return (null failures)
+      return (P.null failures)
 
 ------------------------------------------------------------
 -- :names
@@ -514,15 +513,15 @@ handleNames ::
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
-  pct <- inputs @TopInfo ((PercentNames `S.member`) . view extSet)
-  ctx <- inputs @TopInfo (view topCtx)
-  tyDef <- inputs @TopInfo (view topTyDefs)
-  mapM_ showTyDef $ M.toList tyDef
-  mapM_ showFn . (if pct then id else filter (not . ('%' `elem`) . name2String . fst)) $ M.toList ctx
+  pct   <- inputs @TopInfo ((PercentNames `S.member`) . view extSet)
+  ctx   <- inputs @TopInfo (view (replModInfo . miTys))
+  tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
+  mapM_ showTyDef $ M.assocs tyDef
+  mapM_ showFn . (if pct then id else filter (not . ('%' `elem`) . name2String . fst)) $ Ctx.assocs ctx
   where
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
-    showFn (x, ty) = do
-      p <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+    showFn (QName _ x, ty) = do
+      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
       outputLn p
 
 ------------------------------------------------------------
@@ -602,7 +601,7 @@ handleReload Reload = do
   file <- gets (view lastFile)
   case file of
     Nothing -> outputLn "No file to reload."
-    Just f -> void (handleLoad f)
+    Just f  -> void (handleLoad f)
 
 ------------------------------------------------------------
 -- :defn
@@ -625,13 +624,17 @@ handleShowDefn ::
   Sem r ()
 handleShowDefn (ShowDefn x) = do
   let name2s = name2String x
-  defns <- inputs @TopInfo (view topDefs)
-  tyDefns <- inputs @TopInfo (view topTyDefs)
-  s <- case M.lookup (coerce x) defns of
-    Just d -> renderDoc $ prettyDefn d
-    Nothing -> case M.lookup name2s tyDefns of
-      Just t -> renderDoc $ prettyTyDef name2s t
-      Nothing -> return $ "No definition for " ++ show x
+  defns   <- inputs @TopInfo (view (replModInfo . miTermdefs))
+  tyDefns <- inputs @TopInfo (view (replModInfo . miTydefs))
+
+  let xdefs = Ctx.lookupAll' (coerce x) defns
+      mtydef = M.lookup name2s tyDefns
+
+  s <- renderDoc $ do
+    let ds = map (prettyDefn . snd) xdefs ++ maybe [] (pure . prettyTyDef name2s) mtydef
+    case ds of
+      [] -> text "No definition for" <+> prettyName x
+      _  -> vcat ds
   outputLn s
 
 ------------------------------------------------------------
@@ -654,7 +657,7 @@ handleTest ::
   REPLExpr 'CTestProp ->
   Sem r ()
 handleTest (TestProp t) = do
-  at <- inputToState . typecheckDisco $ checkProperty t
+  at <- inputToState . typecheckTop $ checkProperty t
   inputToState . withTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
     prettyTestResult at r
@@ -679,7 +682,7 @@ handleTypeCheck ::
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- typecheckDisco $ inferTop t
+  (_, sig) <- typecheckTop $ inferTop t
   s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
   outputLn s
 

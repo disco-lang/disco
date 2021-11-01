@@ -79,7 +79,7 @@ import           Disco.AST.Generic                       (Side (..), selectSide)
 import           Disco.AST.Surface                       (Ellipsis (..))
 import           Disco.AST.Typed                         (AProperty)
 import           Disco.Compile                           (compileProperty)
-import           Disco.Context
+import           Disco.Context                           as Ctx
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Eval
@@ -237,9 +237,9 @@ whnf :: Members EvalEffects r => Core -> Sem r Value
 
 -- To reduce a variable, look it up in the environment and reduce the
 -- result.
-whnf (CVar x) = do
-  e <- getEnv
-  case M.lookup (coerce x) e of
+whnf (CVar x) = do    -- XXX look up entire QName once Env is fixed
+  mv <- Ctx.lookup (coerce x)
+  case mv of
     Just v  -> whnfV v
     Nothing -> error $ "Impossible! Unbound variable while interpreting: " ++ show x
       -- We should never encounter an unbound variable at this stage
@@ -355,12 +355,63 @@ whnfApp f vs =
 --   arguments.
 whnfAppExact :: Members EvalEffects r => Value -> [Value] -> Sem r Value
 whnfAppExact (VClos b e) vs  =
-  lunbind b $ \(xs,t) -> withEnv e $ extends (M.fromList $ zip xs vs) $ whnf t
+  lunbind b $ \(xs,t) -> withEnv e $ extends (localCtx $ zip xs vs) $ whnf t
 whnfAppExact (VFun f)    [v] = rnfV v >>= \v' -> whnfV (f v')
 whnfAppExact (VFun _)    vs  =
   error $ "Impossible! whnfAppExact with " ++ show (length vs) ++ " arguments to a VFun"
 whnfAppExact (VConst op) vs  = whnfOp op vs
 whnfAppExact v _ = error $ "Impossible! whnfAppExact on non-function " ++ show v
+
+------------------------------------------------------------
+-- Case analysis
+------------------------------------------------------------
+
+-- | Reduce a case expression to weak head normal form.
+whnfCase :: Members EvalEffects r => [CBranch] -> Sem r Value
+whnfCase []     = throw NonExhaustive
+whnfCase (b:bs) = do
+  lunbind b $ \(gs, t) -> do
+  res <- checkGuards (fromTelescope gs)
+  case res of
+    Nothing -> whnfCase bs
+    Just e' -> extends e' $ whnf t
+
+-- | Check a chain of guards on one branch of a case.  Returns
+--   @Nothing@ if the guards fail to match, or a resulting environment
+--   of bindings if they do match.
+checkGuards :: Members EvalEffects r => [(Embed Core, CPattern)] -> Sem r (Maybe Env)
+checkGuards [] = ok
+checkGuards ((unembed -> c, p) : gs) = do
+  v <- mkValue c
+  res <- match v p
+  case res of
+    Nothing -> return Nothing
+    Just e  -> extends e (fmap (e <>) <$> checkGuards gs)
+
+-- | Match a value against a pattern, returning an environment of
+--   bindings if the match succeeds.
+match :: Members EvalEffects r => Value -> CPattern -> Sem r (Maybe Env)
+match v (CPVar x)      = return $ Just (localCtx [(x, v)])
+match _ CPWild         = ok
+match v CPUnit         = whnfV v >> ok
+    -- Matching the unit value is guaranteed to succeed without
+    -- binding anything, but we still need to reduce in case v throws
+    -- an error.
+
+match v (CPInj s x)    = do
+  VInj t v' <- whnfV v
+  if s == t then return (Just $ localCtx [(x, v')]) else noMatch
+match v (CPPair x1 x2) = do
+  VPair v1 v2 <- whnfV v
+  return . Just . localCtx $ [(x1,v1), (x2,v2)]
+
+-- | Convenience function: successfully match with no bindings.
+ok :: Applicative f => f (Maybe Env)
+ok = pure $ Just emptyCtx
+
+-- | Convenience function: fail to match.
+noMatch :: Applicative f => f (Maybe Env)
+noMatch = pure Nothing
 
 ------------------------------------------------------------
 -- Lists

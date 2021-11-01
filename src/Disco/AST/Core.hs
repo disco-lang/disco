@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
@@ -16,20 +16,22 @@
 -- Abstract syntax trees representing the desugared, untyped core
 -- language for Disco.
 module Disco.AST.Core
-  ( -- * Core AST
-    RationalDisplay (..),
-    Core (..),
-    Op (..),
-    opArity,
-  )
-where
+       ( -- * Core AST
+         RationalDisplay(..)
+       , Core(..)
+       , Op(..), opArity
+       )
+       where
 
-import Data.Coerce
-import Disco.AST.Generic (Side)
-import Disco.Syntax.Operators (BOp)
-import Disco.Types
-import GHC.Generics
-import Unbound.Generics.LocallyNameless
+import           Data.Coerce                      (coerce)
+import           GHC.Generics
+import           Unbound.Generics.LocallyNameless
+
+import           Disco.AST.Generic                (Side)
+import           Disco.AST.Typed                  (ModuleName, ModuleProvenance,
+                                                   NameProvenance, QName (..))
+import           Disco.Syntax.Operators           (BOp)
+import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
@@ -39,7 +41,7 @@ data RationalDisplay = Fraction | Decimal
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
   _ <> Decimal = Decimal
-  _ <> _ = Fraction
+  _ <> _       = Fraction
 
 -- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
 --   idea that the result should be displayed as a decimal if any
@@ -53,7 +55,7 @@ instance Monoid RationalDisplay where
 -- | AST for the desugared, untyped core language.
 data Core where
   -- | A variable.
-  CVar :: Name Core -> Core
+  CVar :: QName Core -> Core
   -- | A rational number.
   CNum :: RationalDisplay -> Rational -> Core
   -- | A built-in constant.
@@ -93,28 +95,26 @@ data Core where
   deriving (Show, Generic, Alpha)
 
 instance Subst Core Atom
-
 instance Subst Core Con
-
 instance Subst Core Var
-
 instance Subst Core Ilk
-
 instance Subst Core BaseTy
-
 instance Subst Core Type
-
 instance Subst Core Op
-
 instance Subst Core RationalDisplay
-
 instance Subst Core Rational where
   subst _ _ = id
   substs _ = id
 
+-- XXX is this really the right thing to do?
+instance Subst Core ModuleProvenance
+instance Subst Core ModuleName
+instance Subst Core NameProvenance
+instance Subst Core (QName Core)
+
 instance Subst Core Core where
-  isvar (CVar x) = Just (SubstName (coerce x))
-  isvar _ = Nothing
+  isvar (CVar (QName _ x)) = Just (SubstName (coerce x))
+  isvar _                  = Nothing
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
@@ -267,10 +267,10 @@ data Op
 --   constant.  A few constants have arity 0; everything else is
 --   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity OEmptyMap = 0
+opArity OEmptyMap       = 0
 opArity (OEmptyGraph _) = 0
-opArity OMatchErr = 0
-opArity _ = 1
+opArity OMatchErr       = 0
+opArity _               = 1
 
 -- opArity OAdd             = 2
 -- opArity ONeg             = 1

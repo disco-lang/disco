@@ -43,7 +43,7 @@ import           Disco.AST.Core                   (RationalDisplay (..))
 import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Eval                       (TopInfo, topTyDefs)
+import           Disco.Eval                       (TopInfo, replModInfo)
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec

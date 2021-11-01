@@ -368,7 +368,7 @@ wholeModule :: LoadingMode -> Parser Module
 wholeModule = between sc eof . parseModule
 
 -- | Parse an entire module (a list of declarations ended by
---   semicolons).  The 'LoadingMode' parameter tells uw whether to
+--   semicolons).  The 'LoadingMode' parameter tells us whether to
 --   include or replace any language extensions enabled at the top
 --   level.  We include them when parsing a module entered at the
 --   REPL, and replace them when parsing a standalone module.
@@ -412,7 +412,7 @@ parseModule mode = do
               (ts, ds2') = matchDefn ds2
           matchDefn ds2 = ([], ds2)
 
-      mkModule exts imps tls = Module exts imps (defnGroups decls) (M.fromList docs) terms
+      mkModule exts imps tls = Module exts imps (defnGroups decls) docs terms
         where
           TLResults decls docs terms = groupTLs [] tls
 
@@ -428,12 +428,12 @@ parseExtName = choice (map parseOneExt allExtsList) <?> "language extension name
     parseOneExt ext = ext <$ lexeme (string' (show ext) :: Parser String)
 
 -- | Parse an import, of the form @import <modulename>@.
-parseImport :: Parser ModName
+parseImport :: Parser String
 parseImport = L.nonIndented sc $
   reserved "import" *> parseModuleName
 
 -- | Parse the name of a module.
-parseModuleName :: Parser ModName
+parseModuleName :: Parser String
 parseModuleName = lexeme $
   intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
 

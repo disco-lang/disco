@@ -17,15 +17,17 @@
 module Disco.Typecheck where
 
 import           Control.Arrow                           ((&&&))
+import           Control.Lens                            ((^..))
 import           Control.Monad.Except
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
 import           Data.List                               (group, sort)
+import           Data.Map                                (Map)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (isJust)
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
-import           Prelude                                 hiding (lookup)
+import           Prelude                                 as P hiding (lookup)
 
 import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
                                                           bind, embed,
@@ -40,17 +42,20 @@ import           Polysemy.Error
 import           Polysemy.Reader
 import           Polysemy.Writer
 
+import           Control.Monad.Trans.Maybe
+import qualified Data.Foldable                           as F
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Context
+import           Disco.Context                           hiding (filter)
+import qualified Disco.Context                           as Ctx
 import           Disco.Module
 import           Disco.Subst                             (applySubst)
 import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Monad
 import           Disco.Typecheck.Solve
+import           Disco.Typecheck.Util
 import           Disco.Types
 import           Disco.Types.Rules
 
@@ -86,7 +91,7 @@ inferTelescope inferOne tel = do
       (tyb, ctx) <- inferOne b
       extends ctx $ do
       (tybs, ctx') <- go bs
-      return (tyb:tybs, ctx `joinCtx` ctx')
+      return (tyb:tybs, ctx <> ctx')
 
 ------------------------------------------------------------
 -- Modules
@@ -94,27 +99,33 @@ inferTelescope inferOne tel = do
 
 -- | Check all the types and extract all relevant info (docs,
 --   properties, types) from a module, returning a 'ModuleInfo' record
---   on success.  This function does not handle imports at all; see
---   'recCheckMod'.
+--   on success.  This function does not handle imports at all; any
+--   imports should already be checked and passed in as the second
+--   argument.
 checkModule
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
-  => Module -> Sem r ModuleInfo
-checkModule (Module es _ m docs terms) = do
+  => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
+checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
+      importTyCtx = mconcat (imports ^.. traverse . miTys)
+      -- XXX this isn't right, if multiple modules define the same type synonyms.
+      -- Need to use a normal Ctx for tydefs too.
+      importTyDefnCtx = M.unions (imports ^.. traverse . miTydefs)
   tyDefnCtx <- makeTyDefnCtx tydefs
-  withTyDefns tyDefnCtx $ do
-    tyCtx     <- makeTyCtx typeDecls
-    extends tyCtx $ do
+  withTyDefns (tyDefnCtx `M.union` importTyDefnCtx) $ do
+    tyCtx     <- makeTyCtx name typeDecls
+    extends importTyCtx $ extends tyCtx $ do
       mapM_ checkTyDefn tydefs
-      adefns <- mapM checkDefn defns
-      let defnCtx = M.fromList (map (getDefnName &&& id) adefns)
-      let dups = filterDups . map getDefnName $ adefns
+      adefns <- mapM (checkDefn name) defns
+      let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)
+          docCtx = ctxForModule name docs
+          dups = filterDups . map getDefnName $ adefns
       case dups of
         (x:_) -> throw $ DuplicateDefns (coerce x)
         [] -> do
-          aprops <- checkProperties docs
+          aprops <- checkProperties docCtx
           aterms <- mapM inferTop terms
-          return $ ModuleInfo docs aprops tyCtx tyDefnCtx defnCtx aterms es
+          return $ ModuleInfo name imports docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 
@@ -217,11 +228,12 @@ filterDups = map head . filter ((>1) . length) . group . sort
 --------------------------------------------------
 -- Type declarations
 
--- | Given a list of type declarations, first check that there are no
---   duplicate type declarations, and that the types are well-formed;
---   then create a type context containing the given declarations.
-makeTyCtx :: Members '[Reader TyDefCtx, Error TCError] r => [TypeDecl] -> Sem r TyCtx
-makeTyCtx decls = do
+-- | Given a list of type declarations from a module, first check that
+--   there are no duplicate type declarations, and that the types are
+--   well-formed; then create a type context containing the given
+--   declarations.
+makeTyCtx :: Members '[Reader TyDefCtx, Error TCError] r => ModuleName -> [TypeDecl] -> Sem r TyCtx
+makeTyCtx name decls = do
   let dups = filterDups . map (\(TypeDecl x _) -> x) $ decls
   case dups of
     (x:_) -> throw (DuplicateDecls x)
@@ -229,28 +241,28 @@ makeTyCtx decls = do
       checkCtx declCtx
       return declCtx
   where
-    declCtx = M.fromList $ map (\(TypeDecl x ty) -> (x,ty)) decls
+    declCtx = ctxForModule name $ map (\(TypeDecl x ty) -> (x,ty)) decls
 
 -- | Check that all the types in a context are valid.
 checkCtx :: Members '[Reader TyDefCtx, Error TCError] r => TyCtx -> Sem r ()
-checkCtx = mapM_ checkPolyTyValid . M.elems
+checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 --------------------------------------------------
 -- Top-level definitions
 
--- | Type check a top-level definition.
+-- | Type check a top-level definition in the given module.
 checkDefn
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
-  => TermDefn -> Sem r Defn
-checkDefn (TermDefn x clauses) = do
+  => ModuleName -> TermDefn -> Sem r Defn
+checkDefn name (TermDefn x clauses) = do
 
   -- Check that all clauses have the same number of patterns
   checkNumPats clauses
 
   -- Get the declared type signature of x
-  Forall sig <- catch (lookupTy x) (\_ -> throw $ NoType x)
+  Forall sig <- lookup (name .- x) >>= maybe (throw $ NoType x) return
     -- If x isn't in the context, it's because no type was declared for it, so
-    -- rethrow a more informative error.
+    -- throw an error.
   (nms, ty) <- unbind sig
 
   -- Try to decompose the type into a chain of arrows like pty1 ->
@@ -286,13 +298,13 @@ checkDefn (TermDefn x clauses) = do
       -- which is the same as the length of the list patTys.  So we can just use
       -- zipWithM to check all the patterns.
       (ctxs, aps) <- unzip <$> zipWithM checkPattern pats patTys
-      at  <- extends (joinCtxs ctxs) $ check body bodyTy
+      at  <- extends (mconcat ctxs) $ check body bodyTy
       return $ bind aps at
 
     -- Decompose a type that must be of the form t1 -> t2 -> ... -> tn -> t{n+1}.
     decomposeDefnTy :: Members '[Reader TyDefCtx, Error TCError] r => Int -> Type -> Sem r ([Type], Type)
     decomposeDefnTy 0 ty = return ([], ty)
-    decomposeDefnTy n (TyUser name args) = lookupTyDefn name args >>= decomposeDefnTy n
+    decomposeDefnTy n (TyUser tyName args) = lookupTyDefn tyName args >>= decomposeDefnTy n
     decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) <$> decomposeDefnTy (n-1) ty2
     decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
 
@@ -305,11 +317,11 @@ checkProperties
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
-  M.mapKeys coerce . M.filter (not.null)
+  Ctx.coerceKeys . Ctx.filter (not . P.null)
     <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
-    properties = M.map (\ds -> [p | DocProperty p <- ds]) docs
+    properties = fmap (\ds -> [p | DocProperty p <- ds]) docs
 
 -- | Check the types of the terms embedded in a property.
 checkProperty
@@ -477,28 +489,41 @@ typecheck mode (TParens t) = typecheck mode t
 --------------------------------------------------
 -- Variables
 
--- To infer the type of a variable, just look it up in the context.
--- We don't need a checking case; checking the type of a variable will
--- fall through to this case.
---
--- Note this is also where unbound identifiers may possibly be turned
--- into primitives if the name matches.
-typecheck Infer (TVar x) = catch checkVar checkPrim
+-- Resolve variable names and infer their types.  We don't need a
+-- checking case; checking the type of a variable will fall through to
+-- this case.
+typecheck Infer (TVar x) = do
+
+  -- Pick the first method that succeeds; if none do, throw an unbound
+  -- variable error.
+  mt <- runMaybeT . F.asum . map MaybeT $ [tryLocal, tryModule, tryPrim]
+  maybe (throw (Unbound x)) return mt
   where
-    checkVar = do
-      Forall sig <- lookupTy x
-      (_, ty)    <- unbind sig
-      return $ ATVar ty (coerce x)
+    -- 1. See if the variable name is bound locally.
+    tryLocal = do
+      mty <- Ctx.lookup (localName x)
+      case mty of
+        Just (Forall sig) -> do
+          (_, ty) <- unbind sig
+          return . Just $ ATVar ty (localName (coerce x))
+        Nothing -> return Nothing
 
-    -- If the variable is not bound, check if it is an exposed primitive name.
-    checkPrim (Unbound _) =
+    -- 2. See if the variable name is bound in some in-scope module,
+    -- throwing an ambiguity error if it is bound in multiple modules.
+    tryModule = do
+      bs <- Ctx.lookupNonLocal x
+      case bs of
+        [(m,Forall sig)] -> do
+          (_, ty) <- unbind sig
+          return . Just $ ATVar ty (m .- coerce x)
+        []       -> return Nothing
+        _        -> throw $ Ambiguous x (map fst bs)
+
+    -- 3. See if we should convert it to a primitive.
+    tryPrim =
       case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
-        -- If so, infer the type of the prim instead.
-        (prim:_) -> typecheck Infer (TPrim prim)
-        _        -> throw (Unbound x)
-
-    -- For any other error, just rethrow.
-    checkPrim e = throw e
+        (prim:_) -> Just <$> typecheck Infer (TPrim prim)
+        _        -> return Nothing
 
 --------------------------------------------------
 -- Primitives
@@ -958,7 +983,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
 
       -- Pass the result type through, and put the pattern-bound variables
       -- in the returned context.
-      return (pCtx `joinCtx` ctx, pTyped : typedArgs, resTy)
+      return (pCtx <> ctx, pTyped : typedArgs, resTy)
 
 -- In inference mode, we handle lambdas as well as quantifiers (∀, ∃).
 typecheck Infer (TAbs q lam)    = do
@@ -984,7 +1009,7 @@ typecheck Infer (TAbs q lam)    = do
 
   -- Extend the context with the given arguments, and then do
   -- something appropriate depending on the quantifier.
-  extends (joinCtxs pCtxs) $ do
+  extends (mconcat pCtxs) $ do
     case q of
       -- For lambdas, infer the type of the body, and return an appropriate
       -- function type.
@@ -1111,7 +1136,7 @@ typecheck mode tcc@(TContainerComp c bqt) = do
     inferQual (QBind x (unembed -> t))  = do
       at <- infer t
       ty <- ensureConstr1 (containerToCon c) (getType at) (Left t)
-      return (AQBind (coerce x) (embed at), singleCtx x (toPolyType ty))
+      return (AQBind (coerce x) (embed at), singleCtx (localName x) (toPolyType ty))
 
     inferQual (QGuard (unembed -> t))   = do
       at <- check t TyBool
@@ -1146,7 +1171,7 @@ typecheck mode (TLet l) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return (ABinding mty (coerce x) (embed at), singleCtx x (toPolyType $ getType at))
+      return (ABinding mty (coerce x) (embed at), singleCtx (localName x) (toPolyType $ getType at))
 
 --------------------------------------------------
 -- Case
@@ -1190,7 +1215,10 @@ typecheck mode (TCase bs) = do
       at <- case mty of
         Just (unembed -> ty) -> checkPolyTy t ty
         Nothing              -> infer t
-      return (AGLet (ABinding mty (coerce x) (embed at)), singleCtx x (toPolyType (getType at)))
+      return
+        ( AGLet (ABinding mty (coerce x) (embed at))
+        , singleCtx (localName x) (toPolyType (getType at))
+        )
 
 --------------------------------------------------
 -- Type ascription
@@ -1223,7 +1251,7 @@ checkPattern
 
 checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
-checkPattern (PVar x) ty = return (singleCtx x (toPolyType ty), APVar ty (coerce x))
+checkPattern (PVar x) ty = return (singleCtx (localName x) (toPolyType ty), APVar ty (coerce x))
 
 checkPattern PWild    ty = return (emptyCtx, APWild ty)
 
@@ -1254,7 +1282,7 @@ checkPattern (PString s) ty = do
 checkPattern (PTup tup) tupTy = do
   listCtxtAps <- checkTuplePat tup tupTy
   let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
+  return (mconcat ctxs, APTup (foldr1 (:*:) (map getType aps)) aps)
 
   where
     checkTuplePat
@@ -1303,13 +1331,13 @@ checkPattern p@(PCons p1 p2) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
   (ctx2, ap2) <- checkPattern p2 (TyList tyl)
-  return (joinCtx ctx1 ctx2, APCons (TyList tyl) ap1 ap2)
+  return (ctx1 <> ctx2, APCons (TyList tyl) ap1 ap2)
 
 checkPattern p@(PList ps) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
   listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
-  return (joinCtxs ctxs, APList (TyList tyl) aps)
+  return (mconcat ctxs, APList (TyList tyl) aps)
 
 checkPattern (PAdd s p t) ty = do
   constraint $ CQual QNum ty
@@ -1341,7 +1369,7 @@ checkPattern (PFrac p q) ty = do
   tyQ <- cPos tyP
   (ctx1, ap1) <- checkPattern p tyP
   (ctx2, ap2) <- checkPattern q tyQ
-  return (joinCtx ctx1 ctx2, APFrac ty ap1 ap2)
+  return (ctx1 <> ctx2, APFrac ty ap1 ap2)
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

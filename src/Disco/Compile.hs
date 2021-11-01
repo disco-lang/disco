@@ -1,7 +1,4 @@
 -----------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Compile
 -- Copyright   :  disco team and contributors
@@ -11,41 +8,36 @@
 --
 -- Compiling the typechecked, desugared AST to the untyped core
 -- language.
+-----------------------------------------------------------------------------
+
 module Disco.Compile where
 
-import Control.Arrow ((&&&))
-import Control.Monad ((<=<))
-import Data.Bool (bool)
-import Data.Coerce
-import Data.Map ((!))
-import qualified Data.Map as M
-import Data.Ratio
-import Data.Set (Set)
-import qualified Data.Set as S
-import Data.Set.Lens (setOf)
-import Disco.AST.Core
-import Disco.AST.Desugared
-import Disco.AST.Generic
-import Disco.AST.Typed
-import Disco.Context (Ctx)
-import Disco.Desugar
-import Disco.Effects.Fresh
-import Disco.Module
-import Disco.Syntax.Operators
-import Disco.Syntax.Prims
-import qualified Disco.Typecheck.Graph as G
-import Disco.Types
-import Disco.Util
-import Polysemy (Member, Sem, run)
-import Unbound.Generics.LocallyNameless
-  ( Name,
-    bind,
-    fv,
-    string2Name,
-    subst,
-    substs,
-    unembed,
-  )
+import           Control.Arrow                    ((&&&))
+import           Control.Monad                    ((<=<))
+import           Data.Bool                        (bool)
+import           Data.Coerce
+import           Data.Map                         ((!))
+import qualified Data.Map                         as M
+import           Data.Ratio
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
+import           Data.Set.Lens                    (setOf)
+import           Disco.AST.Core
+import           Disco.AST.Desugared
+import           Disco.AST.Generic
+import           Disco.AST.Typed
+import           Disco.Context                    as Ctx
+import           Disco.Desugar
+import           Disco.Effects.Fresh
+import           Disco.Module
+import           Disco.Syntax.Operators
+import           Disco.Syntax.Prims
+import qualified Disco.Typecheck.Graph            as G
+import           Disco.Types
+import           Disco.Util
+import           Polysemy                         (Member, Sem, run)
+import           Unbound.Generics.LocallyNameless (Name, bind, fv, string2Name,
+                                                   subst, substs, unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -76,26 +68,26 @@ compileProperty = compileThing desugarProperty
 --   topologically sorts the definitions into mutually recursive
 --   groups, then compiles recursive definitions specially in terms of
 --   'delay' and 'force'.
-compileDefns :: Ctx ATerm Defn -> [(Name Core, Core)]
+compileDefns :: Ctx ATerm Defn -> [(QName Core, Core)]
 compileDefns defs = run . runFresh $ do
-  let vars = M.keysSet defs
+  let vars = Ctx.keysSet defs
 
       -- Get a list of pairs of the form (y,x) where x uses y in its definition.
       -- We want them in the order (y,x) since y needs to be evaluated before x.
       -- These will be the edges in our dependency graph.
-      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fv body)) . M.assocs $ defs
+      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fv body)) . Ctx.assocs $ defs
 
       -- Do a topological sort of the condensation of the dependency
       -- graph.  Each SCC corresponds to a group of mutually recursive
       -- definitions; each such group depends only on groups that come
       -- before it in the topsort.
-      defnGroups :: [Set (Name ATerm)]
+      defnGroups :: [Set (QName ATerm)]
       defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
 
-  concat <$> mapM (compileDefnGroup . M.assocs . M.restrictKeys defs) defnGroups
+  concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
 
 -- | XXX
-compileDefnGroup :: Member Fresh r => [(Name ATerm, Defn)] -> Sem r [(Name Core, Core)]
+compileDefnGroup :: Member Fresh r => [(QName ATerm, Defn)] -> Sem r [(QName Core, Core)]
 compileDefnGroup [(x, defn)]
   -- A recursive definition f = body compiles to
   -- f = force (delay f. [force f / f] body).
@@ -105,7 +97,7 @@ compileDefnGroup [(x, defn)]
   | otherwise =
     return [(x', cdefn)]
   where
-    x' :: Name Core
+    x' :: QName Core
     x' = coerce x
     cdefn = compileThing desugarDefn defn
 
@@ -155,7 +147,7 @@ compileDTerm term@(DTAbs q _ _) = do
   cbody <- compileDTerm body
   case q of
     Lam -> return $ abstract xs cbody
-    Ex -> return $ quantify (OExists tys) (abstract xs cbody)
+    Ex  -> return $ quantify (OExists tys) (abstract xs cbody)
     All -> return $ quantify (OForall tys) (abstract xs cbody)
   where
     -- Gather nested abstractions with the same quantifier.
@@ -219,13 +211,16 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
-  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar hd) (CVar tl))
+  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
+
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj L (CVar a)
+  return $ CAbs $ bind [a] $ CInj L (CVar (localName a))
+
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj R (CVar a)
+  return $ CAbs $ bind [a] $ CInj R (CVar (localName a))
+
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 compilePrim _ PrimSqrt = return $ CConst OSqrt

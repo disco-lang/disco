@@ -1,5 +1,4 @@
 
-
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -57,7 +56,6 @@ import           Data.IntMap                      (IntMap)
 import qualified Data.IntMap                      as IM
 import           Data.List                        (foldl')
 import           Data.Map                         (Map)
-import qualified Data.Map                         as M
 import           Data.Ratio
 
 import           Algebra.Graph                    (Graph)
@@ -65,10 +63,11 @@ import           Algebra.Graph                    (Graph)
 import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
-import           Disco.Context
+import           Disco.Context                    as Ctx
 import           Disco.Error
 import           Disco.Types
 
+import           Disco.AST.Typed                  (QName, localName)
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
 import           Polysemy
@@ -296,7 +295,7 @@ emptyTestEnv = TestEnv []
 
 getTestEnv :: Members '[Reader Env, Error EvalError] r => TestVars -> Sem r TestEnv
 getTestEnv (TestVars tvs) = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
-  value <- M.lookup name <$> getEnv
+  value <- Ctx.lookup (localName name)
   case value of
     Just v  -> return (s, ty, v)
     Nothing -> throw (UnboundError name)
@@ -350,7 +349,7 @@ type Env  = Ctx Core Value
 -- | Locally extend the environment with a new name -> value mapping,
 --   (shadowing any existing binding for the given name).
 extendEnv :: Members '[Reader Env, LFresh] r => Name Core -> Value -> Sem r a -> Sem r a
-extendEnv x v = avoid [AnyName x] . extend x v
+extendEnv x v = avoid [AnyName x] . extend (localName x) v
 
 -- | Locally extend the environment with another environment.
 --   Bindings in the new environment shadow bindings in the old.
@@ -398,11 +397,11 @@ allocate e t = do
 
 -- | Allocate new memory cells for a group of mutually recursive
 --   bindings, and return the indices of the allocate cells.
-allocateRec :: Members '[State Mem] r => Env -> [(Name Core, Core)] -> Sem r [Int]
+allocateRec :: Members '[State Mem] r => Env -> [(QName Core, Core)] -> Sem r [Int]
 allocateRec e bs = do
   Mem n m <- get
   let new = zip [n ..] bs
-      e' = foldl' (flip (\(i,(x,_)) -> M.insert x (VRef i))) e new
+      e' = foldl' (flip (\(i,(x,_)) -> Ctx.insert x (VRef i))) e new
       m' = foldl' (flip (\(i,(_,c)) -> IM.insert i (E e' c))) m new
       n' = n + length bs
   put $ Mem n' m'

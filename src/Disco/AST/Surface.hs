@@ -17,7 +17,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..), ModName
+         Module(..), TopLevel(..)
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -109,7 +109,6 @@ import           Data.Set                         (Set)
 import           Data.Void
 
 import           Disco.AST.Generic
-import           Disco.Context
 import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
@@ -121,11 +120,11 @@ data UD
 
 -- | A module contains all the information from one disco source file.
 data Module = Module
-  { modExts    :: Set Ext       -- ^ Enabled extensions
-  , modImports :: [ModName]     -- ^ Module imports
-  , modDecls   :: [Decl]        -- ^ Declarations
-  , modDocs    :: Ctx Term Docs -- ^ Documentation
-  , modTerms   :: [Term]        -- ^ Top-level (bare) terms
+  { modExts    :: Set Ext             -- ^ Enabled extensions
+  , modImports :: [String]            -- ^ Module imports
+  , modDecls   :: [Decl]              -- ^ Declarations
+  , modDocs    :: [(Name Term, Docs)] -- ^ Documentation
+  , modTerms   :: [Term]              -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
 
@@ -133,9 +132,6 @@ deriving instance ForallTerm Show  UD => Show Module
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl | TLExpr Term
 deriving instance ForallTerm Show  UD => Show TopLevel
-
--- | A module to be imported.
-type ModName = String
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]

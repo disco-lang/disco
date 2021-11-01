@@ -364,7 +364,6 @@ library
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.6,
                        containers >=0.5 && <0.7,
-                       unbound-generics >= 0.3 && < 0.5,
                        polysemy >= 1.6.0.0 && < 1.7,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.8,

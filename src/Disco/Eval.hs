@@ -79,12 +79,12 @@ import           Polysemy.State
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.AST.Typed
 import           Disco.Compile
 import           Disco.Context            as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Error
 import           Disco.Module
+import           Disco.Names
 import           Disco.Parser
 import           Disco.Typecheck          (checkModule)
 import           Disco.Typecheck.Util

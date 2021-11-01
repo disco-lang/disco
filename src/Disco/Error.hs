@@ -22,9 +22,9 @@ import           Polysemy
 import           Polysemy.Error
 
 import           Disco.AST.Core                   (Core)
-import           Disco.AST.Typed                  (ModuleName)
+import           Disco.Names                      (ModuleName)
 import           Disco.Parser
-import           Disco.Typecheck.Util            (TCError)
+import           Disco.Typecheck.Util             (TCError)
 
 -- | Top-level error type for Disco.
 data DiscoError where

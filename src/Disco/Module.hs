@@ -39,6 +39,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Extensions
+import           Disco.Names
 import           Disco.Typecheck.Util             (TCError (..), TyCtx)
 import           Disco.Types
 

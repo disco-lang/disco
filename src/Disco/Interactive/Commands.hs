@@ -48,7 +48,6 @@ import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.State
 
-import           Debug.Trace
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
@@ -59,6 +58,7 @@ import           Disco.Eval
 import           Disco.Extensions
 import           Disco.Interpret.Core
 import           Disco.Module
+import           Disco.Names
 import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
                                                    wholeModule, withExts)

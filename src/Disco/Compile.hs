@@ -20,6 +20,7 @@ import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Module
+import           Disco.Names                      (localName)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types

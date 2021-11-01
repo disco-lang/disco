@@ -32,6 +32,7 @@ import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Module
+import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck                  (containerTy)

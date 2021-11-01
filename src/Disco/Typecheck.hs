@@ -49,6 +49,7 @@ import           Disco.AST.Typed
 import           Disco.Context                           hiding (filter)
 import qualified Disco.Context                           as Ctx
 import           Disco.Module
+import           Disco.Names
 import           Disco.Subst                             (applySubst)
 import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators

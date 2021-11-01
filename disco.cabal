@@ -320,6 +320,7 @@ library
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
+                       Disco.Names
                        Disco.Context
                        Disco.Messages
                        Disco.Module

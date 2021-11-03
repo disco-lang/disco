@@ -54,7 +54,6 @@ module Disco.AST.Desugared
 import           GHC.Generics
 
 import           Data.Void
-import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic
 import           Disco.Names                      (NameProvenance, QName (..))

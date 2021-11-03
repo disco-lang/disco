@@ -22,7 +22,6 @@ import           GHC.Generics                     (Generic)
 
 import           Disco.Types
 import           Disco.Types.Rules
-import           Unbound.Generics.LocallyNameless
 
 -- | Constraints are generated as a result of type inference and checking.
 --   These constraints are accumulated during the inference and checking phase

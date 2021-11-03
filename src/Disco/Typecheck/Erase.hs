@@ -12,8 +12,6 @@
 
 module Disco.Typecheck.Erase where
 
-import           Unbound.Generics.LocallyNameless
-import           Unbound.Generics.LocallyNameless.Unsafe
 
 import           Control.Arrow                           ((***))
 import           Data.Coerce

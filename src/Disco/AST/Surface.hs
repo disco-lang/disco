@@ -113,7 +113,6 @@ import           Disco.Extensions
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
-import           Unbound.Generics.LocallyNameless
 
 -- | The extension descriptor for Surface specific AST types.
 data UD

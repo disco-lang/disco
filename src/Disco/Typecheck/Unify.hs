@@ -12,7 +12,6 @@
 
 module Disco.Typecheck.Unify where
 
-import           Unbound.Generics.LocallyNameless (Name, fv)
 
 import           Control.Lens                     (anyOf)
 import           Control.Monad.State

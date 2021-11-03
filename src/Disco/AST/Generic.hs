@@ -145,7 +145,6 @@ import           Data.Typeable
 import           GHC.Generics                     (Generic)
 
 import           Data.Void
-import           Unbound.Generics.LocallyNameless
 
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims

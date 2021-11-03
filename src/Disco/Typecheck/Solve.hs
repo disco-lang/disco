@@ -14,7 +14,6 @@
 
 module Disco.Typecheck.Solve where
 
-import           Unbound.Generics.LocallyNameless
 
 import           Control.Monad.Except
 import           Control.Monad.State

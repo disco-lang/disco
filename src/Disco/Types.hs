@@ -91,7 +91,6 @@ module Disco.Types
 
 import           Data.Coerce
 import           GHC.Generics                      (Generic)
-import           Unbound.Generics.LocallyNameless
 
 import           Control.Lens                      (toListOf)
 import           Data.List                         (nub)

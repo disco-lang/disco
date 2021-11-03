@@ -21,13 +21,13 @@ module Disco.Pretty
   )
   where
 
-import           Prelude                          hiding ((<>))
+import           Prelude                hiding ((<>))
 
-import           Control.Lens                     (view)
-import           Control.Monad                    ((>=>))
+import           Control.Lens           (view)
+import           Control.Monad          ((>=>))
 import           Data.Bifunctor
-import           Data.Char                        (chr, isAlpha, toLower)
-import qualified Data.Map                         as M
+import           Data.Char              (chr, isAlpha, toLower)
+import qualified Data.Map               as M
 import           Data.Ratio
 
 import           Disco.Effects.LFresh
@@ -36,24 +36,21 @@ import           Polysemy
 import           Polysemy.Input
 import           Polysemy.Reader
 
-import           Text.PrettyPrint                 (Doc)
-import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
-                                                   unembed)
+import           Text.PrettyPrint       (Doc)
 
 import           Disco.AST.Core
-import           Disco.AST.Generic                (selectSide)
+import           Disco.AST.Generic      (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Eval                       (TopInfo, replModInfo)
-import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
-                                                   whnfV)
+import           Disco.Eval             (TopInfo, replModInfo)
+import           Disco.Interpret.Core   (mapToSet, rnfV, whnfList, whnfV)
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
 import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck.Erase            (eraseClause, eraseProperty)
+import           Disco.Typecheck.Erase  (eraseClause, eraseProperty)
 import           Disco.Types
 import           Disco.Value
 

@@ -30,7 +30,6 @@ import qualified Data.Set                         as S
 import           System.Directory                 (doesFileExist)
 import           System.FilePath                  (replaceExtension, (</>))
 
-import           Unbound.Generics.LocallyNameless (Bind, Name, Subst)
 
 import           Polysemy
 import           Polysemy.Error

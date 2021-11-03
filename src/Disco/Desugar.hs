@@ -24,9 +24,9 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import           Data.Bool                        (bool)
+import           Data.Bool              (bool)
 import           Data.Coerce
-import           Data.Maybe                       (fromMaybe, isJust)
+import           Data.Maybe             (fromMaybe, isJust)
 
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
@@ -35,14 +35,11 @@ import           Disco.Module
 import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy)
+import           Disco.Typecheck        (containerTy)
 import           Disco.Types
 
 import           Disco.Effects.Fresh
-import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Bind, Name, bind, embed,
-                                                   name2String, string2Name,
-                                                   unembed, unrebind)
+import           Polysemy               (Member, Sem, run)
 
 ------------------------------------------------------------
 -- Running desugaring computations

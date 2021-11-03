@@ -27,15 +27,15 @@ module Disco.Subst
   )
   where
 
-import           Prelude                          hiding (lookup)
-
-import           Unbound.Generics.LocallyNameless (Name, Subst, substs)
+import           Prelude     hiding (lookup)
 
 import           Data.Coerce
 
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
+import           Data.Map    (Map)
+import qualified Data.Map    as M
+import           Data.Set    (Set)
+
+import           Disco.Names
 
 -- | A value of type @Substitution a@ is a substitution which maps some set of
 --   names (the /domain/, see 'dom') to values of type @a@.
@@ -79,7 +79,7 @@ x |-> t = Substitution (M.singleton x t)
 --   As one would expect, composition is associative and has 'idS' as
 --   its identity.
 (@@) :: Subst a a => Substitution a -> Substitution a -> Substitution a
-(Substitution s1) @@ (Substitution s2) = Substitution ((M.map (applySubst (Substitution s1))) s2 `M.union` s1)
+(Substitution s1) @@ (Substitution s2) = Substitution (M.map (applySubst (Substitution s1)) s2 `M.union` s1)
 
 -- | Compose a whole container of substitutions.  For example,
 --   @compose [s1, s2, s3] = s1 \@\@ s2 \@\@ s3@.

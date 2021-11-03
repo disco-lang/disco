@@ -26,7 +26,6 @@ module Disco.AST.Core
        where
 
 import           GHC.Generics
-import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
 import           Disco.AST.Surface                (Telescope)

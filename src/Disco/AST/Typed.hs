@@ -84,8 +84,6 @@ module Disco.AST.Typed
        )
        where
 
-import           Unbound.Generics.LocallyNameless
-import           Unbound.Generics.LocallyNameless.Unsafe
 
 import           Data.Void
 

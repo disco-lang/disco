@@ -49,28 +49,23 @@ module Disco.Parser
        )
        where
 
-import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
-                                                          fvAny, string2Name)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-
 import           Control.Monad.Combinators.Expr
-import           Text.Megaparsec                         hiding (runParser)
-import qualified Text.Megaparsec                         as MP
+import           Text.Megaparsec                hiding (runParser)
+import qualified Text.Megaparsec                as MP
 import           Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer              as L
+import qualified Text.Megaparsec.Char.Lexer     as L
 
-import           Control.Lens                            (makeLenses, toListOf,
-                                                          use, (%=), (%~), (&),
-                                                          (.=))
+import           Control.Lens                   (makeLenses, toListOf, use,
+                                                 (%=), (%~), (&), (.=))
 import           Control.Monad.State
-import           Data.Char                               (isDigit)
-import           Data.Foldable                           (asum)
-import           Data.List                               (find, intercalate)
-import qualified Data.Map                                as M
-import           Data.Maybe                              (fromMaybe)
+import           Data.Char                      (isDigit)
+import           Data.Foldable                  (asum)
+import           Data.List                      (find, intercalate)
+import qualified Data.Map                       as M
+import           Data.Maybe                     (fromMaybe)
 import           Data.Ratio
-import           Data.Set                                (Set)
-import qualified Data.Set                                as S
+import           Data.Set                       (Set)
+import qualified Data.Set                       as S
 
 import           Disco.AST.Surface
 import           Disco.Extensions
@@ -1037,3 +1032,4 @@ parseTyOp =
 
 parseTypeOp :: Parser Term
 parseTypeOp = TTyOp <$> parseTyOp <*> parseAtomicType
+e

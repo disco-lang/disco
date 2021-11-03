@@ -24,11 +24,11 @@ module Disco.Syntax.Operators
 
        ) where
 
-import           GHC.Generics                     (Generic)
-import           Unbound.Generics.LocallyNameless
+import           GHC.Generics (Generic)
 
-import           Data.Map                         (Map, (!))
-import qualified Data.Map                         as M
+
+import           Data.Map     (Map, (!))
+import qualified Data.Map     as M
 
 ------------------------------------------------------------
 -- Operators

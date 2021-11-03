@@ -64,7 +64,6 @@ import           Polysemy.Error
 import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Reader
-import           Unbound.Generics.LocallyNameless (AnyName (..), Bind, Name)
 
 ------------------------------------------------------------
 -- Evaluation effects

@@ -23,24 +23,22 @@ module Disco.Interactive.Commands
     parseLine
   ) where
 
-import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, (%~), (?~), (^.))
+import           Control.Arrow          ((&&&))
+import           Control.Lens           (view, (%~), (?~), (^.))
 import           Control.Monad.Except
-import           Data.Char                        (isSpace)
+import           Data.Char              (isSpace)
 import           Data.Coerce
-import           Data.List                        (find, isPrefixOf, sortBy)
-import qualified Data.Map                         as M
-import qualified Data.Set                         as S
+import           Data.List              (find, isPrefixOf, sortBy)
+import qualified Data.Map               as M
+import qualified Data.Set               as S
 import           Data.Typeable
-import           Prelude                          as P
-import           System.FilePath                  (splitFileName)
+import           Prelude                as P
+import           System.FilePath        (splitFileName)
 
-import           Text.Megaparsec                  hiding (State, runParser)
-import qualified Text.Megaparsec.Char             as C
-import           Unbound.Generics.LocallyNameless (Name, name2String,
-                                                   string2Name)
+import           Text.Megaparsec        hiding (State, runParser)
+import qualified Text.Megaparsec.Char   as C
 
-import           Disco.Effects.Error              hiding (try)
+import           Disco.Effects.Error    hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
@@ -51,7 +49,7 @@ import           Polysemy.State
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
-import           Disco.Context                    as Ctx
+import           Disco.Context          as Ctx
 import           Disco.Desugar
 import           Disco.Error
 import           Disco.Eval
@@ -59,16 +57,16 @@ import           Disco.Extensions
 import           Disco.Interpret.Core
 import           Disco.Module
 import           Disco.Names
-import           Disco.Parser                     (Parser, ident, reservedOp,
-                                                   runParser, sc, symbol, term,
-                                                   wholeModule, withExts)
-import           Disco.Pretty                     hiding (empty)
+import           Disco.Parser           (Parser, ident, reservedOp, runParser,
+                                         sc, symbol, term, wholeModule,
+                                         withExts)
+import           Disco.Pretty           hiding (empty)
 import           Disco.Property
 import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
+import           Disco.Syntax.Prims     (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
-import           Disco.Types                      (toPolyType)
+import           Disco.Types            (toPolyType)
 import           Disco.Value
 
 ------------------------------------------------------------

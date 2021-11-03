@@ -58,8 +58,6 @@ import           Data.Coerce                             (coerce)
 import qualified Data.Map                                as M
 import           Data.Ratio
 
-import           Unbound.Generics.LocallyNameless        (Embed, unembed)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Math.Combinatorics.Exact.Binomial       (choose)
 import           Math.Combinatorics.Exact.Factorial      (factorial)

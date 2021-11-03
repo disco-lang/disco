@@ -20,23 +20,21 @@ import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Desugar
 import           Disco.Module
-import           Disco.Names                      (localName)
+import           Disco.Names            (localName)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
 import           Disco.Util
 
-import           Control.Monad                    ((<=<))
-import           Data.Bool                        (bool)
+import           Control.Monad          ((<=<))
+import           Data.Bool              (bool)
 import           Data.Coerce
-import           Data.Map                         ((!))
-import qualified Data.Map                         as M
+import           Data.Map               ((!))
+import qualified Data.Map               as M
 import           Data.Ratio
 
 import           Disco.Effects.Fresh
-import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Embed, Name, bind, embed,
-                                                   string2Name, unembed)
+import           Polysemy               (Member, Sem, run)
 
 ------------------------------------------------------------
 -- Convenience operations

@@ -18,13 +18,12 @@
 module Disco.Effects.Fresh where
 
 import           Disco.Effects.Counter
+import           Disco.Names
 import           Polysemy
-import           Polysemy.ConstraintAbsorber
 
 -- | Fresh name generation effect, supporting raw generation of fresh
---   names, and opening binders with automatic freshening.  Simply
---   increments a global counter every time 'fresh' is called and
---   makes a variable with that numeric suffix.
+--   names.  Simply increments a global counter every time 'fresh' is
+--   called and makes a variable with that numeric suffix.
 data Fresh m a where
   Fresh  :: Name x -> Fresh m (Name x)
 
@@ -36,9 +35,7 @@ runFresh' :: Integer -> Sem (Fresh ': r) a -> Sem r a
 runFresh' i
   = runCounter' i
   . reinterpret \case
-      Fresh x -> case x of
-        Fn s _  -> Fn s <$> next
-        nm@Bn{} -> return nm
+      Fresh (Name x _) -> Name x <$> next
 
 -- | Run a computation requiring fresh name generation, beginning with
 --   0 for the initial freshly generated name.

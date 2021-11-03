@@ -13,7 +13,6 @@
 module Disco.Types.Qualifiers where
 
 import           GHC.Generics
-import           Unbound.Generics.LocallyNameless
 
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S

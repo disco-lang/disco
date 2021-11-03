@@ -60,7 +60,6 @@ import qualified Data.Map                         as M
 import           Prelude                          hiding (filter, lookup, null)
 
 
-import           Unbound.Generics.LocallyNameless (Name)
 
 import           Polysemy
 import           Polysemy.Reader

@@ -18,7 +18,6 @@ import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Reader
 import           Polysemy.Writer
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name)
 
 import qualified Data.Map                         as M
 import           Data.Tuple                       (swap)

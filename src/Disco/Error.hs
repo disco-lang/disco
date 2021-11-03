@@ -15,7 +15,6 @@ module Disco.Error (DiscoError(..), EvalError(..), outputDiscoErrors) where
 
 import           Text.Megaparsec                  (ParseErrorBundle,
                                                    errorBundlePretty)
-import           Unbound.Generics.LocallyNameless (Name)
 
 import           Disco.Effects.Output
 import           Polysemy

@@ -17,7 +17,6 @@ module Disco.Syntax.Prims
        ) where
 
 import           GHC.Generics                     (Generic)
-import           Unbound.Generics.LocallyNameless
 
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M

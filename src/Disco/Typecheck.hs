@@ -16,42 +16,35 @@
 
 module Disco.Typecheck where
 
-import           Control.Arrow                           ((&&&))
-import           Control.Lens                            ((^..))
+import           Control.Arrow               ((&&&))
+import           Control.Lens                ((^..))
 import           Control.Monad.Except
-import           Data.Bifunctor                          (first)
+import           Data.Bifunctor              (first)
 import           Data.Coerce
-import           Data.List                               (group, sort)
-import           Data.Map                                (Map)
-import qualified Data.Map                                as M
-import           Data.Maybe                              (isJust)
-import           Data.Set                                (Set)
-import qualified Data.Set                                as S
-import           Prelude                                 as P hiding (lookup)
-
-import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
-                                                          bind, embed,
-                                                          name2String,
-                                                          string2Name, substs,
-                                                          unembed)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import           Data.List                   (group, sort)
+import           Data.Map                    (Map)
+import qualified Data.Map                    as M
+import           Data.Maybe                  (isJust)
+import           Data.Set                    (Set)
+import qualified Data.Set                    as S
+import           Prelude                     as P hiding (lookup)
 
 import           Disco.Effects.Fresh
-import           Polysemy                                hiding (embed)
+import           Polysemy                    hiding (embed)
 import           Polysemy.Error
 import           Polysemy.Reader
 import           Polysemy.Writer
 
 import           Control.Monad.Trans.Maybe
-import qualified Data.Foldable                           as F
+import qualified Data.Foldable               as F
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Context                           hiding (filter)
-import qualified Disco.Context                           as Ctx
+import           Disco.Context               hiding (filter)
+import qualified Disco.Context               as Ctx
 import           Disco.Module
 import           Disco.Names
-import           Disco.Subst                             (applySubst)
-import qualified Disco.Subst                             as Subst
+import           Disco.Subst                 (applySubst)
+import qualified Disco.Subst                 as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints

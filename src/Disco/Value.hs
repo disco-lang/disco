@@ -67,9 +67,10 @@ import           Disco.Context                    as Ctx
 import           Disco.Error
 import           Disco.Types
 
-import           Disco.AST.Typed                  (QName, localName)
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
+import           Disco.Effects.Store
+import           Disco.Names                      (localName)
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Fail

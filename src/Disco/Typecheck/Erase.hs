@@ -22,6 +22,7 @@ import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Module                            (Clause)
+import           Disco.Names                             (QName (..))
 
 -- | Erase all the type annotations from a term.
 erase :: ATerm -> Term

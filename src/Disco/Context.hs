@@ -70,7 +70,7 @@ import           Unbound.Generics.LocallyNameless (Name)
 import           Polysemy
 import           Polysemy.Reader
 
-import           Disco.AST.Typed                  (ModuleName,
+import           Disco.Names                      (ModuleName,
                                                    NameProvenance (..),
                                                    QName (..))
 

@@ -30,6 +30,7 @@ import           Disco.Context                    as Ctx
 import           Disco.Desugar
 import           Disco.Effects.Fresh
 import           Disco.Module
+import           Disco.Names                      (localName)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import qualified Disco.Typecheck.Graph            as G

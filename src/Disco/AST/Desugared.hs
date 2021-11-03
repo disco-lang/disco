@@ -57,7 +57,7 @@ import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic
-import           Disco.AST.Typed                  (NameProvenance, QName (..))
+import           Disco.Names                      (NameProvenance, QName (..))
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types

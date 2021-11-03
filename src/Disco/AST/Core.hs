@@ -28,8 +28,7 @@ import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
-import           Disco.AST.Typed                  (ModuleName, ModuleProvenance,
-                                                   NameProvenance, QName (..))
+import           Disco.Names                      (QName (..))
 import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
 

@@ -335,7 +335,7 @@ identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
     p       = (:) <$> begin <*> many identChar
-    identChar = alphaNumChar <|> oneOf "_'" <|> (ensureEnabled PercentNames *> char '%')
+    identChar = alphaNumChar <|> oneOf "_'"
     check x
       | x `elem` reservedWords = do
           -- back up to beginning of bad token to report correct position

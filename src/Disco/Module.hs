@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -17,6 +18,7 @@
 
 module Disco.Module where
 
+import           Data.Data                        (Data)
 import           GHC.Generics                     (Generic)
 
 import           Control.Lens                     (makeLenses)
@@ -66,7 +68,7 @@ data LoadingMode = REPL | Standalone
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
 data Defn = Defn (Name ATerm) [Type] Type [Clause]
-  deriving (Show, Generic, Alpha)
+  deriving (Show, Generic, Alpha, Data)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete

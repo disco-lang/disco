@@ -37,8 +37,8 @@ import qualified Disco.Typecheck.Graph            as G
 import           Disco.Types
 import           Disco.Util
 import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Name, bind, fv, string2Name,
-                                                   subst, substs, unembed)
+import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
+                                                   unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -69,7 +69,7 @@ compileProperty = compileThing desugarProperty
 --   topologically sorts the definitions into mutually recursive
 --   groups, then compiles recursive definitions specially in terms of
 --   'delay' and 'force'.
-compileDefns :: Ctx ATerm Defn -> [(QName Core, Core)]
+compileDefns :: Ctx ATerm Defn -> Ctx Core Core
 compileDefns defs = run . runFresh $ do
   let vars = Ctx.keysSet defs
 
@@ -77,7 +77,7 @@ compileDefns defs = run . runFresh $ do
       -- We want them in the order (y,x) since y needs to be evaluated before x.
       -- These will be the edges in our dependency graph.
       deps :: Set (QName ATerm, QName ATerm)
-      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fv body)) . Ctx.assocs $ defs
+      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fvQ body)) . Ctx.assocs $ defs
 
       -- Do a topological sort of the condensation of the dependency
       -- graph.  Each SCC corresponds to a group of mutually recursive
@@ -86,15 +86,15 @@ compileDefns defs = run . runFresh $ do
       defnGroups :: [Set (QName ATerm)]
       defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
 
-  concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
+  Ctx.fromList . concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
 
 -- | XXX
 compileDefnGroup :: Member Fresh r => [(QName ATerm, Defn)] -> Sem r [(QName Core, Core)]
 compileDefnGroup [(x, defn)]
   -- A recursive definition f = body compiles to
   -- f = force (delay f. [force f / f] body).
-  | x `S.member` setOf fv defn =
-    return [(x', CForce (CProj L (CDelay (bind [x'] [subst x' (CForce (CVar x')) cdefn]))))]
+  | x `S.member` setOf fvQ defn =
+    return [(x', CForce (CProj L (CDelay (bind [qname x'] [substQ x' (CForce (CVar x')) cdefn]))))]
   -- A non-recursive definition just compiles simply.
   | otherwise =
     return [(x', cdefn)]
@@ -114,16 +114,16 @@ compileDefnGroup [(x, defn)]
 -- where forceVars is the substitution [force f / f, force g / g, ...]
 
 compileDefnGroup defs = do
-  grp <- fresh (string2Name "__grp")
+  grp <- freshQ "__grp"
   let (vars, bodies) = unzip defs
       vars' :: [QName Core]
       vars' = coerce vars
       forceVars :: [(QName Core, Core)]
       forceVars = map (id &&& CForce . CVar) vars'
       bodies' :: [Core]
-      bodies' = (map (substs forceVars . compileThing desugarDefn) bodies)
+      bodies' = map (substsQ forceVars . compileThing desugarDefn) bodies
   return $
-    (grp, CDelay (bind vars' bodies')) :
+    (grp, CDelay (bind (map qname vars') bodies')) :
     zip vars' (map (CForce . flip proj (CVar grp)) [0 ..])
   where
     proj :: Int -> Core -> Core
@@ -156,8 +156,8 @@ compileDTerm term@(DTAbs q _ _) = do
     unbindDeep :: Member Fresh r => DTerm -> Sem r ([Name DTerm], [Type], DTerm)
     unbindDeep (DTAbs q' ty l) | q == q' = do
       (name, inner) <- unbind l
-      (names, tys, body) <- unbindDeep inner
-      return (name : names, ty : tys, body)
+      (ns, tys, body) <- unbindDeep inner
+      return (name : ns, ty : tys, body)
     unbindDeep t = return ([], [], t)
 
     abstract :: [Name DTerm] -> Core -> Core
@@ -325,7 +325,7 @@ compileBranch b = do
 --   type τ which evaluates the guards in sequence, ultimately
 --   returning the given expression if all guards succeed, or calling
 --   the failure continuation at any point if a guard fails.
-compileGuards :: Member Fresh r => [DGuard] -> QName Core -> Core -> Sem r Core
+compileGuards :: Member Fresh r => [DGuard] -> Name Core -> Core -> Sem r Core
 compileGuards [] _ e = return e
 compileGuards (DGPat (unembed -> s) p : gs) k e = do
   e' <- compileGuards gs k e
@@ -338,7 +338,7 @@ compileGuards (DGPat (unembed -> s) p : gs) k e = do
 --   a Core expression of type τ that performs the match and either
 --   calls the failure continuation in the case of failure, or the
 --   rest of the guards in the case of success.
-compileMatch :: Member Fresh r => DPattern -> Core -> QName Core -> Core -> Sem r Core
+compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
 compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) s
 -- Note in the below two cases that we can't just discard s since
 -- that would result in a lazy semantics.  With an eager/strict
@@ -358,19 +358,19 @@ compileMatch (DPPair _ x1 x2) s _ e = do
               ( CApp
                   ( CApp
                       (CAbs (bind [coerce x1, coerce x2] e))
-                      (CProj L (CVar y))
+                      (CProj L (CVar (localName y)))
                   )
-                  (CProj R (CVar y))
+                  (CProj R (CVar (localName y)))
               )
           )
       )
       s
 compileMatch (DPInj _ L x) s k e =
   -- {? e when s is left(x) ?}   ==>   case s of {left x -> e; right _ -> k unit}
-  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar k) CUnit))
+  return $ CCase s (bind (coerce x) e) (bind (string2Name "_") (CApp (CVar (localName k)) CUnit))
 compileMatch (DPInj _ R x) s k e =
   -- {? e when s is right(x) ?}   ==>   case s of {left _ -> k unit; right x -> e}
-  return $ CCase s (bind (string2Name "_") (CApp (CVar k) CUnit)) (bind (coerce x) e)
+  return $ CCase s (bind (string2Name "_") (CApp (CVar (localName k)) CUnit)) (bind (coerce x) e)
 
 ------------------------------------------------------------
 -- Unary and binary operators

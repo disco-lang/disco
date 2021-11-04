@@ -1,9 +1,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Interactive.Commands
 -- Copyright   :  disco team and contributors
@@ -13,6 +10,8 @@
 --
 -- Defining and dispatching all commands/functionality available at
 -- the REPL prompt.
+-----------------------------------------------------------------------------
+
 module Disco.Interactive.Commands
   ( dispatch,
     discoCommands,
@@ -22,7 +21,7 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, (%~), (?~), (^.))
+import           Control.Lens                     (view, zoom, (%~), (?~), (^.))
 import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
@@ -54,7 +53,6 @@ import           Disco.Desugar
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
-import           Disco.Interpret.Core
 import           Disco.Module
 import           Disco.Names
 import           Disco.Parser                     (Parser, ident, reservedOp,
@@ -379,7 +377,7 @@ handleEval
   :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = inputToState $ do
-  mi <- loadParsedDiscoModule FromCwdOrStdlib REPLModule m
+  mi <- loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
   modify @TopInfo (replModInfo . miExts %~ S.union (mi ^. miExts))
   addToREPLModule mi
   forM_ (mi ^. miTerms) (evalTerm . fst)
@@ -513,11 +511,9 @@ handleNames ::
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
-  pct   <- inputs @TopInfo ((PercentNames `S.member`) . view extSet)
   ctx   <- inputs @TopInfo (view (replModInfo . miTys))
   tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
   mapM_ showTyDef $ M.assocs tyDef
-  mapM_ showFn . (if pct then id else filter (not . ('%' `elem`) . name2String . fst)) $ Ctx.assocs ctx
   where
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
     showFn (QName _ x, ty) = do

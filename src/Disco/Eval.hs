@@ -23,11 +23,6 @@ module Disco.Eval
        , TopInfo
        , replModInfo, topEnv, lastFile
 
-         -- * Memory
-
-       , Cell(..), mkCell, Loc, showMemory, garbageCollect
-       , allocate, delay, delay', mkValue, mkSimple
-
          -- * Running things
 
        , runDisco
@@ -44,32 +39,27 @@ module Disco.Eval
        , addToREPLModule
        , setREPLModule
        , populateCurrentModuleInfo
-       , loadDefs
 
        )
        where
 
-import           Control.Arrow                    ((&&&))
-import           Control.Exception                (SomeException, handle)
-import           Control.Lens                     (makeLenses, toListOf, view,
-                                                   (.~))
-import           Control.Monad                    (forM_, void, when)
-import           Control.Monad.IO.Class           (liftIO)
+import           Control.Arrow            ((&&&))
+import           Control.Exception        (SomeException, handle)
+import           Control.Lens             (makeLenses, toListOf, view, (%~),
+                                           (.~))
+import           Control.Monad            (void, when)
+import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
-import           Data.IntSet                      (IntSet)
-import qualified Data.IntSet                      as IntSet
-import qualified Data.Map                         as M
-import qualified Data.Set                         as S
-import           System.FilePath                  ((-<.>))
-import           Text.Printf
+import qualified Data.Map                 as M
+import qualified Data.Set                 as S
+import           System.FilePath          ((-<.>))
 
-import qualified System.Console.Haskeline         as H
+import qualified System.Console.Haskeline as H
 
 import           Disco.Effects.Error
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
-import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Fail
@@ -79,31 +69,18 @@ import           Polysemy.State
 
 import           Disco.AST.Core
 import           Disco.AST.Surface
-import           Disco.Compile
-import           Disco.Context                    as Ctx
+import           Disco.Compile            (compileDefns)
+import           Disco.Context            as Ctx
 import           Disco.Effects.Fresh
-import           Disco.Effects.Input
-import           Disco.Effects.LFresh
-import           Disco.Effects.Output
 import           Disco.Error
-import           Disco.Extensions
 import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Names
 import           Disco.Parser
-import           Disco.Typecheck                  (checkModule)
+import           Disco.Typecheck          (checkModule)
 import           Disco.Typecheck.Util
 import           Disco.Types
 import           Disco.Value
-import           Polysemy
-import           Polysemy.Embed
-import           Polysemy.Fail
-import           Polysemy.Random
-import           Polysemy.Reader
-import           Polysemy.State
-import qualified System.Console.Haskeline         as H
-import           System.FilePath                  ((-<.>))
-import           Unbound.Generics.LocallyNameless (Name)
 
 ------------------------------------------------------------
 -- Top-level effects
@@ -262,10 +239,6 @@ typecheckTop tcm = do
 --------------------------------------------------
 -- Loading
 
--- | Standard library modules which should always be in scope.
-standardModules :: [String]
-standardModules = ["list"]
-
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
 --   'ModuleInfo' records to a map from module names to info records,
@@ -313,9 +286,9 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
       cm <- parseDiscoModule resolvedPath
       loadParsedDiscoModule' quiet Standalone resolver (S.insert name inProcess) name cm
 
-  -- | A list of standard library module names
-stdLib :: [ModName]
-stdLib = ["list"]
+-- | A list of standard library module names
+stdLib :: [ModuleName]
+stdLib = [Named Stdlib "list"]
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
@@ -325,12 +298,12 @@ stdLib = ["list"]
 --   imports, then typecheck it.
 loadParsedDiscoModule'
   :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
-  => LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule' mode resolver inProcess name cm@(Module _ mns _ _ _) = do
+  => Bool -> LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
+loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
 
   -- Recursively load any modules imported by this one, and build a
   -- map with the results.
-  mis <- mapM (loadDiscoModule' (withStdlib resolver) inProcess) mns
+  mis <- mapM (loadDiscoModule' quiet (withStdlib resolver) inProcess) mns
   let modImps = M.fromList (map (view miName &&& id) mis)
 
   -- Get context and type definitions from the REPL, in case we are in REPL mode.
@@ -374,19 +347,19 @@ loadFile file = do
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addToREPLModule
-  :: Members '[Error DiscoError, State TopInfo, Reader Env, Store Cell, Output Debug] r
+  :: Members '[Error DiscoError, State TopInfo, Reader Env, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
   curMI <- gets @TopInfo (view replModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  setREPLModule mi'
+  mapError EvalErr $ setREPLModule mi'
 
 -- | Set the given 'ModuleInfo' record as the currently loaded
 --   module. This also includes updating the top-level state with new
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setREPLModule
-  :: Members '[State TopInfo, Reader Env, Store Cell, Output Debug] r
+  :: Members '[State TopInfo, Reader Env, Error EvalError, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi
@@ -402,15 +375,13 @@ populateCurrentModuleInfo ::
 populateCurrentModuleInfo = do
   tmds <- gets @TopInfo (view (replModInfo . miTermdefs))
   imptmds <- gets @TopInfo (toListOf (replModInfo . miImports . traverse . miTermdefs))
-  let cdefns = Ctx.coerceKeys $ fmap compileDefn tmds
-      impcdefns = map (Ctx.coerceKeys . fmap compileDefn) imptmds
+  let cdefns = Ctx.coerceKeys $ compileDefns tmds
+      impcdefns = map (Ctx.coerceKeys . compileDefns) imptmds
   mapM_ (uncurry loadDef) (Ctx.assocs (cdefns <> mconcat impcdefns))
 
 loadDef ::
   Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r =>
-  Name Core ->
-  Core ->
-  Sem r ()
+  QName Core -> Core -> Sem r ()
 loadDef x body = do
   v <- inputToState . inputTopEnv $ eval body
-  modify @TopInfo $ topEnv %~ M.insert x v
+  modify @TopInfo $ topEnv %~ Ctx.insert x v

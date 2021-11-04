@@ -27,7 +27,8 @@ import           GHC.Generics
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
-import           Disco.Names                      (QName (..))
+import           Disco.Names                      (ModuleName, ModuleProvenance,
+                                                   NameProvenance, QName (..))
 import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
 
@@ -92,21 +93,24 @@ data Core where
   CForce :: Core -> Core
   deriving (Show, Generic, Alpha)
 
--- instance Subst Core Atom
--- instance Subst Core Con
--- instance Subst Core Var
--- instance Subst Core Ilk
--- instance Subst Core BaseTy
--- instance Subst Core Type
--- instance Subst Core Op
--- instance Subst Core RationalDisplay
--- instance Subst Core Rational where
---   subst _ _ = id
---   substs _ = id
-
--- instance Subst Core Core where
---   isvar (CVar (QName _ x)) = Just (SubstName (coerce x))
---   isvar _                  = Nothing
+instance Subst Core ModuleProvenance
+instance Subst Core ModuleName
+instance Subst Core NameProvenance
+instance Subst Core Atom
+instance Subst Core Con
+instance Subst Core Var
+instance Subst Core Ilk
+instance Subst Core BaseTy
+instance Subst Core Type
+instance Subst Core Op
+instance Subst Core RationalDisplay
+instance Subst Core Rational where
+  subst _ _ = id
+  substs _ = id
+instance Subst Core (QName Core)
+instance Subst Core Core where
+  isvar (CVar (QName _ x)) = Just (SubstName x)
+  isvar _                  = Nothing
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are

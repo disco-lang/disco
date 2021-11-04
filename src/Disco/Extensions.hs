@@ -16,7 +16,7 @@ module Disco.Extensions
   )
 where
 
-import Data.Set (Set)
+import           Data.Set (Set)
 import qualified Data.Set as S
 
 type ExtSet = Set Ext
@@ -25,8 +25,6 @@ type ExtSet = Set Ext
 data Ext
   = -- | Allow primitives, i.e. @$prim@
     Primitives
-  | -- | Allow the @%@ char to be used in identifier names
-    PercentNames
   | -- | Don't automatically import standard library modules
     NoStdLib
   | -- | Allow randomness.  This is not implemented yet.

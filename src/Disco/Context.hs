@@ -23,6 +23,7 @@ module Disco.Context
          -- * Construction
        , emptyCtx
        , singleCtx
+       , fromList
        , ctxForModule
        , localCtx
 
@@ -103,6 +104,10 @@ emptyCtx = Ctx M.empty
 -- | A singleton context, mapping a qualified name to a thing.
 singleCtx :: QName a -> b -> Ctx a b
 singleCtx (QName p n) = Ctx . M.singleton p . M.singleton n
+
+-- | XXX
+fromList :: [(QName a, b)] -> Ctx a b
+fromList = undefined
 
 -- | Create a context for bindings from a single module.
 ctxForModule :: ModuleName -> [(Name a, b)] -> Ctx a b

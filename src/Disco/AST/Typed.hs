@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -87,6 +88,7 @@ module Disco.AST.Typed
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
+import           Data.Data                               (Data)
 import           Data.Void
 
 import           Disco.AST.Generic
@@ -98,6 +100,7 @@ import           Disco.Types
 -- | The extension descriptor for Typed specific AST types.
 
 data TY
+  deriving Data
 
 type AProperty = Property_ TY
 

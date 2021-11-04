@@ -47,10 +47,6 @@ module Disco.AST.Generic
        , traverseTelescope
        , toTelescope, fromTelescope
 
-         -- * Free variables
-
-       , fvQ
-
          -- * Utility types
 
        , Side (..), selectSide, fromSide
@@ -147,9 +143,7 @@ module Disco.AST.Generic
        )
        where
 
-import           Control.Lens                     (Traversal', filtered)
 import           Data.Data                        (Data)
-import           Data.Data.Lens                   (template)
 import           Data.Typeable
 import           GHC.Exts                         (Constraint)
 import           GHC.Generics                     (Generic)
@@ -157,7 +151,6 @@ import           GHC.Generics                     (Generic)
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.Names                      (QName, isFree)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -207,25 +200,12 @@ fromTelescope :: Alpha b => Telescope b -> [b]
 fromTelescope = foldTelescope (:) []
 
 ------------------------------------------------------------
--- Free variables
-------------------------------------------------------------
-
--- | The @unbound-generics@ library gives us free variables for free.
---   But when dealing with typed and desugared ASTs, we want all the
---   free 'QName's instead of just 'Name's.
-fvQ :: (Data e, ForallTerm Data e)  => Traversal' (Term_ e) (QName e)
-fvQ = template . filtered isFree
-
-------------------------------------------------------------
 -- Utility types
 ------------------------------------------------------------
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
-  deriving (Show, Eq, Ord, Enum, Bounded, Generic)
-
-instance Alpha Side
-instance Subst t Side
+  deriving (Show, Eq, Ord, Enum, Bounded, Generic, Data, Alpha, Subst t)
 
 -- | Use a 'Side' to select one of two arguments (the first argument
 --   for 'L', and the second for 'R').
@@ -520,6 +500,7 @@ type ForallGuard (a :: * -> Constraint) e
 deriving instance ForallGuard Show         e => Show       (Guard_ e)
 instance          ForallGuard (Subst Type) e => Subst Type (Guard_ e)
 instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
+deriving instance (Typeable e, Data e, ForallGuard Data e) => Data (Guard_ e)
 
 ------------------------------------------------------------
 -- Pattern
@@ -628,6 +609,7 @@ type ForallPattern (a :: * -> Constraint) e
 deriving instance ForallPattern Show         e => Show       (Pattern_ e)
 instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
 instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
+deriving instance (Typeable e, Data e, ForallPattern Data e) => Data (Pattern_ e)
 
 ------------------------------------------------------------
 -- Quantifiers and binders

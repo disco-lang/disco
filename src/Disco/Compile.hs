@@ -30,7 +30,7 @@ import           Disco.Context                    as Ctx
 import           Disco.Desugar
 import           Disco.Effects.Fresh
 import           Disco.Module
-import           Disco.Names                      (localName)
+import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import qualified Disco.Typecheck.Graph            as G
@@ -76,6 +76,7 @@ compileDefns defs = run . runFresh $ do
       -- Get a list of pairs of the form (y,x) where x uses y in its definition.
       -- We want them in the order (y,x) since y needs to be evaluated before x.
       -- These will be the edges in our dependency graph.
+      deps :: Set (QName ATerm, QName ATerm)
       deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fv body)) . Ctx.assocs $ defs
 
       -- Do a topological sort of the condensation of the dependency
@@ -115,9 +116,9 @@ compileDefnGroup [(x, defn)]
 compileDefnGroup defs = do
   grp <- fresh (string2Name "__grp")
   let (vars, bodies) = unzip defs
-      vars' :: [Name Core]
+      vars' :: [QName Core]
       vars' = coerce vars
-      forceVars :: [(Name Core, Core)]
+      forceVars :: [(QName Core, Core)]
       forceVars = map (id &&& CForce . CVar) vars'
       bodies' :: [Core]
       bodies' = (map (substs forceVars . compileThing desugarDefn) bodies)
@@ -260,7 +261,7 @@ compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
 compilePrim _ PrimEmptyMap = return $ CConst OEmptyMap
 compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
-compilePrim (_ :*: TyList _ :->: _) PrimEach = return $ CVar (string2Name "eachlist%")
+compilePrim (_ :*: TyList _ :->: _) PrimEach = return $ CVar (Named Stdlib "list" .- string2Name "eachlist")
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
 compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
 compilePrim ty PrimEach = compilePrimErr PrimEach ty
@@ -268,11 +269,11 @@ compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce = return $ CConst OReduceLi
 compilePrim (_ :*: _ :*: TyBag _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim ty PrimReduce = compilePrimErr PrimReduce ty
-compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $ CVar (string2Name "filterlist%")
+compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $ CVar (Named Stdlib "list" .- string2Name "filterlist")
 compilePrim (_ :*: TyBag _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim (_ :*: TySet _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim ty PrimFilter = compilePrimErr PrimFilter ty
-compilePrim (_ :->: TyList _) PrimJoin = return $ CVar (string2Name "concat%")
+compilePrim (_ :->: TyList _) PrimJoin = return $ CVar (Named Stdlib "list" .- string2Name "concat")
 compilePrim (_ :->: TyBag a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty PrimJoin = compilePrimErr PrimJoin ty
@@ -324,7 +325,7 @@ compileBranch b = do
 --   type τ which evaluates the guards in sequence, ultimately
 --   returning the given expression if all guards succeed, or calling
 --   the failure continuation at any point if a guard fails.
-compileGuards :: Member Fresh r => [DGuard] -> Name Core -> Core -> Sem r Core
+compileGuards :: Member Fresh r => [DGuard] -> QName Core -> Core -> Sem r Core
 compileGuards [] _ e = return e
 compileGuards (DGPat (unembed -> s) p : gs) k e = do
   e' <- compileGuards gs k e
@@ -337,7 +338,7 @@ compileGuards (DGPat (unembed -> s) p : gs) k e = do
 --   a Core expression of type τ that performs the match and either
 --   calls the failure continuation in the case of failure, or the
 --   rest of the guards in the case of success.
-compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
+compileMatch :: Member Fresh r => DPattern -> Core -> QName Core -> Core -> Sem r Core
 compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) s
 -- Note in the below two cases that we can't just discard s since
 -- that would result in a lazy semantics.  With an eager/strict
@@ -464,7 +465,7 @@ compileBOp _ _ (TyBag _) Union = CConst (OMerge Add)
 -- Likewise, ShouldEq also needs to know the type at which the
 -- comparison is occurring.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
-compileBOp ty (TyList _) _ Elem = CConst OListElem
-compileBOp ty _ _ Elem = CConst OBagElem
+compileBOp _ty (TyList _) _ Elem = CConst OListElem
+compileBOp _ty _ _ Elem = CConst OBagElem
 compileBOp ty1 ty2 resTy op =
   error $ "Impossible! missing case in compileBOp: " ++ show (ty1, ty2, resTy, op)

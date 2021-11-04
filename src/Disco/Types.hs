@@ -2,6 +2,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -90,6 +92,8 @@ module Disco.Types
        where
 
 import           Data.Coerce
+import           Data.Data                         (Data)
+import           Disco.Data                        ()
 import           GHC.Generics                      (Generic)
 import           Unbound.Generics.LocallyNameless
 
@@ -160,10 +164,7 @@ data BaseTy where
   -- | List container type.
   CtrList :: BaseTy
 
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha BaseTy
-instance Subst BaseTy BaseTy
+  deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst BaseTy, Subst Atom, Subst UAtom, Subst Type)
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool
@@ -194,13 +195,13 @@ isCtr = (`elem` [CtrSet, CtrBag, CtrList])
 --     means that the function will only work for certain types, in
 --     contradiction to its claim to work for any type at all.
 data Ilk = Skolem | Unification
-  deriving (Eq, Ord, Read, Show, Generic)
+  deriving (Eq, Ord, Read, Show, Generic, Data, Alpha, Subst Atom, Subst Type)
 
 -- | 'Var' represents /type variables/, that is, variables which stand
 --   for some type.
 data Var where
   V :: Ilk -> Name Type -> Var
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst Atom, Subst Type)
 
 pattern U :: Name Type -> Var
 pattern U v = V Unification v
@@ -209,9 +210,6 @@ pattern S :: Name Type -> Var
 pattern S v = V Skolem v
 
 {-# COMPLETE U, S #-}
-
-instance Alpha Ilk
-instance Alpha Var
 
 ----------------------------------------
 -- Atomic types
@@ -227,12 +225,8 @@ instance Alpha Var
 data Atom where
   AVar  :: Var -> Atom
   ABase :: BaseTy -> Atom
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst Type)
 
-instance Alpha Atom
-instance Subst Atom Ilk
-instance Subst Atom Var
-instance Subst Atom BaseTy
 instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
   isvar _            = Nothing
@@ -265,11 +259,8 @@ isSkolem _            = False
 data UAtom where
   UB :: BaseTy    -> UAtom
   UV :: Name Type -> UAtom
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Alpha, Subst BaseTy)
 
-instance Alpha UAtom
-instance Subst UAtom BaseTy
-instance Subst BaseTy UAtom
 instance Subst UAtom UAtom where
   isvar (UV x) = Just (SubstName (coerce x))
   isvar _      = Nothing
@@ -321,9 +312,7 @@ data Con where
   -- | The name of a user defined algebraic datatype.
   CUser :: String -> Con
 
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha Con
+  deriving (Show, Eq, Ord, Generic, Data, Alpha)
 
 -- | 'CList' is provided for convenience; it represents a list type
 --   constructor (/i.e./ @List a@).
@@ -370,9 +359,8 @@ data Type where
   --   arguments @N@ and @Bool@.
   TyCon  :: Con -> [Type] -> Type
 
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Data, Alpha)
 
-instance Alpha Type
 instance Subst Type Qualifier
 instance Subst Type Rational where
   subst _ _ = id
@@ -380,10 +368,6 @@ instance Subst Type Rational where
 instance Subst Type Void where
   subst _ _ = id
   substs _  = id
-instance Subst Type Ilk
-instance Subst Type Var
-instance Subst Type BaseTy
-instance Subst Type Atom
 instance Subst Type Con where
   isCoerceVar (CContainer (AVar (U x)))
     = Just (SubstCoerce x substCtrTy)
@@ -518,10 +502,7 @@ type TyDefCtx = M.Map String TyDefBody
 --   a2 ... an. ty@ (note, however, that n may be 0, that is, we can
 --   have a "trivial" polytype which quantifies zero variables).
 newtype PolyType = Forall (Bind [Name Type] Type)
-  deriving (Show, Generic)
-
-instance Alpha PolyType
-instance Subst Type PolyType
+  deriving (Show, Generic, Data, Alpha, Subst Type)
 
 -- | Convert a monotype into a trivial polytype that does not quantify
 --   over any type variables.  If the type can contain free type
@@ -629,9 +610,7 @@ isSearchable _              = False
 -- | @Strictness@ represents the strictness (either strict or lazy) of
 --   a function application or let-expression.
 data Strictness = Strict | Lazy
-  deriving (Eq, Show, Generic)
-
-instance Alpha Strictness
+  deriving (Eq, Show, Generic, Alpha)
 
 -- | Numeric types are strict; others are lazy.
 strictness :: Type -> Strictness

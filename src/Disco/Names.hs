@@ -1,8 +1,23 @@
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
+-----------------------------------------------------------------------------
+-- |
+-- Module      :  Disco.Names
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- Names for modules and identifiers.
+--
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
 
 module Disco.Names
-  ( -- * Names and provenance
+  ( -- * Modules and their provenance
     ModuleProvenance(..), ModuleName(..)
+    -- * Names and their provenance
   , NameProvenance(..), QName(..), localName, (.-)
   ) where
 
@@ -10,6 +25,10 @@ import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Types
+
+------------------------------------------------------------
+-- Modules
+------------------------------------------------------------
 
 -- | Where did a module come from?
 data ModuleProvenance
@@ -24,6 +43,10 @@ data ModuleName
   | Named ModuleProvenance String
                  -- ^ A named module, with its name and provenance.
   deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+------------------------------------------------------------
+-- Names
+------------------------------------------------------------
 
 -- | Where did a name come from?
 data NameProvenance
@@ -43,4 +66,3 @@ localName = QName LocalName
 -- | Create a module-bound qualified name.
 (.-) :: ModuleName -> Name a -> QName a
 m .- x = QName (QualifiedName m) x
-

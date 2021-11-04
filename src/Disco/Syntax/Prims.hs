@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Prims
@@ -22,6 +24,7 @@ import           Unbound.Generics.LocallyNameless
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
+import           Data.Data                        (Data)
 import           Disco.Syntax.Operators
 
 ------------------------------------------------------------
@@ -80,10 +83,7 @@ data Prim where
 
   PrimLookupSeq  :: Prim        -- ^ Lookup OEIS sequence
   PrimExtendSeq  :: Prim        -- ^ Extend OEIS sequence
-  deriving (Show, Read, Eq, Ord, Generic)
-
-instance Alpha Prim
-instance Subst t Prim
+  deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
 -- Concrete syntax for prims

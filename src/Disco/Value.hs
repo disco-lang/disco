@@ -65,12 +65,12 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
 import           Disco.Context                    as Ctx
 import           Disco.Error
+import           Disco.Names
 import           Disco.Types
+
 
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
-import           Disco.Effects.Store
-import           Disco.Names                      (localName)
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Fail
@@ -401,9 +401,9 @@ allocate e t = do
 allocateRec :: Members '[State Mem] r => Env -> [(QName Core, Core)] -> Sem r [Int]
 allocateRec e bs = do
   Mem n m <- get
-  let new = zip [n ..] bs
-      e' = foldl' (flip (\(i,(x,_)) -> Ctx.insert x (VRef i))) e new
-      m' = foldl' (flip (\(i,(_,c)) -> IM.insert i (E e' c))) m new
+  let newRefs = zip [n ..] bs
+      e' = foldl' (flip (\(i,(x,_)) -> Ctx.insert x (VRef i))) e newRefs
+      m' = foldl' (flip (\(i,(_,c)) -> IM.insert i (E e' c))) m newRefs
       n' = n + length bs
   put $ Mem n' m'
   return [n .. n'-1]

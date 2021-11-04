@@ -24,19 +24,18 @@ import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
 import           Data.List                          (find)
-import qualified Data.Map                           as M
 import           Data.Maybe                         (isJust)
 import           Data.Ratio
 import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
-import           Disco.AST.Typed                    (AProperty, QName,
-                                                     localName)
+import           Disco.AST.Typed                    (AProperty)
 import           Disco.Context                      as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Enumerate
 import           Disco.Error
+import           Disco.Names
 import           Disco.Syntax.Operators             (BOp (..))
 import           Disco.Types                        hiding (V)
 import           Disco.Value

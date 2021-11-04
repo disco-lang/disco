@@ -324,6 +324,7 @@ library
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
+                       Disco.Data
                        Disco.Names
                        Disco.Context
                        Disco.Messages

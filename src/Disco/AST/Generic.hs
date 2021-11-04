@@ -5,6 +5,8 @@
 
 -- Orphan Alpha Void instance
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -44,6 +46,10 @@ module Disco.AST.Generic
        , foldTelescope, mapTelescope
        , traverseTelescope
        , toTelescope, fromTelescope
+
+         -- * Free variables
+
+       , fvQ
 
          -- * Utility types
 
@@ -141,16 +147,20 @@ module Disco.AST.Generic
        )
        where
 
+import           Control.Lens                     (Traversal')
+import           Data.Data                        (Data)
+import           Data.Data.Lens                   (template)
 import           Data.Typeable
+import           GHC.Exts                         (Constraint)
 import           GHC.Generics                     (Generic)
 
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Names                      (QName)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
-import           GHC.Exts                         (Constraint)
 
 ------------------------------------------------------------
 -- Telescopes
@@ -166,10 +176,7 @@ data Telescope b where
   -- | A binder of type @b@ followed by zero or more @b@'s.  This @b@
   --   can bind variables in the subsequent @b@'s.
   TelCons  :: Rebind b (Telescope b) -> Telescope b
-  deriving (Show, Generic)
-
-instance Alpha b => Alpha (Telescope b)
-instance Subst t b => Subst t (Telescope b)
+  deriving (Show, Generic, Alpha, Subst t, Data)
 
 -- | Add a new item to the beginning of a 'Telescope'.
 telCons :: Alpha b => b -> Telescope b -> Telescope b
@@ -200,6 +207,16 @@ fromTelescope :: Alpha b => Telescope b -> [b]
 fromTelescope = foldTelescope (:) []
 
 ------------------------------------------------------------
+-- Free variables
+------------------------------------------------------------
+
+-- | The @unbound-generics@ library gives us free variables for free.
+--   But when dealing with typed and desugared ASTs, we want all the
+--   free 'QName's instead of just 'Name's.
+fvQ :: (Data e, ForallTerm Data e)  => Traversal' (Term_ e) (QName e)
+fvQ = template
+
+------------------------------------------------------------
 -- Utility types
 ------------------------------------------------------------
 
@@ -226,10 +243,7 @@ data Container where
   ListContainer :: Container
   BagContainer  :: Container
   SetContainer  :: Container
-  deriving (Show, Eq, Enum, Generic)
-
-instance Alpha Container
-instance Subst t Container
+  deriving (Show, Eq, Enum, Generic, Data, Alpha, Subst t)
 
 -- | An ellipsis is an "omitted" part of a literal container (such as
 --   a list or set), of the form @.. t@.  We don't have open-ended
@@ -238,10 +252,7 @@ instance Subst t Container
 data Ellipsis t where
   -- | 'Until' represents an ellipsis with a given endpoint, as in @[3 .. 20]@.
   Until   :: t -> Ellipsis t   -- @.. t@
-  deriving (Show, Generic, Functor, Foldable, Traversable)
-
-instance Alpha t => Alpha (Ellipsis t)
-instance Subst a t => Subst a (Ellipsis t)
+  deriving (Show, Generic, Functor, Foldable, Traversable, Alpha, Subst a, Data)
 
 ------------------------------------------------------------
 -- Terms
@@ -392,6 +403,7 @@ instance
   )
   => Subst Type (Term_ e)
 instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
+deriving instance (Data e, Typeable e, ForallTerm Data e) => Data (Term_ e)
 
 ------------------------------------------------------------
 -- Link
@@ -417,6 +429,7 @@ type ForallLink (a :: * -> Constraint) e
 deriving instance ForallLink Show e         => Show       (Link_ e)
 instance          ForallLink (Subst Type) e => Subst Type (Link_ e)
 instance (Typeable e, Show (Link_ e), ForallLink Alpha e) => Alpha (Link_ e)
+deriving instance (Typeable e, Data e, ForallLink Data e) => Data (Link_ e)
 
 ------------------------------------------------------------
 -- Qual
@@ -447,6 +460,7 @@ type ForallQual (a :: * -> Constraint) e
 deriving instance ForallQual Show         e => Show       (Qual_ e)
 instance          ForallQual (Subst Type) e => Subst Type (Qual_ e)
 instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
+deriving instance (Typeable e, Data e, ForallQual Data e) => Data (Qual_ e)
 
 ------------------------------------------------------------
 -- Binding
@@ -460,6 +474,7 @@ data Binding_ e = Binding_ (Maybe (Embed PolyType)) (Name (Term_ e)) (Embed (Ter
 deriving instance ForallTerm Show  e => Show (Binding_ e)
 instance Subst Type (Term_ e) => Subst Type (Binding_ e)
 instance (Typeable e, Show (Binding_ e), Alpha (Term_ e)) => Alpha (Binding_ e)
+deriving instance (Typeable e, Data e, ForallTerm Data e) => Data (Binding_ e)
 
 ------------------------------------------------------------
 -- Branch
@@ -629,10 +644,7 @@ type Binder_ e a = Bind (X_Binder e) a
 
 -- | A quantifier: λ, ∀, or ∃
 data Quantifier = Lam | Ex | All
-  deriving (Generic, Eq, Ord, Show)
-
-instance Subst Type Quantifier
-instance Alpha Quantifier
+  deriving (Generic, Data, Eq, Ord, Show, Alpha, Subst Type)
 
 ------------------------------------------------------------
 -- Property

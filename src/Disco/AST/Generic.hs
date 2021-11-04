@@ -147,7 +147,7 @@ module Disco.AST.Generic
        )
        where
 
-import           Control.Lens                     (Traversal')
+import           Control.Lens                     (Traversal', filtered)
 import           Data.Data                        (Data)
 import           Data.Data.Lens                   (template)
 import           Data.Typeable
@@ -157,7 +157,7 @@ import           GHC.Generics                     (Generic)
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.Names                      (QName)
+import           Disco.Names                      (QName, isFree)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -214,7 +214,7 @@ fromTelescope = foldTelescope (:) []
 --   But when dealing with typed and desugared ASTs, we want all the
 --   free 'QName's instead of just 'Name's.
 fvQ :: (Data e, ForallTerm Data e)  => Traversal' (Term_ e) (QName e)
-fvQ = template
+fvQ = template . filtered isFree
 
 ------------------------------------------------------------
 -- Utility types

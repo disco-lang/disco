@@ -18,7 +18,7 @@ module Disco.Names
   ( -- * Modules and their provenance
     ModuleProvenance(..), ModuleName(..)
     -- * Names and their provenance
-  , NameProvenance(..), QName(..), localName, (.-)
+  , NameProvenance(..), QName(..), isFree, localName, (.-)
   ) where
 
 import           GHC.Generics                     (Generic)
@@ -58,6 +58,11 @@ data NameProvenance
 --   'NameProvenance'.
 data QName a = QName { qnameProvenance :: NameProvenance, qname :: Name a }
   deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+
+-- | Does this name correspond to a free variable?
+isFree :: QName a -> Bool
+isFree (QName (QualifiedName _) _) = True
+isFree (QName LocalName n)         = isFreeName n
 
 -- | Create a locally bound qualified name.
 localName :: Name a -> QName a

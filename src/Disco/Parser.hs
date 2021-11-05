@@ -329,8 +329,7 @@ reservedWords =
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
 --   a given type of character and continuing with alphanumerics,
---   underscores, and apostrophes. (And percent signs, if the
---   'PercentNames' extension is enabled.)
+--   underscores, and apostrophes.
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where

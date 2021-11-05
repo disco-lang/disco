@@ -1,2 +1,2 @@
 #!/bin/sh
-stack test --fast --file-watch --test-arguments '+RTS -N30 -RTS'
+stack test --fast --file-watch --test-arguments '+RTS -N8 -RTS'

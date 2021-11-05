@@ -21,7 +21,7 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, zoom, (%~), (?~), (^.))
+import           Control.Lens                     (view, (%~), (?~), (^.))
 import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
@@ -41,7 +41,6 @@ import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
-import           Disco.Effects.Store
 import           Polysemy
 import           Polysemy.State
 
@@ -53,6 +52,7 @@ import           Disco.Desugar
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
+import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Names
 import           Disco.Parser                     (Parser, ident, reservedOp,
@@ -380,13 +380,16 @@ handleEval (Eval m) = inputToState $ do
   mi <- loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
   modify @TopInfo (replModInfo . miExts %~ S.union (mi ^. miExts))
   addToREPLModule mi
-  forM_ (mi ^. miTerms) (evalTerm . fst)
+  forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm . fst)
   -- garbageCollect
 
-evalTerm :: Members (State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
+evalTerm :: Members (Error EvalError ': State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  v <- inputToState . inputTopEnv $ eval (compileTerm at)
-  s <- zoom topTyDefs . inputToState . renderDoc $ prettyValue ty v
+  env <- gets @TopInfo (view topEnv)
+  v <- runInputConst env $ eval (compileTerm at)
+
+  tydefs <- gets @TopInfo (view $ replModInfo . miTydefs)  -- XXX! include stuff from imports
+  s <- runInputConst tydefs . renderDoc $ prettyValue ty v
   outputLn s
 
   modify @TopInfo $
@@ -446,13 +449,13 @@ loadCmd =
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper ::
-  Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r =>
   REPLExpr 'CLoad ->
   Sem r ()
 handleLoadWrapper (Load fp) = void (handleLoad fp)
 
 handleLoad ::
-  Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r =>
   FilePath ->
   Sem r Bool
 handleLoad fp = do
@@ -511,7 +514,9 @@ handleNames ::
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
-  ctx   <- inputs @TopInfo (view (replModInfo . miTys))
+  ctx   <- inputs @TopInfo (view (replModInfo . miTys)) -- XXX! get imports too?
+  mapM_ showFn $ Ctx.assocs ctx
+
   tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
   mapM_ showTyDef $ M.assocs tyDef
   where
@@ -590,7 +595,7 @@ reloadCmd =
     }
 
 handleReload ::
-  Members (Error DiscoError ': State TopInfo ': Output String ': State Mem ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r =>
   REPLExpr 'CReload ->
   Sem r ()
 handleReload Reload = do

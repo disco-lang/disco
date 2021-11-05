@@ -62,6 +62,7 @@ import           Data.Bifunctor                   (first, second)
 import           Data.Coerce
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Map.Merge.Lazy              as MM
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Prelude                          hiding (filter, lookup, null)
@@ -105,9 +106,9 @@ emptyCtx = Ctx M.empty
 singleCtx :: QName a -> b -> Ctx a b
 singleCtx (QName p n) = Ctx . M.singleton p . M.singleton n
 
--- | XXX
+-- | Create a context from a list of (qualified name, value) pairs.
 fromList :: [(QName a, b)] -> Ctx a b
-fromList = undefined
+fromList = Ctx . M.fromListWith M.union . map (\(QName p n, b) -> (p, M.singleton n b))
 
 -- | Create a context for bindings from a single module.
 ctxForModule :: ModuleName -> [(Name a, b)] -> Ctx a b
@@ -199,13 +200,16 @@ keysSet = S.unions . map (uncurry (S.map . QName) . second M.keysSet) . M.assocs
 -- Traversal
 ------------------------------------------------------------
 
--- | XXX
+-- | Coerce the type of the qualified name keys in a context.
 coerceKeys :: Ctx a1 b -> Ctx a2 b
 coerceKeys = Ctx . M.map (M.mapKeys coerce) . getCtx
 
--- | XXX
+-- | Restrict a context to only the keys in the given set.
 restrictKeys :: Ctx a b -> Set (QName a) -> Ctx a b
-restrictKeys = undefined
+restrictKeys ctx xs = Ctx . restrict m . getCtx $ ctx
+  where
+    restrict = MM.merge MM.dropMissing MM.dropMissing (MM.zipWithMatched (\_ ns m' -> M.restrictKeys m' ns))
+    m = M.fromListWith S.union . map (\(QName p n) -> (p, S.singleton n)) . S.toList $ xs
 
 ------------------------------------------------------------
 -- Combination

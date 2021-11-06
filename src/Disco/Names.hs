@@ -63,7 +63,7 @@ data NameProvenance
 -- | A @QName@, or qualified name, is a 'Name' paired with its
 --   'NameProvenance'.
 data QName a = QName { qnameProvenance :: NameProvenance, qname :: Name a }
-  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
+  deriving (Eq, Ord, Show, Generic, Data, Alpha, Subst Type)
 
 -- | Does this name correspond to a free variable?
 isFree :: QName a -> Bool

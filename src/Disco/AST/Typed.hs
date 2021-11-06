@@ -80,6 +80,7 @@ module Disco.AST.Typed
        , varsBound
        , getType
        , setType
+       , substQT
 
        , AProperty
        )
@@ -91,6 +92,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe
 import           Data.Data                               (Data)
 import           Data.Void
 
+import           Control.Lens.Plated                     (transform)
 import           Disco.AST.Generic
 import           Disco.Names
 import           Disco.Syntax.Operators
@@ -116,7 +118,7 @@ type ATerm = Term_ TY
 
 type instance X_Binder          TY = [APattern]
 
-type instance X_TVar            TY = (Type, NameProvenance)
+type instance X_TVar            TY = Void -- Names are now qualified
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
@@ -139,15 +141,10 @@ type instance X_TParens         TY = Void -- No more explicit parens
  -- A test frame for reporting counterexamples in a test. These don't appear
  -- in source programs, but because the deugarer manipulates partly-desugared
  -- terms it helps to be able to represent these in 'ATerm'.
-type instance X_Term TY = ([(String, Type, Name ATerm)], ATerm)
+type instance X_Term TY = Either ([(String, Type, Name ATerm)], ATerm) (Type, QName ATerm)
 
 pattern ATVar :: Type -> QName ATerm -> ATerm
-pattern ATVar ty qname <- (reassocQ -> Just (ty,qname)) where
-  ATVar ty (QName prov name) = TVar_ (ty,prov) name
-
-reassocQ :: ATerm -> Maybe (Type, QName ATerm)
-reassocQ (TVar_ (ty,prov) name) = Just (ty, QName prov name)
-reassocQ _                      = Nothing
+pattern ATVar ty qname = XTerm_ (Right (ty, qname))
 
 pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name
@@ -198,7 +195,7 @@ pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> 
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 pattern ATTest :: [(String, Type, Name ATerm)] -> ATerm -> ATerm
-pattern ATTest ns t = XTerm_ (ns, t)
+pattern ATTest ns t = XTerm_ (Left (ns, t))
 
 {-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
              ATString, ATAbs, ATApp, ATTup, ATCase, ATChain, ATTyOp,
@@ -443,3 +440,14 @@ instance HasType APattern where
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind
+
+------------------------------------------------------------
+-- subst
+------------------------------------------------------------
+
+substQT :: QName ATerm -> ATerm -> ATerm -> ATerm
+substQT x s = transform $ \case
+  t@(ATVar _ y)
+    | x == y    -> s
+    | otherwise -> t
+  t -> t

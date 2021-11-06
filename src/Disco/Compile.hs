@@ -12,6 +12,8 @@
 
 module Disco.Compile where
 
+import           Debug.Trace
+
 import           Control.Arrow                    ((&&&))
 import           Control.Monad                    ((<=<))
 import           Data.Bool                        (bool)
@@ -77,7 +79,7 @@ compileDefns defs = run . runFresh $ do
       -- We want them in the order (y,x) since y needs to be evaluated before x.
       -- These will be the edges in our dependency graph.
       deps :: Set (QName ATerm, QName ATerm)
-      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf fvQ body)) . Ctx.assocs $ defs
+      deps = S.unions . map (\(x, body) -> S.map (,x) (setOf (fvQ @Defn @ATerm) body)) . Ctx.assocs $ defs
 
       -- Do a topological sort of the condensation of the dependency
       -- graph.  Each SCC corresponds to a group of mutually recursive
@@ -85,6 +87,10 @@ compileDefns defs = run . runFresh $ do
       -- before it in the topsort.
       defnGroups :: [Set (QName ATerm)]
       defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
+
+  traceM "---- compiling definitions... ----"
+  traceShowM defs
+  traceShowM deps
 
   Ctx.fromList . concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
 
@@ -94,7 +100,7 @@ compileDefnGroup [(x, defn)]
   -- A recursive definition f = body compiles to
   -- f = force (delay f. [force f / f] body).
   | x `S.member` setOf fvQ defn =
-    return [(x', CForce (CProj L (CDelay (bind [qname x'] [substQ x' (CForce (CVar x')) cdefn]))))]
+    return [(x', CForce (CProj L (CDelay (bind [qname x'] [substQC x' (CForce (CVar x')) cdefn]))))]
   -- A non-recursive definition just compiles simply.
   | otherwise =
     return [(x', cdefn)]
@@ -121,7 +127,7 @@ compileDefnGroup defs = do
       forceVars :: [(QName Core, Core)]
       forceVars = map (id &&& CForce . CVar) vars'
       bodies' :: [Core]
-      bodies' = map (substsQ forceVars . compileThing desugarDefn) bodies
+      bodies' = map (substsQC forceVars . compileThing desugarDefn) bodies
   return $
     (grp, CDelay (bind (map qname vars') bodies')) :
     zip vars' (map (CForce . flip proj (CVar grp)) [0 ..])

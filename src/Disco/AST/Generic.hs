@@ -143,7 +143,9 @@ module Disco.AST.Generic
        )
        where
 
+import           Control.Lens.Plated
 import           Data.Data                        (Data)
+import           Data.Data.Lens                   (uniplate)
 import           Data.Typeable
 import           GHC.Exts                         (Constraint)
 import           GHC.Generics                     (Generic)
@@ -151,6 +153,7 @@ import           GHC.Generics                     (Generic)
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -384,6 +387,9 @@ instance
   => Subst Type (Term_ e)
 instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
 deriving instance (Data e, Typeable e, ForallTerm Data e) => Data (Term_ e)
+
+instance (Data e, ForallTerm Data e) => Plated (Term_ e) where
+  plate = uniplate
 
 ------------------------------------------------------------
 -- Link

@@ -20,6 +20,8 @@ module Disco.Interpret.CESK
   )
 where
 
+import           Debug.Trace
+
 import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
@@ -132,59 +134,61 @@ runCESK cesk = case isFinal cesk of
   Just vm -> return vm
   Nothing -> step cesk >>= runCESK
 
-(!!!) :: Show a => Ctx a b -> QName a -> b
+(!!!) :: (Show a, Show b) => Ctx a b -> QName a -> b
 ctx !!! x = case Ctx.lookup' x ctx of
-  Nothing -> error $ "variable not found in environment: " ++ show x
+  Nothing -> error $ "variable " ++ show x ++ " not found in environment"
+    ++ show ctx
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
-step (In (CVar x) e k) = return $ Out (e !!! x) k
-step (In (CNum d r) _ k) = return $ Out (VNum d r) k
-step (In (CConst OMatchErr) _ _) = throw NonExhaustive
-step (In (CConst op) _ k) = return $ Out (VConst op) k
-step (In (CInj s c) e k) = return $ In c e (FInj s : k)
-step (In (CCase c b1 b2) e k) = return $ In c e (FCase e b1 b2 : k)
-step (In CUnit _ k) = return $ Out VUnit k
-step (In (CPair c1 c2) e k) = return $ In c1 e (FPairR e c2 : k)
-step (In (CProj s c) e k) = return $ In c e (FProj s : k)
-step (In (CAbs b) e k) = do
-  (xs, body) <- unbind b
-  return $ Out (VClo e xs body) k
-step (In (CApp c1 c2) e k) = return $ In c1 e (FArg e c2 : k)
-step (In (CType ty) _ k) = return $ Out (VType ty) k
-step (In (CDelay b) e k) = do
-  (xs, cs) <- unbind b
-  locs <- allocateRec e (zip (map localName xs) cs)
-  return $ Out (foldr (VPair . VRef) VUnit locs) k
-step (In (CForce c) e k) = return $ In c e (FForce : k)
-step (Out v (FInj s : k)) = return $ Out (VInj s v) k
-step (Out (VInj L v) (FCase e b1 _ : k)) = do
-  (x, c1) <- unbind b1
-  return $ In c1 (Ctx.insert (localName x) v e) k
-step (Out (VInj R v) (FCase e _ b2 : k)) = do
-  (x, c2) <- unbind b2
-  return $ In c2 (Ctx.insert (localName x) v e) k
-step (Out v1 (FPairR e c2 : k)) = return $ In c2 e (FPairL v1 : k)
-step (Out v2 (FPairL v1 : k)) = return $ Out (VPair v1 v2) k
-step (Out (VPair v1 v2) (FProj s : k)) = return $ Out (selectSide s v1 v2) k
-step (Out v (FArg e c2 : k)) = return $ In c2 e (FApp v : k)
-step (Out v2 (FApp (VClo e [x] b) : k)) = return $ In b (Ctx.insert (localName x) v2 e) k
-step (Out v2 (FApp (VClo e (x : xs) b) : k)) = return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
-step (Out v2 (FApp (VConst op) : k)) = appConst k op v2
-step (Out (VRef n) (FForce : k)) = do
-  cell <- lkup n
-  case cell of
-    Nothing -> undefined -- XXX ?
-    Just (V v) -> return $ Out v k
-    Just (E e t) -> do
-      set n Blackhole
-      return $ In t e (FUpdate n : k)
-    Just Blackhole -> error "Infinite loop detected!" -- XXX make a real error
-step (Out v (FUpdate n : k)) = do
-  set n (V v)
-  return $ Out v k
-step c = error $ "step " ++ show c
+step cesk = traceShowM cesk >> case cesk of
+  (In (CVar x) e k) -> return $ Out (e !!! x) k
+  (In (CNum d r) _ k) -> return $ Out (VNum d r) k
+  (In (CConst OMatchErr) _ _) -> throw NonExhaustive
+  (In (CConst op) _ k) -> return $ Out (VConst op) k
+  (In (CInj s c) e k) -> return $ In c e (FInj s : k)
+  (In (CCase c b1 b2) e k) -> return $ In c e (FCase e b1 b2 : k)
+  (In CUnit _ k) -> return $ Out VUnit k
+  (In (CPair c1 c2) e k) -> return $ In c1 e (FPairR e c2 : k)
+  (In (CProj s c) e k) -> return $ In c e (FProj s : k)
+  (In (CAbs b) e k) -> do
+    (xs, body) <- unbind b
+    return $ Out (VClo e xs body) k
+  (In (CApp c1 c2) e k) -> return $ In c1 e (FArg e c2 : k)
+  (In (CType ty) _ k) -> return $ Out (VType ty) k
+  (In (CDelay b) e k) -> do
+    (xs, cs) <- unbind b
+    locs <- allocateRec e (zip (map localName xs) cs)
+    return $ Out (foldr (VPair . VRef) VUnit locs) k
+  (In (CForce c) e k) -> return $ In c e (FForce : k)
+  (Out v (FInj s : k)) -> return $ Out (VInj s v) k
+  (Out (VInj L v) (FCase e b1 _ : k)) -> do
+    (x, c1) <- unbind b1
+    return $ In c1 (Ctx.insert (localName x) v e) k
+  (Out (VInj R v) (FCase e _ b2 : k)) -> do
+    (x, c2) <- unbind b2
+    return $ In c2 (Ctx.insert (localName x) v e) k
+  (Out v1 (FPairR e c2 : k)) -> return $ In c2 e (FPairL v1 : k)
+  (Out v2 (FPairL v1 : k)) -> return $ Out (VPair v1 v2) k
+  (Out (VPair v1 v2) (FProj s : k)) -> return $ Out (selectSide s v1 v2) k
+  (Out v (FArg e c2 : k)) -> return $ In c2 e (FApp v : k)
+  (Out v2 (FApp (VClo e [x] b) : k)) -> return $ In b (Ctx.insert (localName x) v2 e) k
+  (Out v2 (FApp (VClo e (x : xs) b) : k)) -> return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
+  (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
+  (Out (VRef n) (FForce : k)) -> do
+    cell <- lkup n
+    case cell of
+      Nothing -> undefined -- XXX ?
+      Just (V v) -> return $ Out v k
+      Just (E e t) -> do
+        set n Blackhole
+        return $ In t e (FUpdate n : k)
+      Just Blackhole -> error "Infinite loop detected!" -- XXX make a real error
+  (Out v (FUpdate n : k)) -> do
+    set n (V v)
+    return $ Out v k
+  c -> error $ "step " ++ show c
 
 ------------------------------------------------------------
 -- Interpreting constants

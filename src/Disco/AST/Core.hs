@@ -1,11 +1,9 @@
 {-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.AST.Core
 -- Copyright   :  disco team and contributors
@@ -15,27 +13,32 @@
 --
 -- Abstract syntax trees representing the desugared, untyped core
 -- language for Disco.
+-----------------------------------------------------------------------------
+
 module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
-       , Op(..), opArity
+       , Op(..), opArity, substQC, substsQC
        )
        where
 
+import           Control.Lens.Plated
+import           Data.Data                        (Data)
+import           Data.Data.Lens                   (uniplate)
 import           GHC.Generics
+import           Prelude                          as P
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
-import           Disco.Names                      (ModuleName, ModuleProvenance,
-                                                   NameProvenance, QName (..))
+import           Disco.Names                      (QName)
 import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic, Ord, Alpha)
+  deriving (Eq, Show, Generic, Data, Ord, Alpha)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -91,26 +94,10 @@ data Core where
   CDelay :: Bind [Name Core] [Core] -> Core
   -- | Force evaluation of a lazy value.
   CForce :: Core -> Core
-  deriving (Show, Generic, Alpha)
+  deriving (Show, Generic, Data, Alpha)
 
-instance Subst Core ModuleProvenance
-instance Subst Core ModuleName
-instance Subst Core NameProvenance
-instance Subst Core Atom
-instance Subst Core Con
-instance Subst Core Var
-instance Subst Core Ilk
-instance Subst Core BaseTy
-instance Subst Core Type
-instance Subst Core Op
-instance Subst Core RationalDisplay
-instance Subst Core Rational where
-  subst _ _ = id
-  substs _ = id
-instance Subst Core (QName Core)
-instance Subst Core Core where
-  isvar (CVar (QName _ x)) = Just (SubstName x)
-  isvar _                  = Nothing
+instance Plated Core where
+  plate = uniplate
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
@@ -257,7 +244,7 @@ data Op
     OLookupSeq
   | -- | Extend a List via OEIS
     OExtendSeq
-  deriving (Show, Generic, Alpha)
+  deriving (Show, Generic, Data, Alpha)
 
 -- | Get the arity (desired number of arguments) of a function
 --   constant.  A few constants have arity 0; everything else is
@@ -268,52 +255,16 @@ opArity (OEmptyGraph _) = 0
 opArity OMatchErr       = 0
 opArity _               = 1
 
--- opArity OAdd             = 2
--- opArity ONeg             = 1
--- opArity OSqrt            = 1
--- opArity OLg              = 1
--- opArity OFloor           = 1
--- opArity OCeil            = 1
--- opArity OAbs             = 1
--- opArity OMul             = 2
--- opArity ODiv             = 2
--- opArity OExp             = 2
--- opArity OMod             = 2
--- opArity ODivides         = 2
--- opArity OMultinom        = 2
--- opArity OFact            = 1
--- opArity (OEq _)          = 2
--- opArity (OLt _)          = 2
--- opArity OEnum            = 1
--- opArity OCount           = 1
--- opArity (OMDiv _)        = 2
--- opArity (OMExp _)        = 2
--- opArity (OMDivides _)    = 2
--- opArity OSize            = 1
--- opArity (OPower _)       = 1
--- opArity (OBagElem _)     = 2
--- opArity (OListElem _)    = 2
--- opArity OMapList         = 2
--- opArity (OMapBag _)      = 2
--- opArity (OMapSet _)      = 2
--- opArity OReduceList      = 3
--- opArity OReduceBag       = 3
--- opArity OFilterList      = 2
--- opArity OFilterBag       = 2
--- opArity OConcat          = 1
--- opArity (OBagUnions _)   = 1
--- opArity (OUnions _)      = 1
--- opArity (OMerge _)       = 3
--- opArity OForever         = 1
--- opArity OUntil           = 2
--- opArity OSetToList       = 1
--- opArity OBagToSet        = 1
--- opArity OBagToList       = 1
--- opArity (OListToSet _)   = 1
--- opArity (OListToBag _)   = 1
--- opArity OBagToCounts     = 1
--- opArity (OCountsToBag _) = 1
--- opArity OIsPrime         = 1
--- opArity OFactor          = 1
--- opArity OCrash           = 1
--- opArity OId              = 1
+substQC :: QName Core -> Core -> Core -> Core
+substQC x s = transform $ \case
+  CVar y
+    | x == y -> s
+    | otherwise -> CVar y
+  t -> t
+
+substsQC :: [(QName Core, Core)] -> Core -> Core
+substsQC xs = transform $ \case
+  CVar y -> case P.lookup y xs of
+    Just c -> c
+    _      -> CVar y
+  t -> t

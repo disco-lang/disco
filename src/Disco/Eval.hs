@@ -379,5 +379,9 @@ loadDef ::
   Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r =>
   QName Core -> Core -> Sem r ()
 loadDef x body = do
+  traceM $ "loading " ++ show x ++ " = " ++ show body
   v <- inputToState . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
+  e <- gets (view topEnv)
+  traceShowM (Ctx.keysSet e)
+  traceM "=================================================="

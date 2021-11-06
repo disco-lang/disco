@@ -378,7 +378,6 @@ handleEval
   => REPLExpr 'CEval -> Sem r ()
 handleEval (Eval m) = inputToState $ do
   mi <- loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
-  modify @TopInfo (replModInfo . miExts %~ S.union (mi ^. miExts))
   addToREPLModule mi
   forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm . fst)
   -- garbageCollect

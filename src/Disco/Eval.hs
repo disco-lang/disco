@@ -38,16 +38,19 @@ module Disco.Eval
        , loadFile
        , addToREPLModule
        , setREPLModule
-       , populateCurrentModuleInfo
+       , loadDefsFrom
+       , loadDef
 
        )
        where
 
+import           Debug.Trace
+
 import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
 import           Control.Lens             (makeLenses, toListOf, view, (%~),
-                                           (.~))
-import           Control.Monad            (void, when)
+                                           (.~), (^.), (^..))
+import           Control.Monad            (unless, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
 import qualified Data.Map                 as M
@@ -282,11 +285,11 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
-      when (not quiet) $ outputLn $ "Loading " ++ (modPath -<.> "disco") ++ "..."
+      unless quiet $ outputLn $ "Loading " ++ (modPath -<.> "disco") ++ "..."
       cm <- parseDiscoModule resolvedPath
       loadParsedDiscoModule' quiet Standalone resolver (S.insert name inProcess) name cm
 
--- | A list of standard library module names
+-- | A list of standard library module names.
 stdLib :: [ModuleName]
 stdLib = [Named Stdlib "list"]
 
@@ -333,26 +336,17 @@ loadFile file = do
     Left _  -> outputLn ("File not found: " ++ file) >> return Nothing
     Right s -> return (Just s)
 
--- XXX This is recompiling + re-adding everything every time a new
--- module is added.  Can we do this more efficiently?  Only add new
--- stuff incrementally.  But we still have to check there are no
--- conflicts?  Or do we?  Actually, maybe not!  New stuff when being
--- entered as a block should override/shadow anything previous.  Need
--- a new function that does something similar to
--- populateCurrentmoduleinfo but adds instead of completely replaces
--- (but does in fact override anything with the same name).  loadDefs
--- is the tricky bit.  ETA: now that loadDefs is rewritten, maybe it's
--- not tricky anymore.
-
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addToREPLModule
   :: Members '[Error DiscoError, State TopInfo, Reader Env, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
+  mapError EvalErr $ loadDefsFrom mi
+
   curMI <- gets @TopInfo (view replModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  mapError EvalErr $ setREPLModule mi'
+  modify @TopInfo $ replModInfo .~ mi'
 
 -- | Set the given 'ModuleInfo' record as the currently loaded
 --   module. This also includes updating the top-level state with new
@@ -363,18 +357,20 @@ setREPLModule
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi
-  populateCurrentModuleInfo
+  modify @TopInfo $ topEnv .~ Ctx.emptyCtx
+  loadDefsFrom mi
 
 -- | Populate various pieces of the top-level info record (docs, type
 --   context, type and term definitions) from the 'ModuleInfo' record
 --   corresponding to the currently loaded module, and load all the
 --   definitions into the current top-level environment.
-populateCurrentModuleInfo ::
+loadDefsFrom ::
   Members '[State TopInfo, Reader Env, Error EvalError, State Mem] r =>
+  ModuleInfo ->
   Sem r ()
-populateCurrentModuleInfo = do
-  tmds <- gets @TopInfo (view (replModInfo . miTermdefs))
-  imptmds <- gets @TopInfo (toListOf (replModInfo . miImports . traverse . miTermdefs))
+loadDefsFrom mi = do
+  let tmds = mi ^. miTermdefs
+      imptmds = mi ^.. miImports . traverse . miTermdefs
   let cdefns = Ctx.coerceKeys $ compileDefns tmds
       impcdefns = map (Ctx.coerceKeys . compileDefns) imptmds
   mapM_ (uncurry loadDef) (Ctx.assocs (cdefns <> mconcat impcdefns))

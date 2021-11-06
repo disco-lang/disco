@@ -25,7 +25,7 @@ module Disco.Interactive.CmdLine
   ) where
 
 import           Control.Lens                           (view)
-import           Control.Monad                          (unless, (>=>))
+import           Control.Monad                          (unless)
 import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))
 import           Data.Foldable                          (forM_)
@@ -40,8 +40,7 @@ import           System.Console.Haskeline               as H
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
-import           Disco.Module                           (LoadingMode (..),
-                                                         Resolver (..), miExts)
+import           Disco.Module                           (miExts)
 
 import           Disco.Effects.Output
 import           Polysemy

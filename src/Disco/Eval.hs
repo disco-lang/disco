@@ -21,7 +21,7 @@ module Disco.Eval
          -- * Top-level info record and associated lenses
 
        , TopInfo
-       , replModInfo, topEnv, lastFile
+       , replModInfo, topEnv, topModMap, lastFile
 
          -- * Running things
 
@@ -51,6 +51,7 @@ import           Control.Lens             (makeLenses, toListOf, view, (%~),
 import           Control.Monad            (unless, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
+import           Data.Map                 (Map)
 import qualified Data.Map                 as M
 import qualified Data.Set                 as S
 import           System.FilePath          ((-<.>))
@@ -58,9 +59,11 @@ import           System.FilePath          ((-<.>))
 import qualified System.Console.Haskeline as H
 
 import           Disco.Effects.Error
+import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
+import           Disco.Effects.State      (zoom)
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Fail
@@ -72,8 +75,8 @@ import           Disco.AST.Core
 import           Disco.AST.Surface
 import           Disco.Compile            (compileDefns)
 import           Disco.Context            as Ctx
-import           Disco.Effects.Fresh
 import           Disco.Error
+import           Disco.Extensions
 import           Disco.Interpret.CESK
 import           Disco.Module
 import           Disco.Names
@@ -98,7 +101,7 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 -- However, just manually implementing it here seems easier.
 
 -- | Effects needed at the top level.
-type TopEffects = '[Error DiscoError, Input TopInfo, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
+type TopEffects = '[Error DiscoError, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
 
 -- | All effects needed for the top level + interpretation.
 type DiscoEffects = AppendEffects EvalEffects TopEffects
@@ -114,9 +117,12 @@ data TopInfo = TopInfo
     --   the REPL.
 
   , _topEnv      :: Env
-    -- ^ Top-level environment mapping names to values (which all
-    --   start as indirections to thunks).  Set by 'loadDefs'.
-    --   Use it when evaluating with 'withTopEnv'.
+    -- ^ Top-level environment mapping names to values.  Set by
+    --   'loadDefs'.  Use it when evaluating with 'withTopEnv'.
+
+  , _topModMap   :: Map ModuleName ModuleInfo
+    -- ^ Mapping from loaded module names to their 'ModuleInfo'
+    --   records.
 
   , _lastFile    :: Maybe FilePath
     -- ^ The most recent file which was :loaded by the user.
@@ -127,6 +133,7 @@ initTopInfo :: TopInfo
 initTopInfo = TopInfo
   { _replModInfo = emptyModuleInfo
   , _topEnv      = emptyCtx
+  , _topModMap   = M.empty
   , _lastFile    = Nothing
   }
 
@@ -169,6 +176,11 @@ runDisco =
 -- Environment utilities
 ------------------------------------------------------------
 
+-- XXX get rid of withTopEnv, only place it is still used is in test
+-- stuff which needs to be updated anyway.  Note that the 'eval'
+-- function has an Input TopEnv effect, not Reader.  We don't use a
+-- Reader Env effect anymore since Env scoping stuff is handled at a
+-- lower level by the CESK machine.
 -- | Run a computation with the top-level environment used as the
 --   current local environment.  For example, this is used every time
 --   we start evaluating an expression entered at the command line.
@@ -177,7 +189,8 @@ withTopEnv m = do
   e <- inputs (view topEnv)
   runReader e m
 
--- | XXX
+-- | Run a computation that needs an input environment, grabbing the
+--   current top-level environment from the 'TopInfo' records.
 inputTopEnv :: Member (Input TopInfo) r => Sem (Input Env ': r) a -> Sem r a
 inputTopEnv m = do
   e <- inputs (view topEnv)
@@ -249,10 +262,11 @@ typecheckTop tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output String, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> FilePath -> Sem r ModuleInfo
 loadDiscoModule quiet resolver m =
-  evalState M.empty $ loadDiscoModule' quiet resolver S.empty m
+  inputToState @TopInfo . zoom topModMap
+    $ loadDiscoModule' quiet resolver S.empty m
 
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
 --   instead of loading a module from disk by name.  Also, check it in
@@ -260,18 +274,18 @@ loadDiscoModule quiet resolver m =
 --   module loaded from disk).  Used for e.g. blocks/modules entered
 --   at the REPL prompt.
 loadParsedDiscoModule
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output String, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule quiet resolver name m =
-  -- XXX don't use M.empty --- use module map from repl module info in TopInfo?
-  evalState M.empty $ loadParsedDiscoModule' quiet REPL resolver S.empty name m
+  inputToState @TopInfo . zoom topModMap
+    $ loadParsedDiscoModule' quiet REPL resolver S.empty name m
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (Map ModuleName ModuleInfo)] r
   => Bool -> Resolver -> S.Set ModuleName -> FilePath
   -> Sem r ModuleInfo
 loadDiscoModule' quiet resolver inProcess modPath  = do
@@ -287,9 +301,10 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
       cm <- parseDiscoModule resolvedPath
       loadParsedDiscoModule' quiet Standalone resolver (S.insert name inProcess) name cm
 
--- | A list of standard library module names.
-stdLib :: [ModuleName]
-stdLib = [Named Stdlib "list"]
+-- | A list of standard library module names, which should always be
+--   loaded implicitly.
+stdLib :: [String]
+stdLib = ["list"]
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,
@@ -298,14 +313,17 @@ stdLib = [Named Stdlib "list"]
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (M.Map ModuleName ModuleInfo)] r
+  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (Map ModuleName ModuleInfo)] r
   => Bool -> LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
 
-  -- Recursively load any modules imported by this one, and build a
-  -- map with the results.
+  -- Recursively load any modules imported by this one, plus standard
+  -- library modules (unless NoStdLib is enabled), and build a map with the results.
   mis <- mapM (loadDiscoModule' quiet (withStdlib resolver) inProcess) mns
-  let modImps = M.fromList (map (view miName &&& id) mis)
+  stdmis <- case NoStdLib `S.member` modExts cm of
+    True  -> return []
+    False -> mapM (loadDiscoModule' True FromStdlib inProcess) stdLib
+  let modImps = M.fromList (map (view miName &&& id) (mis ++ stdmis))
 
   -- Get context and type definitions from the REPL, in case we are in REPL mode.
   topImports <- inputs (view (replModInfo . miImports))
@@ -382,5 +400,5 @@ loadDef ::
   Members '[State TopInfo, Error EvalError, State Mem] r =>
   QName Core -> Core -> Sem r ()
 loadDef x body = do
-  v <- inputToState . inputTopEnv $ eval body
+  v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v

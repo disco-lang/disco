@@ -264,7 +264,7 @@ annCmd =
       shortHelp = "Show type-annotated typechecked term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handleAnn,
+      action = inputToState @TopInfo . handleAnn,
       parser = Ann <$> term
     }
 
@@ -287,7 +287,7 @@ compileCmd =
       shortHelp = "Show a compiled term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handleCompile,
+      action = inputToState @TopInfo . handleCompile,
       parser = Compile <$> term
     }
 
@@ -310,7 +310,7 @@ desugarCmd =
       shortHelp = "Show a desugared term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handleDesugar,
+      action = inputToState @TopInfo . handleDesugar,
       parser = Desugar <$> term
     }
 
@@ -334,7 +334,7 @@ docCmd =
       shortHelp = "Show documentation",
       category = User,
       cmdtype = ColonCmd,
-      action = handleDoc,
+      action = inputToState @TopInfo . handleDoc,
       parser = Doc <$> (sc *> ident)
     }
 
@@ -375,11 +375,11 @@ evalCmd = REPLCommand
 handleEval
   :: Members (Error DiscoError ': State TopInfo ': Output String ': Embed IO ': EvalEffects) r
   => REPLExpr 'CEval -> Sem r ()
-handleEval (Eval m) = inputToState $ do
-  mi <- loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
+handleEval (Eval m) = do
+  mi <- inputToState @TopInfo $ loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
   addToREPLModule mi
   forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm . fst)
-  -- garbageCollect
+  -- garbageCollect?
 
 evalTerm :: Members (Error EvalError ': State TopInfo ': Output String ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
@@ -458,7 +458,7 @@ handleLoad ::
   Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
-  m <- inputToState $ loadDiscoModule False (FromDir directory) modName
+  m <- inputToState @TopInfo $ loadDiscoModule False (FromDir directory) modName
   setREPLModule m
   t <- inputToState . withTopEnv $ runAllTests (m ^. miProps)
   modify @TopInfo (lastFile ?~ fp)
@@ -502,7 +502,7 @@ namesCmd =
       shortHelp = "Show all names in current scope",
       category = User,
       cmdtype = ColonCmd,
-      action = handleNames,
+      action = inputToState . handleNames,
       parser = return Names
     }
 
@@ -613,7 +613,7 @@ showDefnCmd =
       shortHelp = "Show a variable's definition",
       category = User,
       cmdtype = ColonCmd,
-      action = handleShowDefn,
+      action = inputToState @TopInfo . handleShowDefn,
       parser = ShowDefn <$> (sc *> ident)
     }
 
@@ -677,11 +677,11 @@ typeCheckCmd =
     }
 
 handleTypeCheck ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output String] r =>
+  Members '[Error DiscoError, State TopInfo, LFresh, Output String] r =>
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- typecheckTop $ inferTop t
+  (_, sig) <- inputToState . typecheckTop $ inferTop t
   s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
   outputLn s
 

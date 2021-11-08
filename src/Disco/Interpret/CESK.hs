@@ -596,7 +596,7 @@ runTest n p = undefined
 -}
 
 ------------------------------------------------------------
--- XXX
+-- Top-level evaluation
 ------------------------------------------------------------
 
 eval :: Members '[Error EvalError, Input Env, State Mem] r => Core -> Sem r Value

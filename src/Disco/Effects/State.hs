@@ -24,7 +24,7 @@ import           Polysemy
 import           Polysemy.State
 
 -- | Use a lens to zoom into a component of a state.
-zoom :: Member (State s) r => Lens' s a -> Sem (State a ': r) c -> Sem r c
+zoom :: forall s a r c. Member (State s) r => Lens' s a -> Sem (State a ': r) c -> Sem r c
 zoom l = interpret \case
   Get   -> view l <$> get
   Put a -> modify (l .~ a)

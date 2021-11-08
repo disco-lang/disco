@@ -27,7 +27,7 @@ module Disco.Eval
 
        , runDisco
        , runTCM, runTCMWith
-       , withTopEnv
+       , withTopEnv, inputTopEnv
        , parseDiscoModule
        , typecheckTop
 

@@ -512,11 +512,13 @@ handleNames ::
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
-  ctx   <- inputs @TopInfo (view (replModInfo . miTys)) -- XXX! get imports too?
-  mapM_ showFn $ Ctx.assocs ctx
-
+  -- XXX! get imports too, figure out nicer way to do this common
+  -- thing of gathering stuff from REPL module + imports
   tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
   mapM_ showTyDef $ M.assocs tyDef
+
+  ctx   <- inputs @TopInfo (view (replModInfo . miTys))
+  mapM_ showFn $ Ctx.assocs ctx
   where
     showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= outputLn
     showFn (QName _ x, ty) = do

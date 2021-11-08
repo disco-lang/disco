@@ -20,6 +20,8 @@ module Disco.Interpret.CESK
   )
 where
 
+import           Unbound.Generics.LocallyNameless   (Bind, Name)
+
 import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
@@ -30,9 +32,8 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
 import           Disco.AST.Typed                    (AProperty)
+import           Disco.Compile
 import           Disco.Context                      as Ctx
-import           Disco.Effects.Fresh
-import           Disco.Effects.Input
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Names
@@ -47,10 +48,14 @@ import           Math.NumberTheory.Primes.Testing   (isPrime)
 import           Math.OEIS                          (catalogNums,
                                                      extendSequence,
                                                      lookupSequence)
+
+import           Disco.Effects.Fresh
+import           Disco.Effects.Input
+import           Disco.Effects.Output
+import           Disco.Effects.Random
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.State
-import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 ------------------------------------------------------------
 -- Utilities
@@ -128,7 +133,7 @@ isFinal (Out v []) = Just v
 isFinal _          = Nothing
 
 -- | Run a CESK machine to completion.
-runCESK :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r Value
+runCESK :: Members '[Fresh, Random, Error EvalError, State Mem] r => CESK -> Sem r Value
 runCESK cesk = case isFinal cesk of
   Just vm -> return vm
   Nothing -> step cesk >>= runCESK
@@ -140,7 +145,7 @@ ctx !!! x = case Ctx.lookup' x ctx of
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
-step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
+step :: Members '[Fresh, Random, Error EvalError, State Mem] r => CESK -> Sem r CESK
 step cesk = case cesk of
   (In (CVar x) e k) -> return $ Out (e !!! x) k
   (In (CNum d r) _ k) -> return $ Out (VNum d r) k
@@ -201,7 +206,7 @@ arity2 _f _v         = error "arity2 on a non-pair!" -- XXX
 -- arity3 f (VPair x (VPair y z)) = f x y z
 -- arity3 _f _v                     = error "arity3 on a non-triple!"
 
-appConst :: Member (Error EvalError) r => Cont -> Op -> Value -> Sem r CESK
+appConst :: Members '[Random, Error EvalError] r => Cont -> Op -> Value -> Sem r CESK
 appConst k = \case
   --------------------------------------------------
   -- Basics
@@ -382,7 +387,7 @@ appConst k = \case
 
   OForall tys -> out . (\v -> VProp (VPSearch SMForall tys v emptyTestEnv ))
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv ))
-  -- OHolds ->   -- XXX testProperty etc.?
+  OHolds -> testProperty Exhaustive >=> resultToBool >=> out
   ONotProp -> ensureProp >=> (out . VProp . notProp)
   OShouldEq ty -> arity2 $ \v1 v2 ->
     out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
@@ -587,6 +592,10 @@ merge g = go
 -- Propositions / tests
 ------------------------------------------------------------
 
+resultToBool :: Member (Error EvalError) r => TestResult -> Sem r Value
+resultToBool (TestResult _ (TestRuntimeError e) _) = throw e
+resultToBool (TestResult b _ _)                    = return $ enumv b
+
 notProp :: ValProp -> ValProp
 notProp (VPDone r)            = VPDone (invertPropResult r)
 notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
@@ -598,30 +607,42 @@ ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _          = error "ensureProp: non-prop value" -- XXX! use real error
 
-testProperty :: SearchType -> Value -> Sem r TestResult
-testProperty initialSt v = undefined
+testProperty :: Members '[Random, Error EvalError] r => SearchType -> Value -> Sem r TestResult
+testProperty initialSt = ensureProp >=> checkProp
+  where
+    checkProp :: Members '[Random, Error EvalError] r => ValProp -> Sem r TestResult
+    checkProp (VPDone r) = return r
+    checkProp (VPSearch sm tys f e) =
+      extendResultEnv e <$> (generateSamples initialSt vals >>= go)
+      where
+        vals = enumTypes tys
+        (SearchMotive (whenFound, wantsSuccess)) = sm
 
-runTest :: Members EvalEffects r => Int -> AProperty -> Sem r TestResult
-runTest n p = undefined
+        go :: Members '[Random, Error EvalError] r => ([[Value]], SearchType) -> Sem r TestResult
+        go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) emptyTestEnv
+        go (x:xs, st) = do
+          prop <- ensureProp =<< whnfApp f x
+          case prop of
+            VPDone r    -> continue st xs r
+            VPSearch {} -> checkProp prop >>= continue st xs
 
-  -- testProperty (Randomized n' n') =<< eval (compileProperty p)
-  -- where
-  --   n' = fromIntegral (n `div` 2)
+        continue :: Members '[Random, Error EvalError] r => SearchType -> [[Value]] -> TestResult -> Sem r TestResult
+        continue st xs r@(TestResult _ _ e')
+          | testIsError r              = return r
+          | testIsOk r == wantsSuccess =
+            return $ TestResult whenFound (TestFound r) e'
+          | otherwise                  = go (xs, st)
 
-{-
-
-  -- | A "test frame" under which a test case is run. Records the
-  --   types and legible names of theariables that should
-  --   be reported to the user if the test fails.
-  CTest :: [(String, Type, Name Core)] -> Core -> Core
-
--}
+runTest :: Members '[Error EvalError, Random, Input Env, State Mem] r => Int -> AProperty -> Sem r TestResult
+runTest n p = testProperty (Randomized n' n') =<< eval (compileProperty p)
+  where
+    n' = fromIntegral (n `div` 2)
 
 ------------------------------------------------------------
 -- Top-level evaluation
 ------------------------------------------------------------
 
-eval :: Members '[Error EvalError, Input Env, State Mem] r => Core -> Sem r Value
+eval :: Members '[Random, Error EvalError, Input Env, State Mem] r => Core -> Sem r Value
 eval c = do
   e <- input @Env
   runFresh $ runCESK (In c e [])

@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Error
@@ -21,7 +22,6 @@ import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Error
 
-import           Disco.AST.Core                   (Core)
 import           Disco.Names                      (ModuleName)
 import           Disco.Parser
 import           Disco.Typecheck.Util             (TCError)
@@ -54,7 +54,7 @@ data DiscoError where
 data EvalError where
 
   -- | An unbound name.
-  UnboundError  :: Name Core -> EvalError
+  UnboundError  :: Name core  -> EvalError
 
   -- | Division by zero.
   DivByZero     ::              EvalError
@@ -71,7 +71,7 @@ data EvalError where
   -- | User-generated crash.
   Crash         :: String    -> EvalError
 
-  deriving Show
+deriving instance Show EvalError
 
 outputDiscoErrors :: Member (Output String) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do

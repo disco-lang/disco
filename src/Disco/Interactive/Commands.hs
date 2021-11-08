@@ -482,7 +482,7 @@ runAllTests aprops
     runTests :: Members (Output String ': Input TopInfo ': EvalEffects) r => QName ATerm -> [AProperty] -> Sem r Bool
     runTests (QName _ n) props = do
       output ("  " ++ name2String n ++ ":")
-      results <- traverse (sequenceA . (id &&& runTest numSamples)) props
+      results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
       let failures = P.filter (not . testIsOk . snd) results
       case P.null failures of
         True  -> outputLn " OK"
@@ -659,7 +659,7 @@ handleTest ::
   Sem r ()
 handleTest (TestProp t) = do
   at <- inputToState . typecheckTop $ checkProperty t
-  inputToState . withTopEnv $ do
+  inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
     prettyTestResult at r
 

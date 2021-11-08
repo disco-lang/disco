@@ -34,6 +34,7 @@ import           Disco.AST.Generic                (Side)
 import           Disco.Names                      (QName)
 import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
+import           Disco.Value                      (Value)
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
@@ -94,6 +95,8 @@ data Core where
   CDelay :: Bind [Name Core] [Core] -> Core
   -- | Force evaluation of a lazy value.
   CForce :: Core -> Core
+
+  CValue :: Value -> Core
   deriving (Show, Generic, Data, Alpha)
 
 instance Plated Core where

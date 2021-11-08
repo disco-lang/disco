@@ -47,7 +47,6 @@ module Disco.Value
 
   , Debug(..)
   , debug
-  , EvalEffects
 
   ) where
 
@@ -70,10 +69,8 @@ import           Disco.Types
 
 
 import           Disco.Effects.LFresh
-import           Disco.Effects.Random
 import           Polysemy
 import           Polysemy.Error
-import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
@@ -87,15 +84,6 @@ newtype Debug = Debug { unDebug :: String }
 
 debug :: Member (Output Debug) r => String -> Sem r ()
 debug = output . Debug
-
--- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
-  -- XXX write about order.
-  -- memory, counter etc. should not be reset by errors.
-
-  -- XXX add some kind of proper logging effect(s)
-    -- With tags so we can filter on log messages we want??
-    -- Just make my own message logging effect.
 
 ------------------------------------------------------------
 -- Value type

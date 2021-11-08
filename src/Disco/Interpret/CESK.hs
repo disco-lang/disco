@@ -30,7 +30,6 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
 import           Disco.AST.Typed                    (AProperty)
-import           Disco.Compile                      (compileProperty)
 import           Disco.Context                      as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
@@ -383,9 +382,10 @@ appConst k = \case
 
   OForall tys -> out . (\v -> VProp (VPSearch SMForall tys v emptyTestEnv ))
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv ))
-  OHolds -> _  -- XXX testProperty etc.?
+  -- OHolds ->   -- XXX testProperty etc.?
   ONotProp -> ensureProp >=> (out . VProp . notProp)
-  OShouldEq ty -> _
+  OShouldEq ty -> arity2 $ \v1 v2 ->
+    out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where

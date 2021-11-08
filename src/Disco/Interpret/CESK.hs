@@ -30,12 +30,14 @@ import           Disco.AST.Core
 import           Disco.AST.Generic                  (Ellipsis (..), Side (..),
                                                      selectSide)
 import           Disco.AST.Typed                    (AProperty)
+import           Disco.Compile                      (compileProperty)
 import           Disco.Context                      as Ctx
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Names
+import           Disco.Property
 import           Disco.Syntax.Operators             (BOp (..))
 import           Disco.Types                        hiding (V)
 import           Disco.Value
@@ -372,12 +374,18 @@ appConst k = \case
   -- appConst OEmptyMap                          = _wO
   -- appConst OInsert                            = _wP
   -- appConst OLookup                            = _wQ
-  -- appConst (OForall tys)                      = _w15
-  -- appConst (OExists tys)                      = _w16
-  -- appConst OHolds                             = _w17
-  -- appConst ONotProp                           = _w18
-  -- appConst (OShouldEq ty)                     = _w19
   -- appConst OMatchErr                          = _w1a
+
+  --------------------------------------------------
+  -- Propositions
+
+  -- XXX WORKING HERE
+
+  OForall tys -> out . (\v -> VProp (VPSearch SMForall tys v emptyTestEnv ))
+  OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv ))
+  OHolds -> _  -- XXX testProperty etc.?
+  ONotProp -> ensureProp >=> (out . VProp . notProp)
+  OShouldEq ty -> _
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where
@@ -576,15 +584,29 @@ merge g = go
       n -> (a, n) : zs
 
 ------------------------------------------------------------
--- Tests
+-- Propositions / tests
 ------------------------------------------------------------
+
+notProp :: ValProp -> ValProp
+notProp (VPDone r)            = VPDone (invertPropResult r)
+notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
+
+-- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
+ensureProp :: Member (Error EvalError) r => Value -> Sem r ValProp
+ensureProp (VProp p)  = return p
+ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
+ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
+ensureProp _          = error "ensureProp: non-prop value" -- XXX! use real error
+
+testProperty :: SearchType -> Value -> Sem r TestResult
+testProperty initialSt v = undefined
 
 runTest :: Members EvalEffects r => Int -> AProperty -> Sem r TestResult
 runTest n p = undefined
 
--- testProperty (Randomized n' n') =<< mkValue (compileProperty p)
--- where
---   n' = fromIntegral (n `div` 2)
+  -- testProperty (Randomized n' n') =<< eval (compileProperty p)
+  -- where
+  --   n' = fromIntegral (n `div` 2)
 
 {-
 

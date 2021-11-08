@@ -27,7 +27,6 @@ import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf, sortBy)
 import qualified Data.Map                         as M
-import qualified Data.Set                         as S
 import           Data.Typeable
 import           Prelude                          as P
 import           System.FilePath                  (splitFileName)

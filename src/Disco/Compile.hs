@@ -12,9 +12,6 @@
 
 module Disco.Compile where
 
-import           Debug.Trace
-
-import           Control.Arrow                    ((&&&))
 import           Control.Monad                    ((<=<))
 import           Data.Bool                        (bool)
 import           Data.Coerce
@@ -24,13 +21,18 @@ import           Data.Ratio
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Set.Lens                    (setOf)
+
+import           Disco.Effects.Fresh
+import           Polysemy                         (Member, Sem, run)
+import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
+                                                   unembed)
+
 import           Disco.AST.Core
 import           Disco.AST.Desugared
 import           Disco.AST.Generic
 import           Disco.AST.Typed
 import           Disco.Context                    as Ctx
 import           Disco.Desugar
-import           Disco.Effects.Fresh
 import           Disco.Module
 import           Disco.Names
 import           Disco.Syntax.Operators
@@ -38,9 +40,6 @@ import           Disco.Syntax.Prims
 import qualified Disco.Typecheck.Graph            as G
 import           Disco.Types
 import           Disco.Util
-import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
-                                                   unembed)
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -71,7 +70,7 @@ compileProperty = compileThing desugarProperty
 --   topologically sorts the definitions into mutually recursive
 --   groups, then compiles recursive definitions specially in terms of
 --   'delay' and 'force'.
-compileDefns :: Ctx ATerm Defn -> Ctx Core Core
+compileDefns :: Ctx ATerm Defn -> [(QName Core, Core)]
 compileDefns defs = run . runFresh $ do
   let vars = Ctx.keysSet defs
 
@@ -88,49 +87,59 @@ compileDefns defs = run . runFresh $ do
       defnGroups :: [Set (QName ATerm)]
       defnGroups = G.topsort (G.condensation (G.mkGraph vars deps))
 
-  traceM "---- compiling definitions... ----"
-  traceShowM defs
-  traceShowM deps
+  concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
 
-  Ctx.fromList . concat <$> mapM (compileDefnGroup . Ctx.assocs . Ctx.restrictKeys defs) defnGroups
-
--- | XXX
+-- | Compile a group of mutually recursive definitions, using @delay@
+--   to compile recursion via references to memory cells.
 compileDefnGroup :: Member Fresh r => [(QName ATerm, Defn)] -> Sem r [(QName Core, Core)]
-compileDefnGroup [(x, defn)]
-  -- A recursive definition f = body compiles to
-  -- f = force (delay f. [force f / f] body).
-  | x `S.member` setOf fvQ defn =
-    return [(x', CForce (CProj L (CDelay (bind [qname x'] [substQC x' (CForce (CVar x')) cdefn]))))]
+compileDefnGroup [(f, defn)]
+  -- Informally, a recursive definition f = body compiles to
+  --
+  --   f = force (delay f. [force f / f] body).
+  --
+  -- However, we have to be careful: in the informal notation above,
+  -- all the variables are named 'f', but in fully renamed syntax they
+  -- are different.  Writing fT for the top-level f bound in a
+  -- specific module etc.  and fL for a locally bound f, we really
+  -- have
+  --
+  --   fT = force (delay fL. [force fL / fT] body)
+  | f `S.member` setOf fvQ defn = return . (:[]) $
+    (fT, CForce (CProj L (CDelay (bind [qname fL] [substQC fT (CForce (CVar fL)) cdefn]))))
+
   -- A non-recursive definition just compiles simply.
   | otherwise =
-    return [(x', cdefn)]
+    return [(fT, cdefn)]
+
   where
-    x' :: QName Core
-    x' = coerce x
+    fT, fL :: QName Core
+    fT = coerce f
+    fL = localName (coerce (qname f))
+
     cdefn = compileThing desugarDefn defn
 
 -- A group of mutually recursive definitions  {f = fbody, g = gbody, ...}
 -- compiles to
---   { _grp = delay f g ... . (forceVars fbody, forceVars gbody, ...)
---   , f = fst (force _grp)
---   , g = snd (force _grp)
+--   { _grp = delay fL gL ... . (forceVars fbody, forceVars gbody, ...)
+--   , fT = fst (force _grp)
+--   , gT = snd (force _grp)
 --   , ...
 --   }
---
--- where forceVars is the substitution [force f / f, force g / g, ...]
+-- where forceVars is the substitution [force fL / fT, force gL / gT, ...]
 
 compileDefnGroup defs = do
-  grp <- freshQ "__grp"
+  grp :: QName Core <- freshQ "__grp"
   let (vars, bodies) = unzip defs
-      vars' :: [QName Core]
-      vars' = coerce vars
+      varsT, varsL :: [QName Core]
+      varsT = coerce vars
+      varsL = map (localName . qname) varsT
       forceVars :: [(QName Core, Core)]
-      forceVars = map (id &&& CForce . CVar) vars'
+      forceVars = zipWith (\t l -> (t, CForce (CVar l))) varsT varsL
       bodies' :: [Core]
       bodies' = map (substsQC forceVars . compileThing desugarDefn) bodies
   return $
-    (grp, CDelay (bind (map qname vars') bodies')) :
-    zip vars' (map (CForce . flip proj (CVar grp)) [0 ..])
+    (grp, CDelay (bind (map qname varsL) bodies')) :
+    zip varsT (for [0 ..] $ CForce . flip proj (CVar grp))
   where
     proj :: Int -> Core -> Core
     proj 0 = CProj L

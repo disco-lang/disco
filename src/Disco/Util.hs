@@ -18,3 +18,6 @@ infixr 1 ==>
 --   constructing literal maps via M.fromList.
 (==>) :: a -> b -> (a,b)
 (==>) = (,)
+
+for :: [a] -> (a -> b) -> [b]
+for = flip map

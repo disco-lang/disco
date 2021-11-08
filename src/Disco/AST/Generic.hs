@@ -153,7 +153,6 @@ import           GHC.Generics                     (Generic)
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
-import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types

@@ -44,8 +44,6 @@ module Disco.Eval
        )
        where
 
-import           Debug.Trace
-
 import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
 import           Control.Lens             (makeLenses, toListOf, view, (%~),
@@ -353,7 +351,7 @@ addToREPLModule mi = do
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setREPLModule
-  :: Members '[State TopInfo, Reader Env, Error EvalError, State Mem, Output Debug] r
+  :: Members '[State TopInfo, Error EvalError, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi
@@ -365,23 +363,24 @@ setREPLModule mi = do
 --   corresponding to the currently loaded module, and load all the
 --   definitions into the current top-level environment.
 loadDefsFrom ::
-  Members '[State TopInfo, Reader Env, Error EvalError, State Mem] r =>
+  Members '[State TopInfo, Error EvalError, State Mem] r =>
   ModuleInfo ->
   Sem r ()
 loadDefsFrom mi = do
   let tmds = mi ^. miTermdefs
       imptmds = mi ^.. miImports . traverse . miTermdefs
-  let cdefns = Ctx.coerceKeys $ compileDefns tmds
-      impcdefns = map (Ctx.coerceKeys . compileDefns) imptmds
-  mapM_ (uncurry loadDef) (Ctx.assocs (cdefns <> mconcat impcdefns))
+      defsToLoad = concatMap compileDefns imptmds <> compileDefns tmds
+
+  -- Note that the compiled definitions we get back from compileDefns
+  -- are topologically sorted by mutually recursive group. Each
+  -- definition needs to be evaluated in an environment containing the
+  -- previous ones.
+
+  mapM_ (uncurry loadDef) defsToLoad
 
 loadDef ::
-  Members '[Reader Env, State TopInfo, Error EvalError, State Mem] r =>
+  Members '[State TopInfo, Error EvalError, State Mem] r =>
   QName Core -> Core -> Sem r ()
 loadDef x body = do
-  traceM $ "loading " ++ show x ++ " = " ++ show body
   v <- inputToState . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
-  e <- gets (view topEnv)
-  traceShowM (Ctx.keysSet e)
-  traceM "=================================================="

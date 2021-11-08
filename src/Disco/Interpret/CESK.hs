@@ -20,8 +20,6 @@ module Disco.Interpret.CESK
   )
 where
 
-import           Debug.Trace
-
 import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
@@ -142,7 +140,7 @@ ctx !!! x = case Ctx.lookup' x ctx of
 
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Error EvalError, State Mem] r => CESK -> Sem r CESK
-step cesk = traceShowM cesk >> case cesk of
+step cesk = case cesk of
   (In (CVar x) e k) -> return $ Out (e !!! x) k
   (In (CNum d r) _ k) -> return $ Out (VNum d r) k
   (In (CConst OMatchErr) _ _) -> throw NonExhaustive

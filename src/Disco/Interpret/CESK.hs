@@ -51,7 +51,6 @@ import           Math.OEIS                          (catalogNums,
 
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
-import           Disco.Effects.Output
 import           Disco.Effects.Random
 import           Polysemy
 import           Polysemy.Error
@@ -101,6 +100,8 @@ data Frame
     FForce
   | -- | Update the contents of a memory cell with its evaluation.
     FUpdate Int
+  | -- | XXX blah blah test
+    FTest TestVars Env
   deriving (Show)
 
 ------------------------------------------------------------
@@ -166,6 +167,7 @@ step cesk = case cesk of
     locs <- allocateRec e (zip (map localName xs) cs)
     return $ Out (foldr (VPair . VRef) VUnit locs) k
   (In (CForce c) e k) -> return $ In c e (FForce : k)
+  (In (CTest vars c) e k) -> return $ In c e (FTest (TestVars vars) e : k)
   (Out v (FInj s : k)) -> return $ Out (VInj s v) k
   (Out (VInj L v) (FCase e b1 _ : k)) -> do
     (x, c1) <- unbind b1
@@ -192,7 +194,15 @@ step cesk = case cesk of
   (Out v (FUpdate n : k)) -> do
     set n (V v)
     return $ Out v k
-  c -> error $ "step " ++ show c
+  (Out v (FTest vs e : k)) -> do
+    result <- failTestOnError (ensureProp v)
+    e' <- getTestEnv vs e
+    return $ Out (VProp $ extendPropEnv e' result) k
+  _ -> error "bad step"  -- "step " ++ show c
+
+failTestOnError :: Member (Error EvalError) r => Sem r ValProp -> Sem r ValProp
+failTestOnError m = catch m $ \e ->
+  return $ VPDone (TestResult False (TestRuntimeError e) emptyTestEnv)
 
 ------------------------------------------------------------
 -- Interpreting constants
@@ -206,7 +216,9 @@ arity2 _f _v         = error "arity2 on a non-pair!" -- XXX
 -- arity3 f (VPair x (VPair y z)) = f x y z
 -- arity3 _f _v                     = error "arity3 on a non-triple!"
 
-appConst :: Members '[Random, Error EvalError] r => Cont -> Op -> Value -> Sem r CESK
+appConst
+  :: Members '[Random, Error EvalError, State Mem] r
+  => Cont -> Op -> Value -> Sem r CESK
 appConst k = \case
   --------------------------------------------------
   -- Basics
@@ -607,10 +619,14 @@ ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _          = error "ensureProp: non-prop value" -- XXX! use real error
 
-testProperty :: Members '[Random, Error EvalError] r => SearchType -> Value -> Sem r TestResult
+testProperty
+  :: Members '[Random, Error EvalError, State Mem] r
+  => SearchType -> Value -> Sem r TestResult
 testProperty initialSt = ensureProp >=> checkProp
   where
-    checkProp :: Members '[Random, Error EvalError] r => ValProp -> Sem r TestResult
+    checkProp
+      :: Members '[Random, Error EvalError, State Mem] r
+      => ValProp -> Sem r TestResult
     checkProp (VPDone r) = return r
     checkProp (VPSearch sm tys f e) =
       extendResultEnv e <$> (generateSamples initialSt vals >>= go)
@@ -618,22 +634,34 @@ testProperty initialSt = ensureProp >=> checkProp
         vals = enumTypes tys
         (SearchMotive (whenFound, wantsSuccess)) = sm
 
-        go :: Members '[Random, Error EvalError] r => ([[Value]], SearchType) -> Sem r TestResult
+        go
+          :: Members '[Error EvalError, Random, State Mem] r
+          => ([[Value]], SearchType) -> Sem r TestResult
         go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) emptyTestEnv
         go (x:xs, st) = do
-          prop <- ensureProp =<< whnfApp f x
+          prop <- ensureProp =<< evalApp f x
           case prop of
             VPDone r    -> continue st xs r
             VPSearch {} -> checkProp prop >>= continue st xs
 
-        continue :: Members '[Random, Error EvalError] r => SearchType -> [[Value]] -> TestResult -> Sem r TestResult
+        continue
+          :: Members '[Random, Error EvalError, State Mem] r
+          => SearchType -> [[Value]] -> TestResult -> Sem r TestResult
         continue st xs r@(TestResult _ _ e')
           | testIsError r              = return r
           | testIsOk r == wantsSuccess =
             return $ TestResult whenFound (TestFound r) e'
           | otherwise                  = go (xs, st)
 
-runTest :: Members '[Error EvalError, Random, Input Env, State Mem] r => Int -> AProperty -> Sem r TestResult
+evalApp
+  :: Members '[Random, Error EvalError, State Mem] r
+  => Value -> [Value] -> Sem r Value
+evalApp f xs = do
+  runFresh $ runCESK (Out f (map FApp xs))
+
+runTest
+  :: Members '[Random, Error EvalError, Input Env, State Mem] r
+  => Int -> AProperty -> Sem r TestResult
 runTest n p = testProperty (Randomized n' n') =<< eval (compileProperty p)
   where
     n' = fromIntegral (n `div` 2)

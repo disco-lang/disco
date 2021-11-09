@@ -355,7 +355,7 @@ loadFile file = do
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addToREPLModule
-  :: Members '[Error DiscoError, State TopInfo, Reader Env, State Mem, Output Debug] r
+  :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
   mapError EvalErr $ loadDefsFrom mi
@@ -369,7 +369,7 @@ addToREPLModule mi = do
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setREPLModule
-  :: Members '[State TopInfo, Error EvalError, State Mem, Output Debug] r
+  :: Members '[State TopInfo, Random, Error EvalError, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi
@@ -381,7 +381,7 @@ setREPLModule mi = do
 --   corresponding to the currently loaded module, and load all the
 --   definitions into the current top-level environment.
 loadDefsFrom ::
-  Members '[State TopInfo, Error EvalError, State Mem] r =>
+  Members '[State TopInfo, Random, Error EvalError, State Mem] r =>
   ModuleInfo ->
   Sem r ()
 loadDefsFrom mi = do
@@ -397,7 +397,7 @@ loadDefsFrom mi = do
   mapM_ (uncurry loadDef) defsToLoad
 
 loadDef ::
-  Members '[State TopInfo, Error EvalError, State Mem] r =>
+  Members '[State TopInfo, Random, Error EvalError, State Mem] r =>
   QName Core -> Core -> Sem r ()
 loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body

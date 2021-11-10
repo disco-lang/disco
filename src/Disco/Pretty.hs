@@ -553,14 +553,14 @@ digitalExpansion b n d = digits
 -- XXX redo with message framework, with proper support for indentation etc.
 
 prettyTestFailure :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
-prettyTestFailure = undefined
+prettyTestFailure _ _ = output "test result (failure)"
 -- prettyTestFailure _    (TestResult True _ _)    = return ()
 -- prettyTestFailure prop (TestResult False r env) = do
 --   prettyFailureReason prop r
 --   prettyTestEnv "    Counterexample:" env
 
 prettyTestResult :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
-prettyTestResult = undefined
+prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 
 -- prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 -- prettyTestResult prop (TestResult _ r _)   = do
@@ -620,3 +620,6 @@ prettyTestResult = undefined
 --       output (replicate (maxNameLen - length x) ' ')
 --       output " = "
 --       prettyValue ty v
+
+
+

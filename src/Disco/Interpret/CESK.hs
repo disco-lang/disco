@@ -405,8 +405,6 @@ appConst k = \case
   --------------------------------------------------
   -- Propositions
 
-  -- XXX WORKING HERE
-
   OForall tys -> out . (\v -> VProp (VPSearch SMForall tys v emptyTestEnv ))
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv ))
   OHolds -> testProperty Exhaustive >=> resultToBool >=> out

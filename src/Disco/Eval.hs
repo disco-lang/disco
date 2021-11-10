@@ -304,7 +304,7 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
 -- | A list of standard library module names, which should always be
 --   loaded implicitly.
 stdLib :: [String]
-stdLib = ["list"]
+stdLib = ["list", "container"]
 
 -- | Recursively load an already-parsed Disco module while keeping
 --   track of an extra Map from module names to 'ModuleInfo' records,

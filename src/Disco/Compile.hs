@@ -278,20 +278,24 @@ compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
 compilePrim _ PrimEmptyMap = return $ CConst OEmptyMap
 compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
-compilePrim (_ :*: TyList _ :->: _) PrimEach = return $ CVar (Named Stdlib "list" .- string2Name "eachlist")
+compilePrim (_ :*: TyList _ :->: _) PrimEach = return $
+  CVar (Named Stdlib "list" .- string2Name "eachlist")
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
 compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
 compilePrim ty PrimEach = compilePrimErr PrimEach ty
 compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce =
   return $ CVar (Named Stdlib "list" .- string2Name "foldr")
 compilePrim (_ :*: _ :*: TyBag _ :->: _) PrimReduce = return $ CConst OReduceBag
-compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce = return $ CConst OReduceBag
+compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce = return $
+  CVar (Named Stdlib "container" .- string2Name "reduceset")
 compilePrim ty PrimReduce = compilePrimErr PrimReduce ty
-compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $ CVar (Named Stdlib "list" .- string2Name "filterlist")
+compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $
+  CVar (Named Stdlib "list" .- string2Name "filterlist")
 compilePrim (_ :*: TyBag _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim (_ :*: TySet _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim ty PrimFilter = compilePrimErr PrimFilter ty
-compilePrim (_ :->: TyList _) PrimJoin = return $ CVar (Named Stdlib "list" .- string2Name "concat")
+compilePrim (_ :->: TyList _) PrimJoin = return $
+  CVar (Named Stdlib "list" .- string2Name "concat")
 compilePrim (_ :->: TyBag a) PrimJoin = return $ CConst (OBagUnions a)
 compilePrim (_ :->: TySet a) PrimJoin = return $ CConst (OUnions a)
 compilePrim ty PrimJoin = compilePrimErr PrimJoin ty

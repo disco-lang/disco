@@ -15,7 +15,6 @@ module Disco.Compile where
 import           Control.Monad                    ((<=<))
 import           Data.Bool                        (bool)
 import           Data.Coerce
-import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Ratio
 import           Data.Set                         (Set)
@@ -74,9 +73,12 @@ compileDefns :: Ctx ATerm Defn -> [(QName Core, Core)]
 compileDefns defs = run . runFresh $ do
   let vars = Ctx.keysSet defs
 
-      -- Get a list of pairs of the form (y,x) where x uses y in its definition.
-      -- We want them in the order (y,x) since y needs to be evaluated before x.
-      -- These will be the edges in our dependency graph.
+      -- Get a list of pairs of the form (y,x) where x uses y in its
+      -- definition.  We want them in the order (y,x) since y needs to
+      -- be evaluated before x.  These will be the edges in our
+      -- dependency graph.  Note that some of these edges may refer to
+      -- things that were imported, and hence not in the set of
+      -- definitions; those edges will simply be dropped by G.mkGraph.
       deps :: Set (QName ATerm, QName ATerm)
       deps = S.unions . map (\(x, body) -> S.map (,x) (setOf (fvQ @Defn @ATerm) body)) . Ctx.assocs $ defs
 

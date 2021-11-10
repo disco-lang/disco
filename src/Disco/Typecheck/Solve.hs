@@ -651,7 +651,7 @@ simplify tyDefns origVM cs
 -- | Given a list of atoms and atomic subtype constraints (each pair
 --   @(a1,a2)@ corresponds to the constraint @a1 <: a2@) build the
 --   corresponding constraint graph.
-mkConstraintGraph :: Ord a => Set a -> [(a, a)] -> Graph a
+mkConstraintGraph :: (Show a, Ord a) => Set a -> [(a, a)] -> Graph a
 mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
   where
     nodes = as `S.union` S.fromList (cs ^.. traverse . each)

@@ -12,6 +12,8 @@
 
 module Disco.Util where
 
+import qualified Data.Map as M
+
 infixr 1 ==>
 
 -- | A synonym for pairing which makes convenient syntax for
@@ -21,3 +23,8 @@ infixr 1 ==>
 
 for :: [a] -> (a -> b) -> [b]
 for = flip map
+
+(!) :: (Show k, Ord k) => M.Map k v -> k -> v
+m ! k = case M.lookup k m of
+  Nothing -> error $ "key " ++ show k ++ " is not an element in the map"
+  Just v  -> v

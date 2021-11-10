@@ -282,7 +282,8 @@ compilePrim (_ :*: TyList _ :->: _) PrimEach = return $ CVar (Named Stdlib "list
 compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
 compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
 compilePrim ty PrimEach = compilePrimErr PrimEach ty
-compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce = return $ CConst OReduceList
+compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce =
+  return $ CVar (Named Stdlib "list" .- string2Name "foldr")
 compilePrim (_ :*: _ :*: TyBag _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce = return $ CConst OReduceBag
 compilePrim ty PrimReduce = compilePrimErr PrimReduce ty

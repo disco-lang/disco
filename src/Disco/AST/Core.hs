@@ -150,16 +150,12 @@ data Op
     OBagElem
   | -- | List element test.
     OListElem
-  | -- | Map a function over a list.
-    OEachList
   | -- | Map a function over a bag.  Carries the
     --   output type of the function.
     OEachBag Type
   | -- | Map a function over a set. Carries the
     --   output type of the function.
     OEachSet Type
-  | -- | Reduce/fold a list.
-    OReduceList
   | -- | Reduce/fold a bag (or set).
     OReduceBag
   | -- | Filter a bag.
@@ -168,8 +164,6 @@ data Op
     OMerge BOp
   | -- | Bag join, i.e. union a bag of bags.
     OBagUnions Type
-  | -- | Set join, i.e. union a set of sets.
-    OUnions Type
   | -- | Adjacency List of given graph
     OSummary
   | -- | Empty graph

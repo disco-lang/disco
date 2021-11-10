@@ -10,30 +10,32 @@ sumTree : Tree -> N
 sumTree (left _) = 0
 sumTree (right (n, l, r)) = n + sumTree(l) + sumTree(r)
 
-type Stream = N * N * Stream
+-- XXX Stream is problematic without laziness!
 
-unconsStream : Stream -> N * Stream
-unconsStream s = s
-  -- Just the identity function, because there's no way to tell the difference
-  -- between a Stream and an N * Stream !
+-- type Stream = N * N * Stream
 
-streamy : N * N * N * Stream -> N * N * Stream
-streamy s = s
+-- unconsStream : Stream -> N * Stream
+-- unconsStream s = s
+--   -- Just the identity function, because there's no way to tell the difference
+--   -- between a Stream and an N * Stream !
 
-streamy2 : Stream -> Stream
-streamy2 (n,s) = (n+1,n+1,s)
+-- streamy : N * N * N * Stream -> N * N * Stream
+-- streamy s = s
 
-nats : Stream
-nats = natsFrom 0
+-- streamy2 : Stream -> Stream
+-- streamy2 (n,s) = (n+1,n+1,s)
 
-natsFrom : N -> Stream
-natsFrom n = (n, natsFrom (n+1))
+-- nats : Stream
+-- nats = natsFrom 0
 
-addStreams : Stream -> Stream -> Stream
-addStreams (a,s) (b,t) = (a+b, addStreams s t)
+-- natsFrom : N -> Stream
+-- natsFrom n = (n, natsFrom (n+1))
 
-type Lst = Unit + N * Lst
+-- addStreams : Stream -> Stream -> Stream
+-- addStreams (a,s) (b,t) = (a+b, addStreams s t)
 
-takeStream : N -> Stream -> Lst
-takeStream 0     _     = left(unit)
-takeStream (n+1) (x,s) = right (x, takeStream n s)
+-- type Lst = Unit + N * Lst
+
+-- takeStream : N -> Stream -> Lst
+-- takeStream 0     _     = left(unit)
+-- takeStream (n+1) (x,s) = right (x, takeStream n s)

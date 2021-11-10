@@ -11,3 +11,6 @@ reducebag(f,z,b) = foldr(f,z,each(fst,list(bagCounts(b))))
 
 reduceset : (a × a → a) × a × Set(a) → a
 reduceset(f,z,s) = foldr(f,z,list(s))
+
+unions : Set(Set(a)) → Set(a)
+unions(ss) = foldr(~∪~, {}, list(ss))

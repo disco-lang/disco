@@ -298,7 +298,8 @@ compilePrim ty PrimFilter = compilePrimErr PrimFilter ty
 compilePrim (_ :->: TyList _) PrimJoin = return $
   CVar (Named Stdlib "list" .- string2Name "concat")
 compilePrim (_ :->: TyBag a) PrimJoin = return $ CConst (OBagUnions a)
-compilePrim (_ :->: TySet a) PrimJoin = return $ CConst (OUnions a)
+compilePrim (_ :->: TySet _) PrimJoin = return $
+  CVar (Named Stdlib "container" .- string2Name "unions")
 compilePrim ty PrimJoin = compilePrimErr PrimJoin ty
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor = return $ CConst OFactor

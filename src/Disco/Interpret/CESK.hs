@@ -94,6 +94,8 @@ data Frame
   | -- | Evaluate the argument of an application once we have finished
     --   evaluating the function.
     FArg Env Core
+  | -- | Apply an evaluated function to this already-evaluated argument.
+    FArgV Value
   | -- | Apply a previously evaluated function to the value.
     FApp Value
   | -- | Force evaluation of the contents of a memory cell.
@@ -182,6 +184,13 @@ step cesk = case cesk of
   (Out v2 (FApp (VClo e [x] b) : k)) -> return $ In b (Ctx.insert (localName x) v2 e) k
   (Out v2 (FApp (VClo e (x : xs) b) : k)) -> return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
+  -- Annoying to repeat this code, not sure of a better way.
+  -- The usual evaluation order (function then argument) doesn't work when
+  -- we're applying a test function to randomly generated values.
+  (Out (VClo e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
+  (Out (VClo e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo (Ctx.insert (localName x) v e) xs b) k
+  (Out (VConst op) (FArgV v : k)) -> appConst k op v
+
   (Out (VRef n) (FForce : k)) -> do
     cell <- lkup n
     case cell of
@@ -198,7 +207,8 @@ step cesk = case cesk of
     result <- failTestOnError (ensureProp v)
     e' <- getTestEnv vs e
     return $ Out (VProp $ extendPropEnv e' result) k
-  _ -> error "bad step"  -- "step " ++ show c
+  (In c _ (k:_)) -> error $ "bad step: In " ++ show c ++ "\n" ++ show k
+  (Out v k) -> error $ "bad step: Out " ++ (take 100 (show v) ++ "...") ++ "\n" ++ show k
 
 failTestOnError :: Member (Error EvalError) r => Sem r ValProp -> Sem r ValProp
 failTestOnError m = catch m $ \e ->
@@ -657,7 +667,7 @@ evalApp
   :: Members '[Random, Error EvalError, State Mem] r
   => Value -> [Value] -> Sem r Value
 evalApp f xs = do
-  runFresh $ runCESK (Out f (map FApp xs))
+  runFresh $ runCESK (Out f (map FArgV xs))
 
 runTest
   :: Members '[Random, Error EvalError, Input Env, State Mem] r

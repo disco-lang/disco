@@ -161,7 +161,7 @@ data Op
   | -- | Merge two bags/sets.
     OMerge BOp
   | -- | Bag join, i.e. union a bag of bags.
-    OBagUnions Type
+    OBagUnions
   | -- | Adjacency List of given graph
     OSummary
   | -- | Empty graph

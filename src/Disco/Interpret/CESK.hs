@@ -366,9 +366,8 @@ appConst k = \case
       interpOp SSub = \x y -> max 0 (x - y)
       interpOp op   = error $ "unknown op in OMerge: " ++ show op
 
-  -- appConst OConcat                            = _wG
-  -- appConst (OBagUnions ty)                    = _wH
-  -- appConst (OUnions ty)                       = _wI
+  OBagUnions -> \(VBag cts) ->
+    out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
 
   --------------------------------------------------
   -- Container conversions

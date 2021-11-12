@@ -3,9 +3,6 @@ using NoStdLib
 import list
 import product
 
--- eachset : (a -> b) * Set(a) -> Set(a)
--- eachset(f, s) = set(list(s))
-
 reducebag : (a × a → a) × a × Bag(a) → a
 reducebag(f,z,b) = foldr(f,z,each(fst,list(bagCounts(b))))
 

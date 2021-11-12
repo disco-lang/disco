@@ -26,6 +26,7 @@ import           Control.Arrow                      ((***))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
 import           Data.List                          (find)
+import qualified Data.Map                           as M
 import           Data.Maybe                         (isJust)
 import           Data.Ratio
 import           Disco.AST.Core
@@ -38,7 +39,6 @@ import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Names
 import           Disco.Property
-import           Disco.Syntax.Operators             (BOp (..))
 import           Disco.Types                        hiding (V)
 import           Disco.Value
 import           Math.Combinatorics.Exact.Binomial  (choose)
@@ -390,7 +390,10 @@ appConst k = \case
       assoc ((a, b), c) = (a, (b, c))
 
   -- appConst (OMapToSet ty ty')                 = _w10
-  -- appConst OSetToMap                          = _w11
+  OSetToMap -> \(VBag xs) ->
+    out . VMap . M.fromList . map (convertAssoc . fst) $ xs
+    where
+      convertAssoc (VPair k v) = (toSimpleValue k, v)
 
   --------------------------------------------------
   -- Graph operations
@@ -633,6 +636,29 @@ mergeM g = go
       return $ case n of
         VNum _ 0 -> zs
         VNum _ n -> (a, numerator n) : zs
+
+------------------------------------------------------------
+-- SimpleValue Utilities
+------------------------------------------------------------
+
+toSimpleValue :: Value -> SimpleValue
+toSimpleValue = \case
+  VNum d n    -> SNum d n
+  VUnit       -> SUnit
+  VInj s v1   -> SInj s (toSimpleValue v1)
+  VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
+  VBag bs     -> SBag (map (first toSimpleValue) bs)
+  VType t     -> SType t
+  t           -> error $ "A non-simple value was passed as simple" ++ show t
+
+fromSimpleValue :: SimpleValue -> Value
+fromSimpleValue (SNum d n)    = VNum d n
+fromSimpleValue SUnit         = VUnit
+fromSimpleValue (SInj s v)    = VInj s (fromSimpleValue v)
+fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
+fromSimpleValue (SBag bs)     = VBag $ map (first fromSimpleValue) bs
+fromSimpleValue (SType t)     = VType t
+
 
 ------------------------------------------------------------
 -- Propositions / tests

@@ -357,7 +357,7 @@ appConst k = \case
     bs <- mapM (evalApp f . (:[]) . fst) xs
     out . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
     where
-      isTrue (VInj L VUnit) = True
+      isTrue (VInj R VUnit) = True
       isTrue _              = False
 
   OMerge -> arity3 $ \f (VBag xs) (VBag ys) -> do

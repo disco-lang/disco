@@ -280,8 +280,8 @@ compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
 compilePrim (_ :*: TyList _ :->: _) PrimEach = return $
   CVar (Named Stdlib "list" .- string2Name "eachlist")
-compilePrim (_ :*: TyBag _ :->: TyBag outTy) PrimEach = return $ CConst (OEachBag outTy)
-compilePrim (_ :*: TySet _ :->: TySet outTy) PrimEach = return $ CConst (OEachSet outTy)
+compilePrim (_ :*: TyBag _ :->: TyBag _) PrimEach = return $ CConst OEachBag
+compilePrim (_ :*: TySet _ :->: TySet _) PrimEach = return $ CConst OEachSet
 compilePrim ty PrimEach = compilePrimErr PrimEach ty
 compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce =
   return $ CVar (Named Stdlib "list" .- string2Name "foldr")

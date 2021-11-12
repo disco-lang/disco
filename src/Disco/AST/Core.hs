@@ -152,10 +152,10 @@ data Op
     OListElem
   | -- | Map a function over a bag.  Carries the
     --   output type of the function.
-    OEachBag Type
+    OEachBag
   | -- | Map a function over a set. Carries the
     --   output type of the function.
-    OEachSet Type
+    OEachSet
   | -- | Reduce/fold a bag (or set).
     OReduceBag
   | -- | Filter a bag.

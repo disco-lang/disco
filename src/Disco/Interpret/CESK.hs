@@ -342,8 +342,14 @@ appConst k = \case
   OBagElem -> arity2 $ \x (VBag xs) ->
     out . enumv . isJust . find (valEq x) . map fst $ xs
   OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
-  -- appConst (OEachSet ty)                      = _wA
-  -- each@Set f = set . each@List f . list
+
+  OEachSet -> arity2 $ \f (VBag xs) -> do
+    xs' <- mapM (evalApp f . (:[]) . fst) xs
+    out . VBag . countValues $ xs'
+
+  OEachBag -> arity2 $ \f (VBag xs) -> do
+    xs' <- mapM (\(x,n) -> (,n) <$> evalApp f [x]) xs
+    out . VBag . sortNCount $ xs'
 
   -- appConst OReduceList                        = _wB
   -- appConst OReduceBag                         = _wC

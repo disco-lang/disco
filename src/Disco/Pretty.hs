@@ -556,14 +556,14 @@ digitalExpansion b n d = digits
 
 -- XXX redo with message framework, with proper support for indentation etc.
 
-prettyTestFailure :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+prettyTestFailure :: Member (Output String) r => AProperty -> TestResult -> Sem r ()
 prettyTestFailure _ _ = output "test result (failure)"
 -- prettyTestFailure _    (TestResult True _ _)    = return ()
 -- prettyTestFailure prop (TestResult False r env) = do
 --   prettyFailureReason prop r
 --   prettyTestEnv "    Counterexample:" env
 
-prettyTestResult :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+prettyTestResult :: Member (Output String) r => AProperty -> TestResult -> Sem r ()
 prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 
 -- prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
@@ -572,7 +572,7 @@ prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 --     output       "  - Test passed: " >> outputLn dp
 --     prettySuccessReason r
 
--- prettySuccessReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => TestReason -> Sem r ()
+-- prettySuccessReason :: Member (Output String) r => TestReason -> Sem r ()
 -- prettySuccessReason (TestFound (TestResult _ _ vs)) = do
 --   prettyTestEnv "    Found example:" vs
 -- prettySuccessReason (TestNotFound Exhaustive) = do
@@ -583,7 +583,7 @@ prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 --   outputLn " possibilities without finding a counterexample."
 -- prettySuccessReason _ = return ()
 
--- prettyFailureReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestReason -> Sem r ()
+-- prettyFailureReason :: Member (Output String) r => AProperty -> TestReason -> Sem r ()
 -- prettyFailureReason prop TestBool = do
 --   dp <- renderDoc $ prettyProperty (eraseProperty prop)
 --   output     "  - Test is false: " >> outputLn dp
@@ -611,7 +611,7 @@ prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 --   outputLn dp
 --   output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
 
--- prettyTestEnv :: Members (Output String ': Input TopInfo ': EvalEffects) r => String -> TestEnv -> Sem r ()
+-- prettyTestEnv :: Member (Output String) r => String -> TestEnv -> Sem r ()
 -- prettyTestEnv _ (TestEnv []) = return ()
 -- prettyTestEnv s (TestEnv vs) = do
 --   outputLn s
@@ -624,61 +624,6 @@ prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 --       output (replicate (maxNameLen - length x) ' ')
 --       output " = "
 --       prettyValue ty v
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 

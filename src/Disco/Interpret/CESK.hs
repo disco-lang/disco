@@ -205,7 +205,7 @@ step cesk = case cesk of
     return $ Out v k
   (Out v (FTest vs e : k)) -> do
     result <- failTestOnError (ensureProp v)
-    e' <- getTestEnv vs e
+    e' <- either (throw . UnboundError) return $ getTestEnv vs e
     return $ Out (VProp $ extendPropEnv e' result) k
   (In c _ (k:_)) -> error $ "bad step: In " ++ show c ++ "\n" ++ show k
   (Out v k) -> error $ "bad step: Out " ++ (take 100 (show v) ++ "...") ++ "\n" ++ show k

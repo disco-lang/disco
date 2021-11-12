@@ -39,16 +39,10 @@ module Disco.Value
 
   -- * Environments
 
-  , Env, extendEnv, extendsEnv, getEnv, withEnv
+  , Env
 
   -- * Memory
   , Cell(..), Mem, emptyMem, allocate, allocateRec, lkup, set
-
-  -- * Evaluation effects
-
-  , Debug(..)
-  , debug
-  , EvalEffects
 
   ) where
 
@@ -79,23 +73,6 @@ import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (AnyName (..), Name)
-
-------------------------------------------------------------
--- Evaluation effects
-------------------------------------------------------------
-
-newtype Debug = Debug { unDebug :: String }
-
-debug :: Member (Output Debug) r => String -> Sem r ()
-debug = output . Debug
-
---- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
-  -- XXX write about order.
-  -- memory, counter etc. should not be reset by errors.
-
-  -- XXX add some kind of proper logging effect(s)
-    -- With tags so we can filter on log messages we want??
 
 ------------------------------------------------------------
 -- Value type
@@ -312,12 +289,18 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: Members '[Error EvalError] r => TestVars -> Env -> Sem r TestEnv
+getTestEnv :: TestVars -> Env -> Either (Name Core) TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> throw (UnboundError name)
+    Nothing -> Left name
+    -- Note, previously this had a type like
+    --
+    -- Member (Error EvalError) r => ... -> Sem r TestEnv
+    --
+    -- which was sensible, except we don't want this module to depend
+    -- on the Disco.Error module to avoid an import cycle.
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
@@ -364,35 +347,6 @@ extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
 
 -- | An environment is a mapping from names to values.
 type Env  = Ctx Core Value
-
--- | Locally extend the environment with a new name -> value mapping,
---   (shadowing any existing binding for the given name).
-extendEnv :: Members '[Reader Env, LFresh] r => Name Core -> Value -> Sem r a -> Sem r a
-extendEnv x v = avoid [AnyName x] . extend (localName x) v
-
--- | Locally extend the environment with another environment.
---   Bindings in the new environment shadow bindings in the old.
-extendsEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
-extendsEnv e' = avoid (map AnyName (names e')) . extends e'
-
--- | Get the current environment.
-getEnv :: Member (Reader Env) r => Sem r Env
-getEnv = ask
-
--- | Run a @Disco@ computation with a /replaced/ (not extended)
---   environment.  This is used for evaluating things such as closures
---   and thunks that come with their own environment.
-withEnv :: Members '[Reader Env, LFresh] r => Env -> Sem r a -> Sem r a
-withEnv e = avoid (map AnyName (names e)) . local (const e)
-
--- The below code seems to work too, but I don't understand why.  Seems like
--- we should have to avoid names bound in the environment currently in use.
-
--- withEnv = local . const
-
-------------------------------------------------------------
--- Memory
-------------------------------------------------------------
 
 ------------------------------------------------------------
 -- Memory

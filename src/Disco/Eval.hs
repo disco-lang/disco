@@ -16,7 +16,8 @@ module Disco.Eval
        (
          -- * Effects
 
-         DiscoEffects
+         EvalEffects, Debug, debug
+       , DiscoEffects
 
          -- * Top-level info record and associated lenses
 
@@ -103,7 +104,20 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 -- | Effects needed at the top level.
 type TopEffects = '[Error DiscoError, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
 
--- | All effects needed for the top level + interpretation.
+-- | Effects needed for evaluation.
+type EvalEffects = [Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
+  -- XXX write about order.
+  -- memory, counter etc. should not be reset by errors.
+
+  -- XXX add some kind of proper logging effect(s)
+    -- With tags so we can filter on log messages we want??
+
+newtype Debug = Debug { unDebug :: String }
+
+debug :: Member (Output Debug) r => String -> Sem r ()
+debug = output . Debug
+
+-- | All effects needed for the top level + evaluation.
 type DiscoEffects = AppendEffects EvalEffects TopEffects
 
 ------------------------------------------------------------

@@ -156,8 +156,6 @@ data Op
   | -- | Map a function over a set. Carries the
     --   output type of the function.
     OEachSet
-  | -- | Reduce/fold a bag (or set).
-    OReduceBag
   | -- | Filter a bag.
     OFilterBag
   | -- | Merge two bags/sets.

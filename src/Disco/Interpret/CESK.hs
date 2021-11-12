@@ -351,10 +351,12 @@ appConst k = \case
     xs' <- mapM (\(x,n) -> (,n) <$> evalApp f [x]) xs
     out . VBag . sortNCount $ xs'
 
-  -- appConst OReduceList                        = _wB
-  -- appConst OReduceBag                         = _wC
-
-  -- appConst OFilterBag                         = _wE
+  OFilterBag -> arity2 $ \f (VBag xs) -> do
+    bs <- mapM (evalApp f . (:[]) . fst) xs
+    out . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
+    where
+      isTrue (VInj L VUnit) = True
+      isTrue _              = False
 
   OMerge op -> arity2 $ \(VBag xs) (VBag ys) -> out . VBag $ merge (interpOp op) xs ys
     where

@@ -90,7 +90,7 @@ debug :: Member (Output Debug) r => String -> Sem r ()
 debug = output . Debug
 
 --- Get rid of Reader Env --- should be dispatched locally?
-type EvalEffects = [Reader Env, Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
+type EvalEffects = [Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
 

@@ -27,7 +27,7 @@ module Disco.Eval
 
        , runDisco
        , runTCM, runTCMWith
-       , withTopEnv, inputTopEnv
+       , inputTopEnv
        , parseDiscoModule
        , typecheckTop
 
@@ -176,18 +176,8 @@ runDisco =
 -- Environment utilities
 ------------------------------------------------------------
 
--- XXX get rid of withTopEnv, only place it is still used is in test
--- stuff which needs to be updated anyway.  Note that the 'eval'
--- function has an Input TopEnv effect, not Reader.  We don't use a
--- Reader Env effect anymore since Env scoping stuff is handled at a
--- lower level by the CESK machine.
--- | Run a computation with the top-level environment used as the
---   current local environment.  For example, this is used every time
---   we start evaluating an expression entered at the command line.
-withTopEnv :: Member (Input TopInfo) r => Sem (Reader Env ': r) a -> Sem r a
-withTopEnv m = do
-  e <- inputs (view topEnv)
-  runReader e m
+-- XXX change name to inputREPLEnv, modify to actually get the Env
+-- from the REPL module info?
 
 -- | Run a computation that needs an input environment, grabbing the
 --   current top-level environment from the 'TopInfo' records.

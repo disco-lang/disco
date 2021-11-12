@@ -460,7 +460,7 @@ handleLoad fp = do
   let (directory, modName) = splitFileName fp
   m <- inputToState @TopInfo $ loadDiscoModule False (FromDir directory) modName
   setREPLModule m
-  t <- inputToState . withTopEnv $ runAllTests (m ^. miProps)
+  t <- inputToState $ runAllTests (m ^. miProps)
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
   return t

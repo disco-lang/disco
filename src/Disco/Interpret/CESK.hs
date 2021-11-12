@@ -222,9 +222,9 @@ arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
 arity2 _f _v         = error "arity2 on a non-pair!" -- XXX
 
--- arity3 :: (Value -> Value -> Value -> a) -> Value -> a
--- arity3 f (VPair x (VPair y z)) = f x y z
--- arity3 _f _v                     = error "arity3 on a non-triple!"
+arity3 :: (Value -> Value -> Value -> a) -> Value -> a
+arity3 f (VPair x (VPair y z)) = f x y z
+arity3 _f _v                   = error "arity3 on a non-triple!"
 
 appConst
   :: Members '[Random, Error EvalError, State Mem] r
@@ -358,13 +358,9 @@ appConst k = \case
       isTrue (VInj L VUnit) = True
       isTrue _              = False
 
-  OMerge op -> arity2 $ \(VBag xs) (VBag ys) -> out . VBag $ merge (interpOp op) xs ys
-    where
-      interpOp Max  = max
-      interpOp Min  = min
-      interpOp Add  = (+)
-      interpOp SSub = \x y -> max 0 (x - y)
-      interpOp op   = error $ "unknown op in OMerge: " ++ show op
+  OMerge -> arity3 $ \f (VBag xs) (VBag ys) -> do
+    zs <- mergeM f xs ys
+    out . VBag $ zs
 
   OBagUnions -> \(VBag cts) ->
     out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
@@ -614,6 +610,29 @@ merge g = go
     mergeCons a m1 m2 zs = case g m1 m2 of
       0 -> zs
       n -> (a, n) : zs
+
+
+mergeM ::
+  Members '[Random, Error EvalError, State Mem] r =>
+  Value ->
+  [(Value, Integer)] ->
+  [(Value, Integer)] ->
+  Sem r [(Value, Integer)]
+mergeM g = go
+  where
+    go [] [] = return []
+    go [] ((y, n) : ys) = mergeCons y 0 n =<< go [] ys
+    go ((x, n) : xs) [] = mergeCons x n 0 =<< go xs []
+    go ((x, n1) : xs) ((y, n2) : ys) = case valCmp x y of
+      LT -> mergeCons x n1 0 =<< go xs ((y, n2) : ys)
+      EQ -> mergeCons x n1 n2 =<< go xs ys
+      GT -> mergeCons y 0 n2 =<< go ((x, n1) : xs) ys
+
+    mergeCons a m1 m2 zs = do
+      n <- evalApp g [VPair (intv m1) (intv m2)]
+      return $ case n of
+        VNum _ 0 -> zs
+        VNum _ n -> (a, numerator n) : zs
 
 ------------------------------------------------------------
 -- Propositions / tests

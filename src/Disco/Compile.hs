@@ -301,6 +301,11 @@ compilePrim (_ :->: TyBag _) PrimJoin = return $ CConst OBagUnions
 compilePrim (_ :->: TySet _) PrimJoin = return $
   CVar (Named Stdlib "container" .- string2Name "unions")
 compilePrim ty PrimJoin = compilePrimErr PrimJoin ty
+
+compilePrim (_ :*: TyBag _ :*: _ :->: _) PrimMerge = return $ CConst OMerge
+compilePrim (_ :*: TySet _ :*: _ :->: _) PrimMerge = return $ CConst OMerge
+compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
+
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor = return $ CConst OFactor
 compilePrim _ PrimFrac = return $ CConst OFrac
@@ -476,18 +481,9 @@ compileBOp _ _ _ op
           Lt ==> OLt
         ]
 
---     mergeOp _         Inter = PrimBOp Min
---     mergeOp _         Diff  = PrimBOp SSub
---     mergeOp (TySet _) Union = PrimBOp Max
---     mergeOp (TyBag _) Union = PrimBOp Add
-
-compileBOp _ _ _ Inter = CConst (OMerge Min)
-compileBOp _ _ _ Diff = CConst (OMerge SSub)
-compileBOp _ _ (TySet _) Union = CConst (OMerge Max)
-compileBOp _ _ (TyBag _) Union = CConst (OMerge Add)
--- XXX don't think this is true any more?
--- Likewise, ShouldEq also needs to know the type at which the
--- comparison is occurring.
+-- ShouldEq needs to know the type at which the comparison is
+-- occurring, so values can be correctly pretty-printed if the test
+-- fails.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
 compileBOp _ty (TyList _) _ Elem = CConst OListElem
 compileBOp _ty _ _ Elem = CConst OBagElem

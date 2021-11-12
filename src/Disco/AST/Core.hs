@@ -159,7 +159,7 @@ data Op
   | -- | Filter a bag.
     OFilterBag
   | -- | Merge two bags/sets.
-    OMerge BOp
+    OMerge
   | -- | Bag join, i.e. union a bag of bags.
     OBagUnions
   | -- | Adjacency List of given graph

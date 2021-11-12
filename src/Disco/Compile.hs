@@ -275,7 +275,6 @@ compilePrim ty PrimVertex = compilePrimErr PrimVertex ty
 compilePrim ty PrimEmptyGraph = compilePrimErr PrimEmptyGraph ty
 compilePrim ty PrimOverlay = compilePrimErr PrimOverlay ty
 compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
-compilePrim _ PrimEmptyMap = return $ CConst OEmptyMap
 compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
 compilePrim (_ :*: TyList _ :->: _) PrimEach = return $

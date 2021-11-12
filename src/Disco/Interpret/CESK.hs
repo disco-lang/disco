@@ -389,11 +389,22 @@ appConst k = \case
     where
       assoc ((a, b), c) = (a, (b, c))
 
+  --------------------------------------------------
+  -- Maps
+
   -- appConst (OMapToSet ty ty')                 = _w10
   OSetToMap -> \(VBag xs) ->
     out . VMap . M.fromList . map (convertAssoc . fst) $ xs
     where
       convertAssoc (VPair k v) = (toSimpleValue k, v)
+
+  OInsert -> arity3 $ \k v (VMap m) ->
+    out . VMap . M.insert (toSimpleValue k) v $ m
+
+  OLookup -> arity2 $ \k (VMap m) ->
+    out . toMaybe . M.lookup (toSimpleValue k) $ m
+    where
+      toMaybe = maybe (VInj L VUnit) (VInj R)
 
   --------------------------------------------------
   -- Graph operations
@@ -403,9 +414,6 @@ appConst k = \case
   -- appConst (OVertex ty)                       = _wL
   -- appConst (OOverlay ty)                      = _wM
   -- appConst (OConnect ty)                      = _wN
-  -- appConst OEmptyMap                          = _wO
-  -- appConst OInsert                            = _wP
-  -- appConst OLookup                            = _wQ
   -- appConst OMatchErr                          = _w1a
 
   --------------------------------------------------
@@ -636,29 +644,6 @@ mergeM g = go
       return $ case n of
         VNum _ 0 -> zs
         VNum _ n -> (a, numerator n) : zs
-
-------------------------------------------------------------
--- SimpleValue Utilities
-------------------------------------------------------------
-
-toSimpleValue :: Value -> SimpleValue
-toSimpleValue = \case
-  VNum d n    -> SNum d n
-  VUnit       -> SUnit
-  VInj s v1   -> SInj s (toSimpleValue v1)
-  VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
-  VBag bs     -> SBag (map (first toSimpleValue) bs)
-  VType t     -> SType t
-  t           -> error $ "A non-simple value was passed as simple" ++ show t
-
-fromSimpleValue :: SimpleValue -> Value
-fromSimpleValue (SNum d n)    = VNum d n
-fromSimpleValue SUnit         = VUnit
-fromSimpleValue (SInj s v)    = VInj s (fromSimpleValue v)
-fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
-fromSimpleValue (SBag bs)     = VBag $ map (first fromSimpleValue) bs
-fromSimpleValue (SType t)     = VType t
-
 
 ------------------------------------------------------------
 -- Propositions / tests

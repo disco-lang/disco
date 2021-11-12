@@ -172,8 +172,6 @@ data Op
     OOverlay Type
   | -- | Graph connect
     OConnect Type
-  | -- | Empty map
-    OEmptyMap
   | -- | Map insert
     OInsert
   | -- | Map lookup
@@ -242,7 +240,6 @@ data Op
 --   constant.  A few constants have arity 0; everything else is
 --   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity OEmptyMap       = 0
 opArity (OEmptyGraph _) = 0
 opArity OMatchErr       = 0
 opArity _               = 1

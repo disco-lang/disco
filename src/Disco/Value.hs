@@ -21,6 +21,7 @@ module Disco.Value
 
     Value(.., VNil, VCons, VFun)
   , SimpleValue(..)
+  , toSimpleValue, fromSimpleValue
 
     -- ** Conversion
 
@@ -51,6 +52,8 @@ module Disco.Value
 
   ) where
 
+import           Control.Monad                    (forM)
+import           Data.Bifunctor                   (first)
 import           Data.Char                        (chr, ord)
 import           Data.IntMap                      (IntMap)
 import qualified Data.IntMap                      as IM
@@ -60,14 +63,12 @@ import           Data.Ratio
 
 import           Algebra.Graph                    (Graph)
 
-import           Control.Monad                    (forM)
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
 import           Disco.Context                    as Ctx
 import           Disco.Error
 import           Disco.Names
 import           Disco.Types
-
 
 import           Disco.Effects.LFresh
 import           Disco.Effects.Random
@@ -190,6 +191,24 @@ data SimpleValue where
   SBag   :: [(SimpleValue, Integer)] -> SimpleValue
   SType  :: Type -> SimpleValue
   deriving (Show, Eq, Ord)
+
+toSimpleValue :: Value -> SimpleValue
+toSimpleValue = \case
+  VNum d n    -> SNum d n
+  VUnit       -> SUnit
+  VInj s v1   -> SInj s (toSimpleValue v1)
+  VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
+  VBag bs     -> SBag (map (first toSimpleValue) bs)
+  VType t     -> SType t
+  t           -> error $ "A non-simple value was passed as simple" ++ show t
+
+fromSimpleValue :: SimpleValue -> Value
+fromSimpleValue (SNum d n)    = VNum d n
+fromSimpleValue SUnit         = VUnit
+fromSimpleValue (SInj s v)    = VInj s (fromSimpleValue v)
+fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
+fromSimpleValue (SBag bs)     = VBag $ map (first fromSimpleValue) bs
+fromSimpleValue (SType t)     = VType t
 
 -- | A @ValFun@ is just a Haskell function @Value -> Value@.  It is a
 --   @newtype@ just so we can have a custom @Show@ instance for it and

@@ -166,8 +166,9 @@ prettyName = text . show
 
 -- | Pretty-print a term with guaranteed parentheses.
 prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
-prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
-prettyTermP t        = withPA initPA $ prettyTerm t
+prettyTermP t@TTup{}       = setPA initPA $ prettyTerm t
+prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
+prettyTermP t              = withPA initPA $ prettyTerm t
 
 -- | Pretty-print a term.
 prettyTerm :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
@@ -454,6 +455,10 @@ prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 
 prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
+prettyValue (TyMap tyK tyV) (VMap m)         =
+  "map" <+> braces (prettySequence (tyK :*: tyV) "," (assocsToValues m))
+  where
+    assocsToValues = map (\(k,v) -> VPair (fromSimpleValue k) v) . M.assocs
 
 prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
 
@@ -463,7 +468,6 @@ prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ sh
 -- prettyValue ty (VFun_ vf)     = undefined
 -- prettyValue ty (VProp vp)     = undefined
 -- prettyValue ty (VGraph gr va) = undefined
--- prettyValue ty (VMap map)     = undefined
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
@@ -620,6 +624,61 @@ prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
 --       output (replicate (maxNameLen - length x) ' ')
 --       output " = "
 --       prettyValue ty v
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

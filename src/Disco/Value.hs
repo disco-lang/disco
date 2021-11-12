@@ -289,18 +289,12 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: TestVars -> Env -> Either (Name Core) TestEnv
+getTestEnv :: Member (Error EvalError) r => TestVars -> Env -> Sem r TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> Left name
-    -- Note, previously this had a type like
-    --
-    -- Member (Error EvalError) r => ... -> Sem r TestEnv
-    --
-    -- which was sensible, except we don't want this module to depend
-    -- on the Disco.Error module to avoid an import cycle.
+    Nothing -> throw (UnboundError name)
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition

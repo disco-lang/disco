@@ -21,7 +21,7 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, (%~), (?~), (^.))
+import           Control.Lens                     (view, (%~), (.~), (?~), (^.))
 import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
@@ -458,9 +458,20 @@ handleLoad ::
   Sem r Bool
 handleLoad fp = do
   let (directory, modName) = splitFileName fp
+
+  -- Reset top-level module map and context to empty, so we start
+  -- fresh and pick up any changes to imported modules etc.
+  modify @TopInfo $ topModMap .~ M.empty
+  modify @TopInfo $ topEnv .~ Ctx.emptyCtx
+
+  -- Load the module.
   m <- inputToState @TopInfo $ loadDiscoModule False (FromDir directory) modName
   setREPLModule m
+
+  -- Now run any tests
   t <- inputToState $ runAllTests (m ^. miProps)
+
+  -- Remember which was the most recently loaded file, so we can :reload
   modify @TopInfo (lastFile ?~ fp)
   outputLn "Loaded."
   return t

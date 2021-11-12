@@ -32,7 +32,6 @@ import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
 import           Disco.Names                      (QName)
-import           Disco.Syntax.Operators           (BOp)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number

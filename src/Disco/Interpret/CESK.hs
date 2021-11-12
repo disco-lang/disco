@@ -20,6 +20,8 @@ module Disco.Interpret.CESK
   )
 where
 
+import           Text.Show.Pretty                   (ppShow)
+
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 import           Control.Arrow                      ((***))
@@ -143,8 +145,8 @@ runCESK cesk = case isFinal cesk of
 
 (!!!) :: (Show a, Show b) => Ctx a b -> QName a -> b
 ctx !!! x = case Ctx.lookup' x ctx of
-  Nothing -> error $ "variable " ++ show x ++ " not found in environment"
-    ++ show ctx
+  Nothing -> error $ "variable " ++ show x ++ " not found in environment\n"
+    ++ ppShow (Ctx.keysSet ctx)
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
@@ -205,7 +207,7 @@ step cesk = case cesk of
     return $ Out v k
   (Out v (FTest vs e : k)) -> do
     result <- failTestOnError (ensureProp v)
-    e' <- either (throw . UnboundError) return $ getTestEnv vs e
+    e' <- getTestEnv vs e
     return $ Out (VProp $ extendPropEnv e' result) k
   (In c _ (k:_)) -> error $ "bad step: In " ++ show c ++ "\n" ++ show k
   (Out v k) -> error $ "bad step: Out " ++ (take 100 (show v) ++ "...") ++ "\n" ++ show k

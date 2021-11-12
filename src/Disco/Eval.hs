@@ -48,7 +48,7 @@ module Disco.Eval
 import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
 import           Control.Lens             (makeLenses, toListOf, view, (%~),
-                                           (.~), (^.), (^..))
+                                           (.~), (^.))
 import           Control.Monad            (unless, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
@@ -64,7 +64,6 @@ import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
-import           Disco.Effects.State      (zoom)
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Fail
@@ -105,7 +104,7 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 type TopEffects = '[Error DiscoError, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
 
 -- | Effects needed for evaluation.
-type EvalEffects = [Fail, Error EvalError, Random, LFresh, Output Debug, State Mem]
+type EvalEffects = [Error EvalError, Random, LFresh, Output Debug, State Mem]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
 
@@ -132,7 +131,7 @@ data TopInfo = TopInfo
 
   , _topEnv      :: Env
     -- ^ Top-level environment mapping names to values.  Set by
-    --   'loadDefs'.  Use it when evaluating with 'withTopEnv'.
+    --   'loadDefs'.
 
   , _topModMap   :: Map ModuleName ModuleInfo
     -- ^ Mapping from loaded module names to their 'ModuleInfo'
@@ -266,11 +265,10 @@ typecheckTop tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule
-  :: Members '[State TopInfo, Output String, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> FilePath -> Sem r ModuleInfo
-loadDiscoModule quiet resolver m =
-  inputToState @TopInfo . zoom topModMap
-    $ loadDiscoModule' quiet resolver S.empty m
+loadDiscoModule quiet resolver =
+  loadDiscoModule' quiet resolver S.empty
 
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
 --   instead of loading a module from disk by name.  Also, check it in
@@ -278,18 +276,17 @@ loadDiscoModule quiet resolver m =
 --   module loaded from disk).  Used for e.g. blocks/modules entered
 --   at the REPL prompt.
 loadParsedDiscoModule
-  :: Members '[State TopInfo, Output String, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> ModuleName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule quiet resolver name m =
-  inputToState @TopInfo . zoom topModMap
-    $ loadParsedDiscoModule' quiet REPL resolver S.empty name m
+loadParsedDiscoModule quiet resolver =
+  loadParsedDiscoModule' quiet REPL resolver S.empty
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (Map ModuleName ModuleInfo)] r
+  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> S.Set ModuleName -> FilePath
   -> Sem r ModuleInfo
 loadDiscoModule' quiet resolver inProcess modPath  = do
@@ -297,7 +294,7 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
                   >>= maybe (throw $ ModuleNotFound modPath) return
   let name = Named prov modPath
   when (S.member name inProcess) (throw $ CyclicImport name)
-  modMap <- get
+  modMap <- gets @TopInfo (view topModMap)
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
@@ -317,7 +314,7 @@ stdLib = ["list", "container"]
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule'
-  :: Members '[Input TopInfo, Output String, Error DiscoError, Embed IO, State (Map ModuleName ModuleInfo)] r
+  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
 
@@ -330,9 +327,9 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   let modImps = M.fromList (map (view miName &&& id) (mis ++ stdmis))
 
   -- Get context and type definitions from the REPL, in case we are in REPL mode.
-  topImports <- inputs (view (replModInfo . miImports))
-  topTyCtx   <- inputs (view (replModInfo . miTys))
-  topTyDefns <- inputs (view (replModInfo . miTydefs))
+  topImports <- gets (view (replModInfo . miImports))
+  topTyCtx   <- gets (view (replModInfo . miTys))
+  topTyDefns <- gets (view (replModInfo . miTydefs))
 
   -- Choose the contexts to use based on mode: if we are loading a
   -- standalone module, we should start it in an empty context.  If we
@@ -344,7 +341,12 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
 
   -- Typecheck (and resolve names in) the module.
   m  <- runTCMWith tyctx tydefns $ checkModule name importMap cm
-  modify (M.insert name m)
+
+  -- Evaluate all the module definitions and add them to the topEnv.
+  mapError EvalErr $ loadDefsFrom m
+
+  -- Record the ModuleInfo record in the top-level map.
+  modify (topModMap %~ M.insert name m)
   return m
 
 -- | Try loading the contents of a file from the filesystem, emitting
@@ -362,8 +364,6 @@ addToREPLModule
   :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Debug] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
-  mapError EvalErr $ loadDefsFrom mi
-
   curMI <- gets @TopInfo (view replModInfo)
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
   modify @TopInfo $ replModInfo .~ mi'
@@ -377,8 +377,6 @@ setREPLModule
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi
-  modify @TopInfo $ topEnv .~ Ctx.emptyCtx
-  loadDefsFrom mi
 
 -- | Populate various pieces of the top-level info record (docs, type
 --   context, type and term definitions) from the 'ModuleInfo' record
@@ -389,16 +387,13 @@ loadDefsFrom ::
   ModuleInfo ->
   Sem r ()
 loadDefsFrom mi = do
-  let tmds = mi ^. miTermdefs
-      imptmds = mi ^.. miImports . traverse . miTermdefs
-      defsToLoad = concatMap compileDefns imptmds <> compileDefns tmds
 
   -- Note that the compiled definitions we get back from compileDefns
   -- are topologically sorted by mutually recursive group. Each
   -- definition needs to be evaluated in an environment containing the
   -- previous ones.
 
-  mapM_ (uncurry loadDef) defsToLoad
+  mapM_ (uncurry loadDef) (compileDefns (mi ^. miTermdefs))
 
 loadDef ::
   Members '[State TopInfo, Random, Error EvalError, State Mem] r =>

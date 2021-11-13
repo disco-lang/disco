@@ -106,8 +106,6 @@ discoMain = do
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
   runDisco $ do
-    -- XXX! What to do with this?
-    -- forM_ stdLib $ loadDiscoModule True FromStdlib >=> addModule Standalone
     case checkFile opts of
       Just file -> do
         res <- handleLoad file

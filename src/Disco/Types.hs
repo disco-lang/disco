@@ -590,6 +590,8 @@ isFiniteTy ty
   | Just _ <- countType ty = True
   | otherwise              = False
 
+-- XXX coinductively check whether user-defined types are searchable
+--   e.g.  L = Unit + N * L  ought to be searchable.
 -- | Decide whether a type is searchable, i.e. effectively enumerable.
 isSearchable :: Type -> Bool
 isSearchable TyProp         = False

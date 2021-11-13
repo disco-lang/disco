@@ -16,7 +16,7 @@ module Disco.Eval
        (
          -- * Effects
 
-         EvalEffects, Debug, debug
+         EvalEffects, Debug(..), debug
        , DiscoEffects
 
          -- * Top-level info record and associated lenses

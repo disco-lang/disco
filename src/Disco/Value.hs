@@ -1,4 +1,3 @@
-
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -64,15 +63,9 @@ import           Disco.Error
 import           Disco.Names
 import           Disco.Types
 
-import           Disco.Effects.LFresh
-import           Disco.Effects.Random
 import           Polysemy
-import           Polysemy.Error
-import           Polysemy.Fail
-import           Polysemy.Output
-import           Polysemy.Reader
 import           Polysemy.State
-import           Unbound.Generics.LocallyNameless (AnyName (..), Name)
+import           Unbound.Generics.LocallyNameless (Name)
 
 ------------------------------------------------------------
 -- Value type

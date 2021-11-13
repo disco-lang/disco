@@ -25,7 +25,7 @@ module Disco.Pretty
 import           Prelude                          hiding ((<>))
 
 import           Data.Bifunctor
-import           Data.Char                        (chr, isAlpha, toLower)
+import           Data.Char                        (isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -40,10 +40,8 @@ import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
                                                    unembed)
 
 import           Disco.AST.Core                   (RationalDisplay (..))
-import           Disco.AST.Generic                (selectSide)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Eval                       (TopInfo, replModInfo)
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
@@ -445,7 +443,7 @@ prettyValue (TyList ty) (vlist id -> xs)     = do
 prettyValue ty@(_ :*: _) v                   = parens (prettyTuple ty v)
 prettyValue (ty1 :+: _) (VInj L v)           = "left"  <> prettyVP ty1 v
 prettyValue (_ :+: ty2) (VInj R v)           = "right" <> prettyVP ty2 v
-prettyValue ty (VNum d r)
+prettyValue _ (VNum d r)
   | denominator r == 1                       = text $ show (numerator r)
   | otherwise                                = text $ case d of
       Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
@@ -632,6 +630,7 @@ prettyTestEnv s (TestEnv vs) = do
       output (replicate (maxNameLen - length x) ' ')
       output " = "
       outputLn =<< renderDoc (prettyValue ty v)
+
 
 
 

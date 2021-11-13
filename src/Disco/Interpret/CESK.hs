@@ -226,8 +226,6 @@ step cesk = case cesk of
     case res of
       Left err -> return $ Up err k
       Right e' -> return $ Out (VProp $ extendPropEnv e' result) k
-  (In c _ (k:_)) -> error $ "bad step: In " ++ show c ++ "\n" ++ show k
-  (Out v k) -> error $ "bad step: Out " ++ (take 100 (show v) ++ "...") ++ "\n" ++ show k
 
 ------------------------------------------------------------
 -- Interpreting constants
@@ -303,13 +301,13 @@ appConst k = \case
   OMultinom -> arity2 multinomOp >=> out
     where
       multinomOp :: Value -> Value -> Sem r Value
-      multinomOp (vint -> n) (vlist vint -> ks) = return . intv $ multinomial n ks
+      multinomOp (vint -> n0) (vlist vint -> ks0) = return . intv $ multinomial n0 ks0
         where
           multinomial :: Integer -> [Integer] -> Integer
           multinomial _ [] = 1
-          multinomial n (k : ks)
-            | k > n = 0
-            | otherwise = choose n k * multinomial (n - k) ks
+          multinomial n (k' : ks)
+            | k' > n = 0
+            | otherwise = choose n k' * multinomial (n - k') ks
   OFact -> numOp1' factOp >>> outWithErr
     where
       factOp :: Member (Error EvalError) r => Rational -> Sem r Value
@@ -350,10 +348,10 @@ appConst k = \case
     where
       choices :: [(Value, Integer)] -> [([(Value, Integer)], Integer)]
       choices [] = [([], 1)]
-      choices ((x, n) : xs) = xs' ++ concatMap (\k -> map (cons n (x, k)) xs') [1 .. n]
+      choices ((x, n) : xs) = xs' ++ concatMap (\k' -> map (cons n (x, k')) xs') [1 .. n]
         where
           xs' = choices xs
-      cons n (x, k) (zs, m) = ((x, k) : zs, choose n k * m)
+      cons n (x, k') (zs, m) = ((x, k') : zs, choose n k' * m)
   OBagElem -> arity2 $ \x (VBag xs) ->
     out . enumv . isJust . find (valEq x) . map fst $ xs
   OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
@@ -385,7 +383,6 @@ appConst k = \case
   OBagToList -> \(VBag cs) -> out . listv id . concatMap (uncurry (flip (replicate . fromIntegral))) $ cs
   OListToSet -> out . VBag . (map . fmap) (const 1) . countValues . vlist id
   OListToBag -> out . VBag . countValues . vlist id
-  -- Bag a -> Set (a, N)
   OBagToCounts -> \(VBag cs) -> out . VBag . map ((,1) . pairv id intv) $ cs
   -- Bag (a, N) -> Bag a
   --   Notionally this takes a set of pairs instead of a bag, but operationally we need to
@@ -410,11 +407,11 @@ appConst k = \case
     where
       convertAssoc (VPair k v) = (toSimpleValue k, v)
 
-  OInsert -> arity3 $ \k v (VMap m) ->
-    out . VMap . M.insert (toSimpleValue k) v $ m
+  OInsert -> arity3 $ \k' v (VMap m) ->
+    out . VMap . M.insert (toSimpleValue k') v $ m
 
-  OLookup -> arity2 $ \k (VMap m) ->
-    out . toMaybe . M.lookup (toSimpleValue k) $ m
+  OLookup -> arity2 $ \k' (VMap m) ->
+    out . toMaybe . M.lookup (toSimpleValue k') $ m
     where
       toMaybe = maybe (VInj L VUnit) (VInj R)
 

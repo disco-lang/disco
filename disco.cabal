@@ -36,8 +36,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-prim/input
                      test/arith-round/expected
                      test/arith-round/input
-                     test/bag-ops/expected
-                     test/bag-ops/input
                      test/case-arith/case-arith.disco
                      test/case-arith/expected
                      test/case-arith/input
@@ -49,12 +47,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/input
                      test/compile-cons/expected
                      test/compile-cons/input
-                     test/container-comp/expected
-                     test/container-comp/input
-                     test/container-ops/expected
-                     test/container-ops/input
                      test/containers-cmp/expected
                      test/containers-cmp/input
+                     test/containers-comp/expected
+                     test/containers-comp/input
                      test/containers-convert/expected
                      test/containers-convert/input
                      test/containers-each/expected
@@ -67,6 +63,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-join/input
                      test/containers-merge/expected
                      test/containers-merge/input
+                     test/containers-ops/expected
+                     test/containers-ops/input
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
@@ -143,24 +141,24 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/prop-basic/prop-basic.disco
                      test/prop-cmp/expected
                      test/prop-cmp/input
+                     test/prop-fail/bad-tests.disco
+                     test/prop-fail/expected
+                     test/prop-fail/input
                      test/prop-fairness/expected
                      test/prop-fairness/input
+                     test/prop-higher-order/expected
+                     test/prop-higher-order/higher-order.disco
+                     test/prop-higher-order/input
                      test/prop-holds/expected
                      test/prop-holds/input
                      test/prop-impredicative/expected
                      test/prop-impredicative/input
                      test/prop-impredicative/prop-impredicative.disco
+                     test/prop-tests/expected
+                     test/prop-tests/input
+                     test/prop-tests/prop-tests.disco
                      test/prop-type/expected
                      test/prop-type/input
-                     test/props-basic/expected
-                     test/props-basic/input
-                     test/props-basic/props-basic.disco
-                     test/props-fail/bad-tests.disco
-                     test/props-fail/expected
-                     test/props-fail/input
-                     test/props-higher-order/expected
-                     test/props-higher-order/higher-order.disco
-                     test/props-higher-order/input
                      test/repl-ann/expected
                      test/repl-ann/input
                      test/repl-compile/expected

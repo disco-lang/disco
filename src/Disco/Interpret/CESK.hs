@@ -24,7 +24,7 @@ import           Text.Show.Pretty                   (ppShow)
 
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
-import           Control.Arrow                      ((***))
+import           Control.Arrow                      ((***), (>>>))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
 import           Data.List                          (find)
@@ -130,18 +130,25 @@ data CESK
     --   (and sometimes on the value as well), to see what is to be done
     --   with the value.
     Out Value Cont
+  | -- | There is also an 'Up' constructor representing an exception
+    --   that is propagating up the continuation stack.  Disco does
+    --   not have user-level exceptions or try/catch blocks etc., but
+    --   exceptions may be caught by test frames and turned into a
+    --   test result rather than crashing the entire computation.
+    Up EvalError Cont
   deriving (Show)
 
 -- | Is the CESK machine in a final state?
-isFinal :: CESK -> Maybe Value
-isFinal (Out v []) = Just v
+isFinal :: CESK -> Maybe (Either EvalError Value)
+isFinal (Up e [])  = Just (Left e)
+isFinal (Out v []) = Just (Right v)
 isFinal _          = Nothing
 
 -- | Run a CESK machine to completion.
-runCESK :: Members '[Fresh, Random, Error EvalError, State Mem] r => CESK -> Sem r Value
+runCESK :: Members '[Fresh, Random, State Mem] r => CESK -> Sem r (Either EvalError Value)
 runCESK cesk = case isFinal cesk of
-  Just vm -> return vm
-  Nothing -> step cesk >>= runCESK
+  Just res -> return res
+  Nothing  -> step cesk >>= runCESK
 
 (!!!) :: (Show a, Show b) => Ctx a b -> QName a -> b
 ctx !!! x = case Ctx.lookup' x ctx of
@@ -150,11 +157,11 @@ ctx !!! x = case Ctx.lookup' x ctx of
   Just v  -> v
 
 -- | Advance the CESK machine by one step.
-step :: Members '[Fresh, Random, Error EvalError, State Mem] r => CESK -> Sem r CESK
+step :: Members '[Fresh, Random, State Mem] r => CESK -> Sem r CESK
 step cesk = case cesk of
   (In (CVar x) e k) -> return $ Out (e !!! x) k
   (In (CNum d r) _ k) -> return $ Out (VNum d r) k
-  (In (CConst OMatchErr) _ _) -> throw NonExhaustive
+  (In (CConst OMatchErr) _ k) -> return $ Up NonExhaustive k
   (In (CConst op) _ k) -> return $ Out (VConst op) k
   (In (CInj s c) e k) -> return $ In c e (FInj s : k)
   (In (CCase c b1 b2) e k) -> return $ In c e (FCase e b1 b2 : k)
@@ -172,6 +179,7 @@ step cesk = case cesk of
     return $ Out (foldr (VPair . VRef) VUnit locs) k
   (In (CForce c) e k) -> return $ In c e (FForce : k)
   (In (CTest vars c) e k) -> return $ In c e (FTest (TestVars vars) e : k)
+
   (Out v (FInj s : k)) -> return $ Out (VInj s v) k
   (Out (VInj L v) (FCase e b1 _ : k)) -> do
     (x, c1) <- unbind b1
@@ -207,16 +215,19 @@ step cesk = case cesk of
   (Out v (FUpdate n : k)) -> do
     set n (V v)
     return $ Out v k
+
+  (Up err (f@FTest{} : k)) ->
+    return $ Out (VProp (VPDone (TestResult False (TestRuntimeError err) emptyTestEnv))) (f : k)
+  (Up err (_ : ks)) -> return $ Up err ks
+
   (Out v (FTest vs e : k)) -> do
-    result <- failTestOnError (ensureProp v)
-    e' <- getTestEnv vs e
-    return $ Out (VProp $ extendPropEnv e' result) k
+    let result = ensureProp v
+        res    = getTestEnv vs e
+    case res of
+      Left err -> return $ Up err k
+      Right e' -> return $ Out (VProp $ extendPropEnv e' result) k
   (In c _ (k:_)) -> error $ "bad step: In " ++ show c ++ "\n" ++ show k
   (Out v k) -> error $ "bad step: Out " ++ (take 100 (show v) ++ "...") ++ "\n" ++ show k
-
-failTestOnError :: Member (Error EvalError) r => Sem r ValProp -> Sem r ValProp
-failTestOnError m = catch m $ \e ->
-  return $ VPDone (TestResult False (TestRuntimeError e) emptyTestEnv)
 
 ------------------------------------------------------------
 -- Interpreting constants
@@ -231,13 +242,13 @@ arity3 f (VPair x (VPair y z)) = f x y z
 arity3 _f _v                   = error "arity3 on a non-triple!"
 
 appConst
-  :: Members '[Random, Error EvalError, State Mem] r
+  :: Members '[Random, State Mem] r
   => Cont -> Op -> Value -> Sem r CESK
 appConst k = \case
   --------------------------------------------------
   -- Basics
 
-  OCrash -> throw . Crash . vlist vchar
+  OCrash -> up . Crash . vlist vchar
   OId -> out
   --------------------------------------------------
   -- Arithmetic
@@ -249,13 +260,13 @@ appConst k = \case
   OCeil -> numOp1 ((% 1) . ceiling) >=> out
   OAbs -> numOp1 abs >=> out
   OMul -> numOp2 (*) >=> out
-  ODiv -> numOp2' divOp >=> out
+  ODiv -> numOp2' divOp >>> outWithErr
     where
       divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       divOp _ 0 = throw DivByZero
       divOp m n = return $ ratv (m / n)
   OExp -> (numOp2 $ \m n -> m ^^ numerator n) >=> out
-  OMod -> numOp2' modOp >=> out
+  OMod -> numOp2' modOp >>> outWithErr
     where
       modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       modOp m n
@@ -271,7 +282,7 @@ appConst k = \case
   -- Number theory
 
   OIsPrime -> intOp1 (enumv . isPrime) >=> out
-  OFactor -> intOp1' primFactor >=> out
+  OFactor -> intOp1' primFactor >>> outWithErr
     where
       -- Semantics of the @$factor@ prim: turn a natural number into its
       -- bag of prime factors.  Crash if called on 0, which does not have
@@ -299,7 +310,7 @@ appConst k = \case
           multinomial n (k : ks)
             | k > n = 0
             | otherwise = choose n k * multinomial (n - k) ks
-  OFact -> numOp1' factOp >=> out
+  OFact -> numOp1' factOp >>> outWithErr
     where
       factOp :: Member (Error EvalError) r => Rational -> Sem r Value
       factOp (numerator -> n)
@@ -347,24 +358,21 @@ appConst k = \case
     out . enumv . isJust . find (valEq x) . map fst $ xs
   OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
 
-  OEachSet -> arity2 $ \f (VBag xs) -> do
-    xs' <- mapM (evalApp f . (:[]) . fst) xs
-    out . VBag . countValues $ xs'
+  OEachSet -> arity2 $ \f (VBag xs) -> outWithErr $
+    (VBag . countValues) <$> mapM (evalApp f . (:[]) . fst) xs
 
-  OEachBag -> arity2 $ \f (VBag xs) -> do
-    xs' <- mapM (\(x,n) -> (,n) <$> evalApp f [x]) xs
-    out . VBag . sortNCount $ xs'
+  OEachBag -> arity2 $ \f (VBag xs) -> outWithErr $
+    (VBag . sortNCount) <$> mapM (\(x,n) -> (,n) <$> evalApp f [x]) xs
 
-  OFilterBag -> arity2 $ \f (VBag xs) -> do
+  OFilterBag -> arity2 $ \f (VBag xs) -> outWithErr $ do
     bs <- mapM (evalApp f . (:[]) . fst) xs
-    out . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
+    return . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
     where
       isTrue (VInj R VUnit) = True
       isTrue _              = False
 
   OMerge -> arity3 $ \f (VBag xs) (VBag ys) -> do
-    zs <- mergeM f xs ys
-    out . VBag $ zs
+    outWithErr (VBag <$> mergeM f xs ys)
 
   OBagUnions -> \(VBag cts) ->
     out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
@@ -425,14 +433,17 @@ appConst k = \case
 
   OForall tys -> out . (\v -> VProp (VPSearch SMForall tys v emptyTestEnv ))
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv ))
-  OHolds -> testProperty Exhaustive >=> resultToBool >=> out
-  ONotProp -> ensureProp >=> (out . VProp . notProp)
+  OHolds -> testProperty Exhaustive >=> resultToBool >>> outWithErr
+  ONotProp -> out . VProp . notProp . ensureProp
   OShouldEq ty -> arity2 $ \v1 v2 ->
     out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where
+    outWithErr :: Sem (Error EvalError ': r) Value -> Sem r CESK
+    outWithErr m = either (`Up` k) (`Out` k) <$> runError m
     out v = return $ Out v k
+    up e  = return $ Up e k
 
 --------------------------------------------------
 -- Arithmetic
@@ -626,7 +637,6 @@ merge g = go
       0 -> zs
       n -> (a, n) : zs
 
-
 mergeM ::
   Members '[Random, Error EvalError, State Mem] r =>
   Value ->
@@ -644,8 +654,8 @@ mergeM g = go
       GT -> mergeCons y 0 n2 =<< go ((x, n1) : xs) ys
 
     mergeCons a m1 m2 zs = do
-      n <- evalApp g [VPair (intv m1) (intv m2)]
-      return $ case n of
+      nm <- evalApp g [VPair (intv m1) (intv m2)]
+      return $ case nm of
         VNum _ 0 -> zs
         VNum _ n -> (a, numerator n) : zs
 
@@ -662,19 +672,19 @@ notProp (VPDone r)            = VPDone (invertPropResult r)
 notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
-ensureProp :: Member (Error EvalError) r => Value -> Sem r ValProp
-ensureProp (VProp p)  = return p
-ensureProp (VInj L _) = return $ VPDone (TestResult False TestBool emptyTestEnv)
-ensureProp (VInj R _) = return $ VPDone (TestResult True TestBool emptyTestEnv)
+ensureProp :: Value -> ValProp
+ensureProp (VProp p)  = p
+ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
+ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _          = error "ensureProp: non-prop value" -- XXX! use real error
 
 testProperty
-  :: Members '[Random, Error EvalError, State Mem] r
+  :: Members '[Random, State Mem] r
   => SearchType -> Value -> Sem r TestResult
-testProperty initialSt = ensureProp >=> checkProp
+testProperty initialSt = checkProp . ensureProp
   where
     checkProp
-      :: Members '[Random, Error EvalError, State Mem] r
+      :: Members '[Random, State Mem] r
       => ValProp -> Sem r TestResult
     checkProp (VPDone r) = return r
     checkProp (VPSearch sm tys f e) =
@@ -684,17 +694,18 @@ testProperty initialSt = ensureProp >=> checkProp
         (SearchMotive (whenFound, wantsSuccess)) = sm
 
         go
-          :: Members '[Error EvalError, Random, State Mem] r
+          :: Members '[Random, State Mem] r
           => ([[Value]], SearchType) -> Sem r TestResult
         go ([], st)   = return $ TestResult (not whenFound) (TestNotFound st) emptyTestEnv
         go (x:xs, st) = do
-          prop <- ensureProp =<< evalApp f x
-          case prop of
-            VPDone r    -> continue st xs r
-            VPSearch {} -> checkProp prop >>= continue st xs
+          mprop <- runError (ensureProp <$> evalApp f x)
+          case mprop of
+            Left err    -> return $ TestResult False (TestRuntimeError err) emptyTestEnv
+            Right (VPDone r) -> continue st xs r
+            Right prop       -> checkProp prop >>= continue st xs
 
         continue
-          :: Members '[Random, Error EvalError, State Mem] r
+          :: Members '[Random, State Mem] r
           => SearchType -> [[Value]] -> TestResult -> Sem r TestResult
         continue st xs r@(TestResult _ _ e')
           | testIsError r              = return r
@@ -705,8 +716,8 @@ testProperty initialSt = ensureProp >=> checkProp
 evalApp
   :: Members '[Random, Error EvalError, State Mem] r
   => Value -> [Value] -> Sem r Value
-evalApp f xs = do
-  runFresh $ runCESK (Out f (map FArgV xs))
+evalApp f xs =
+  runFresh (runCESK (Out f (map FArgV xs))) >>= either throw return
 
 runTest
   :: Members '[Random, Error EvalError, Input Env, State Mem] r
@@ -722,4 +733,4 @@ runTest n p = testProperty (Randomized n' n') =<< eval (compileProperty p)
 eval :: Members '[Random, Error EvalError, Input Env, State Mem] r => Core -> Sem r Value
 eval c = do
   e <- input @Env
-  runFresh $ runCESK (In c e [])
+  runFresh (runCESK (In c e [])) >>= either throw return

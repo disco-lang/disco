@@ -289,12 +289,12 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
-getTestEnv :: Member (Error EvalError) r => TestVars -> Env -> Sem r TestEnv
+getTestEnv :: TestVars -> Env -> Either EvalError TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> throw (UnboundError name)
+    Nothing -> Left (UnboundError name)
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition

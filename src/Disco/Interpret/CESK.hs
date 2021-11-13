@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -fmax-pmcheck-models=200 #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -104,7 +105,7 @@ data Frame
     FForce
   | -- | Update the contents of a memory cell with its evaluation.
     FUpdate Int
-  | -- | XXX blah blah test
+  | -- | Record the results of a test.
     FTest TestVars Env
   deriving (Show)
 
@@ -227,13 +228,15 @@ step cesk = case cesk of
       Left err -> return $ Up err k
       Right e' -> return $ Out (VProp $ extendPropEnv e' result) k
 
+  _ -> error "Impossible! Bad CESK machine state"
+
 ------------------------------------------------------------
 -- Interpreting constants
 ------------------------------------------------------------
 
 arity2 :: (Value -> Value -> a) -> Value -> a
 arity2 f (VPair x y) = f x y
-arity2 _f _v         = error "arity2 on a non-pair!" -- XXX
+arity2 _f _v         = error "arity2 on a non-pair!"
 
 arity3 :: (Value -> Value -> Value -> a) -> Value -> a
 arity3 f (VPair x (VPair y z)) = f x y z
@@ -263,14 +266,14 @@ appConst k = \case
       divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       divOp _ 0 = throw DivByZero
       divOp m n = return $ ratv (m / n)
-  OExp -> (numOp2 $ \m n -> m ^^ numerator n) >=> out
+  OExp -> numOp2 (\m n -> m ^^ numerator n) >=> out
   OMod -> numOp2' modOp >>> outWithErr
     where
       modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
       modOp m n
         | n == 0 = throw DivByZero
         | otherwise = return $ intv (numerator m `mod` numerator n)
-  ODivides -> (numOp2' $ \m n -> return (enumv $ divides m n)) >=> out
+  ODivides -> numOp2' (\m n -> return (enumv $ divides m n)) >=> out
     where
       divides 0 0 = True
       divides 0 _ = False
@@ -318,7 +321,7 @@ appConst k = \case
     where
       enumOp :: Value -> Value
       enumOp (VType ty) = listv id (enumerateType ty)
-      enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v -- XXX
+      enumOp v          = error $ "Impossible! enumOp on non-type " ++ show v
   OCount -> out . countOp
     where
       countOp :: Value -> Value
@@ -341,10 +344,8 @@ appConst k = \case
   --------------------------------------------------
   -- Container operations
 
-  OSize -> out . sizeOp
-    where
-      sizeOp (VBag xs) = intv (sum (map snd xs))
-  OPower -> \(VBag xs) -> out . VBag . sortNCount . map (first VBag) . choices $ xs
+  OSize -> withBag OSize $ out . intv . sum . map snd
+  OPower -> withBag OPower $ out . VBag . sortNCount . map (first VBag) . choices
     where
       choices :: [(Value, Integer)] -> [([(Value, Integer)], Integer)]
       choices [] = [([], 1)]
@@ -352,38 +353,43 @@ appConst k = \case
         where
           xs' = choices xs
       cons n (x, k') (zs, m) = ((x, k') : zs, choose n k' * m)
-  OBagElem -> arity2 $ \x (VBag xs) ->
-    out . enumv . isJust . find (valEq x) . map fst $ xs
+  OBagElem -> arity2 $ \x -> withBag OBagElem $
+    out . enumv . isJust . find (valEq x) . map fst
   OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
 
-  OEachSet -> arity2 $ \f (VBag xs) -> outWithErr $
-    (VBag . countValues) <$> mapM (evalApp f . (:[]) . fst) xs
+  OEachSet -> arity2 $ \f -> withBag OEachSet $
+    outWithErr . fmap (VBag . countValues) . mapM (evalApp f . (:[]) . fst)
 
-  OEachBag -> arity2 $ \f (VBag xs) -> outWithErr $
-    (VBag . sortNCount) <$> mapM (\(x,n) -> (,n) <$> evalApp f [x]) xs
+  OEachBag -> arity2 $ \f -> withBag OEachBag $
+    outWithErr . fmap (VBag . sortNCount) . mapM (\(x,n) -> (,n) <$> evalApp f [x])
 
-  OFilterBag -> arity2 $ \f (VBag xs) -> outWithErr $ do
-    bs <- mapM (evalApp f . (:[]) . fst) xs
-    return . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
+  OFilterBag -> arity2 $ \f -> withBag OFilterBag $ \xs ->
+    outWithErr $ do
+      bs <- mapM (evalApp f . (:[]) . fst) xs
+      return . VBag . map snd . Prelude.filter (isTrue . fst) $ zip bs xs
     where
       isTrue (VInj R VUnit) = True
       isTrue _              = False
 
-  OMerge -> arity3 $ \f (VBag xs) (VBag ys) -> do
-    outWithErr (VBag <$> mergeM f xs ys)
+  OMerge -> arity3 $ \f bxs bys ->
+    case (bxs, bys) of
+      (VBag xs, VBag ys) -> outWithErr (VBag <$> mergeM f xs ys)
+      (VBag _, _) -> error $ "Impossible! OMerge on non-VBag " ++ show bys
+      _           -> error $ "Impossible! OMerge on non-VBag " ++ show bxs
 
-  OBagUnions -> \(VBag cts) ->
-    out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
+  OBagUnions -> \case
+    VBag cts -> out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
+    v -> error $ "Impossible! OBagUnions on non-VBag " ++ show v
 
   --------------------------------------------------
   -- Container conversions
 
-  OBagToSet -> \(VBag cs) -> out . VBag . (map . second) (const 1) $ cs
-  OSetToList -> \(VBag cs) -> out . listv id . map fst $ cs
-  OBagToList -> \(VBag cs) -> out . listv id . concatMap (uncurry (flip (replicate . fromIntegral))) $ cs
+  OBagToSet -> withBag OBagToSet $ out . VBag . (map . second) (const 1)
+  OSetToList -> withBag OSetToList $ out . listv id . map fst
+  OBagToList -> withBag OBagToList $ out . listv id . concatMap (uncurry (flip (replicate . fromIntegral)))
   OListToSet -> out . VBag . (map . fmap) (const 1) . countValues . vlist id
   OListToBag -> out . VBag . countValues . vlist id
-  OBagToCounts -> \(VBag cs) -> out . VBag . map ((,1) . pairv id intv) $ cs
+  OBagToCounts -> withBag OBagToCounts $ out . VBag . map ((,1) . pairv id intv)
   -- Bag (a, N) -> Bag a
   --   Notionally this takes a set of pairs instead of a bag, but operationally we need to
   --   be prepared for a bag, because of the way literal bags desugar, e.g.
@@ -391,10 +397,8 @@ appConst k = \case
   --   Disco> :desugar let x = 3 in ⟅ 'a' # (2 + x), 'b', 'b' ⟆
   --   (λx. bagFromCounts(bag(('a', 2 + x) :: ('b', 1) :: ('b', 1) :: [])))(3)
 
-  OCountsToBag -> \(VBag cs) ->
-    out . VBag . sortNCount
-      . map (second (uncurry (*)) . assoc . first (vpair id vint))
-      $ cs
+  OCountsToBag -> withBag OCountsToBag $
+    out . VBag . sortNCount . map (second (uncurry (*)) . assoc . first (vpair id vint))
     where
       assoc ((a, b), c) = (a, (b, c))
 
@@ -402,16 +406,17 @@ appConst k = \case
   -- Maps
 
   -- appConst (OMapToSet ty ty')                 = _w10
-  OSetToMap -> \(VBag xs) ->
-    out . VMap . M.fromList . map (convertAssoc . fst) $ xs
+  OSetToMap -> withBag OSetToMap $
+    out . VMap . M.fromList . map (convertAssoc . fst)
     where
-      convertAssoc (VPair k v) = (toSimpleValue k, v)
+      convertAssoc (VPair k' v) = (toSimpleValue k', v)
+      convertAssoc v = error $ "Impossible! convertAssoc on non-VPair " ++ show v
 
-  OInsert -> arity3 $ \k' v (VMap m) ->
-    out . VMap . M.insert (toSimpleValue k') v $ m
+  OInsert -> arity3 $ \k' v -> withMap OInsert $
+    out . VMap . M.insert (toSimpleValue k') v
 
-  OLookup -> arity2 $ \k' (VMap m) ->
-    out . toMaybe . M.lookup (toSimpleValue k') $ m
+  OLookup -> arity2 $ \k' -> withMap OLookup $
+    out . toMaybe . M.lookup (toSimpleValue k')
     where
       toMaybe = maybe (VInj L VUnit) (VInj R)
 
@@ -442,6 +447,16 @@ appConst k = \case
     out v = return $ Out v k
     up e  = return $ Up e k
 
+    withBag :: Op -> ([(Value,Integer)] -> Sem r a) -> Value -> Sem r a
+    withBag op f = \case
+      VBag xs -> f xs
+      v       -> error $ "Impossible! " ++ show op ++ " on non-VBag " ++ show v
+
+    withMap :: Op -> (M.Map SimpleValue Value -> Sem r a) -> Value -> Sem r a
+    withMap op f = \case
+      VMap m -> f m
+      v      -> error $ "Impossible! " ++ show op ++ " on non-VMap " ++ show v
+
 --------------------------------------------------
 -- Arithmetic
 
@@ -456,17 +471,21 @@ numOp1 f = numOp1' $ return . ratv . f
 
 numOp1' :: (Rational -> Sem r Value) -> Value -> Sem r Value
 numOp1' f (VNum _ m) = f m
+numOp1' _ v          = error $ "Impossible! numOp1' on non-VNum " ++ show v
 
 numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
 numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))
 
 numOp2' :: (Rational -> Rational -> Sem r Value) -> Value -> Sem r Value
 numOp2' (#) =
-  arity2 $ \(VNum d1 n1) (VNum d2 n2) -> do
-    res <- n1 # n2
-    case res of
-      VNum _ r -> return $ VNum (d1 <> d2) r
-      _        -> return res
+  arity2 $ \v1 v2 -> case (v1, v2) of
+    (VNum d1 n1, VNum d2 n2) -> do
+      res <- n1 # n2
+      case res of
+        VNum _ r -> return $ VNum (d1 <> d2) r
+        _        -> return res
+    (VNum{}, _) -> error $ "Impossible! numOp2' on non-VNum " ++ show v2
+    _           -> error $ "Impossible! numOp2' on non-VNum " ++ show v1
 
 -- | Perform a square root operation. If the program typechecks,
 --   then the argument and output will really be Natural.
@@ -655,6 +674,7 @@ mergeM g = go
       return $ case nm of
         VNum _ 0 -> zs
         VNum _ n -> (a, numerator n) : zs
+        v -> error $ "Impossible! merge function in mergeM returned non-VNum " ++ show v
 
 ------------------------------------------------------------
 -- Propositions / tests
@@ -673,7 +693,7 @@ ensureProp :: Value -> ValProp
 ensureProp (VProp p)  = p
 ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
-ensureProp _          = error "ensureProp: non-prop value" -- XXX! use real error
+ensureProp _          = error "ensureProp: non-prop value"
 
 testProperty
   :: Members '[Random, State Mem] r

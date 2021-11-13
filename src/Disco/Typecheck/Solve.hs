@@ -512,7 +512,6 @@ simplify tyDefns origVM cs
           ssSeen %= S.insert c
           simplifyOne' c
 
-    -- XXX comment me
     simplifyOne' :: SimpleConstraint -> SimplifyM ()
 
     -- If we have an equality constraint, run unification on it.  The

@@ -25,9 +25,6 @@ import           Unbound.Generics.LocallyNameless.Rebind
 -- Some orphan instances
 ------------------------------------------------------------
 
--- XXX move these into their own module to avoid cyclic import with
--- Disco.Types
-
 deriving instance (Data a, Data b) => Data (Bind a b)
 deriving instance Data t => Data (Embed t)
 deriving instance (Data a, Data b) => Data (Rebind a b)

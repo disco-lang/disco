@@ -206,7 +206,7 @@ step cesk = case cesk of
   (Out (VRef n) (FForce : k)) -> do
     cell <- lkup n
     case cell of
-      Nothing -> undefined -- XXX ?
+      Nothing -> error $ "impossible: location " ++ show n ++ " not found in memory"
       Just (V v) -> return $ Out v k
       Just (E e t) -> do
         set n Blackhole

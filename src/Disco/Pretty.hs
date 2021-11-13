@@ -166,9 +166,9 @@ prettyName = text . show
 
 -- | Pretty-print a term with guaranteed parentheses.
 prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
-prettyTermP t@TTup{}       = setPA initPA $ prettyTerm t
-prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
-prettyTermP t              = withPA initPA $ prettyTerm t
+prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
+-- prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
+prettyTermP t        = withPA initPA $ prettyTerm t
 
 -- | Pretty-print a term.
 prettyTerm :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
@@ -632,6 +632,10 @@ prettyTestEnv s (TestEnv vs) = do
       output (replicate (maxNameLen - length x) ' ')
       output " = "
       outputLn =<< renderDoc (prettyValue ty v)
+
+
+
+
 
 
 

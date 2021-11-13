@@ -21,3 +21,5 @@ insert(1, {"hi","there"}, insert(2, {}, insert(4, {"why","not","now"}, insert(2,
 insert(1, "A", insert(1, "B", map {}))
 insert(1, "B", insert(1, "A", map {}))
 insert("hi", 1, insert("there", 2, map {}))
+mapToSet(map{})
+mapToSet(insert("hi", 1, insert("there", 2, map {})))

@@ -19,3 +19,5 @@ map {(1, {"hi", "there"}), (2, {}), (4, {"not", "now", "why"})}
 map {(1, "A")}
 map {(1, "B")}
 map {("hi", 1), ("there", 2)}
+{}
+{("hi", 1), ("there", 2)}

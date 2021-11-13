@@ -405,7 +405,9 @@ appConst k = \case
   --------------------------------------------------
   -- Maps
 
-  -- appConst (OMapToSet ty ty')                 = _w10
+  OMapToSet -> withMap OMapToSet $
+    out . VBag . map (\(k',v) -> (VPair (fromSimpleValue k') v, 1)) . M.assocs
+
   OSetToMap -> withBag OSetToMap $
     out . VMap . M.fromList . map (convertAssoc . fst)
     where

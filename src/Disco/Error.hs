@@ -68,6 +68,9 @@ data EvalError where
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              EvalError
 
+  -- | Infinite loop detected via black hole.
+  InfiniteLoop  ::              EvalError
+
   -- | User-generated crash.
   Crash         :: String    -> EvalError
 

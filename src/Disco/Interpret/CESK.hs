@@ -211,7 +211,7 @@ step cesk = case cesk of
       Just (E e t) -> do
         set n Blackhole
         return $ In t e (FUpdate n : k)
-      Just Blackhole -> error "Infinite loop detected!" -- XXX make a real error
+      Just Blackhole -> return $ Up InfiniteLoop k
   (Out v (FUpdate n : k)) -> do
     set n (V v)
     return $ Out v k

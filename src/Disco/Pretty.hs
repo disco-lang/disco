@@ -556,74 +556,103 @@ digitalExpansion b n d = digits
 
 -- XXX redo with message framework, with proper support for indentation etc.
 
-prettyTestFailure :: Member (Output String) r => AProperty -> TestResult -> Sem r ()
-prettyTestFailure _ _ = output "test result (failure)"
--- prettyTestFailure _    (TestResult True _ _)    = return ()
--- prettyTestFailure prop (TestResult False r env) = do
---   prettyFailureReason prop r
---   prettyTestEnv "    Counterexample:" env
+prettyTestFailure
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
+prettyTestFailure _    (TestResult True _ _)    = return ()
+prettyTestFailure prop (TestResult False r env) = do
+  prettyFailureReason prop r
+  prettyTestEnv "    Counterexample:" env
 
-prettyTestResult :: Member (Output String) r => AProperty -> TestResult -> Sem r ()
-prettyTestResult _ tr = output $ "test result (todo): " ++ show tr
+prettyTestResult
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
+prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
+prettyTestResult prop (TestResult _ r _)   = do
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  output       "  - Test passed: " >> outputLn dp
+  prettySuccessReason r
 
--- prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
--- prettyTestResult prop (TestResult _ r _)   = do
---     dp <- renderDoc $ prettyProperty (eraseProperty prop)
---     output       "  - Test passed: " >> outputLn dp
---     prettySuccessReason r
+prettySuccessReason
+  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  => TestReason -> Sem r ()
+prettySuccessReason (TestFound (TestResult _ _ vs)) = do
+  prettyTestEnv "    Found example:" vs
+prettySuccessReason (TestNotFound Exhaustive) = do
+  outputLn     "    No counterexamples exist."
+prettySuccessReason (TestNotFound (Randomized n m)) = do
+  output       "    Checked "
+  output (show (n + m))
+  outputLn " possibilities without finding a counterexample."
+prettySuccessReason _ = return ()
 
--- prettySuccessReason :: Member (Output String) r => TestReason -> Sem r ()
--- prettySuccessReason (TestFound (TestResult _ _ vs)) = do
---   prettyTestEnv "    Found example:" vs
--- prettySuccessReason (TestNotFound Exhaustive) = do
---   outputLn     "    No counterexamples exist."
--- prettySuccessReason (TestNotFound (Randomized n m)) = do
---   output       "    Checked "
---   output (show (n + m))
---   outputLn " possibilities without finding a counterexample."
--- prettySuccessReason _ = return ()
+prettyFailureReason
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestReason -> Sem r ()
+prettyFailureReason prop TestBool = do
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  output     "  - Test is false: " >> outputLn dp
+prettyFailureReason prop (TestEqual ty v1 v2) = do
+  output     "  - Test result mismatch for: "
+  outputLn =<< renderDoc (prettyProperty (eraseProperty prop))
+  output     "    - Left side:  "
+  outputLn =<< renderDoc (prettyValue ty v2)
+  output     "    - Right side: "
+  outputLn =<< renderDoc (prettyValue ty v1)
+prettyFailureReason prop (TestRuntimeError e) = do
+  output     "  - Test failed: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  output     "    " >> printoutLn e
+prettyFailureReason prop (TestFound (TestResult _ r _)) = do
+  prettyFailureReason prop r
+prettyFailureReason prop (TestNotFound Exhaustive) = do
+  output     "  - No example exists: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  outputLn   "    All possible values were checked."
+prettyFailureReason prop (TestNotFound (Randomized n m)) = do
+  output     "  - No example was found: "
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  outputLn dp
+  output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
 
--- prettyFailureReason :: Member (Output String) r => AProperty -> TestReason -> Sem r ()
--- prettyFailureReason prop TestBool = do
---   dp <- renderDoc $ prettyProperty (eraseProperty prop)
---   output     "  - Test is false: " >> outputLn dp
--- prettyFailureReason prop (TestEqual ty v1 v2) = do
---   output     "  - Test result mismatch for: "
---   dp <- renderDoc $ prettyProperty (eraseProperty prop)
---   outputLn dp
---   output     "    - Left side:  " >> prettyValue ty v2
---   output     "    - Right side: " >> prettyValue ty v1
--- prettyFailureReason prop (TestRuntimeError e) = do
---   output     "  - Test failed: "
---   dp <- renderDoc $ prettyProperty (eraseProperty prop)
---   outputLn dp
---   output     "    " >> printoutLn e
--- prettyFailureReason prop (TestFound (TestResult _ r _)) = do
---   prettyFailureReason prop r
--- prettyFailureReason prop (TestNotFound Exhaustive) = do
---   output     "  - No example exists: "
---   dp <- renderDoc $ prettyProperty (eraseProperty prop)
---   outputLn dp
---   outputLn   "    All possible values were checked."
--- prettyFailureReason prop (TestNotFound (Randomized n m)) = do
---   output     "  - No example was found: "
---   dp <- renderDoc $ prettyProperty (eraseProperty prop)
---   outputLn dp
---   output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
+prettyTestEnv
+  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  => String -> TestEnv -> Sem r ()
+prettyTestEnv _ (TestEnv []) = return ()
+prettyTestEnv s (TestEnv vs) = do
+  outputLn s
+  mapM_ prettyBind vs
+  where
+    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
+    prettyBind (x, ty, v) = do
+      output "      "
+      output x
+      output (replicate (maxNameLen - length x) ' ')
+      output " = "
+      outputLn =<< renderDoc (prettyValue ty v)
 
--- prettyTestEnv :: Member (Output String) r => String -> TestEnv -> Sem r ()
--- prettyTestEnv _ (TestEnv []) = return ()
--- prettyTestEnv s (TestEnv vs) = do
---   outputLn s
---   mapM_ prettyBind vs
---   where
---     maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
---     prettyBind (x, ty, v) = do
---       output "      "
---       output x
---       output (replicate (maxNameLen - length x) ' ')
---       output " = "
---       prettyValue ty v
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

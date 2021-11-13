@@ -41,6 +41,7 @@ import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
 import           Polysemy
+import           Polysemy.Reader
 import           Polysemy.State
 
 import           Disco.AST.Surface
@@ -58,6 +59,7 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty)
+import           Disco.Pretty.Prec                (initPA)
 import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
@@ -499,7 +501,8 @@ runAllTests aprops
         True  -> outputLn " OK"
         False -> do
           outputLn ""
-          forM_ failures (uncurry prettyTestFailure)
+          tydefs <- inputs @TopInfo (view (replModInfo . miTydefs)) -- XXX!
+          forM_ failures (runInputConst tydefs . runReader initPA . uncurry prettyTestFailure)
       return (P.null failures)
 
 ------------------------------------------------------------
@@ -670,9 +673,10 @@ handleTest ::
   Sem r ()
 handleTest (TestProp t) = do
   at <- inputToState . typecheckTop $ checkProperty t
+  tydefs <- gets @TopInfo (view (replModInfo . miTydefs))  -- XXX! should be from imports too
   inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
-    prettyTestResult at r
+    runInputConst tydefs . runReader initPA $ prettyTestResult at r
 
 ------------------------------------------------------------
 -- :type

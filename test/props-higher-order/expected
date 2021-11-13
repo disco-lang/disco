@@ -5,9 +5,7 @@ Running tests...
 Loaded.
   - Test passed: ∀x. por(x =!= 0, ∃n. n * x ≥ 1)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: ∀f. any([f =!= ¬~, f =!= (λx. x), f =!= (λ_. false), f =!= (λ_. true)])
-    No counterexamples exist.
-  - Test is false: all([true, true, true, false, true])
+  - Test is false: all [true, true, true, false, true]
     Counterexample:
       and_side = right(■)
       and_side = right(■)

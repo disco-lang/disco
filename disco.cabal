@@ -171,6 +171,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-defns/input
                      test/repl-desugar/expected
                      test/repl-desugar/input
+                     test/repl-eval-tydef-import/a.disco
+                     test/repl-eval-tydef-import/b.disco
+                     test/repl-eval-tydef-import/expected
+                     test/repl-eval-tydef-import/input
                      test/repl-help/expected
                      test/repl-help/input
                      test/repl-import/expected
@@ -178,6 +182,7 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-names/expected
                      test/repl-names/input
                      test/repl-names/logic.disco
+                     test/repl-names/other.disco
                      test/repl-proptest/expected
                      test/repl-proptest/input
                      test/solver-issue112/diag-iso-bad.disco

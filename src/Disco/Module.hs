@@ -21,7 +21,8 @@ module Disco.Module where
 import           Data.Data                        (Data)
 import           GHC.Generics                     (Generic)
 
-import           Control.Lens                     (makeLenses)
+import           Control.Lens                     (Getting, foldOf, makeLenses,
+                                                   view)
 import           Control.Monad                    (filterM, foldM)
 import           Control.Monad.IO.Class           (MonadIO (..))
 import           Data.Bifunctor                   (first)
@@ -96,6 +97,19 @@ data ModuleInfo = ModuleInfo
 
 makeLenses ''ModuleInfo
 
+-- | Get something from a module and its direct imports.
+withImports :: Monoid a => Getting a ModuleInfo a -> ModuleInfo -> a
+withImports l = view l <> foldOf (miImports . traverse . l)
+
+-- | Get the types of all names bound in a module and its direct imports.
+allTys :: ModuleInfo -> TyCtx
+allTys = withImports miTys
+
+-- | Get all type definitions from a module and its direct imports.
+allTydefs :: ModuleInfo -> TyDefCtx
+allTydefs = withImports miTydefs
+
+-- | The empty module info record.
 emptyModuleInfo :: ModuleInfo
 emptyModuleInfo = ModuleInfo REPLModule M.empty emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
 

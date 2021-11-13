@@ -21,7 +21,8 @@ module Disco.Interactive.Commands
   ) where
 
 import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (view, (%~), (.~), (?~), (^.))
+import           Control.Lens                     (to, view, (%~), (.~), (?~),
+                                                   (^.))
 import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
@@ -58,7 +59,7 @@ import           Disco.Names
 import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
                                                    wholeModule, withExts)
-import           Disco.Pretty                     hiding (empty)
+import           Disco.Pretty                     hiding (empty, (<>))
 import           Disco.Pretty.Prec                (initPA)
 import           Disco.Property
 import           Disco.Syntax.Operators
@@ -388,7 +389,7 @@ evalTerm at = do
   env <- gets @TopInfo (view topEnv)
   v <- runInputConst env $ eval (compileTerm at)
 
-  tydefs <- gets @TopInfo (view $ replModInfo . miTydefs)  -- XXX! include stuff from imports
+  tydefs <- gets @TopInfo (view $ replModInfo . to allTydefs)
   s <- runInputConst tydefs . renderDoc $ prettyValue ty v
   outputLn s
 
@@ -501,7 +502,7 @@ runAllTests aprops
         True  -> outputLn " OK"
         False -> do
           outputLn ""
-          tydefs <- inputs @TopInfo (view (replModInfo . miTydefs)) -- XXX!
+          tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
           forM_ failures (runInputConst tydefs . runReader initPA . uncurry prettyTestFailure)
       return (P.null failures)
 
@@ -526,8 +527,6 @@ handleNames ::
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
-  -- XXX! get imports too, figure out nicer way to do this common
-  -- thing of gathering stuff from REPL module + imports
   tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
   mapM_ showTyDef $ M.assocs tyDef
 
@@ -673,7 +672,7 @@ handleTest ::
   Sem r ()
 handleTest (TestProp t) = do
   at <- inputToState . typecheckTop $ checkProperty t
-  tydefs <- gets @TopInfo (view (replModInfo . miTydefs))  -- XXX! should be from imports too
+  tydefs <- gets @TopInfo (view (replModInfo . to allTydefs))
   inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
     runInputConst tydefs . runReader initPA $ prettyTestResult at r

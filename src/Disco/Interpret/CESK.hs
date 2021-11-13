@@ -186,12 +186,14 @@ step cesk = case cesk of
   (Out v2 (FApp (VClo e [x] b) : k)) -> return $ In b (Ctx.insert (localName x) v2 e) k
   (Out v2 (FApp (VClo e (x : xs) b) : k)) -> return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
+  (Out v2 (FApp (VFun f) : k)) -> return $ Out (f v2) k
   -- Annoying to repeat this code, not sure of a better way.
   -- The usual evaluation order (function then argument) doesn't work when
   -- we're applying a test function to randomly generated values.
   (Out (VClo e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
   (Out (VClo e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo (Ctx.insert (localName x) v e) xs b) k
   (Out (VConst op) (FArgV v : k)) -> appConst k op v
+  (Out (VFun f) (FArgV v : k)) -> return $ Out (f v) k
 
   (Out (VRef n) (FForce : k)) -> do
     cell <- lkup n

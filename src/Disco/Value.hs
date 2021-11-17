@@ -126,8 +126,8 @@ data Value where
   --   are equal to 1).
   VBag :: [(Value, Integer)] -> Value
 
-  -- | A Graph in the algebraic repesentation. The stored value is an indirection to the graph's adjacency map representation.
-  VGraph :: Graph SimpleValue -> Value -> Value
+  -- | A graph, stored using an algebraic repesentation.
+  VGraph :: Graph SimpleValue -> Value
 
   -- | A map from keys to values. Differs from functions because we can
   --   actually construct the set of entries, while functions only have this

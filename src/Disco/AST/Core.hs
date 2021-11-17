@@ -164,13 +164,13 @@ data Op
   | -- | Adjacency List of given graph
     OSummary
   | -- | Empty graph
-    OEmptyGraph Type
+    OEmptyGraph
   | -- | Construct a vertex with given value
-    OVertex Type
+    OVertex
   | -- | Graph overlay
-    OOverlay Type
+    OOverlay
   | -- | Graph connect
-    OConnect Type
+    OConnect
   | -- | Map insert
     OInsert
   | -- | Map lookup
@@ -239,9 +239,9 @@ data Op
 --   constant.  A few constants have arity 0; everything else is
 --   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity (OEmptyGraph _) = 0
-opArity OMatchErr       = 0
-opArity _               = 1
+opArity OEmptyGraph = 0
+opArity OMatchErr   = 0
+opArity _           = 1
 
 substQC :: QName Core -> Core -> Core -> Core
 substQC x s = transform $ \case

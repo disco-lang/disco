@@ -25,6 +25,8 @@ import           Text.Show.Pretty                   (ppShow)
 
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
+import           Algebra.Graph
+import qualified Algebra.Graph.AdjacencyMap         as AdjMap
 import           Control.Arrow                      ((***), (>>>))
 import           Control.Monad                      ((>=>))
 import           Data.Bifunctor                     (first, second)
@@ -163,6 +165,7 @@ step cesk = case cesk of
   (In (CVar x) e k) -> return $ Out (e !!! x) k
   (In (CNum d r) _ k) -> return $ Out (VNum d r) k
   (In (CConst OMatchErr) _ k) -> return $ Up NonExhaustive k
+  (In (CConst OEmptyGraph) _ k) -> return $ Out (VGraph empty) k
   (In (CConst op) _ k) -> return $ Out (VConst op) k
   (In (CInj s c) e k) -> return $ In c e (FInj s : k)
   (In (CCase c b1 b2) e k) -> return $ In c e (FCase e b1 b2 : k)
@@ -377,9 +380,8 @@ appConst k = \case
       (VBag _, _) -> error $ "Impossible! OMerge on non-VBag " ++ show bys
       _           -> error $ "Impossible! OMerge on non-VBag " ++ show bxs
 
-  OBagUnions -> \case
-    VBag cts -> out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
-    v -> error $ "Impossible! OBagUnions on non-VBag " ++ show v
+  OBagUnions -> withBag OBagUnions $ \cts ->
+    out . VBag $ sortNCount [(x, m*n) | (VBag xs, n) <- cts, (x,m) <- xs]
 
   --------------------------------------------------
   -- Container conversions
@@ -425,12 +427,20 @@ appConst k = \case
   --------------------------------------------------
   -- Graph operations
 
-  -- appConst OSummary                           = _wJ
-  -- appConst (OEmptyGraph ty)                   = _wK
-  -- appConst (OVertex ty)                       = _wL
-  -- appConst (OOverlay ty)                      = _wM
-  -- appConst (OConnect ty)                      = _wN
-  -- appConst OMatchErr                          = _w1a
+  OVertex  -> out . VGraph . Vertex . toSimpleValue
+  OOverlay -> arity2 $ withGraph2 OOverlay $ \g1 g2 ->
+    out $ VGraph (Overlay g1 g2)
+  OConnect -> arity2 $ withGraph2 OConnect $ \g1 g2 ->
+    out $ VGraph (Connect g1 g2)
+  OSummary -> withGraph OSummary $ out . toDiscoAdjMap . reifyGraph
+    where
+      reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
+      reifyGraph =
+        AdjMap.adjacencyList . foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect
+
+      toDiscoAdjMap :: [(SimpleValue, [SimpleValue])] -> Value
+      toDiscoAdjMap =
+        VMap . M.fromList . map (second (VBag . countValues . map fromSimpleValue))
 
   --------------------------------------------------
   -- Propositions
@@ -458,6 +468,17 @@ appConst k = \case
     withMap op f = \case
       VMap m -> f m
       v      -> error $ "Impossible! " ++ show op ++ " on non-VMap " ++ show v
+
+    withGraph :: Op -> (Graph SimpleValue -> Sem r a) -> Value -> Sem r a
+    withGraph op f = \case
+      VGraph g -> f g
+      v        -> error $ "Impossible! " ++ show op ++ " on non-VGraph " ++ show v
+
+    withGraph2 :: Op -> (Graph SimpleValue -> Graph SimpleValue -> Sem r a) -> Value -> Value -> Sem r a
+    withGraph2 op f v1 v2 = case (v1, v2) of
+      (VGraph g1, VGraph g2) -> f g1 g2
+      (_, VGraph _) -> error $ "Impossible! " ++ show op ++ " on non-VGraph " ++ show v1
+      _             -> error $ "Impossible! " ++ show op ++ " on non-VGraph " ++ show v2
 
 --------------------------------------------------
 -- Arithmetic

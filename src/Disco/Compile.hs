@@ -267,10 +267,10 @@ compilePrim (_ :->: TyMap _ _) PrimSetToMap = return $ CConst OSetToMap
 compilePrim ty PrimMapToSet = compilePrimErr PrimMapToSet ty
 compilePrim ty PrimSetToMap = compilePrimErr PrimSetToMap ty
 compilePrim _ PrimSummary = return $ CConst OSummary
-compilePrim (_ :->: TyGraph ty) PrimVertex = return $ CConst $ OVertex ty
-compilePrim (TyGraph ty) PrimEmptyGraph = return $ CConst $ OEmptyGraph ty
-compilePrim (_ :->: TyGraph ty) PrimOverlay = return $ CConst $ OOverlay ty
-compilePrim (_ :->: TyGraph ty) PrimConnect = return $ CConst $ OConnect ty
+compilePrim (_ :->: TyGraph _) PrimVertex = return $ CConst OVertex
+compilePrim (TyGraph _) PrimEmptyGraph = return $ CConst OEmptyGraph
+compilePrim (_ :->: TyGraph _) PrimOverlay = return $ CConst OOverlay
+compilePrim (_ :->: TyGraph _) PrimConnect = return $ CConst OConnect
 compilePrim ty PrimVertex = compilePrimErr PrimVertex ty
 compilePrim ty PrimEmptyGraph = compilePrimErr PrimEmptyGraph ty
 compilePrim ty PrimOverlay = compilePrimErr PrimOverlay ty
@@ -453,14 +453,14 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 
 -- Graph operations are separate, but use the same syntax, as traditional
 -- addition and multiplication.
-compileBOp (TyGraph _) (TyGraph _) (TyGraph a) op
+compileBOp (TyGraph _) (TyGraph _) (TyGraph _) op
   | op `elem` [Add, Mul] =
     CConst (regularOps ! op)
   where
     regularOps =
       M.fromList
-        [ Add ==> OOverlay a,
-          Mul ==> OConnect a
+        [ Add ==> OOverlay,
+          Mul ==> OConnect
         ]
 
 -- Some regular arithmetic operations that just translate straightforwardly.

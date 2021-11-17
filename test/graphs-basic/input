@@ -1,0 +1,17 @@
+:type emptyGraph
+emptyGraph
+:type vertex 1
+vertex 1
+summary (vertex 1)
+:type vertex 1 + vertex 2
+vertex 1 + vertex 2
+summary (vertex 1 + vertex 2)
+:type vertex 'a' + vertex 'b' + vertex 'c'
+vertex 'a' + vertex 'b' + vertex 'c'
+summary (vertex 'a' + vertex 'b' + vertex 'c')
+:type (vertex 1 + vertex 2) * vertex 3
+(vertex 1 + vertex 2) * vertex 3
+summary ((vertex 1 + vertex 2) * vertex 3)
+import list
+foldr(~*~, emptyGraph, each(vertex, [1..5]))
+summary it

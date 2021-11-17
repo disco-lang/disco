@@ -68,6 +68,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
+                     test/graphs-basic/expected
+                     test/graphs-basic/input
                      test/interp-loop/expected
                      test/interp-loop/input
                      test/interp-strictmatch/bomb.disco

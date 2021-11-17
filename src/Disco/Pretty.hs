@@ -29,6 +29,8 @@ import           Data.Char                        (isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
+import           Algebra.Graph                    (foldg)
+
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
 import           Polysemy
@@ -39,7 +41,8 @@ import           Text.PrettyPrint                 (Doc)
 import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
                                                    unembed)
 
-import           Disco.AST.Core                   (RationalDisplay (..))
+import           Disco.AST.Core                   (Op (OEmptyGraph),
+                                                   RationalDisplay (..))
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Module
@@ -454,18 +457,24 @@ prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
 prettyValue (TyMap tyK tyV) (VMap m)         =
-  "map" <+> braces (prettySequence (tyK :*: tyV) "," (assocsToValues m))
+  "map" <> parens (braces (prettySequence (tyK :*: tyV) "," (assocsToValues m)))
   where
     assocsToValues = map (\(k,v) -> VPair (fromSimpleValue k) v) . M.assocs
+
+  -- XXX can we get rid of OEmptyGraph?
+prettyValue (TyGraph _ ) (VConst OEmptyGraph) = "emptyGraph"
+prettyValue (TyGraph ty) (VGraph g)          =
+  foldg
+    "emptyGraph"
+    (("vertex" <>) . prettyVP ty . fromSimpleValue)
+    (\l r -> withPA (getPA Add) $ lt l <+> "+" <+> rt r)
+    (\l r -> withPA (getPA Mul) $ lt l <+> "*" <+> rt r)
+    g
 
 prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
 
 -- prettyValue ty (VClo map xs bi) = undefined
 -- prettyValue ty (VType ty')    = undefined
--- prettyValue ty (VRef n)       = undefined
--- prettyValue ty (VFun_ vf)     = undefined
--- prettyValue ty (VProp vp)     = undefined
--- prettyValue ty (VGraph gr va) = undefined
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.

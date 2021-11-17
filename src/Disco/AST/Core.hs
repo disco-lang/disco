@@ -1,4 +1,5 @@
-
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
@@ -11,32 +12,31 @@
 --
 -- Abstract syntax trees representing the desugared, untyped core
 -- language for Disco.
---
 -----------------------------------------------------------------------------
 
 module Disco.AST.Core
        ( -- * Core AST
          RationalDisplay(..)
        , Core(..)
-       , Op(..), opArity
-
-         -- * Case expressions and patterns
-       , CBranch, CPattern(..)
+       , Op(..), opArity, substQC, substsQC
        )
        where
 
+import           Control.Lens.Plated
+import           Data.Data                        (Data)
+import           Data.Data.Lens                   (uniplate)
 import           GHC.Generics
+import           Prelude                          as P
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic                (Side)
-import           Disco.AST.Surface                (Telescope)
-import           Disco.AST.Typed                  (QName (..))
+import           Disco.Names                      (QName)
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
 data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic, Ord)
+  deriving (Eq, Show, Generic, Data, Ord, Alpha)
 
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
@@ -49,21 +49,17 @@ instance Semigroup RationalDisplay where
 --   to display as a fraction.  So the identity element is 'Fraction',
 --   and 'Decimal' always wins when combining.
 instance Monoid RationalDisplay where
-  mempty  = Fraction
+  mempty = Fraction
   mappend = (<>)
 
 -- | AST for the desugared, untyped core language.
 data Core where
-
   -- | A variable.
-  CVar   :: QName Core -> Core
-
-  -- | A function constant.
+  CVar :: QName Core -> Core
+  -- | A rational number.
+  CNum :: RationalDisplay -> Rational -> Core
+  -- | A built-in constant.
   CConst :: Op -> Core
-
-  -- | The unit value.
-  CUnit :: Core
-
   -- | An injection into a sum type, i.e. a value together with a tag
   --   indicating which element of a sum type we are in.  For example,
   --   false is represented by @CSum L CUnit@; @right(v)@ is
@@ -72,229 +68,190 @@ data Core where
   --   typechecked then we will never end up comparing constructors
   --   from different types.
   CInj :: Side -> Core -> Core
-
+  -- | A primitive case expression on a value of a sum type.
+  CCase :: Core -> Bind (Name Core) Core -> Bind (Name Core) Core -> Core
+  -- | The unit value.
+  CUnit :: Core
   -- | A pair of values.
   CPair :: Core -> Core -> Core
-
-  -- | A rational number.
-  CNum  :: RationalDisplay -> Rational -> Core
-
+  -- | A projection from a product type, i.e. @fst@ or @snd@.
+  CProj :: Side -> Core -> Core
   -- | An anonymous function.
-  CAbs  :: Bind [Name Core] Core -> Core
-
-  -- | Function application, where each argument has a strictness
-  --   annotation.  The strictness is determined by the type of the
-  --   application (which has been erased), and determines whether the
-  --   argument should be evaluated before applying the function.
-  CApp  :: Core -> (Strictness, Core) -> Core
-
-  -- | A case expression.
-  CCase :: [CBranch] -> Core
-
+  CAbs :: Bind [Name Core] Core -> Core
+  -- | Function application.
+  CApp :: Core -> Core -> Core
   -- | A "test frame" under which a test case is run. Records the
   --   types and legible names of the variables that should
   --   be reported to the user if the test fails.
   CTest :: [(String, Type, Name Core)] -> Core -> Core
-
   -- | A type.
   CType :: Type -> Core
+  -- | Introduction form for a lazily evaluated value of type Lazy T
+  --   for some type T.  We can have multiple bindings to multiple
+  --   terms to create a simple target for compiling mutual recursion.
+  CDelay :: Bind [Name Core] [Core] -> Core
+  -- | Force evaluation of a lazy value.
+  CForce :: Core -> Core
+  deriving (Show, Generic, Data, Alpha)
 
-  deriving (Show, Generic)
+instance Plated Core where
+  plate = uniplate
 
 -- | Operators that can show up in the core language.  Note that not
 --   all surface language operators show up here, since some are
 --   desugared into combinators of the operators here.
-data Op = OAdd      -- ^ Addition (@+@)
-        | ONeg      -- ^ Arithmetic negation (@-@)
-        | OSqrt     -- ^ Integer square root (@sqrt@)
-        | OFloor    -- ^ Floor of fractional type (@floor@)
-        | OCeil     -- ^ Ceiling of fractional type (@ceiling@)
-        | OAbs      -- ^ Absolute value (@abs@)
-        | OMul      -- ^ Multiplication (@*@)
-        | ODiv      -- ^ Division (@/@)
-        | OExp      -- ^ Exponentiation (@^@)
-        | OMod      -- ^ Modulo (@mod@)
-        | ODivides  -- ^ Divisibility test (@|@)
-        | OMultinom -- ^ Multinomial coefficient (@choose@)
-        | OFact     -- ^ Factorial (@!@)
-        | OEq Type  -- ^ Equality test (@==@) at the given type.  At
-                    --   this point, typechecking has determined that
-                    --   the given type has decidable equality.  We
-                    --   need to know the type in order to perform the
-                    --   equality test.
-        | OLt Type  -- ^ Less than (@<@).  Similarly, typechecking has
-                    --   determined that the given type has a decidable
-                    --   ordering relation.
+data Op
+  = -- | Addition (@+@)
+    OAdd
+  | -- | Arithmetic negation (@-@)
+    ONeg
+  | -- | Integer square root (@sqrt@)
+    OSqrt
+  | -- | Floor of fractional type (@floor@)
+    OFloor
+  | -- | Ceiling of fractional type (@ceiling@)
+    OCeil
+  | -- | Absolute value (@abs@)
+    OAbs
+  | -- | Multiplication (@*@)
+    OMul
+  | -- | Division (@/@)
+    ODiv
+  | -- | Exponentiation (@^@)
+    OExp
+  | -- | Modulo (@mod@)
+    OMod
+  | -- | Divisibility test (@|@)
+    ODivides
+  | -- | Multinomial coefficient (@choose@)
+    OMultinom
+  | -- | Factorial (@!@)
+    OFact
+  | -- | Equality test (@==@)
+    OEq
+  | -- | Less than (@<@)
+    OLt
+  | -- Type operators
 
-        -- Type operators
-        | OEnum     -- ^ Enumerate the values of a type.
-        | OCount    -- ^ Count the values of a type.
+    -- | Enumerate the values of a type.
+    OEnum
+  | -- | Count the values of a type.
+    OCount
+  | -- Container operations
 
-        -- Arithmetic operators with special runtime behavior for finite types
-        | OMDiv  Integer
-        | OMExp  Integer
-        | OMDivides Integer
+    -- | Size of two sets (@size@)
+    OSize
+  | -- | Power set/bag of a given set/bag
+    --   (@power@).
+    OPower
+  | -- | Set/bag element test.
+    OBagElem
+  | -- | List element test.
+    OListElem
+  | -- | Map a function over a bag.  Carries the
+    --   output type of the function.
+    OEachBag
+  | -- | Map a function over a set. Carries the
+    --   output type of the function.
+    OEachSet
+  | -- | Filter a bag.
+    OFilterBag
+  | -- | Merge two bags/sets.
+    OMerge
+  | -- | Bag join, i.e. union a bag of bags.
+    OBagUnions
+  | -- | Adjacency List of given graph
+    OSummary
+  | -- | Empty graph
+    OEmptyGraph
+  | -- | Construct a vertex with given value
+    OVertex
+  | -- | Graph overlay
+    OOverlay
+  | -- | Graph connect
+    OConnect
+  | -- | Map insert
+    OInsert
+  | -- | Map lookup
+    OLookup
+  | -- Ellipses
 
-        -- Container operations
-        | OSize           -- ^ Size of two sets (@size@)
-        | OPower Type     -- ^ Power set/bag of a given set/bag
-                          --   (@power@). Carries the element type.
-        | OBagElem Type   -- ^ Set/bag element test.
-        | OListElem Type  -- ^ List element test.
+    -- | Continue until end, @[x, y, z .. e]@
+    OUntil
+  | -- Container conversion
 
-        | OEachList       -- ^ Map a function over a list.
-        | OEachBag Type   -- ^ Map a function over a bag.  Carries the
-                          --   output type of the function.
-        | OEachSet Type   -- ^ Map a function over a set. Carries the
-                          --   output type of the function.
+    -- | set -> list conversion (sorted order).
+    OSetToList
+  | -- | bag -> set conversion (forget duplicates).
+    OBagToSet
+  | -- | bag -> list conversion (sorted order).
+    OBagToList
+  | -- | list -> set conversion (forget order, duplicates).
+    OListToSet
+  | -- | list -> bag conversion (forget order).
+    OListToBag
+  | -- | bag -> set of counts
+    OBagToCounts
+  | -- | set of counts -> bag
+    OCountsToBag
+  | -- | Map k v -> Set (k × v)
+    OMapToSet
+  | -- | Set (k × v) -> Map k v
+    OSetToMap
+  | -- Number theory primitives
 
-        | OReduceList     -- ^ Reduce/fold a list.
-        | OReduceBag      -- ^ Reduce/fold a bag (or set).
+    -- | Primality test
+    OIsPrime
+  | -- | Factorization
+    OFactor
+  | -- | Turn a rational into a (num, denom) pair
+    OFrac
+  | -- Propositions
 
-        | OFilterList     -- ^ Filter a list.
-        | OFilterBag      -- ^ Filter a bag.
+    -- | Universal quantification. Applied to a closure
+    --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+    OForall [Type]
+  | -- | Existential quantification. Applied to a closure
+    --   @t1, ..., tn -> Prop@ it yields a @Prop@.
+    OExists [Type]
+  | -- | Convert Prop -> Bool via exhaustive search.
+    OHolds
+  | -- | Flip success and failure for a prop.
+    ONotProp
+  | -- | Equality assertion, @=!=@
+    OShouldEq Type
+  | -- Other primitives
 
-        | OMerge Type     -- ^ Merge two bags/sets.
-
-        | OConcat         -- ^ List concatenation.  (Perhaps in the
-                          --   future this should get
-                          --   desugared/compiled into more primitive
-                          --   things.)
-        | OBagUnions Type -- ^ Bag join, i.e. union a bag of bags.
-        | OUnions Type    -- ^ Set join, i.e. union a set of sets.
-
-        | OSummary        -- ^ Adjacency List of given graph
-        | OEmptyGraph Type -- ^ Empty graph
-        | OVertex Type    -- ^ Construct a vertex with given value
-        | OOverlay Type   -- ^ Graph overlay
-        | OConnect Type   -- ^ Graph connect
-
-        | OEmptyMap       -- ^ Empty map
-        | OInsert         -- ^ Map insert
-        | OLookup         -- ^ Map lookup
-
-        -- Ellipses
-        | OForever        -- ^ Continue forever, @[x, y, z ..]@
-        | OUntil          -- ^ Continue until end, @[x, y, z .. e]@
-
-        -- Container conversion
-        | OSetToList      -- ^ set -> list conversion (sorted order).
-        | OBagToSet       -- ^ bag -> set conversion (forget duplicates).
-        | OBagToList      -- ^ bag -> list conversion (sorted order).
-        | OListToSet Type -- ^ list -> set conversion (forget order, duplicates).
-                          --   Carries the element type.
-        | OListToBag Type -- ^ list -> bag conversion (forget order).
-                          --   Carries the element type.
-        | OBagToCounts    -- ^ bag -> set of counts
-        | OCountsToBag Type  -- ^ set of counts -> bag
-        | OMapToSet Type Type -- ^ Map k v -> Set (k × v)
-        | OSetToMap           -- ^ Set (k × v) -> Map k v
-
-        -- Number theory primitives
-        | OIsPrime        -- ^ Primality test
-        | OFactor         -- ^ Factorization
-        | OFrac           -- ^ Turn a rational into a (num, denom) pair
-
-        -- Propositions
-        | OForall [Type]  -- ^ Universal quantification. Applied to a closure
-                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
-        | OExists [Type]  -- ^ Existential quantification. Applied to a closure
-                          --   @t1, ..., tn -> Prop@ it yields a @Prop@.
-        | OHolds          -- ^ Convert Prop -> Bool via exhaustive search.
-        | ONotProp        -- ^ Flip success and failure for a prop.
-        | OShouldEq Type  -- ^ Equality assertion, @=!=@
-
-        -- Other primitives
-        | OCrash          -- ^ Crash with a user-supplied message
-        | OId             -- ^ No-op/identity function
-        | OLookupSeq      -- ^ Lookup OEIS sequence
-        | OExtendSeq      -- ^ Extend a List via OEIS
-
-  deriving (Show, Generic)
+    -- | Error for non-exhaustive pattern match
+    OMatchErr
+  | -- | Crash with a user-supplied message
+    OCrash
+  | -- | No-op/identity function
+    OId
+  | -- | Lookup OEIS sequence
+    OLookupSeq
+  | -- | Extend a List via OEIS
+    OExtendSeq
+  deriving (Show, Generic, Data, Alpha)
 
 -- | Get the arity (desired number of arguments) of a function
 --   constant.  A few constants have arity 0; everything else is
 --   uncurried and hence has arity 1.
 opArity :: Op -> Int
-opArity OEmptyMap       = 0
-opArity (OEmptyGraph _) = 0
-opArity _               = 1
+opArity OEmptyGraph = 0
+opArity OMatchErr   = 0
+opArity _           = 1
 
--- opArity OAdd             = 2
--- opArity ONeg             = 1
--- opArity OSqrt            = 1
--- opArity OLg              = 1
--- opArity OFloor           = 1
--- opArity OCeil            = 1
--- opArity OAbs             = 1
--- opArity OMul             = 2
--- opArity ODiv             = 2
--- opArity OExp             = 2
--- opArity OMod             = 2
--- opArity ODivides         = 2
--- opArity OMultinom        = 2
--- opArity OFact            = 1
--- opArity (OEq _)          = 2
--- opArity (OLt _)          = 2
--- opArity OEnum            = 1
--- opArity OCount           = 1
--- opArity (OMDiv _)        = 2
--- opArity (OMExp _)        = 2
--- opArity (OMDivides _)    = 2
--- opArity OSize            = 1
--- opArity (OPower _)       = 1
--- opArity (OBagElem _)     = 2
--- opArity (OListElem _)    = 2
--- opArity OMapList         = 2
--- opArity (OMapBag _)      = 2
--- opArity (OMapSet _)      = 2
--- opArity OReduceList      = 3
--- opArity OReduceBag       = 3
--- opArity OFilterList      = 2
--- opArity OFilterBag       = 2
--- opArity OConcat          = 1
--- opArity (OBagUnions _)   = 1
--- opArity (OUnions _)      = 1
--- opArity (OMerge _)       = 3
--- opArity OForever         = 1
--- opArity OUntil           = 2
--- opArity OSetToList       = 1
--- opArity OBagToSet        = 1
--- opArity OBagToList       = 1
--- opArity (OListToSet _)   = 1
--- opArity (OListToBag _)   = 1
--- opArity OBagToCounts     = 1
--- opArity (OCountsToBag _) = 1
--- opArity OIsPrime         = 1
--- opArity OFactor          = 1
--- opArity OCrash           = 1
--- opArity OId              = 1
+substQC :: QName Core -> Core -> Core -> Core
+substQC x s = transform $ \case
+  CVar y
+    | x == y -> s
+    | otherwise -> CVar y
+  t -> t
 
--- | A branch, consisting of a list of guards and a term.
-type CBranch = Bind (Telescope (Embed Core, CPattern)) Core
-
--- | Core (desugared) patterns.  We only need variables, wildcards,
---   natural numbers, and constructors.
-data CPattern where
-
-  -- | A variable pattern, which matches anything and binds the name.
-  CPVar  :: Name Core -> CPattern
-
-  -- | A wildcard pattern @_@, which matches anything.
-  CPWild :: CPattern
-
-  -- | The unit pattern.
-  CPUnit :: CPattern
-
-  -- | An injection into a sum type.
-  CPInj  :: Side -> Name Core -> CPattern
-
-  -- | A pair.
-  CPPair :: Name Core -> Name Core -> CPattern
-
-  deriving (Show, Generic)
-
-instance Alpha RationalDisplay
-instance Alpha Core
-instance Alpha Op
-instance Alpha CPattern
+substsQC :: [(QName Core, Core)] -> Core -> Core
+substsQC xs = transform $ \case
+  CVar y -> case P.lookup y xs of
+    Just c -> c
+    _      -> CVar y
+  t -> t

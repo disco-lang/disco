@@ -1,5 +1,3 @@
-import list
-
 g : N -> N
 g(x) = x + 1
 

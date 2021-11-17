@@ -57,7 +57,7 @@ import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.AST.Generic
-import           Disco.AST.Typed                  (NameProvenance, QName (..))
+import           Disco.Names                      (QName (..))
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -74,7 +74,7 @@ type DTerm = Term_ DS
 
 type instance X_Binder DS         = Name DTerm
 
-type instance X_TVar DS           = (Type, NameProvenance)
+type instance X_TVar DS           = Void -- names are qualified
 type instance X_TPrim DS          = Type
 type instance X_TLet DS           = Void -- Let gets translated to lambda
 type instance X_TUnit DS          = ()
@@ -107,18 +107,14 @@ data X_DTerm
   = DTPair_ Type DTerm DTerm
   | DTNil_ Type
   | DTTest_ [(String, Type, Name DTerm)] DTerm
+  | DTVar_ Type (QName DTerm)
   deriving (Show, Generic)
 
 instance Subst Type X_DTerm
 instance Alpha X_DTerm
 
 pattern DTVar :: Type -> QName DTerm -> DTerm
-pattern DTVar ty qname <- (reassocQ -> Just (ty,qname)) where
-  DTVar ty (QName prov name) = TVar_ (ty,prov) name
-
-reassocQ :: DTerm -> Maybe (Type, QName DTerm)
-reassocQ (TVar_ (ty,prov) name) = Just (ty, QName prov name)
-reassocQ _                      = Nothing
+pattern DTVar ty qname = XTerm_ (DTVar_ ty qname)
 
 pattern DTPrim :: Type -> Prim -> DTerm
 pattern DTPrim ty name = TPrim_ ty name

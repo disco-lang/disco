@@ -1,3 +1,5 @@
+using NoStdLib
+
 ||| A right fold for lists.
 |||   foldr(f, z, [a,b,c]) = f(a, f(b, f(c, z)))
 
@@ -51,14 +53,8 @@ take(0, _)         = []
 take(_, [])        = []
 take(n+1, x :: xs) = x :: take(n, xs)
 
-||| Repeat the given element infinitely.
-!!!   take(3, repeat true) == [true, true, true]
-repeat : a → List(a)
-repeat x = x :: repeat x
-
 ||| The length of a list.
 !!!   length [true, false, true] == 3
-!!!   length(take(20, repeat true)) == 20
 length : List(a) → ℕ
 length [] = 0
 length (_::l) = 1 + length l
@@ -68,9 +64,9 @@ zipWith(_, [], _) = []
 zipWith(_, _, []) = []
 zipWith(f, a::as, b::bs) = f(a, b) :: zipWith(f, as, bs)
 
-filterList: (a -> Bool) × List(a) -> List(a)
-filterList(_, []) = []
-filterList(p, a :: as) =
-  {? a :: filterList(p, as)  if p a
-  ,  filterList(p, as)       otherwise
+filterlist : (a -> Bool) × List(a) -> List(a)
+filterlist(_, []) = []
+filterlist(p, a :: as) =
+  {? a :: filterlist(p, as)  if p a
+  ,  filterlist(p, as)       otherwise
   ?}

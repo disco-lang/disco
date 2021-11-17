@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingVia                #-}
-
-
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Pretty.DSL
@@ -13,9 +10,12 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Disco.Pretty.DSL where
 
 import           Control.Applicative hiding (empty)
+import           Data.String         (IsString (..))
 import           Prelude             hiding ((<>))
 
 import           Polysemy
@@ -25,6 +25,9 @@ import           Text.PrettyPrint    (Doc)
 import qualified Text.PrettyPrint    as PP
 
 import           Disco.Pretty.Prec
+
+instance IsString (Sem r Doc) where
+  fromString = text
 
 ------------------------------------------------------------
 -- Adapter DSL

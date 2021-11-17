@@ -1,3 +1,0 @@
-:load example/expensive-list.disco
-take(1, expensiveList)
-take(2, expensiveList)

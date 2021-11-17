@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveAnyClass  #-}
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,12 +16,8 @@
 -----------------------------------------------------------------------------
 
 module Disco.AST.Typed
-       ( -- * Names and provenance
-
-         ModuleProvenance(..), ModuleName(..), NameProvenance(..), QName(..), localName, (.-)
-
-         -- * Type-annotated terms
-       , ATerm
+       ( -- * Type-annotated terms
+         ATerm
        , pattern ATVar
        , pattern ATPrim
        , pattern ATLet
@@ -83,6 +79,7 @@ module Disco.AST.Typed
        , varsBound
        , getType
        , setType
+       , substQT
 
        , AProperty
        )
@@ -91,10 +88,12 @@ module Disco.AST.Typed
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
+import           Data.Data                               (Data)
 import           Data.Void
-import           GHC.Generics                            (Generic)
 
+import           Control.Lens.Plated                     (transform)
 import           Disco.AST.Generic
+import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -102,48 +101,11 @@ import           Disco.Types
 -- | The extension descriptor for Typed specific AST types.
 
 data TY
+  deriving Data
 
 type AProperty = Property_ TY
 
 ------------------------------------------------------------
--- Names and provenance
-------------------------------------------------------------
-
--- | Where did a module come from?
-data ModuleProvenance
-  = Dir FilePath -- ^ From a particular directory (relative to cwd)
-  | Stdlib       -- ^ From the standard library
-  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
-
--- | The name of a module.
-data ModuleName
-  = REPLModule   -- ^ The special top-level "module" consisting of
-                 -- what has been entered at the REPL.
-  | Named ModuleProvenance String
-                 -- ^ A named module, with its name and provenance.
-  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
-
--- | Where did a name come from?
-data NameProvenance
-  = LocalName                    -- ^ The name is locally bound
-  | QualifiedName ModuleName     -- ^ The name is exported by the given module
-  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
-
--- | A @QName@, or qualified name, is a 'Name' paired with its
---   'NameProvenance'.
-data QName a = QName { qnameProvenance :: NameProvenance, qname :: Name a }
-  deriving (Eq, Ord, Show, Generic, Alpha, Subst Type)
-
--- | Create a locally bound qualified name.
-localName :: Name a -> QName a
-localName = QName LocalName
-
--- | Create a module-bound qualified name.
-(.-) :: ModuleName -> Name a -> QName a
-m .- x = QName (QualifiedName m) x
-
-------------------------------------------------------------
-
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever
@@ -155,7 +117,7 @@ type ATerm = Term_ TY
 
 type instance X_Binder          TY = [APattern]
 
-type instance X_TVar            TY = (Type, NameProvenance)
+type instance X_TVar            TY = Void -- Names are now qualified
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
@@ -178,15 +140,10 @@ type instance X_TParens         TY = Void -- No more explicit parens
  -- A test frame for reporting counterexamples in a test. These don't appear
  -- in source programs, but because the deugarer manipulates partly-desugared
  -- terms it helps to be able to represent these in 'ATerm'.
-type instance X_Term TY = ([(String, Type, Name ATerm)], ATerm)
+type instance X_Term TY = Either ([(String, Type, Name ATerm)], ATerm) (Type, QName ATerm)
 
 pattern ATVar :: Type -> QName ATerm -> ATerm
-pattern ATVar ty qname <- (reassocQ -> Just (ty,qname)) where
-  ATVar ty (QName prov name) = TVar_ (ty,prov) name
-
-reassocQ :: ATerm -> Maybe (Type, QName ATerm)
-reassocQ (TVar_ (ty,prov) name) = Just (ty, QName prov name)
-reassocQ _                      = Nothing
+pattern ATVar ty qname = XTerm_ (Right (ty, qname))
 
 pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name
@@ -237,7 +194,7 @@ pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> 
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 pattern ATTest :: [(String, Type, Name ATerm)] -> ATerm -> ATerm
-pattern ATTest ns t = XTerm_ (ns, t)
+pattern ATTest ns t = XTerm_ (Left (ns, t))
 
 {-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
              ATString, ATAbs, ATApp, ATTup, ATCase, ATChain, ATTyOp,
@@ -482,3 +439,14 @@ instance HasType APattern where
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind
+
+------------------------------------------------------------
+-- subst
+------------------------------------------------------------
+
+substQT :: QName ATerm -> ATerm -> ATerm -> ATerm
+substQT x s = transform $ \case
+  t@(ATVar _ y)
+    | x == y    -> s
+    | otherwise -> t
+  t -> t

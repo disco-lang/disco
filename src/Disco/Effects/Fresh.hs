@@ -18,6 +18,7 @@
 module Disco.Effects.Fresh where
 
 import           Disco.Effects.Counter
+import           Disco.Names                           (QName, localName)
 import           Polysemy
 import           Polysemy.ConstraintAbsorber
 import qualified Unbound.Generics.LocallyNameless      as U
@@ -73,6 +74,11 @@ runFresh1 = runFresh' 1
 --   variables.
 unbind :: (Member Fresh r, U.Alpha p, U.Alpha t) => U.Bind p t -> Sem r (p, t)
 unbind b = absorbFresh (U.unbind b)
+
+-- | Generate a fresh (local, free) qualified name based on a given
+--   string.
+freshQ :: (Member Fresh r) => String -> Sem r (QName a)
+freshQ s = localName <$> fresh (string2Name s)
 
 ------------------------------------------------------------
 -- Machinery for absorbing MTL-style constraint.

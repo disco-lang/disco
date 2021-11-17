@@ -1,5 +1,3 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
 {-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
@@ -23,6 +21,7 @@ module Disco.Context
          -- * Construction
        , emptyCtx
        , singleCtx
+       , fromList
        , ctxForModule
        , localCtx
 
@@ -31,17 +30,21 @@ module Disco.Context
        , extend
        , extends
 
-       -- * Query/conversion
+       -- * Query
        , null
        , lookup, lookup'
        , lookupNonLocal, lookupNonLocal'
        , lookupAll, lookupAll'
+
+       -- * Conversion
        , names
        , elems
        , assocs
+       , keysSet
 
        -- * Traversal
        , coerceKeys
+       , restrictKeys
 
        -- * Combination
        , joinCtx
@@ -53,19 +56,21 @@ module Disco.Context
        ) where
 
 import           Control.Monad                    ((<=<))
-import           Data.Bifunctor                   (first)
+import           Data.Bifunctor                   (first, second)
 import           Data.Coerce
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
+import           Data.Map.Merge.Lazy              as MM
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Prelude                          hiding (filter, lookup, null)
-
 
 import           Unbound.Generics.LocallyNameless (Name)
 
 import           Polysemy
 import           Polysemy.Reader
 
-import           Disco.AST.Typed                  (ModuleName,
+import           Disco.Names                      (ModuleName,
                                                    NameProvenance (..),
                                                    QName (..))
 
@@ -99,6 +104,10 @@ emptyCtx = Ctx M.empty
 singleCtx :: QName a -> b -> Ctx a b
 singleCtx (QName p n) = Ctx . M.singleton p . M.singleton n
 
+-- | Create a context from a list of (qualified name, value) pairs.
+fromList :: [(QName a, b)] -> Ctx a b
+fromList = Ctx . M.fromListWith M.union . map (\(QName p n, b) -> (p, M.singleton n b))
+
 -- | Create a context for bindings from a single module.
 ctxForModule :: ModuleName -> [(Name a, b)] -> Ctx a b
 ctxForModule m = Ctx . M.singleton (QualifiedName m) . M.fromList
@@ -128,7 +137,7 @@ extends :: Member (Reader (Ctx a b)) r => Ctx a b -> Sem r c -> Sem r c
 extends = local . joinCtx
 
 ------------------------------------------------------------
--- Query/conversion
+-- Query
 ------------------------------------------------------------
 
 -- | Check if a context is empty.
@@ -161,6 +170,10 @@ lookupAll n = lookupAll' n <$> ask
 lookupAll' :: Name a -> Ctx a b -> [(QName a, b)]
 lookupAll' n = map (first (`QName` n)) . M.assocs . M.mapMaybe (M.lookup n) . getCtx
 
+------------------------------------------------------------
+-- Conversion
+------------------------------------------------------------
+
 -- | Return a list of the names defined by the context.
 names :: Ctx a b -> [Name a]
 names = concatMap M.keys . M.elems . getCtx
@@ -177,12 +190,24 @@ assocs = concatMap (uncurry modAssocs) . M.assocs . getCtx
     modAssocs :: NameProvenance -> Map (Name a) b -> [(QName a, b)]
     modAssocs p = map (first (QName p)) . M.assocs
 
+-- | Return a set of all qualified names in the context.
+keysSet :: Ctx a b -> Set (QName a)
+keysSet = S.unions . map (uncurry (S.map . QName) . second M.keysSet) . M.assocs . getCtx
+
 ------------------------------------------------------------
 -- Traversal
 ------------------------------------------------------------
 
+-- | Coerce the type of the qualified name keys in a context.
 coerceKeys :: Ctx a1 b -> Ctx a2 b
 coerceKeys = Ctx . M.map (M.mapKeys coerce) . getCtx
+
+-- | Restrict a context to only the keys in the given set.
+restrictKeys :: Ctx a b -> Set (QName a) -> Ctx a b
+restrictKeys ctx xs = Ctx . restrict m . getCtx $ ctx
+  where
+    restrict = MM.merge MM.dropMissing MM.dropMissing (MM.zipWithMatched (\_ ns m' -> M.restrictKeys m' ns))
+    m = M.fromListWith S.union . map (\(QName p n) -> (p, S.singleton n)) . S.toList $ xs
 
 ------------------------------------------------------------
 -- Combination

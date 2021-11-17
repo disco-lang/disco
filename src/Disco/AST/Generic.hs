@@ -5,6 +5,8 @@
 
 -- Orphan Alpha Void instance
 {-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -141,7 +143,11 @@ module Disco.AST.Generic
        )
        where
 
+import           Control.Lens.Plated
+import           Data.Data                        (Data)
+import           Data.Data.Lens                   (uniplate)
 import           Data.Typeable
+import           GHC.Exts                         (Constraint)
 import           GHC.Generics                     (Generic)
 
 import           Data.Void
@@ -150,7 +156,6 @@ import           Unbound.Generics.LocallyNameless
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
-import           GHC.Exts                         (Constraint)
 
 ------------------------------------------------------------
 -- Telescopes
@@ -166,10 +171,7 @@ data Telescope b where
   -- | A binder of type @b@ followed by zero or more @b@'s.  This @b@
   --   can bind variables in the subsequent @b@'s.
   TelCons  :: Rebind b (Telescope b) -> Telescope b
-  deriving (Show, Generic)
-
-instance Alpha b => Alpha (Telescope b)
-instance Subst t b => Subst t (Telescope b)
+  deriving (Show, Generic, Alpha, Subst t, Data)
 
 -- | Add a new item to the beginning of a 'Telescope'.
 telCons :: Alpha b => b -> Telescope b -> Telescope b
@@ -205,10 +207,7 @@ fromTelescope = foldTelescope (:) []
 
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
-  deriving (Show, Eq, Ord, Enum, Bounded, Generic)
-
-instance Alpha Side
-instance Subst t Side
+  deriving (Show, Eq, Ord, Enum, Bounded, Generic, Data, Alpha, Subst t)
 
 -- | Use a 'Side' to select one of two arguments (the first argument
 --   for 'L', and the second for 'R').
@@ -226,23 +225,16 @@ data Container where
   ListContainer :: Container
   BagContainer  :: Container
   SetContainer  :: Container
-  deriving (Show, Eq, Enum, Generic)
-
-instance Alpha Container
-instance Subst t Container
+  deriving (Show, Eq, Enum, Generic, Data, Alpha, Subst t)
 
 -- | An ellipsis is an "omitted" part of a literal container (such as
---   a list or set), of the form @..@ or @.. t@.
+--   a list or set), of the form @.. t@.  We don't have open-ended
+--   ellipses since everything is evaluated eagerly and hence
+--   containers must be finite.
 data Ellipsis t where
-  -- | 'Forever' represents an open-ended ellipsis, as in @[3 ..]@.
-  Forever ::      Ellipsis t
-
   -- | 'Until' represents an ellipsis with a given endpoint, as in @[3 .. 20]@.
   Until   :: t -> Ellipsis t   -- @.. t@
-  deriving (Show, Generic, Functor, Foldable, Traversable)
-
-instance Alpha t => Alpha (Ellipsis t)
-instance Subst a t => Subst a (Ellipsis t)
+  deriving (Show, Generic, Functor, Foldable, Traversable, Alpha, Subst a, Data)
 
 ------------------------------------------------------------
 -- Terms
@@ -393,6 +385,10 @@ instance
   )
   => Subst Type (Term_ e)
 instance (Typeable e, ForallTerm Alpha e) => Alpha (Term_ e)
+deriving instance (Data e, Typeable e, ForallTerm Data e) => Data (Term_ e)
+
+instance (Data e, ForallTerm Data e) => Plated (Term_ e) where
+  plate = uniplate
 
 ------------------------------------------------------------
 -- Link
@@ -418,6 +414,7 @@ type ForallLink (a :: * -> Constraint) e
 deriving instance ForallLink Show e         => Show       (Link_ e)
 instance          ForallLink (Subst Type) e => Subst Type (Link_ e)
 instance (Typeable e, Show (Link_ e), ForallLink Alpha e) => Alpha (Link_ e)
+deriving instance (Typeable e, Data e, ForallLink Data e) => Data (Link_ e)
 
 ------------------------------------------------------------
 -- Qual
@@ -448,6 +445,7 @@ type ForallQual (a :: * -> Constraint) e
 deriving instance ForallQual Show         e => Show       (Qual_ e)
 instance          ForallQual (Subst Type) e => Subst Type (Qual_ e)
 instance (Typeable e, ForallQual Alpha e) => Alpha (Qual_ e)
+deriving instance (Typeable e, Data e, ForallQual Data e) => Data (Qual_ e)
 
 ------------------------------------------------------------
 -- Binding
@@ -461,6 +459,7 @@ data Binding_ e = Binding_ (Maybe (Embed PolyType)) (Name (Term_ e)) (Embed (Ter
 deriving instance ForallTerm Show  e => Show (Binding_ e)
 instance Subst Type (Term_ e) => Subst Type (Binding_ e)
 instance (Typeable e, Show (Binding_ e), Alpha (Term_ e)) => Alpha (Binding_ e)
+deriving instance (Typeable e, Data e, ForallTerm Data e) => Data (Binding_ e)
 
 ------------------------------------------------------------
 -- Branch
@@ -506,6 +505,7 @@ type ForallGuard (a :: * -> Constraint) e
 deriving instance ForallGuard Show         e => Show       (Guard_ e)
 instance          ForallGuard (Subst Type) e => Subst Type (Guard_ e)
 instance (Typeable e, Show (Guard_ e), ForallGuard Alpha e) => Alpha (Guard_ e)
+deriving instance (Typeable e, Data e, ForallGuard Data e) => Data (Guard_ e)
 
 ------------------------------------------------------------
 -- Pattern
@@ -614,6 +614,7 @@ type ForallPattern (a :: * -> Constraint) e
 deriving instance ForallPattern Show         e => Show       (Pattern_ e)
 instance          ForallPattern (Subst Type) e => Subst Type (Pattern_ e)
 instance (Typeable e, Show (Pattern_ e), ForallPattern Alpha e) => Alpha (Pattern_ e)
+deriving instance (Typeable e, Data e, ForallPattern Data e) => Data (Pattern_ e)
 
 ------------------------------------------------------------
 -- Quantifiers and binders
@@ -630,10 +631,7 @@ type Binder_ e a = Bind (X_Binder e) a
 
 -- | A quantifier: λ, ∀, or ∃
 data Quantifier = Lam | Ex | All
-  deriving (Generic, Eq, Ord, Show)
-
-instance Subst Type Quantifier
-instance Alpha Quantifier
+  deriving (Generic, Data, Eq, Ord, Show, Alpha, Subst Type)
 
 ------------------------------------------------------------
 -- Property

@@ -32,6 +32,7 @@ import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Module
+import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck                  (containerTy)
@@ -164,17 +165,8 @@ mkDTPair dt1 dt2 = DTPair (getType dt1 :*: getType dt2) dt1 dt2
 -- Definition desugaring
 ------------------------------------------------------------
 
--- | Desugar a definition (of the form @f pat1 .. patn = term@, but
---   without the name @f@ of the thing being defined) into a core
---   language term.  Each pattern desugars to an anonymous function,
---   appropriately combined with a case expression for non-variable
---   patterns.
---
---   For example, @f n (x,y) = n*x + y@ desugars to something like
---
---   @
---     n -> p -> { n*x + y  when p = (x,y)
---   @
+-- | Desugar a definition (consisting of a collection of pattern
+--   clauses with bodies) into a core language term.
 desugarDefn :: Member Fresh r => Defn -> Sem r DTerm
 desugarDefn (Defn _ patTys bodyTy def) =
   desugarAbs Lam (foldr (:->:) bodyTy patTys) def
@@ -323,8 +315,7 @@ bopDesugars _   _   _ bop = bop `elem`
   , Neq, Gt, Leq, Geq, Min, Max
   , IDiv
   , Sub, SSub
-  , Inter, Diff, Union
-  , Subset
+  , Inter, Diff, Union, Subset
   ]
 
 -- | Desugar a primitive binary operator at the given type.
@@ -455,7 +446,8 @@ desugarBinApp ty SSub t1 t2 = desugarTerm $
 -- Intersection, difference, and union all desugar to an application
 -- of 'merge' with an appropriate combining operation.
 desugarBinApp ty op t1 t2
-  | op `elem` [Inter, Diff, Union] = desugarTerm $
+  | op `elem` [Inter, Diff, Union] =
+    desugarTerm $
     tapps (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
       [ ATPrim (TyN :*: TyN :->: TyN) (mergeOp ty op)
       , t1
@@ -787,13 +779,8 @@ desugarContainer :: Member Fresh r => Type -> Container -> [(ATerm, Maybe ATerm)
 desugarContainer ty ListContainer es Nothing =
   foldr (dtbin ty (PrimBOp Cons)) (DTNil ty) <$> mapM (desugarTerm . fst) es
 
--- A list container with an ellipsis (@[x, y, z ..]@) desugars to
--- an application of the primitive 'forever' function...
-desugarContainer ty ListContainer es (Just Forever) =
-  dtapp (DTPrim (ty :->: ty) PrimForever) <$> desugarContainer ty ListContainer es Nothing
-
--- ... or @[x, y, z .. e]@ desugars to an application of the primitive
--- 'until' function.
+-- A list container with an ellipsis @[x, y, z .. e]@ desugars to an
+-- application of the primitive 'until' function.
 desugarContainer ty@(TyList _) ListContainer es (Just (Until t)) =
   dtbin ty PrimUntil
     <$> desugarTerm t

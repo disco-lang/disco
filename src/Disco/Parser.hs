@@ -333,7 +333,8 @@ reservedWords =
 identifier :: Parser Char -> Parser String
 identifier begin = (lexeme . try) (p >>= check) <?> "variable name"
   where
-    p       = (:) <$> begin <*> many (alphaNumChar <|> oneOf "_'")
+    p       = (:) <$> begin <*> many identChar
+    identChar = alphaNumChar <|> oneOf "_'"
     check x
       | x `elem` reservedWords = do
           -- back up to beginning of bad token to report correct position
@@ -670,11 +671,11 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
         _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
 
 -- | Parse an ellipsis at the end of a literal list, of the form
---   @.. [t]@.  Any number > 1 of dots may be used, just for fun.
+--   @.. t@.  Any number > 1 of dots may be used, just for fun.
 parseEllipsis :: Parser (Ellipsis Term)
 parseEllipsis = do
   _ <- ellipsis
-  maybe Forever Until <$> optional parseTerm
+  Until <$> parseTerm
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.

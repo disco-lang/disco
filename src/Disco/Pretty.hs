@@ -1,5 +1,6 @@
 {-# LANGUAGE DerivingVia               #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings         #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -23,12 +24,12 @@ module Disco.Pretty
 
 import           Prelude                          hiding ((<>))
 
-import           Control.Lens                     (view)
-import           Control.Monad                    ((>=>))
 import           Data.Bifunctor
-import           Data.Char                        (chr, isAlpha, toLower)
+import           Data.Char                        (isAlpha, toLower)
 import qualified Data.Map                         as M
 import           Data.Ratio
+
+import           Algebra.Graph                    (foldg)
 
 import           Disco.Effects.LFresh
 import           Disco.Effects.Output
@@ -40,13 +41,10 @@ import           Text.PrettyPrint                 (Doc)
 import           Unbound.Generics.LocallyNameless (Bind, Name, string2Name,
                                                    unembed)
 
-import           Disco.AST.Core
-import           Disco.AST.Generic                (selectSide)
+import           Disco.AST.Core                   (Op (OEmptyGraph),
+                                                   RationalDisplay (..))
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Eval                       (TopInfo, replModInfo)
-import           Disco.Interpret.Core             (mapToSet, rnfV, whnfList,
-                                                   whnfV)
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
@@ -170,6 +168,7 @@ prettyName = text . show
 -- | Pretty-print a term with guaranteed parentheses.
 prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
 prettyTermP t@TTup{} = setPA initPA $ prettyTerm t
+-- prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
 prettyTermP t        = withPA initPA $ prettyTerm t
 
 -- | Pretty-print a term.
@@ -229,7 +228,6 @@ prettyTerm (TContainer c ts e)  = setPA initPA $ do
   ds <- punctuate (text ",") (map prettyCount ts)
   let pe = case e of
              Nothing        -> []
-             Just Forever   -> [text ".."]
              Just (Until t) -> [text "..", prettyTerm t]
   containerDelims c (hsep (ds ++ pe))
   where
@@ -427,126 +425,83 @@ prettyTyDecl x ty = hsep [prettyName x, text ":", prettyTy ty]
 -- Pretty-printing values
 ------------------------------------------------------------
 
--- | Pretty-printing of values, with output interleaved lazily with
---   evaluation.
-prettyValue :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyValue ty v = prettyV ty v >> output "\n"
+prettyValue :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
 
--- | Pretty-printing of values, with output interleaved lazily with
---   evaluation.  Takes a continuation that specifies how the output
---   should be processed (which will be called many times as the
---   output is produced incrementally).
-prettyV :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyV ty = whnfV >=> prettyWHNF ty
+-- Lazily expand any user-defined types
+prettyValue (TyUser x args) v = do
+  tydefs <- input
+  let (TyDefBody _ body) = tydefs M.! x   -- This can't fail if typechecking succeeded
+  prettyValue (body args) v
+
+prettyValue _      VUnit                     = "■"
+prettyValue TyProp _                         = prettyPlaceholder TyProp
+prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
+prettyValue TyC (vchar -> c)                 = text (show c)
+prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
+  where
+    prettyChar = drop 1 . reverse . drop 1 . reverse . show . (:[])
+prettyValue (TyList ty) (vlist id -> xs)     = do
+  ds <- punctuate (text ",") (map (prettyValue ty) xs)
+  brackets (hsep ds)
+prettyValue ty@(_ :*: _) v                   = parens (prettyTuple ty v)
+prettyValue (ty1 :+: _) (VInj L v)           = "left"  <> prettyVP ty1 v
+prettyValue (_ :+: ty2) (VInj R v)           = "right" <> prettyVP ty2 v
+prettyValue _ (VNum d r)
+  | denominator r == 1                       = text $ show (numerator r)
+  | otherwise                                = text $ case d of
+      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> prettyDecimal r
+
+prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
+
+prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
+prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
+prettyValue (TyMap tyK tyV) (VMap m)         =
+  "map" <> parens (braces (prettySequence (tyK :*: tyV) "," (assocsToValues m)))
+  where
+    assocsToValues = map (\(k,v) -> VPair (fromSimpleValue k) v) . M.assocs
+
+  -- XXX can we get rid of OEmptyGraph?
+prettyValue (TyGraph _ ) (VConst OEmptyGraph) = "emptyGraph"
+prettyValue (TyGraph ty) (VGraph g)          =
+  foldg
+    "emptyGraph"
+    (("vertex" <>) . prettyVP ty . fromSimpleValue)
+    (\l r -> withPA (getPA Add) $ lt l <+> "+" <+> rt r)
+    (\l r -> withPA (getPA Mul) $ lt l <+> "*" <+> rt r)
+    g
+
+prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
+
+-- prettyValue ty (VClo map xs bi) = undefined
+-- prettyValue ty (VType ty')    = undefined
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyVP :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyVP ty@(_ :*: _) v = prettyV ty v
-prettyVP ty           v = output "(" >> prettyV ty v >> output ")"
+prettyVP :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
+prettyVP ty@(_ :*: _) = prettyValue ty
+prettyVP ty           = parens . prettyValue ty
 
--- | Pretty-print a value which is already guaranteed to be in weak
---   head normal form.
-prettyWHNF :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyWHNF (TyUser nm args) v = do
-  tymap <- inputs (view (replModInfo . miTydefs))
-  case M.lookup nm tymap of
-    Just (TyDefBody _ body) -> prettyWHNF (body args) v
-    Nothing                 -> error "Impossible! TyDef name does not exist in TyMap"
-prettyWHNF TyUnit          VUnit        = output "■"
-prettyWHNF TyProp          _            = prettyPlaceholder TyProp
-prettyWHNF TyBool          (VInj s _)   = output $ map toLower (show (selectSide s False True))
-prettyWHNF TyC             (VNum _ c)   = output (show $ chr (fromIntegral (numerator c)))
-prettyWHNF (TyList TyC)    v            = prettyString v
-prettyWHNF (TyList ty)     v            = prettyList ty v
-prettyWHNF ty@(_ :*: _)    v            = output "(" >> prettyTuple ty v >> output ")"
-prettyWHNF (ty1 :+: ty2) (VInj s v)
-  = case s of
-      L -> output "left"  >> prettyVP ty1 v
-      R -> output "right" >> prettyVP ty2 v
-prettyWHNF _ (VNum d r)
-  | denominator r == 1 = output $ show (numerator r)
-  | otherwise          = case d of
-      Fraction -> output $ show (numerator r) ++ "/" ++ show (denominator r)
-      Decimal  -> output $ prettyDecimal r
+prettyPlaceholder :: Members '[Reader PA] r => Type -> Sem r Doc
+prettyPlaceholder ty = "<" <> prettyTy ty <> ">"
 
-prettyWHNF ty@(_ :->: _) _ = prettyPlaceholder ty
-
-prettyWHNF (TySet t) (VBag xs) =
-  output "{" >> prettySequence t (map fst xs) ", " >> output "}"
-prettyWHNF (TyBag t) (VBag xs) = prettyBag t xs
-
-prettyWHNF (TyGraph a) (VGraph _ adj) = prettyWHNF (TyMap a (TySet a)) =<< rnfV adj
-prettyWHNF (TyMap k v) (VMap m)
-  | M.null m = output "emptyMap"
-  | otherwise = do
-      output "map("
-      prettyWHNF (TySet (k :*: v)) =<< mapToSet k v (VMap m)
-      output ")"
-
-prettyWHNF ty v = error $
-  "Impossible! No matching case in prettyWHNF for " ++ show v ++ ": " ++ show ty
-
-prettyPlaceholder :: Member (Output String) r => Type -> Sem r ()
-prettyPlaceholder ty = do
-  output "<"
-  tyStr <- renderDoc (prettyTy ty)
-  output tyStr
-  output ">"
+prettyTuple :: Members '[Input TyDefCtx, Reader PA] r => Type -> Value -> Sem r Doc
+prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
+prettyTuple ty v                        = prettyValue ty v
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> [Value] -> String -> Sem r ()
-prettySequence _ []     _   = output ""
-prettySequence t [x]    _   = prettyV t x
-prettySequence t (x:xs) del = prettyV t x >> output del >> prettySequence t xs del
+prettySequence :: Members '[Input TyDefCtx, Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
+prettySequence ty del vs = hsep =<< punctuate (return del) (map (prettyValue ty) vs)
 
-prettyBag :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> [(Value, Integer)] -> Sem r ()
-prettyBag _ []         = output "⟅⟆"
-prettyBag t vs
-  | all ((==1) . snd) vs   = output "⟅" >> prettySequence t (map fst vs) ", " >> output "⟆"
-  | otherwise              = output "⟅" >> prettyCounts vs >> output "⟆"
-
+-- | Pretty-print a literal bag value.
+prettyBag :: Members '[Input TyDefCtx, Reader PA] r => Type -> [(Value,Integer)] -> Sem r Doc
+prettyBag _ [] = bag empty
+prettyBag ty vs
+  | all ((==1) . snd) vs = bag $ prettySequence ty "," (map fst vs)
+  | otherwise            = bag $ hsep =<< punctuate (return ",") (map prettyCount vs)
   where
-    prettyCounts []      = error "Impossible! prettyCounts []"
-    prettyCounts [v]     = prettyCount v
-    prettyCounts (v:vs') = prettyCount v >> output ", " >> prettyCounts vs'
-
-    prettyCount (v,1) = prettyV t v
-    prettyCount (v,n) = prettyV t v >> output (" # " ++ show n)
-
-prettyString :: Members (Input TopInfo ': Output String ': EvalEffects) r => Value -> Sem r ()
-prettyString str = output "\"" >> go str >> output "\""
-  where
-    toChar :: Value -> String
-    toChar (VNum _ c) = drop 1 . reverse . drop 1 . reverse . show $ [chr (fromIntegral (numerator c))]
-    toChar v' = error $ "Impossible! Value that's not a char in prettyString.toChar: " ++ show v'
-
-    go :: Members (Output String ': EvalEffects) r => Value -> Sem r ()
-    go v = do
-      whnfList v (return ()) $ \hd tl -> do
-        hd' <- whnfV hd
-        output (toChar hd')
-        go tl
-
--- | Pretty-print a list with elements of a given type, assuming the
---   list has already been reduced to WHNF.
-prettyList :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyList ty v = output "[" >> go v
-  where
-    go w = whnfList w (output "]") $ \hd tl -> do
-      prettyV ty hd
-      tlWHNF <- whnfV tl
-      case tlWHNF of
-        VInj R _ -> output ", "
-        _        -> return ()
-      go tlWHNF
-
-prettyTuple :: Members (Input TopInfo ': Output String ': EvalEffects) r => Type -> Value -> Sem r ()
-prettyTuple (ty1 :*: ty2) (VPair v1 v2) = do
-  prettyV ty1 v1
-  output ", "
-  whnfV v2 >>= prettyTuple ty2
-prettyTuple ty v = prettyV ty v
+    prettyCount (v,1) = prettyValue ty v
+    prettyCount (v,n) = prettyValue ty v <+> "#" <+> text (show n)
 
 --------------------------------------------------
 -- Pretty-printing decimals
@@ -607,20 +562,27 @@ digitalExpansion b n d = digits
 ------------------------------------------------------------
 
 -- XXX redo with message framework, with proper support for indentation etc.
-prettyTestFailure :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+
+prettyTestFailure
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
 prettyTestFailure _    (TestResult True _ _)    = return ()
 prettyTestFailure prop (TestResult False r env) = do
   prettyFailureReason prop r
   prettyTestEnv "    Counterexample:" env
 
-prettyTestResult :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestResult -> Sem r ()
+prettyTestResult
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   = do
-    dp <- renderDoc $ prettyProperty (eraseProperty prop)
-    output       "  - Test passed: " >> outputLn dp
-    prettySuccessReason r
+  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  output       "  - Test passed: " >> outputLn dp
+  prettySuccessReason r
 
-prettySuccessReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => TestReason -> Sem r ()
+prettySuccessReason
+  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  => TestReason -> Sem r ()
 prettySuccessReason (TestFound (TestResult _ _ vs)) = do
   prettyTestEnv "    Found example:" vs
 prettySuccessReason (TestNotFound Exhaustive) = do
@@ -631,16 +593,19 @@ prettySuccessReason (TestNotFound (Randomized n m)) = do
   outputLn " possibilities without finding a counterexample."
 prettySuccessReason _ = return ()
 
-prettyFailureReason :: Members (Output String ': Input TopInfo ': EvalEffects) r => AProperty -> TestReason -> Sem r ()
+prettyFailureReason
+  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestReason -> Sem r ()
 prettyFailureReason prop TestBool = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
   output     "  - Test is false: " >> outputLn dp
 prettyFailureReason prop (TestEqual ty v1 v2) = do
   output     "  - Test result mismatch for: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  outputLn dp
-  output     "    - Left side:  " >> prettyValue ty v2
-  output     "    - Right side: " >> prettyValue ty v1
+  outputLn =<< renderDoc (prettyProperty (eraseProperty prop))
+  output     "    - Left side:  "
+  outputLn =<< renderDoc (prettyValue ty v2)
+  output     "    - Right side: "
+  outputLn =<< renderDoc (prettyValue ty v1)
 prettyFailureReason prop (TestRuntimeError e) = do
   output     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
@@ -659,7 +624,9 @@ prettyFailureReason prop (TestNotFound (Randomized n m)) = do
   outputLn dp
   output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
 
-prettyTestEnv :: Members (Output String ': Input TopInfo ': EvalEffects) r => String -> TestEnv -> Sem r ()
+prettyTestEnv
+  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  => String -> TestEnv -> Sem r ()
 prettyTestEnv _ (TestEnv []) = return ()
 prettyTestEnv s (TestEnv vs) = do
   outputLn s
@@ -671,4 +638,33 @@ prettyTestEnv s (TestEnv vs) = do
       output x
       output (replicate (maxNameLen - length x) ' ')
       output " = "
-      prettyValue ty v
+      outputLn =<< renderDoc (prettyValue ty v)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

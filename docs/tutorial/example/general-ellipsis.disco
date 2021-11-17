@@ -1,10 +1,10 @@
--- The infinite list of triangular numbers
+-- Some triangular numbers
 triangular : List(N)
-triangular = [1, 3, 6 ..]
+triangular = [1, 3, 6 .. 100]
 
--- The infinite list of squares
+-- Some squares
 squares : List(N)
-squares = [1, 4, 9 ..]
+squares = [1, 4, 9 .. 100]
 
 -- Some cubes
 cubes : List(N)

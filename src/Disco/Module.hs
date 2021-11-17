@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -12,14 +14,15 @@
 --
 -- The 'ModuleInfo' record representing a disco module, and functions
 -- to resolve the location of a module on disk.
---
 -----------------------------------------------------------------------------
 
 module Disco.Module where
 
+import           Data.Data                        (Data)
 import           GHC.Generics                     (Generic)
 
-import           Control.Lens                     (makeLenses)
+import           Control.Lens                     (Getting, foldOf, makeLenses,
+                                                   view)
 import           Control.Monad                    (filterM, foldM)
 import           Control.Monad.IO.Class           (MonadIO (..))
 import           Data.Bifunctor                   (first)
@@ -30,7 +33,7 @@ import qualified Data.Set                         as S
 import           System.Directory                 (doesFileExist)
 import           System.FilePath                  (replaceExtension, (</>))
 
-import           Unbound.Generics.LocallyNameless (Bind, Name, Subst)
+import           Unbound.Generics.LocallyNameless (Alpha, Bind, Name, Subst)
 
 import           Polysemy
 import           Polysemy.Error
@@ -39,6 +42,7 @@ import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Extensions
+import           Disco.Names
 import           Disco.Typecheck.Util             (TCError (..), TyCtx)
 import           Disco.Types
 
@@ -64,8 +68,8 @@ data LoadingMode = REPL | Standalone
 --   @
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
-data Defn  = Defn (Name ATerm) [Type] Type [Clause]
-  deriving (Show, Generic)
+data Defn = Defn (Name ATerm) [Type] Type [Clause]
+  deriving (Show, Generic, Alpha, Data)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete
@@ -93,6 +97,19 @@ data ModuleInfo = ModuleInfo
 
 makeLenses ''ModuleInfo
 
+-- | Get something from a module and its direct imports.
+withImports :: Monoid a => Getting a ModuleInfo a -> ModuleInfo -> a
+withImports l = view l <> foldOf (miImports . traverse . l)
+
+-- | Get the types of all names bound in a module and its direct imports.
+allTys :: ModuleInfo -> TyCtx
+allTys = withImports miTys
+
+-- | Get all type definitions from a module and its direct imports.
+allTydefs :: ModuleInfo -> TyDefCtx
+allTydefs = withImports miTydefs
+
+-- | The empty module info record.
 emptyModuleInfo :: ModuleInfo
 emptyModuleInfo = ModuleInfo REPLModule M.empty emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
 
@@ -129,9 +146,14 @@ combineModuleInfo = foldM combineMods emptyModuleInfo
 -- | A data type indicating where we should look for Disco modules to
 --   be loaded.
 data Resolver
-  = FromDir FilePath          -- ^ Load only from a specific directory     (:load)
-  | FromCwdOrStdlib           -- ^ Load from current working dir or stdlib (import at REPL)
-  | FromDirOrStdlib FilePath  -- ^ Load from specific dir or stdlib        (import in file)
+  = -- | Load only from the stdlib               (standard lib modules)
+    FromStdlib
+  | -- | Load only from a specific directory     (:load)
+    FromDir FilePath
+  | -- | Load from current working dir or stdlib (import at REPL)
+    FromCwdOrStdlib
+  | -- | Load from specific dir or stdlib        (import in file)
+    FromDirOrStdlib FilePath
 
 -- | Add the possibility of loading imports from the stdlib.  For
 --   example, this is what we want to do after a user loads a specific
@@ -152,6 +174,7 @@ resolveModule resolver modname = do
   datadir <- liftIO getDataDir
   let searchPath =
         case resolver of
+          FromStdlib          -> [(datadir, Stdlib)]
           FromDir dir         -> [(dir, Dir dir)]
           FromCwdOrStdlib     -> [(datadir, Stdlib), (".", Dir ".")]
           FromDirOrStdlib dir -> [(datadir, Stdlib), (dir, Dir dir)]

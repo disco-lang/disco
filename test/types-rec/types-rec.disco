@@ -1,3 +1,5 @@
+import product
+
 type DoubleStream = N * N * DoubleStream
 
 cons : N * DoubleStream -> DoubleStream
@@ -7,12 +9,6 @@ cons = \x.x
 
 type T1 = (T1 -> N) * (T1 -> Z)
 type T2 = (T2 -> Z) * (T2 -> Z)
-
-fst : a*b -> a
-fst(a,_) = a
-
-snd : a*b -> b
-snd(_,b) = b
 
 e : T1
 e = (\x:T1. 4, \x:T1. sqrt(fst(x)(x)))

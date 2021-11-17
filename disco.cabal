@@ -36,8 +36,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-prim/input
                      test/arith-round/expected
                      test/arith-round/input
-                     test/bag-ops/expected
-                     test/bag-ops/input
                      test/case-arith/case-arith.disco
                      test/case-arith/expected
                      test/case-arith/input
@@ -49,12 +47,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/input
                      test/compile-cons/expected
                      test/compile-cons/input
-                     test/container-comp/expected
-                     test/container-comp/input
-                     test/container-ops/expected
-                     test/container-ops/input
                      test/containers-cmp/expected
                      test/containers-cmp/input
+                     test/containers-comp/expected
+                     test/containers-comp/input
                      test/containers-convert/expected
                      test/containers-convert/input
                      test/containers-each/expected
@@ -67,17 +63,20 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-join/input
                      test/containers-merge/expected
                      test/containers-merge/input
+                     test/containers-ops/expected
+                     test/containers-ops/input
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
-                     test/interp-fibs/expected
-                     test/interp-fibs/fiblist.disco
-                     test/interp-fibs/input
-                     test/interp-gc/expected
-                     test/interp-gc/input
-                     test/interp-lazymatch/bomb.disco
-                     test/interp-lazymatch/expected
-                     test/interp-lazymatch/input
+                     test/graphs-basic/expected
+                     test/graphs-basic/input
+                     test/graphs-equality/expected
+                     test/graphs-equality/input
+                     test/interp-loop/expected
+                     test/interp-loop/input
+                     test/interp-strictmatch/bomb.disco
+                     test/interp-strictmatch/expected
+                     test/interp-strictmatch/input
                      test/lib-oeis/expected
                      test/lib-oeis/input
                      test/list-comp/expected
@@ -90,6 +89,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/logic-cmp/input
                      test/map-basic/expected
                      test/map-basic/input
+                     test/map-compare/expected
+                     test/map-compare/input
                      test/module-basic/a.disco
                      test/module-basic/b.disco
                      test/module-basic/c.disco
@@ -125,8 +126,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-functions/input
                      test/pretty-issue258/expected
                      test/pretty-issue258/input
-                     test/pretty-lazy/expected
-                     test/pretty-lazy/input
                      test/pretty-lit/expected
                      test/pretty-lit/input
                      test/pretty-ops/expected
@@ -141,6 +140,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/pretty-whnf/input
                      test/prim-crash/expected
                      test/prim-crash/input
+                     test/prim-frac/expected
+                     test/prim-frac/input
                      test/prim-sum/expected
                      test/prim-sum/input
                      test/prop-basic/expected
@@ -148,24 +149,24 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/prop-basic/prop-basic.disco
                      test/prop-cmp/expected
                      test/prop-cmp/input
+                     test/prop-fail/bad-tests.disco
+                     test/prop-fail/expected
+                     test/prop-fail/input
                      test/prop-fairness/expected
                      test/prop-fairness/input
+                     test/prop-higher-order/expected
+                     test/prop-higher-order/higher-order.disco
+                     test/prop-higher-order/input
                      test/prop-holds/expected
                      test/prop-holds/input
                      test/prop-impredicative/expected
                      test/prop-impredicative/input
                      test/prop-impredicative/prop-impredicative.disco
+                     test/prop-tests/expected
+                     test/prop-tests/input
+                     test/prop-tests/prop-tests.disco
                      test/prop-type/expected
                      test/prop-type/input
-                     test/props-basic/expected
-                     test/props-basic/input
-                     test/props-basic/props-basic.disco
-                     test/props-fail/bad-tests.disco
-                     test/props-fail/expected
-                     test/props-fail/input
-                     test/props-higher-order/expected
-                     test/props-higher-order/higher-order.disco
-                     test/props-higher-order/input
                      test/repl-ann/expected
                      test/repl-ann/input
                      test/repl-compile/expected
@@ -176,6 +177,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-defns/input
                      test/repl-desugar/expected
                      test/repl-desugar/input
+                     test/repl-eval-tydef-import/a.disco
+                     test/repl-eval-tydef-import/b.disco
+                     test/repl-eval-tydef-import/expected
+                     test/repl-eval-tydef-import/input
                      test/repl-help/expected
                      test/repl-help/input
                      test/repl-import/expected
@@ -183,6 +188,7 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-names/expected
                      test/repl-names/input
                      test/repl-names/logic.disco
+                     test/repl-names/other.disco
                      test/repl-proptest/expected
                      test/repl-proptest/input
                      test/solver-issue112/diag-iso-bad.disco
@@ -269,9 +275,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-tydef-kind/expected
                      test/types-tydef-kind/input
                      test/types-tydef-kind/types-tydef-kind.disco
-                     test/types-tydef-omega/expected
-                     test/types-tydef-omega/input
-                     test/types-tydef-omega/types-tydef-omega.disco
                      test/types-tydef-param/expected
                      test/types-tydef-param/input
                      test/types-tydef-param/types-tydef-param.disco
@@ -286,7 +289,18 @@ source-repository head
   type:     git
   location: git://github.com/disco-lang/disco.git
 
+common common
+  ghc-options:      -Wall
+                    -Wcompat
+                    -Widentities
+                    -Wincomplete-uni-patterns
+                    -Wincomplete-record-updates
+                    -Wno-star-is-type
+                    -Wpartial-fields
+  default-language: Haskell2010
+
 library
+  import:              common
   ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
   default-extensions:  DataKinds
                        DeriveGeneric
@@ -314,12 +328,15 @@ library
                        Disco.Effects.LFresh
                        Disco.Effects.Output
                        Disco.Effects.Random
+                       Disco.Effects.State
                        Disco.Effects.Store
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
+                       Disco.Data
+                       Disco.Names
                        Disco.Context
                        Disco.Messages
                        Disco.Module
@@ -334,7 +351,7 @@ library
                        Disco.Value
                        Disco.Error
                        Disco.Eval
-                       Disco.Interpret.Core
+                       Disco.Interpret.CESK
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints
@@ -379,12 +396,14 @@ library
                        fgl >= 5.5 && < 5.8,
                        optparse-applicative >= 0.12 && < 0.17,
                        oeis >= 0.3.10,
-                       algebraic-graphs >= 0.5
+                       algebraic-graphs >= 0.5,
+                       pretty-show >= 1.10
 
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable disco
+  import:              common
   hs-source-dirs:      repl
   main-is:             REPL.hs
   build-depends:       base,
@@ -404,6 +423,7 @@ executable disco
   default-language:    Haskell2010
 
 test-suite disco-tests
+  import:              common
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   hs-source-dirs: test
@@ -419,6 +439,7 @@ test-suite disco-tests
   default-language: Haskell2010
 
 test-suite disco-examples
+  import:              common
   type: exitcode-stdio-1.0
   main-is: TestExamples.hs
   hs-source-dirs: example

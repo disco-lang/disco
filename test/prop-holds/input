@@ -1,7 +1,7 @@
 holds (forall (x : Bool). x or not x)
 holds (exists (x : Bool). x)
 holds (exists (f : Bool + Bool -> Bool + Bool). forall (a : Bool). (f (left a) == right a) and (f (right a) == left a))
-holds (exists (f : Bool -> Bool). f /= (\x. f (f (f x))))
+holds (exists (f : Bool -> Bool). exists (x : Bool). f(x) /= f (f (f x)))
 holds (forall (a:N, b:N, c:N). a^2 + b^2 == c^2)
 holds (exists (xs : List(N)). xs == [2, 2, 1])
 holds (exists (xs : Set(Z)). size xs == 3 and reduce(\(a, b). a + b, 0, xs) == 0)

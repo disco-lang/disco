@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Error
@@ -21,10 +22,9 @@ import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Error
 
-import           Disco.AST.Core                   (Core)
-import           Disco.AST.Typed                  (ModuleName)
+import           Disco.Names                      (ModuleName)
 import           Disco.Parser
-import           Disco.Typecheck.Util            (TCError)
+import           Disco.Typecheck.Util             (TCError)
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -54,7 +54,7 @@ data DiscoError where
 data EvalError where
 
   -- | An unbound name.
-  UnboundError  :: Name Core -> EvalError
+  UnboundError  :: Name core  -> EvalError
 
   -- | Division by zero.
   DivByZero     ::              EvalError
@@ -68,10 +68,13 @@ data EvalError where
   -- | Non-exhaustive case analysis.
   NonExhaustive ::              EvalError
 
+  -- | Infinite loop detected via black hole.
+  InfiniteLoop  ::              EvalError
+
   -- | User-generated crash.
   Crash         :: String    -> EvalError
 
-  deriving Show
+deriving instance Show EvalError
 
 outputDiscoErrors :: Member (Output String) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do

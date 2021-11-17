@@ -49,6 +49,7 @@ import           Disco.AST.Typed
 import           Disco.Context                           hiding (filter)
 import qualified Disco.Context                           as Ctx
 import           Disco.Module
+import           Disco.Names
 import           Disco.Subst                             (applySubst)
 import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
@@ -642,12 +643,6 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QSimple a
       return $ TyGraph a :*: TyGraph a :->: TyGraph a
 
-    inferPrim PrimEmptyMap = do
-      a <- freshTy
-      b <- freshTy
-      constraint $ CQual QSimple a
-      return $ TyMap a b
-
     inferPrim PrimInsert = do
       a <- freshTy
       b <- freshTy
@@ -798,14 +793,13 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Ellipses
 
-    -- Actually 'forever' and 'until' support more types than this, e.g. Q
-    -- instead of N, but this is good enough.  These cases are here just
-    -- for completeness---in case someone enables primitives and uses them
-    -- directly---but typically they are generated only during desugaring
-    -- of a container with ellipsis, after typechecking, in which case
-    -- they can be assigned a more appropriate type directly.
+    -- Actually 'until' supports more types than this, e.g. Q instead
+    -- of N, but this is good enough.  This case is here just for
+    -- completeness---in case someone enables primitives and uses it
+    -- directly---but typically 'until' is generated only during
+    -- desugaring of a container with ellipsis, after typechecking, in
+    -- which case it can be assigned a more appropriate type directly.
 
-    inferPrim PrimForever = return $ TyList TyN :->: TyList TyN
     inferPrim PrimUntil   = return $ TyN :*: TyList TyN :->: TyList TyN
 
     ----------------------------------------
@@ -1127,7 +1121,6 @@ typecheck mode t@(TContainer c xs ell)  = do
       :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
       => Mode -> Maybe (Ellipsis Term) -> Sem r (Maybe (Ellipsis ATerm))
     typecheckEllipsis _ Nothing           = return Nothing
-    typecheckEllipsis _ (Just Forever)    = return $ Just Forever
     typecheckEllipsis m (Just (Until tm)) = Just . Until <$> typecheck m tm
 
 -- Container comprehensions

@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Prims
@@ -22,6 +24,7 @@ import           Unbound.Generics.LocallyNameless
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
+import           Data.Data                        (Data)
 import           Disco.Syntax.Operators
 
 ------------------------------------------------------------
@@ -59,7 +62,6 @@ data Prim where
   PrimOverlay    :: Prim        -- ^ Overlay two Graphs
   PrimConnect    :: Prim        -- ^ Connect Graph to another with directed edges
 
-  PrimEmptyMap   :: Prim        -- ^ Empty Map
   PrimInsert     :: Prim        -- ^ Insert into map
   PrimLookup     :: Prim        -- ^ Get value associated with key in map
 
@@ -75,17 +77,13 @@ data Prim where
 
   PrimCrash      :: Prim        -- ^ Crash
 
-  PrimForever    :: Prim        -- ^ @[x, y, z .. ]@
   PrimUntil      :: Prim        -- ^ @[x, y, z .. e]@
 
   PrimHolds      :: Prim        -- ^ Test whether a proposition holds
 
   PrimLookupSeq  :: Prim        -- ^ Lookup OEIS sequence
   PrimExtendSeq  :: Prim        -- ^ Extend OEIS sequence
-  deriving (Show, Read, Eq, Ord, Generic)
-
-instance Alpha Prim
-instance Subst t Prim
+  deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
 -- Concrete syntax for prims
@@ -147,7 +145,6 @@ primTable =
   , PrimInfo PrimOverlay   "overlay"        True
   , PrimInfo PrimConnect   "connect"        True
 
-  , PrimInfo PrimEmptyMap  "emptyMap"       True
   , PrimInfo PrimInsert    "insert"         True
   , PrimInfo PrimLookup    "lookup"         True
 
@@ -163,7 +160,6 @@ primTable =
 
   , PrimInfo PrimCrash     "crash"          False
 
-  , PrimInfo PrimForever   "forever"        False
   , PrimInfo PrimUntil     "until"          False
 
   , PrimInfo PrimHolds     "holds"          True

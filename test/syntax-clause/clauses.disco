@@ -12,6 +12,6 @@ zipWithN f (m :: ms) (n :: ns) = f m n :: zipWithN f ms ns
 -- handle name resolution (the implementation of 'lunbinds' in
 -- Desugar.desugarDefn was wrong).
 
-append : List(ℕ) × List(ℕ) → List(ℕ)
-append ([]    , ys) = ys
-append (x::xs', ys) = x :: append(xs',ys)
+appendC : List(ℕ) × List(ℕ) → List(ℕ)
+appendC ([]    , ys) = ys
+appendC (x::xs', ys) = x :: appendC(xs',ys)

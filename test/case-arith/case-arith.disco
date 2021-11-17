@@ -34,17 +34,18 @@ Zabs : Z -> Z
 Zabs (-x) = x
 Zabs x    = x
 
-type Tree = F * Tree * Tree
+type Tree = Unit + F * Tree * Tree
 
-expandTree : F -> Tree
-expandTree (a/b) = (a/b, expandTree (a/(a+b)), expandTree ((a+b)/b))
+expandTree : N -> F -> Tree
+expandTree 0 _     = left(unit)
+expandTree n (a/b) = right(a/b, expandTree (n .- 1) (a/(a+b)), expandTree (n .- 1) ((a+b)/b))
 
-cwTree : Tree
-cwTree = expandTree 1
+cwTree : N -> Tree
+cwTree n = expandTree n 1
 
-inorder : N -> Tree -> List(F)
-inorder 0     (x,_,_) = [x]
-inorder (n+1) (x,l,r) = append(inorder n l, x :: inorder n r)
+inorder : Tree -> List(F)
+inorder (left(unit))   = []
+inorder (right(x,l,r)) = append(inorder(l), x :: inorder(r))
 
 numerator : Q -> Z
 numerator (p/q) = p

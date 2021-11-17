@@ -31,7 +31,7 @@ Zabs(17)
 Zabs(-17)
 Zabs(0)
 
-inorder 3 cwTree
+inorder(cwTree(4))
 
 numerator 5
 denominator 5

@@ -1,0 +1,2 @@
+:load test/repl-eval-tydef-import/a.disco
+x

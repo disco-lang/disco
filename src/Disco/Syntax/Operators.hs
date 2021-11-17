@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Operators
@@ -24,6 +26,7 @@ module Disco.Syntax.Operators
 
        ) where
 
+import           Data.Data                        (Data)
 import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
@@ -38,7 +41,7 @@ import qualified Data.Map                         as M
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
-  deriving (Show, Read, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Binary operators.
 data BOp = Add      -- ^ Addition (@+@)
@@ -69,20 +72,12 @@ data BOp = Add      -- ^ Addition (@+@)
          | Elem     -- ^ Element test (@∈@)
          | Subset   -- ^ Subset test (@⊆@)
          | ShouldEq -- ^ Equality assertion (@=!=@)
-  deriving (Show, Read, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.
 data TyOp = Enumerate -- ^ List all values of a type
           | Count     -- ^ Count how many values there are of a type
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha UOp
-instance Alpha BOp
-instance Alpha TyOp
-
-instance Subst t UOp
-instance Subst t BOp
-instance Subst t TyOp
+  deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 ------------------------------------------------------------
 -- Operator info

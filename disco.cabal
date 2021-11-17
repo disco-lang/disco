@@ -70,6 +70,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-reduce/input
                      test/graphs-basic/expected
                      test/graphs-basic/input
+                     test/graphs-equality/expected
+                     test/graphs-equality/input
                      test/interp-loop/expected
                      test/interp-loop/input
                      test/interp-strictmatch/bomb.disco
@@ -87,6 +89,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/logic-cmp/input
                      test/map-basic/expected
                      test/map-basic/input
+                     test/map-compare/expected
+                     test/map-compare/input
                      test/module-basic/a.disco
                      test/module-basic/b.disco
                      test/module-basic/c.disco

@@ -432,15 +432,7 @@ appConst k = \case
     out $ VGraph (Overlay g1 g2)
   OConnect -> arity2 $ withGraph2 OConnect $ \g1 g2 ->
     out $ VGraph (Connect g1 g2)
-  OSummary -> withGraph OSummary $ out . toDiscoAdjMap . reifyGraph
-    where
-      reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
-      reifyGraph =
-        AdjMap.adjacencyList . foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect
-
-      toDiscoAdjMap :: [(SimpleValue, [SimpleValue])] -> Value
-      toDiscoAdjMap =
-        VMap . M.fromList . map (second (VBag . countValues . map fromSimpleValue))
+  OSummary -> withGraph OSummary $ out . graphSummary
 
   --------------------------------------------------
   -- Propositions
@@ -553,16 +545,23 @@ valCmp VUnit VUnit = EQ
 valCmp (VPair v11 v12) (VPair v21 v22) = valCmp v11 v21 <> valCmp v12 v22
 valCmp (VType ty1) (VType ty2) = compare ty1 ty2
 valCmp (VBag cs1) (VBag cs2) = compareBags cs1 cs2
+valCmp (VMap m1) (VMap m2) = compareMaps (M.assocs m1) (M.assocs m2)
+valCmp (VGraph g1) (VGraph g2) = valCmp (graphSummary g1) (graphSummary g2)
 valCmp v1 v2 = error $ "valCmp " ++ show v1 ++ " " ++ show v2
 
 compareBags :: [(Value, Integer)] -> [(Value, Integer)] -> Ordering
 compareBags [] [] = EQ
 compareBags [] _ = LT
 compareBags _ [] = GT
-compareBags ((x, xn) : xs) ((y, yn) : ys) = valCmp x y <> compare xn yn <> compareBags xs ys
+compareBags ((x, xn) : xs) ((y, yn) : ys)
+  = valCmp x y <> compare xn yn <> compareBags xs ys
 
--- VConst, VClo, VFun_
--- VBag, VGraph, VMap
+compareMaps :: [(SimpleValue, Value)] -> [(SimpleValue, Value)] -> Ordering
+compareMaps [] [] = EQ
+compareMaps [] _ = LT
+compareMaps _ [] = GT
+compareMaps ((k1, v1) : as1) ((k2, v2) : as2)
+  = valCmp (fromSimpleValue k1) (fromSimpleValue k2) <> valCmp v1 v2 <> compareMaps as1 as2
 
 ------------------------------------------------------------
 -- Polynomial sequences [a,b,c,d .. e]
@@ -698,6 +697,21 @@ mergeM g = go
         VNum _ 0 -> zs
         VNum _ n -> (a, numerator n) : zs
         v -> error $ "Impossible! merge function in mergeM returned non-VNum " ++ show v
+
+------------------------------------------------------------
+-- Graphs
+------------------------------------------------------------
+
+graphSummary :: Graph SimpleValue -> Value
+graphSummary = toDiscoAdjMap . reifyGraph
+  where
+    reifyGraph :: Graph SimpleValue -> [(SimpleValue, [SimpleValue])]
+    reifyGraph =
+      AdjMap.adjacencyList . foldg AdjMap.empty AdjMap.vertex AdjMap.overlay AdjMap.connect
+
+    toDiscoAdjMap :: [(SimpleValue, [SimpleValue])] -> Value
+    toDiscoAdjMap =
+      VMap . M.fromList . map (second (VBag . countValues . map fromSimpleValue))
 
 ------------------------------------------------------------
 -- Propositions / tests

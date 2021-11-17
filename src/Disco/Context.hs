@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveFunctor     #-}
+
+
 {-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------

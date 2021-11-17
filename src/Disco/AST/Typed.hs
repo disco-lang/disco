@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveAnyClass     #-}
+
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms    #-}
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass       #-}
 {-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE StandaloneDeriving   #-}
+
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------

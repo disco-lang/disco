@@ -15,43 +15,58 @@
 
 module Disco.Messages where
 
-import           Unbound.Generics.LocallyNameless
+-- import           Unbound.Generics.LocallyNameless
 
-import           Data.Sequence                    (Seq)
-import qualified Data.Sequence                    as Seq
+-- import           Disco.AST.Core
+-- import           Disco.AST.Surface
+-- import           Disco.AST.Typed
 
-import           Disco.AST.Core
-import           Disco.AST.Surface
-import           Disco.AST.Typed
+import           Polysemy
+import           Polysemy.Output
 
-data MessageLevel
+data MessageType
   = Info
   | Warning
   | Error
   | Debug
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
-data Report
-  = RTxt   String
-  | RName  AnyName
-  | RTerm  Term
-  | RPat   Pattern
-  | RATerm ATerm
-  | RCore  Core
-  | RSeq   [Report]
-  | RList  [Report]
-  | RSub   Report
+-- data Report
+--   = RTxt   String
+--   | RName  AnyName
+--   | RTerm  Term
+--   | RPat   Pattern
+--   | RATerm ATerm
+--   | RCore  Core
+--   | RSeq   [Report]
+--   | RList  [Report]
+--   | RSub   Report
+--   deriving (Show)
+
+data Message = Message MessageType String
   deriving (Show)
 
-data MessageBody e
-  = Msg  Report
-  | Item e
-  deriving (Show, Functor)
+printMsg :: Member (Embed IO) r => Message -> Sem r ()
+printMsg (Message Debug _) = return ()
+printMsg (Message _ m)     = embed $ putStr m
 
-data Message e = Message MessageLevel (MessageBody e)
-  deriving (Show, Functor)
+msgLn :: Member (Output Message) r => MessageType -> String -> Sem r ()
+msgLn typ = msg typ . (++"\n")
 
-type MessageLog e = Seq (Message e)
+msg :: Member (Output Message) r => MessageType -> String -> Sem r ()
+msg typ = output . Message typ
 
-emptyMessageLog :: MessageLog e
-emptyMessageLog = Seq.empty
+info :: Member (Output Message) r => String -> Sem r ()
+info = msgLn Info
+
+info' :: Member (Output Message) r => String -> Sem r ()
+info' = msg Info
+
+warn :: Member (Output Message) r => String -> Sem r ()
+warn = msgLn Warning
+
+debug :: Member (Output Message) r => String -> Sem r ()
+debug = msgLn Debug
+
+err :: Member (Output Message) r => String -> Sem r ()
+err = msgLn Error

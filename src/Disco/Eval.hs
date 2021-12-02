@@ -16,7 +16,7 @@ module Disco.Eval
        (
          -- * Effects
 
-         EvalEffects, Debug(..), debug
+         EvalEffects
        , DiscoEffects
 
          -- * Top-level info record and associated lenses
@@ -63,10 +63,10 @@ import           Disco.Effects.Error
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
-import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Fail
+import           Polysemy.Output
 import           Polysemy.Random
 import           Polysemy.Reader
 import           Polysemy.State
@@ -78,6 +78,7 @@ import           Disco.Context            as Ctx
 import           Disco.Error
 import           Disco.Extensions
 import           Disco.Interpret.CESK
+import           Disco.Messages
 import           Disco.Module
 import           Disco.Names
 import           Disco.Parser
@@ -101,20 +102,12 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 -- However, just manually implementing it here seems easier.
 
 -- | Effects needed at the top level.
-type TopEffects = '[Error DiscoError, State TopInfo, Output String, Embed IO, Final (H.InputT IO)]
+type TopEffects = '[Error DiscoError, State TopInfo, Output Message, Embed IO, Final (H.InputT IO)]
 
 -- | Effects needed for evaluation.
-type EvalEffects = [Error EvalError, Random, LFresh, Output Debug, State Mem]
+type EvalEffects = [Error EvalError, Random, LFresh, Output Message, State Mem]
   -- XXX write about order.
   -- memory, counter etc. should not be reset by errors.
-
-  -- XXX add some kind of proper logging effect(s)
-    -- With tags so we can filter on log messages we want??
-
-newtype Debug = Debug { unDebug :: String }
-
-debug :: Member (Output Debug) r => String -> Sem r ()
-debug = output . Debug
 
 -- | All effects needed for the top level + evaluation.
 type DiscoEffects = AppendEffects EvalEffects TopEffects
@@ -172,18 +165,16 @@ runDisco =
     . runFinal @(H.InputT IO)
     . embedToFinal
     . runEmbedded @_ @(H.InputT IO) liftIO
-    . runOutputSem (embed . putStr) -- Handle Output String via printing to console
+    . runOutputSem printMsg -- Handle Output Message via printing to console
     . stateToIO initTopInfo -- Run State TopInfo via an IORef
-    . inputToState -- Dispatch Input TopInfo effect via State effect
-    . runState emptyMem
-    . outputDiscoErrors -- Output any top-level errors
-    -- . runOutputSem (embed . putStrLn . unDebug)   -- debugging mode
-    . ignoreOutput @Debug -- non-debugging mode: ignore Debug output
-    . runLFresh -- Generate locally fresh names
-    . runRandomIO -- Generate randomness via IO
-    . mapError EvalErr -- Embed runtime errors into top-level error type
-    . failToError Panic -- Turn pattern-match failures into a Panic error
-    . runReader emptyCtx -- Keep track of current Env
+    . inputToState          -- Dispatch Input TopInfo effect via State effect
+    . runState emptyMem     -- Start with empty memory
+    . outputDiscoErrors     -- Output any top-level errors
+    . runLFresh             -- Generate locally fresh names
+    . runRandomIO           -- Generate randomness via IO
+    . mapError EvalErr      -- Embed runtime errors into top-level error type
+    . failToError Panic     -- Turn pattern-match failures into a Panic error
+    . runReader emptyCtx    -- Keep track of current Env
 
 ------------------------------------------------------------
 -- Environment utilities
@@ -265,7 +256,7 @@ typecheckTop tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule
-  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> FilePath -> Sem r ModuleInfo
 loadDiscoModule quiet resolver =
   loadDiscoModule' quiet resolver S.empty
@@ -276,7 +267,7 @@ loadDiscoModule quiet resolver =
 --   module loaded from disk).  Used for e.g. blocks/modules entered
 --   at the REPL prompt.
 loadParsedDiscoModule
-  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule quiet resolver =
   loadParsedDiscoModule' quiet REPL resolver S.empty
@@ -286,7 +277,7 @@ loadParsedDiscoModule quiet resolver =
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
-  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> S.Set ModuleName -> FilePath
   -> Sem r ModuleInfo
 loadDiscoModule' quiet resolver inProcess modPath  = do
@@ -298,7 +289,7 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
-      unless quiet $ outputLn $ "Loading " ++ (modPath -<.> "disco") ++ "..."
+      unless quiet $ info $ "Loading " ++ (modPath -<.> "disco") ++ "..."
       cm <- parseDiscoModule resolvedPath
       loadParsedDiscoModule' quiet Standalone resolver (S.insert name inProcess) name cm
 
@@ -314,7 +305,7 @@ stdLib = ["list", "container"]
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule'
-  :: Members '[State TopInfo, Output String, Random, State Mem, Error DiscoError, Embed IO] r
+  :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
 
@@ -351,17 +342,17 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
 
 -- | Try loading the contents of a file from the filesystem, emitting
 --   an error if it's not found.
-loadFile :: Members '[Output String, Embed IO] r => FilePath -> Sem r (Maybe String)
+loadFile :: Members '[Output Message, Embed IO] r => FilePath -> Sem r (Maybe String)
 loadFile file = do
   res <- liftIO $ handle @SomeException (return . Left) (Right <$> readFile file)
   case res of
-    Left _  -> outputLn ("File not found: " ++ file) >> return Nothing
+    Left _  -> info ("File not found: " ++ file) >> return Nothing
     Right s -> return (Just s)
 
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addToREPLModule
-  :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Debug] r
+  :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Message] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
   curMI <- gets @TopInfo (view replModInfo)
@@ -373,7 +364,7 @@ addToREPLModule mi = do
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setREPLModule
-  :: Members '[State TopInfo, Random, Error EvalError, State Mem, Output Debug] r
+  :: Members '[State TopInfo, Random, Error EvalError, State Mem, Output Message] r
   => ModuleInfo -> Sem r ()
 setREPLModule mi = do
   modify @TopInfo $ replModInfo .~ mi

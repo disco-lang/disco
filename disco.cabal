@@ -326,7 +326,6 @@ library
                        Disco.Effects.Fresh
                        Disco.Effects.Input
                        Disco.Effects.LFresh
-                       Disco.Effects.Output
                        Disco.Effects.Random
                        Disco.Effects.State
                        Disco.Effects.Store

@@ -32,9 +32,9 @@ import           Data.Ratio
 import           Algebra.Graph                    (foldg)
 
 import           Disco.Effects.LFresh
-import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Input
+import           Polysemy.Output
 import           Polysemy.Reader
 
 import           Text.PrettyPrint                 (Doc)
@@ -45,6 +45,7 @@ import           Disco.AST.Core                   (Op (OEmptyGraph),
                                                    RationalDisplay (..))
 import           Disco.AST.Surface
 import           Disco.AST.Typed
+import           Disco.Messages
 import           Disco.Module
 import           Disco.Pretty.DSL
 import           Disco.Pretty.Prec
@@ -564,7 +565,7 @@ digitalExpansion b n d = digits
 -- XXX redo with message framework, with proper support for indentation etc.
 
 prettyTestFailure
-  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestResult -> Sem r ()
 prettyTestFailure _    (TestResult True _ _)    = return ()
 prettyTestFailure prop (TestResult False r env) = do
@@ -572,73 +573,83 @@ prettyTestFailure prop (TestResult False r env) = do
   prettyTestEnv "    Counterexample:" env
 
 prettyTestResult
-  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestResult -> Sem r ()
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  output       "  - Test passed: " >> outputLn dp
+  info'       "  - Test passed: " >> info dp
   prettySuccessReason r
 
 prettySuccessReason
-  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  :: Members '[Output Message, Input TyDefCtx, Reader PA] r
   => TestReason -> Sem r ()
 prettySuccessReason (TestFound (TestResult _ _ vs)) = do
   prettyTestEnv "    Found example:" vs
 prettySuccessReason (TestNotFound Exhaustive) = do
-  outputLn     "    No counterexamples exist."
+  info     "    No counterexamples exist."
 prettySuccessReason (TestNotFound (Randomized n m)) = do
-  output       "    Checked "
-  output (show (n + m))
-  outputLn " possibilities without finding a counterexample."
+  info'       "    Checked "
+  info' (show (n + m))
+  info " possibilities without finding a counterexample."
 prettySuccessReason _ = return ()
 
 prettyFailureReason
-  :: Members '[Output String, Input TyDefCtx, LFresh, Reader PA] r
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestReason -> Sem r ()
 prettyFailureReason prop TestBool = do
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  output     "  - Test is false: " >> outputLn dp
+  info'     "  - Test is false: " >> info dp
 prettyFailureReason prop (TestEqual ty v1 v2) = do
-  output     "  - Test result mismatch for: "
-  outputLn =<< renderDoc (prettyProperty (eraseProperty prop))
-  output     "    - Left side:  "
-  outputLn =<< renderDoc (prettyValue ty v2)
-  output     "    - Right side: "
-  outputLn =<< renderDoc (prettyValue ty v1)
+  info'     "  - Test result mismatch for: "
+  info =<< renderDoc (prettyProperty (eraseProperty prop))
+  info'     "    - Left side:  "
+  info =<< renderDoc (prettyValue ty v2)
+  info'     "    - Right side: "
+  info =<< renderDoc (prettyValue ty v1)
 prettyFailureReason prop (TestRuntimeError e) = do
-  output     "  - Test failed: "
+  info'     "  - Test failed: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  outputLn dp
-  output     "    " >> printoutLn e
+  info dp
+  info'     "    " >> info (show e)
 prettyFailureReason prop (TestFound (TestResult _ r _)) = do
   prettyFailureReason prop r
 prettyFailureReason prop (TestNotFound Exhaustive) = do
-  output     "  - No example exists: "
+  info'     "  - No example exists: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  outputLn dp
-  outputLn   "    All possible values were checked."
+  info dp
+  info   "    All possible values were checked."
 prettyFailureReason prop (TestNotFound (Randomized n m)) = do
-  output     "  - No example was found: "
+  info'     "  - No example was found: "
   dp <- renderDoc $ prettyProperty (eraseProperty prop)
-  outputLn dp
-  output     "    Checked " >> output (show (n + m)) >> outputLn " possibilities."
+  info dp
+  info'     "    Checked " >> info' (show (n + m)) >> info " possibilities."
 
 prettyTestEnv
-  :: Members '[Output String, Input TyDefCtx, Reader PA] r
+  :: Members '[Output Message, Input TyDefCtx, Reader PA] r
   => String -> TestEnv -> Sem r ()
 prettyTestEnv _ (TestEnv []) = return ()
 prettyTestEnv s (TestEnv vs) = do
-  outputLn s
+  info s
   mapM_ prettyBind vs
   where
     maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
     prettyBind (x, ty, v) = do
-      output "      "
-      output x
-      output (replicate (maxNameLen - length x) ' ')
-      output " = "
-      outputLn =<< renderDoc (prettyValue ty v)
+      info' "      "
+      info' x
+      info' (replicate (maxNameLen - length x) ' ')
+      info' " = "
+      info =<< renderDoc (prettyValue ty v)
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -18,10 +18,11 @@ import           Text.Megaparsec                  (ParseErrorBundle,
                                                    errorBundlePretty)
 import           Unbound.Generics.LocallyNameless (Name)
 
-import           Disco.Effects.Output
 import           Polysemy
 import           Polysemy.Error
+import           Polysemy.Output
 
+import           Disco.Messages
 import           Disco.Names                      (ModuleName)
 import           Disco.Parser
 import           Disco.Typecheck.Util             (TCError)
@@ -76,10 +77,10 @@ data EvalError where
 
 deriving instance Show EvalError
 
-outputDiscoErrors :: Member (Output String) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
-  either (outputLn . prettyDiscoError) return e
+  either (err . prettyDiscoError) return e
 
 prettyDiscoError :: DiscoError -> String
 prettyDiscoError (ParseErr pe) = errorBundlePretty pe

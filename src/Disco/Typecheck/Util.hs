@@ -115,7 +115,8 @@ solve :: Members '[Reader TyDefCtx, Error TCError] r => Sem (Writer Constraint '
 solve m = do
   (a, c) <- withConstraint m
   tds <- ask @TyDefCtx
-  case runSolveM . solveConstraint tds $ c of
+  res <- runSolve . solveConstraint tds $ c
+  case res of
     Left err -> throw (Unsolvable err)
     Right s  -> return (a, s)
 

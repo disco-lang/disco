@@ -37,6 +37,7 @@ import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless (Name, name2String,
                                                    string2Name)
 
+import           Disco.EFfects.State
 import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
@@ -387,10 +388,10 @@ handleEval (Eval m) = do
 
 evalTerm :: Members (Error EvalError ': State TopInfo ': Output Message ': EvalEffects) r => ATerm -> Sem r Value
 evalTerm at = do
-  env <- gets @TopInfo (view topEnv)
+  env <- use @TopInfo topEnv
   v <- runInputConst env $ eval (compileTerm at)
 
-  tydefs <- gets @TopInfo (view $ replModInfo . to allTydefs)
+  tydefs <- use @TopInfo (replModInfo . to allTydefs)
   s <- runInputConst tydefs . renderDoc $ prettyValue ty v
   info s
 
@@ -613,7 +614,7 @@ handleReload ::
   REPLExpr 'CReload ->
   Sem r ()
 handleReload Reload = do
-  file <- gets (view lastFile)
+  file <- use lastFile
   case file of
     Nothing -> info "No file to reload."
     Just f  -> void (handleLoad f)
@@ -673,7 +674,7 @@ handleTest ::
   Sem r ()
 handleTest (TestProp t) = do
   at <- inputToState . typecheckTop $ checkProperty t
-  tydefs <- gets @TopInfo (view (replModInfo . to allTydefs))
+  tydefs <- use @TopInfo (replModInfo . to allTydefs)
   inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
     runInputConst tydefs . runReader initPA $ prettyTestResult at r

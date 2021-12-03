@@ -43,10 +43,10 @@ import           Disco.Interactive.Commands
 import           Disco.Messages
 import           Disco.Module                           (miExts)
 
+import           Disco.Effects.State
 import           Polysemy
 import           Polysemy.ConstraintAbsorber.MonadCatch
 import           Polysemy.Error
-import           Polysemy.State
 
 ------------------------------------------------------------
 -- Command-line options parser
@@ -173,7 +173,7 @@ discoMain = do
 handleCMD :: Members DiscoEffects r => String -> Sem r ()
 handleCMD "" = return ()
 handleCMD s = do
-  exts <- gets @TopInfo (view (replModInfo . miExts))
+  exts <- use @TopInfo (replModInfo . miExts)
   case parseLine discoCommands exts s of
     Left m  -> info m
     Right l -> catch @DiscoError (dispatch discoCommands l) (info . show)

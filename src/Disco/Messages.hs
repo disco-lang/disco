@@ -1,4 +1,5 @@
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,6 +22,8 @@ module Disco.Messages where
 -- import           Disco.AST.Surface
 -- import           Disco.AST.Typed
 
+import           Control.Lens
+import           Control.Monad   (when)
 import           Polysemy
 import           Polysemy.Output
 
@@ -43,11 +46,15 @@ data MessageType
 --   | RSub   Report
 --   deriving (Show)
 
-data Message = Message MessageType String
+data Message = Message { _messageType :: MessageType, _message :: String }
   deriving (Show)
 
+makeLenses ''Message
+
+handleMsg :: Member (Embed IO) r => (Message -> Bool) -> Message -> Sem r ()
+handleMsg p m = when (p m) $ printMsg m
+
 printMsg :: Member (Embed IO) r => Message -> Sem r ()
-printMsg (Message Debug _) = return ()
 printMsg (Message _ m)     = embed $ putStr m
 
 msgLn :: Member (Output Message) r => MessageType -> String -> Sem r ()

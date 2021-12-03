@@ -19,8 +19,10 @@ module Disco.Typecheck where
 import           Control.Arrow                           ((&&&))
 import           Control.Lens                            ((^..))
 import           Control.Monad.Except
+import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor                          (first)
 import           Data.Coerce
+import qualified Data.Foldable                           as F
 import           Data.List                               (group, sort)
 import           Data.Map                                (Map)
 import qualified Data.Map                                as M
@@ -39,15 +41,15 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Disco.Effects.Fresh
 import           Polysemy                                hiding (embed)
 import           Polysemy.Error
+import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
 
-import           Control.Monad.Trans.Maybe
-import qualified Data.Foldable                           as F
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Context                           hiding (filter)
 import qualified Disco.Context                           as Ctx
+import           Disco.Messages
 import           Disco.Module
 import           Disco.Names
 import           Disco.Subst                             (applySubst)
@@ -55,7 +57,6 @@ import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Solve
 import           Disco.Typecheck.Util
 import           Disco.Types
 import           Disco.Types.Rules
@@ -104,7 +105,7 @@ inferTelescope inferOne tel = do
 --   imports should already be checked and passed in as the second
 --   argument.
 checkModule
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
@@ -416,14 +417,14 @@ infer = typecheck Infer
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
 inferTop
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Term -> Sem r (ATerm, PolyType)
 inferTop t = do
 
   -- Run inference on the term and try to solve the resulting
   -- constraints.
   (at, theta) <- solve $ infer t
-  traceShowM at
+  debug (show at)  -- XXX for testing
 
       -- Apply the resulting substitution.
   let at' = applySubst theta at

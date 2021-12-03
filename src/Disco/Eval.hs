@@ -63,6 +63,7 @@ import           Disco.Effects.Error
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
+import           Disco.Effects.State
 import           Polysemy
 import           Polysemy.Embed
 import           Polysemy.Fail
@@ -165,16 +166,16 @@ runDisco =
     . runFinal @(H.InputT IO)
     . embedToFinal
     . runEmbedded @_ @(H.InputT IO) liftIO
-    . runOutputSem printMsg -- Handle Output Message via printing to console
-    . stateToIO initTopInfo -- Run State TopInfo via an IORef
-    . inputToState          -- Dispatch Input TopInfo effect via State effect
-    . runState emptyMem     -- Start with empty memory
-    . outputDiscoErrors     -- Output any top-level errors
-    . runLFresh             -- Generate locally fresh names
-    . runRandomIO           -- Generate randomness via IO
-    . mapError EvalErr      -- Embed runtime errors into top-level error type
-    . failToError Panic     -- Turn pattern-match failures into a Panic error
-    . runReader emptyCtx    -- Keep track of current Env
+    . runOutputSem (handleMsg ((/= Debug) . view messageType))   -- Handle Output Message via printing to console
+    . stateToIO initTopInfo                 -- Run State TopInfo via an IORef
+    . inputToState                          -- Dispatch Input TopInfo effect via State effect
+    . runState emptyMem                     -- Start with empty memory
+    . outputDiscoErrors                     -- Output any top-level errors
+    . runLFresh                             -- Generate locally fresh names
+    . runRandomIO                           -- Generate randomness via IO
+    . mapError EvalErr                      -- Embed runtime errors into top-level error type
+    . failToError Panic                     -- Turn pattern-match failures into a Panic error
+    . runReader emptyCtx                    -- Keep track of current Env
 
 ------------------------------------------------------------
 -- Environment utilities
@@ -285,7 +286,7 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
                   >>= maybe (throw $ ModuleNotFound modPath) return
   let name = Named prov modPath
   when (S.member name inProcess) (throw $ CyclicImport name)
-  modMap <- gets @TopInfo (view topModMap)
+  modMap <- use @TopInfo topModMap
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
@@ -318,9 +319,9 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   let modImps = M.fromList (map (view miName &&& id) (mis ++ stdmis))
 
   -- Get context and type definitions from the REPL, in case we are in REPL mode.
-  topImports <- gets (view (replModInfo . miImports))
-  topTyCtx   <- gets (view (replModInfo . miTys))
-  topTyDefns <- gets (view (replModInfo . miTydefs))
+  topImports <- use (replModInfo . miImports)
+  topTyCtx   <- use (replModInfo . miTys)
+  topTyDefns <- use (replModInfo . miTydefs)
 
   -- Choose the contexts to use based on mode: if we are loading a
   -- standalone module, we should start it in an empty context.  If we
@@ -355,7 +356,7 @@ addToREPLModule
   :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Message] r
   => ModuleInfo -> Sem r ()
 addToREPLModule mi = do
-  curMI <- gets @TopInfo (view replModInfo)
+  curMI <- use @TopInfo replModInfo
   mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
   modify @TopInfo $ replModInfo .~ mi'
 

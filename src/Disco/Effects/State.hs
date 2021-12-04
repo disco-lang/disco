@@ -19,7 +19,7 @@ module Disco.Effects.State
   ,(%=),(.=))
   where
 
-import           Control.Lens   (Lens', view, (%~), (.~))
+import           Control.Lens   (Getter, Lens', view, (%~), (.~))
 
 import           Polysemy
 import           Polysemy.State
@@ -30,7 +30,7 @@ zoom l = interpret \case
   Get   -> view l <$> get
   Put a -> modify (l .~ a)
 
-use :: Member (State s) r => Lens' s a -> Sem r a
+use :: Member (State s) r => Getter s a -> Sem r a
 use = gets . view
 
 infix 4 .=, %=

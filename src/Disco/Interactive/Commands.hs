@@ -37,14 +37,13 @@ import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless (Name, name2String,
                                                    string2Name)
 
-import           Disco.EFfects.State
 import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
+import           Disco.Effects.State
 import           Polysemy
 import           Polysemy.Output
 import           Polysemy.Reader
-import           Polysemy.State
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed

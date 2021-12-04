@@ -70,7 +70,6 @@ import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Random
 import           Polysemy.Reader
-import           Polysemy.State
 
 import           Disco.AST.Core
 import           Disco.AST.Surface

@@ -24,7 +24,6 @@ module Disco.Interactive.CmdLine
 
   ) where
 
-import           Control.Lens                           (view)
 import           Control.Monad                          (unless)
 import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))

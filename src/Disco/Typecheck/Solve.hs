@@ -54,16 +54,6 @@ import           Disco.Types
 import           Disco.Types.Qualifiers
 import           Disco.Types.Rules
 
--- import qualified Debug.Trace                      as Debug
-
-traceM :: Applicative f => String -> f ()
-traceM _ = pure ()
--- traceM = Debug.traceM
-
-traceShowM :: (Show a, Applicative f) => a -> f ()
-traceShowM _ = pure ()
--- traceShowM = Debug.traceShowM
-
 --------------------------------------------------
 -- Solver errors
 
@@ -244,7 +234,8 @@ solveConstraint tyDefns c = do
   -- list of possible constraint sets; each one consists of equational
   -- and subtyping constraints in addition to qualifiers.
 
-  traceShowM c
+  debug "Solving:"
+  debug (show c)
 
   debug "------------------------------"
   debug "Decomposing constraints..."
@@ -256,12 +247,12 @@ solveConstraint tyDefns c = do
   asum' (map (uncurry (solveConstraintChoice tyDefns)) qcList)
 
 solveConstraintChoice
-  :: Members '[Fresh, Error SolveError] r
+  :: Members '[Fresh, Error SolveError, Output Message] r
   => TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> Sem r S
 solveConstraintChoice tyDefns quals cs = do
 
-  traceM (show quals)
-  traceM (show cs)
+  debug (show quals)
+  debug (show cs)
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
@@ -274,20 +265,20 @@ solveConstraintChoice tyDefns quals cs = do
   -- subtyping constraints.  Also simplify/update qualifier set
   -- accordingly.
 
-  traceM "------------------------------"
-  traceM "Running simplifier..."
+  debug "------------------------------"
+  debug "Running simplifier..."
 
   (vm, atoms, theta_simp) <- simplify tyDefns quals cs
 
-  traceM (show vm)
-  traceM (show atoms)
-  traceM (show theta_simp)
+  debug (show vm)
+  debug (show atoms)
+  debug (show theta_simp)
 
   -- Step 4. Turn the atomic constraints into a directed constraint
   -- graph.
 
-  traceM "------------------------------"
-  traceM "Generating constraint graph..."
+  debug "------------------------------"
+  debug "Generating constraint graph..."
 
   -- Some variables might have qualifiers but not participate in any
   -- equality or subtyping relations (see issue #153); make sure to
@@ -298,7 +289,7 @@ solveConstraintChoice tyDefns quals cs = do
       vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm
       g = mkConstraintGraph vars atoms
 
-  traceShowM g
+  debug (show g)
 
   -- Step 5.
   -- Check for any weakly connected components containing more
@@ -306,11 +297,11 @@ solveConstraintChoice tyDefns quals cs = do
   -- not allowed.  Other WCCs with a single skolem simply unify to
   -- that skolem.
 
-  traceM "------------------------------"
-  traceM "Checking WCCs for skolems..."
+  debug "------------------------------"
+  debug "Checking WCCs for skolems..."
 
   (g', theta_skolem) <- checkSkolems tyDefns vm g
-  traceShowM theta_skolem
+  debug (show theta_skolem)
 
   -- We don't need to ensure that theta_skolem respects sorts since
   -- checkSkolems will only unify skolem vars with unsorted variables.
@@ -320,13 +311,13 @@ solveConstraintChoice tyDefns quals cs = do
   -- connected component into a single node, unifying all the atoms in
   -- each component.
 
-  traceM "------------------------------"
-  traceM "Collapsing SCCs..."
+  debug "------------------------------"
+  debug "Collapsing SCCs..."
 
   (g'', theta_cyc) <- elimCycles tyDefns g'
 
-  traceShowM g''
-  traceShowM theta_cyc
+  debug (show g'')
+  debug (show theta_cyc)
 
   -- Check that the resulting substitution respects sorts...
   let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort vm x)
@@ -339,8 +330,8 @@ solveConstraintChoice tyDefns quals cs = do
   -- Just make sure that if theta_cyc maps x |-> y, then y picks up
   -- the sort of x.
 
-  traceM "Old sort map:"
-  traceShowM vm
+  debug "Old sort map:"
+  debug (show vm)
 
   let vm' = foldr updateVarMap vm (Subst.toList theta_cyc)
         where
@@ -348,25 +339,25 @@ solveConstraintChoice tyDefns quals cs = do
           updateVarMap (x, TyAtom (AVar (U y))) vmm = extendSort y (getSort vmm x) vmm
           updateVarMap _                        vmm = vmm
 
-  traceM "Updated sort map:"
-  traceShowM vm'
+  debug "Updated sort map:"
+  debug (show vm')
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
   -- predecessor base types in the graph; then unify all the type
   -- variables in any remaining weakly connected components.
 
-  traceM "------------------------------"
-  traceM "Solving for type variables..."
+  debug "------------------------------"
+  debug "Solving for type variables..."
 
   theta_sol       <- solveGraph vm' g''
-  traceShowM theta_sol
+  debug (show theta_sol)
 
-  traceM "------------------------------"
-  traceM "Composing final substitution..."
+  debug "------------------------------"
+  debug "Composing final substitution..."
 
   let theta_final = theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp
-  traceShowM theta_final
+  debug (show theta_final)
 
   return theta_final
 
@@ -430,7 +421,7 @@ checkQual q (ABase bty)  =
 --   (b <: v), where v is a type variable and b is a base type.
 
 simplify
-  :: Members '[Error SolveError] r
+  :: Members '[Error SolveError, Output Message] r
   => TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> Sem r (TyVarInfoMap, [(Atom, Atom)], S)
 simplify tyDefns origVM cs
   = (\(SS vm' cs' s' _) -> (vm', map extractAtoms cs', s'))
@@ -459,20 +450,20 @@ simplify tyDefns origVM cs
     -- Iterate picking one simplifiable constraint and simplifying it
     -- until none are left.
     simplify'
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Output Message] r
       => Sem r ()
     simplify' = do
       -- q <- gets fst
-      -- traceM (pretty q)
-      -- traceM ""
+      -- debug (pretty q)
+      -- debug ""
 
       mc <- pickSimplifiable
       case mc of
         Nothing -> return ()
         Just s  -> do
 
-          traceM (show s)
-          traceM "---------------------------------------"
+          debug (show s)
+          debug "---------------------------------------"
 
           simplifyOne s
           simplify'
@@ -692,7 +683,7 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
 checkSkolems
-  :: Members '[Error SolveError] r
+  :: Members '[Error SolveError, Output Message] r
   => TyDefCtx -> TyVarInfoMap -> Graph Atom -> Sem r (Graph UAtom, S)
 checkSkolems tyDefns vm graph = do
   let skolemWCCs :: [Set Atom]
@@ -721,7 +712,7 @@ checkSkolems tyDefns vm graph = do
 
     unifyWCCs g s []     = return (G.map noSkolems g, s)
     unifyWCCs g s (u:us) = do
-      traceM $ "Unifying " ++ show (u:us) ++ "..."
+      debug $ "Unifying " ++ show (u:us) ++ "..."
 
       let g' = foldl' (flip G.delete) g u
 
@@ -858,7 +849,7 @@ glbBySort vm rm = limBySort vm rm SubTy
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
 solveGraph
-  :: Members '[Fresh, Error SolveError] r
+  :: Members '[Fresh, Error SolveError, Output Message] r
   => TyVarInfoMap -> Graph UAtom -> Sem r S
 solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
   where
@@ -915,19 +906,19 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
         fromVar _      = error "Impossible! UB but uisVar."
 
     go
-      :: Members '[Fresh, Error SolveError] r
+      :: Members '[Fresh, Error SolveError, Output Message] r
       => RelMap -> Sem r (Substitution BaseTy)
-    go relMap = traceShowM relMap >> case as of
+    go relMap = debug (show relMap) >> case as of
 
       -- No variables left that have base type constraints.
       []    -> return idS
 
       -- Solve one variable at a time.  See below.
       (a:_) -> do
-        traceM $ "Solving for " ++ show a
+        debug $ "Solving for " ++ show a
         case solveVar a of
           Nothing       -> do
-            traceM $ "Couldn't solve for " ++ show a
+            debug $ "Couldn't solve for " ++ show a
             throw NoUnify
 
           -- If we solved for a, delete it from the maps, apply the
@@ -942,7 +933,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
           -- they have an empty sort), so it doesn't matter if old
           -- variables hang around in it.
           Just s -> do
-            traceShowM s
+            debug (show s)
             (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
 
       where

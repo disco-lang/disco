@@ -41,7 +41,9 @@ import           Disco.Effects.Error
 import           Disco.Effects.Fresh
 import           Disco.Effects.State
 import           Polysemy
+import           Polysemy.Output
 
+import           Disco.Messages
 import           Disco.Subst
 import qualified Disco.Subst                      as Subst
 import           Disco.Typecheck.Constraints
@@ -220,20 +222,20 @@ data SimplifyState = SS
 makeLenses ''SimplifyState
 
 lkup :: (Ord k, Show k, Show (Map k a)) => String -> Map k a -> k -> a
-lkup msg m k = fromMaybe (error errMsg) (M.lookup k m)
+lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
   where
     errMsg = unlines
       [ "Key lookup error:"
       , "  Key = " ++ show k
       , "  Map = " ++ show m
-      , "  Location: " ++ msg
+      , "  Location: " ++ messg
       ]
 
 --------------------------------------------------
 -- Top-level solver algorithm
 
 solveConstraint
-  :: Members '[Fresh, Error SolveError] r
+  :: Members '[Fresh, Error SolveError, Output Message] r
   => TyDefCtx -> Constraint -> Sem r S
 solveConstraint tyDefns c = do
 
@@ -244,8 +246,8 @@ solveConstraint tyDefns c = do
 
   traceShowM c
 
-  traceM "------------------------------"
-  traceM "Decomposing constraints..."
+  debug "------------------------------"
+  debug "Decomposing constraints..."
 
   qcList <- decomposeConstraint c
 

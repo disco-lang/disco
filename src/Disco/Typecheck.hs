@@ -254,7 +254,7 @@ checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 -- | Type check a top-level definition in the given module.
 checkDefn
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
   => ModuleName -> TermDefn -> Sem r Defn
 checkDefn name (TermDefn x clauses) = do
 
@@ -316,7 +316,7 @@ checkDefn name (TermDefn x clauses) = do
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
   => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
   Ctx.coerceKeys . Ctx.filter (not . P.null)
@@ -327,7 +327,7 @@ checkProperties docs =
 
 -- | Check the types of the terms embedded in a property.
 checkProperty
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
   => Property -> Sem r AProperty
 checkProperty prop = do
   (at, theta) <- solve $ check prop TyProp

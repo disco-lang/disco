@@ -16,6 +16,7 @@ module Disco.Typecheck.Util where
 import           Disco.Effects.Fresh
 import           Polysemy
 import           Polysemy.Error
+import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
 import           Unbound.Generics.LocallyNameless (Name, bind, string2Name)
@@ -26,6 +27,7 @@ import           Prelude                          hiding (lookup)
 
 import           Disco.AST.Surface
 import           Disco.Context
+import           Disco.Messages
 import           Disco.Names                      (ModuleName, QName (..))
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
@@ -111,14 +113,16 @@ withConstraint = fmap swap . runWriter
 -- | Run a computation and solve its generated constraint, returning
 --   the resulting substitution (or failing with an error).  Note that
 --   this locally dispatches the constraint writer effect.
-solve :: Members '[Reader TyDefCtx, Error TCError] r => Sem (Writer Constraint ': r) a -> Sem r (a, S)
+solve
+  :: Members '[Reader TyDefCtx, Error TCError, Output Message] r
+  => Sem (Writer Constraint ': r) a -> Sem r (a, S)
 solve m = do
   (a, c) <- withConstraint m
   tds <- ask @TyDefCtx
   res <- runSolve . solveConstraint tds $ c
   case res of
-    Left err -> throw (Unsolvable err)
-    Right s  -> return (a, s)
+    Left e  -> throw (Unsolvable e)
+    Right s -> return (a, s)
 
 ------------------------------------------------------------
 -- Contexts

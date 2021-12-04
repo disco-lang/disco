@@ -21,8 +21,9 @@ module Disco.Eval
 
          -- * Top-level info record and associated lenses
 
+       , DiscoConfig, initDiscoConfig, debugMode
        , TopInfo
-       , replModInfo, topEnv, topModMap, lastFile
+       , replModInfo, topEnv, topModMap, lastFile, discoConfig
 
          -- * Running things
 
@@ -88,6 +89,57 @@ import           Disco.Types
 import           Disco.Value
 
 ------------------------------------------------------------
+-- Configuation options
+------------------------------------------------------------
+
+data DiscoConfig = DiscoConfig
+  { _debugMode :: Bool
+  }
+
+makeLenses ''DiscoConfig
+
+initDiscoConfig :: DiscoConfig
+initDiscoConfig = DiscoConfig
+  { _debugMode = False
+  }
+
+------------------------------------------------------------
+-- Top level info record
+------------------------------------------------------------
+
+-- | A record of information about the current top-level environment.
+data TopInfo = TopInfo
+  { _replModInfo :: ModuleInfo
+    -- ^ Info about the top-level module collecting stuff entered at
+    --   the REPL.
+
+  , _topEnv      :: Env
+    -- ^ Top-level environment mapping names to values.  Set by
+    --   'loadDefs'.
+
+  , _topModMap   :: Map ModuleName ModuleInfo
+    -- ^ Mapping from loaded module names to their 'ModuleInfo'
+    --   records.
+
+  , _lastFile    :: Maybe FilePath
+    -- ^ The most recent file which was :loaded by the user.
+
+  , _discoConfig :: DiscoConfig
+  }
+
+-- | The initial (empty) record of top-level info.
+initTopInfo :: DiscoConfig -> TopInfo
+initTopInfo cfg = TopInfo
+  { _replModInfo = emptyModuleInfo
+  , _topEnv      = emptyCtx
+  , _topModMap   = M.empty
+  , _lastFile    = Nothing
+  , _discoConfig = cfg
+  }
+
+makeLenses ''TopInfo
+
+------------------------------------------------------------
 -- Top-level effects
 ------------------------------------------------------------
 
@@ -113,39 +165,6 @@ type EvalEffects = [Error EvalError, Random, LFresh, Output Message, State Mem]
 type DiscoEffects = AppendEffects EvalEffects TopEffects
 
 ------------------------------------------------------------
--- Top level info record
-------------------------------------------------------------
-
--- | A record of information about the current top-level environment.
-data TopInfo = TopInfo
-  { _replModInfo :: ModuleInfo
-    -- ^ Info about the top-level module collecting stuff entered at
-    --   the REPL.
-
-  , _topEnv      :: Env
-    -- ^ Top-level environment mapping names to values.  Set by
-    --   'loadDefs'.
-
-  , _topModMap   :: Map ModuleName ModuleInfo
-    -- ^ Mapping from loaded module names to their 'ModuleInfo'
-    --   records.
-
-  , _lastFile    :: Maybe FilePath
-    -- ^ The most recent file which was :loaded by the user.
-  }
-
--- | The initial (empty) record of top-level info.
-initTopInfo :: TopInfo
-initTopInfo = TopInfo
-  { _replModInfo = emptyModuleInfo
-  , _topEnv      = emptyCtx
-  , _topModMap   = M.empty
-  , _lastFile    = Nothing
-  }
-
-makeLenses ''TopInfo
-
-------------------------------------------------------------
 -- Running top-level Disco computations
 ------------------------------------------------------------
 
@@ -158,15 +177,15 @@ inputSettings =
     }
 
 -- | Run a top-level computation.
-runDisco :: (forall r. Members DiscoEffects r => Sem r ()) -> IO ()
-runDisco =
+runDisco :: DiscoConfig -> (forall r. Members DiscoEffects r => Sem r ()) -> IO ()
+runDisco cfg =
   void
     . H.runInputT inputSettings
     . runFinal @(H.InputT IO)
     . embedToFinal
     . runEmbedded @_ @(H.InputT IO) liftIO
-    . runOutputSem (handleMsg ((/= Debug) . view messageType))   -- Handle Output Message via printing to console
-    . stateToIO initTopInfo                 -- Run State TopInfo via an IORef
+    . runOutputSem (handleMsg msgFilter)    -- Handle Output Message via printing to console
+    . stateToIO (initTopInfo cfg)           -- Run State TopInfo via an IORef
     . inputToState                          -- Dispatch Input TopInfo effect via State effect
     . runState emptyMem                     -- Start with empty memory
     . outputDiscoErrors                     -- Output any top-level errors
@@ -175,6 +194,10 @@ runDisco =
     . mapError EvalErr                      -- Embed runtime errors into top-level error type
     . failToError Panic                     -- Turn pattern-match failures into a Panic error
     . runReader emptyCtx                    -- Keep track of current Env
+  where
+    msgFilter
+      | cfg ^. debugMode = const True
+      | otherwise        = (/= Debug) . view messageType
 
 ------------------------------------------------------------
 -- Environment utilities

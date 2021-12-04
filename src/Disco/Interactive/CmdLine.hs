@@ -24,6 +24,7 @@ module Disco.Interactive.CmdLine
 
   ) where
 
+import           Control.Lens                           hiding (use)
 import           Control.Monad                          (unless)
 import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))
@@ -56,6 +57,7 @@ data DiscoOpts = DiscoOpts
   { evaluate  :: Maybe String  -- ^ A single expression to evaluate
   , cmdFile   :: Maybe String  -- ^ Execute the commands in a given file
   , checkFile :: Maybe String  -- ^ Check a file and then exit
+  , debugFlag :: Bool
   }
 
 discoOpts :: O.Parser DiscoOpts
@@ -83,6 +85,13 @@ discoOpts = DiscoOpts
           , O.metavar "FILE"
           ])
       )
+  <*> O.switch (
+        mconcat
+        [ O.long "debug"
+        , O.help "print debugging information"
+        , O.short 'd'
+        ]
+        )
 
 discoInfo :: O.ParserInfo DiscoOpts
 discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
@@ -90,6 +99,9 @@ discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
   , O.header "disco v0.1"
   ]
+
+optsToCfg :: DiscoOpts -> DiscoConfig
+optsToCfg opts = initDiscoConfig & debugMode .~ debugFlag opts
 
 ------------------------------------------------------------
 -- Command-line interface
@@ -104,7 +116,7 @@ discoMain = do
 
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
-  runDisco $ do
+  runDisco (optsToCfg opts) $ do
     case checkFile opts of
       Just file -> do
         res <- handleLoad file

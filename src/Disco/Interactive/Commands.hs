@@ -61,8 +61,6 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty, (<>))
-import           Disco.Pretty.Prec                (initPA)
-import           Disco.Property
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck

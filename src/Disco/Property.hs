@@ -22,22 +22,6 @@ import           Polysemy
 
 import           Disco.Value
 
--- | Whether the property test resulted in a runtime error.
-testIsError :: TestResult -> Bool
-testIsError (TestResult _ (TestRuntimeError _) _) = True
-testIsError _                                     = False
-
--- | Whether the property test resulted in success.
-testIsOk :: TestResult -> Bool
-testIsOk (TestResult b _ _) = b
-
--- | The reason the property test had this result.
-testReason :: TestResult -> TestReason
-testReason (TestResult _ r _) = r
-
-testEnv :: TestResult -> TestEnv
-testEnv (TestResult _ _ e) = e
-
 -- | Toggles which outcome (finding or not finding the thing being
 --   searched for) qualifies as success, without changing the thing
 --   being searched for.

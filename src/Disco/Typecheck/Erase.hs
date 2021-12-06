@@ -21,7 +21,6 @@ import           Data.Coerce
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Module                            (Clause)
 import           Disco.Names                             (QName (..))
 
 -- | Erase all the type annotations from a term.
@@ -87,10 +86,6 @@ eraseQual (AQGuard (unembed -> at))  = QGuard (embed (erase at))
 
 eraseProperty :: AProperty -> Property
 eraseProperty = erase
-
-eraseClause :: Clause -> Bind [Pattern] Term
-eraseClause b = bind (map erasePattern ps) (erase t)
-  where (ps, t) = unsafeUnbind b
 
 ------------------------------------------------------------
 -- DTerm erasure

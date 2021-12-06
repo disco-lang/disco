@@ -95,7 +95,7 @@ import           Data.Coerce
 import           Data.Data                         (Data)
 import           Disco.Data                        ()
 import           GHC.Generics                      (Generic)
-import           Unbound.Generics.LocallyNameless
+import           Unbound.Generics.LocallyNameless  hiding (lunbind)
 
 import           Control.Lens                      (toListOf)
 import           Data.List                         (nub)
@@ -106,6 +106,9 @@ import qualified Data.Set                          as S
 import           Data.Void
 import           Math.Combinatorics.Exact.Binomial (choose)
 
+import           Disco.Effects.LFresh
+
+import           Disco.Pretty                      hiding ((<>))
 import           Disco.Subst                       (Substitution)
 import           Disco.Types.Qualifiers
 
@@ -165,6 +168,21 @@ data BaseTy where
   CtrList :: BaseTy
 
   deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst BaseTy, Subst Atom, Subst UAtom, Subst Type)
+
+instance Pretty BaseTy where
+  pretty = \case
+    Void    -> text "Void"
+    Unit    -> text "Unit"
+    B       -> text "Bool"
+    P       -> text "Prop"
+    N       -> text "ℕ"
+    Z       -> text "ℤ"
+    Q       -> text "ℚ"
+    F       -> text "𝔽"
+    C       -> text "Char"
+    CtrList -> text "List"
+    CtrBag  -> text "Bag"
+    CtrSet  -> text "Set"
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool
@@ -230,6 +248,12 @@ data Atom where
 instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
   isvar _            = Nothing
+
+instance Pretty Atom where
+  pretty = \case
+    AVar (U v) -> pretty v
+    AVar (S v) -> text "$" <> pretty v
+    ABase b    -> pretty b
 
 -- | Is this atomic type a variable?
 isVar :: Atom -> Bool
@@ -314,6 +338,17 @@ data Con where
 
   deriving (Show, Eq, Ord, Generic, Data, Alpha)
 
+instance Pretty Con where
+  pretty = \case
+    CMap         -> text "Map"
+    CGraph       -> text "Graph"
+    CUser s      -> text s
+    CList        -> text "List"
+    CBag         -> text "Bag"
+    CSet         -> text "Set"
+    CContainer v -> pretty v
+    c            -> error $ "Impossible: got Con " ++ show c ++ " in pretty @Con"
+
 -- | 'CList' is provided for convenience; it represents a list type
 --   constructor (/i.e./ @List a@).
 pattern CList :: Con
@@ -360,6 +395,19 @@ data Type where
   TyCon  :: Con -> [Type] -> Type
 
   deriving (Show, Eq, Ord, Generic, Data, Alpha)
+
+instance Pretty Type where
+  pretty (TyAtom a)     = pretty a
+  pretty (ty1 :->: ty2) = withPA tarrPA $
+    lt (pretty ty1) <+> text "→" <+> rt (pretty ty2)
+  pretty (ty1 :*: ty2)  = withPA tmulPA $
+    lt (pretty ty1) <+> text "×" <+> rt (pretty ty2)
+  pretty (ty1 :+: ty2)  = withPA taddPA $
+    lt (pretty ty1) <+> text "+" <+> rt (pretty ty2)
+  pretty (TyCon c [])   = pretty c
+  pretty (TyCon c tys)  = do
+    ds <- setPA initPA $ punctuate (text ",") (map pretty tys)
+    pretty c <> parens (hsep ds)
 
 instance Subst Type Qualifier
 instance Subst Type Rational where
@@ -495,6 +543,17 @@ instance Show TyDefBody where
 --   definitions.
 type TyDefCtx = M.Map String TyDefBody
 
+-- | Pretty-print a type definition.
+instance Pretty (String, TyDefBody) where
+
+  pretty (tyName, TyDefBody ps body)
+    = text tyName <> prettyArgs ps <+> text "=" <+> pretty (body (map (TyVar . string2Name) ps))
+    where
+      prettyArgs [] = empty
+      prettyArgs _  = do
+          ds <- punctuate (text ",") (map text ps)
+          parens (hsep ds)
+
 ---------------------------------
 --  Universally quantified types
 
@@ -503,6 +562,12 @@ type TyDefCtx = M.Map String TyDefBody
 --   have a "trivial" polytype which quantifies zero variables).
 newtype PolyType = Forall (Bind [Name Type] Type)
   deriving (Show, Generic, Data, Alpha, Subst Type)
+
+-- | Pretty-print a polytype.  Note that we never explicitly print
+--   @forall@; quantification is implicit, as in Haskell.
+instance Pretty PolyType where
+  pretty (Forall bnd) = lunbind bnd $
+    \(_, body) -> pretty body
 
 -- | Convert a monotype into a trivial polytype that does not quantify
 --   over any type variables.  If the type can contain free type
@@ -664,3 +729,40 @@ class HasType t where
   --   implementation is for 'setType' to do nothing.
   setType :: Type -> t -> t
   setType _ = id
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -18,22 +18,25 @@
 
 module Disco.Module where
 
-import           Data.Data                        (Data)
-import           GHC.Generics                     (Generic)
+import           Data.Data                               (Data)
+import           GHC.Generics                            (Generic)
 
-import           Control.Lens                     (Getting, foldOf, makeLenses,
-                                                   view)
-import           Control.Monad                    (filterM, foldM)
-import           Control.Monad.IO.Class           (MonadIO (..))
-import           Data.Bifunctor                   (first)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Maybe                       (listToMaybe)
-import qualified Data.Set                         as S
-import           System.Directory                 (doesFileExist)
-import           System.FilePath                  (replaceExtension, (</>))
+import           Control.Lens                            (Getting, foldOf,
+                                                          makeLenses, view)
+import           Control.Monad                           (filterM, foldM)
+import           Control.Monad.IO.Class                  (MonadIO (..))
+import           Data.Bifunctor                          (first)
+import           Data.Map                                (Map)
+import qualified Data.Map                                as M
+import           Data.Maybe                              (listToMaybe)
+import qualified Data.Set                                as S
+import           System.Directory                        (doesFileExist)
+import           System.FilePath                         (replaceExtension,
+                                                          (</>))
 
-import           Unbound.Generics.LocallyNameless (Alpha, Bind, Name, Subst)
+import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
+                                                          Subst, bind)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Polysemy
 import           Polysemy.Error
@@ -43,7 +46,9 @@ import           Disco.AST.Typed
 import           Disco.Context
 import           Disco.Extensions
 import           Disco.Names
-import           Disco.Typecheck.Util             (TCError (..), TyCtx)
+import           Disco.Pretty                            hiding ((<>))
+import           Disco.Typecheck.Erase                   (erase, erasePattern)
+import           Disco.Typecheck.Util                    (TCError (..), TyCtx)
 import           Disco.Types
 
 import           Paths_disco
@@ -69,7 +74,13 @@ data LoadingMode = REPL | Standalone
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
 data Defn = Defn (Name ATerm) [Type] Type [Clause]
-  deriving (Show, Generic, Alpha, Data)
+  deriving (Show, Generic, Alpha, Data, Subst Type)
+
+instance Pretty Defn where
+  pretty (Defn x patTys ty clauses) = vcat $
+    pretty (x, foldr (:->:) ty patTys)
+    :
+    map (pretty . (x,) . eraseClause) clauses
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete
@@ -77,7 +88,9 @@ data Defn = Defn (Name ATerm) [Type] Type [Clause]
 --   something like @[n, (x,y)] (n*x + y)@.
 type Clause = Bind [APattern] ATerm
 
-instance Subst Type Defn
+eraseClause :: Clause -> Bind [Pattern] Term
+eraseClause b = bind (map erasePattern ps) (erase t)
+  where (ps, t) = unsafeUnbind b
 
 -- | Type checking a module yields a value of type ModuleInfo which contains
 --   mapping from terms to their relavent documenation, a mapping from terms to

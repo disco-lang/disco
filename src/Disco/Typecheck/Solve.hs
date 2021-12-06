@@ -1,4 +1,6 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -44,6 +46,7 @@ import           Polysemy
 import           Polysemy.Output
 
 import           Disco.Messages
+import           Disco.Pretty                     hiding ((<>))
 import           Disco.Subst
 import qualified Disco.Subst                      as Subst
 import           Disco.Typecheck.Constraints
@@ -105,11 +108,12 @@ asum' (m:ms) = m `catch` (\_ -> asum' ms)
 data SimpleConstraint where
   (:<:) :: Type -> Type -> SimpleConstraint
   (:=:) :: Type -> Type -> SimpleConstraint
-  deriving (Show, Eq, Ord, Generic)
+  deriving (Show, Eq, Ord, Generic, Alpha, Subst Type)
 
-instance Alpha SimpleConstraint
-
-instance Subst Type SimpleConstraint
+instance Pretty SimpleConstraint where
+  pretty = \case
+    ty1 :<: ty2 -> pretty ty1 <+> "<:" <+> pretty ty2
+    ty1 :=: ty2 -> pretty ty1 <+> "=" <+> pretty ty2
 
 --------------------------------------------------
 -- Simplifier types
@@ -252,7 +256,8 @@ solveConstraintChoice
 solveConstraintChoice tyDefns quals cs = do
 
   debug (show quals)
-  debug (show cs)
+--  debug (show cs)
+  debug . unlines =<< mapM prettyStr cs
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).

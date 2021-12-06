@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveTraversable          #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE PatternSynonyms            #-}
 
 -----------------------------------------------------------------------------
@@ -35,6 +36,7 @@ module Disco.Value
   , ValProp(..), TestResult(..), TestReason_(..), TestReason
   , SearchType(..), SearchMotive(.., SMExists, SMForall)
   , TestVars(..), TestEnv(..), emptyTestEnv, getTestEnv, extendPropEnv, extendResultEnv
+  , testIsOk, testIsError, testReason, testEnv
 
   -- * Environments
 
@@ -43,27 +45,43 @@ module Disco.Value
   -- * Memory
   , Cell(..), Mem, emptyMem, allocate, allocateRec, lkup, set
 
+  -- * Pretty-printing
+
+  , prettyValue, prettyTestFailure, prettyTestResult
   ) where
+
+import           Prelude                          hiding ((<>))
+import qualified Prelude                          as P
 
 import           Control.Monad                    (forM)
 import           Data.Bifunctor                   (first)
-import           Data.Char                        (chr, ord)
+import           Data.Char                        (chr, ord, toLower)
 import           Data.IntMap                      (IntMap)
 import qualified Data.IntMap                      as IM
 import           Data.List                        (foldl')
 import           Data.Map                         (Map)
+import qualified Data.Map                         as M
 import           Data.Ratio
 
-import           Algebra.Graph                    (Graph)
+import           Algebra.Graph                    (Graph, foldg)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
+import           Disco.AST.Typed                  (AProperty)
 import           Disco.Context                    as Ctx
 import           Disco.Error
+import           Disco.Messages
 import           Disco.Names
+import           Disco.Pretty
+import           Disco.Syntax.Operators           (BOp (Add, Mul))
+import           Disco.Typecheck.Erase            (eraseProperty)
 import           Disco.Types
 
+import           Disco.Effects.LFresh
 import           Polysemy
+import           Polysemy.Input
+import           Polysemy.Output
+import           Polysemy.Reader
 import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (Name)
 
@@ -313,6 +331,22 @@ type TestReason = TestReason_ Value
 data TestResult = TestResult Bool TestReason TestEnv
   deriving Show
 
+-- | Whether the property test resulted in a runtime error.
+testIsError :: TestResult -> Bool
+testIsError (TestResult _ (TestRuntimeError _) _) = True
+testIsError _                                     = False
+
+-- | Whether the property test resulted in success.
+testIsOk :: TestResult -> Bool
+testIsOk (TestResult b _ _) = b
+
+-- | The reason the property test had this result.
+testReason :: TestResult -> TestReason
+testReason (TestResult _ r _) = r
+
+testEnv :: TestResult -> TestEnv
+testEnv (TestResult _ _ e) = e
+
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp
   = VPDone TestResult
@@ -322,11 +356,11 @@ data ValProp
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
-extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g <> e))
-extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g <> e)
+extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
+extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g P.<> e)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
-extendResultEnv g (TestResult b r e) = TestResult b r (g <> e)
+extendResultEnv g (TestResult b r e) = TestResult b r (g P.<> e)
 
 ------------------------------------------------------------
 -- Environments
@@ -374,3 +408,165 @@ lkup n = gets (IM.lookup n . mu)
 -- | Set the cell at a given index.
 set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
 set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
+
+------------------------------------------------------------
+-- Pretty-printing values
+------------------------------------------------------------
+
+prettyValue :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+
+-- Lazily expand any user-defined types
+prettyValue (TyUser x args) v = do
+  tydefs <- input
+  let (TyDefBody _ body) = tydefs M.! x   -- This can't fail if typechecking succeeded
+  prettyValue (body args) v
+
+prettyValue _      VUnit                     = "■"
+prettyValue TyProp _                         = prettyPlaceholder TyProp
+prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
+prettyValue TyC (vchar -> c)                 = text (show c)
+prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
+  where
+    prettyChar = drop 1 . reverse . drop 1 . reverse . show . (:[])
+prettyValue (TyList ty) (vlist id -> xs)     = do
+  ds <- punctuate (text ",") (map (prettyValue ty) xs)
+  brackets (hsep ds)
+prettyValue ty@(_ :*: _) v                   = parens (prettyTuple ty v)
+prettyValue (ty1 :+: _) (VInj L v)           = "left"  <> prettyVP ty1 v
+prettyValue (_ :+: ty2) (VInj R v)           = "right" <> prettyVP ty2 v
+prettyValue _ (VNum d r)
+  | denominator r == 1                       = text $ show (numerator r)
+  | otherwise                                = text $ case d of
+      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
+      Decimal  -> prettyDecimal r
+
+prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
+
+prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
+prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
+prettyValue (TyMap tyK tyV) (VMap m)         =
+  "map" <> parens (braces (prettySequence (tyK :*: tyV) "," (assocsToValues m)))
+  where
+    assocsToValues = map (\(k,v) -> VPair (fromSimpleValue k) v) . M.assocs
+
+  -- XXX can we get rid of OEmptyGraph?
+prettyValue (TyGraph _ ) (VConst OEmptyGraph) = "emptyGraph"
+prettyValue (TyGraph ty) (VGraph g)          =
+  foldg
+    "emptyGraph"
+    (("vertex" <>) . prettyVP ty . fromSimpleValue)
+    (\l r -> withPA (getPA Add) $ lt l <+> "+" <+> rt r)
+    (\l r -> withPA (getPA Mul) $ lt l <+> "*" <+> rt r)
+    g
+
+prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
+
+-- | Pretty-print a value with guaranteed parentheses.  Do nothing for
+--   tuples; add an extra set of parens for other values.
+prettyVP :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+prettyVP ty@(_ :*: _) = prettyValue ty
+prettyVP ty           = parens . prettyValue ty
+
+prettyPlaceholder :: Members '[Reader PA, LFresh] r => Type -> Sem r Doc
+prettyPlaceholder ty = "<" <> pretty ty <> ">"
+
+prettyTuple :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
+prettyTuple ty v                        = prettyValue ty v
+
+-- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
+prettySequence :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
+prettySequence ty del vs = hsep =<< punctuate (return del) (map (prettyValue ty) vs)
+
+-- | Pretty-print a literal bag value.
+prettyBag :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> [(Value,Integer)] -> Sem r Doc
+prettyBag _ [] = bag empty
+prettyBag ty vs
+  | all ((==1) . snd) vs = bag $ prettySequence ty "," (map fst vs)
+  | otherwise            = bag $ hsep =<< punctuate (return ",") (map prettyCount vs)
+  where
+    prettyCount (v,1) = prettyValue ty v
+    prettyCount (v,n) = prettyValue ty v <+> "#" <+> text (show n)
+
+------------------------------------------------------------
+-- Pretty-printing for test results
+------------------------------------------------------------
+
+-- XXX redo with message framework, with proper support for indentation etc.
+
+prettyTestFailure
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
+prettyTestFailure _    (TestResult True _ _)    = return ()
+prettyTestFailure prop (TestResult False r env) = do
+  prettyFailureReason prop r
+  prettyTestEnv "    Counterexample:" env
+
+prettyTestResult
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r ()
+prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
+prettyTestResult prop (TestResult _ r _)   = do
+  dp <- renderDoc $ pretty (eraseProperty prop)
+  info'       "  - Test passed: " >> info dp
+  prettySuccessReason r
+
+prettySuccessReason
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
+  => TestReason -> Sem r ()
+prettySuccessReason (TestFound (TestResult _ _ vs)) = do
+  prettyTestEnv "    Found example:" vs
+prettySuccessReason (TestNotFound Exhaustive) = do
+  info     "    No counterexamples exist."
+prettySuccessReason (TestNotFound (Randomized n m)) = do
+  info'       "    Checked "
+  info' (show (n + m))
+  info " possibilities without finding a counterexample."
+prettySuccessReason _ = return ()
+
+prettyFailureReason
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestReason -> Sem r ()
+prettyFailureReason prop TestBool = do
+  dp <- renderDoc $ pretty (eraseProperty prop)
+  info'     "  - Test is false: " >> info dp
+prettyFailureReason prop (TestEqual ty v1 v2) = do
+  info'     "  - Test result mismatch for: "
+  info =<< renderDoc (pretty (eraseProperty prop))
+  info'     "    - Left side:  "
+  info =<< renderDoc (prettyValue ty v2)
+  info'     "    - Right side: "
+  info =<< renderDoc (prettyValue ty v1)
+prettyFailureReason prop (TestRuntimeError e) = do
+  info'     "  - Test failed: "
+  dp <- renderDoc $ pretty (eraseProperty prop)
+  info dp
+  info'     "    " >> info (show e)
+prettyFailureReason prop (TestFound (TestResult _ r _)) = do
+  prettyFailureReason prop r
+prettyFailureReason prop (TestNotFound Exhaustive) = do
+  info'     "  - No example exists: "
+  dp <- renderDoc $ pretty (eraseProperty prop)
+  info dp
+  info   "    All possible values were checked."
+prettyFailureReason prop (TestNotFound (Randomized n m)) = do
+  info'     "  - No example was found: "
+  dp <- renderDoc $ pretty (eraseProperty prop)
+  info dp
+  info'     "    Checked " >> info' (show (n + m)) >> info " possibilities."
+
+prettyTestEnv
+  :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
+  => String -> TestEnv -> Sem r ()
+prettyTestEnv _ (TestEnv []) = return ()
+prettyTestEnv s (TestEnv vs) = do
+  info s
+  mapM_ prettyBind vs
+  where
+    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
+    prettyBind (x, ty, v) = do
+      info' "      "
+      info' x
+      info' (replicate (maxNameLen - length x) ' ')
+      info' " = "
+      info =<< renderDoc (prettyValue ty v)

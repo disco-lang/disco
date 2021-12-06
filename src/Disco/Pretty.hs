@@ -203,7 +203,7 @@ instance Pretty Term where
     TAbs q bnd  -> withPA initPA $
       lunbind bnd $ \(args, body) ->
       prettyQ q
-        <> (hsep =<< punctuate (text ",") (map prettyPattern args))
+        <> (hsep =<< punctuate (text ",") (map pretty args))
         <> text "."
         <+> lt (pretty body)
       where
@@ -246,7 +246,7 @@ instance Pretty Term where
         prettyCount (t, Just n)  = lt (pretty t) <+> text "#" <+> rt (pretty n)
     TContainerComp c bqst ->
       lunbind bqst $ \(qs,t) ->
-      setPA initPA $ containerDelims c (hsep [pretty t, text "|", prettyQuals qs])
+      setPA initPA $ containerDelims c (hsep [pretty t, text "|", pretty qs])
     TNat n       -> integer n
     TChain t lks -> withPA (getPA Eq) . hsep $
         lt (pretty t)
@@ -258,7 +258,7 @@ instance Pretty Term where
           ]
     TLet bnd -> withPA initPA $
       lunbind bnd $ \(bs, t2) -> do
-        ds <- punctuate (text ",") (map prettyBinding (fromTelescope bs))
+        ds <- punctuate (text ",") (map pretty (fromTelescope bs))
         hsep
           [ text "let"
           , hsep ds
@@ -267,7 +267,7 @@ instance Pretty Term where
           ]
 
     TCase b    -> withPA initPA $
-      (text "{?" <+> prettyBranches b) $+$ text "?}"
+      (text "{?" <+> pretty b) $+$ text "?}"
     TAscr t ty -> withPA ascrPA $
       lt (pretty t) <+> text ":" <+> rt (pretty ty)
     TRat  r    -> text (prettyDecimal r)
@@ -306,130 +306,124 @@ instance Pretty BOp where
     Just (OpInfo _ (syn:_) _) -> text syn
     _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
--- | Pretty-print the branches of a case expression.
-prettyBranches :: Members '[LFresh, Reader PA] r => [Branch] -> Sem r Doc
-prettyBranches []     = error "Empty branches are disallowed."
-prettyBranches (b:bs) =
-  prettyBranch False b
-  $+$
-  foldr (($+$) . prettyBranch True) empty bs
+instance Pretty [Branch] where
+  pretty = \case
+    [] -> error "Empty branches are disallowed."
+    b:bs ->
+      pretty b
+      $+$
+      foldr (($+$) . (text "," <+>) . pretty) empty bs
 
 -- | Pretty-print a single branch in a case expression.
-prettyBranch :: Members '[LFresh, Reader PA] r => Bool -> Branch -> Sem r Doc
-prettyBranch com br = lunbind br $ \(gs,t) ->
-  (if com then (text "," <+>) else id) (pretty t <+> prettyGuards gs)
+instance Pretty Branch where
+  pretty br = lunbind br $ \(gs,t) ->
+    pretty t <+> pretty gs
 
 -- | Pretty-print the guards in a single branch of a case expression.
-prettyGuards :: Members '[LFresh, Reader PA] r => Telescope Guard -> Sem r Doc
-prettyGuards TelEmpty                     = text "otherwise"
-prettyGuards (fromTelescope -> gs)
-  = foldr (\g r -> prettyGuard g <+> r) (text "") gs
+instance Pretty (Telescope Guard) where
+  pretty = \case
+    TelEmpty -> text "otherwise"
+    gs       -> foldr (\g r -> pretty g <+> r) (text "") (fromTelescope gs)
 
--- | Pretty-print one guard in a branch of a case expression.
-prettyGuard :: Members '[LFresh, Reader PA] r => Guard -> Sem r Doc
-prettyGuard (GBool et)  = text "if" <+> pretty (unembed et)
-prettyGuard (GPat et p) = text "when" <+> pretty (unembed et) <+> text "is" <+> prettyPattern p
-prettyGuard (GLet b)    = text "let" <+> prettyBinding b
+instance Pretty Guard where
+  pretty = \case
+    GBool et  -> text "if" <+> pretty (unembed et)
+    GPat et p -> text "when" <+> pretty (unembed et) <+> text "is" <+> pretty p
+    GLet b    -> text "let" <+> pretty b
 
 -- | Pretty-print a binding, i.e. a pairing of a name (with optional
 --   type annotation) and term.
-prettyBinding :: Members '[LFresh, Reader PA] r => Binding -> Sem r Doc
-prettyBinding (Binding Nothing x (unembed -> t))
-  = hsep [pretty x, text "=", pretty t]
-prettyBinding (Binding (Just (unembed -> ty)) x (unembed -> t))
-  = hsep [pretty x, text ":", pretty ty, text "=", pretty t]
+instance Pretty Binding where
+  pretty = \case
+    Binding Nothing x (unembed -> t) ->
+      hsep [pretty x, text "=", pretty t]
+    Binding (Just (unembed -> ty)) x (unembed -> t) ->
+      hsep [pretty x, text ":", pretty ty, text "=", pretty t]
 
 -- | Pretty-print the qualifiers in a comprehension.
-prettyQuals :: Members '[LFresh, Reader PA] r => Telescope Qual -> Sem r Doc
-prettyQuals (fromTelescope -> qs) = do
-  ds <- punctuate (text ",") (map prettyQual qs)
-  hsep ds
+instance Pretty (Telescope Qual) where
+  pretty (fromTelescope -> qs) = do
+    ds <- punctuate (text ",") (map pretty qs)
+    hsep ds
 
 -- | Pretty-print a single qualifier in a comprehension.
-prettyQual :: Members '[LFresh, Reader PA] r => Qual -> Sem r Doc
-prettyQual (QBind x (unembed -> t))
-  = hsep [pretty x, text "in", pretty t]
-prettyQual (QGuard (unembed -> t))
-  = pretty t
+instance Pretty Qual where
+  pretty = \case
+    QBind x (unembed -> t) -> hsep [pretty x, text "in", pretty t]
+    QGuard (unembed -> t)  -> pretty t
 
 -- | Pretty-print a pattern with guaranteed parentheses.
 prettyPatternP :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
-prettyPatternP p@PTup{} = setPA initPA $ prettyPattern p
-prettyPatternP p        = withPA initPA $ prettyPattern p
+prettyPatternP p@PTup{} = setPA initPA $ pretty p
+prettyPatternP p        = withPA initPA $ pretty p
 
 -- We could probably alternatively write a function to turn a pattern
 -- back into a term, and pretty-print that instead of the below.
 -- Unsure whether it would be worth it.
 
--- | Pretty-print a pattern.
-prettyPattern :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
-prettyPattern (PVar x)          = pretty x
-prettyPattern PWild             = text "_"
-prettyPattern (PAscr p ty)      = withPA ascrPA $
-  lt (prettyPattern p) <+> text ":" <+> rt (pretty ty)
-prettyPattern PUnit             = text "■"
-prettyPattern (PBool b)         = text $ map toLower $ show b
-prettyPattern (PChar c)         = text (show c)
-prettyPattern (PString s)       = text (show s)
-prettyPattern (PTup ts)         = setPA initPA $ do
-  ds <- punctuate (text ",") (map prettyPattern ts)
-  parens (hsep ds)
-prettyPattern (PInj s p)        = withPA funPA $
-  pretty s <> prettyPatternP p
-prettyPattern (PNat n)          = integer n
-prettyPattern (PCons p1 p2)     = withPA (getPA Cons) $
-  lt (prettyPattern p1) <+> text "::" <+> rt (prettyPattern p2)
-prettyPattern (PList ps)        = setPA initPA $ do
-  ds <- punctuate (text ",") (map prettyPattern ps)
-  brackets (hsep ds)
-prettyPattern (PAdd L p t)      = withPA (getPA Add) $
-  lt (prettyPattern p) <+> text "+" <+> rt (pretty t)
-prettyPattern (PAdd R p t)      = withPA (getPA Add) $
-  lt (pretty t) <+> text "+" <+> rt (prettyPattern p)
-prettyPattern (PMul L p t)      = withPA (getPA Mul) $
-  lt (prettyPattern p) <+> text "*" <+> rt (pretty t)
-prettyPattern (PMul R p t)      = withPA (getPA Mul) $
-  lt (pretty t) <+> text "*" <+> rt (prettyPattern p)
-prettyPattern (PSub p t)        = withPA (getPA Sub) $
-  lt (prettyPattern p) <+> text "-" <+> rt (pretty t)
-prettyPattern (PNeg p)          = withPA (ugetPA Neg) $
-  text "-" <> rt (prettyPattern p)
-prettyPattern (PFrac p1 p2)     = withPA (getPA Div) $
-  lt (prettyPattern p1) <+> text "/" <+> rt (prettyPattern p2)
+instance Pretty Pattern where
+  pretty = \case
+    PVar x      -> pretty x
+    PWild       -> text "_"
+    PAscr p ty  -> withPA ascrPA $
+      lt (pretty p) <+> text ":" <+> rt (pretty ty)
+    PUnit       -> text "■"
+    PBool b     -> text $ map toLower $ show b
+    PChar c     -> text (show c)
+    PString s   -> text (show s)
+    PTup ts     -> setPA initPA $ do
+      ds <- punctuate (text ",") (map pretty ts)
+      parens (hsep ds)
+    PInj s p    -> withPA funPA $
+      pretty s <> prettyPatternP p
+    PNat n      -> integer n
+    PCons p1 p2 -> withPA (getPA Cons) $
+      lt (pretty p1) <+> text "::" <+> rt (pretty p2)
+    PList ps    -> setPA initPA $ do
+      ds <- punctuate (text ",") (map pretty ps)
+      brackets (hsep ds)
+    PAdd L p t  -> withPA (getPA Add) $
+      lt (pretty p) <+> text "+" <+> rt (pretty t)
+    PAdd R p t  -> withPA (getPA Add) $
+      lt (pretty t) <+> text "+" <+> rt (pretty p)
+    PMul L p t  -> withPA (getPA Mul) $
+      lt (pretty p) <+> text "*" <+> rt (pretty t)
+    PMul R p t  -> withPA (getPA Mul) $
+      lt (pretty t) <+> text "*" <+> rt (pretty p)
+    PSub p t    -> withPA (getPA Sub) $
+      lt (pretty p) <+> text "-" <+> rt (pretty t)
+    PNeg p      -> withPA (ugetPA Neg) $
+      text "-" <> rt (pretty p)
+    PFrac p1 p2 -> withPA (getPA Div) $
+      lt (pretty p1) <+> text "/" <+> rt (pretty p2)
 
 ------------------------------------------------------------
 -- Pretty-printing top-level declarations
 
 -- prettyModule :: Module -> Doc
--- prettyModule = foldr ($+$) empty . map prettyDecl
+-- prettyModule = foldr ($+$) empty . map pretty
 
--- | Pretty-print a declaration.
-prettyDecl :: Members '[LFresh, Reader PA] r => Decl -> Sem r Doc
-prettyDecl (DType  (TypeDecl x ty)) = pretty x <+> text ":" <+> pretty ty
-prettyDecl (DTyDef (TypeDefn x args body))
-  = text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> pretty body
-prettyDecl (DDefn  (TermDefn x bs)) = vcat $ map (prettyClause x) bs
+instance Pretty Decl where
+  pretty = \case
+    DType  (TypeDecl x ty) -> pretty x <+> text ":" <+> pretty ty
+    DTyDef (TypeDefn x args body) ->
+      text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> pretty body
+    DDefn  (TermDefn x bs) -> vcat $ map (pretty . (x,)) bs
 
--- | Pretty-print a definition.
-prettyDefn :: Members '[LFresh, Reader PA] r => Defn -> Sem r Doc
-prettyDefn (Defn x patTys ty clauses) = vcat $
-  prettyTyDecl x (foldr (:->:) ty patTys)
-  :
-  map (prettyClause x . eraseClause) clauses
+instance Pretty Defn where
+  pretty (Defn x patTys ty clauses) = vcat $
+    pretty (x, foldr (:->:) ty patTys)
+    :
+    map (pretty . (x,) . eraseClause) clauses
 
 -- | Pretty-print a single clause in a definition.
-prettyClause :: Members '[LFresh, Reader PA] r => Name a -> Bind [Pattern] Term -> Sem r Doc
-prettyClause x b
-  = withPA funPA . lunbind b $ \(ps, t) ->
-      pretty x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (pretty t)
-
--- | Pretty-print a property.
-prettyProperty :: Members '[LFresh, Reader PA] r => Property -> Sem r Doc
-prettyProperty = pretty
+instance Pretty (Name a, Bind [Pattern] Term) where
+  pretty (x, b) = withPA funPA . lunbind b $ \(ps, t) ->
+    pretty x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (pretty t)
 
 -- | Pretty-print a type declaration.
-prettyTyDecl :: Members '[LFresh, Reader PA] r => Name t -> Type -> Sem r Doc
-prettyTyDecl x ty = hsep [pretty x, text ":", pretty ty]
+instance Pretty (Name t, Type) where
+  pretty (x, ty) = hsep [pretty x, text ":", pretty ty]
 
 ------------------------------------------------------------
 -- Pretty-printing values
@@ -482,9 +476,6 @@ prettyValue (TyGraph ty) (VGraph g)          =
     g
 
 prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
-
--- prettyValue ty (VClo map xs bi) = undefined
--- prettyValue ty (VType ty')    = undefined
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
@@ -586,7 +577,7 @@ prettyTestResult
   => AProperty -> TestResult -> Sem r ()
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   = do
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  dp <- renderDoc $ pretty (eraseProperty prop)
   info'       "  - Test passed: " >> info dp
   prettySuccessReason r
 
@@ -607,30 +598,30 @@ prettyFailureReason
   :: Members '[Output Message, Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestReason -> Sem r ()
 prettyFailureReason prop TestBool = do
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  dp <- renderDoc $ pretty (eraseProperty prop)
   info'     "  - Test is false: " >> info dp
 prettyFailureReason prop (TestEqual ty v1 v2) = do
   info'     "  - Test result mismatch for: "
-  info =<< renderDoc (prettyProperty (eraseProperty prop))
+  info =<< renderDoc (pretty (eraseProperty prop))
   info'     "    - Left side:  "
   info =<< renderDoc (prettyValue ty v2)
   info'     "    - Right side: "
   info =<< renderDoc (prettyValue ty v1)
 prettyFailureReason prop (TestRuntimeError e) = do
   info'     "  - Test failed: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  dp <- renderDoc $ pretty (eraseProperty prop)
   info dp
   info'     "    " >> info (show e)
 prettyFailureReason prop (TestFound (TestResult _ r _)) = do
   prettyFailureReason prop r
 prettyFailureReason prop (TestNotFound Exhaustive) = do
   info'     "  - No example exists: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  dp <- renderDoc $ pretty (eraseProperty prop)
   info dp
   info   "    All possible values were checked."
 prettyFailureReason prop (TestNotFound (Randomized n m)) = do
   info'     "  - No example was found: "
-  dp <- renderDoc $ prettyProperty (eraseProperty prop)
+  dp <- renderDoc $ pretty (eraseProperty prop)
   info dp
   info'     "    Checked " >> info' (show (n + m)) >> info " possibilities."
 
@@ -658,6 +649,874 @@ instance Pretty SimpleConstraint where
   pretty = \case
     ty1 :<: ty2 -> pretty ty1 <+> "<:" <+> pretty ty2
     ty1 :=: ty2 -> pretty ty1 <+> "=" <+> pretty ty2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

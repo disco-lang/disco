@@ -646,7 +646,7 @@ handleShowDefn (ShowDefn x) = do
       mtydef = M.lookup name2s tyDefns
 
   s <- renderDoc $ do
-    let ds = map (prettyDefn . snd) xdefs ++ maybe [] (pure . pretty . (name2s,)) mtydef
+    let ds = map (pretty . snd) xdefs ++ maybe [] (pure . pretty . (name2s,)) mtydef
     case ds of
       [] -> text "No definition for" <+> pretty x
       _  -> vcat ds

@@ -1,3 +1,6 @@
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Typecheck.Constraints
@@ -19,10 +22,14 @@ module Disco.Typecheck.Constraints
 import qualified Data.List.NonEmpty               as NE
 import           Data.Semigroup
 import           GHC.Generics                     (Generic)
+import           Unbound.Generics.LocallyNameless hiding (lunbind)
 
+import           Disco.Effects.LFresh
+
+import           Disco.Pretty                     hiding ((<>))
+import           Disco.Syntax.Operators           (BFixity (In, InL, InR))
 import           Disco.Types
 import           Disco.Types.Rules
-import           Unbound.Generics.LocallyNameless
 
 -- | Constraints are generated as a result of type inference and checking.
 --   These constraints are accumulated during the inference and checking phase
@@ -36,11 +43,22 @@ data Constraint where
   COr    :: [Constraint] -> Constraint
   CAll  :: Bind [Name Type] Constraint -> Constraint
 
-  deriving (Show, Generic)
+  deriving (Show, Generic, Alpha, Subst Type)
 
-instance Alpha Constraint
-
-instance Subst Type Constraint
+instance Pretty Constraint where
+  pretty = \case
+    CSub ty1 ty2  -> withPA (PA 4 In) $ lt (pretty ty1) <+> "<:" <+> rt (pretty ty2)
+    CEq ty1 ty2   -> withPA (PA 4 In) $ lt (pretty ty1) <+> "=" <+> rt (pretty ty2)
+    CQual q ty    -> withPA (PA 10 InL) $ lt (pretty q) <+> rt (pretty ty)
+    CAnd [c]      -> pretty c
+      -- Use rt for both, since we don't need to print parens for /\ at all
+    CAnd (c:cs)   -> withPA (PA 3 InR) $ rt (pretty c) <+> "/\\" <+> rt (pretty (CAnd cs))
+    CAnd []       -> "True"
+    CTrue         -> "True"
+    COr [c]       -> pretty c
+    COr (c:cs)    -> withPA (PA 2 InR) $ lt (pretty c) <+> "\\/" <+> rt (pretty (COr cs))
+    COr []        -> "False"
+    CAll _bi       -> "FORALL"
 
 -- A helper function for creating a single constraint from a list of constraints.
 cAnd :: [Constraint] -> Constraint

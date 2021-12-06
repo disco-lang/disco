@@ -1,12 +1,13 @@
 {-# LANGUAGE ConstraintKinds      #-}
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
 {-# LANGUAGE DeriveTraversable    #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE StandaloneDeriving   #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -- Orphan Alpha Void instance
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -153,6 +154,7 @@ import           GHC.Generics                     (Generic)
 import           Data.Void
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -208,6 +210,11 @@ fromTelescope = foldTelescope (:) []
 -- | Injections into a sum type (@inl@ or @inr@) have a "side" (@L@ or @R@).
 data Side = L | R
   deriving (Show, Eq, Ord, Enum, Bounded, Generic, Data, Alpha, Subst t)
+
+instance Pretty Side where
+  pretty = \case
+    L -> text "left"
+    R -> text "right"
 
 -- | Use a 'Side' to select one of two arguments (the first argument
 --   for 'L', and the second for 'R').

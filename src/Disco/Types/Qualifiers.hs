@@ -1,4 +1,6 @@
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Types.Qualifiers
@@ -19,6 +21,7 @@ import           Unbound.Generics.LocallyNameless
 import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 
+import           Disco.Pretty
 import           Disco.Syntax.Operators
 
 ------------------------------------------------------------
@@ -50,6 +53,17 @@ data Qualifier
   | QBasic     -- ^ Things that do not involve Prop.
   | QSimple    -- ^ Things for which we can derive a *Haskell* Ord instance
   deriving (Show, Eq, Ord, Generic, Alpha)
+
+instance Pretty Qualifier where
+  pretty = \case
+    QNum    -> "num"
+    QSub    -> "sub"
+    QDiv    -> "div"
+    QCmp    -> "cmp"
+    QEnum   -> "enum"
+    QBool   -> "bool"
+    QBasic  -> "basic"
+    QSimple -> "simple"
 
 -- ~~~~ Note [QCmp]
 --
@@ -101,3 +115,9 @@ type Sort = Set Qualifier
 -- | The special sort \(\top\) which includes all types.
 topSort :: Sort
 topSort = S.empty
+
+instance Pretty Sort where
+  pretty s = do
+    let es = map pretty (S.toList s)
+    ds <- punctuate "," es
+    braces (hsep ds)

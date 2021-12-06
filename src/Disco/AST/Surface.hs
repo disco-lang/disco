@@ -555,11 +555,6 @@ instance Pretty Term where
       pretty op <+> pretty ty
     TWild -> text "_"
 
-instance Pretty Side where
-  pretty = \case
-    L -> text "left"
-    R -> text "right"
-
 -- | Print appropriate delimiters for a container literal.
 containerDelims :: Member (Reader PA) r => Container -> (Sem r Doc -> Sem r Doc)
 containerDelims ListContainer = brackets

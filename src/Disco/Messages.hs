@@ -27,6 +27,8 @@ import           Control.Monad   (when)
 import           Polysemy
 import           Polysemy.Output
 
+import           Disco.Pretty    (Pretty, prettyStr)
+
 data MessageType
   = Info
   | Warning
@@ -74,6 +76,9 @@ warn = msgLn Warning
 
 debug :: Member (Output Message) r => String -> Sem r ()
 debug = msgLn Debug
+
+debugPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
+debugPretty t = debug =<< prettyStr t
 
 err :: Member (Output Message) r => String -> Sem r ()
 err = msgLn Error

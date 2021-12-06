@@ -133,6 +133,9 @@ data TyVarInfo = TVI
 
 makeLenses ''TyVarInfo
 
+instance Pretty TyVarInfo where
+  pretty (TVI (First ilk) s) = maybe (pure "?") pretty ilk <> "%" <> pretty s
+
 -- | Create a 'TyVarInfo' given an 'Ilk' and a 'Sort'.
 mkTVI :: Ilk -> Sort -> TyVarInfo
 mkTVI = TVI . First . Just
@@ -147,6 +150,9 @@ instance Semigroup TyVarInfo where
 --   it is a mapping from type variable names to 'TyVarInfo' records.
 newtype TyVarInfoMap = VM { unVM :: Map (Name Type) TyVarInfo }
   deriving (Show)
+
+instance Pretty TyVarInfoMap where
+  pretty (VM m) = pretty m
 
 -- | Utility function for acting on a 'TyVarInfoMap' by acting on the
 --   underlying 'Map'.
@@ -239,7 +245,7 @@ solveConstraint tyDefns c = do
   -- and subtyping constraints in addition to qualifiers.
 
   debug "Solving:"
-  debug (show c)
+  debugPretty c
 
   debug "------------------------------"
   debug "Decomposing constraints..."
@@ -255,8 +261,7 @@ solveConstraintChoice
   => TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> Sem r S
 solveConstraintChoice tyDefns quals cs = do
 
-  debug (show quals)
---  debug (show cs)
+  debugPretty quals
   debug . unlines =<< mapM prettyStr cs
 
   -- Step 2. Check for weak unification to ensure termination. (a la

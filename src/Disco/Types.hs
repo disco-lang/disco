@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveAnyClass       #-}
+{-# LANGUAGE DeriveDataTypeable   #-}
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE PatternSynonyms      #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -214,6 +215,11 @@ isCtr = (`elem` [CtrSet, CtrBag, CtrList])
 --     contradiction to its claim to work for any type at all.
 data Ilk = Skolem | Unification
   deriving (Eq, Ord, Read, Show, Generic, Data, Alpha, Subst Atom, Subst Type)
+
+instance Pretty Ilk where
+  pretty = \case
+    Skolem      -> "S"
+    Unification -> "U"
 
 -- | 'Var' represents /type variables/, that is, variables which stand
 --   for some type.

@@ -27,6 +27,7 @@ module Disco.Pretty
 import           Prelude                          hiding ((<>))
 
 import           Data.Bifunctor
+import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Ratio
 
@@ -90,6 +91,12 @@ prettyStr = renderDoc . runLFresh . pretty
 
 instance Pretty (Name a) where
   pretty = text . show
+
+instance (Pretty k, Pretty v) => Pretty (Map k v) where
+  pretty m = do
+    let es = map (\(k,v) -> pretty k <+> "->" <+> pretty v) (M.assocs m)
+    ds <- setPA initPA $ punctuate "," es
+    braces (hsep ds)
 
 --------------------------------------------------
 -- Pretty-printing decimals

@@ -324,7 +324,7 @@ handleDesugar ::
   Sem r ()
 handleDesugar (Desugar t) = do
   (at, _) <- typecheckTop $ inferTop t
-  s <- renderDoc . prettyTerm . eraseDTerm . runDesugar . desugarTerm $ at
+  s <- renderDoc . pretty . eraseDTerm . runDesugar . desugarTerm $ at
   info s
 
 ------------------------------------------------------------
@@ -356,7 +356,7 @@ handleDoc (Doc x) = do
 
   where
     showDoc docMap (qn, ty) = do
-      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+      p  <- renderDoc . hsep $ [pretty x, text ":", pretty ty]
       info p
       case Ctx.lookup' qn docMap of
         Just (DocString ss : _) -> info $ "\n" ++ unlines ss
@@ -534,9 +534,9 @@ handleNames Names = do
   ctx   <- inputs @TopInfo (view (replModInfo . miTys))
   mapM_ showFn $ Ctx.assocs ctx
   where
-    showTyDef (nm, body) = renderDoc (prettyTyDef nm body) >>= info
+    showTyDef d = prettyStr d >>= info
     showFn (QName _ x, ty) = do
-      p  <- renderDoc . hsep $ [prettyName x, text ":", prettyPolyTy ty]
+      p  <- renderDoc . hsep $ [pretty x, text ":", pretty ty]
       info p
 
 ------------------------------------------------------------
@@ -591,7 +591,7 @@ prettyCmd =
     }
 
 handlePretty :: Members '[LFresh, Output Message] r => REPLExpr 'CPretty -> Sem r ()
-handlePretty (Pretty t) = renderDoc (prettyTerm t) >>= info
+handlePretty (Pretty t) = renderDoc (pretty t) >>= info
 
 ------------------------------------------------------------
 -- :reload
@@ -646,9 +646,9 @@ handleShowDefn (ShowDefn x) = do
       mtydef = M.lookup name2s tyDefns
 
   s <- renderDoc $ do
-    let ds = map (prettyDefn . snd) xdefs ++ maybe [] (pure . prettyTyDef name2s) mtydef
+    let ds = map (prettyDefn . snd) xdefs ++ maybe [] (pure . pretty . (name2s,)) mtydef
     case ds of
-      [] -> text "No definition for" <+> prettyName x
+      [] -> text "No definition for" <+> pretty x
       _  -> vcat ds
   info s
 
@@ -699,7 +699,7 @@ handleTypeCheck ::
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
   (_, sig) <- inputToState . typecheckTop $ inferTop t
-  s <- renderDoc $ prettyTerm t <+> text ":" <+> prettyPolyTy sig
+  s <- renderDoc $ pretty t <+> text ":" <+> pretty sig
   info s
 
 parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)

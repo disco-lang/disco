@@ -115,9 +115,3 @@ type Sort = Set Qualifier
 -- | The special sort \(\top\) which includes all types.
 topSort :: Sort
 topSort = S.empty
-
-instance Pretty Sort where
-  pretty s = do
-    let es = map pretty (S.toList s)
-    ds <- punctuate "," es
-    braces (hsep ds)

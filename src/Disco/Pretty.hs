@@ -30,6 +30,8 @@ import           Data.Bifunctor
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Ratio
+import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 
 import           Disco.Effects.LFresh
 import           Polysemy
@@ -97,6 +99,9 @@ instance (Pretty k, Pretty v) => Pretty (Map k v) where
     let es = map (\(k,v) -> pretty k <+> "->" <+> pretty v) (M.assocs m)
     ds <- setPA initPA $ punctuate "," es
     braces (hsep ds)
+
+instance Pretty a => Pretty (Set a) where
+  pretty = braces . intercalate "," . map pretty . S.toList
 
 --------------------------------------------------
 -- Pretty-printing decimals

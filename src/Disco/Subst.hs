@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Subst
@@ -37,6 +39,11 @@ import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 
+import           Disco.Effects.LFresh
+import           Disco.Pretty
+import           Polysemy
+import           Polysemy.Reader
+
 -- | A value of type @Substitution a@ is a substitution which maps some set of
 --   names (the /domain/, see 'dom') to values of type @a@.
 --   Substitutions can be /applied/ to certain terms (see
@@ -55,6 +62,15 @@ newtype Substitution a = Substitution { getSubst :: Map (Name a) a }
 
 instance Functor Substitution where
   fmap f (Substitution m) = Substitution (M.mapKeys coerce . M.map f $ m)
+
+instance Pretty a => Pretty (Substitution a) where
+  pretty (Substitution s) = do
+    let es = map (uncurry prettyMapping) (M.assocs s)
+    ds <- punctuate "," es
+    braces (hsep ds)
+
+prettyMapping :: (Pretty a, Members '[Reader PA, LFresh] r) => Name a -> a -> Sem r Doc
+prettyMapping x a = pretty x <+> "->" <+> pretty a
 
 -- | The domain of a substitution is the set of names for which the
 --   substitution is defined.

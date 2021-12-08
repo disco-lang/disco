@@ -77,6 +77,9 @@ warn = msgLn Warning
 debug :: Member (Output Message) r => String -> Sem r ()
 debug = msgLn Debug
 
+debug' :: Member (Output Message) r => String -> Sem r ()
+debug' = msg Debug
+
 debugPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
 debugPretty t = debug =<< prettyStr t
 

@@ -295,6 +295,10 @@ instance Subst UAtom UAtom where
   isvar (UV x) = Just (SubstName (coerce x))
   isvar _      = Nothing
 
+instance Pretty UAtom where
+  pretty (UB b) = pretty b
+  pretty (UV n) = pretty n
+
 -- | Is this unifiable atomic type a (unification) variable?
 uisVar :: UAtom -> Bool
 uisVar (UV _) = True

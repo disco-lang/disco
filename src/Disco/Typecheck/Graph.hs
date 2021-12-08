@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Typecheck.Graph
@@ -13,7 +15,7 @@
 
 module Disco.Typecheck.Graph where
 
-import           Prelude                           hiding (map)
+import           Prelude                           hiding (map, (<>))
 import qualified Prelude                           as P
 
 import           Control.Arrow                     ((&&&))
@@ -29,12 +31,25 @@ import           Data.Graph.Inductive.PatriciaTree (Gr)
 import qualified Data.Graph.Inductive.Query.DFS    as G (components,
                                                          condensation, topsort')
 
+import           Disco.Pretty
 import           Disco.Util                        ((!))
 
 -- | Directed graphs, with vertices labelled by @a@ and unlabelled
 --   edges.
 data Graph a = G (Gr a ()) (Map a G.Node) (Map G.Node a)
   deriving Show
+
+instance Pretty a => Pretty (Graph a) where
+  pretty (G g _ _) = parens (prettyVertices <> ", " <> prettyEdges)
+    -- (V = {(0, x), (1, N)}, E = {0 -> 1, 2 -> 3})
+    where
+      vs = G.labNodes g
+      es = G.labEdges g
+
+      prettyVertex (n,a) = parens (text (show n) <> ", " <> pretty a)
+      prettyVertices = "V = " <> braces (intercalate "," (P.map prettyVertex vs))
+      prettyEdge (v1,v2,_) = text (show v1) <+> "->" <+> text (show v2)
+      prettyEdges = "E = " <> braces (intercalate "," (P.map prettyEdge es))
 
 -- | Create a graph with the given set of vertices and directed edges.
 --   If any edges refer to vertices that are not in the given vertex

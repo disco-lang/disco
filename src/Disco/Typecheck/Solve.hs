@@ -262,7 +262,7 @@ solveConstraintChoice
 solveConstraintChoice tyDefns quals cs = do
 
   debugPretty quals
-  debug . unlines =<< mapM prettyStr cs
+  debug' . unlines =<< mapM prettyStr cs
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
@@ -279,10 +279,11 @@ solveConstraintChoice tyDefns quals cs = do
   debug "Running simplifier..."
 
   (vm, atoms, theta_simp) <- simplify tyDefns quals cs
+  debug "Done running simplifier. Results:"
 
-  debug (show vm)
-  debug (show atoms)
-  debug (show theta_simp)
+  debugPretty vm
+  debug' . unlines =<< mapM (prettyStr . (\(x,y) -> TyAtom x :<: TyAtom y)) atoms
+  debugPretty theta_simp
 
   -- Step 4. Turn the atomic constraints into a directed constraint
   -- graph.
@@ -299,7 +300,7 @@ solveConstraintChoice tyDefns quals cs = do
       vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm
       g = mkConstraintGraph vars atoms
 
-  debug (show g)
+  debugPretty g
 
   -- Step 5.
   -- Check for any weakly connected components containing more
@@ -311,7 +312,7 @@ solveConstraintChoice tyDefns quals cs = do
   debug "Checking WCCs for skolems..."
 
   (g', theta_skolem) <- checkSkolems tyDefns vm g
-  debug (show theta_skolem)
+  debugPretty theta_skolem
 
   -- We don't need to ensure that theta_skolem respects sorts since
   -- checkSkolems will only unify skolem vars with unsorted variables.
@@ -326,8 +327,8 @@ solveConstraintChoice tyDefns quals cs = do
 
   (g'', theta_cyc) <- elimCycles tyDefns g'
 
-  debug (show g'')
-  debug (show theta_cyc)
+  debugPretty g''
+  debugPretty theta_cyc
 
   -- Check that the resulting substitution respects sorts...
   let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort vm x)
@@ -341,7 +342,7 @@ solveConstraintChoice tyDefns quals cs = do
   -- the sort of x.
 
   debug "Old sort map:"
-  debug (show vm)
+  debugPretty vm
 
   let vm' = foldr updateVarMap vm (Subst.toList theta_cyc)
         where
@@ -350,7 +351,7 @@ solveConstraintChoice tyDefns quals cs = do
           updateVarMap _                        vmm = vmm
 
   debug "Updated sort map:"
-  debug (show vm')
+  debugPretty vm
 
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
@@ -361,13 +362,13 @@ solveConstraintChoice tyDefns quals cs = do
   debug "Solving for type variables..."
 
   theta_sol       <- solveGraph vm' g''
-  debug (show theta_sol)
+  debugPretty theta_sol
 
   debug "------------------------------"
   debug "Composing final substitution..."
 
   let theta_final = theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp
-  debug (show theta_final)
+  debugPretty theta_final
 
   return theta_final
 
@@ -472,8 +473,8 @@ simplify tyDefns origVM cs
         Nothing -> return ()
         Just s  -> do
 
-          debug (show s)
-          debug "---------------------------------------"
+          debug' "Simplifying: "
+          debugPretty s
 
           simplifyOne s
           simplify'
@@ -783,7 +784,16 @@ data Rels = Rels
 
 -- | A RelMap associates each variable to its sets of base type and
 --   variable predecessors and successors in the constraint graph.
-type RelMap = Map (Name Type, Dir) Rels
+newtype RelMap = RelMap { unRelMap :: Map (Name Type, Dir) Rels}
+
+instance Pretty RelMap where
+  pretty (RelMap rm) = vcat (map prettyVar byVar)
+    where
+      vars = S.map fst (M.keysSet rm)
+      byVar = map (\x -> (rm!(x,SubTy), x, rm!(x,SuperTy))) (S.toList vars)
+
+      prettyVar (subs, x, sups) = hsep [prettyRel subs, "<:", pretty x, "<:", prettyRel sups]
+      prettyRel rs = pretty (baseRels rs) <> ", " <> pretty (varRels rs)
 
 -- | Modify a @RelMap@ to record the fact that we have solved for a
 --   type variable.  In particular, delete the variable from the
@@ -792,16 +802,18 @@ type RelMap = Map (Name Type, Dir) Rels
 --   chose for it.
 substRel :: Name Type -> BaseTy -> RelMap -> RelMap
 substRel x ty
-  = M.delete (x,SuperTy)
+  = RelMap
+  . M.delete (x,SuperTy)
   . M.delete (x,SubTy)
   . M.map (\r@(Rels b v) -> if x `S.member` v then Rels (S.insert ty b) (S.delete x v) else r)
+  . unRelMap
 
 -- | Essentially dirtypesBySort vm rm dir t s x finds all the
 --   dir-types (sub- or super-) of t which have sort s, relative to
 --   the variables in x.  This is \overbar{T}_S^X (resp. \underbar...)
 --   from Traytel et al.
 dirtypesBySort :: TyVarInfoMap -> RelMap -> Dir -> BaseTy -> Sort -> Set (Name Type) -> [BaseTy]
-dirtypesBySort vm relMap dir t s x
+dirtypesBySort vm (RelMap relMap) dir t s x
 
     -- Keep only those supertypes t' of t
   = keep (dirtypes dir t) $ \t' ->
@@ -902,7 +914,8 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
     -- Get the successor and predecessor sets for all the type variables.
     topRelMap :: RelMap
     topRelMap
-      = M.map (uncurry Rels . (S.fromAscList *** S.fromAscList)
+      = RelMap
+      . M.map (uncurry Rels . (S.fromAscList *** S.fromAscList)
                . partitionEithers . map uatomToEither . S.toList)
       $ M.mapKeys (,SuperTy) subMap `M.union` M.mapKeys (,SubTy) superMap
 
@@ -918,7 +931,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
     go
       :: Members '[Fresh, Error SolveError, Output Message] r
       => RelMap -> Sem r (Substitution BaseTy)
-    go relMap = debug (show relMap) >> case as of
+    go relMap@(RelMap rm) = debugPretty relMap >> case as of
 
       -- No variables left that have base type constraints.
       []    -> return idS
@@ -943,7 +956,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
           -- they have an empty sort), so it doesn't matter if old
           -- variables hang around in it.
           Just s -> do
-            debug (show s)
+            debugPretty s
             (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
 
       where
@@ -980,17 +993,17 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
         -- leave them).
         asBase
           = map fst
-          . filter (not . S.null . baseRels . lkup "solveGraph.go.as" relMap)
-          $ M.keys relMap
+          . filter (not . S.null . baseRels . lkup "solveGraph.go.as" rm)
+          $ M.keys rm
         as = case asBase of
-          [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys relMap
+          [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys rm
           _  -> asBase
 
         -- Solve for a variable, failing if it has no solution, otherwise returning
         -- a substitution for it.
         solveVar :: Name Type -> Maybe (Substitution BaseTy)
         solveVar v =
-          case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" relMap) of
+          case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" rm) of
             -- No sub- or supertypes; the only way this can happen is
             -- if it has a nontrivial sort.
             --
@@ -1008,13 +1021,13 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
             ([], []) ->
               -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
               (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
-                (varRels (lkup "solveVar none, rels" relMap (v,SubTy)))
+                (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
 
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->
               -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
               (coerce v |->) <$> glbBySort vm relMap bsupers (getSort vm v)
-                (varRels (lkup "solveVar bsupers, rels" relMap (v,SuperTy)))
+                (varRels (lkup "solveVar bsupers, rels" rm (v,SuperTy)))
 
             -- Only subtypes.  Just assign a to their sup.
             ([], bsubs)   ->
@@ -1024,16 +1037,16 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
               -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
               -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
               (coerce v |->) <$> lubBySort vm relMap bsubs (getSort vm v)
-                (varRels (lkup "solveVar bsubs, rels" relMap (v,SubTy)))
+                (varRels (lkup "solveVar bsubs, rels" rm (v,SubTy)))
 
             -- Both successors and predecessors.  Both must have a
             -- valid bound, and the bounds must not overlap.  Assign a
             -- to the sup of its predecessors.
             (bsupers, bsubs) -> do
               ub <- glbBySort vm relMap bsupers (getSort vm v)
-                      (varRels (relMap ! (v,SuperTy)))
+                      (varRels (rm ! (v,SuperTy)))
               lb <- lubBySort vm relMap bsubs   (getSort vm v)
-                      (varRels (relMap ! (v,SubTy)))
+                      (varRels (rm ! (v,SubTy)))
               case isSubB lb ub of
                 True  -> Just (coerce v |-> lb)
                 False -> Nothing

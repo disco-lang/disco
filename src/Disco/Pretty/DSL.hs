@@ -86,6 +86,11 @@ empty    = pure PP.empty
 punctuate :: Applicative f => f Doc -> [f Doc] -> f [f Doc]
 punctuate p ds = map pure <$> (PP.punctuate <$> p <*> sequenceA ds)
 
+intercalate :: Monad f => f Doc -> [f Doc] -> f Doc
+intercalate p ds = do
+  ds' <- punctuate p ds
+  hsep ds'
+
 ------------------------------------------------------------
 -- Running a pretty-printer
 

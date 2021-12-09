@@ -276,7 +276,7 @@ handleAnn ::
   Sem r ()
 handleAnn (Ann t) = do
   (at, _) <- typecheckTop $ inferTop t
-  info (show at)
+  infoPretty at
 
 ------------------------------------------------------------
 -- :compile

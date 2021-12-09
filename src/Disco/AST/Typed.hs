@@ -88,12 +88,16 @@ module Disco.AST.Typed
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
+import           Control.Arrow                           ((***))
+import           Data.Coerce                             (coerce)
 import           Data.Data                               (Data)
 import           Data.Void
 
 import           Control.Lens.Plated                     (transform)
 import           Disco.AST.Generic
+import           Disco.AST.Surface
 import           Disco.Names
+import           Disco.Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -450,3 +454,79 @@ substQT x s = transform $ \case
     | x == y    -> s
     | otherwise -> t
   t -> t
+
+------------------------------------------------------------
+-- Exploding a typed term into a surface term with annotations
+------------------------------------------------------------
+
+instance Pretty ATerm where
+  pretty = pretty . explode
+
+explode :: ATerm -> Term
+explode = \case
+  ATVar ty x             -> TAscr (TVar (coerce (qname x))) (toPolyType ty)
+  ATPrim ty x            -> TAscr (TPrim x) (toPolyType ty)
+  ATLet ty tel           -> TAscr (TLet (explodeTelescope explodeBinding tel)) (toPolyType ty)
+  ATUnit                 -> TUnit
+  ATBool _ty b           -> TBool b
+  ATNat ty x             -> TAscr (TNat x) (toPolyType ty)
+  ATRat r                -> TRat r
+  ATChar c               -> TChar c
+  ATString cs            -> TString cs
+  ATAbs q ty a           -> TAscr (TAbs q (explodeAbs a)) (toPolyType ty)
+  ATApp ty x y           -> TAscr (TApp (explode x) (explode y)) (toPolyType ty)
+  ATTup ty xs            -> TAscr (TTup (map explode xs)) (toPolyType ty)
+  ATCase ty bs           -> TAscr (TCase (map explodeBranch bs)) (toPolyType ty)
+  ATChain ty t ls        -> TAscr (TChain (explode t) (map explodeLink ls)) (toPolyType ty)
+  ATTyOp ty x y          -> TAscr (TTyOp x y) (toPolyType ty)
+  ATContainer ty c ts el ->
+    TAscr
+      (TContainer c (map (explode *** fmap explode) ts) (fmap (fmap explode) el))
+      (toPolyType ty)
+  ATContainerComp ty c b -> TAscr (TContainerComp c (explodeTelescope explodeQual b)) (toPolyType ty)
+  ATTest _vs x           -> TAscr (explode x) (toPolyType TyProp)
+
+explodeTelescope
+  :: (Alpha a, Alpha b)
+  => (a -> b) -> Bind (Telescope a) ATerm -> Bind (Telescope b) Term
+explodeTelescope explodeBinder (unsafeUnbind -> (xs,at)) = bind (mapTelescope explodeBinder xs) (explode at)
+
+explodeBinding :: ABinding -> Binding
+explodeBinding (ABinding m b (unembed -> n)) = Binding m (coerce b) (embed (explode n))
+
+explodeAbs :: Bind [APattern] ATerm -> Bind [Pattern] Term
+explodeAbs (unsafeUnbind -> (aps, at)) = bind (map explodePattern aps) (explode at)
+
+explodePattern :: APattern -> Pattern
+explodePattern = \case
+  APVar ty x      -> PAscr (PVar (coerce x)) ty
+  APWild ty       -> PAscr PWild ty
+  APUnit          -> PUnit
+  APBool b        -> PBool b
+  APChar c        -> PChar c
+  APString s      -> PString s
+  APTup ty ps     -> PAscr (PTup (map explodePattern ps)) ty
+  APInj ty s p    -> PAscr (PInj s (explodePattern p)) ty
+  APNat ty n      -> PAscr (PNat n) ty
+  APCons ty p1 p2 -> PAscr (PCons (explodePattern p1) (explodePattern p2)) ty
+  APList ty ps    -> PAscr (PList (map explodePattern ps)) ty
+  APAdd ty s p t  -> PAscr (PAdd s (explodePattern p) (explode t)) ty
+  APMul ty s p t  -> PAscr (PMul s (explodePattern p) (explode t)) ty
+  APSub ty p t    -> PAscr (PSub (explodePattern p) (explode t)) ty
+  APNeg ty p      -> PAscr (PNeg (explodePattern p)) ty
+  APFrac ty p q   -> PAscr (PFrac (explodePattern p) (explodePattern q)) ty
+
+explodeBranch :: ABranch -> Branch
+explodeBranch = explodeTelescope explodeGuard
+
+explodeGuard :: AGuard -> Guard
+explodeGuard (AGBool (unembed -> at))   = GBool (embed (explode at))
+explodeGuard (AGPat (unembed -> at) ap) = GPat (embed (explode at)) (explodePattern ap)
+explodeGuard (AGLet ab)                 = GLet (explodeBinding ab)
+
+explodeLink :: ALink -> Link
+explodeLink (ATLink bop at) = TLink bop (explode at)
+
+explodeQual :: AQual -> Qual
+explodeQual (AQBind x (unembed -> at)) = QBind (coerce x) (embed (explode at))
+explodeQual (AQGuard (unembed -> at))  = QGuard (embed (explode at))

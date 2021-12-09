@@ -424,7 +424,9 @@ inferTop t = do
   -- Run inference on the term and try to solve the resulting
   -- constraints.
   (at, theta) <- solve $ infer t
-  debug (show at)  -- XXX for testing
+
+  debug "Final annotated term (before substitution and container monomorphizing):"
+  debugPretty at
 
       -- Apply the resulting substitution.
   let at' = applySubst theta at

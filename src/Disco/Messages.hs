@@ -71,6 +71,9 @@ info = msgLn Info
 info' :: Member (Output Message) r => String -> Sem r ()
 info' = msg Info
 
+infoPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
+infoPretty t = info =<< prettyStr t
+
 warn :: Member (Output Message) r => String -> Sem r ()
 warn = msgLn Warning
 

@@ -1,5 +1,5 @@
 holds (∀ℕ. (λarg0. (λ_. (λk. (λx. test [(x, ℕ, x)] (3 < x)) arg0) (λ_1. matchErr)) unit))
-λarg0. (λ_. (λk. (λx. λarg01. (λ_1. (λk1. (λy. x) arg01) (λ_2. matchErr)) unit) arg0) (λ_1. matchErr)) unit
+λx, y. x
 (λ_. (λk. (λy. (λp, q. p) (fst y) (snd y)) (frac (2 / 3))) (λ_1. matchErr)) unit
 (λ_. (λk. case (3 < 2) of {
             left _1 -> k unit

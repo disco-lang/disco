@@ -24,9 +24,9 @@ module Disco.Desugar
        where
 
 import           Control.Monad.Cont
-import           Data.Bool                        (bool)
+import           Data.Bool                               (bool)
 import           Data.Coerce
-import           Data.Maybe                       (fromMaybe, isJust)
+import           Data.Maybe                              (fromMaybe, isJust)
 
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
@@ -35,14 +35,16 @@ import           Disco.Module
 import           Disco.Names
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
-import           Disco.Typecheck                  (containerTy)
+import           Disco.Typecheck                         (containerTy)
 import           Disco.Types
 
 import           Disco.Effects.Fresh
-import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Bind, Name, bind, embed,
-                                                   name2String, string2Name,
-                                                   unembed, unrebind)
+import           Polysemy                                (Member, Sem, run)
+import           Unbound.Generics.LocallyNameless        (Bind, Name, bind,
+                                                          embed, name2String,
+                                                          string2Name, unembed,
+                                                          unrebind)
+import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 ------------------------------------------------------------
 -- Running desugaring computations
@@ -181,6 +183,14 @@ desugarDefn (Defn _ patTys bodyTy def) =
 --   abstractions (which happen to have only one clause).
 
 desugarAbs :: Member Fresh r => Quantifier -> Type -> [Clause] -> Sem r DTerm
+-- Special case for compiling a single lambda with no pattern matching directly to a lambda
+desugarAbs Lam ty [cl@(unsafeUnbind -> ([APVar _ _], _))] = do
+  (ps, at) <- unbind cl
+  d <- desugarTerm at
+  return $ DTAbs Lam ty (bind (getVar (head ps)) d)
+  where
+    getVar (APVar _ x) = coerce x
+-- General case
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
   let (pats, bodies) = unzip clausePairs

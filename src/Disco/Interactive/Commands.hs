@@ -299,7 +299,7 @@ handleCompile ::
   Sem r ()
 handleCompile (Compile t) = do
   (at, _) <- typecheckTop $ inferTop t
-  info . show . compileTerm $ at
+  infoPretty . compileTerm $ at
 
 ------------------------------------------------------------
 -- :desugar

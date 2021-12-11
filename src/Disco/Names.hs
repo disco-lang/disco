@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings  #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -27,8 +28,10 @@ import           Data.Data                        (Data)
 import           Data.Data.Lens                   (template)
 import           Data.Typeable                    (Typeable)
 import           GHC.Generics                     (Generic)
+import           Prelude                          hiding ((<>))
 import           Unbound.Generics.LocallyNameless
 
+import           Disco.Pretty
 import           Disco.Types
 
 ------------------------------------------------------------
@@ -92,3 +95,16 @@ substQ = undefined
 
 substsQ :: Subst b a => [(QName b, b)] -> a -> a
 substsQ = undefined
+
+------------------------------------------------------------
+-- Pretty-printing
+------------------------------------------------------------
+
+instance Pretty ModuleName where
+  pretty REPLModule        = "REPL"
+  pretty (Named (Dir _) s) = text s
+  pretty (Named Stdlib s)  = text s
+
+instance Pretty (QName a) where
+  pretty (QName LocalName x)          = pretty x
+  pretty (QName (QualifiedName mn) x) = pretty mn <> "." <> pretty x

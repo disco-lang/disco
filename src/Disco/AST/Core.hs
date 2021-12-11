@@ -1,6 +1,8 @@
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveAnyClass           #-}
+{-# LANGUAGE DeriveDataTypeable       #-}
+{-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE OverloadedStrings        #-}
+{-# LANGUAGE UndecidableInstances     #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -25,12 +27,20 @@ module Disco.AST.Core
 import           Control.Lens.Plated
 import           Data.Data                        (Data)
 import           Data.Data.Lens                   (uniplate)
+import qualified Data.Set                         as S
 import           GHC.Generics
-import           Prelude                          as P
-import           Unbound.Generics.LocallyNameless
+import           Prelude                          hiding ((<>))
+import qualified Prelude                          as P
+import           Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
 
-import           Disco.AST.Generic                (Side)
+import           Disco.Effects.LFresh
+import           Polysemy                         (Members, Sem)
+import           Polysemy.Reader
+
+import           Data.Ratio
+import           Disco.AST.Generic                (Side, selectSide)
 import           Disco.Names                      (QName)
+import           Disco.Pretty
 import           Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
@@ -50,7 +60,7 @@ instance Semigroup RationalDisplay where
 --   and 'Decimal' always wins when combining.
 instance Monoid RationalDisplay where
   mempty = Fraction
-  mappend = (<>)
+  mappend = (P.<>)
 
 -- | AST for the desugared, untyped core language.
 data Core where
@@ -232,7 +242,7 @@ data Op
     OLookupSeq
   | -- | Extend a List via OEIS
     OExtendSeq
-  deriving (Show, Generic, Data, Alpha)
+  deriving (Show, Generic, Data, Alpha, Eq, Ord)
 
 -- | Get the arity (desired number of arguments) of a function
 --   constant.  A few constants have arity 0; everything else is
@@ -255,3 +265,126 @@ substsQC xs = transform $ \case
     Just c -> c
     _      -> CVar y
   t -> t
+
+instance Pretty Core where
+  pretty = \case
+    CVar qn         -> pretty qn
+    CNum _ r
+      | denominator r == 1 -> text (show (numerator r))
+      | otherwise          -> text (show (numerator r)) <> "/" <> text (show (denominator r))
+    CApp (CConst op) (CPair c1 c2)
+      | isInfix op -> parens (pretty c1 <+> text (opToStr op) <+> pretty c2)
+    CApp (CConst op) c
+      | isPrefix op -> text (opToStr op) <> pretty c
+      | isPostfix op -> pretty c <> text (opToStr op)
+    CConst op       -> pretty op
+    CInj s c        -> withPA funPA $ selectSide s "left" "right" <+> rt (pretty c)
+    CCase c l r     -> do
+      lunbind l $ \(x, lc) -> do
+      lunbind r $ \(y, rc) -> do
+        "case" <+> pretty c <+> "of {"
+          $+$ nest 2 (
+            vcat
+            [ withPA funPA $ "left" <+> rt (pretty x) <+> "->" <+> pretty lc
+            , withPA funPA $ "right" <+> rt (pretty y) <+> "->" <+> pretty rc
+            ])
+          $+$ "}"
+    CUnit           -> "unit"
+    CPair c1 c2     -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
+    CProj s c       -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
+    CAbs lam        -> withPA initPA $ do
+      lunbind lam $ \(xs, body) -> "λ" <> intercalate "," (map pretty xs) <> "." <+> lt (pretty body)
+    CApp c1 c2      -> withPA funPA $ lt (pretty c1) <+> rt (pretty c2)
+    CTest xs c      -> "test" <+> prettyTestVars xs <+> pretty c
+    CType ty        -> pretty ty
+    CDelay d        -> withPA initPA $ do
+      lunbind d $ \(xs, bodies) ->
+        "delay" <+> intercalate "," (map pretty xs) <> "." <+> pretty (toTuple bodies)
+    CForce c        -> withPA funPA $ "force" <+> rt (pretty c)
+
+toTuple :: [Core] -> Core
+toTuple = foldr CPair CUnit
+
+prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r Doc
+prettyTestVars = brackets . intercalate "," . map prettyTestVar
+  where
+    prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
+
+isInfix, isPrefix, isPostfix :: Op -> Bool
+isInfix OShouldEq{} = True
+isInfix op = op `S.member` S.fromList
+  [ OAdd, OMul, ODiv, OExp, OMod, ODivides, OMultinom, OEq, OLt]
+
+isPrefix ONeg = True
+isPrefix _    = False
+
+isPostfix OFact = True
+isPostfix _     = False
+
+instance Pretty Op where
+  pretty (OForall tys) = "∀" <> intercalate "," (map pretty tys) <> "."
+  pretty (OExists tys) = "∃" <> intercalate "," (map pretty tys) <> "."
+  pretty op
+    | isInfix op = "~" <> text (opToStr op) <> "~"
+    | isPrefix op = text (opToStr op) <> "~"
+    | isPostfix op = "~" <> text (opToStr op)
+    | otherwise  = text (opToStr op)
+
+opToStr :: Op -> String
+opToStr = \case
+  OAdd         -> "+"
+  ONeg         -> "-"
+  OSqrt        -> "sqrt"
+  OFloor       -> "floor"
+  OCeil        -> "ceil"
+  OAbs         -> "abs"
+  OMul         -> "*"
+  ODiv         -> "/"
+  OExp         -> "^"
+  OMod         -> "mod"
+  ODivides     -> "divides"
+  OMultinom    -> "choose"
+  OFact        -> "!"
+  OEq          -> "=="
+  OLt          -> "<"
+  OEnum        -> "enumerate"
+  OCount       -> "count"
+  OSize        -> "size"
+  OPower       -> "power"
+  OBagElem     -> "elem_bag"
+  OListElem    -> "elem_list"
+  OEachBag     -> "each_bag"
+  OEachSet     -> "each_set"
+  OFilterBag   -> "filter_bag"
+  OMerge       -> "merge"
+  OBagUnions   -> "unions_bag"
+  OSummary     -> "summary"
+  OEmptyGraph  -> "emptyGraph"
+  OVertex      -> "vertex"
+  OOverlay     -> "overlay"
+  OConnect     -> "connect"
+  OInsert      -> "insert"
+  OLookup      -> "lookup"
+  OUntil       -> "until"
+  OSetToList   -> "set2list"
+  OBagToSet    -> "bag2set"
+  OBagToList   -> "bag2list"
+  OListToSet   -> "list2set"
+  OListToBag   -> "list2bag"
+  OBagToCounts -> "bag2counts"
+  OCountsToBag -> "counts2bag"
+  OMapToSet    -> "map2set"
+  OSetToMap    -> "set2map"
+  OIsPrime     -> "isPrime"
+  OFactor      -> "factor"
+  OFrac        -> "frac"
+  OHolds       -> "holds"
+  ONotProp     -> "not"
+  OShouldEq _  -> "=!="
+  OMatchErr    -> "matchErr"
+  OCrash       -> "crash"
+  OId          -> "id"
+  OLookupSeq   -> "lookupSeq"
+  OExtendSeq   -> "extendSeq"
+  OForall{}    -> "∀"
+  OExists{}    -> "∃"

@@ -1,2 +1,2 @@
 Loading num.disco...
-CVar (QName {qnameProvenance = QualifiedName (Named Stdlib "num"), qname = isPrime})
+num.isPrime

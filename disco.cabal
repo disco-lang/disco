@@ -47,6 +47,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/input
                      test/compile-cons/expected
                      test/compile-cons/input
+                     test/compile-misc/expected
+                     test/compile-misc/input
                      test/containers-cmp/expected
                      test/containers-cmp/input
                      test/containers-comp/expected

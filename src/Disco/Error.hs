@@ -1,4 +1,6 @@
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
+
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Error
@@ -14,17 +16,23 @@
 
 module Disco.Error (DiscoError(..), EvalError(..), outputDiscoErrors) where
 
+import           Control.Monad                    ((<=<))
+import           Prelude                          hiding ((<>))
+
 import           Text.Megaparsec                  (ParseErrorBundle,
                                                    errorBundlePretty)
 import           Unbound.Generics.LocallyNameless (Name)
 
+import           Disco.Effects.LFresh
 import           Polysemy
 import           Polysemy.Error
 import           Polysemy.Output
+import           Polysemy.Reader
 
 import           Disco.Messages
 import           Disco.Names                      (ModuleName)
 import           Disco.Parser
+import           Disco.Pretty
 import           Disco.Typecheck.Util             (TCError)
 
 -- | Top-level error type for Disco.
@@ -34,7 +42,7 @@ data DiscoError where
   ModuleNotFound :: String -> DiscoError
 
   -- | Cyclic import encountered.
-  CyclicImport :: ModuleName -> DiscoError
+  CyclicImport :: [ModuleName] -> DiscoError
 
   -- | Error encountered during typechecking.
   TypeCheckErr :: TCError -> DiscoError
@@ -80,8 +88,32 @@ deriving instance Show EvalError
 outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
-  either (err . prettyDiscoError) return e
+  either (err <=< runLFresh . renderDoc . prettyDiscoError) return e
 
-prettyDiscoError :: DiscoError -> String
-prettyDiscoError (ParseErr pe) = errorBundlePretty pe
-prettyDiscoError e             = show e  -- for now!
+prettyDiscoError :: Members '[Reader PA, LFresh] r => DiscoError -> Sem r Doc
+prettyDiscoError = \case
+  ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
+  CyclicImport ms  -> cyclicImportError ms
+  TypeCheckErr te  -> prettyTCError te
+  ParseErr pe      -> text (errorBundlePretty pe)
+  EvalErr ee       -> prettyEvalError ee
+  Panic s          ->
+    hcat
+      [ "Bug! " <> text s
+      , "Please report this as a bug at https://github.com/disco-lang/disco/issues/"
+      ]
+
+cyclicImportError
+  :: Members '[Reader PA, LFresh] r
+  => [ModuleName] -> Sem r Doc
+cyclicImportError ms =
+  vcat
+    [ "Error: module imports form a cycle:"
+    , nest 2 $ intercalate " ->" (map pretty ms)
+    ]
+
+prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
+prettyTCError = text . show . TypeCheckErr
+
+prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
+prettyEvalError = text . show . EvalErr

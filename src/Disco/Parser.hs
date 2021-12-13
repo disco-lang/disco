@@ -434,7 +434,7 @@ parseImport = L.nonIndented sc $
 -- | Parse the name of a module.
 parseModuleName :: Parser String
 parseModuleName = lexeme $
-  intercalate "/" <$> (some alphaNumChar `sepBy` char '/') <* optional (string ".disco")
+  intercalate "/" <$> (some (alphaNumChar <|> oneOf "_-") `sepBy` char '/') <* optional (string ".disco")
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.

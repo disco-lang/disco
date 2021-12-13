@@ -100,6 +100,12 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/module-basic/expected
                      test/module-basic/input
                      test/module-basic/subdir/d.disco
+                     test/module-cycle/cyclic1.disco
+                     test/module-cycle/cyclic2.disco
+                     test/module-cycle/expected
+                     test/module-cycle/input
+                     test/module-notfound/expected
+                     test/module-notfound/input
                      test/parse-245/expected
                      test/parse-245/input
                      test/parse-280/capitalvars.disco

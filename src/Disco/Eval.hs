@@ -282,7 +282,7 @@ loadDiscoModule
   :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> FilePath -> Sem r ModuleInfo
 loadDiscoModule quiet resolver =
-  loadDiscoModule' quiet resolver S.empty
+  loadDiscoModule' quiet resolver []
 
 -- | Like 'loadDiscoModule', but start with an already parsed 'Module'
 --   instead of loading a module from disk by name.  Also, check it in
@@ -293,7 +293,7 @@ loadParsedDiscoModule
   :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> Resolver -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule quiet resolver =
-  loadParsedDiscoModule' quiet REPL resolver S.empty
+  loadParsedDiscoModule' quiet REPL resolver []
 
 -- | Recursively load a Disco module while keeping track of an extra
 --   Map from module names to 'ModuleInfo' records, to avoid loading
@@ -301,20 +301,20 @@ loadParsedDiscoModule quiet resolver =
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule'
   :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
-  => Bool -> Resolver -> S.Set ModuleName -> FilePath
+  => Bool -> Resolver -> [ModuleName] -> FilePath
   -> Sem r ModuleInfo
 loadDiscoModule' quiet resolver inProcess modPath  = do
   (resolvedPath, prov) <- resolveModule resolver modPath
                   >>= maybe (throw $ ModuleNotFound modPath) return
   let name = Named prov modPath
-  when (S.member name inProcess) (throw $ CyclicImport name)
+  when (name `elem` inProcess) (throw $ CyclicImport (name:inProcess))
   modMap <- use @TopInfo topModMap
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
       unless quiet $ info $ "Loading " ++ (modPath -<.> "disco") ++ "..."
       cm <- parseDiscoModule resolvedPath
-      loadParsedDiscoModule' quiet Standalone resolver (S.insert name inProcess) name cm
+      loadParsedDiscoModule' quiet Standalone resolver (name : inProcess) name cm
 
 -- | A list of standard library module names, which should always be
 --   loaded implicitly.
@@ -329,7 +329,7 @@ stdLib = ["list", "container"]
 --   imports, then typecheck it.
 loadParsedDiscoModule'
   :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
-  => Bool -> LoadingMode -> Resolver -> S.Set ModuleName -> ModuleName -> Module -> Sem r ModuleInfo
+  => Bool -> LoadingMode -> Resolver -> [ModuleName] -> ModuleName -> Module -> Sem r ModuleInfo
 loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
 
   -- Recursively load any modules imported by this one, plus standard

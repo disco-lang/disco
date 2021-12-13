@@ -32,7 +32,7 @@ import           Disco.Pretty    (Pretty, prettyStr)
 data MessageType
   = Info
   | Warning
-  | Error
+  | ErrMsg
   | Debug
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
@@ -87,4 +87,4 @@ debugPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
 debugPretty t = debug =<< prettyStr t
 
 err :: Member (Output Message) r => String -> Sem r ()
-err = msgLn Error
+err = msgLn ErrMsg

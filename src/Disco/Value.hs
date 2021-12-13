@@ -424,6 +424,8 @@ prettyValue (TyUser x args) v = do
 prettyValue _      VUnit                     = "■"
 prettyValue TyProp _                         = prettyPlaceholder TyProp
 prettyValue TyBool (VInj s _)                = text $ map toLower (show (s == R))
+prettyValue TyBool v =
+  error $ "Non-VInj passed with Bool type to prettyValue: " ++ show v
 prettyValue TyC (vchar -> c)                 = text (show c)
 prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap prettyChar $ cs
   where
@@ -431,9 +433,14 @@ prettyValue (TyList TyC) (vlist vchar -> cs) = doubleQuotes . text . concatMap p
 prettyValue (TyList ty) (vlist id -> xs)     = do
   ds <- punctuate (text ",") (map (prettyValue ty) xs)
   brackets (hsep ds)
+
 prettyValue ty@(_ :*: _) v                   = parens (prettyTuple ty v)
+
 prettyValue (ty1 :+: _) (VInj L v)           = "left"  <> prettyVP ty1 v
 prettyValue (_ :+: ty2) (VInj R v)           = "right" <> prettyVP ty2 v
+prettyValue (_ :+: _) v =
+  error $ "Non-VInj passed with sum type to prettyValue: " ++ show v
+
 prettyValue _ (VNum d r)
   | denominator r == 1                       = text $ show (numerator r)
   | otherwise                                = text $ case d of
@@ -443,14 +450,19 @@ prettyValue _ (VNum d r)
 prettyValue ty@(_ :->: _) _                  = prettyPlaceholder ty
 
 prettyValue (TySet ty) (VBag xs)             = braces $ prettySequence ty "," (map fst xs)
+prettyValue (TySet _) v =
+  error $ "Non-VBag passed with Set type to prettyValue: " ++ show v
 prettyValue (TyBag ty) (VBag xs)             = prettyBag ty xs
+prettyValue (TyBag _) v =
+  error $ "Non-VBag passed with Bag type to prettyValue: " ++ show v
+
 prettyValue (TyMap tyK tyV) (VMap m)         =
   "map" <> parens (braces (prettySequence (tyK :*: tyV) "," (assocsToValues m)))
   where
     assocsToValues = map (\(k,v) -> VPair (fromSimpleValue k) v) . M.assocs
+prettyValue (TyMap _ _) v =
+  error $ "Non-map value with map type passed to prettyValue: " ++ show v
 
-  -- XXX can we get rid of OEmptyGraph?
-prettyValue (TyGraph _ ) (VConst OEmptyGraph) = "emptyGraph"
 prettyValue (TyGraph ty) (VGraph g)          =
   foldg
     "emptyGraph"
@@ -458,8 +470,14 @@ prettyValue (TyGraph ty) (VGraph g)          =
     (\l r -> withPA (getPA Add) $ lt l <+> "+" <+> rt r)
     (\l r -> withPA (getPA Mul) $ lt l <+> "*" <+> rt r)
     g
+prettyValue (TyGraph _) v =
+  error $ "Non-graph value with graph type passed to prettyValue: " ++ show v
 
-prettyValue ty v = error $ "unimplemented: prettyValue " ++ show ty ++ " " ++ show v
+prettyValue ty@TyAtom{} v =
+  error $ "Invalid atomic type passed to prettyValue: " ++ show ty ++ " " ++ show v
+
+prettyValue ty@TyCon{} v =
+  error $ "Invalid type constructor passed to prettyValue: " ++ show ty ++ " " ++ show v
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.

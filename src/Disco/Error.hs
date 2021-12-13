@@ -14,7 +14,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Disco.Error (DiscoError(..), EvalError(..), outputDiscoErrors) where
+module Disco.Error (DiscoError(..), EvalError(..), panic, outputDiscoErrors) where
 
 import           Control.Monad                    ((<=<))
 import           Prelude                          hiding ((<>))
@@ -84,6 +84,9 @@ data EvalError where
   Crash         :: String    -> EvalError
 
 deriving instance Show EvalError
+
+panic :: Member (Error DiscoError) r => String -> Sem r a
+panic = throw . Panic
 
 outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do

@@ -188,7 +188,7 @@ toSimpleValue = \case
   VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
   VBag bs     -> SBag (map (first toSimpleValue) bs)
   VType t     -> SType t
-  t           -> error $ "A non-simple value was passed as simple" ++ show t
+  t           -> error $ "A non-simple value was passed as simple: " ++ show t
 
 fromSimpleValue :: SimpleValue -> Value
 fromSimpleValue (SNum d n)    = VNum d n

@@ -16,7 +16,6 @@
 
 module Disco.Error (DiscoError(..), EvalError(..), panic, outputDiscoErrors) where
 
-import           Control.Monad                    ((<=<))
 import           Prelude                          hiding ((<>))
 
 import           Text.Megaparsec                  (ParseErrorBundle,
@@ -91,20 +90,20 @@ panic = throw . Panic
 outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
-  either (err <=< runLFresh . renderDoc . prettyDiscoError) return e
+  either (err . pretty') return e
 
-prettyDiscoError :: Members '[Reader PA, LFresh] r => DiscoError -> Sem r Doc
-prettyDiscoError = \case
-  ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
-  CyclicImport ms  -> cyclicImportError ms
-  TypeCheckErr te  -> prettyTCError te
-  ParseErr pe      -> text (errorBundlePretty pe)
-  EvalErr ee       -> prettyEvalError ee
-  Panic s          ->
-    hcat
-      [ "Bug! " <> text s
-      , "Please report this as a bug at https://github.com/disco-lang/disco/issues/"
-      ]
+instance Pretty DiscoError where
+  pretty = \case
+    ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
+    CyclicImport ms  -> cyclicImportError ms
+    TypeCheckErr te  -> prettyTCError te
+    ParseErr pe      -> text (errorBundlePretty pe)
+    EvalErr ee       -> prettyEvalError ee
+    Panic s          ->
+      hcat
+        [ "Bug! " <> text s
+        , "Please report this as a bug at https://github.com/disco-lang/disco/issues/"
+        ]
 
 cyclicImportError
   :: Members '[Reader PA, LFresh] r

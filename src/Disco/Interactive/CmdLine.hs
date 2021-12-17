@@ -42,6 +42,7 @@ import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Messages
 import           Disco.Module                           (miExts)
+import           Disco.Pretty
 
 import           Disco.Effects.State
 import           Polysemy
@@ -186,7 +187,7 @@ handleCMD "" = return ()
 handleCMD s = do
   exts <- use @TopInfo (replModInfo . miExts)
   case parseLine discoCommands exts s of
-    Left m  -> info m
-    Right l -> catch @DiscoError (dispatch discoCommands l) (info . show)
+    Left m  -> info (text m)
+    Right l -> catch @DiscoError (dispatch discoCommands l) (info . pretty')
                 -- The above has to be catch, not outputErrors, because
                 -- the latter won't resume afterwards.

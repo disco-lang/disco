@@ -39,10 +39,10 @@ import           Data.Set                         (Set)
 import qualified Data.Set                         as S
 import           Data.Tuple
 
-import           Disco.Effects.Error
 import           Disco.Effects.Fresh
 import           Disco.Effects.State
 import           Polysemy
+import           Polysemy.Error
 import           Polysemy.Output
 
 import           Disco.Messages
@@ -262,7 +262,7 @@ solveConstraintChoice
 solveConstraintChoice tyDefns quals cs = do
 
   debugPretty quals
-  debug' . unlines =<< mapM prettyStr cs
+  debug $ vcat (map pretty' cs)
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
@@ -282,7 +282,7 @@ solveConstraintChoice tyDefns quals cs = do
   debug "Done running simplifier. Results:"
 
   debugPretty vm
-  debug' . unlines =<< mapM (prettyStr . (\(x,y) -> TyAtom x :<: TyAtom y)) atoms
+  debug $ vcat $ map (pretty' . (\(x,y) -> TyAtom x :<: TyAtom y)) atoms
   debugPretty theta_simp
 
   -- Step 4. Turn the atomic constraints into a directed constraint
@@ -473,8 +473,7 @@ simplify tyDefns origVM cs
         Nothing -> return ()
         Just s  -> do
 
-          debug' "Simplifying: "
-          debugPretty s
+          debug $ "Simplifying:" <+> pretty' s
 
           simplifyOne s
           simplify'
@@ -723,7 +722,7 @@ checkSkolems tyDefns vm graph = do
 
     unifyWCCs g s []     = return (G.map noSkolems g, s)
     unifyWCCs g s (u:us) = do
-      debug $ "Unifying " ++ show (u:us) ++ "..."
+      debug $ "Unifying" <+> pretty' (u:us) <> "..."
 
       let g' = foldl' (flip G.delete) g u
 
@@ -938,10 +937,10 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
 
       -- Solve one variable at a time.  See below.
       (a:_) -> do
-        debug $ "Solving for " ++ show a
+        debug $ "Solving for" <+> pretty' a
         case solveVar a of
           Nothing       -> do
-            debug $ "Couldn't solve for " ++ show a
+            debug $ "Couldn't solve for" <+> pretty' a
             throw NoUnify
 
           -- If we solved for a, delete it from the maps, apply the

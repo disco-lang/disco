@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -37,11 +38,11 @@ import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless (Name, name2String,
                                                    string2Name)
 
-import           Disco.Effects.Error              hiding (try)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.State
 import           Polysemy
+import           Polysemy.Error                   hiding (try)
 import           Polysemy.Output
 import           Polysemy.Reader
 
@@ -61,6 +62,7 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    runParser, sc, symbol, term,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty, (<>))
+import qualified Disco.Pretty                     as Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
@@ -322,8 +324,7 @@ handleDesugar ::
   Sem r ()
 handleDesugar (Desugar t) = do
   (at, _) <- typecheckTop $ inferTop t
-  s <- renderDoc . pretty . eraseDTerm . runDesugar . desugarTerm $ at
-  info s
+  info $ pretty' . eraseDTerm . runDesugar . desugarTerm $ at
 
 ------------------------------------------------------------
 -- :doc
@@ -349,16 +350,16 @@ handleDoc (Doc x) = do
   docs <- inputs @TopInfo (view (replModInfo . miDocs))
 
   case Ctx.lookupAll' x ctx of
-    []    -> err $ "No documentation found for " ++ show x ++ "."
+    []    -> err $ "No documentation found for" <+> pretty' x <> "."
     binds -> mapM_ (showDoc docs) binds
 
   where
-    showDoc docMap (qn, ty) = do
-      p  <- renderDoc . hsep $ [pretty x, text ":", pretty ty]
-      info p
+    showDoc docMap (qn, ty) = info $
+      hsep [pretty' x, ":", pretty' ty]
+      $+$
       case Ctx.lookup' qn docMap of
-        Just (DocString ss : _) -> info $ "\n" ++ unlines ss
-        _                       -> return ()
+        Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
+        _                       -> Pretty.empty
 
 ------------------------------------------------------------
 -- eval
@@ -389,8 +390,7 @@ evalTerm at = do
   v <- runInputConst env $ eval (compileTerm at)
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
-  s <- runInputConst tydefs . renderDoc $ prettyValue ty v
-  info s
+  info $ runInputConst tydefs $ prettyValue' ty v
 
   modify @TopInfo $
     (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
@@ -425,7 +425,7 @@ handleHelp Help = do
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
     filteredCommands cmds = P.filter (\(SomeCmd c) -> category c == User) cmds
-    showCmd c maxlen = padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c
+    showCmd c maxlen = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
 
@@ -494,15 +494,18 @@ runAllTests aprops
 
     runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName ATerm -> [AProperty] -> Sem r Bool
     runTests (QName _ n) props = do
-      info' ("  " ++ name2String n ++ ":")
       results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
       let failures = P.filter (not . testIsOk . snd) results
+          hdr = pretty' n <> ":"
+
       case P.null failures of
-        True  -> info " OK"
+        True  -> info $ nest 2 $ hdr <+> "OK"
         False -> do
-          info ""
           tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
-          forM_ failures (runInputConst tydefs . runReader initPA . uncurry prettyTestFailure)
+          let prettyFailures =
+                runInputConst tydefs . runReader initPA . runLFresh $
+                  bulletList "-" $ map (uncurry prettyTestFailure) failures
+          info $ nest 2 $ hdr $+$ prettyFailures
       return (P.null failures)
 
 ------------------------------------------------------------
@@ -527,15 +530,13 @@ handleNames ::
   Sem r ()
 handleNames Names = do
   tyDef <- inputs @TopInfo (view (replModInfo . miTydefs))
-  mapM_ showTyDef $ M.assocs tyDef
-
-  ctx   <- inputs @TopInfo (view (replModInfo . miTys))
-  mapM_ showFn $ Ctx.assocs ctx
+  ctx <- inputs @TopInfo (view (replModInfo . miTys))
+  info $
+    vcat (map pretty' (M.assocs tyDef))
+    $+$
+    vcat (map showFn (Ctx.assocs ctx))
   where
-    showTyDef d = prettyStr d >>= info
-    showFn (QName _ x, ty) = do
-      p  <- renderDoc . hsep $ [pretty x, text ":", pretty ty]
-      info p
+    showFn (QName _ x, ty) = hsep [pretty' x, text ":", pretty' ty]
 
 ------------------------------------------------------------
 -- nop
@@ -571,7 +572,7 @@ parseCmd =
     }
 
 handleParse :: Member (Output Message) r => REPLExpr 'CParse -> Sem r ()
-handleParse (Parse t) = info (show t)
+handleParse (Parse t) = info (text (show t))
 
 ------------------------------------------------------------
 -- :pretty
@@ -589,7 +590,7 @@ prettyCmd =
     }
 
 handlePretty :: Members '[LFresh, Output Message] r => REPLExpr 'CPretty -> Sem r ()
-handlePretty (Pretty t) = renderDoc (pretty t) >>= info
+handlePretty (Pretty t) = info $ pretty' t
 
 ------------------------------------------------------------
 -- :reload
@@ -643,12 +644,11 @@ handleShowDefn (ShowDefn x) = do
   let xdefs = Ctx.lookupAll' (coerce x) defns
       mtydef = M.lookup name2s tyDefns
 
-  s <- renderDoc $ do
-    let ds = map (pretty . snd) xdefs ++ maybe [] (pure . pretty . (name2s,)) mtydef
+  info $ do
+    let ds = map (pretty' . snd) xdefs ++ maybe [] (pure . pretty' . (name2s,)) mtydef
     case ds of
-      [] -> text "No definition for" <+> pretty x
+      [] -> text "No definition for" <+> pretty' x
       _  -> vcat ds
-  info s
 
 ------------------------------------------------------------
 -- :test
@@ -674,7 +674,7 @@ handleTest (TestProp t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
-    runInputConst tydefs . runReader initPA $ prettyTestResult at r
+    info $ runInputConst tydefs . runReader initPA $ nest 2 $ "-" <+> prettyTestResult at r
 
 ------------------------------------------------------------
 -- :type
@@ -697,8 +697,7 @@ handleTypeCheck ::
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
   (_, sig) <- inputToState . typecheckTop $ inferTop t
-  s <- renderDoc $ pretty t <+> text ":" <+> pretty sig
-  info s
+  info $ pretty' t <+> text ":" <+> pretty' sig
 
 parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
 parseTypeCheck =

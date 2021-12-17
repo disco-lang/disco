@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings    #-}
 {-# LANGUAGE TemplateHaskell      #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 
@@ -56,17 +57,18 @@ import           Data.Bifunctor
 import           Data.Map                 (Map)
 import qualified Data.Map                 as M
 import qualified Data.Set                 as S
+import           Prelude
 import           System.FilePath          ((-<.>))
 
 import qualified System.Console.Haskeline as H
 
-import           Disco.Effects.Error
 import           Disco.Effects.Fresh
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.State
 import           Polysemy
 import           Polysemy.Embed
+import           Polysemy.Error
 import           Polysemy.Fail
 import           Polysemy.Output
 import           Polysemy.Random
@@ -83,6 +85,8 @@ import           Disco.Messages
 import           Disco.Module
 import           Disco.Names
 import           Disco.Parser
+import           Disco.Pretty             hiding ((<>))
+import qualified Disco.Pretty             as Pretty
 import           Disco.Typecheck          (checkModule)
 import           Disco.Typecheck.Util
 import           Disco.Types
@@ -312,7 +316,7 @@ loadDiscoModule' quiet resolver inProcess modPath  = do
   case M.lookup name modMap of
     Just mi -> return mi
     Nothing -> do
-      unless quiet $ info $ "Loading " ++ (modPath -<.> "disco") ++ "..."
+      unless quiet $ info $ "Loading" <+> text (modPath -<.> "disco") Pretty.<> "..."
       cm <- parseDiscoModule resolvedPath
       loadParsedDiscoModule' quiet Standalone resolver (name : inProcess) name cm
 
@@ -369,7 +373,7 @@ loadFile :: Members '[Output Message, Embed IO] r => FilePath -> Sem r (Maybe St
 loadFile file = do
   res <- liftIO $ handle @SomeException (return . Left) (Right <$> readFile file)
   case res of
-    Left _  -> info ("File not found: " ++ file) >> return Nothing
+    Left _  -> info ("File not found:" <+> text file) >> return Nothing
     Right s -> return (Just s)
 
 -- | Add things from the given module to the set of currently loaded

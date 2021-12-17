@@ -78,7 +78,7 @@ data Defn = Defn (Name ATerm) [Type] Type [Clause]
 
 instance Pretty Defn where
   pretty (Defn x patTys ty clauses) = vcat $
-    pretty (x, foldr (:->:) ty patTys)
+    prettyTyDecl x (foldr (:->:) ty patTys)
     :
     map (pretty . (x,) . eraseClause) clauses
 

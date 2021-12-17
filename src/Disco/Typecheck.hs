@@ -1,5 +1,6 @@
 {-# LANGUAGE MultiWayIf               #-}
 {-# LANGUAGE NondecreasingIndentation #-}
+{-# LANGUAGE OverloadedStrings        #-}
 
 -----------------------------------------------------------------------------
 -- |

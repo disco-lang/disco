@@ -16,40 +16,22 @@
 
 module Disco.Messages where
 
--- import           Unbound.Generics.LocallyNameless
-
--- import           Disco.AST.Core
--- import           Disco.AST.Surface
--- import           Disco.AST.Typed
-
 import           Control.Lens
 import           Control.Monad   (when)
 import           Polysemy
 import           Polysemy.Output
 
-import           Disco.Pretty    (Pretty, prettyStr)
+import           Disco.Pretty    (Doc, Pretty, pretty', renderDoc')
 
 data MessageType
-  = Info
-  | Warning
-  | ErrMsg
-  | Debug
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+    = Info
+    | Warning
+    | ErrMsg
+    | Debug
+    deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
--- data Report
---   = RTxt   String
---   | RName  AnyName
---   | RTerm  Term
---   | RPat   Pattern
---   | RATerm ATerm
---   | RCore  Core
---   | RSeq   [Report]
---   | RList  [Report]
---   | RSub   Report
---   deriving (Show)
-
-data Message = Message { _messageType :: MessageType, _message :: String }
-  deriving (Show)
+data Message = Message {_messageType :: MessageType, _message :: Doc}
+    deriving (Show)
 
 makeLenses ''Message
 
@@ -57,34 +39,25 @@ handleMsg :: Member (Embed IO) r => (Message -> Bool) -> Message -> Sem r ()
 handleMsg p m = when (p m) $ printMsg m
 
 printMsg :: Member (Embed IO) r => Message -> Sem r ()
-printMsg (Message _ m)     = embed $ putStr m
+printMsg (Message _ m) = embed $ putStrLn (renderDoc' m)
 
-msgLn :: Member (Output Message) r => MessageType -> String -> Sem r ()
-msgLn typ = msg typ . (++"\n")
+msg :: Member (Output Message) r => MessageType -> Sem r Doc -> Sem r ()
+msg typ m = m >>= output . Message typ
 
-msg :: Member (Output Message) r => MessageType -> String -> Sem r ()
-msg typ = output . Message typ
-
-info :: Member (Output Message) r => String -> Sem r ()
-info = msgLn Info
-
-info' :: Member (Output Message) r => String -> Sem r ()
-info' = msg Info
+info :: Member (Output Message) r => Sem r Doc -> Sem r ()
+info = msg Info
 
 infoPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
-infoPretty t = info =<< prettyStr t
+infoPretty = info . pretty'
 
-warn :: Member (Output Message) r => String -> Sem r ()
-warn = msgLn Warning
+warn :: Member (Output Message) r => Sem r Doc -> Sem r ()
+warn = msg Warning
 
-debug :: Member (Output Message) r => String -> Sem r ()
-debug = msgLn Debug
-
-debug' :: Member (Output Message) r => String -> Sem r ()
-debug' = msg Debug
+debug :: Member (Output Message) r => Sem r Doc -> Sem r ()
+debug = msg Debug
 
 debugPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
-debugPretty t = debug =<< prettyStr t
+debugPretty = debug . pretty'
 
-err :: Member (Output Message) r => String -> Sem r ()
-err = msgLn ErrMsg
+err :: Member (Output Message) r => Sem r Doc -> Sem r ()
+err = msg ErrMsg

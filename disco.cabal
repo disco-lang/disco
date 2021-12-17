@@ -330,7 +330,6 @@ library
                        Disco.Syntax.Prims
                        Disco.Extensions
                        Disco.Effects.Counter
-                       Disco.Effects.Error
                        Disco.Effects.Fresh
                        Disco.Effects.Input
                        Disco.Effects.LFresh
@@ -345,6 +344,7 @@ library
                        Disco.Data
                        Disco.Names
                        Disco.Context
+                       Disco.Report
                        Disco.Messages
                        Disco.Module
                        Disco.Parser

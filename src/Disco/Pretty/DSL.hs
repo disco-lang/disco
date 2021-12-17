@@ -71,6 +71,9 @@ integer  = pure . PP.integer
 nest :: Functor f => Int -> f Doc -> f Doc
 nest n d = PP.nest n <$> d
 
+hang :: Applicative f => f Doc -> Int -> f Doc -> f Doc
+hang d1 n d2 = PP.hang <$> d1 <*> pure n <*> d2
+
 empty :: Applicative m => m Doc
 empty    = pure PP.empty
 
@@ -91,8 +94,14 @@ intercalate p ds = do
   ds' <- punctuate p ds
   hsep ds'
 
+bulletList :: Applicative f => f Doc -> [f Doc] -> f Doc
+bulletList bullet = vcat . map (hang bullet 2)
+
 ------------------------------------------------------------
 -- Running a pretty-printer
 
 renderDoc :: Sem (Reader PA ': r) Doc -> Sem r String
 renderDoc = fmap PP.render . runReader initPA
+
+renderDoc' :: Doc -> String
+renderDoc' = PP.render

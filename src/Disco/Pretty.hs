@@ -27,6 +27,7 @@ module Disco.Pretty
 import           Prelude                          hiding ((<>))
 
 import           Data.Bifunctor
+import           Data.Char                        (isAlpha)
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 import           Data.Ratio
@@ -91,8 +92,14 @@ class Pretty t where
 prettyStr :: Pretty t => t -> Sem r String
 prettyStr = renderDoc . runLFresh . pretty
 
-instance Pretty (Name a) where
-  pretty = text . show
+pretty' :: Pretty t => t -> Sem r Doc
+pretty' = runReader initPA . runLFresh . pretty
+
+------------------------------------------------------------
+-- Some standard instances
+
+instance Pretty a => Pretty [a] where
+  pretty = brackets . intercalate "," . map pretty
 
 instance (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty m = do
@@ -102,6 +109,32 @@ instance (Pretty k, Pretty v) => Pretty (Map k v) where
 
 instance Pretty a => Pretty (Set a) where
   pretty = braces . intercalate "," . map pretty . S.toList
+
+------------------------------------------------------------
+-- Some Disco instances
+
+instance Pretty (Name a) where
+  pretty = text . show
+
+instance Pretty TyOp where
+  pretty = \case
+    Enumerate -> text "enumerate"
+    Count     -> text "count"
+
+-- | Pretty-print a unary operator, by looking up its concrete syntax
+--   in the 'uopMap'.
+instance Pretty UOp where
+  pretty op = case M.lookup op uopMap of
+    Just (OpInfo _ (syn:_) _) ->
+      text $ syn ++ (if all isAlpha syn then " " else "")
+    _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
+
+-- | Pretty-print a binary operator, by looking up its concrete syntax
+--   in the 'bopMap'.
+instance Pretty BOp where
+  pretty op = case M.lookup op bopMap of
+    Just (OpInfo _ (syn:_) _) -> text syn
+    _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 --------------------------------------------------
 -- Pretty-printing decimals

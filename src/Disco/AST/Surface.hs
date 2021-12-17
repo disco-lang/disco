@@ -22,7 +22,7 @@ module Disco.AST.Surface
        , Docs, DocThing(..), Property
          -- ** Declarations
        , TypeDecl(..), TermDefn(..), TypeDefn(..)
-       , Decl(..), partitionDecls
+       , Decl(..), partitionDecls, prettyTyDecl
 
          -- * Terms
        , UD
@@ -107,7 +107,7 @@ module Disco.AST.Surface
 import           Prelude                          hiding ((<>))
 
 import           Control.Lens                     (_1, _2, _3, (%~))
-import           Data.Char                        (isAlpha, toLower)
+import           Data.Char                        (toLower)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
 import           Data.Void
@@ -207,8 +207,8 @@ instance Pretty (Name a, Bind [Pattern] Term) where
     pretty x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (pretty t)
 
 -- | Pretty-print a type declaration.
-instance Pretty (Name t, Type) where
-  pretty (x, ty) = hsep [pretty x, text ":", pretty ty]
+prettyTyDecl :: Members '[Reader PA, LFresh] r => Name t -> Type -> Sem r Doc
+prettyTyDecl x ty = hsep [pretty x, text ":", pretty ty]
 
 ------------------------------------------------------------
 -- Terms
@@ -547,7 +547,7 @@ instance Pretty Term where
           ]
 
     TCase b    -> withPA initPA $
-      (text "{?" <+> pretty b) $+$ text "?}"
+      (text "{?" <+> prettyBranches b) $+$ text "?}"
     TAscr t ty -> withPA ascrPA $
       lt (pretty t) <+> text ":" <+> rt (pretty ty)
     TRat  r    -> text (prettyDecimal r)
@@ -561,33 +561,13 @@ containerDelims ListContainer = brackets
 containerDelims BagContainer  = bag
 containerDelims SetContainer  = braces
 
-instance Pretty TyOp where
-  pretty = \case
-    Enumerate -> text "enumerate"
-    Count     -> text "count"
-
--- | Pretty-print a unary operator, by looking up its concrete syntax
---   in the 'uopMap'.
-instance Pretty UOp where
-  pretty op = case M.lookup op uopMap of
-    Just (OpInfo _ (syn:_) _) ->
-      text $ syn ++ (if all isAlpha syn then " " else "")
-    _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
-
--- | Pretty-print a binary operator, by looking up its concrete syntax
---   in the 'bopMap'.
-instance Pretty BOp where
-  pretty op = case M.lookup op bopMap of
-    Just (OpInfo _ (syn:_) _) -> text syn
-    _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
-
-instance Pretty [Branch] where
-  pretty = \case
-    [] -> error "Empty branches are disallowed."
-    b:bs ->
-      pretty b
-      $+$
-      foldr (($+$) . (text "," <+>) . pretty) empty bs
+prettyBranches :: Members '[Reader PA, LFresh] r => [Branch] -> Sem r Doc
+prettyBranches = \case
+  [] -> error "Empty branches are disallowed."
+  b:bs ->
+    pretty b
+    $+$
+    foldr (($+$) . (text "," <+>) . pretty) empty bs
 
 -- | Pretty-print a single branch in a case expression.
 instance Pretty Branch where

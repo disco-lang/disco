@@ -70,7 +70,6 @@ import           Disco.AST.Generic                (Side (..))
 import           Disco.AST.Typed                  (AProperty)
 import           Disco.Context                    as Ctx
 import           Disco.Error
-import           Disco.Messages
 import           Disco.Names
 import           Disco.Pretty
 import           Disco.Syntax.Operators           (BOp (Add, Mul))
@@ -80,7 +79,6 @@ import           Disco.Types
 import           Disco.Effects.LFresh
 import           Polysemy
 import           Polysemy.Input
-import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.State
 import           Unbound.Generics.LocallyNameless (Name)

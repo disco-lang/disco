@@ -1,13 +1,13 @@
-EvalErr DivByZero
-EvalErr DivByZero
-EvalErr DivByZero
-EvalErr DivByZero
+Error: division by zero.
+Error: division by zero.
+Error: division by zero.
+Error: division by zero.
 Loading bomb.disco...
 Loaded.
-EvalErr NonExhaustive
-EvalErr NonExhaustive
-EvalErr NonExhaustive
-EvalErr NonExhaustive
-EvalErr NonExhaustive
-EvalErr DivByZero
-EvalErr NonExhaustive
+Error: value did not match any of the branches in a case expression.
+Error: value did not match any of the branches in a case expression.
+Error: value did not match any of the branches in a case expression.
+Error: value did not match any of the branches in a case expression.
+Error: value did not match any of the branches in a case expression.
+Error: division by zero.
+Error: value did not match any of the branches in a case expression.

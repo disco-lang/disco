@@ -1,4 +1,4 @@
 Loading syntax-prims.disco...
 Loaded.
 x : ℕ → ℕ
-EvalErr (Crash "bad dog!")
+User crash: bad dog!

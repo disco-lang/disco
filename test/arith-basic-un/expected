@@ -15,7 +15,7 @@
 2/3
 2/3
 -6
-EvalErr Overflow
+Error: that number would not even fit in the universe!
 -9
 -~ : ℤ → ℤ
 -3 : ℤ

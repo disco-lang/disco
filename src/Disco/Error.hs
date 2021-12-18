@@ -61,14 +61,11 @@ data DiscoError where
 -- | Errors that can be generated at runtime.
 data EvalError where
 
-  -- | An unbound name.
+  -- | An unbound name.  This shouldn't happen.
   UnboundError  :: Name core  -> EvalError
 
   -- | Division by zero.
   DivByZero     ::              EvalError
-
-  -- | Underflow, e.g. (2 - 3 : Nat)
-  Underflow     ::              EvalError
 
   -- | Overflow, e.g. (2^66)!
   Overflow      ::              EvalError
@@ -102,7 +99,7 @@ instance Pretty DiscoError where
     Panic s          ->
       hcat
         [ "Bug! " <> text s
-        , "Please report this as a bug at https://github.com/disco-lang/disco/issues/"
+        , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
         ]
 
 cyclicImportError
@@ -118,4 +115,13 @@ prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = text . show . TypeCheckErr
 
 prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
-prettyEvalError = text . show . EvalErr
+prettyEvalError = \case
+   UnboundError x ->
+     ("Bug! No variable found named" <+> pretty' x <> ".")
+     $+$
+     "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
+   DivByZero      -> "Error: division by zero."
+   Overflow       -> "Error: that number would not even fit in the universe!"
+   NonExhaustive  -> "Error: value did not match any of the branches in a case expression."
+   InfiniteLoop   -> "Error: infinite loop detected!"
+   Crash s        -> "User crash:" <+> text s

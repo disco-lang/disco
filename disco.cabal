@@ -77,6 +77,8 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-ambiguous/input
                      test/error-names/expected
                      test/error-names/input
+                     test/error-notype/expected
+                     test/error-notype/input
                      test/graphs-basic/expected
                      test/graphs-basic/input
                      test/graphs-equality/expected

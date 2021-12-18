@@ -415,17 +415,21 @@ helpCmd =
     }
 
 handleHelp :: Member (Output Message) r => REPLExpr 'CHelp -> Sem r ()
-handleHelp Help = do
-  info "Commands available from the prompt:\n"
-  let maxlen = longestCmd discoCommands
-  mapM_ (\(SomeCmd c) -> info $ showCmd c maxlen) $ sortedList discoCommands
-  info ""
+handleHelp Help =
+  info $
+    vcat
+    [ "Commands available from the prompt:"
+    , text ""
+    , vcat (map (\(SomeCmd c) -> showCmd c) $ sortedList discoCommands)
+    , text ""
+    ]
   where
+    maxlen = longestCmd discoCommands
     sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
     --  don't show dev-only commands by default
     filteredCommands cmds = P.filter (\(SomeCmd c) -> category c == User) cmds
-    showCmd c maxlen = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
+    showCmd c = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
 

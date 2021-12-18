@@ -29,6 +29,7 @@ import           Data.Data.Lens                   (template)
 import           Data.Typeable                    (Typeable)
 import           GHC.Generics                     (Generic)
 import           Prelude                          hiding ((<>))
+import           System.FilePath                  (dropExtension)
 import           Unbound.Generics.LocallyNameless
 
 import           Disco.Pretty
@@ -102,8 +103,8 @@ substsQ = undefined
 
 instance Pretty ModuleName where
   pretty REPLModule        = "REPL"
-  pretty (Named (Dir _) s) = text s
-  pretty (Named Stdlib s)  = text s
+  pretty (Named (Dir _) s) = text (dropExtension s)
+  pretty (Named Stdlib s)  = text (dropExtension s)
 
 instance Pretty (QName a) where
   pretty (QName LocalName x)          = pretty x

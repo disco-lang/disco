@@ -70,6 +70,13 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
+                     test/error-ambiguous/a.disco
+                     test/error-ambiguous/ambiguous.disco
+                     test/error-ambiguous/b.disco
+                     test/error-ambiguous/expected
+                     test/error-ambiguous/input
+                     test/error-names/expected
+                     test/error-names/input
                      test/graphs-basic/expected
                      test/graphs-basic/input
                      test/graphs-equality/expected

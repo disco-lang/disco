@@ -32,7 +32,7 @@ import           Disco.Messages
 import           Disco.Names                      (ModuleName)
 import           Disco.Parser
 import           Disco.Pretty
-import           Disco.Typecheck.Util             (TCError)
+import           Disco.Typecheck.Util             (TCError (..))
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -111,9 +111,6 @@ cyclicImportError ms =
     , nest 2 $ intercalate " ->" (map pretty ms)
     ]
 
-prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
-prettyTCError = text . show . TypeCheckErr
-
 prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
 prettyEvalError = \case
    UnboundError x ->
@@ -125,3 +122,41 @@ prettyEvalError = \case
    NonExhaustive  -> "Error: value did not match any of the branches in a case expression."
    InfiniteLoop   -> "Error: infinite loop detected!"
    Crash s        -> "User crash:" <+> text s
+
+-- Step 1: nice error messages, make sure all are tested
+-- Step 2: get it to return multiple error messages
+-- Step 3: save parse locations, display with errors
+prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
+prettyTCError = \case
+
+  -- XXX include some potential misspellings along with Unbound
+  Unbound x      -> "Error: there is nothing named" <+> pretty' x <> "."
+  Ambiguous x ms ->
+    ("Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:")
+    $+$
+    nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
+
+  e              -> text . show . TypeCheckErr $ e
+
+  -- NoType na -> "notype"
+  -- NotCon con te ty -> _
+  -- EmptyCase -> _
+  -- PatternType pat ty -> _
+  -- DuplicateDecls na -> _
+  -- DuplicateDefns na -> _
+  -- DuplicateTyDefns s -> _
+  -- CyclicTyDef s -> _
+  -- NumPatterns -> _
+  -- NoLub ty ty' -> _
+  -- NoNeg ty -> _
+  -- NoSearch ty -> _
+  -- Unsolvable se -> _
+  -- NotTyDef s -> _
+  -- NoTWild -> _
+  -- CantInferPrim pr -> _
+  -- NotEnoughArgs con -> _
+  -- TooManyArgs con -> _
+  -- UnboundTyVar na -> _
+  -- NoPolyRec s ss tys -> _
+  -- Failure s -> _
+  -- NoError -> _

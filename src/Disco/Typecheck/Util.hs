@@ -28,7 +28,7 @@ import           Prelude                          hiding (lookup)
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
-import           Disco.Names                      (ModuleName, QName (..))
+import           Disco.Names                      (ModuleName)
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
@@ -48,7 +48,6 @@ type TyCtx = Ctx Term PolyType
 -- | Potential typechecking errors.
 data TCError
   = Unbound (Name Term)    -- ^ Encountered an unbound variable
-  | UnboundQ (QName Term)  -- ^ Encountered an unbound qualified name?  Shouldn't happen?
   | Ambiguous (Name Term) [ModuleName] -- ^ Encountered an ambiguous name.
   | NoType  (Name Term)    -- ^ No type is specified for a definition
   | NotCon Con Term Type   -- ^ The type of the term should have an

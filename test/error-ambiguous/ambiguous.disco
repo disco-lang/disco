@@ -1,0 +1,8 @@
+import a
+import b
+
+x : Int
+x = 0
+
+y : Int
+y = x + 1

@@ -150,18 +150,10 @@ prettyTCError = \case
       , nest 2 $ pretty' ty <> "."
       ]
 
-  -- list (\x : Int. x) produces
-  --   NotCon CArr (TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase Z))]> TVar_ () 0@0)) (TyCon (CContainer (AVar (V Unification c))) [TyAtom (AVar (V Unification a1))])   ???
-
-  -- Disco> f : List Int -> List Int
-  -- Disco> f x = x
-  -- Disco> f (\x : Int. x)
-  -- TypeCheckErr (NotCon CArr (TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase Z))]> TVar_ () 0@0)) (TyCon (CContainer (ABase CtrList)) [TyAtom (ABase Z)]))
-
+  EmptyCase -> "Empty case expressions {? ?} are not allowed."
 
   e              -> text . show . TypeCheckErr $ e
 
-  -- EmptyCase -> _
   -- PatternType pat ty -> _
   -- DuplicateDecls na -> _
   -- DuplicateDefns na -> _

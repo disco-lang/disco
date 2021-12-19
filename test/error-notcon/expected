@@ -1,0 +1,4 @@
+Error: the term
+  λx : ℤ. x
+must have both a function type and also the incompatible type
+  List(ℤ).

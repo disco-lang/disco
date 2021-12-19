@@ -1,0 +1,4 @@
+f : List(Int) -> List(Int)
+f x = x
+
+f (\x:Z.x)

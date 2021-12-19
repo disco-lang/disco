@@ -33,6 +33,7 @@ import           Disco.Names                      (ModuleName)
 import           Disco.Parser
 import           Disco.Pretty
 import           Disco.Typecheck.Util             (TCError (..))
+import           Disco.Types
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -141,9 +142,25 @@ prettyTCError = \case
     "Try writing something like '" <> pretty' x <+> ": Int' (or whatever the type of"
       <+> pretty' x <+> "should be) first."
 
+  NotCon c t ty ->
+    vcat
+      [ "Error: the term"
+      , nest 2 $ pretty' t
+      , "must have both a" <+> conWord c <+> "type and also the incompatible type"
+      , nest 2 $ pretty' ty <> "."
+      ]
+
+  -- list (\x : Int. x) produces
+  --   NotCon CArr (TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase Z))]> TVar_ () 0@0)) (TyCon (CContainer (AVar (V Unification c))) [TyAtom (AVar (V Unification a1))])   ???
+
+  -- Disco> f : List Int -> List Int
+  -- Disco> f x = x
+  -- Disco> f (\x : Int. x)
+  -- TypeCheckErr (NotCon CArr (TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase Z))]> TVar_ () 0@0)) (TyCon (CContainer (ABase CtrList)) [TyAtom (ABase Z)]))
+
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NotCon con te ty -> _
   -- EmptyCase -> _
   -- PatternType pat ty -> _
   -- DuplicateDecls na -> _
@@ -164,3 +181,16 @@ prettyTCError = \case
   -- NoPolyRec s ss tys -> _
   -- Failure s -> _
   -- NoError -> _
+
+conWord :: Con -> Sem r Doc
+conWord = \case
+  CArr         -> "function"
+  CProd        -> "product"
+  CSum         -> "sum"
+  CSet         -> "set"
+  CBag         -> "bag"
+  CList        -> "list"
+  CContainer _ -> "container"
+  CMap         -> "map"
+  CGraph       -> "graph"
+  CUser s      -> text s

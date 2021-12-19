@@ -1581,7 +1581,7 @@ ensureConstr c ty targ = matchConTy c ty
     matchError :: Sem r a
     matchError = case targ of
       Left term -> throw (NotCon c term ty)
-      Right pat -> throw (PatternType pat ty)
+      Right pat -> throw (PatternType c pat ty)
 
 -- | A variant of ensureConstr that expects to get exactly one
 --   argument type out, and throws an error if we get any other

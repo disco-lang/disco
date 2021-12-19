@@ -54,7 +54,8 @@ data TCError
                            --   outermost constructor matching Con, but
                            --   it has type 'Type' instead
   | EmptyCase              -- ^ Case analyses cannot be empty.
-  | PatternType Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
+  | PatternType Con Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
+                                  -- instead it has a kind of type given by the Con.
   | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
   | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
   | DuplicateTyDefns String -- ^ Duplicate type definitions.

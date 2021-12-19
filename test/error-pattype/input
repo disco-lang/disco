@@ -1,0 +1,8 @@
+f : List(Int) -> Bool
+f (left(x)) = false
+
+g : N -> Bool
+g (x,y) = false
+
+h : Z*Z -> Bool
+h(3:Z) = false

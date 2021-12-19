@@ -1,1 +1,1 @@
-Empty case expressions {? ?} are not allowed.
+Error: empty case expressions {? ?} are not allowed.

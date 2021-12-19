@@ -132,10 +132,12 @@ prettyTCError = \case
 
   -- XXX include some potential misspellings along with Unbound
   Unbound x      -> "Error: there is nothing named" <+> pretty' x <> "."
+
   Ambiguous x ms ->
     ("Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:")
     $+$
     nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
+
   NoType x ->
     "Error: the definition of" <+> pretty' x <+> "must have an accompanying type signature."
     $+$
@@ -150,11 +152,19 @@ prettyTCError = \case
       , nest 2 $ pretty' ty <> "."
       ]
 
-  EmptyCase -> "Empty case expressions {? ?} are not allowed."
+  EmptyCase -> "Error: empty case expressions {? ?} are not allowed."
+
+  PatternType c pat ty ->
+    vcat
+    [ "Error: the pattern"
+    , nest 2 $ pretty' pat
+    , "is supposed to have type"
+    , nest 2 $ pretty' ty <> ","
+    , "but instead it has a" <+> conWord c <+> "type."
+    ]
 
   e              -> text . show . TypeCheckErr $ e
 
-  -- PatternType pat ty -> _
   -- DuplicateDecls na -> _
   -- DuplicateDefns na -> _
   -- DuplicateTyDefns s -> _

@@ -1,0 +1,11 @@
+Error: the pattern
+  left(x)
+is supposed to have type
+  List(ℤ),
+but instead it has a sum type.
+Error: the pattern
+  (x1, y)
+is supposed to have type
+  ℕ,
+but instead it has a product type.
+TypeCheckErr (Unsolvable NoWeakUnifier)

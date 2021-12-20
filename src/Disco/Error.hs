@@ -169,9 +169,11 @@ prettyTCError = \case
 
   DuplicateTyDefns s -> "Error: duplicate definition for type" <+> text s <> "."
 
+  -- XXX include all types involved in the cycle.
+  CyclicTyDef s -> "Error: cyclic type definition for" <+> text s <> "."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- CyclicTyDef s -> _
   -- NumPatterns -> _
   -- NoLub ty ty' -> _
   -- NoNeg ty -> _

@@ -75,6 +75,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-ambiguous/b.disco
                      test/error-ambiguous/expected
                      test/error-ambiguous/input
+                     test/error-cyclic/cyclic.disco
+                     test/error-cyclic/expected
+                     test/error-cyclic/input
                      test/error-duplicatedecls/dupdecls.disco
                      test/error-duplicatedecls/expected
                      test/error-duplicatedecls/input

@@ -172,9 +172,11 @@ prettyTCError = \case
   -- XXX include all types involved in the cycle.
   CyclicTyDef s -> "Error: cyclic type definition for" <+> text s <> "."
 
+  -- XXX lots more info!  & Split into several different errors.
+  NumPatterns -> "Error: number of arguments does not match."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NumPatterns -> _
   -- NoLub ty ty' -> _
   -- NoSearch ty -> _
   -- Unsolvable se -> _

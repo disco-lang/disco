@@ -1,0 +1,3 @@
+f : N -> N -> Bool
+f 3 = \x.x > 2
+f x y = true

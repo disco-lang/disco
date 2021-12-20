@@ -309,7 +309,8 @@ checkDefn name (TermDefn x clauses) = do
     decomposeDefnTy 0 ty = return ([], ty)
     decomposeDefnTy n (TyUser tyName args) = lookupTyDefn tyName args >>= decomposeDefnTy n
     decomposeDefnTy n (ty1 :->: ty2) = first (ty1:) <$> decomposeDefnTy (n-1) ty2
-    decomposeDefnTy n ty = error $ "Impossible! decomposeDefnTy " ++ show n ++ " " ++ show ty
+    decomposeDefnTy _n _ty = throw NumPatterns
+      -- XXX include more info. More argument patterns than arrows in the type.
 
 --------------------------------------------------
 -- Properties

@@ -75,6 +75,12 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-ambiguous/b.disco
                      test/error-ambiguous/expected
                      test/error-ambiguous/input
+                     test/error-duplicatedecls/dupdecls.disco
+                     test/error-duplicatedecls/expected
+                     test/error-duplicatedecls/input
+                     test/error-duplicatedefns/dupdefns.disco
+                     test/error-duplicatedefns/expected
+                     test/error-duplicatedefns/input
                      test/error-emptycase/expected
                      test/error-emptycase/input
                      test/error-names/expected
@@ -83,6 +89,7 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-notcon/input
                      test/error-notype/expected
                      test/error-notype/input
+                     test/error-pattype/expected
                      test/error-pattype/input
                      test/graphs-basic/expected
                      test/graphs-basic/input

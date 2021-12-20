@@ -167,9 +167,10 @@ prettyTCError = \case
 
   DuplicateDefns x -> "Error: duplicate definition for" <+> pretty' x <> "."
 
+  DuplicateTyDefns s -> "Error: duplicate definition for type" <+> text s <> "."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- DuplicateTyDefns s -> _
   -- CyclicTyDef s -> _
   -- NumPatterns -> _
   -- NoLub ty ty' -> _

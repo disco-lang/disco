@@ -81,6 +81,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-duplicatedefns/dupdefns.disco
                      test/error-duplicatedefns/expected
                      test/error-duplicatedefns/input
+                     test/error-duplicatetydefns/duptydefns.disco
+                     test/error-duplicatetydefns/expected
+                     test/error-duplicatetydefns/input
                      test/error-emptycase/expected
                      test/error-emptycase/input
                      test/error-names/expected

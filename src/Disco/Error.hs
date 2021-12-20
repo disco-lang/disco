@@ -163,9 +163,9 @@ prettyTCError = \case
     , "but instead it has a" <+> conWord c <+> "type."
     ]
 
-  DuplicateDecls x -> "Error: duplicate type signatures for" <+> pretty' x <> "."
+  DuplicateDecls x -> "Error: duplicate type signature for" <+> pretty' x <> "."
 
-  DuplicateDefns x -> "Error: duplicate definitions for" <+> pretty' x <> "."
+  DuplicateDefns x -> "Error: duplicate definition for" <+> pretty' x <> "."
 
   e              -> text . show . TypeCheckErr $ e
 

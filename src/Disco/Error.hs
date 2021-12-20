@@ -176,7 +176,6 @@ prettyTCError = \case
 
   -- NumPatterns -> _
   -- NoLub ty ty' -> _
-  -- NoNeg ty -> _
   -- NoSearch ty -> _
   -- Unsolvable se -> _
   -- NotTyDef s -> _

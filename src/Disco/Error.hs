@@ -185,9 +185,12 @@ prettyTCError = \case
 
   Unsolvable solveErr -> prettySolveError solveErr
 
+  -- XXX maybe include close edit-distance alternatives?
+  NotTyDef s ->
+    "Error: there is no built-in or user-defined type named '" <> text s <> "'."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NotTyDef s -> _
   -- NoTWild -> _
   -- CantInferPrim pr -> _
   -- NotEnoughArgs con -> _

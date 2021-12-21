@@ -1,2 +1,2 @@
 Loading types-tydef-bad.disco...
-TypeCheckErr (NotTyDef "Flerb")
+Error: there is no built-in or user-defined type named 'Flerb'.

@@ -61,7 +61,6 @@ data TCError
   | DuplicateTyDefns String -- ^ Duplicate type definitions.
   | CyclicTyDef String     -- ^ Cyclic type definition.
   | NumPatterns            -- ^ # of patterns does not match type in definition
-  | NoLub Type Type        -- ^ No least upper bound.
   | NoSearch Type          -- ^ Type can't be quantified over.
   | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
   | NotTyDef String        -- ^ An undefined type name was used.

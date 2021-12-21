@@ -177,7 +177,6 @@ prettyTCError = \case
 
   e              -> text . show . TypeCheckErr $ e
 
-  -- NoLub ty ty' -> _
   -- NoSearch ty -> _
   -- Unsolvable se -> _
   -- NotTyDef s -> _

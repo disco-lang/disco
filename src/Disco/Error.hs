@@ -32,6 +32,7 @@ import           Disco.Messages
 import           Disco.Names                      (ModuleName)
 import           Disco.Parser
 import           Disco.Pretty
+import           Disco.Typecheck.Solve
 import           Disco.Typecheck.Util             (TCError (..))
 import           Disco.Types
 
@@ -182,9 +183,10 @@ prettyTCError = \case
     , "is not searchable (i.e. it cannot be used in a forall)."
     ]
 
+  Unsolvable solveErr -> prettySolveError solveErr
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- Unsolvable se -> _
   -- NotTyDef s -> _
   -- NoTWild -> _
   -- CantInferPrim pr -> _
@@ -207,3 +209,15 @@ conWord = \case
   CMap         -> "map"
   CGraph       -> "graph"
   CUser s      -> text s
+
+prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
+prettySolveError = \case
+
+  e -> text . show . TypeCheckErr . Unsolvable $ e
+
+  -- NoWeakUnifier -> _
+  -- NoUnify -> _
+  -- UnqualBase qual bt -> _
+  -- Unqual qual ty -> _
+  -- QualSkolem qual na -> _
+  -- Unknown -> _

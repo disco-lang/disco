@@ -175,9 +175,15 @@ prettyTCError = \case
   -- XXX lots more info!  & Split into several different errors.
   NumPatterns -> "Error: number of arguments does not match."
 
+  NoSearch ty ->
+    vcat
+    [ "Error: the type"
+    , nest 2 $ pretty' ty
+    , "is not searchable (i.e. it cannot be used in a forall)."
+    ]
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NoSearch ty -> _
   -- Unsolvable se -> _
   -- NotTyDef s -> _
   -- NoTWild -> _

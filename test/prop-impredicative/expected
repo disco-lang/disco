@@ -1,6 +1,14 @@
 Loading prop-impredicative.disco...
 Loaded.
-TypeCheckErr (NoSearch (TyAtom (ABase P)))
-TypeCheckErr (NoSearch (TyAtom (ABase P)))
-TypeCheckErr (NoSearch (TyCon CArr [TyAtom (ABase N),TyAtom (ABase P)]))
-TypeCheckErr (NoSearch (TyCon CArr [TyCon (CContainer (ABase CtrList)) [TyAtom (ABase P)],TyAtom (ABase N)]))
+Error: the type
+  Prop
+is not searchable (i.e. it cannot be used in a forall).
+Error: the type
+  Prop
+is not searchable (i.e. it cannot be used in a forall).
+Error: the type
+  ℕ → Prop
+is not searchable (i.e. it cannot be used in a forall).
+Error: the type
+  List(Prop) → ℕ
+is not searchable (i.e. it cannot be used in a forall).

@@ -218,7 +218,6 @@ prettyTCError = \case
 
   e              -> text . show . TypeCheckErr $ e
 
-  -- Failure s -> _
   -- NoError -> _
 
 conWord :: Con -> Sem r Doc

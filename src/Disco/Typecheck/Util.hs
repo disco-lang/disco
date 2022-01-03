@@ -29,7 +29,6 @@ import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
 import           Disco.Names                      (ModuleName)
-import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
@@ -69,7 +68,6 @@ data TCError
   | TooManyArgs Con        -- ^ Too many arguments provided to type constructor.
   | UnboundTyVar (Name Type) -- ^ Unbound type variable
   | NoPolyRec String [String] [Type] -- ^ Polymorphic recursion is not allowed
-  | Failure String         -- ^ Generic failure.
   | NoError                -- ^ Not an error.  The identity of the
                            --   @Monoid TCError@ instance.
   deriving Show

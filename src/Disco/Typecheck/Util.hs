@@ -65,7 +65,6 @@ data TCError
   | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
   | NotTyDef String        -- ^ An undefined type name was used.
   | NoTWild                -- ^ Wildcards are not allowed in terms.
-  | CantInferPrim Prim     -- ^ Can't infer the type of some prims
   | NotEnoughArgs Con      -- ^ Not enough arguments provided to type constructor.
   | TooManyArgs Con        -- ^ Too many arguments provided to type constructor.
   | UnboundTyVar (Name Type) -- ^ Unbound type variable

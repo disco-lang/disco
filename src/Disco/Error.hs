@@ -194,7 +194,6 @@ prettyTCError = \case
 
   e              -> text . show . TypeCheckErr $ e
 
-  -- CantInferPrim pr -> _
   -- NotEnoughArgs con -> _
   -- TooManyArgs con -> _
   -- UnboundTyVar na -> _

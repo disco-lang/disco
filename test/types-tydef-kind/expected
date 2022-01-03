@@ -1,2 +1,2 @@
 Loading types-tydef-kind.disco...
-TypeCheckErr (NotEnoughArgs (CUser "Foo"))
+Error: not enough arguments supplied to the type constructor 'Foo'.

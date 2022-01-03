@@ -1,0 +1,7 @@
+Loading error-tyargs.disco...
+Loaded.
+Error: not enough arguments supplied to the type constructor 'T'.
+Error: not enough arguments supplied to the type constructor 'T'.
+Error: too many arguments supplied to the type constructor 'T'.
+Error: not enough arguments supplied to the type constructor 'List'.
+Error: too many arguments supplied to the type constructor 'List'.

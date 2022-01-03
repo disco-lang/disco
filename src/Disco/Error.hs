@@ -192,10 +192,17 @@ prettyTCError = \case
   NoTWild ->
     "Error: wildcards (_) are not allowed in terms."
 
+  -- XXX say how many are expected, how many there were, what the actual arguments were?
+  -- XXX distinguish between built-in and user-supplied type constructors in the error
+  --     message?
+  NotEnoughArgs con ->
+    "Error: not enough arguments supplied to the type constructor '" <> pretty' con <> "'."
+
+  TooManyArgs con ->
+    "Error: too many arguments supplied to the type constructor '" <> pretty' con <> "'."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NotEnoughArgs con -> _
-  -- TooManyArgs con -> _
   -- UnboundTyVar na -> _
   -- NoPolyRec s ss tys -> _
   -- Failure s -> _

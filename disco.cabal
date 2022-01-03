@@ -100,6 +100,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-numpatterns/numpatterns.disco
                      test/error-pattype/expected
                      test/error-pattype/input
+                     test/error-tyargs/error-tyargs.disco
+                     test/error-tyargs/expected
+                     test/error-tyargs/input
                      test/error-wildcard/expected
                      test/error-wildcard/input
                      test/graphs-basic/expected

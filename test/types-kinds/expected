@@ -1,5 +1,5 @@
-TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
-TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
+Error: too many arguments supplied to the type constructor 'List'.
+Error: too many arguments supplied to the type constructor 'List'.
 TypeCheckErr (Unsolvable NoWeakUnifier)
-TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
-TypeCheckErr (TooManyArgs (CContainer (ABase CtrList)))
+Error: too many arguments supplied to the type constructor 'List'.
+Error: too many arguments supplied to the type constructor 'List'.

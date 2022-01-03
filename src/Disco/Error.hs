@@ -30,7 +30,7 @@ import           Polysemy.Reader
 
 import           Disco.Messages
 import           Disco.Names                      (ModuleName)
-import           Disco.Parser
+import           Disco.Parser                     (DiscoParseError)
 import           Disco.Pretty
 import           Disco.Typecheck.Solve
 import           Disco.Typecheck.Util             (TCError (..))
@@ -126,8 +126,10 @@ prettyEvalError = \case
    Crash s        -> "User crash:" <+> text s
 
 -- Step 1: nice error messages, make sure all are tested
--- Step 2: get it to return multiple error messages
--- Step 3: save parse locations, display with errors
+-- Step 2: link to wiki/website with more info on errors!
+-- Step 3: improve error messages according to notes below
+-- Step 4: get it to return multiple error messages
+-- Step 5: save parse locations, display with errors
 prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = \case
 
@@ -207,10 +209,15 @@ prettyTCError = \case
   UnboundTyVar v ->
     "Error: Unknown type variable '" <> pretty' v <> "'."
 
+  NoPolyRec s ss tys ->
+    "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
+    $+$
+    nest 2 (
+      text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
+    )
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- UnboundTyVar na -> _
-  -- NoPolyRec s ss tys -> _
   -- Failure s -> _
   -- NoError -> _
 

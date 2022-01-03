@@ -242,23 +242,33 @@ prettySolveError = \case
   NoUnify       -> "Error: unification failure."
 
   UnqualBase q b ->
-    "Error: values of the base type" <+> pretty' b <+> qualPhrase q <> "."
+    "Error: values of the base type" <+> pretty' b <+> qualPhrase False q <> "."
 
   Unqual q ty ->
-    "Error: values of the type" <+> pretty' ty <+> qualPhrase q <> "."
+    "Error: values of the type" <+> pretty' ty <+> qualPhrase False q <> "."
+
+  QualSkolem q a ->
+    "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
+    $+$
+    nest 2 (qualPhrase True q) <> "."
 
   e             -> text . show . TypeCheckErr . Unsolvable $ e
 
-  -- QualSkolem qual na -> _
   -- Unknown -> _
 
-qualPhrase :: Qualifier -> Sem r Doc
-qualPhrase = \case
-  QNum    -> "cannot be added and multiplied"
-  QSub    -> "cannot be subtracted"
-  QDiv    -> "cannot be divided"
-  QCmp    -> "cannot be compared"
-  QEnum   -> "cannot be enumerated"
-  QBool   -> "are not boolean"
-  QBasic  -> "are not basic"
-  QSimple -> "are not simple"
+qualPhrase :: Bool -> Qualifier -> Sem r Doc
+qualPhrase b q
+  | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q
+  | otherwise = "can" <> (if b then empty else "not") <+> "be" <+> qualAction q
+
+qualAction :: Qualifier -> Sem r Doc
+qualAction = \case
+  QNum    -> "added and multiplied"
+  QSub    -> "subtracted"
+  QDiv    -> "divided"
+  QCmp    -> "compared"
+  QEnum   -> "enumerated"
+  QBool   -> "boolean"
+  QBasic  -> "basic"
+  QSimple -> "simple"
+

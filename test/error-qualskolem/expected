@@ -1,0 +1,3 @@
+Loading qualskolem.disco...
+Error: type variable a represents any type, so we cannot assume values of that type
+  can be subtracted.

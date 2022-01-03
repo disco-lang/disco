@@ -103,6 +103,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-polyrec/expected
                      test/error-polyrec/input
                      test/error-polyrec/polyrec.disco
+                     test/error-qualskolem/expected
+                     test/error-qualskolem/input
+                     test/error-qualskolem/qualskolem.disco
                      test/error-tyargs/error-tyargs.disco
                      test/error-tyargs/expected
                      test/error-tyargs/input

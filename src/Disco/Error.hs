@@ -244,9 +244,11 @@ prettySolveError = \case
   UnqualBase q b ->
     "Error: values of the base type" <+> pretty' b <+> qualPhrase q <> "."
 
+  Unqual q ty ->
+    "Error: values of the type" <+> pretty' ty <+> qualPhrase q <> "."
+
   e             -> text . show . TypeCheckErr . Unsolvable $ e
 
-  -- Unqual qual ty -> _
   -- QualSkolem qual na -> _
   -- Unknown -> _
 

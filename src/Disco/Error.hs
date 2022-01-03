@@ -126,7 +126,7 @@ prettyEvalError = \case
    InfiniteLoop   -> "Error: infinite loop detected!"
    Crash s        -> "User crash:" <+> text s
 
--- [ ] Step 1: nice error messages, make sure all are tested
+-- [X] Step 1: nice error messages, make sure all are tested
 -- [ ] Step 2: link to wiki/website with more info on errors!
 -- [ ] Step 3: improve error messages according to notes below
 -- [ ] Step 4: get it to return multiple error messages

@@ -103,6 +103,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-tyargs/error-tyargs.disco
                      test/error-tyargs/expected
                      test/error-tyargs/input
+                     test/error-unboundtyvar/expected
+                     test/error-unboundtyvar/input
+                     test/error-unboundtyvar/unboundtyvar.disco
                      test/error-wildcard/expected
                      test/error-wildcard/input
                      test/graphs-basic/expected

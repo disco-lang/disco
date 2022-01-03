@@ -189,9 +189,11 @@ prettyTCError = \case
   NotTyDef s ->
     "Error: there is no built-in or user-defined type named '" <> text s <> "'."
 
+  NoTWild ->
+    "Error: wildcards (_) are not allowed in terms."
+
   e              -> text . show . TypeCheckErr $ e
 
-  -- NoTWild -> _
   -- CantInferPrim pr -> _
   -- NotEnoughArgs con -> _
   -- TooManyArgs con -> _

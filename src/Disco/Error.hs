@@ -35,6 +35,7 @@ import           Disco.Pretty
 import           Disco.Typecheck.Solve
 import           Disco.Typecheck.Util             (TCError (..))
 import           Disco.Types
+import           Disco.Types.Qualifiers
 
 -- | Top-level error type for Disco.
 data DiscoError where
@@ -240,9 +241,22 @@ prettySolveError = \case
   -- XXX say more!
   NoUnify       -> "Error: unification failure."
 
+  UnqualBase q b ->
+    "Error: values of the base type" <+> pretty' b <+> qualPhrase q <> "."
+
   e             -> text . show . TypeCheckErr . Unsolvable $ e
 
-  -- UnqualBase qual bt -> _
   -- Unqual qual ty -> _
   -- QualSkolem qual na -> _
   -- Unknown -> _
+
+qualPhrase :: Qualifier -> Sem r Doc
+qualPhrase = \case
+  QNum    -> "cannot be added and multiplied"
+  QSub    -> "cannot be subtracted"
+  QDiv    -> "cannot be divided"
+  QCmp    -> "cannot be compared"
+  QEnum   -> "cannot be enumerated"
+  QBool   -> "are not boolean"
+  QBasic  -> "are not basic"
+  QSimple -> "are not simple"

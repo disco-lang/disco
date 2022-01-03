@@ -109,6 +109,9 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/error-unboundtyvar/expected
                      test/error-unboundtyvar/input
                      test/error-unboundtyvar/unboundtyvar.disco
+                     test/error-unqual-base/expected
+                     test/error-unqual-base/input
+                     test/error-unqual-base/unqualbase.disco
                      test/error-wildcard/expected
                      test/error-wildcard/input
                      test/graphs-basic/expected

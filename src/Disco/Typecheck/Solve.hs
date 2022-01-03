@@ -68,15 +68,10 @@ data SolveError where
   UnqualBase    :: Qualifier -> BaseTy    -> SolveError
   Unqual        :: Qualifier -> Type      -> SolveError
   QualSkolem    :: Qualifier -> Name Type -> SolveError
-  Unknown       :: SolveError
   deriving Show
 
 instance Semigroup SolveError where
   e <> _ = e
-
-instance Monoid SolveError where
-  mempty  = Unknown
-  mappend = (<>)
 
 --------------------------------------------------
 -- Error utilities
@@ -556,7 +551,7 @@ simplify tyDefns origVM cs
     -- Otherwise, expand the user-defined type and continue.
     simplifyOne' (TyCon (CUser t) ts :<: ty2) =
       case M.lookup t tyDefns of
-        Nothing  -> throw Unknown
+        Nothing  -> error $ show t ++ " not in ty defn map!"
         Just (TyDefBody _ body) ->
           ssConstraints %= ((body ts :<: ty2) :)
 
@@ -566,7 +561,7 @@ simplify tyDefns origVM cs
 
     simplifyOne' (ty1 :<: TyCon (CUser t) ts) =
       case M.lookup t tyDefns of
-        Nothing  -> throw Unknown
+        Nothing  -> error $ show t ++ " not in ty defn map!"
         Just (TyDefBody _ body) ->
           ssConstraints %= ((ty1 :<: body ts) :)
 

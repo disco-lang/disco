@@ -252,10 +252,6 @@ prettySolveError = \case
     $+$
     nest 2 (qualPhrase True q) <> "."
 
-  e             -> text . show . TypeCheckErr . Unsolvable $ e
-
-  -- Unknown -> _
-
 qualPhrase :: Bool -> Qualifier -> Sem r Doc
 qualPhrase b q
   | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q

@@ -1,5 +1,5 @@
 Error: too many arguments supplied to the type constructor 'List'.
 Error: too many arguments supplied to the type constructor 'List'.
-TypeCheckErr (Unsolvable NoWeakUnifier)
+Error: the shape of two types does not match.
 Error: too many arguments supplied to the type constructor 'List'.
 Error: too many arguments supplied to the type constructor 'List'.

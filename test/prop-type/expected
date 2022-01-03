@@ -4,6 +4,6 @@
 ∃x : ℕ. ∃y : ℕ. x > y : Prop
 ∀x : ℕ, y : ℕ, z : ℕ. x + y + z == x + (y + z) : Prop
 ∃x : ℕ. ∀y : ℕ. x ≤ y : Prop
-TypeCheckErr (Unsolvable NoUnify)
-TypeCheckErr (Unsolvable NoUnify)
-TypeCheckErr (Unsolvable NoUnify)
+Error: unification failure.
+Error: unification failure.
+Error: unification failure.

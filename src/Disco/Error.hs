@@ -125,11 +125,11 @@ prettyEvalError = \case
    InfiniteLoop   -> "Error: infinite loop detected!"
    Crash s        -> "User crash:" <+> text s
 
--- Step 1: nice error messages, make sure all are tested
--- Step 2: link to wiki/website with more info on errors!
--- Step 3: improve error messages according to notes below
--- Step 4: get it to return multiple error messages
--- Step 5: save parse locations, display with errors
+-- [ ] Step 1: nice error messages, make sure all are tested
+-- [ ] Step 2: link to wiki/website with more info on errors!
+-- [ ] Step 3: improve error messages according to notes below
+-- [ ] Step 4: get it to return multiple error messages
+-- [ ] Step 5: save parse locations, display with errors
 prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = \case
 
@@ -216,9 +216,7 @@ prettyTCError = \case
       text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
     )
 
-  e              -> text . show . TypeCheckErr $ e
-
-  -- NoError -> _
+  NoError -> empty
 
 conWord :: Con -> Sem r Doc
 conWord = \case
@@ -236,10 +234,14 @@ conWord = \case
 prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
 prettySolveError = \case
 
-  e -> text . show . TypeCheckErr . Unsolvable $ e
+  -- XXX say which types!
+  NoWeakUnifier -> "Error: the shape of two types does not match."
 
-  -- NoWeakUnifier -> _
-  -- NoUnify -> _
+  -- XXX say more!
+  NoUnify       -> "Error: unification failure."
+
+  e             -> text . show . TypeCheckErr . Unsolvable $ e
+
   -- UnqualBase qual bt -> _
   -- Unqual qual ty -> _
   -- QualSkolem qual na -> _

@@ -1,6 +1,6 @@
-TypeCheckErr (Unsolvable NoWeakUnifier)
-TypeCheckErr (Unsolvable NoUnify)
-TypeCheckErr (Unsolvable NoWeakUnifier)
-TypeCheckErr (Unsolvable NoWeakUnifier)
-TypeCheckErr (Unsolvable NoUnify)
-TypeCheckErr (Unsolvable NoUnify)
+Error: the shape of two types does not match.
+Error: unification failure.
+Error: the shape of two types does not match.
+Error: the shape of two types does not match.
+Error: unification failure.
+Error: unification failure.

@@ -8,4 +8,4 @@ Error: the pattern
 is supposed to have type
   ℕ,
 but instead it has a product type.
-TypeCheckErr (Unsolvable NoWeakUnifier)
+Error: the shape of two types does not match.

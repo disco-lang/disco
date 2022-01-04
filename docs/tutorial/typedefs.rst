@@ -31,7 +31,7 @@ capital letter. Now we can rewrite our type declaration for
 
 ::
 
-   sumTripletList : List NatTriple -> N
+   sumTripletList : List(NatTriple) -> N
 
 
 Recursive type definitions
@@ -60,20 +60,6 @@ values.
 
 .. literalinclude:: example/tydefs.disco
    :lines: 9-11
-   :language: idris
-   :caption:
-
-Recursive type definitions can behave surprisingly at times.  In
-essence, two types are considered equivalent as long as they can never
-be distinguished no matter how far you unroll their definitions.  This
-means, for example, that we can declare the following strange infinite
-stream type, consisting of a pair of natural numbers followed by a
-stream, and work with it as if it had only a single natural number
-followed by a stream---since these two types would be
-indistinguishable.
-
-.. literalinclude:: example/tydefs.disco
-   :lines: 13-
    :language: idris
    :caption:
 
@@ -119,6 +105,6 @@ For example:
    type Bar = Baz
    type Baz = Bar
 
-   -- Pair is OK because it expands to a top-level type former
-   -- (product) which is not a type definition.
+   -- Pair is OK (though rather useless) because it expands to a
+   -- top-level type former (product) which is not a type definition.
    type Pair = Pair * Pair

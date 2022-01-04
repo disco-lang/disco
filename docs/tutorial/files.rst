@@ -34,13 +34,17 @@ each definition may refer to any other definition in the whole file.
 
 To load the definitions in a file into the disco REPL, you can use the
 ``:load`` command.  After successfully loading a file, all the names
-defined in the file are available for use.  For example:
+defined in the file are available for use; the ``:names`` command can
+be used to list all the available names.  For example:
 
 ::
 
     Disco> :load example/basics.disco
     Loading example/basics.disco...
     Loaded.
+    Disco> :names
+    approx_pi : ℚ
+    increment : ℕ → ℕ
     Disco> approx_pi
     22/7
     Disco> increment(3)

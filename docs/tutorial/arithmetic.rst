@@ -160,9 +160,9 @@ might not find built in to other languages.
         Disco> 20!
         2432902008176640000
 
-* Square root (``sqrt``) and base-two logarithm (``lg``) functions are
-  provided which round their result down to the nearest integer
-  (remember that disco does not support arbitrary real numbers).
+* A square root (``sqrt``) function is provided which rounds the
+  result down to the nearest integer (remember that disco does not
+  support arbitrary real numbers).
 
     ::
 
@@ -170,8 +170,3 @@ might not find built in to other languages.
         299
         Disco> sqrt (299^2 .- 1)
         298
-        Disco> lg (2^35 + 7)
-        35
-        Disco> lg (2^35 .- 1)
-        34
-

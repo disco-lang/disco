@@ -89,43 +89,43 @@ Here are a few examples to illustrate the possibilities:
     Disco> (\x:N, y:Q. x > y) 5 (9/2)
     true
 
-Comparing functions
-===================
+Let expressions
+===============
 
-In certain cases, functions can be compared for equality, or even
-compared to see which is less or greater.
+*Let expressions* are a mechanism for defining new variables for local
+use within an expression.  For example, ``3 + (let y = 2 in y + y)``
+evaluates to ``7``: the expression ``y + y`` is evaluated in a context
+where ``y`` is defined to be ``2``, and the result is then added to
+``3``.  The simplest syntax for a let expression, as in this example,
+is ``let <variable> = <expression1> in <expression2>``.  The value of
+the let expression is the value of ``<expression2>``, which may
+contain occurrences of the ``<variable>``; any such occurrences will
+take on the value of ``<expression1>``.
 
-::
+More generally:
 
-    Disco> (\x:Bool. x) == (\x:Bool. not (not x))
-    true
-    Disco> (\x:Bool. x) == (\x:Bool. not x)
-    false
+* A ``let`` may have multiple variables defined before ``in``,
+  separated by commas.
+* Each variable may optionally have a type annotation.
+* The definitions of later variables may refer to previously defined
+  variables.
+* However, the definition of a variable in a ``let`` may not refer to
+  itself; only top-level definitions may be recursive.
 
-There is no magic involved, and it does not work by looking at the
-definitions of the functions. Simply put, two functions are equal if
-they give the same output for every input. Disco enumerates all
-possible values of the input type, and tests that the two functions
-give equal outputs for every input.  For functions with finite input
-types, this is guaranteed to return a result.  For functions with
-infinite input types, disco will do its best to search for a
-counterexample, returning ``false`` if it finds an input for which the
-functions disagree, and running forever otherwise.
+Here is a (somewhat contrived) example which demonstrates all these
+features:
 
-::
+.. literalinclude:: example/let.disco
+   :language: idris
+   :caption:
 
-    Disco> (\x:N. x) == (\x:N. 3)
-    false
-    Disco> (\x:N. x) == (\x:N. (x+1) .- 1)
-    ^CInterrupt
-
-Functions are ordered by conceptually listing all their outputs
-ordered by inputs (that is, list the values of the input type in order
-from smallest to largest and apply the function to each) and then
-comparing these lists of outputs lexicographically.  That is, if ``i``
-is the smallest possible input value and ``f i < g i``, then ``f <
-g``.  If ``f i == g i``, then disco moves on to consider the second
-smallest input value, and so on.
+An important thing to note is that a given definition in a ``let``
+expression will only ever be evaluated (at most) once, even if the
+variable is used multiple times.  ``let`` expressions are thus a way
+for the programmer to ensure that the result of some computation is
+shared. ``let x = e in f x x`` and ``f e e`` will always yield the
+same result, but the former might be more efficient, if ``e`` is
+expensive to calculate.
 
 Disambiguating function application and multiplication
 ======================================================
@@ -151,12 +151,12 @@ and only if ``X`` is a *multiplicative term*, and function application
 otherwise.  A multiplicative term is one that looks like either a
 natural number literal, or a unary or binary operation (possibly in
 parentheses).  For example, ``3``, ``(-2)``, and ``(x + 5)`` are all
-multiplicative terms, so ``3x``, ``(-2)x``, and ``(x + 5)x`` all get parsed as
-multiplication.  On the other hand, an expression like ``(x y)`` is always parsed as
-function application, even if x and y both turn out to have numeric types
-types; a bare variable like x does not count as a multiplicative term.
-Likewise, ``(x y) z`` is parsed as function application, since ``(x y)`` is
-not a multiplicative term.
+multiplicative terms, so ``3x``, ``(-2)x``, and ``(x + 5)x`` all get
+parsed as multiplication.  On the other hand, an expression like ``(x
+y)`` is always parsed as function application, even if x and y both
+turn out to have numeric types; a bare variable like ``x`` does not count
+as a multiplicative term.  Likewise, ``(x y) z`` is parsed as function
+application, since ``(x y)`` is not a multiplicative term.
 
 .. note::
 

@@ -77,22 +77,22 @@ import           Disco.Value
 -- | Data type to represent things typed at the Disco REPL.  Each
 --   constructor has a singleton type to facilitate dispatch.
 data REPLExpr :: CmdTag -> * where
-  TypeCheck :: Term -> REPLExpr 'CTypeCheck -- Typecheck a term
-  Eval :: Module -> REPLExpr 'CEval -- Evaluate a block
-  TestProp :: Term -> REPLExpr 'CTestProp -- Run a property test
-  ShowDefn :: Name Term -> REPLExpr 'CShowDefn -- Show a variable's definition
-  Parse :: Term -> REPLExpr 'CParse -- Show the parsed AST
-  Pretty :: Term -> REPLExpr 'CPretty -- Pretty-print a term
-  Ann :: Term -> REPLExpr 'CAnn -- Show type-annotated typechecked term
-  Desugar :: Term -> REPLExpr 'CDesugar -- Show a desugared term
-  Compile :: Term -> REPLExpr 'CCompile -- Show a compiled term
-  Load :: FilePath -> REPLExpr 'CLoad -- Load a file.
-  Reload :: REPLExpr 'CReload -- Reloads the most recently loaded file.
-  Doc :: Name Term -> REPLExpr 'CDoc -- Show documentation.
-  Nop :: REPLExpr 'CNop -- No-op, e.g. if the user
-  -- just enters a comment
-  Help :: REPLExpr 'CHelp
-  Names :: REPLExpr 'CNames
+  TypeCheck :: Term      -> REPLExpr 'CTypeCheck -- Typecheck a term
+  Eval      :: Module    -> REPLExpr 'CEval      -- Evaluate a block
+  TestProp  :: Term      -> REPLExpr 'CTestProp  -- Run a property test
+  ShowDefn  :: Name Term -> REPLExpr 'CShowDefn  -- Show a variable's definition
+  Parse     :: Term      -> REPLExpr 'CParse     -- Show the parsed AST
+  Pretty    :: Term      -> REPLExpr 'CPretty    -- Pretty-print a term
+  Ann       :: Term      -> REPLExpr 'CAnn       -- Show type-annotated typechecked term
+  Desugar   :: Term      -> REPLExpr 'CDesugar   -- Show a desugared term
+  Compile   :: Term      -> REPLExpr 'CCompile   -- Show a compiled term
+  Load      :: FilePath  -> REPLExpr 'CLoad      -- Load a file.
+  Reload    ::              REPLExpr 'CReload    -- Reloads the most recently loaded file.
+  Doc       :: Term      -> REPLExpr 'CDoc       -- Show documentation.
+  Nop       ::              REPLExpr 'CNop       -- No-op, e.g. if the user
+                                                 -- just enters a comment
+  Help      ::              REPLExpr 'CHelp      -- Show help
+  Names     ::              REPLExpr 'CNames     -- Show bound names
 
 deriving instance Show (REPLExpr c)
 

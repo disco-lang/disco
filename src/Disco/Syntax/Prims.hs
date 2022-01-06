@@ -15,7 +15,7 @@
 
 module Disco.Syntax.Prims
        ( Prim(..)
-       , PrimInfo(..), primTable, primMap
+       , PrimInfo(..), primTable, primMap, primReference
        ) where
 
 import           GHC.Generics                     (Generic)
@@ -26,6 +26,7 @@ import qualified Data.Map                         as M
 
 import           Data.Data                        (Data)
 import           Disco.Syntax.Operators
+import           Disco.Util                       ((==>))
 
 ------------------------------------------------------------
 -- Prims
@@ -172,3 +173,11 @@ primTable =
 primMap :: Map Prim PrimInfo
 primMap = M.fromList $
   [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]
+
+-- | A map from some primitives to their corresponding page in the
+--   Disco language reference
+--   (https://disco-lang.readthedocs.io/en/latest/reference/index.html).
+primReference :: Map Prim String
+primReference = M.fromList $
+  [ PrimBOp Add ==> "addition"
+  ]

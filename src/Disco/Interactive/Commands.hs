@@ -65,7 +65,8 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
 import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
 import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
+import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
+                                                   primReference)
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Types                      (toPolyType)
@@ -379,7 +380,9 @@ handleDoc (Doc (Left x)) = do
         _                           -> Pretty.empty
 handleDoc (Doc (Right prim)) = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  -- XXX display more info about prims --- link to documentation
+  case M.lookup prim primReference of
+    Nothing -> return ()
+    Just p  -> info $ "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
 
 ------------------------------------------------------------
 -- eval

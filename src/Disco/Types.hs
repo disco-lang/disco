@@ -557,7 +557,7 @@ type TyDefCtx = M.Map String TyDefBody
 instance Pretty (String, TyDefBody) where
 
   pretty (tyName, TyDefBody ps body)
-    = text tyName <> prettyArgs ps <+> text "=" <+> pretty (body (map (TyVar . string2Name) ps))
+    = "type" <+> (text tyName <> prettyArgs ps) <+> text "=" <+> pretty (body (map (TyVar . string2Name) ps))
     where
       prettyArgs [] = empty
       prettyArgs _  = do

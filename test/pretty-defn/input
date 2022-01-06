@@ -1,0 +1,10 @@
+f : N -> N
+f x = x+2
+type P = N * N
+type Pair(a) = a * a
+type HPair(a,b) = a * b
+
+:defn f
+:defn P
+:defn Pair
+:defn HPair

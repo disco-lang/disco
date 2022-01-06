@@ -1,0 +1,5 @@
+f : ℕ → ℕ
+f(x) = x + 2
+type P = ℕ × ℕ
+type Pair(a) = a × a
+type HPair(a, b) = a × b

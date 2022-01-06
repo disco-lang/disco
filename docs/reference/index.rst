@@ -16,3 +16,4 @@ topics just when it is relevant to them.
 
    arithmetic
    numeric
+   variable

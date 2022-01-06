@@ -346,8 +346,8 @@ docCmd =
 
 parseDoc :: Parser (Either (Name Term) Prim)
 parseDoc =
-      (try (Left <$> (sc *> ident)) <?> "operator")
-  <|> (Right <$> parseNakedOpPrim)
+      try (Left <$> (sc *> ident))
+  <|> (Right <$> (parseNakedOpPrim <?> "operator"))
 
 handleDoc ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>

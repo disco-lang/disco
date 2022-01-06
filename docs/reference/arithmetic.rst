@@ -6,3 +6,7 @@ Arithmetic
    addition
    multiplication
    subtraction
+   division
+   integerdiv
+   mod
+

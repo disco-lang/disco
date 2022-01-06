@@ -1,6 +1,13 @@
 Numeric types
 =============
 
+.. toctree::
+
+   natural
+   integer
+   fraction
+   rational
+
 Disco has four :doc:`types <type>` which represent numbers:
 
 * :doc:`Natural numbers <natural>`, written ``N``, ``ℕ``, ``Nat``, or

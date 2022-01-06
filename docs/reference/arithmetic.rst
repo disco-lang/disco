@@ -9,4 +9,5 @@ Arithmetic
    division
    integerdiv
    mod
+   exponentiation
 

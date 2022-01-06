@@ -68,7 +68,7 @@ import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp))
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
-import           Disco.Types                      (Type, toPolyType)
+import           Disco.Types                      (toPolyType)
 import           Disco.Value
 
 ------------------------------------------------------------
@@ -78,24 +78,23 @@ import           Disco.Value
 -- | Data type to represent things typed at the Disco REPL.  Each
 --   constructor has a singleton type to facilitate dispatch.
 data REPLExpr :: CmdTag -> * where
-  TypeCheck :: Term             -> REPLExpr 'CTypeCheck -- Typecheck a term
-  Eval      :: Module           -> REPLExpr 'CEval      -- Evaluate a block
-  TestProp  :: Term             -> REPLExpr 'CTestProp  -- Run a property test
-  ShowDefn  :: Name Term        -> REPLExpr 'CShowDefn  -- Show a variable's definition
-  Parse     :: Term             -> REPLExpr 'CParse     -- Show the parsed AST
-  Pretty    :: Term             -> REPLExpr 'CPretty    -- Pretty-print a term
-  Ann       :: Term             -> REPLExpr 'CAnn       -- Show type-annotated
-                                                        -- typechecked term
-  Desugar   :: Term             -> REPLExpr 'CDesugar   -- Show a desugared term
-  Compile   :: Term             -> REPLExpr 'CCompile   -- Show a compiled term
-  Load      :: FilePath         -> REPLExpr 'CLoad      -- Load a file.
-  Reload    ::                     REPLExpr 'CReload    -- Reloads the most recently
-                                                        -- loaded file.
-  Doc       :: Name Term        -> REPLExpr 'CDoc       -- Show documentation.
-  Nop       ::                     REPLExpr 'CNop       -- No-op, e.g. if the user
-                                                        -- just enters a comment
-  Help      ::                     REPLExpr 'CHelp      -- Show help
-  Names     ::                     REPLExpr 'CNames     -- Show bound names
+  TypeCheck :: Term      -> REPLExpr 'CTypeCheck -- Typecheck a term
+  Eval      :: Module    -> REPLExpr 'CEval      -- Evaluate a block
+  TestProp  :: Term      -> REPLExpr 'CTestProp  -- Run a property test
+  ShowDefn  :: Name Term -> REPLExpr 'CShowDefn  -- Show a variable's definition
+  Parse     :: Term      -> REPLExpr 'CParse     -- Show the parsed AST
+  Pretty    :: Term      -> REPLExpr 'CPretty    -- Pretty-print a term
+  Ann       :: Term      -> REPLExpr 'CAnn       -- Show type-annotated term
+  Desugar   :: Term      -> REPLExpr 'CDesugar   -- Show a desugared term
+  Compile   :: Term      -> REPLExpr 'CCompile   -- Show a compiled term
+  Load      :: FilePath  -> REPLExpr 'CLoad      -- Load a file.
+  Reload    ::              REPLExpr 'CReload    -- Reloads the most recently
+                                                 -- loaded file.
+  Doc       :: Either (Name Term) Prim -> REPLExpr 'CDoc       -- Show documentation.
+  Nop       ::              REPLExpr 'CNop       -- No-op, e.g. if the user
+                                                 -- just enters a comment
+  Help      ::              REPLExpr 'CHelp      -- Show help
+  Names     ::              REPLExpr 'CNames     -- Show bound names
 
 deriving instance Show (REPLExpr c)
 
@@ -341,14 +340,19 @@ docCmd =
       category = User,
       cmdtype = ColonCmd,
       action = inputToState @TopInfo . handleDoc,
-      parser = Doc <$> (sc *> ident)
+      parser = Doc <$> parseDoc
     }
 
+parseDoc :: Parser (Either (Name Term) Prim)
+parseDoc =
+      (try (Left <$> (sc *> ident)) <?> "operator")
+  <|> (Right <$> parseNakedOpPrim)
+
 handleDoc ::
-  Members '[Input TopInfo, LFresh, Output Message] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
-handleDoc (Doc x) = do
+handleDoc (Doc (Left x)) = do
   ctx  <- inputs @TopInfo (view (replModInfo . miTys))
   tydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
   docs <- inputs @TopInfo (view (replModInfo . miDocs))
@@ -373,6 +377,9 @@ handleDoc (Doc x) = do
       case Ctx.lookupAll' x docMap of
         ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
         _                           -> Pretty.empty
+handleDoc (Doc (Right prim)) = do
+  handleTypeCheck (TypeCheck (TPrim prim))
+  -- XXX display more info about prims --- link to documentation
 
 ------------------------------------------------------------
 -- eval
@@ -704,16 +711,16 @@ typeCheckCmd =
       shortHelp = "Typecheck a term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handleTypeCheck,
+      action = inputToState @TopInfo . handleTypeCheck,
       parser = parseTypeCheck
     }
 
 handleTypeCheck ::
-  Members '[Error DiscoError, State TopInfo, LFresh, Output Message] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- inputToState . typecheckTop $ inferTop t
+  (_, sig) <- typecheckTop $ inferTop t
   info $ pretty' t <+> text ":" <+> pretty' sig
 
 parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
@@ -723,13 +730,16 @@ parseTypeCheck =
             <|> (parseNakedOp <?> "operator")
         )
 
--- In a :type command, allow naked operators, as in :type + , even
--- though + by itself is not a syntactically valid term.  However,
--- this seems like it may be a common thing for a student to ask and
--- there is no reason we can't have this as a special case.
+-- In a :type or :doc command, allow naked operators, as in :type + ,
+-- even though + by itself is not a syntactically valid term.
+-- However, this seems like it may be a common thing for a student to
+-- ask and there is no reason we can't have this as a special case.
 parseNakedOp :: Parser Term
-parseNakedOp = sc *> choice (map mkOpParser (concat opTable))
+parseNakedOp = TPrim <$> parseNakedOpPrim
+
+parseNakedOpPrim :: Parser Prim
+parseNakedOpPrim = sc *> choice (map mkOpParser (concat opTable))
   where
-    mkOpParser :: OpInfo -> Parser Term
-    mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((TPrim (PrimUOp op) <$) . reservedOp) syns)
-    mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((TPrim (PrimBOp op) <$) . reservedOp) syns)
+    mkOpParser :: OpInfo -> Parser Prim
+    mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((PrimUOp op <$) . reservedOp) syns)
+    mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((PrimBOp op <$) . reservedOp) syns)

@@ -24,5 +24,4 @@ knowledge of functional programming.
    polymorphism
    typedefs
    containers
-   laziness
    properties

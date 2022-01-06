@@ -1,0 +1,14 @@
+Loading doc.disco...
+Running tests...
+  f: OK
+Loaded.
+type P = ℕ × ℕ
+
+P is a type of stuff.
+
+f : ℕ → ℕ
+
+f is a function.
+Some more documentation.
+
+No documentation found for x.

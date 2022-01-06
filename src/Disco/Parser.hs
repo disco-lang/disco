@@ -392,6 +392,10 @@ parseModule mode = do
         = groupTLs [] rest
           & tlDecls %~ (decl :)
           & tlDocs  %~ ((x, reverse revDocs) :)
+      groupTLs revDocs (TLDecl decl@(DTyDef (TypeDefn x _ _)) : rest)
+        = groupTLs [] rest
+          & tlDecls %~ (decl :)
+          & tlDocs  %~ ((string2Name x, reverse revDocs) :)
       groupTLs _ (TLDecl defn : rest)
         = groupTLs [] rest
           & tlDecls %~ (defn :)

@@ -1,0 +1,8 @@
+||| P is a type of stuff.
+type P = N * N
+
+||| f is a function.
+||| Some more documentation.
+!!! f(1) == 2
+f : N -> N
+f x = x + 1

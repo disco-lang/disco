@@ -1,0 +1,4 @@
+:load test/repl-doc/doc.disco
+:doc P
+:doc f
+:doc x

@@ -46,6 +46,7 @@ import           Polysemy.Error                   hiding (try)
 import           Polysemy.Output
 import           Polysemy.Reader
 
+import           Data.Maybe                       (maybeToList)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
@@ -349,19 +350,29 @@ handleDoc ::
   Sem r ()
 handleDoc (Doc x) = do
   ctx  <- inputs @TopInfo (view (replModInfo . miTys))
+  tydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
   docs <- inputs @TopInfo (view (replModInfo . miDocs))
 
-  case Ctx.lookupAll' x ctx of
-    []    -> err $ "No documentation found for" <+> pretty' x <> "."
-    binds -> mapM_ (showDoc docs) binds
+  debug $ text . show $ docs
+
+  case (Ctx.lookupAll' x ctx, M.lookup (name2String x) tydefs) of
+    ([], Nothing) -> err $ "No documentation found for" <+> pretty' x <> "."
+    (binds, def) ->
+      mapM_ (showDoc docs) (map Left binds ++ map Right (maybeToList def))
 
   where
-    showDoc docMap (qn, ty) = info $
+    showDoc docMap (Left (qn, ty)) = info $
       hsep [pretty' x, ":", pretty' ty]
       $+$
       case Ctx.lookup' qn docMap of
         Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
         _                       -> Pretty.empty
+    showDoc docMap (Right tdBody) = info $
+      pretty' (name2String x, tdBody)
+      $+$
+      case Ctx.lookupAll' x docMap of
+        ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
+        _                           -> Pretty.empty
 
 ------------------------------------------------------------
 -- eval

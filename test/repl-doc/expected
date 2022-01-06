@@ -12,3 +12,5 @@ f is a function.
 Some more documentation.
 
 No documentation found for x.
+~+~ : ℕ × ℕ → ℕ
+https://disco-lang.readthedocs.io/en/latest/reference/addition.html

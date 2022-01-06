@@ -1,7 +1,7 @@
 Addition
 ========
 
-All :doc:`numeric types <numeric>` support addition using the ``+``
+All :doc:`numeric types <numeric>` can be added using the ``+``
 operator.  For example:
 
 ::
@@ -22,3 +22,6 @@ which says that it is a :doc:`function <functions>` taking :doc:`two
 <product>` natural numbers and returning a natural number.  However,
 as mentioned above, it also works on other numeric types such as
 integers and rational numbers.
+
+The ``+`` operator can also be used on :doc:`graphs`, where it has the
+meaning of :doc:`overlaying <overlay>` two graphs.

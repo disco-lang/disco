@@ -178,6 +178,8 @@ primMap = M.fromList $
 --   Disco language reference
 --   (https://disco-lang.readthedocs.io/en/latest/reference/index.html).
 primReference :: Map Prim String
-primReference = M.fromList $
+primReference = M.fromList
   [ PrimBOp Add ==> "addition"
+  , PrimBOp Sub ==> "subtraction"
+  , PrimBOp SSub ==> "subtraction"
   ]

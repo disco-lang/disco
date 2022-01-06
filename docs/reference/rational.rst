@@ -17,6 +17,6 @@ Doing any of the four :doc:`arithmetic <arithmetic>` operations
 :doc:`division <division>`) on two rational numbers results in another rational number.
 
 Note that Disco does not have any way to work with *irrational*
-numbers such as pi or the square root of two; such numbers are
-typically not needed in Discrete Mathematics, and including them would
-make things much more complicated.
+numbers such as :math:`\pi` or :math:`\sqrt{2}`; such numbers are
+typically not needed in discrete mathematics, and including them would
+make the language much more complicated.

@@ -19,4 +19,7 @@ integer.  For example, ``11 // 2`` is ``5``, because ``2`` fits into
    Disco (-7) // 2
    -4
 
-XXX working here
+Formally, the result of ``//`` is defined in terms of the "Division
+Algorithm": given a number :math:`n` and a divisor :math:`d`, the
+quotient is the unique number :math:`q` such that :math:`n = qd + r`,
+where :math:`0 \leq r < d`.

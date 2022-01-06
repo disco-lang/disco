@@ -21,5 +21,5 @@ Examples of things which are *not* expressions include:
 
 Be careful not to confuse ``x = 3`` (a definition of the
 :doc:`variable` ``x``) with ``x == 3`` (an expression which has a
-     value of either ``true`` or ``false`` depending on whether ``x``
-     is equal to ``3`` or not).
+value of either ``true`` or ``false`` depending on whether ``x``
+is equal to ``3`` or not).

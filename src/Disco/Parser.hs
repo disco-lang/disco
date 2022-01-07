@@ -552,10 +552,14 @@ parseAtom = label "expression" $
   <|> TApp (TPrim PrimFloor) . TParens <$> fbrack parseTerm
   <|> TApp (TPrim PrimCeil)  . TParens <$> cbrack parseTerm
   <|> parseCase
+  <|> try parseAbs
   <|> bagdelims (parseContainer BagContainer)
   <|> braces    (parseContainer SetContainer)
   <|> brackets  (parseContainer ListContainer)
   <|> tuple <$> parens (parseTerm `sepBy1` comma)
+
+parseAbs :: Parser Term
+parseAbs = TApp (TPrim PrimAbs) <$> (pipe *> parseTerm <* pipe)
 
 parseUnit :: Parser Term
 parseUnit = TUnit <$ (reserved "unit" <|> void (symbol "■"))

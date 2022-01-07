@@ -179,7 +179,12 @@ primMap = M.fromList $
 --   (https://disco-lang.readthedocs.io/en/latest/reference/index.html).
 primReference :: Map Prim String
 primReference = M.fromList
-  [ PrimBOp Add ==> "addition"
-  , PrimBOp Sub ==> "subtraction"
+  [ PrimBOp Add  ==> "addition"
+  , PrimBOp Sub  ==> "subtraction"
   , PrimBOp SSub ==> "subtraction"
+  , PrimBOp Mul  ==> "multiplication"
+  , PrimBOp Div  ==> "division"
+  , PrimBOp IDiv ==> "integerdiv"
+  , PrimBOp Mod  ==> "mod"
+  , PrimBOp Exp  ==> "exponentiation"
   ]

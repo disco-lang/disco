@@ -191,6 +191,8 @@ primDoc = M.fromList
   , PrimBOp Mod  ==> "a mod b is the remainder when a is divided by b."
   , PrimBOp Exp  ==> "Exponentiation.  a ^ b is a raised to the b power."
   , PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
+  , PrimFloor    ==> "floor(x) is the largest integer which is <= x."
+  , PrimCeil     ==> "ceiling(x) is the smallest integer which is >= x."
   , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
   ]
 
@@ -208,5 +210,7 @@ primReference = M.fromList
   , PrimBOp Mod  ==> "mod"
   , PrimBOp Exp  ==> "exponentiation"
   , PrimUOp Fact ==> "factorial"
+  , PrimFloor    ==> "round"
+  , PrimCeil     ==> "round"
   , PrimUOp Not  ==> "not"
   ]

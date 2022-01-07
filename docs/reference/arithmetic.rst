@@ -11,3 +11,5 @@ Arithmetic
    mod
    exponentiation
    factorial
+   round
+   abs

@@ -527,7 +527,7 @@ typecheck Infer (TVar x) = do
 
     -- 3. See if we should convert it to a primitive.
     tryPrim =
-      case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
+      case toPrim (name2String x) of
         (prim:_) -> Just <$> typecheck Infer (TPrim prim)
         _        -> return Nothing
 

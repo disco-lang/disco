@@ -66,7 +66,8 @@ import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
-                                                   primDoc, primReference)
+                                                   primDoc, primReference,
+                                                   toPrim)
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Types                      (toPolyType)
@@ -361,7 +362,11 @@ handleDoc (Doc (Left x)) = do
   debug $ text . show $ docs
 
   case (Ctx.lookupAll' x ctx, M.lookup (name2String x) tydefs) of
-    ([], Nothing) -> err $ "No documentation found for" <+> pretty' x <> "."
+    ([], Nothing) ->
+      -- Maybe the variable name entered by the user is actually a prim.
+      case toPrim (name2String x) of
+        (prim:_) -> handleDoc (Doc (Right prim))
+        _        -> err $ "No documentation found for" <+> pretty' x <> "."
     (binds, def) ->
       mapM_ (showDoc docs) (map Left binds ++ map Right (maybeToList def))
 

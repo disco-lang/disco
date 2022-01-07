@@ -15,7 +15,7 @@
 
 module Disco.Syntax.Prims
        ( Prim(..)
-       , PrimInfo(..), primTable, primMap, primDoc, primReference
+       , PrimInfo(..), primTable, toPrim, primMap, primDoc, primReference
        ) where
 
 import           GHC.Generics                     (Generic)
@@ -169,11 +169,17 @@ primTable =
   , PrimInfo PrimExtendSeq "extendSequence" False
   ]
 
+-- | Find any exposed prims with the given name.
+toPrim :: String -> [Prim]
+toPrim x = [ p | PrimInfo p syn True <- primTable, syn == x ]
+
 -- | A convenient map from each 'Prim' to its info record.
 primMap :: Map Prim PrimInfo
 primMap = M.fromList $
   [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]
 
+-- | A map from some primitives to a short descriptive string,
+--   to be shown by the :doc command.
 primDoc :: Map Prim String
 primDoc = M.fromList
   [ PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
@@ -194,4 +200,5 @@ primReference = M.fromList
   , PrimBOp Mod  ==> "mod"
   , PrimBOp Exp  ==> "exponentiation"
   , PrimUOp Fact ==> "factorial"
+  , PrimUOp Not  ==> "not"
   ]

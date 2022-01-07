@@ -8,9 +8,9 @@ their two arguments, like ``1 + 2``.  Disco has many built-in
 operators which are symbols (like ``+``, ``*``, ``/``, *etc.*) as well
 as a few which are words (like ``mod``, ``choose``, and ``divides``).
 
-Disco also has three *unary* operators: arithmetic negation (``-``)
-and logical negation (``¬`` or ``not``) are written in front of their
-one argument, and factorial (``!``) is written after its argument.
+Disco also has three *unary* operators: :doc:`arithmetic negation <neg>` (``-``)
+and :doc:`logical negation <not>` (``¬`` or ``not``) are written in front of their
+one argument, and :doc:`factorial <factorial>` (``!``) is written after its argument.
 
 Twiddle notation
 ----------------
@@ -19,7 +19,7 @@ Disco has a special syntax for talking about operators on their own,
 without any arguments: a tilde (or "twiddle") (``~``) goes in each
 place where an argument would be.  For example, to talk about the
 ``+`` operator on its own we can write ``~+~``.  To talk about the
-factorial operator we would write ``~!``, because factorial only takes
+:doc:`factorial <factorial>` operator we would write ``~!``, because factorial only takes
 a single argument which goes before it.  Disco will use this "twiddle
 notation" when you ask it for the type of an operator:
 
@@ -51,4 +51,7 @@ for example:
 
    Disco> :doc !
    ~! : ℕ → ℕ
-   XXX UPDATE ME!
+
+   n! computes the factorial of n, that is, 1 * 2 * ... * n.
+
+   https://disco-lang.readthedocs.io/en/latest/reference/factorial.html

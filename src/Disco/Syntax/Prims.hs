@@ -15,7 +15,7 @@
 
 module Disco.Syntax.Prims
        ( Prim(..)
-       , PrimInfo(..), primTable, primMap, primReference
+       , PrimInfo(..), primTable, primMap, primDoc, primReference
        ) where
 
 import           GHC.Generics                     (Generic)
@@ -174,6 +174,12 @@ primMap :: Map Prim PrimInfo
 primMap = M.fromList $
   [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]
 
+primDoc :: Map Prim String
+primDoc = M.fromList
+  [ PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
+  , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
+  ]
+
 -- | A map from some primitives to their corresponding page in the
 --   Disco language reference
 --   (https://disco-lang.readthedocs.io/en/latest/reference/index.html).
@@ -187,4 +193,5 @@ primReference = M.fromList
   , PrimBOp IDiv ==> "integerdiv"
   , PrimBOp Mod  ==> "mod"
   , PrimBOp Exp  ==> "exponentiation"
+  , PrimUOp Fact ==> "factorial"
   ]

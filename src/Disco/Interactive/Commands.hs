@@ -66,7 +66,7 @@ import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
-                                                   primReference)
+                                                   primDoc, primReference)
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
 import           Disco.Types                      (toPolyType)
@@ -380,9 +380,14 @@ handleDoc (Doc (Left x)) = do
         _                           -> Pretty.empty
 handleDoc (Doc (Right prim)) = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  case M.lookup prim primReference of
-    Nothing -> return ()
-    Just p  -> info $ "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
+  case (M.lookup prim primDoc, M.lookup prim primReference) of
+    (Nothing, Nothing) -> return ()
+    (Nothing, Just p)  -> info $ mkReference p
+    (Just d, mp)  ->
+      info $ "" $+$ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
+  where
+    mkReference p =
+      "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
 
 ------------------------------------------------------------
 -- eval

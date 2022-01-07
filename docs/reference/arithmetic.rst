@@ -10,4 +10,4 @@ Arithmetic
    integerdiv
    mod
    exponentiation
-
+   factorial

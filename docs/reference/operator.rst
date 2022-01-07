@@ -12,6 +12,9 @@ Disco also has three *unary* operators: :doc:`arithmetic negation <neg>` (``-``)
 and :doc:`logical negation <not>` (``¬`` or ``not``) are written in front of their
 one argument, and :doc:`factorial <factorial>` (``!``) is written after its argument.
 
+When multiple operators are used together, Disco uses their
+:doc:`precedence <precedence>` to decide how to interpret it.
+
 Twiddle notation
 ----------------
 

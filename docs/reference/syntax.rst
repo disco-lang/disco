@@ -10,3 +10,5 @@ grammar, but not things like meaning.
    variable
    expression
    operator
+   comment
+   docs

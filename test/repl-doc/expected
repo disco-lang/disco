@@ -13,7 +13,11 @@ Some more documentation.
 
 No documentation found for x.
 ~+~ : ℕ × ℕ → ℕ
+
+The sum of two numbers, types, or graphs.
+
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
+
 ~! : ℕ → ℕ
 
 n! computes the factorial of n, that is, 1 * 2 * ... * n.

@@ -8,7 +8,7 @@ Numeric types
    fraction
    rational
 
-Disco has four :doc:`types <type>` which represent numbers:
+Disco has four :doc:`types <types>` which represent numbers:
 
 * :doc:`Natural numbers <natural>`, written ``N``, ``ℕ``, ``Nat``, or
   ``Natural``.  These represent the counting numbers 0, 1, 2,

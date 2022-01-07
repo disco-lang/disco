@@ -193,6 +193,7 @@ primDoc = M.fromList
   , PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
   , PrimFloor    ==> "floor(x) is the largest integer which is <= x."
   , PrimCeil     ==> "ceiling(x) is the smallest integer which is >= x."
+  , PrimAbs      ==> "abs(x) is the absolute value of x.  Also written |x|."
   , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
   ]
 
@@ -212,5 +213,6 @@ primReference = M.fromList
   , PrimUOp Fact ==> "factorial"
   , PrimFloor    ==> "round"
   , PrimCeil     ==> "round"
+  , PrimAbs      ==> "abs"
   , PrimUOp Not  ==> "not"
   ]

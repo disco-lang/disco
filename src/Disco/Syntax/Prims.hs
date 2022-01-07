@@ -182,7 +182,15 @@ primMap = M.fromList $
 --   to be shown by the :doc command.
 primDoc :: Map Prim String
 primDoc = M.fromList
-  [ PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
+  [ PrimBOp Add  ==> "The sum of two numbers, types, or graphs."
+  , PrimBOp Sub  ==> "The difference of two numbers."
+  , PrimBOp SSub ==> "The difference of two numbers, with a lower bound of 0."
+  , PrimBOp Mul  ==> "The product of two numbers, types, or graphs."
+  , PrimBOp Div  ==> "Divide two numbers."
+  , PrimBOp IDiv ==> "The integer quotient of two numbers, rounded down."
+  , PrimBOp Mod  ==> "a mod b is the remainder when a is divided by b."
+  , PrimBOp Exp  ==> "Exponentiation.  a ^ b is a raised to the b power."
+  , PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
   , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
   ]
 

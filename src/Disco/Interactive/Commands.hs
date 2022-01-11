@@ -38,6 +38,7 @@ import qualified Text.Megaparsec.Char             as C
 import           Unbound.Generics.LocallyNameless (Name, name2String,
                                                    string2Name)
 
+import           Disco.Effects.Fresh              (runFresh)
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Effects.State
@@ -281,7 +282,7 @@ handleAnn ::
   REPLExpr 'CAnn ->
   Sem r ()
 handleAnn (Ann t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   infoPretty at
 
 ------------------------------------------------------------
@@ -304,7 +305,7 @@ handleCompile ::
   REPLExpr 'CCompile ->
   Sem r ()
 handleCompile (Compile t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   infoPretty . compileTerm $ at
 
 ------------------------------------------------------------
@@ -327,7 +328,7 @@ handleDesugar ::
   REPLExpr 'CDesugar ->
   Sem r ()
 handleDesugar (Desugar t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   info $ pretty' . eraseDTerm . runDesugar . desugarTerm $ at
 
 ------------------------------------------------------------
@@ -733,8 +734,13 @@ handleTypeCheck ::
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- typecheckTop $ inferTop t
-  info $ pretty' t <+> text ":" <+> pretty' sig
+  asigs <- typecheckTop $ inferTop t
+  sigs <- runFresh . mapInput (view (replModInfo . miTydefs)) $ thin $ map snd asigs
+  let (toShow, extra) = splitAt 8 sigs
+  when (length sigs > 1) $ info "This expression has multiple possible types.  Some examples:"
+  info $ vcat $
+    map (\sig -> pretty' t <+> text ":" <+> pretty' sig) toShow
+    ++ ["..." | not (P.null extra)]
 
 parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
 parseTypeCheck =

@@ -42,6 +42,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Disco.Effects.Fresh
 import           Polysemy                                hiding (embed)
 import           Polysemy.Error
+import           Polysemy.Input
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
@@ -58,6 +59,7 @@ import qualified Disco.Subst                             as Subst
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Typecheck.Constraints
+import           Disco.Typecheck.Solve                   (solveConstraint)
 import           Disco.Typecheck.Util
 import           Disco.Types
 import           Disco.Types.Rules
@@ -127,7 +129,7 @@ checkModule name imports (Module es _ m docs terms) = do
         (x:_) -> throw $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- checkProperties docCtx
-          aterms <- mapM inferTop terms
+          aterms <- mapM inferTop' terms
           return $ ModuleInfo name imports docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
@@ -273,11 +275,11 @@ checkDefn name (TermDefn x clauses) = do
   -- patterns, and lazily unrolling type definitions along the way.
   (patTys, bodyTy) <- decomposeDefnTy (numPats (head clauses)) ty
 
-  ((acs, _), theta) <- solve $ do
+  ((acs, _), thetas) <- solve $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
     return (aclauses, ty)
 
-  return $ applySubst theta (Defn (coerce x) patTys bodyTy acs)
+  return $ applySubst (head thetas) (Defn (coerce x) patTys bodyTy acs)
   where
     numPats = length . fst . unsafeUnbind
 
@@ -332,9 +334,9 @@ checkProperty
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
   => Property -> Sem r AProperty
 checkProperty prop = do
-  (at, theta) <- solve $ check prop TyProp
+  (at, thetas) <- solve $ check prop TyProp
   -- XXX do we need to default container variables here?
-  return $ applySubst theta at
+  return $ applySubst (head thetas) at
 
 ------------------------------------------------------------
 -- Type checking/inference
@@ -415,33 +417,45 @@ infer
   => Term -> Sem r ATerm
 infer = typecheck Infer
 
--- | Top-level type inference algorithm: infer a (polymorphic) type
---   for a term by running type inference, solving the resulting
---   constraints, and quantifying over any remaining type variables.
-inferTop
+-- | Top-level type inference algorithm, returning only the first
+--   possible result.
+inferTop'
   :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
   => Term -> Sem r (ATerm, PolyType)
+inferTop' = fmap head . inferTop
+
+-- | Top-level type inference algorithm: infer some possible
+--   (polymorphic) types for a term by running type inference, solving
+--   the resulting constraints, and quantifying over any remaining
+--   type variables.
+inferTop
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Term -> Sem r [(ATerm, PolyType)]
 inferTop t = do
 
   -- Run inference on the term and try to solve the resulting
   -- constraints.
-  (at, theta) <- solve $ infer t
+  (at, thetas) <- solve $ infer t
 
   debug "Final annotated term (before substitution and container monomorphizing):"
   debugPretty at
 
-      -- Apply the resulting substitution.
-  let at' = applySubst theta at
+  return
+    -- Quantify over any remaining type variables and return
+    -- the term along with the resulting polymorphic type.
+    [ (at'', closeType (getType at''))
+
+    | theta <- thetas
+      -- Apply the resulting substitutions.
+    , let at' = applySubst theta at
 
       -- Find any remaining container variables.
-      cvs = containerVars (getType at')
+    , let cvs = containerVars (getType at')
 
-      -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
-
-  -- Finally, quantify over any remaining type variables and return
-  -- the term along with the resulting polymorphic type.
-  return (at'', closeType (getType at''))
+      -- Replace them with all possible container types
+    , ctrs <- replicateM (S.size cvs) (map (TyAtom . ABase) [CtrList, CtrBag, CtrSet])
+    , let at'' = applySubst (Subst.fromList $ zip (S.toList cvs) ctrs) at'
+    ]
 
 --------------------------------------------------
 -- The typecheck function
@@ -1602,3 +1616,41 @@ ensureEq :: Member (Writer Constraint) r => Type -> Type -> Sem r ()
 ensureEq ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise  = constraint $ CEq ty1 ty2
+
+------------------------------------------------------------
+-- Subtyping
+------------------------------------------------------------
+
+isSubPolyType
+  :: Members '[Input TyDefCtx, Output Message, Fresh] r
+  => PolyType -> PolyType -> Sem r Bool
+isSubPolyType (Forall b1) (Forall b2) = do
+  (as1, ty1) <- unbind b1
+  (as2, ty2) <- unbind b2
+  tydefs <- input @TyDefCtx
+  let c = CAll (bind as1 (CSub ty1 (substs (zip as2 (map TyVar as1)) ty2)))
+  ss <- runError (solveConstraint tydefs c)
+  return (either (const False) (not . P.null) ss)
+
+thin :: Members '[Input TyDefCtx, Output Message, Fresh] r => [PolyType] -> Sem r [PolyType]
+thin []       = return []
+thin (ty:tys) = do
+  ss <- or <$> mapM (`isSubPolyType` ty) tys
+  if ss
+    then thin tys
+    else do
+      tys' <- filterM (fmap not . (ty `isSubPolyType`)) tys
+      (ty :) <$> thin tys'
+
+-- -- XXX this doesn't handle user-defined types...
+-- isSubPolytype :: PolyType -> PolyType -> Bool
+-- isSubPolytype (Forall b1) (Forall b2) = isSubtype (snd (unsafeUnbind b1)) (snd (unsafeUnbind b2))
+
+-- isSubtype :: Type -> Type -> Bool
+-- isSubtype (TyAtom a1) (TyAtom a2) = isSuAb a1 a2
+-- isSubtype (TyCon c1 tys1) (TyCon c2 tys2)
+--   = (c1 == c2) && and (zipWith3 variance (arity c1) tys1 tys2)
+--   where
+--     variance Co     = isSubtype
+--     variance Contra = flip isSubtype
+-- isSubtype _ _ = False

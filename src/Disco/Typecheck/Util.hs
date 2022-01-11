@@ -106,18 +106,18 @@ withConstraint :: Sem (Writer Constraint ': r) a -> Sem r (a, Constraint)
 withConstraint = fmap swap . runWriter
 
 -- | Run a computation and solve its generated constraint, returning
---   the resulting substitution (or failing with an error).  Note that
+--   all the possible resulting substitutions (or failing with an error).  Note that
 --   this locally dispatches the constraint writer effect.
 solve
   :: Members '[Reader TyDefCtx, Error TCError, Output Message] r
-  => Sem (Writer Constraint ': r) a -> Sem r (a, S)
+  => Sem (Writer Constraint ': r) a -> Sem r (a, [S])
 solve m = do
   (a, c) <- withConstraint m
   tds <- ask @TyDefCtx
   res <- runSolve . solveConstraint tds $ c
   case res of
-    Left e  -> throw (Unsolvable e)
-    Right s -> return (a, s)
+    Left e   -> throw (Unsolvable e)
+    Right ss -> return (a, ss)
 
 ------------------------------------------------------------
 -- Contexts

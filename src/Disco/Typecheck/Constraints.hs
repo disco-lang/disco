@@ -41,7 +41,7 @@ data Constraint where
   CAnd   :: [Constraint] -> Constraint
   CTrue  :: Constraint
   COr    :: [Constraint] -> Constraint
-  CAll  :: Bind [Name Type] Constraint -> Constraint
+  CAll   :: Bind [Name Type] Constraint -> Constraint
 
   deriving (Show, Generic, Alpha, Subst Type)
 

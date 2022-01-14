@@ -229,15 +229,14 @@ prettyTCError = \case
   -- XXX say how many are expected, how many there were, what the actual arguments were?
   -- XXX distinguish between built-in and user-supplied type constructors in the error
   --     message?
-  -- XXX don't use word "constructor"
   NotEnoughArgs con -> vcat
-    [ "Error: not enough arguments supplied to the type constructor '" <> pretty' con <> "'."
-    , rtd "missing-doc"
+    [ "Error: not enough arguments for the type '" <> pretty' con <> "'."
+    , rtd "num-args-type"
     ]
 
   TooManyArgs con -> vcat
-    [ "Error: too many arguments supplied to the type constructor '" <> pretty' con <> "'."
-    , rtd "missing-doc"
+    [ "Error: too many arguments for the type '" <> pretty' con <> "'."
+    , rtd "num-args-type"
     ]
 
   -- XXX Mention the definition in which it was found, suggest adding the variable

@@ -275,7 +275,7 @@ prettySolveError = \case
   -- XXX say which types!
   NoWeakUnifier -> vcat
     [ "Error: the shape of two types does not match."
-    , rtd "missing-doc"
+    , rtd "shape-mismatch"
     ]
 
   -- XXX say more!

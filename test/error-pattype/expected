@@ -11,4 +11,4 @@ is supposed to have type
 but instead it has a product type.
 https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
 Error: the shape of two types does not match.
-https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html

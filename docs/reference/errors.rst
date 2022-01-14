@@ -29,3 +29,4 @@ https://github.com/disco-lang/disco/issues !
    num-args-type
    unbound-tyvar
    no-poly-rec
+   shape-mismatch

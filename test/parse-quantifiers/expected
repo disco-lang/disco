@@ -10,7 +10,7 @@ TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y)
 TAbs_ Lam () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
 8
 Error: the shape of two types does not match.
-https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
 8
 8
 8

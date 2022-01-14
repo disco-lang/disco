@@ -161,6 +161,7 @@ prettyTCError = \case
     , nest 2 $ pretty' t
     , "must have both a" <+> conWord c <+> "type and also the incompatible type"
     , nest 2 $ pretty' ty <> "."
+    , rtd "notcon"
     ]
 
   EmptyCase -> vcat

@@ -178,11 +178,20 @@ prettyTCError = \case
     , rtd "pattern-type"
     ]
 
-  DuplicateDecls x -> "Error: duplicate type signature for" <+> pretty' x <> "."
+  DuplicateDecls x -> vcat
+    [ "Error: duplicate type signature for" <+> pretty' x <> "."
+    , rtd "dup-sig"
+    ]
 
-  DuplicateDefns x -> "Error: duplicate definition for" <+> pretty' x <> "."
+  DuplicateDefns x -> vcat
+    [ "Error: duplicate definition for" <+> pretty' x <> "."
+    , rtd "dup-def"
+    ]
 
-  DuplicateTyDefns s -> "Error: duplicate definition for type" <+> text s <> "."
+  DuplicateTyDefns s -> vcat
+    [ "Error: duplicate definition for type" <+> text s <> "."
+    , rtd "dup-tydef"
+    ]
 
   -- XXX include all types involved in the cycle.
   CyclicTyDef s -> "Error: cyclic type definition for" <+> text s <> "."

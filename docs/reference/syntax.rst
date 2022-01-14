@@ -10,6 +10,8 @@ grammar, but not things like meaning.
    variable
    type-sig
    expression
+   definition
    operator
    comment
    docs
+   tydef

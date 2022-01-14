@@ -13,3 +13,6 @@ background to help you understand a particular error message.
    notcon
    empty-case
    pattern-type
+   dup-sig
+   dup-def
+   dup-tydef

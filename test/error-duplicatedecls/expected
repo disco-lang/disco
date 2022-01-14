@@ -1,2 +1,3 @@
 Loading dupdecls.disco...
 Error: duplicate type signature for x.
+https://disco-lang.readthedocs.io/en/latest/reference/dup-sig.html

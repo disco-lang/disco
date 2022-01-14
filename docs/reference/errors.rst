@@ -23,4 +23,4 @@ https://github.com/disco-lang/disco/issues !
    dup-tydef
    cyc-ty
    num-args
-
+   no-search

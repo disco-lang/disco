@@ -210,7 +210,7 @@ prettyTCError = \case
     [ "Error: the type"
     , nest 2 $ pretty' ty
     , "is not searchable (i.e. it cannot be used in a forall)."
-    , rtd "missing-doc"
+    , rtd "no-search"
     ]
 
   Unsolvable solveErr -> prettySolveError solveErr

@@ -147,6 +147,8 @@ prettyTCError = \case
     ("Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:")
     $+$
     nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
+    $+$
+    rtd "ambiguous"
 
   NoType x ->
     "Error: the definition of" <+> pretty' x <+> "must have an accompanying type signature."

@@ -12,3 +12,4 @@ background to help you understand a particular error message.
    missingtype
    notcon
    empty-case
+   pattern-type

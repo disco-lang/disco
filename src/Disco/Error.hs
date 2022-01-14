@@ -157,7 +157,7 @@ prettyTCError = \case
     ]
 
   NotCon c t ty -> vcat
-    [ "Error: the term"
+    [ "Error: the expression"
     , nest 2 $ pretty' t
     , "must have both a" <+> conWord c <+> "type and also the incompatible type"
     , nest 2 $ pretty' ty <> "."
@@ -169,13 +169,13 @@ prettyTCError = \case
     , rtd "empty-case"
     ]
 
-  PatternType c pat ty ->
-    vcat
+  PatternType c pat ty -> vcat
     [ "Error: the pattern"
     , nest 2 $ pretty' pat
     , "is supposed to have type"
     , nest 2 $ pretty' ty <> ","
     , "but instead it has a" <+> conWord c <+> "type."
+    , rtd "pattern-type"
     ]
 
   DuplicateDecls x -> "Error: duplicate type signature for" <+> pretty' x <> "."
@@ -204,7 +204,7 @@ prettyTCError = \case
     "Error: there is no built-in or user-defined type named '" <> text s <> "'."
 
   NoTWild ->
-    "Error: wildcards (_) are not allowed in terms."
+    "Error: wildcards (_) are not allowed in expressions."
 
   -- XXX say how many are expected, how many there were, what the actual arguments were?
   -- XXX distinguish between built-in and user-supplied type constructors in the error

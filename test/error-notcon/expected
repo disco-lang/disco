@@ -1,4 +1,4 @@
-Error: the term
+Error: the expression
   λx : ℤ. x
 must have both a function type and also the incompatible type
   List(ℤ).

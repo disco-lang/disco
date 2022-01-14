@@ -1,9 +1,9 @@
-The term t must have both a blah type and also...
-=================================================
+The expression e must have both a blah type and also...
+=======================================================
 
 This error occurs sometimes when two incompatible types meet: the
-context in which a term is used requires it to have a certain type,
-whereas the term actually has a different type.
+context in which an expression is used requires it to have a certain type,
+whereas the expression actually has a different type.
 
 For example, consider the following:
 
@@ -12,7 +12,7 @@ For example, consider the following:
    Disco> x : N
    Disco> x = 5
    Disco> x(2)
-   Error: the term
+   Error: the expression
      x
    must have both a function type and also the incompatible type
      ℕ.

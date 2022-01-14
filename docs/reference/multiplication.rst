@@ -3,7 +3,7 @@ Multiplication
 
 [This page concerns the ``*`` operator on numbers; for the ``*``
 operator on :doc:`types <types>`, see :doc:`product types
-<producttype>`; for the ``*`` operator on :doc:`graphs <graphs>`, see
+<product-type>`; for the ``*`` operator on :doc:`graphs <graphs>`, see
 :doc:`connect <connect>`.]
 
 All :doc:`numeric types <numeric>` can be multiplied using the ``*``

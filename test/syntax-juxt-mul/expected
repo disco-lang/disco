@@ -2,7 +2,7 @@ Loading juxt-mul.disco...
 Loaded.
 200
 200
-Error: the term
+Error: the expression
   x
 must have both a function type and also the incompatible type
   ℕ.

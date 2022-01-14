@@ -251,7 +251,7 @@ prettyTCError = \case
     , nest 2 (
         text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
       )
-    , rtd "missing-doc"
+    , rtd "no-poly-rec"
     ]
 
   NoError -> empty

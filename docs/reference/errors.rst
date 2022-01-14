@@ -28,3 +28,4 @@ https://github.com/disco-lang/disco/issues !
    wildcard-expr
    num-args-type
    unbound-tyvar
+   no-poly-rec

@@ -18,6 +18,6 @@ not defined.
 - Did you misspell a variable name?
 
 - Did you forget to add the variable as a parameter of the type?  For
-  example, if we want to define a type of polymorphic trees, but write
+  example, if we want to define a type of parameterized trees, but write
   ``type T = Unit + a * T * T``, we would get this error; what we
   should write insitead is ``type T(a) = Unit + a * T(a) * T(a)``.

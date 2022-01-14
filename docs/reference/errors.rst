@@ -27,3 +27,4 @@ https://github.com/disco-lang/disco/issues !
    no-tydef
    wildcard-expr
    num-args-type
+   unbound-tyvar

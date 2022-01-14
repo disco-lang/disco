@@ -243,7 +243,7 @@ prettyTCError = \case
   --     as a parameter
   UnboundTyVar v -> vcat
     [ "Error: Unknown type variable '" <> pretty' v <> "'."
-    , rtd "missing-doc"
+    , rtd "unbound-tyvar"
     ]
 
   NoPolyRec s ss tys -> vcat

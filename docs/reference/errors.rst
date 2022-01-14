@@ -9,3 +9,4 @@ background to help you understand a particular error message.
 
    unbound
    ambiguous
+   missingtype

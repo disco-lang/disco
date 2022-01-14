@@ -155,6 +155,8 @@ prettyTCError = \case
     $+$
     "Try writing something like '" <> pretty' x <+> ": Int' (or whatever the type of"
       <+> pretty' x <+> "should be) first."
+    $+$
+    rtd "missingtype"
 
   NotCon c t ty ->
     vcat

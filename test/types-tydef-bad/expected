@@ -1,2 +1,3 @@
 Loading types-tydef-bad.disco...
 Error: there is no built-in or user-defined type named 'Flerb'.
+https://disco-lang.readthedocs.io/en/latest/reference/no-tydef.html

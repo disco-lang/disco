@@ -216,8 +216,10 @@ prettyTCError = \case
   Unsolvable solveErr -> prettySolveError solveErr
 
   -- XXX maybe include close edit-distance alternatives?
-  NotTyDef s ->
-    "Error: there is no built-in or user-defined type named '" <> text s <> "'."
+  NotTyDef s -> vcat
+    [ "Error: there is no built-in or user-defined type named '" <> text s <> "'."
+    , rtd "no-tydef"
+    ]
 
   NoTWild -> vcat
     [ "Error: wildcards (_) are not allowed in expressions."

@@ -202,7 +202,7 @@ prettyTCError = \case
   -- XXX lots more info!  & Split into several different errors.
   NumPatterns -> vcat
     [ "Error: number of arguments does not match."
-    , rtd "missing-doc"
+    , rtd "num-args"
     ]
 
   NoSearch ty ->

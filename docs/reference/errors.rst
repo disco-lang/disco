@@ -22,3 +22,5 @@ https://github.com/disco-lang/disco/issues !
    dup-def
    dup-tydef
    cyc-ty
+   num-args
+

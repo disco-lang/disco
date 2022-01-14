@@ -16,3 +16,4 @@ background to help you understand a particular error message.
    dup-sig
    dup-def
    dup-tydef
+   cyc-ty

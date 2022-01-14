@@ -194,7 +194,10 @@ prettyTCError = \case
     ]
 
   -- XXX include all types involved in the cycle.
-  CyclicTyDef s -> "Error: cyclic type definition for" <+> text s <> "."
+  CyclicTyDef s -> vcat
+    [ "Error: cyclic type definition for" <+> text s <> "."
+    , rtd "cyc-ty"
+    ]
 
   -- XXX lots more info!  & Split into several different errors.
   NumPatterns -> "Error: number of arguments does not match."

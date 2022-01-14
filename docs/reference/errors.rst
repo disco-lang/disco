@@ -24,3 +24,6 @@ https://github.com/disco-lang/disco/issues !
    cyc-ty
    num-args
    no-search
+   no-tydef
+   wildcard-expr
+

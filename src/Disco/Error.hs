@@ -223,7 +223,7 @@ prettyTCError = \case
 
   NoTWild -> vcat
     [ "Error: wildcards (_) are not allowed in expressions."
-    , rtd "missing-doc"
+    , rtd "wildcard-expr"
     ]
 
   -- XXX say how many are expected, how many there were, what the actual arguments were?

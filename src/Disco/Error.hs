@@ -200,13 +200,17 @@ prettyTCError = \case
     ]
 
   -- XXX lots more info!  & Split into several different errors.
-  NumPatterns -> "Error: number of arguments does not match."
+  NumPatterns -> vcat
+    [ "Error: number of arguments does not match."
+    , rtd "missing-doc"
+    ]
 
   NoSearch ty ->
     vcat
     [ "Error: the type"
     , nest 2 $ pretty' ty
     , "is not searchable (i.e. it cannot be used in a forall)."
+    , rtd "missing-doc"
     ]
 
   Unsolvable solveErr -> prettySolveError solveErr
@@ -215,30 +219,39 @@ prettyTCError = \case
   NotTyDef s ->
     "Error: there is no built-in or user-defined type named '" <> text s <> "'."
 
-  NoTWild ->
-    "Error: wildcards (_) are not allowed in expressions."
+  NoTWild -> vcat
+    [ "Error: wildcards (_) are not allowed in expressions."
+    , rtd "missing-doc"
+    ]
 
   -- XXX say how many are expected, how many there were, what the actual arguments were?
   -- XXX distinguish between built-in and user-supplied type constructors in the error
   --     message?
   -- XXX don't use word "constructor"
-  NotEnoughArgs con ->
-    "Error: not enough arguments supplied to the type constructor '" <> pretty' con <> "'."
+  NotEnoughArgs con -> vcat
+    [ "Error: not enough arguments supplied to the type constructor '" <> pretty' con <> "'."
+    , rtd "missing-doc"
+    ]
 
-  TooManyArgs con ->
-    "Error: too many arguments supplied to the type constructor '" <> pretty' con <> "'."
+  TooManyArgs con -> vcat
+    [ "Error: too many arguments supplied to the type constructor '" <> pretty' con <> "'."
+    , rtd "missing-doc"
+    ]
 
   -- XXX Mention the definition in which it was found, suggest adding the variable
   --     as a parameter
-  UnboundTyVar v ->
-    "Error: Unknown type variable '" <> pretty' v <> "'."
+  UnboundTyVar v -> vcat
+    [ "Error: Unknown type variable '" <> pretty' v <> "'."
+    , rtd "missing-doc"
+    ]
 
-  NoPolyRec s ss tys ->
-    "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
-    $+$
-    nest 2 (
-      text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
-    )
+  NoPolyRec s ss tys -> vcat
+    [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
+    , nest 2 (
+        text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
+      )
+    , rtd "missing-doc"
+    ]
 
   NoError -> empty
 
@@ -259,21 +272,32 @@ prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
 prettySolveError = \case
 
   -- XXX say which types!
-  NoWeakUnifier -> "Error: the shape of two types does not match."
+  NoWeakUnifier -> vcat
+    [ "Error: the shape of two types does not match."
+    , rtd "missing-doc"
+    ]
 
   -- XXX say more!
-  NoUnify       -> "Error: unification failure."
+  NoUnify       -> vcat
+    [ "Error: unification failure."
+    , rtd "missing-doc"
+    ]
 
-  UnqualBase q b ->
-    "Error: values of the base type" <+> pretty' b <+> qualPhrase False q <> "."
+  UnqualBase q b -> vcat
+    [ "Error: values of the base type" <+> pretty' b <+> qualPhrase False q <> "."
+    , rtd "missing-doc"
+    ]
 
-  Unqual q ty ->
-    "Error: values of the type" <+> pretty' ty <+> qualPhrase False q <> "."
+  Unqual q ty -> vcat
+    [ "Error: values of the type" <+> pretty' ty <+> qualPhrase False q <> "."
+    , rtd "missing-doc"
+    ]
 
-  QualSkolem q a ->
-    "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
-    $+$
-    nest 2 (qualPhrase True q) <> "."
+  QualSkolem q a -> vcat
+    [ "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
+    , nest 2 (qualPhrase True q) <> "."
+    , rtd "missing-doc"
+    ]
 
 qualPhrase :: Bool -> Qualifier -> Sem r Doc
 qualPhrase b q

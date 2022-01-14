@@ -1,2 +1,3 @@
 Loading types-tydef-kind.disco...
 Error: not enough arguments supplied to the type constructor 'Foo'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html

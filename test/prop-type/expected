@@ -5,5 +5,8 @@
 ∀x : ℕ, y : ℕ, z : ℕ. x + y + z == x + (y + z) : Prop
 ∃x : ℕ. ∀y : ℕ. x ≤ y : Prop
 Error: unification failure.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: unification failure.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: unification failure.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html

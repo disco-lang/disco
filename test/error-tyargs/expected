@@ -1,7 +1,12 @@
 Loading error-tyargs.disco...
 Loaded.
 Error: not enough arguments supplied to the type constructor 'T'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: not enough arguments supplied to the type constructor 'T'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: too many arguments supplied to the type constructor 'T'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: not enough arguments supplied to the type constructor 'List'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
 Error: too many arguments supplied to the type constructor 'List'.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html

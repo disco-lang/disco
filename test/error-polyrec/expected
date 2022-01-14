@@ -1,3 +1,4 @@
 Loading polyrec.disco...
 Error: in the definition of Bush(a): recursive occurrences of Bush may only have type variables as arguments.
   Bush(a × a) does not follow this rule.
+https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html

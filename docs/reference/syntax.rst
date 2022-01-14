@@ -8,6 +8,7 @@ grammar, but not things like meaning.
 .. toctree::
 
    variable
+   type-sig
    expression
    operator
    comment

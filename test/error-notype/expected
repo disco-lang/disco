@@ -1,2 +1,3 @@
 Error: the definition of x must have an accompanying type signature.
 Try writing something like 'x : Int' (or whatever the type of x should be) first.
+https://disco-lang.readthedocs.io/en/latest/reference/missingtype.html

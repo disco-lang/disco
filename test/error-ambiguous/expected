@@ -5,3 +5,4 @@ Error: the name x is ambiguous. It could refer to:
   a.x
   ambiguous.x
   b.x
+https://disco-lang.readthedocs.io/en/latest/reference/ambiguous.html

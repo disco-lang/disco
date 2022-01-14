@@ -18,3 +18,4 @@ topics just when it is relevant to them.
    numeric
    syntax
    types
+   errors

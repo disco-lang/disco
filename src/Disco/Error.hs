@@ -105,6 +105,9 @@ instance Pretty DiscoError where
         , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
         ]
 
+rtd :: String -> Sem r Doc
+rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
+
 cyclicImportError
   :: Members '[Reader PA, LFresh] r
   => [ModuleName] -> Sem r Doc
@@ -135,7 +138,10 @@ prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = \case
 
   -- XXX include some potential misspellings along with Unbound
-  Unbound x      -> "Error: there is nothing named" <+> pretty' x <> "."
+  Unbound x      -> vcat
+    [ "Error: there is nothing named" <+> pretty' x <> "."
+    , rtd "unbound"
+    ]
 
   Ambiguous x ms ->
     ("Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:")

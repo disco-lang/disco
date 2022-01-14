@@ -143,30 +143,30 @@ prettyTCError = \case
     , rtd "unbound"
     ]
 
-  Ambiguous x ms ->
-    ("Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:")
-    $+$
-    nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
-    $+$
-    rtd "ambiguous"
+  Ambiguous x ms -> vcat
+    [ "Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:"
+    , nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
+    , rtd "ambiguous"
+    ]
 
-  NoType x ->
-    "Error: the definition of" <+> pretty' x <+> "must have an accompanying type signature."
-    $+$
-    "Try writing something like '" <> pretty' x <+> ": Int' (or whatever the type of"
+  NoType x -> vcat
+    [ "Error: the definition of" <+> pretty' x <+> "must have an accompanying type signature."
+    , "Try writing something like '" <> pretty' x <+> ": Int' (or whatever the type of"
       <+> pretty' x <+> "should be) first."
-    $+$
-    rtd "missingtype"
+    , rtd "missingtype"
+    ]
 
-  NotCon c t ty ->
-    vcat
-      [ "Error: the term"
-      , nest 2 $ pretty' t
-      , "must have both a" <+> conWord c <+> "type and also the incompatible type"
-      , nest 2 $ pretty' ty <> "."
-      ]
+  NotCon c t ty -> vcat
+    [ "Error: the term"
+    , nest 2 $ pretty' t
+    , "must have both a" <+> conWord c <+> "type and also the incompatible type"
+    , nest 2 $ pretty' ty <> "."
+    ]
 
-  EmptyCase -> "Error: empty case expressions {? ?} are not allowed."
+  EmptyCase -> vcat
+    [ "Error: empty case expressions {? ?} are not allowed."
+    , rtd "empty-case"
+    ]
 
   PatternType c pat ty ->
     vcat

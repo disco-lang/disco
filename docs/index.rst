@@ -7,7 +7,7 @@ Documentation for the Disco Language
 ====================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
-   tutorial/index
    reference/index
+   tutorial/index

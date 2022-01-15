@@ -1,3 +1,3 @@
 Loading unqualbase.disco...
-Error: values of the base type ℕ cannot be subtracted.
-https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
+Error: values of type ℕ cannot be subtracted.
+https://disco-lang.readthedocs.io/en/latest/reference/not-qual.html

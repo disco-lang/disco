@@ -31,3 +31,5 @@ https://github.com/disco-lang/disco/issues !
    no-poly-rec
    shape-mismatch
    typecheck-fail
+   not-qual
+

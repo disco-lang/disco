@@ -285,13 +285,13 @@ prettySolveError = \case
     ]
 
   UnqualBase q b -> vcat
-    [ "Error: values of the base type" <+> pretty' b <+> qualPhrase False q <> "."
-    , rtd "missing-doc"
+    [ "Error: values of type" <+> pretty' b <+> qualPhrase False q <> "."
+    , rtd "not-qual"
     ]
 
   Unqual q ty -> vcat
-    [ "Error: values of the type" <+> pretty' ty <+> qualPhrase False q <> "."
-    , rtd "missing-doc"
+    [ "Error: values of type" <+> pretty' ty <+> qualPhrase False q <> "."
+    , rtd "not-qual"
     ]
 
   QualSkolem q a -> vcat

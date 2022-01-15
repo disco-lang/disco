@@ -297,7 +297,7 @@ prettySolveError = \case
   QualSkolem q a -> vcat
     [ "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
     , nest 2 (qualPhrase True q) <> "."
-    , rtd "missing-doc"
+    , rtd "qual-skolem"
     ]
 
 qualPhrase :: Bool -> Qualifier -> Sem r Doc

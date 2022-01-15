@@ -32,4 +32,4 @@ https://github.com/disco-lang/disco/issues !
    shape-mismatch
    typecheck-fail
    not-qual
-
+   qual-skolem

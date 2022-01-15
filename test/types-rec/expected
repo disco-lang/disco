@@ -1,5 +1,5 @@
 Loading types-rec.disco...
 Loading product.disco...
 Loaded.
-Error: unification failure.
-https://disco-lang.readthedocs.io/en/latest/reference/missing-doc.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

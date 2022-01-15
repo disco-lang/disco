@@ -30,3 +30,4 @@ https://github.com/disco-lang/disco/issues !
    unbound-tyvar
    no-poly-rec
    shape-mismatch
+   typecheck-fail

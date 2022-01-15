@@ -278,10 +278,10 @@ prettySolveError = \case
     , rtd "shape-mismatch"
     ]
 
-  -- XXX say more!
+  -- XXX say more!  XXX HIGHEST PRIORITY!
   NoUnify       -> vcat
-    [ "Error: unification failure."
-    , rtd "missing-doc"
+    [ "Error: typechecking failed."
+    , rtd "typecheck-fail"
     ]
 
   UnqualBase q b -> vcat

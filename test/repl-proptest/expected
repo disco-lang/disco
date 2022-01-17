@@ -1,4 +1,4 @@
-  - Test passed: ¬false
+  - Test passed: not false
   - Test passed: {1, 2} =!= {2, 1}
   - Test passed: ∃a, b. (a and b) =!= (a or b)
     Found example:

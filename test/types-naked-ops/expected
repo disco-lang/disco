@@ -2,4 +2,4 @@
 ~! : ℕ → ℕ
 ~mod~ : ℤ × ℤ → ℤ
 ~+~ : ℕ × ℕ → ℕ
-¬~ : Bool → Bool
+not~ : Bool → Bool

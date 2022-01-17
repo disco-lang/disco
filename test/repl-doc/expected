@@ -26,7 +26,7 @@ n! computes the factorial of n, that is, 1 * 2 * ... * n.
 
 https://disco-lang.readthedocs.io/en/latest/reference/factorial.html
 
-¬~ : Bool → Bool
+not~ : Bool → Bool
 precedence level 15
 
 Logical negation: ¬true = false and ¬false = true.  Also written 'not'.

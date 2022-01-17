@@ -21,6 +21,16 @@ you should skip to the instructions below about building with stack.
   [instructions here](https://www.haskell.org/ghcup/install/) for a
   PowerShell command to run.
 - Now run `cabal install disco` at a command prompt.
+- If it works, you should be able to now type `disco` at a command
+  prompt, which should display a message like this:
+
+    ```
+    Welcome to Disco!
+
+    A language for programming discrete mathematics.
+
+    Disco>
+    ```
 
 If you encounter any difficulties, please let me know --- either come
 talk to me or [open a GitHub
@@ -96,4 +106,3 @@ stack test --fast --file-watch --ghc-options='-Wall'
 which will turn on warnings, turn off optimizations for a faster
 edit-compile-test cycle, and automatically recompile and run the test
 suite every time a source file changes.
-

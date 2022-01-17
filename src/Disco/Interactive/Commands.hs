@@ -28,6 +28,7 @@ import           Control.Monad.Except
 import           Data.Char                        (isSpace)
 import           Data.Coerce
 import           Data.List                        (find, isPrefixOf, sortBy)
+import           Data.Map                         ((!))
 import qualified Data.Map                         as M
 import           Data.Typeable
 import           Prelude                          as P
@@ -385,10 +386,18 @@ handleDoc (Doc (Left x)) = do
         _                           -> Pretty.empty
 handleDoc (Doc (Right prim)) = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  info $ case prim of
-    PrimUOp uo -> describePrec (uPrec uo)
-    PrimBOp bo -> describePrec (bPrec bo) <> describeFixity (assoc bo)
-    _          -> Pretty.empty
+  info $ vcat
+    [ case prim of
+        PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
+          where
+            OpInfo (UOpF f _) syns _ = uopMap ! u
+        PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
+        _         -> Pretty.empty
+    , case prim of
+        PrimUOp u -> describePrec (uPrec u)
+        PrimBOp b -> describePrec (bPrec b) <> describeFixity (assoc b)
+        _         -> Pretty.empty
+    ]
   case (M.lookup prim primDoc, M.lookup prim primReference) of
     (Nothing, Nothing) -> return ()
     (Nothing, Just p)  -> info $ mkReference p
@@ -399,6 +408,16 @@ handleDoc (Doc (Right prim)) = do
     describeFixity In  = Pretty.empty
     describeFixity InL = ", left associative"
     describeFixity InR = ", right associative"
+    describeAlts _ _ []            = Pretty.empty
+    describeAlts _ _ [_]           = Pretty.empty
+    describeAlts pre post (_:alts) = "Alternative syntax:" <+> intercalate "," (map showOp alts)
+      where
+        showOp op = hcat
+          [ if pre then "~" else Pretty.empty
+          , text op
+          , if post then "~" else Pretty.empty]
+
+
     mkReference p =
       "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
 

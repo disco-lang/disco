@@ -45,8 +45,8 @@ Design principles
   experience. (However, this principle is, as of yet, only
   that---there is no tooling or nice error messages to speak of.)
 
-Feel free to look around, ask questions, etc.  You can even contribute
-some code if you like---collaborators are most welcome.
+Feel free to look around, ask questions, etc.  You can also
+[contribute](CONTRIBUTING.md)---collaborators are most welcome.
 
 Community
 ---------
@@ -59,6 +59,12 @@ Documentation
 
 Documentation is [hosted on
 readthedocs.io](http://disco-lang.readthedocs.io/en/latest/).
+
+Contributing
+------------
+
+If you'd like to contribute to disco development, check out
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 Building with stack
 -------------------

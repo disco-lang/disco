@@ -434,21 +434,21 @@ library
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
 
-  build-depends:       base >=4.8 && <4.16,
+  build-depends:       base >=4.8 && <4.17,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 9.1,
+                       megaparsec >= 6.1.1 && < 9.3,
                        parser-combinators >= 1.0.0 && < 1.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
-                       transformers >= 0.4 && < 0.6,
+                       transformers >= 0.4 && < 0.7,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       polysemy >= 1.6.0.0 && < 1.7,
+                       polysemy >= 1.6.0.0 && < 1.8,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.8,
-                       lens >= 4.14 && < 5.1,
+                       lens >= 4.14 && < 5.2,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.13,
                        integer-logarithms >= 1.0 && < 1.1,
@@ -476,11 +476,11 @@ executable disco
                        filepath,
                        haskeline >=0.8 && <0.9,
                        mtl >=2.2 && <2.3,
-                       transformers >= 0.4 && < 0.6,
-                       megaparsec >= 6.1.1 && < 9.1,
+                       transformers >= 0.4 && < 0.7,
+                       megaparsec >= 6.1.1 && < 9.3,
                        containers >= 0.5 && < 0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 5.1,
+                       lens >= 4.14 && < 5.2,
                        optparse-applicative >= 0.12 && < 0.17,
                        oeis >= 0.3.10
 
@@ -492,7 +492,7 @@ test-suite disco-tests
   main-is: Tests.hs
   hs-source-dirs: test
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.16,
+  build-depends:    base >= 4.7 && < 4.17,
                     tasty >= 0.10 && < 1.5,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
@@ -508,7 +508,7 @@ test-suite disco-examples
   main-is: TestExamples.hs
   hs-source-dirs: example
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.16,
+  build-depends:    base >= 4.7 && < 4.17,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

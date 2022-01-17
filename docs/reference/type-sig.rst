@@ -1,9 +1,9 @@
 Type signature
 ==============
 
-A *type signature* declares what :doc:`type <types>` a variable has.
-It consists of a variable name, a colon, and a type on one line
-together.  For example,
+A *type signature* declares what :doc:`type <types>` a :doc:`variable
+<variable>` has.  It consists of a variable name, a colon, and a type
+on one line together.  For example,
 
 ::
 

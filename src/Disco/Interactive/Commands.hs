@@ -385,12 +385,20 @@ handleDoc (Doc (Left x)) = do
         _                           -> Pretty.empty
 handleDoc (Doc (Right prim)) = do
   handleTypeCheck (TypeCheck (TPrim prim))
+  info $ case prim of
+    PrimUOp uo -> describePrec (uPrec uo)
+    PrimBOp bo -> describePrec (bPrec bo) <> describeFixity (assoc bo)
+    _          -> Pretty.empty
   case (M.lookup prim primDoc, M.lookup prim primReference) of
     (Nothing, Nothing) -> return ()
     (Nothing, Just p)  -> info $ mkReference p
     (Just d, mp)  ->
       info $ "" $+$ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
   where
+    describePrec p = "precedence level" <+> text (show p)
+    describeFixity In  = Pretty.empty
+    describeFixity InL = ", left associative"
+    describeFixity InR = ", right associative"
     mkReference p =
       "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
 

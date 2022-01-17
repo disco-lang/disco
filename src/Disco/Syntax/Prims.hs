@@ -182,7 +182,8 @@ primMap = M.fromList $
 --   to be shown by the :doc command.
 primDoc :: Map Prim String
 primDoc = M.fromList
-  [ PrimBOp Add  ==> "The sum of two numbers, types, or graphs."
+  [ PrimUOp Neg ==> "Arithmetic negation."
+  , PrimBOp Add  ==> "The sum of two numbers, types, or graphs."
   , PrimBOp Sub  ==> "The difference of two numbers."
   , PrimBOp SSub ==> "The difference of two numbers, with a lower bound of 0."
   , PrimBOp Mul  ==> "The product of two numbers, types, or graphs."
@@ -195,6 +196,16 @@ primDoc = M.fromList
   , PrimCeil     ==> "ceiling(x) is the smallest integer which is >= x."
   , PrimAbs      ==> "abs(x) is the absolute value of x.  Also written |x|."
   , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
+  , PrimBOp And  ==> "Logical conjunction (and): true and true = true; otherwise x and y = false."
+  , PrimBOp Or   ==> "Logical disjunction (or): false or false = false; otherwise x or y = true."
+  , PrimBOp Impl ==> "Logical implication (implies): true ==> false = false; otherwise x ==> y = true."
+  , PrimBOp Eq   ==> "Equality test.  x == y is true if x and y are equal."
+  , PrimBOp Neq  ==> "Inequality test.  x /= y is true if x and y are unequal."
+  , PrimBOp Lt   ==> "Less-than test. x < y is true if x is less than (but not equal to) y."
+  , PrimBOp Gt   ==> "Greater-than test. x > y is true if x is greater than (but not equal to) y."
+  , PrimBOp Leq  ==> "Less-than-or-equal test. x <= y is true if x is less than or equal to y."
+  , PrimBOp Geq  ==> "Greater-than-or-equal test. x >= y is true if x is greater than or equal to y."
+
   ]
 
 -- | A map from some primitives to their corresponding page in the

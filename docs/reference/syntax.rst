@@ -12,6 +12,7 @@ grammar, but not things like meaning.
    expression
    definition
    operator
+   precedence
    comment
    docs
    tydef

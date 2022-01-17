@@ -13,7 +13,8 @@ and :doc:`logical negation <not>` (``¬`` or ``not``) are written in front of th
 one argument, and :doc:`factorial <factorial>` (``!``) is written after its argument.
 
 When multiple operators are used together, Disco uses their
-:doc:`precedence <precedence>` to decide how to interpret it.
+:doc:`precedence and associativity <precedence>` to decide how to
+interpret it.
 
 Twiddle notation
 ----------------

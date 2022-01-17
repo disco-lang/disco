@@ -31,7 +31,7 @@ zoom l = interpret \case
   Put a -> modify (l .~ a)
 
 use :: Member (State s) r => Getter s a -> Sem r a
-use = gets . view
+use g = gets (view g)
 
 infix 4 .=, %=
 

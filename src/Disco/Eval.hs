@@ -182,7 +182,7 @@ inputSettings =
 
 -- | Run a top-level computation.
 runDisco :: DiscoConfig -> (forall r. Members DiscoEffects r => Sem r ()) -> IO ()
-runDisco cfg =
+runDisco cfg m =
   void
     . H.runInputT inputSettings
     . runFinal @(H.InputT IO)
@@ -198,6 +198,7 @@ runDisco cfg =
     . mapError EvalErr                      -- Embed runtime errors into top-level error type
     . failToError Panic                     -- Turn pattern-match failures into a Panic error
     . runReader emptyCtx                    -- Keep track of current Env
+    $ m
   where
     msgFilter
       | cfg ^. debugMode = const True

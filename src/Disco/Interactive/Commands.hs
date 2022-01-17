@@ -273,7 +273,7 @@ annCmd =
       shortHelp = "Show type-annotated typechecked term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleAnn,
+      action = \x -> inputToState @TopInfo . handleAnn $ x,
       parser = Ann <$> term
     }
 
@@ -296,7 +296,7 @@ compileCmd =
       shortHelp = "Show a compiled term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleCompile,
+      action = \x -> inputToState @TopInfo . handleCompile $ x,
       parser = Compile <$> term
     }
 
@@ -319,7 +319,7 @@ desugarCmd =
       shortHelp = "Show a desugared term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleDesugar,
+      action = \x -> inputToState @TopInfo . handleDesugar $ x,
       parser = Desugar <$> term
     }
 
@@ -342,7 +342,7 @@ docCmd =
       shortHelp = "Show documentation",
       category = User,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleDoc,
+      action = \x -> inputToState @TopInfo . handleDoc $ x,
       parser = Doc <$> parseDoc
     }
 
@@ -431,7 +431,7 @@ evalCmd = REPLCommand
   , shortHelp = "Evaluate a block of code"
   , category  = User
   , cmdtype   = BuiltIn
-  , action    = handleEval
+  , action    = \x -> handleEval x
   , parser    = Eval <$> wholeModule REPL
   }
 
@@ -470,7 +470,7 @@ helpCmd =
       shortHelp = "Show help",
       category = User,
       cmdtype = ColonCmd,
-      action = handleHelp,
+      action = \x -> handleHelp x,
       parser = return Help
     }
 
@@ -504,7 +504,7 @@ loadCmd =
       shortHelp = "Load a file",
       category = User,
       cmdtype = ColonCmd,
-      action = handleLoadWrapper,
+      action = \x -> handleLoadWrapper x,
       parser = Load <$> fileParser
     }
 
@@ -583,7 +583,7 @@ namesCmd =
       shortHelp = "Show all names in current scope",
       category = User,
       cmdtype = ColonCmd,
-      action = inputToState . handleNames,
+      action = \x -> inputToState . handleNames $ x,
       parser = return Names
     }
 
@@ -613,7 +613,7 @@ nopCmd =
       shortHelp = "No-op, e.g. if the user just enters a comment",
       category = Dev,
       cmdtype = BuiltIn,
-      action = handleNop,
+      action = \x -> handleNop x,
       parser = Nop <$ (sc <* eof)
     }
 
@@ -631,7 +631,7 @@ parseCmd =
       shortHelp = "Show the parsed AST",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handleParse,
+      action = \x -> handleParse x,
       parser = Parse <$> term
     }
 
@@ -649,7 +649,7 @@ prettyCmd =
       shortHelp = "Pretty-print a term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = handlePretty,
+      action = \x -> handlePretty x,
       parser = Pretty <$> term
     }
 
@@ -667,7 +667,7 @@ reloadCmd =
       shortHelp = "Reloads the most recently loaded file",
       category = User,
       cmdtype = ColonCmd,
-      action = handleReload,
+      action = \x -> handleReload x,
       parser = return Reload
     }
 
@@ -692,7 +692,7 @@ showDefnCmd =
       shortHelp = "Show a variable's definition",
       category = User,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleShowDefn,
+      action = \x -> inputToState @TopInfo . handleShowDefn $ x,
       parser = ShowDefn <$> (sc *> ident)
     }
 
@@ -725,7 +725,7 @@ testPropCmd =
       shortHelp = "Test a property using random examples",
       category = User,
       cmdtype = ColonCmd,
-      action = handleTest,
+      action = \x -> handleTest x,
       parser = TestProp <$> term
     }
 
@@ -751,7 +751,7 @@ typeCheckCmd =
       shortHelp = "Typecheck a term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleTypeCheck,
+      action = \x -> inputToState @TopInfo . handleTypeCheck $ x,
       parser = parseTypeCheck
     }
 

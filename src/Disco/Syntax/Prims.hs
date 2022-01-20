@@ -198,7 +198,7 @@ primDoc = M.fromList
   , PrimUOp Not  ==> "Logical negation: ¬true = false and ¬false = true.  Also written 'not'."
   , PrimBOp And  ==> "Logical conjunction (and): true and true = true; otherwise x and y = false."
   , PrimBOp Or   ==> "Logical disjunction (or): false or false = false; otherwise x or y = true."
-  , PrimBOp Impl ==> "Logical implication (implies): true ==> false = false; otherwise x ==> y = true."
+  , PrimBOp Impl ==> "Logical implication (implies): true -> false = false; otherwise x -> y = true."
   , PrimBOp Eq   ==> "Equality test.  x == y is true if x and y are equal."
   , PrimBOp Neq  ==> "Inequality test.  x /= y is true if x and y are unequal."
   , PrimBOp Lt   ==> "Less-than test. x < y is true if x is less than (but not equal to) y."

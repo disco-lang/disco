@@ -169,7 +169,7 @@ opTable =
     ]
   , [ bopInfo InR  Or      ["or", "∨", "||"]
     ]
-  , [ bopInfo InR Impl     ["==>", "implies"]
+  , [ bopInfo InR Impl     ["->", "==>", "implies"]
     ]
   ]
   where

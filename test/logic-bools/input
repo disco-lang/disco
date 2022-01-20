@@ -7,11 +7,13 @@ true and false
 false and true
 false and false
 true && false
+true /\ false
 true or true
 true or false
 false or true
 false or false
 true || false
+true \/ false
 not true
 not false
 true ==> true

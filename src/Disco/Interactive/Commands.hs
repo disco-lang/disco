@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE PatternSynonyms    #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
@@ -71,7 +72,7 @@ import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
                                                    toPrim)
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
-import           Disco.Types                      (toPolyType)
+import           Disco.Types                      (pattern TyString, toPolyType)
 import           Disco.Value
 
 ------------------------------------------------------------
@@ -87,6 +88,7 @@ data REPLExpr :: CmdTag -> * where
   ShowDefn  :: Name Term -> REPLExpr 'CShowDefn  -- Show a variable's definition
   Parse     :: Term      -> REPLExpr 'CParse     -- Show the parsed AST
   Pretty    :: Term      -> REPLExpr 'CPretty    -- Pretty-print a term
+  Print     :: Term      -> REPLExpr 'CPrint     -- Print a string
   Ann       :: Term      -> REPLExpr 'CAnn       -- Show type-annotated term
   Desugar   :: Term      -> REPLExpr 'CDesugar   -- Show a desugared term
   Compile   :: Term      -> REPLExpr 'CCompile   -- Show a compiled term
@@ -130,6 +132,7 @@ data CmdTag
   | CShowDefn
   | CParse
   | CPretty
+  | CPrint
   | CAnn
   | CDesugar
   | CCompile
@@ -208,6 +211,7 @@ discoCommands =
     SomeCmd nopCmd,
     SomeCmd parseCmd,
     SomeCmd prettyCmd,
+    SomeCmd printCmd,
     SomeCmd reloadCmd,
     SomeCmd showDefnCmd,
     SomeCmd typeCheckCmd,
@@ -441,16 +445,17 @@ handleEval
 handleEval (Eval m) = do
   mi <- inputToState @TopInfo $ loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
   addToREPLModule mi
-  forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm . fst)
+  forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm True . fst)
   -- garbageCollect?
 
-evalTerm :: Members (Error EvalError ': State TopInfo ': Output Message ': EvalEffects) r => ATerm -> Sem r Value
-evalTerm at = do
+-- First argument = should the value be printed?
+evalTerm :: Members (Error EvalError ': State TopInfo ': Output Message ': EvalEffects) r => Bool -> ATerm -> Sem r Value
+evalTerm pr at = do
   env <- use @TopInfo topEnv
   v <- runInputConst env $ eval (compileTerm at)
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
-  info $ runInputConst tydefs $ prettyValue' ty v
+  when pr $ info $ runInputConst tydefs $ prettyValue' ty v
 
   modify @TopInfo $
     (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
@@ -655,6 +660,31 @@ prettyCmd =
 
 handlePretty :: Members '[LFresh, Output Message] r => REPLExpr 'CPretty -> Sem r ()
 handlePretty (Pretty t) = info $ pretty' t
+
+------------------------------------------------------------
+-- :print
+
+printCmd :: REPLCommand 'CPrint
+printCmd =
+  REPLCommand
+    { name = "print",
+      helpcmd = ":print <expr>",
+      shortHelp = "Print a string without the double quotes, interpreting special characters",
+      category = User,
+      cmdtype = ColonCmd,
+      action = \x -> handlePrint x,
+      parser = Print <$> term
+    }
+
+handlePrint :: Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r => REPLExpr 'CPrint -> Sem r ()
+handlePrint (Print t) = do
+  (at, _) <- inputToState . typecheckTop $ inferTop t
+  let ty = getType at
+  case ty of
+    TyString -> do
+      v <- mapError EvalErr . evalTerm False $ at
+      info $ text (vlist vchar v)
+    _        -> err $ "Argument to :print must have type List(Char), not" <+> pretty' ty
 
 ------------------------------------------------------------
 -- :reload

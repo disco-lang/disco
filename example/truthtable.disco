@@ -1,23 +1,19 @@
+import string
+
+||| Print a truth table for a binary boolean operation.  Intended to be used with
+||| the :print command, as in
+|||
+|||   :print truthtable(~/\~)
+!!! truthtable(~/\~) == "| F | F | F |\n| F | T | F |\n| T | F | F |\n| T | T | T |"
 truthtable : (Bool * Bool -> Bool) -> List(Char)
 truthtable(op) =
-  unlines [ fmtrow(x,y,op(x,y)) | x <- enumerate(Bool), y <- enumerate(Bool) ]
+  unlines [ fmtrow [x,y,op(x,y)] | x <- enumerate(Bool), y <- enumerate(Bool) ]
 
-unlines : List(List(Char)) -> List(Char)
-unlines([]) = []
-unlines([l]) = l
-unlines(l :: ls) = append(l, append("\n", unlines(ls)))
-
-fmtrow : Bool * Bool * Bool -> List(Char)
-fmtrow(x,y,r) = concat
-  [ "| "
-  , fmtbool(x)
-  , " | "
-  , fmtbool(y)
-  , " | "
-  , fmtbool(r)
-  , " |"
-  ]
+||| Format a row of Boolean values with intervening | characters.
+!!! fmtrow [true, false, false, true] == "| T | F | F | T |"
+fmtrow : List(Bool) -> List(Char)
+fmtrow(bs) = append("|", concat([ append(fmtbool(b), " |") | b <- bs ]))
 
 fmtbool : Bool -> List(Char)
-fmtbool(true) = "T"
-fmtbool(false) = "F"
+fmtbool(true) = " T"
+fmtbool(false) = " F"

@@ -6,6 +6,7 @@ Commands available from the prompt:
 :help             Show help
 :load <filename>  Load a file
 :names            Show all names in current scope
+:print <expr>     Print a string without the double quotes, interpreting special characters
 :reload           Reloads the most recently loaded file
 :test <property>  Test a property using random examples
 

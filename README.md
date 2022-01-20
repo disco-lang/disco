@@ -20,7 +20,32 @@ you should skip to the instructions below about building with stack.
   (if you don't know what that is, then you don't have it), see the
   [instructions here](https://www.haskell.org/ghcup/install/) for a
   PowerShell command to run.
+    - If you use PowerShell, note that after running the magic
+      PowerShell command to set up `ghcup`, you need to close and
+      reopen PowerShell in order for it to recognize the `cabal`
+      command.
+
+- Run `cabal update`, which will download the latest information about
+  Haskell packages.
+
 - Now run `cabal install disco` at a command prompt.
+
+    - Note that this may take a very long time, on the order of an
+      hour or so.
+    - The good news is that most of this work only needs to be done
+      once, even if you later install an updated version of disco.
+      Even if installation fails partway through, the work already
+      completed up to that point need not be redone.
+    - On OSX, if building fails with an error like `ghc: could not
+      execute: opt`, it means you need to install LLVM.  The easiest
+      way to do this is to first [follow the instructions to install
+      Homebrew](https://brew.sh/) (if you don't already have it), and
+      then type
+
+          brew install llvm
+
+      at a terminal prompt.
+
 - If it works, you should be able to now type `disco` at a command
   prompt, which should display a message like this:
 
@@ -31,6 +56,21 @@ you should skip to the instructions below about building with stack.
 
     Disco>
     ```
+
+- If installation seems like it succeeded but the `disco` command is
+  not recognized, it may be an issue with your path environment
+  variable settings.  Try running `disco` using an explicit path:
+    - `~/.cabal/bin/disco` on Linux or OSX
+    - `C:\cabal\bin\disco` on Windows
+    - If those don't work, poke around and see if you can figure
+      out where the `cabal/bin` folder is on your computer, and
+      run `disco` from there.
+    - If you wish, you may add the `cabal/bin` folder (wherever it is
+      located) to your `Path` (Windows) or `PATH` (Linux/OSX)
+      environment variable, so that you can run disco simply by typing
+      `disco`.  However, this step is optional.
+
+
 
 If you encounter any difficulties, please let me know --- either come
 talk to me or [open a GitHub

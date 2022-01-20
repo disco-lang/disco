@@ -1,0 +1,23 @@
+truthtable : (Bool * Bool -> Bool) -> List(Char)
+truthtable(op) =
+  unlines [ fmtrow(x,y,op(x,y)) | x <- enumerate(Bool), y <- enumerate(Bool) ]
+
+unlines : List(List(Char)) -> List(Char)
+unlines([]) = []
+unlines([l]) = l
+unlines(l :: ls) = append(l, append("\n", unlines(ls)))
+
+fmtrow : Bool * Bool * Bool -> List(Char)
+fmtrow(x,y,r) = concat
+  [ "| "
+  , fmtbool(x)
+  , " | "
+  , fmtbool(y)
+  , " | "
+  , fmtbool(r)
+  , " |"
+  ]
+
+fmtbool : Bool -> List(Char)
+fmtbool(true) = "T"
+fmtbool(false) = "F"

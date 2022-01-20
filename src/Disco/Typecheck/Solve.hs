@@ -67,6 +67,7 @@ data SolveError where
   NoUnify       :: SolveError
   UnqualBase    :: Qualifier -> BaseTy    -> SolveError
   Unqual        :: Qualifier -> Type      -> SolveError
+  UnqualUser    :: Qualifier -> Type      -> SolveError
   QualSkolem    :: Qualifier -> Name Type -> SolveError
   deriving Show
 

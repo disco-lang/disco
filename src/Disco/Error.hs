@@ -108,6 +108,9 @@ instance Pretty DiscoError where
 rtd :: String -> Sem r Doc
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
 
+issue :: Int -> Sem r Doc
+issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
+
 cyclicImportError
   :: Members '[Reader PA, LFresh] r
   => [ModuleName] -> Sem r Doc
@@ -292,6 +295,13 @@ prettySolveError = \case
   Unqual q ty -> vcat
     [ "Error: values of type" <+> pretty' ty <+> qualPhrase False q <> "."
     , rtd "not-qual"
+    ]
+
+  UnqualUser q ty -> vcat
+    [ "Error: don't know whether values of type" <+> pretty' ty <+> qualPhrase True q <> "."
+    , "  Disco cannot currently check whether user-defined types satisfy a qualifier,"
+    , "  but there's no theretical reason for this; someone just needs to write the code!"
+    , issue 317
     ]
 
   QualSkolem q a -> vcat

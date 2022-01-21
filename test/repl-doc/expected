@@ -32,5 +32,5 @@ precedence level 15
 
 Logical negation: not(true) = false and not(false) = true.
 
-https://disco-lang.readthedocs.io/en/latest/reference/not.html
+https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
 

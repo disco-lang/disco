@@ -43,6 +43,7 @@ import           Disco.Effects.Fresh
 import           Disco.Effects.State
 import           Polysemy
 import           Polysemy.Error
+import           Polysemy.Input
 import           Polysemy.Output
 
 import           Disco.Messages
@@ -67,7 +68,6 @@ data SolveError where
   NoUnify       :: SolveError
   UnqualBase    :: Qualifier -> BaseTy    -> SolveError
   Unqual        :: Qualifier -> Type      -> SolveError
-  UnqualUser    :: Qualifier -> Type      -> SolveError
   QualSkolem    :: Qualifier -> Name Type -> SolveError
   deriving Show
 
@@ -231,9 +231,9 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 -- Top-level solver algorithm
 
 solveConstraint
-  :: Members '[Fresh, Error SolveError, Output Message] r
-  => TyDefCtx -> Constraint -> Sem r S
-solveConstraint tyDefns c = do
+  :: Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r
+  => Constraint -> Sem r S
+solveConstraint c = do
 
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers; also expand disjunctions.  Result in a
@@ -250,15 +250,17 @@ solveConstraint tyDefns c = do
 
   -- Now try continuing with each set and pick the first one that has
   -- a solution.
-  asum' (map (uncurry (solveConstraintChoice tyDefns)) qcList)
+  asum' (map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice
-  :: Members '[Fresh, Error SolveError, Output Message] r
-  => TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> Sem r S
-solveConstraintChoice tyDefns quals cs = do
+  :: Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r
+  => TyVarInfoMap -> [SimpleConstraint] -> Sem r S
+solveConstraintChoice quals cs = do
 
   debugPretty quals
   debug $ vcat (map pretty' cs)
+
+  tyDefns <- input @TyDefCtx
 
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
@@ -274,7 +276,7 @@ solveConstraintChoice tyDefns quals cs = do
   debug "------------------------------"
   debug "Running simplifier..."
 
-  (vm, atoms, theta_simp) <- simplify tyDefns quals cs
+  (vm, atoms, theta_simp) <- simplify quals cs
   debug "Done running simplifier. Results:"
 
   debugPretty vm
@@ -307,7 +309,7 @@ solveConstraintChoice tyDefns quals cs = do
   debug "------------------------------"
   debug "Checking WCCs for skolems..."
 
-  (g', theta_skolem) <- checkSkolems tyDefns vm g
+  (g', theta_skolem) <- checkSkolems vm g
   debugPretty theta_skolem
 
   -- We don't need to ensure that theta_skolem respects sorts since
@@ -373,7 +375,7 @@ solveConstraintChoice tyDefns quals cs = do
 -- Step 1. Constraint decomposition.
 
 decomposeConstraint
-  :: Members '[Fresh, Error SolveError] r
+  :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
   => Constraint -> Sem r [(TyVarInfoMap, [SimpleConstraint])]
 decomposeConstraint (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
 decomposeConstraint (CEq  t1 t2) = return [(mempty, [t1 :=: t2])]
@@ -392,16 +394,37 @@ decomposeConstraint (CAll ty)    = do
 decomposeConstraint (COr cs)     = concat <$> filterErrors (map decomposeConstraint cs)
 
 decomposeQual
-  :: Members '[Fresh, Error SolveError] r
+  :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
   => Type -> Qualifier -> Sem r TyVarInfoMap
-decomposeQual (TyAtom a) q             = checkQual q a
-  -- XXX Really we should be able to check by induction whether a
-  -- user-defined type has a certain sort.
-decomposeQual ty@(TyCon (CUser _) _) q = throw $ Unqual q ty
-decomposeQual ty@(TyCon c tys) q
-  = case qualRules c q of
+decomposeQual = go S.empty
+  where
+    go :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
+       => Set (String, [Type], Qualifier) -> Type -> Qualifier -> Sem r TyVarInfoMap
+
+    -- For a type atom, call out to checkQual.
+    go _ (TyAtom a) q = checkQual q a
+
+    -- Coinductively check user-defined types for a qualifier.  Keep
+    -- track of a set of user-defined types and qualifiers we have
+    -- seen.  Every time we encounter a new one, add it to the set and
+    -- recurse on its unfolding.  If we ever encounter one we have
+    -- already seen, we can assume by coinduction that the qualifier
+    -- is satisfied.
+    go seen (TyCon (CUser t) tys) q = do
+      case (t, tys, q) `S.member` seen of
+        True -> return mempty
+        False -> do
+          tyDefns <- input @TyDefCtx
+          case M.lookup t tyDefns of
+            Nothing  -> error $ show t ++ " not in ty defn map!!"
+            Just (TyDefBody _ body) -> do
+              let ty' = body tys
+              go (S.insert (t, tys, q) seen) ty' q
+
+    -- Otherwise, decompose a type constructor according to the qualRules.
+    go seen ty@(TyCon c tys) q = case qualRules c q of
       Nothing -> throw $ Unqual q ty
-      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . decomposeQual) tys qs
+      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . go seen) tys qs
 
 checkQual
   :: Members '[Fresh, Error SolveError] r
@@ -428,9 +451,9 @@ checkQual q (ABase bty)  =
 --   (b <: v), where v is a type variable and b is a base type.
 
 simplify
-  :: Members '[Error SolveError, Output Message] r
-  => TyDefCtx -> TyVarInfoMap -> [SimpleConstraint] -> Sem r (TyVarInfoMap, [(Atom, Atom)], S)
-simplify tyDefns origVM cs
+  :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
+  => TyVarInfoMap -> [SimpleConstraint] -> Sem r (TyVarInfoMap, [(Atom, Atom)], S)
+simplify origVM cs
   = (\(SS vm' cs' s' _) -> (vm', map extractAtoms cs', s'))
   -- contFreshMT :: Monad m => FreshMT m a -> Integer -> m a
   -- "Run a FreshMT computation given a starting index for fresh name generation."
@@ -457,7 +480,7 @@ simplify tyDefns origVM cs
     -- Iterate picking one simplifiable constraint and simplifying it
     -- until none are left.
     simplify'
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Output Message] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Output Message, Input TyDefCtx] r
       => Sem r ()
     simplify' = do
       -- q <- gets fst
@@ -518,7 +541,7 @@ simplify tyDefns origVM cs
     -- has already been seen before (due to expansion of a recursive
     -- type), just throw it away and stop.
     simplifyOne
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
       => SimpleConstraint -> Sem r ()
     simplifyOne c = do
       seen <- use ssSeen
@@ -529,14 +552,15 @@ simplify tyDefns origVM cs
           simplifyOne' c
 
     simplifyOne'
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
       => SimpleConstraint -> Sem r ()
 
     -- If we have an equality constraint, run unification on it.  The
     -- resulting substitution is applied to the remaining constraints
     -- as well as prepended to the current substitution.
 
-    simplifyOne' (ty1 :=: ty2) =
+    simplifyOne' (ty1 :=: ty2) = do
+      tyDefns <- input @TyDefCtx
       case unify tyDefns [(ty1, ty2)] of
         Nothing -> throw NoUnify
         Just s' -> extendSubst s'
@@ -550,7 +574,8 @@ simplify tyDefns origVM cs
       = simplifyOne' (ty1 :=: ty2)
 
     -- Otherwise, expand the user-defined type and continue.
-    simplifyOne' (TyCon (CUser t) ts :<: ty2) =
+    simplifyOne' (TyCon (CUser t) ts :<: ty2) = do
+      tyDefns <- input @TyDefCtx
       case M.lookup t tyDefns of
         Nothing  -> error $ show t ++ " not in ty defn map!"
         Just (TyDefBody _ body) ->
@@ -560,7 +585,8 @@ simplify tyDefns origVM cs
     simplifyOne' (ty1@TyVar{} :<: ty2@(TyCon (CUser _) _))
       = simplifyOne' (ty1 :=: ty2)
 
-    simplifyOne' (ty1 :<: TyCon (CUser t) ts) =
+    simplifyOne' (ty1 :<: TyCon (CUser t) ts) = do
+      tyDefns <- input @TyDefCtx
       case M.lookup t tyDefns of
         Nothing  -> error $ show t ++ " not in ty defn map!"
         Just (TyDefBody _ body) ->
@@ -605,7 +631,7 @@ simplify tyDefns origVM cs
       error $ "Impossible! simplifyOne' " ++ show s ++ " :<: " ++ show t
 
     expandStruct
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
       => Name Type -> Con -> SimpleConstraint -> Sem r ()
     expandStruct a c con = do
       as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
@@ -617,7 +643,7 @@ simplify tyDefns origVM cs
     -- 2. apply s' to constraints
     -- 3. apply s' to qualifier map and decompose
     extendSubst
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
       => S -> Sem r ()
     extendSubst s' = do
       ssSubst %= (s'@@)
@@ -625,7 +651,7 @@ simplify tyDefns origVM cs
       substVarMap s'
 
     substVarMap
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
+      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
       => S -> Sem r ()
     substVarMap s' = do
       vm <- use ssVarMap
@@ -689,9 +715,9 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
 checkSkolems
-  :: Members '[Error SolveError, Output Message] r
-  => TyDefCtx -> TyVarInfoMap -> Graph Atom -> Sem r (Graph UAtom, S)
-checkSkolems tyDefns vm graph = do
+  :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
+  => TyVarInfoMap -> Graph Atom -> Sem r (Graph UAtom, S)
+checkSkolems vm graph = do
   let skolemWCCs :: [Set Atom]
       skolemWCCs = filter (any isSkolem) $ G.wcc graph
 
@@ -716,9 +742,14 @@ checkSkolems tyDefns vm graph = do
     noSkolems (AVar (U v)) = UV v
     noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
 
+    unifyWCCs
+      :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
+      => Graph Atom -> S -> [Set Atom] -> Sem r (Graph UAtom, S)
     unifyWCCs g s []     = return (G.map noSkolems g, s)
     unifyWCCs g s (u:us) = do
       debug $ "Unifying" <+> pretty' (u:us) <> "..."
+
+      tyDefns <- input @TyDefCtx
 
       let g' = foldl' (flip G.delete) g u
 

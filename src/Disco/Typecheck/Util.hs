@@ -113,8 +113,7 @@ solve
   => Sem (Writer Constraint ': r) a -> Sem r (a, S)
 solve m = do
   (a, c) <- withConstraint m
-  tds <- ask @TyDefCtx
-  res <- runSolve . solveConstraint tds $ c
+  res <- runSolve . inputToReader . solveConstraint $ c
   case res of
     Left e  -> throw (Unsolvable e)
     Right s -> return (a, s)

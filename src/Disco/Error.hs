@@ -297,13 +297,6 @@ prettySolveError = \case
     , rtd "not-qual"
     ]
 
-  UnqualUser q ty -> vcat
-    [ "Error: don't know whether values of type" <+> pretty' ty <+> qualPhrase True q <> "."
-    , "  Disco cannot currently check whether user-defined types satisfy a qualifier,"
-    , "  but there's no theretical reason for this; someone just needs to write the code!"
-    , issue 317
-    ]
-
   QualSkolem q a -> vcat
     [ "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
     , nest 2 (qualPhrase True q) <> "."

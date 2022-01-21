@@ -9,7 +9,7 @@ license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Disco team
 maintainer:          byorgey@gmail.com
-copyright:           Disco team 2016 (see LICENSE)
+copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
 tested-with:         GHC == 8.10.4

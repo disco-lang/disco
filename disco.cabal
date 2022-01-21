@@ -18,7 +18,7 @@ data-dir:            lib
 
 data-files:          *.disco
 
-extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
+extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/*.hs
                      docs/tutorial/example/*.disco
                      --- TEST FILES BEGIN (updated automatically by add-test-files.hs) ---
                      test/README.md

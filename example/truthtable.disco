@@ -5,15 +5,15 @@ import string
 |||
 |||   :print truthtable(~/\~)
 !!! truthtable(~/\~) == "| F | F | F |\n| F | T | F |\n| T | F | F |\n| T | T | T |"
-truthtable : (Bool * Bool -> Bool) -> List(Char)
+truthtable : (Bool * Bool -> Bool) -> String
 truthtable(op) =
   unlines [ fmtrow [x,y,op(x,y)] | x <- enumerate(Bool), y <- enumerate(Bool) ]
 
 ||| Format a row of Boolean values with intervening | characters.
 !!! fmtrow [true, false, false, true] == "| T | F | F | T |"
-fmtrow : List(Bool) -> List(Char)
+fmtrow : List(Bool) -> String
 fmtrow(bs) = append("|", concat([ append(fmtbool(b), " |") | b <- bs ]))
 
-fmtbool : Bool -> List(Char)
+fmtbool : Bool -> String
 fmtbool(true) = " T"
 fmtbool(false) = " F"

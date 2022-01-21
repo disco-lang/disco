@@ -1,0 +1,5 @@
+Logical operations
+==================
+
+* ``not``
+* ``/\``, blah

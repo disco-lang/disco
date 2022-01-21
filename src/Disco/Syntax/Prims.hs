@@ -225,5 +225,8 @@ primReference = M.fromList
   , PrimFloor    ==> "round"
   , PrimCeil     ==> "round"
   , PrimAbs      ==> "abs"
-  , PrimUOp Not  ==> "not"
+  , PrimUOp Not  ==> "logic-ops"
+  , PrimBOp And  ==> "logic-ops"
+  , PrimBOp Or   ==> "logic-ops"
+  , PrimBOp Impl ==> "logic-ops"
   ]

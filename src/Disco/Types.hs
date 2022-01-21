@@ -667,6 +667,8 @@ isFiniteTy ty
 
 -- XXX coinductively check whether user-defined types are searchable
 --   e.g.  L = Unit + N * L  ought to be searchable.
+--   See https://github.com/disco-lang/disco/issues/318.
+
 -- | Decide whether a type is searchable, i.e. effectively enumerable.
 isSearchable :: Type -> Bool
 isSearchable TyProp         = False

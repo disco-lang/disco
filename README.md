@@ -46,6 +46,18 @@ you should skip to the instructions below about building with stack.
 
       at a terminal prompt.
 
+        - If this fails with an error like `Could not resolve HEAD to
+          a revision`, then try running these two commands at a
+          terminal prompt:
+
+              rm -rf $(brew --repo homebrew/core)
+              brew tap homebrew/core
+
+          Then re-run the `brew install llvm` command.
+
+        - After installing `llvm`, you may need to close and re-open
+          the terminal before running `cabal install disco` again.
+
 - If it works, you should be able to now type `disco` at a command
   prompt, which should display a message like this:
 
@@ -70,7 +82,26 @@ you should skip to the instructions below about building with stack.
       environment variable, so that you can run disco simply by typing
       `disco`.  However, this step is optional.
 
+- On Windows, if disco crashes with an error about `foldr` after you
+  try to type anything (or if it simply closes the entire window when
+  you type anything), the problem is probably that you need to [enable
+  UTF-8 mode](https://github.com/disco-lang/disco/issues/253).
 
+    - Open a command prompt, and type
+
+          chcp 65001
+
+    - Now start `disco` as before (by typing `disco` or
+      `C:\cabal\bin\disco` or whatever worked).
+
+    - You will have to do this every time you run disco.
+      Alternatively, you can create a file called `disco.cmd`
+      containing those two commands, for example:
+
+          chcp 65001
+          C:\cabal\bin\disco
+
+      Now you can simply double-click on `disco.cmd` to run disco.
 
 If you encounter any difficulties, please let me know --- either come
 talk to me or [open a GitHub

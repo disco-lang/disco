@@ -552,7 +552,7 @@ prettyFailureReason prop (TestEqual ty v1 v2) =
 prettyFailureReason prop (TestRuntimeError e) =
   "Test failed:" <+> pretty (eraseProperty prop)
   $+$
-  text (show e)
+  pretty (EvalErr e)
 prettyFailureReason prop (TestFound (TestResult _ r _)) = prettyFailureReason prop r
 prettyFailureReason prop (TestNotFound Exhaustive) =
   "No example exists:" <+> pretty (eraseProperty prop)

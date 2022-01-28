@@ -1134,9 +1134,9 @@ typecheck mode t@(TContainer c xs ell)  = do
       constraints $ map (`CSub` tyv) tys
       return $ containerTy c tyv
     Check ty -> return ty
-  when (isJust ell) $ do
-    eltTy <- getEltTy c resTy
-    constraint $ CQual QEnum eltTy
+  eltTy <- getEltTy c resTy
+  when (c /= ListContainer) $ constraint $ CQual QCmp eltTy
+  when (isJust ell) $ constraint $ CQual QEnum eltTy   -- XXX causes container lib to fail
   return $ ATContainer resTy c axns aell
 
   where

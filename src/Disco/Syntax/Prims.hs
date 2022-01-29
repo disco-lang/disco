@@ -199,6 +199,7 @@ primDoc = M.fromList
   , PrimBOp And  ==> "Logical conjunction (and): true /\\ true = true; otherwise x /\\ y = false."
   , PrimBOp Or   ==> "Logical disjunction (or): false \\/ false = false; otherwise x \\/ y = true."
   , PrimBOp Impl ==> "Logical implication (implies): true -> false = false; otherwise x -> y = true."
+  , PrimBOp Iff  ==> "Biconditional (if and only if)."
   , PrimBOp Eq   ==> "Equality test.  x == y is true if x and y are equal."
   , PrimBOp Neq  ==> "Inequality test.  x /= y is true if x and y are unequal."
   , PrimBOp Lt   ==> "Less-than test. x < y is true if x is less than (but not equal to) y."
@@ -229,4 +230,5 @@ primReference = M.fromList
   , PrimBOp And  ==> "logic-ops"
   , PrimBOp Or   ==> "logic-ops"
   , PrimBOp Impl ==> "logic-ops"
+  , PrimBOp Iff  ==> "logic-ops"
   ]

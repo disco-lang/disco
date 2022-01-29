@@ -321,7 +321,7 @@ bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 bopDesugars _   _   _ bop = bop `elem`
-  [ And, Or, Impl
+  [ And, Or, Impl, Iff
   , Neq, Gt, Leq, Geq, Min, Max
   , IDiv
   , Sub, SSub
@@ -380,6 +380,9 @@ desugarBinApp _ And t1 t2 = desugarTerm $
 
 -- (t1 implies t2) ==> (not t1 or t2)
 desugarBinApp _ Impl t1 t2 = desugarTerm $ tnot t1 ||. t2
+
+-- (t1 iff t2) ==> (t1 == t2)
+desugarBinApp _ Iff t1 t2 = desugarTerm $ t1 ==. t2
 
 -- t1 or t2 ==> {? true if t1, t2 otherwise ?})
 desugarBinApp _ Or t1 t2 = desugarTerm $

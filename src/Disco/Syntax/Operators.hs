@@ -61,7 +61,8 @@ data BOp = Add      -- ^ Addition (@+@)
          | Max      -- ^ Maximum (@max@)
          | And      -- ^ Logical and (@&&@ / @and@)
          | Or       -- ^ Logical or (@||@ / @or@)
-         | Impl     -- ^ Logical implies (@==>@ / @implies@)
+         | Impl     -- ^ Logical implies (@->@ / @implies@)
+         | Iff      -- ^ Logical biconditional (@<->@ / @iff@)
          | Mod      -- ^ Modulo (@mod@)
          | Divides  -- ^ Divisibility test (@|@)
          | Choose   -- ^ Binomial and multinomial coefficients (@choose@)
@@ -170,6 +171,7 @@ opTable =
   , [ bopInfo InR  Or      ["\\/", "or", "∨", "||"]
     ]
   , [ bopInfo InR Impl     ["->", "==>", "implies"]
+    , bopInfo InR Iff      ["<->", "<==>", "iff"]
     ]
   ]
   where

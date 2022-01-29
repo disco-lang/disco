@@ -315,7 +315,7 @@ reservedWords :: [String]
 reservedWords =
   [ "unit", "true", "false", "True", "False", "let", "in", "is"
   , "if", "when"
-  , "otherwise", "and", "or", "mod", "choose", "implies"
+  , "otherwise", "and", "or", "mod", "choose", "implies", "iff"
   , "min", "max"
   , "union", "∪", "intersect", "∩", "subset", "⊆", "elem", "∈"
   , "enumerate", "count", "divides"

@@ -459,7 +459,7 @@ typecheck
 -- ~~~~ Note [Pattern coverage]
 -- In several places we have clauses like
 --
---   inferPrim (PrimBOp op) | op `elem` [And, Or, Impl]
+--   inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff]
 --
 -- since the typing rules for all the given operators are the same.
 -- The only problem is that the pattern coverage checker (sensibly)
@@ -560,7 +560,7 @@ typecheck Infer (TPrim prim) = do
     --- XXX restore typing rules for logical operations on Props
     --- once the evaluator can handle them.
 
-    inferPrim (PrimBOp op) | op `elem` [And, Or, Impl] = do
+    inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff] = do
       return $ TyBool :*: TyBool :->: TyBool
       -- a <- freshTy
       -- constraint $ CQual (bopQual op) a
@@ -570,6 +570,7 @@ typecheck Infer (TPrim prim) = do
     inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
     inferPrim (PrimBOp Or)   = error "inferPrim Or should be unreachable"
     inferPrim (PrimBOp Impl) = error "inferPrim Impl should be unreachable"
+    inferPrim (PrimBOp Iff)  = error "inferPrim Iff should be unreachable"
     ------------------------------------------------------------
 
     inferPrim (PrimUOp Not) = do

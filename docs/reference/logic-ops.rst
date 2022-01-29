@@ -38,3 +38,15 @@ Logical operations
     T      F      F
     T      T      T
     =====  =====  ==========
+
+* Biconditional, aka "if and only if", is written ``<->``, ``<==>``, or
+  ``iff``. It has the following truth table:
+
+    =====  =====  ==========
+    ``x``  ``y``  ``x <-> y``
+    =====  =====  ==========
+    F      F      T
+    F      T      F
+    T      F      F
+    T      T      T
+    =====  =====  ==========

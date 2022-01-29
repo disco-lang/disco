@@ -546,8 +546,8 @@ prettyFailureReason prop (TestEqual ty v1 v2) =
   "Test result mismatch for:" <+> pretty (eraseProperty prop)
   $+$
   bulletList "-"
-  [ "Left side:  " <> prettyValue ty v2
-  , "Right side: " <> prettyValue ty v1
+  [ "Left side:  " <> prettyValue ty v1
+  , "Right side: " <> prettyValue ty v2
   ]
 prettyFailureReason prop (TestRuntimeError e) =
   "Test failed:" <+> pretty (eraseProperty prop)

@@ -5,8 +5,8 @@
       a = false
       b = false
   - Test result mismatch for: ∀a, b. (a /\ b) =!= (a \/ b)
-    - Left side:  true
-    - Right side: false
+    - Left side:  false
+    - Right side: true
     Counterexample:
       a = false
       b = true

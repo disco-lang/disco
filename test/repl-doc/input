@@ -7,3 +7,6 @@
 :doc !
 :doc ~!
 :doc not
+:doc N
+:doc ℕ
+:doc Rational

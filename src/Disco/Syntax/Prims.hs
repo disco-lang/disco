@@ -15,7 +15,7 @@
 
 module Disco.Syntax.Prims
        ( Prim(..)
-       , PrimInfo(..), primTable, toPrim, primMap, primDoc, primReference
+       , PrimInfo(..), primTable, toPrim, primMap
        ) where
 
 import           GHC.Generics                     (Generic)
@@ -26,7 +26,6 @@ import qualified Data.Map                         as M
 
 import           Data.Data                        (Data)
 import           Disco.Syntax.Operators
-import           Disco.Util                       ((==>))
 
 ------------------------------------------------------------
 -- Prims
@@ -177,58 +176,3 @@ toPrim x = [ p | PrimInfo p syn True <- primTable, syn == x ]
 primMap :: Map Prim PrimInfo
 primMap = M.fromList $
   [ (p, pinfo) | pinfo@(PrimInfo p _ _) <- primTable ]
-
--- | A map from some primitives to a short descriptive string,
---   to be shown by the :doc command.
-primDoc :: Map Prim String
-primDoc = M.fromList
-  [ PrimUOp Neg ==> "Arithmetic negation."
-  , PrimBOp Add  ==> "The sum of two numbers, types, or graphs."
-  , PrimBOp Sub  ==> "The difference of two numbers."
-  , PrimBOp SSub ==> "The difference of two numbers, with a lower bound of 0."
-  , PrimBOp Mul  ==> "The product of two numbers, types, or graphs."
-  , PrimBOp Div  ==> "Divide two numbers."
-  , PrimBOp IDiv ==> "The integer quotient of two numbers, rounded down."
-  , PrimBOp Mod  ==> "a mod b is the remainder when a is divided by b."
-  , PrimBOp Exp  ==> "Exponentiation.  a ^ b is a raised to the b power."
-  , PrimUOp Fact ==> "n! computes the factorial of n, that is, 1 * 2 * ... * n."
-  , PrimFloor    ==> "floor(x) is the largest integer which is <= x."
-  , PrimCeil     ==> "ceiling(x) is the smallest integer which is >= x."
-  , PrimAbs      ==> "abs(x) is the absolute value of x.  Also written |x|."
-  , PrimUOp Not  ==> "Logical negation: not(true) = false and not(false) = true."
-  , PrimBOp And  ==> "Logical conjunction (and): true /\\ true = true; otherwise x /\\ y = false."
-  , PrimBOp Or   ==> "Logical disjunction (or): false \\/ false = false; otherwise x \\/ y = true."
-  , PrimBOp Impl ==> "Logical implication (implies): true -> false = false; otherwise x -> y = true."
-  , PrimBOp Iff  ==> "Biconditional (if and only if)."
-  , PrimBOp Eq   ==> "Equality test.  x == y is true if x and y are equal."
-  , PrimBOp Neq  ==> "Inequality test.  x /= y is true if x and y are unequal."
-  , PrimBOp Lt   ==> "Less-than test. x < y is true if x is less than (but not equal to) y."
-  , PrimBOp Gt   ==> "Greater-than test. x > y is true if x is greater than (but not equal to) y."
-  , PrimBOp Leq  ==> "Less-than-or-equal test. x <= y is true if x is less than or equal to y."
-  , PrimBOp Geq  ==> "Greater-than-or-equal test. x >= y is true if x is greater than or equal to y."
-
-  ]
-
--- | A map from some primitives to their corresponding page in the
---   Disco language reference
---   (https://disco-lang.readthedocs.io/en/latest/reference/index.html).
-primReference :: Map Prim String
-primReference = M.fromList
-  [ PrimBOp Add  ==> "addition"
-  , PrimBOp Sub  ==> "subtraction"
-  , PrimBOp SSub ==> "subtraction"
-  , PrimBOp Mul  ==> "multiplication"
-  , PrimBOp Div  ==> "division"
-  , PrimBOp IDiv ==> "integerdiv"
-  , PrimBOp Mod  ==> "mod"
-  , PrimBOp Exp  ==> "exponentiation"
-  , PrimUOp Fact ==> "factorial"
-  , PrimFloor    ==> "round"
-  , PrimCeil     ==> "round"
-  , PrimAbs      ==> "abs"
-  , PrimUOp Not  ==> "logic-ops"
-  , PrimBOp And  ==> "logic-ops"
-  , PrimBOp Or   ==> "logic-ops"
-  , PrimBOp Impl ==> "logic-ops"
-  , PrimBOp Iff  ==> "logic-ops"
-  ]

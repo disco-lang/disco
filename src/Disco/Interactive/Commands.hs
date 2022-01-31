@@ -54,6 +54,7 @@ import           Disco.AST.Typed
 import           Disco.Compile
 import           Disco.Context                    as Ctx
 import           Disco.Desugar
+import           Disco.Doc
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Extensions
@@ -68,7 +69,6 @@ import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
-                                                   primDoc, primReference,
                                                    toPrim)
 import           Disco.Typecheck
 import           Disco.Typecheck.Erase
@@ -95,7 +95,7 @@ data REPLExpr :: CmdTag -> * where
   Load      :: FilePath  -> REPLExpr 'CLoad      -- Load a file.
   Reload    ::              REPLExpr 'CReload    -- Reloads the most recently
                                                  -- loaded file.
-  Doc       :: Either Term Prim -> REPLExpr 'CDoc       -- Show documentation.
+  Doc       :: DocInput  -> REPLExpr 'CDoc       -- Show documentation.
   Nop       ::              REPLExpr 'CNop       -- No-op, e.g. if the user
                                                  -- just enters a comment
   Help      ::              REPLExpr 'CHelp      -- Show help
@@ -350,19 +350,26 @@ docCmd =
       parser = Doc <$> parseDoc
     }
 
-parseDoc :: Parser (Either Term Prim)
+-- XXX
+data DocInput = DocTerm Term | DocPrim Prim | DocOther String
+  deriving (Show)
+
+parseDoc :: Parser DocInput
 parseDoc =
-      (Left <$> try term)
-  <|> (Right <$> (parseNakedOpPrim <?> "operator"))
+      (DocTerm <$> try term)
+  <|> (DocPrim <$> try (parseNakedOpPrim <?> "operator"))
+  <|> (DocOther <$> (sc *> many (anySingleBut ' ')))
 
 handleDoc ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
-handleDoc (Doc (Left (TPrim p))) = handleDocPrim p
-handleDoc (Doc (Left (TVar x)))  = handleDocVar x
-handleDoc (Doc (Left e))         = undefined -- XXX
-handleDoc (Doc (Right p))        = handleDocPrim p
+handleDoc (Doc (DocTerm (TPrim p))) = handleDocPrim p
+handleDoc (Doc (DocTerm (TVar x)))  = handleDocVar x
+handleDoc (Doc (DocTerm _))         =
+  err "Can't display documentation for an expression.  Try asking about a function, operator, or type name."
+handleDoc (Doc (DocPrim p))         = handleDocPrim p
+handleDoc (Doc (DocOther s))        = handleDocOther s
 
 handleDocVar ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
@@ -379,8 +386,8 @@ handleDocVar x = do
     ([], Nothing) ->
       -- Maybe the variable name entered by the user is actually a prim.
       case toPrim (name2String x) of
-        (prim:_) -> handleDoc (Doc (Right prim))
-        _        -> err $ "No documentation found for" <+> pretty' x <> "."
+        (prim:_) -> handleDocPrim prim
+        _        -> err $ "No documentation found for '" <> pretty' x <> "'."
     (binds, def) ->
       mapM_ (showDoc docs) (map Left binds ++ map Right (maybeToList def))
 
@@ -436,8 +443,20 @@ handleDocPrim prim = do
           , if post then "~" else Pretty.empty]
 
 
-    mkReference p =
-      "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
+mkReference :: String -> Sem r Doc
+mkReference p =
+  "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
+
+handleDocOther ::
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
+  String ->
+  Sem r ()
+handleDocOther s =
+  case (M.lookup s otherDoc, M.lookup s otherReference) of
+    (Nothing, Nothing) -> info $ "No documentation found for '" <> text s <> "'."
+    (Nothing, Just p)  -> info $ mkReference p
+    (Just d, mp)  ->
+      info $ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
 
 ------------------------------------------------------------
 -- eval

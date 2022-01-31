@@ -11,7 +11,7 @@ f : ℕ → ℕ
 f is a function.
 Some more documentation.
 
-No documentation found for x.
+No documentation found for 'x'.
 ~+~ : ℕ × ℕ → ℕ
 precedence level 7, left associative
 
@@ -47,4 +47,16 @@ precedence level 15
 Logical negation: not(true) = false and not(false) = true.
 
 https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
+
+The type of natural numbers: 0, 1, 2, ...
+
+https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+
+The type of natural numbers: 0, 1, 2, ...
+
+https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+
+The type of rational numbers p/q.
+
+https://disco-lang.readthedocs.io/en/latest/reference/rational.html
 

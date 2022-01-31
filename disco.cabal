@@ -430,6 +430,7 @@ library
                        Disco.Util
                        Disco.Interactive.CmdLine
                        Disco.Interactive.Commands
+                       Disco.Doc
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco

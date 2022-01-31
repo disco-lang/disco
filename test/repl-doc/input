@@ -3,5 +3,7 @@
 :doc f
 :doc x
 :doc +
+:doc ~+~
 :doc !
+:doc ~!
 :doc not

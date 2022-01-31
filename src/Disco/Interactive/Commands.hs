@@ -95,7 +95,7 @@ data REPLExpr :: CmdTag -> * where
   Load      :: FilePath  -> REPLExpr 'CLoad      -- Load a file.
   Reload    ::              REPLExpr 'CReload    -- Reloads the most recently
                                                  -- loaded file.
-  Doc       :: Either (Name Term) Prim -> REPLExpr 'CDoc       -- Show documentation.
+  Doc       :: Either Term Prim -> REPLExpr 'CDoc       -- Show documentation.
   Nop       ::              REPLExpr 'CNop       -- No-op, e.g. if the user
                                                  -- just enters a comment
   Help      ::              REPLExpr 'CHelp      -- Show help
@@ -350,16 +350,25 @@ docCmd =
       parser = Doc <$> parseDoc
     }
 
-parseDoc :: Parser (Either (Name Term) Prim)
+parseDoc :: Parser (Either Term Prim)
 parseDoc =
-      try (Left <$> (sc *> ident))
+      (Left <$> try term)
   <|> (Right <$> (parseNakedOpPrim <?> "operator"))
 
 handleDoc ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
-handleDoc (Doc (Left x)) = do
+handleDoc (Doc (Left (TPrim p))) = handleDocPrim p
+handleDoc (Doc (Left (TVar x)))  = handleDocVar x
+handleDoc (Doc (Left e))         = undefined -- XXX
+handleDoc (Doc (Right p))        = handleDocPrim p
+
+handleDocVar ::
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
+  Name Term ->
+  Sem r ()
+handleDocVar x = do
   ctx  <- inputs @TopInfo (view (replModInfo . miTys))
   tydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
   docs <- inputs @TopInfo (view (replModInfo . miDocs))
@@ -388,7 +397,12 @@ handleDoc (Doc (Left x)) = do
       case Ctx.lookupAll' x docMap of
         ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
         _                           -> Pretty.empty
-handleDoc (Doc (Right prim)) = do
+
+handleDocPrim ::
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
+  Prim ->
+  Sem r ()
+handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
   info $ vcat
     [ case prim of

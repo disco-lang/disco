@@ -78,23 +78,23 @@ primReference = M.fromList
 
 otherDoc :: Map String String
 otherDoc = M.fromList
-  [ "N"       ==> docN
-  , "ℕ"       ==> docN
-  , "Nat"     ==> docN
-  , "Natural" ==> docN
-  , "Z"       ==> docZ
-  , "ℤ"       ==> docZ
-  , "Int"     ==> docZ
-  , "Integer" ==> docZ
-  , "F"       ==> docF
-  , "𝔽"       ==> docF
-  , "Frac"    ==> docF
+  [ "N"          ==> docN
+  , "ℕ"          ==> docN
+  , "Nat"        ==> docN
+  , "Natural"    ==> docN
+  , "Z"          ==> docZ
+  , "ℤ"          ==> docZ
+  , "Int"        ==> docZ
+  , "Integer"    ==> docZ
+  , "F"          ==> docF
+  , "𝔽"          ==> docF
+  , "Frac"       ==> docF
   , "Fractional" ==> docF
-  , "Q"       ==> docQ
-  , "ℚ"       ==> docQ
-  , "Rational"    ==> docQ
-  , "Bool"    ==> docB
-  , "Boolean" ==> docB
+  , "Q"          ==> docQ
+  , "ℚ"          ==> docQ
+  , "Rational"   ==> docQ
+  , "Bool"       ==> docB
+  , "Boolean"    ==> docB
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
@@ -105,21 +105,21 @@ otherDoc = M.fromList
 
 otherReference :: Map String String
 otherReference = M.fromList
-  [ "N"       ==> "natural"
-  , "ℕ"       ==> "natural"
-  , "Nat"     ==> "natural"
-  , "Natural" ==> "natural"
-  , "Z"       ==> "integer"
-  , "ℤ"       ==> "integer"
-  , "Int"     ==> "integer"
-  , "Integer" ==> "integer"
-  , "F"       ==> "fraction"
-  , "𝔽"       ==> "fraction"
-  , "Frac"    ==> "fraction"
+  [ "N"          ==> "natural"
+  , "ℕ"          ==> "natural"
+  , "Nat"        ==> "natural"
+  , "Natural"    ==> "natural"
+  , "Z"          ==> "integer"
+  , "ℤ"          ==> "integer"
+  , "Int"        ==> "integer"
+  , "Integer"    ==> "integer"
+  , "F"          ==> "fraction"
+  , "𝔽"          ==> "fraction"
+  , "Frac"       ==> "fraction"
   , "Fractional" ==> "fraction"
-  , "Q"       ==> "rational"
-  , "ℚ"       ==> "rational"
-  , "Rational" ==> "rational"
-  , "Bool"    ==> "bool"
-  , "Boolean" ==> "bool"
+  , "Q"          ==> "rational"
+  , "ℚ"          ==> "rational"
+  , "Rational"   ==> "rational"
+  , "Bool"       ==> "bool"
+  , "Boolean"    ==> "bool"
   ]

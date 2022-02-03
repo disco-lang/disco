@@ -63,7 +63,7 @@ import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (%=), (%~), (&),
                                                           (.=))
 import           Control.Monad.State
-import           Data.Char                               (isDigit)
+import           Data.Char                               (isAlpha, isDigit)
 import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
@@ -877,13 +877,19 @@ parseExpr = fixJuxtMul . fixChains <$> (makeExprParser parseAtom table <?> "expr
       : (map . concatMap) mkOpParser opTable
 
     mkOpParser :: OpInfo -> [Operator Parser Term]
-    mkOpParser (OpInfo op syns _) = map (withOpFixity op) syns
+    mkOpParser (OpInfo op syns _) = concatMap (withOpFixity op) syns
 
+    -- Only parse unary operators consisting of operator symbols.
+    -- Alphabetic unary operators (i.e. 'not') will be parsed as
+    -- applications of variable names, since if they are parsed here
+    -- they will incorrectly parse even when they are a prefix of a
+    -- variable name.
     withOpFixity (UOpF fx op) syn
-      = ufxParser fx ((reservedOp syn <?> "operator") >> return (TUn op))
+      | any isAlpha syn = []
+      | otherwise = [ufxParser fx ((reservedOp syn <?> "operator") >> return (TUn op))]
 
     withOpFixity (BOpF fx op) syn
-      = bfxParser fx ((reservedOp syn <?> "operator") >> return (TBin op))
+      = [bfxParser fx ((reservedOp syn <?> "operator") >> return (TBin op))]
 
     ufxParser Pre  = Prefix
     ufxParser Post = Postfix

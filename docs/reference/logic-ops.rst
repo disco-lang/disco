@@ -1,6 +1,9 @@
 Logical operations
 ==================
 
+Disco has various standard operations for manipulating :doc:`Boolean
+values <bool>`.
+
 * Logical negation is written ``not``; it inverts ``true`` to
   ``false`` and vice versa.
 * Logical conjunction, aka AND, is written ``/\``, ``and``, or

@@ -17,6 +17,7 @@ them.
 
    arithmetic
    numeric
+   logic-ops
    syntax
    types
    errors

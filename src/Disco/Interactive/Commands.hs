@@ -364,12 +364,20 @@ handleDoc ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
+handleDoc (Doc (DocTerm (TBool _))) = handleDocBool
 handleDoc (Doc (DocTerm (TPrim p))) = handleDocPrim p
 handleDoc (Doc (DocTerm (TVar x)))  = handleDocVar x
 handleDoc (Doc (DocTerm _))         =
   err "Can't display documentation for an expression.  Try asking about a function, operator, or type name."
 handleDoc (Doc (DocPrim p))         = handleDocPrim p
 handleDoc (Doc (DocOther s))        = handleDocOther s
+
+handleDocBool :: Members '[Output Message] r => Sem r ()
+handleDocBool =
+  info $
+    "true and false (also written True and False) are the two possible values of type Boolean."
+    $+$
+    mkReference "bool"
 
 handleDocVar ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>

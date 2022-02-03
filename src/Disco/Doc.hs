@@ -93,12 +93,15 @@ otherDoc = M.fromList
   , "Q"       ==> docQ
   , "ℚ"       ==> docQ
   , "Rational"    ==> docQ
+  , "Bool"    ==> docB
+  , "Boolean" ==> docB
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
     docZ = "The type of integers: ..., -2, -1, 0, 1, 2, ..."
     docF = "The type of fractional numbers p/q >= 0."
     docQ = "The type of rational numbers p/q."
+    docB = "The type of Booleans (true or false)."
 
 otherReference :: Map String String
 otherReference = M.fromList
@@ -116,5 +119,7 @@ otherReference = M.fromList
   , "Fractional" ==> "fraction"
   , "Q"       ==> "rational"
   , "ℚ"       ==> "rational"
-  , "Rational"    ==> "rational"
+  , "Rational" ==> "rational"
+  , "Bool"    ==> "bool"
+  , "Boolean" ==> "bool"
   ]

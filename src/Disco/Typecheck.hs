@@ -443,6 +443,16 @@ inferTop t = do
   -- the term along with the resulting polymorphic type.
   return (at'', closeType (getType at''))
 
+-- | Top-level type checking algorithm: check that a term has a given
+--   polymorphic type by running type checking and solving the
+--   resulting constraints.
+checkTop
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  => Term -> PolyType -> Sem r ATerm
+checkTop t ty = do
+  (at, theta) <- solve $ checkPolyTy t ty
+  return $ applySubst theta at
+
 --------------------------------------------------
 -- The typecheck function
 --------------------------------------------------

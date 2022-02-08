@@ -719,13 +719,9 @@ printCmd =
 
 handlePrint :: Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r => REPLExpr 'CPrint -> Sem r ()
 handlePrint (Print t) = do
-  (at, _) <- inputToState . typecheckTop $ inferTop t
-  let ty = getType at
-  case ty of
-    TyString -> do
-      v <- mapError EvalErr . evalTerm False $ at
-      info $ text (vlist vchar v)
-    _        -> err $ "Argument to :print must have type List(Char), not" <+> pretty' ty
+  at <- inputToState . typecheckTop $ checkTop t (toPolyType TyString)
+  v <- mapError EvalErr . evalTerm False $ at
+  info $ text (vlist vchar v)
 
 ------------------------------------------------------------
 -- :reload

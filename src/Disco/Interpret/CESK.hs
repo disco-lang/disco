@@ -347,7 +347,6 @@ appConst k = \case
   --------------------------------------------------
   -- Container operations
 
-  OSize -> withBag OSize $ out . intv . sum . map snd
   OPower -> withBag OPower $ out . VBag . sortNCount . map (first VBag) . choices
     where
       choices :: [(Value, Integer)] -> [([(Value, Integer)], Integer)]

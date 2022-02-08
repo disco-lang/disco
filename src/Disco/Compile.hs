@@ -246,7 +246,6 @@ compilePrim _ PrimSqrt = return $ CConst OSqrt
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil = return $ CConst OCeil
 compilePrim _ PrimAbs = return $ CConst OAbs
-compilePrim _ PrimSize = return $ CConst OSize
 compilePrim (TySet _ :->: _) PrimPower = return $ CConst OPower
 compilePrim (TyBag _ :->: _) PrimPower = return $ CConst OPower
 compilePrim ty PrimPower = compilePrimErr PrimPower ty

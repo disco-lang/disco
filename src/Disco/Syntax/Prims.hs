@@ -44,7 +44,6 @@ data Prim where
   PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
   PrimAbs        :: Prim        -- ^ Absolute value (@abs@)
 
-  PrimSize       :: Prim        -- ^ Size of a set (XXX should be in library)
   PrimPower      :: Prim        -- ^ Power set (XXX or bag?)
 
   PrimList       :: Prim        -- ^ Container -> list conversion
@@ -127,7 +126,6 @@ primTable =
   , PrimInfo PrimCeil      "ceiling"        True
   , PrimInfo PrimAbs       "abs"            True
 
-  , PrimInfo PrimSize      "size"           True
   , PrimInfo PrimPower     "power"          True
 
   , PrimInfo PrimList      "list"           True

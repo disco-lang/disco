@@ -894,12 +894,7 @@ typecheck Infer (TPrim prim) = do
       return $ argTy :->: resTy
 
     ----------------------------------------
-    -- set size, power set/bag
-
-    -- XXX set size should move into standard library
-    inferPrim PrimSize = do
-      a <- freshTy
-      return $ TySet a :->: TyN
+    -- power set/bag
 
     inferPrim PrimPower = do
       a <- freshTy

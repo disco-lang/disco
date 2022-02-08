@@ -149,9 +149,7 @@ data Op
     OCount
   | -- Container operations
 
-    -- | Size of two sets (@size@)
-    OSize
-  | -- | Power set/bag of a given set/bag
+    -- | Power set/bag of a given set/bag
     --   (@power@).
     OPower
   | -- | Set/bag element test.
@@ -349,7 +347,6 @@ opToStr = \case
   OLt          -> "<"
   OEnum        -> "enumerate"
   OCount       -> "count"
-  OSize        -> "size"
   OPower       -> "power"
   OBagElem     -> "elem_bag"
   OListElem    -> "elem_list"

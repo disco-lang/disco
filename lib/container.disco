@@ -3,6 +3,15 @@ using NoStdLib
 import list
 import product
 
+||| The size of a set, i.e. the number of (distinct) elements it contains.
+
+!!! size({}) == 0
+!!! size({1,2,3}) == 3
+!!! forall s1 : Set(N), s2 : Set(N). size(s1 union s2) <= size(s1) + size(s2)
+
+size : Set(a) -> N
+size(s) = length(list(s))
+
 reducebag : (a × a → a) × a × Bag(a) → a
 reducebag(f,z,b) = foldr(f,z,list(b))
 

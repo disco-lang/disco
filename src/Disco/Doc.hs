@@ -95,6 +95,7 @@ otherDoc = M.fromList
   , "Rational"   ==> docQ
   , "Bool"       ==> docB
   , "Boolean"    ==> docB
+  , "Prop"       ==> "The type of propositions."
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
@@ -122,4 +123,5 @@ otherReference = M.fromList
   , "Rational"   ==> "rational"
   , "Bool"       ==> "bool"
   , "Boolean"    ==> "bool"
+  , "Prop"       ==> "prop"
   ]

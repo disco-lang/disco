@@ -890,7 +890,8 @@ typecheck Infer (TPrim prim) = do
 
     inferPrim PrimAbs = do
       argTy <- freshTy
-      resTy <- cPos argTy
+      resTy <- freshTy
+      cAbs argTy resTy `cOr` cSize argTy resTy
       return $ argTy :->: resTy
 
     ----------------------------------------
@@ -1391,6 +1392,22 @@ checkPattern (PFrac p q) ty = do
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp
 ------------------------------------------------------------
+
+-- | Constraints needed on a function type for it to be the type of
+--   the absolute value function.
+cAbs :: Members '[Writer Constraint, Fresh] r => Type -> Type -> Sem r ()
+cAbs argTy resTy = do
+  resTy' <- cPos argTy
+  constraint $ CEq resTy resTy'
+
+-- | Constraints needed on a function type for it to be the type of
+--   the container size operation.
+cSize :: Members '[Writer Constraint, Fresh] r => Type -> Type -> Sem r ()
+cSize argTy resTy = do
+  a <- freshTy
+  c <- freshAtom
+  constraint $ CEq (TyContainer c a) argTy
+  constraint $ CEq TyN resTy
 
 -- | Given an input type @ty@, return a type which represents the
 --   output type of the absolute value function, and generate

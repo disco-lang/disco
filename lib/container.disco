@@ -12,6 +12,14 @@ import product
 size : Set(a) -> N
 size(s) = length(list(s))
 
+||| The size of a bag, i.e. the number of elements it contains (counting multiplicity).
+!!! bagSize(bag([])) == 0
+!!! bagSize(bag([1,2,3])) == 3
+!!! bagSize(bag([1,1,2,3,3,3])) == 6
+!!! bagSize(⟅1 # 1000000, 2 # 990482⟆) == 1990482
+bagSize : Bag(a) -> N
+bagSize(b) = foldr(\((_,n), s). n + s, 0, list(bagCounts(b)))
+
 reducebag : (a × a → a) × a × Bag(a) → a
 reducebag(f,z,b) = foldr(f,z,list(b))
 

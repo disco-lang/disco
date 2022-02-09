@@ -96,6 +96,14 @@ constraints = constraint . cAnd
 forAll :: Member (Writer Constraint) r => [Name Type] -> Sem r a -> Sem r a
 forAll nms = censor (CAll . bind nms)
 
+-- | Run two constraint-generating actions and combine the constraints
+--   via disjunction.
+cOr :: Members '[Writer Constraint] r => Sem r () -> Sem r () -> Sem r ()
+cOr m1 m2 = do
+  (c1, _) <- censor (const CTrue) (listen m1)
+  (c2, _) <- censor (const CTrue) (listen m2)
+  constraint $ COr [c1, c2]
+
 -- | Run a computation that generates constraints, returning the
 --   generated 'Constraint' along with the output. Note that this
 --   locally dispatches the constraint writer effect.

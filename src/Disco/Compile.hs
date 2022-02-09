@@ -245,7 +245,13 @@ compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 compilePrim _ PrimSqrt = return $ CConst OSqrt
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil = return $ CConst OCeil
-compilePrim _ PrimAbs = return $ CConst OAbs
+compilePrim (TySet _ :->: _) PrimAbs = return $
+  CVar (Named Stdlib "container" .- string2Name "size")
+compilePrim (TyBag _ :->: _) PrimAbs = return $
+  CVar (Named Stdlib "container" .- string2Name "bagSize")
+compilePrim (TyList _ :->: _) PrimAbs = return $
+  CVar (Named Stdlib "list" .- string2Name "length")
+compilePrim _                PrimAbs = return $ CConst OAbs
 compilePrim (TySet _ :->: _) PrimPower = return $ CConst OPower
 compilePrim (TyBag _ :->: _) PrimPower = return $ CConst OPower
 compilePrim ty PrimPower = compilePrimErr PrimPower ty

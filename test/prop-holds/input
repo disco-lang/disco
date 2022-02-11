@@ -4,4 +4,4 @@ holds (exists (f : Bool + Bool -> Bool + Bool). forall (a : Bool). (f (left a) =
 holds (exists (f : Bool -> Bool). exists (x : Bool). f(x) /= f (f (f x)))
 holds (forall (a:N, b:N, c:N). a^2 + b^2 == c^2)
 holds (exists (xs : List(N)). xs == [2, 2, 1])
-holds (exists (xs : Set(Z)). size xs == 3 and reduce(\(a, b). a + b, 0, xs) == 0)
+holds (exists (xs : Set(Z)). |xs| == 3 and reduce(\(a, b). a + b, 0, xs) == 0)

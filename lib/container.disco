@@ -5,12 +5,12 @@ import product
 
 ||| The size of a set, i.e. the number of (distinct) elements it contains.
 
-!!! size({}) == 0
-!!! size({1,2,3}) == 3
-!!! forall s1 : Set(N), s2 : Set(N). size(s1 union s2) <= size(s1) + size(s2)
-
-size : Set(a) -> N
-size(s) = length(list(s))
+!!! setSize({}) == 0
+!!! setSize({1,2,3}) == 3
+!!! forall s1 : Set(N), s2 : Set(N). setSize(s1 union s2) <= setSize(s1) + setSize(s2)
+!!! ∀ S : Set(N). setSize S == setSize (S ∪ S)
+setSize : Set(a) -> N
+setSize(s) = length(list(s))
 
 ||| The size of a bag, i.e. the number of elements it contains (counting multiplicity).
 !!! bagSize(bag([])) == 0

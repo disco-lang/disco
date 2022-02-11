@@ -246,7 +246,7 @@ compilePrim _ PrimSqrt = return $ CConst OSqrt
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil = return $ CConst OCeil
 compilePrim (TySet _ :->: _) PrimAbs = return $
-  CVar (Named Stdlib "container" .- string2Name "size")
+  CVar (Named Stdlib "container" .- string2Name "setSize")
 compilePrim (TyBag _ :->: _) PrimAbs = return $
   CVar (Named Stdlib "container" .- string2Name "bagSize")
 compilePrim (TyList _ :->: _) PrimAbs = return $

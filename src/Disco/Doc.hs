@@ -96,6 +96,7 @@ otherDoc = M.fromList
   , "Bool"       ==> docB
   , "Boolean"    ==> docB
   , "Prop"       ==> "The type of propositions."
+  , "Set"        ==> "The type of finite sets."
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
@@ -124,4 +125,5 @@ otherReference = M.fromList
   , "Bool"       ==> "bool"
   , "Boolean"    ==> "bool"
   , "Prop"       ==> "prop"
+  , "Set"        ==> "set"
   ]

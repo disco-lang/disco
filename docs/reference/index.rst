@@ -20,4 +20,5 @@ them.
    logic-ops
    syntax
    types
+   collection-ops
    errors

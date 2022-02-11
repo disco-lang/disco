@@ -384,9 +384,17 @@ handleDocVar ::
   Name Term ->
   Sem r ()
 handleDocVar x = do
-  ctx  <- inputs @TopInfo (view (replModInfo . miTys))
-  tydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
-  docs <- inputs @TopInfo (view (replModInfo . miDocs))
+  replCtx  <- inputs @TopInfo (view (replModInfo . miTys))
+  replTydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
+  replDocs <- inputs @TopInfo (view (replModInfo . miDocs))
+
+  importCtx <- inputs @TopInfo (joinCtxs . map (view miTys) . M.elems . view topModMap)
+  importTydefs <- inputs @TopInfo (M.unions . map (view miTydefs) . M.elems . view topModMap)
+  importDocs <- inputs @TopInfo (joinCtxs . map (view miDocs) . M.elems . view topModMap)
+
+  let ctx = replCtx `joinCtx` importCtx
+      tydefs = importTydefs `M.union` replTydefs
+      docs = replDocs `joinCtx` importDocs
 
   debug $ text . show $ docs
 

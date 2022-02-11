@@ -60,3 +60,7 @@ The type of rational numbers p/q.
 
 https://disco-lang.readthedocs.io/en/latest/reference/rational.html
 
+append : List(a) × List(a) → List(a)
+
+Append two lists into a single list.
+

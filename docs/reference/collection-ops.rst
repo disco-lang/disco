@@ -4,7 +4,6 @@ Collection operations
 .. toctree::
 
    size
-   union
-   intersection
-   subset
+   set-ops
    power
+   comprehension

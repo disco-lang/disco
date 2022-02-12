@@ -160,6 +160,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/parse-280/capitalvars.disco
                      test/parse-280/expected
                      test/parse-280/input
+                     test/parse-320/expected
+                     test/parse-320/input
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
@@ -256,6 +258,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
+                     test/syntax-abs/expected
+                     test/syntax-abs/input
                      test/syntax-chain/expected
                      test/syntax-chain/inRange.disco
                      test/syntax-chain/input
@@ -343,6 +347,9 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/types-tydef-param/expected
                      test/types-tydef-param/input
                      test/types-tydef-param/types-tydef-param.disco
+                     test/types-tydef-qual/expected
+                     test/types-tydef-qual/input
+                     test/types-tydef-qual/tydef-qual.disco
                      test/types-tydefs/expected
                      test/types-tydefs/input
                      test/types-tydefs/types-tydefs.disco

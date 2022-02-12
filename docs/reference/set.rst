@@ -44,7 +44,7 @@ copies of an element.  For example,
    {1, 2, 3}
 
 To check whether a set contains a given element, one can use the
-``elem`` operator:
+``elem`` operator (also written ``∈``):
 
 ::
 
@@ -52,6 +52,8 @@ To check whether a set contains a given element, one can use the
    true
    Disco> 5 elem {1,2,3}
    false
+   Disco> 2 ∈ {1,2,3}
+   true
 
 Sets support various operations, including :doc:`size <size>`,
 :doc:`union <set-ops>`, :doc:`intersection <set-ops>`,

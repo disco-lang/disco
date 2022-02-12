@@ -51,7 +51,7 @@ primDoc = M.fromList
   , PrimBOp Geq  ==> "Greater-than-or-equal test. x >= y is true if x is greater than or equal to y."
 
   , PrimBOp CartProd ==> "Cartesian product, i.e. the collection of all pairs.  Also works on bags and sets."
-
+  , PrimPower    ==> "Power set, i.e. the set of all subsets.  Also works on bags."
   ]
 
 -- | A map from some primitives to their corresponding page in the
@@ -77,6 +77,7 @@ primReference = M.fromList
   , PrimBOp Impl ==> "logic-ops"
   , PrimBOp Iff  ==> "logic-ops"
   , PrimBOp CartProd ==> "cp"
+  , PrimPower    ==> "power"
   ]
 
 otherDoc :: Map String String

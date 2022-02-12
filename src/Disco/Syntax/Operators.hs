@@ -67,6 +67,7 @@ data BOp = Add      -- ^ Addition (@+@)
          | Divides  -- ^ Divisibility test (@|@)
          | Choose   -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons     -- ^ List cons (@::@)
+         | CartProd -- ^ Cartesian product of sets (@**@ / @⨯@)
          | Union    -- ^ Union of two sets (@union@ / @∪@)
          | Inter    -- ^ Intersection of two sets (@intersect@ / @∩@)
          | Diff     -- ^ Difference between two sets (@\@)
@@ -135,6 +136,8 @@ opTable =
   , [ uopInfo Pre  Neg     ["-"]
     ]
   , [ bopInfo In   Choose  ["choose"]
+    ]
+  , [ bopInfo InR  CartProd ["><", "⨯"]
     ]
   , [ bopInfo InL  Union   ["union", "∪"]
     , bopInfo InL  Inter   ["intersect", "∩"]

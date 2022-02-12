@@ -267,6 +267,8 @@ compilePrim ty PrimSet = compilePrimErr PrimSet ty
 compilePrim _ PrimB2C = return $ CConst OBagToCounts
 compilePrim (_ :->: TyBag _) PrimC2B = return $ CConst OCountsToBag
 compilePrim ty PrimC2B = compilePrimErr PrimC2B ty
+compilePrim (_ :->: TyBag _) PrimUC2B = return $ CConst OUnsafeCountsToBag
+compilePrim ty PrimUC2B = compilePrimErr PrimUC2B ty
 compilePrim (TyMap _ _ :->: _) PrimMapToSet = return $ CConst OMapToSet
 compilePrim (_ :->: TyMap _ _) PrimSetToMap = return $ CConst OSetToMap
 compilePrim ty PrimMapToSet = compilePrimErr PrimMapToSet ty
@@ -467,6 +469,14 @@ compileBOp (TyGraph _) (TyGraph _) (TyGraph _) op
         [ Add ==> OOverlay,
           Mul ==> OConnect
         ]
+
+-- The Cartesian product operator just compiles to library function calls.
+compileBOp (TySet _) _ _ CartProd =
+  CVar (Named Stdlib "container" .- string2Name "setCP")
+compileBOp (TyBag _) _ _ CartProd =
+  CVar (Named Stdlib "container" .- string2Name "bagCP")
+compileBOp (TyList _) _ _ CartProd =
+  CVar (Named Stdlib "list" .- string2Name "listCP")
 
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op

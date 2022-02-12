@@ -1,4 +1,5 @@
 using NoStdLib
+using Primitives
 
 import list
 import product
@@ -12,6 +13,15 @@ import product
 setSize : Set(a) -> N
 setSize(s) = length(list(s))
 
+||| Cartesian product of two sets, i.e. the set of all possible ordered pairs
+||| with one element from each set.
+
+!!! setCP({1,2}, {'a','b'}) == {(1,'a'), (1,'b'), (2,'a'), (2,'b')}
+!!! setCP({}, {1,2,3}) == {}
+!!! ∀ A : Set(N), B : Set(N). setSize(setCP(A, B)) == setSize(A) * setSize(B)
+setCP : Set(a) * Set(b) -> Set(a * b)
+setCP (A,B) = unions(each(\a. each(\b. (a,b), B), A))
+
 ||| The size of a bag, i.e. the number of elements it contains (counting multiplicity).
 !!! bagSize(bag([])) == 0
 !!! bagSize(bag([1,2,3])) == 3
@@ -19,6 +29,20 @@ setSize(s) = length(list(s))
 !!! bagSize(⟅1 # 1000000, 2 # 990482⟆) == 1990482
 bagSize : Bag(a) -> N
 bagSize(b) = foldr(\((_,n), s). n + s, 0, list(bagCounts(b)))
+
+||| Cartesian product of two bags, i.e. the bag of all possible
+||| ordered pairs with one element taken from each bag.  Note that if
+||| there are multiple copies of an element, they are considered
+||| distinct for the purposes of counting how many ways there are to
+||| form a given pair.
+
+!!! bagCounts(bagCP(bag [1,1,1], bag ['x'])) == {((1,'x'), 3)}
+!!! bagCP(bag [1,1,2], bag "hello") == ⟅(1, 'e') # 2, (1, 'h') # 2, (1, 'l') # 4, (1, 'o') # 2, (2, 'e'), (2, 'h'), (2, 'l') # 2, (2, 'o')⟆
+!!! ∀ A : List(N), B : List(N). bag(listCP(A,B)) == bagCP(bag(A), bag(B))
+!!! ∀ A : List(N), B : List(N). bagSize(bagCP(bag(A), bag(B))) == bagSize(bag(A)) * bagSize(bag(B))
+
+bagCP : Bag(a) * Bag(b) -> Bag(a * b)
+bagCP (A,B) = $unsafeBagFromCounts(each(\((a,m),(b,n)). ((a,b), m*n), setCP(bagCounts(A), bagCounts(B))))
 
 reducebag : (a × a → a) × a × Bag(a) → a
 reducebag(f,z,b) = foldr(f,z,list(b))

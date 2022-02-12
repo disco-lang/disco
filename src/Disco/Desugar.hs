@@ -240,6 +240,18 @@ desugarAbs quant overallTy body = do
 -- Term desugaring
 ------------------------------------------------------------
 
+-- | Desugar the application of a "bag from counts" primitive on a
+--   list, either a safe or unsafe variant.
+desugarCList2B :: Member Fresh r => Prim -> Type -> Type -> Type -> Sem r DTerm
+desugarCList2B p ty cts b = do
+  c <- fresh (string2Name "c")
+  body <- desugarTerm $
+    tapp (ATPrim (TyBag cts :->: TyBag b) p)
+      (tapp (ATPrim (TyList cts :->: TyBag cts) PrimBag)
+        (atVar (TyList cts) c)
+      )
+  return $ mkLambda ty [c] body
+
 -- | Desugar a typechecked term.
 desugarTerm :: Member Fresh r => ATerm -> Sem r DTerm
 desugarTerm (ATVar ty x) = return $ DTVar ty (coerce x)
@@ -247,14 +259,8 @@ desugarTerm (ATPrim (ty1 :->: resTy) (PrimUOp uop))
   | uopDesugars ty1 resTy uop = desugarPrimUOp ty1 resTy uop
 desugarTerm (ATPrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
-desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = do
-  c <- fresh (string2Name "c")
-  body <- desugarTerm $
-    tapp (ATPrim (TyBag cts :->: TyBag b) PrimC2B)
-      (tapp (ATPrim (TyList cts :->: TyBag cts) PrimBag)
-        (atVar (TyList cts) c)
-      )
-  return $ mkLambda ty [c] body
+desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = desugarCList2B PrimC2B ty cts b
+desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimUC2B) = desugarCList2B PrimUC2B ty cts b
 
 desugarTerm (ATPrim ty x)        = return $ DTPrim ty x
 desugarTerm ATUnit               = return DTUnit

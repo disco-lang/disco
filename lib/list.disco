@@ -59,6 +59,14 @@ length : List(a) → ℕ
 length [] = 0
 length (_::l) = 1 + length l
 
+||| The Cartesian product of two lists.
+!!! listCP([1,2],[3,4]) == [(1,3), (1,4), (2,3), (2,4)]
+!!! listCP([], [1,2,3]) == []
+!!! listCP([1,2,3], []) == []
+!!! ∀ xs : List(N), ys : List(N). length(listCP(xs,ys)) == length(xs) * length(ys)
+listCP : List(a) * List(b) -> List(a * b)
+listCP(as,bs) = concat(eachlist(\a. eachlist(\b. (a,b), bs), as))
+
 zipWith : (a × b → c) × List(a) × List(b) -> List(c)
 zipWith(_, [], _) = []
 zipWith(_, _, []) = []

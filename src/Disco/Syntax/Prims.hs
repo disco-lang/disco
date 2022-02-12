@@ -52,6 +52,8 @@ data Prim where
 
   PrimB2C        :: Prim        -- ^ bag -> set of counts conversion
   PrimC2B        :: Prim        -- ^ set of counts -> bag conversion
+  PrimUC2B       :: Prim        -- ^ unsafe set of counts -> bag conversion
+                                --   that assumes all distinct
   PrimMapToSet   :: Prim        -- ^ Map k v -> Set (k × v)
   PrimSetToMap   :: Prim        -- ^ Set (k × v) -> Map k v
 
@@ -134,6 +136,7 @@ primTable =
 
   , PrimInfo PrimB2C       "bagCounts"      True
   , PrimInfo PrimC2B       "bagFromCounts"  True
+  , PrimInfo PrimUC2B      "unsafeBagFromCounts" False
   , PrimInfo PrimMapToSet  "mapToSet"       True
   , PrimInfo PrimSetToMap  "map"            True
 

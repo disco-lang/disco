@@ -622,6 +622,11 @@ typecheck Infer (TPrim prim) = do
       constraint $ CQual QCmp a
       return $ TyContainer c (a :*: TyN) :->: TyBag a
 
+    inferPrim PrimUC2B = do
+      a <- freshTy
+      c <- freshAtom
+      return $ TyContainer c (a :*: TyN) :->: TyBag a
+
     inferPrim PrimMapToSet  = do
       k <- freshTy
       v <- freshTy
@@ -715,6 +720,12 @@ typecheck Infer (TPrim prim) = do
         ]
       let ca = TyContainer c a
       return $ (TyN :*: TyN :->: TyN) :*: ca :*: ca :->: ca
+
+    inferPrim (PrimBOp CartProd) = do
+      a <- freshTy
+      b <- freshTy
+      c <- freshAtom
+      return $ TyContainer c a :*: TyContainer c b :->: TyContainer c (a :*: b)
 
     inferPrim (PrimBOp setOp) | setOp `elem` [Union, Inter, Diff, Subset] = do
       a <- freshTy

@@ -403,6 +403,11 @@ appConst k = \case
     where
       assoc ((a, b), c) = (a, (b, c))
 
+  OUnsafeCountsToBag -> withBag OUnsafeCountsToBag $
+    out . VBag . map (second (uncurry (*)) . assoc . first (vpair id vint))
+    where
+      assoc ((a, b), c) = (a, (b, c))
+
   --------------------------------------------------
   -- Maps
 

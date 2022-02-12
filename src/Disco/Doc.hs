@@ -100,6 +100,7 @@ otherDoc = M.fromList
   , "Boolean"    ==> docB
   , "Prop"       ==> "The type of propositions."
   , "Set"        ==> "The type of finite sets."
+  , "|~|"        ==> "Absolute value, or the size of a collection."
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
@@ -129,4 +130,5 @@ otherReference = M.fromList
   , "Boolean"    ==> "bool"
   , "Prop"       ==> "prop"
   , "Set"        ==> "set"
+  , "|~|"        ==> "size"
   ]

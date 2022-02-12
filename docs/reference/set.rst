@@ -57,4 +57,4 @@ To check whether a set contains a given element, one can use the
 
 Sets support various operations, including :doc:`size <size>`,
 :doc:`union <set-ops>`, :doc:`intersection <set-ops>`,
-:doc:`subset <set-ops>`, and :doc:`power set <power>`.
+:doc:`difference <set-ops>`, :doc:`subset <set-ops>`, and :doc:`power set <power>`.

@@ -20,6 +20,14 @@ notation ``∪`` and ``∩``.
    Disco> {1,2,3} intersect {2,3,4}
    {2, 3}
 
+The *difference* of two sets can be found using the set difference
+operator, written ``\``:
+
+::
+
+   Disco> {7 .. 12} \ {1 .. 10}
+   {11, 12}
+
 You can check whether one set is a subset of another using the
 ``subset`` operator (or the Unicode symbol ``⊆``):
 

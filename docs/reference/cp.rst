@@ -2,7 +2,7 @@ Cartesian product
 =================
 
 The *Cartesian product* operator, written ``><`` (or, using Unicode,
-as ``⨯``), operates on two collections of the same type (either
+as ``×``), operates on two collections of the same type (either
 :doc:`sets <set>`, :doc:`bags <bag>`, or :doc:`lists <list>`), and
 forms the collection of all possible pairs with one element taken from
 the first collection and the other from the second.

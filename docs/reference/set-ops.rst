@@ -37,3 +37,7 @@ You can check whether one set is a subset of another using the
    true
    Disco> {7 .. 11} subset {1 .. 10}
    false
+
+Note that Disco does not support the set complement operation, since
+the complement of a finite set is infinite whenever the domain is
+infinite.

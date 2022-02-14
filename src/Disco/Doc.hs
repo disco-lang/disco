@@ -52,6 +52,9 @@ primDoc = M.fromList
 
   , PrimBOp CartProd ==> "Cartesian product, i.e. the collection of all pairs.  Also works on bags and sets."
   , PrimPower    ==> "Power set, i.e. the set of all subsets.  Also works on bags."
+  , PrimBOp Union ==> "Union of two sets (or bags)."
+  , PrimBOp Inter ==> "Intersection of two sets (or bags)."
+  , PrimBOp Diff  ==> "Difference of two sets (or bags)."
   ]
 
 -- | A map from some primitives to their corresponding page in the
@@ -78,6 +81,9 @@ primReference = M.fromList
   , PrimBOp Iff  ==> "logic-ops"
   , PrimBOp CartProd ==> "cp"
   , PrimPower    ==> "power"
+  , PrimBOp Union ==> "set-ops"
+  , PrimBOp Inter ==> "set-ops"
+  , PrimBOp Diff  ==> "set-ops"
   ]
 
 otherDoc :: Map String String

@@ -106,7 +106,7 @@ inferTelescope inferOne tel = do
 --   imports should already be checked and passed in as the second
 --   argument.
 checkModule
-  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
@@ -114,20 +114,20 @@ checkModule name imports (Module es _ m docs terms) = do
       -- XXX this isn't right, if multiple modules define the same type synonyms.
       -- Need to use a normal Ctx for tydefs too.
       importTyDefnCtx = M.unions (imports ^.. traverse . miTydefs)
-  tyDefnCtx <- makeTyDefnCtx tydefs
+  tyDefnCtx <- mapError noLoc $ makeTyDefnCtx tydefs
   withTyDefns (tyDefnCtx `M.union` importTyDefnCtx) $ do
-    tyCtx     <- makeTyCtx name typeDecls
+    tyCtx     <- mapError noLoc $ makeTyCtx name typeDecls
     extends importTyCtx $ extends tyCtx $ do
-      mapM_ checkTyDefn tydefs
+      mapM_ (checkTyDefn name) tydefs
       adefns <- mapM (checkDefn name) defns
       let defnCtx = ctxForModule name (map (getDefnName &&& id) adefns)
           docCtx = ctxForModule name docs
           dups = filterDups . map getDefnName $ adefns
       case dups of
-        (x:_) -> throw $ DuplicateDefns (coerce x)
+        (x:_) -> throw $ noLoc $ DuplicateDefns (coerce x)
         [] -> do
-          aprops <- checkProperties docCtx
-          aterms <- mapM inferTop terms
+          aprops <- mapError noLoc $ checkProperties docCtx  -- XXX location?
+          aterms <- mapError noLoc $ mapM inferTop terms     -- XXX location?
           return $ ModuleInfo name imports docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
@@ -153,8 +153,8 @@ makeTyDefnCtx tydefs = do
     []    -> return . M.fromList $ map convert tydefs
 
 -- | Check the validity of a type definition.
-checkTyDefn :: Members '[Reader TyDefCtx, Error TCError] r => TypeDefn -> Sem r ()
-checkTyDefn defn@(TypeDefn x args body) = do
+checkTyDefn :: Members '[Reader TyDefCtx, Error LocTCError] r => ModuleName -> TypeDefn -> Sem r ()
+checkTyDefn name defn@(TypeDefn x args body) = mapError (LocTCError (Just (name .- string2Name x))) $ do
 
   -- First, make sure the body is a valid type, i.e. everything inside
   -- it is well-kinded.
@@ -255,9 +255,9 @@ checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 -- | Type check a top-level definition in the given module.
 checkDefn
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output Message] r
   => ModuleName -> TermDefn -> Sem r Defn
-checkDefn name (TermDefn x clauses) = do
+checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $ do
 
   -- Check that all clauses have the same number of patterns
   checkNumPats clauses

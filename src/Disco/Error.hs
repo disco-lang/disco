@@ -33,7 +33,8 @@ import           Disco.Names                      (ModuleName)
 import           Disco.Parser                     (DiscoParseError)
 import           Disco.Pretty
 import           Disco.Typecheck.Solve
-import           Disco.Typecheck.Util             (TCError (..))
+import           Disco.Typecheck.Util             (LocTCError (..),
+                                                   TCError (..))
 import           Disco.Types
 import           Disco.Types.Qualifiers
 
@@ -47,7 +48,7 @@ data DiscoError where
   CyclicImport :: [ModuleName] -> DiscoError
 
   -- | Error encountered during typechecking.
-  TypeCheckErr :: TCError -> DiscoError
+  TypeCheckErr :: LocTCError -> DiscoError
 
   -- | Error encountered during parsing.
   ParseErr :: ParseErrorBundle String DiscoParseError -> DiscoError
@@ -94,13 +95,18 @@ outputDiscoErrors m = do
 
 instance Pretty DiscoError where
   pretty = \case
-    ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
-    CyclicImport ms  -> cyclicImportError ms
-    TypeCheckErr te  -> prettyTCError te
-    ParseErr pe      -> text (errorBundlePretty pe)
-    EvalErr ee       -> prettyEvalError ee
-    Panic s          ->
-      hcat
+    ModuleNotFound m  -> "Error: couldn't find a module named '" <> text m <> "'."
+    CyclicImport ms   -> cyclicImportError ms
+    TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
+    TypeCheckErr (LocTCError (Just n) te) ->
+      vcat
+        [ "While checking " <> pretty' n <> ":"
+        , nest 2 $ prettyTCError te
+        ]
+    ParseErr pe       -> text (errorBundlePretty pe)
+    EvalErr ee        -> prettyEvalError ee
+    Panic s           ->
+      vcat
         [ "Bug! " <> text s
         , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
         ]

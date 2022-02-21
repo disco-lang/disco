@@ -1,4 +1,5 @@
 Loading qualskolem.disco...
-Error: type variable a represents any type, so we cannot assume values of that type
-  can be subtracted.
-https://disco-lang.readthedocs.io/en/latest/reference/qual-skolem.html
+While checking qualskolem.f:
+  Error: type variable a represents any type, so we cannot assume values of that type
+    can be subtracted.
+  https://disco-lang.readthedocs.io/en/latest/reference/qual-skolem.html

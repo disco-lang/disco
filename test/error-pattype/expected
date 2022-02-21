@@ -1,14 +1,17 @@
-Error: the pattern
-  left(x)
-is supposed to have type
-  List(ℤ),
-but instead it has a sum type.
-https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
-Error: the pattern
-  (x1, y)
-is supposed to have type
-  ℕ,
-but instead it has a product type.
-https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
-Error: the shape of two types does not match.
-https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+While checking REPL.f:
+  Error: the pattern
+    left(x)
+  is supposed to have type
+    List(ℤ),
+  but instead it has a sum type.
+  https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
+While checking REPL.g:
+  Error: the pattern
+    (x1, y)
+  is supposed to have type
+    ℕ,
+  but instead it has a product type.
+  https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
+While checking REPL.h:
+  Error: the shape of two types does not match.
+  https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html

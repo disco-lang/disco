@@ -28,7 +28,7 @@ import           Prelude                          hiding (lookup)
 import           Disco.AST.Surface
 import           Disco.Context
 import           Disco.Messages
-import           Disco.Names                      (ModuleName)
+import           Disco.Names                      (ModuleName, QName)
 import           Disco.Typecheck.Constraints
 import           Disco.Typecheck.Solve
 import           Disco.Types
@@ -43,6 +43,16 @@ type TyCtx = Ctx Term PolyType
 ------------------------------------------------------------
 -- Errors
 ------------------------------------------------------------
+
+-- | A typechecking error, wrapped up together with the name of the
+--   thing that was being checked when the error occurred.
+data LocTCError = LocTCError (Maybe (QName Term)) TCError
+  deriving Show
+
+-- | Wrap a @TCError@ into a @LocTCError@ with no explicit provenance
+--   information.
+noLoc :: TCError -> LocTCError
+noLoc = LocTCError Nothing
 
 -- | Potential typechecking errors.
 data TCError

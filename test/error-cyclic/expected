@@ -1,3 +1,4 @@
 Loading cyclic.disco...
-Error: cyclic type definition for A.
-https://disco-lang.readthedocs.io/en/latest/reference/cyc-ty.html
+While checking cyclic.A:
+  Error: cyclic type definition for A.
+  https://disco-lang.readthedocs.io/en/latest/reference/cyc-ty.html

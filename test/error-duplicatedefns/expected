@@ -1,3 +1,4 @@
 Loading dupdefns.disco...
-Error: duplicate definition for x.
-https://disco-lang.readthedocs.io/en/latest/reference/dup-def.html
+While checking dupdefns.x:
+  Error: duplicate definition for x.
+  https://disco-lang.readthedocs.io/en/latest/reference/dup-def.html

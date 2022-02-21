@@ -23,7 +23,7 @@ import           GHC.Generics                            (Generic)
 
 import           Control.Lens                            (Getting, foldOf,
                                                           makeLenses, view)
-import           Control.Monad                           (filterM, foldM)
+import           Control.Monad                           (filterM)
 import           Control.Monad.IO.Class                  (MonadIO (..))
 import           Data.Bifunctor                          (first)
 import           Data.Map                                (Map)
@@ -39,7 +39,6 @@ import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Polysemy
-import           Polysemy.Error
 
 import           Disco.AST.Surface
 import           Disco.AST.Typed
@@ -48,7 +47,7 @@ import           Disco.Extensions
 import           Disco.Names
 import           Disco.Pretty                            hiding ((<>))
 import           Disco.Typecheck.Erase                   (erase, erasePattern)
-import           Disco.Typecheck.Util                    (TCError (..), TyCtx)
+import           Disco.Typecheck.Util                    (TyCtx)
 import           Disco.Types
 
 import           Paths_disco
@@ -110,6 +109,31 @@ data ModuleInfo = ModuleInfo
 
 makeLenses ''ModuleInfo
 
+instance Semigroup ModuleInfo where
+  -- | Two ModuleInfos
+  --   are merged by joining their doc, type, type definition, and term
+  --   contexts. The property context of the new module is the one
+  --   obtained from the second module. The name of the new module is
+  --   taken from the first. Definitions from later modules override
+  --   earlier ones.  Note that this function should really only be used
+  --   for the special top-level REPL module.
+  ModuleInfo n1 is1 d1 _ ty1 tyd1 tm1 tms1 es1
+    <> ModuleInfo _  is2 d2 p2 ty2 tyd2 tm2 tms2 es2
+    = ModuleInfo
+        n1
+        (is1 <> is2)
+        (d2 <> d1)
+        p2
+        (ty2 <> ty1)
+        (tyd2 <> tyd1)
+        (tm2 <> tm1)
+        (tms1 <> tms2)
+        (es1 <> es2)
+
+instance Monoid ModuleInfo where
+  mempty = emptyModuleInfo
+  mappend = (<>)
+
 -- | Get something from a module and its direct imports.
 withImports :: Monoid a => Getting a ModuleInfo a -> ModuleInfo -> a
 withImports l = view l <> foldOf (miImports . traverse . l)
@@ -125,32 +149,6 @@ allTydefs = withImports miTydefs
 -- | The empty module info record.
 emptyModuleInfo :: ModuleInfo
 emptyModuleInfo = ModuleInfo REPLModule M.empty emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
-
--- | Merges a list of ModuleInfos into one ModuleInfo. Two ModuleInfos
---   are merged by joining their doc, type, type definition, and term
---   contexts. The property context of the new module is the one
---   obtained from the second module. The name of the new module is
---   taken from the first. Definitions from later modules override
---   earlier ones.  Note that this function should really only be used
---   for the special top-level REPL module.
-combineModuleInfo :: Member (Error TCError) r => [ModuleInfo] -> Sem r ModuleInfo
-combineModuleInfo = foldM combineMods emptyModuleInfo
-  where
-    combineMods :: Member (Error TCError) r => ModuleInfo -> ModuleInfo -> Sem r ModuleInfo
-    combineMods
-      (ModuleInfo n1 is1 d1 _ ty1 tyd1 tm1 tms1 es1)
-      (ModuleInfo _  is2 d2 p2 ty2 tyd2 tm2 tms2 es2) =
-        return $
-          ModuleInfo
-            n1
-            (is1 <> is2)
-            (d2 <> d1)
-            p2
-            (ty2 <> ty1)
-            (tyd2 <> tyd1)
-            (tm2 <> tm1)
-            (tms1 <> tms2)
-            (es1 <> es2)
 
 ------------------------------------------------------------
 -- Module resolution

@@ -29,7 +29,7 @@ module Disco.Eval
          -- * Running things
 
        , runDisco
-       , runTCM, runTCMWith
+       , runTCM
        , inputTopEnv
        , parseDiscoModule
        , typecheckTop
@@ -50,7 +50,7 @@ module Disco.Eval
 import           Control.Arrow            ((&&&))
 import           Control.Exception        (SomeException, handle)
 import           Control.Lens             (makeLenses, toListOf, view, (%~),
-                                           (.~), (^.))
+                                           (.~), (<>~), (^.))
 import           Control.Monad            (unless, void, when)
 import           Control.Monad.IO.Class   (liftIO)
 import           Data.Bifunctor
@@ -235,26 +235,31 @@ parseDiscoModule file = do
 --------------------------------------------------
 -- Type checking
 
--- | Run a typechecking computation, providing it with local
---   (initially empty) contexts for variable types and type
---   definitions.
-runTCM ::
-  Member (Error DiscoError) r =>
-  Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a ->
-  Sem r a
-runTCM = runTCMWith emptyCtx M.empty
-
 -- | Run a typechecking computation, providing it with local contexts
 --   (initialized to the provided arguments) for variable types and
 --   type definitions.
-runTCMWith ::
+runTCM ::
+  Member (Error DiscoError) r =>
+  TyCtx ->
+  TyDefCtx ->
+  Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error LocTCError ': r) a ->
+  Sem r a
+runTCM tyCtx tyDefCtx =
+  mapError TypeCheckErr
+    . runFresh
+    . runReader @TyDefCtx tyDefCtx
+    . runReader @TyCtx tyCtx
+
+-- | A variant of 'runTCM' that requires only a 'TCError' instead
+--   of a 'LocTCError'.
+runTCM'  ::
   Member (Error DiscoError) r =>
   TyCtx ->
   TyDefCtx ->
   Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a ->
   Sem r a
-runTCMWith tyCtx tyDefCtx =
-  mapError TypeCheckErr
+runTCM' tyCtx tyDefCtx =
+  mapError (TypeCheckErr . noLoc)
     . runFresh
     . runReader @TyDefCtx tyDefCtx
     . runReader @TyCtx tyCtx
@@ -270,7 +275,7 @@ typecheckTop tcm = do
   imptyctx <- inputs (toListOf (replModInfo . miImports . traverse . miTys))
   tydefs <- inputs (view (replModInfo . miTydefs))
   imptydefs <- inputs (toListOf (replModInfo . miImports . traverse . miTydefs))
-  runTCMWith (tyctx <> mconcat imptyctx) (tydefs <> mconcat imptydefs) tcm
+  runTCM' (tyctx <> mconcat imptyctx) (tydefs <> mconcat imptydefs) tcm
 
 --------------------------------------------------
 -- Loading
@@ -359,7 +364,7 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
       tydefns = case mode of { Standalone -> M.empty ; REPL -> topTyDefns }
 
   -- Typecheck (and resolve names in) the module.
-  m  <- runTCMWith tyctx tydefns $ checkModule name importMap cm
+  m  <- runTCM tyctx tydefns $ checkModule name importMap cm
 
   -- Evaluate all the module definitions and add them to the topEnv.
   mapError EvalErr $ loadDefsFrom m
@@ -382,10 +387,7 @@ loadFile file = do
 addToREPLModule
   :: Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Message] r
   => ModuleInfo -> Sem r ()
-addToREPLModule mi = do
-  curMI <- use @TopInfo replModInfo
-  mi' <- mapError TypeCheckErr $ combineModuleInfo [curMI, mi]
-  modify @TopInfo $ replModInfo .~ mi'
+addToREPLModule mi = modify @TopInfo (replModInfo <>~ mi)
 
 -- | Set the given 'ModuleInfo' record as the currently loaded
 --   module. This also includes updating the top-level state with new

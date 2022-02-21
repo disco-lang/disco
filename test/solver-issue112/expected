@@ -1,5 +1,6 @@
 Loading diag-iso-bad.disco...
-Error: typechecking failed.
-https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+While checking diag-iso-bad.diagIso':
+  Error: typechecking failed.
+  https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
 Error: typechecking failed.
 https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

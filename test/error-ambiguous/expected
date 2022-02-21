@@ -1,8 +1,9 @@
 Loading ambiguous.disco...
 Loading a.disco...
 Loading b.disco...
-Error: the name x is ambiguous. It could refer to:
-  a.x
-  ambiguous.x
-  b.x
-https://disco-lang.readthedocs.io/en/latest/reference/ambiguous.html
+While checking ambiguous.y:
+  Error: the name x is ambiguous. It could refer to:
+    a.x
+    ambiguous.x
+    b.x
+  https://disco-lang.readthedocs.io/en/latest/reference/ambiguous.html

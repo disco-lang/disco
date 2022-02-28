@@ -17,7 +17,12 @@ similar "shape".
 
 The type of each variable in Disco must be declared with a :doc:`type
 signature <type-sig>`.  We can also give Disco hints about the
-intended type of an expression using a :doc:`type annotation <type-annot>`.
+intended type of an expression using a :doc:`type annotation
+<type-annot>`.
+
+In some situations, Disco may be willing to accept something of type
+``B`` when it was expecting an ``A``: specifically, when ``B`` is a
+:doc:`subtype <subtypes>` of ``A``.
 
 .. toctree::
    :maxdepth: 1
@@ -27,3 +32,4 @@ intended type of an expression using a :doc:`type annotation <type-annot>`.
    algebraic-types
    collection-types
    prop
+   subtypes

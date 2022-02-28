@@ -22,3 +22,4 @@ them.
    types
    collection-ops
    errors
+   symbols

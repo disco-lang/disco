@@ -591,6 +591,9 @@ handleLoad fp = do
   -- Now run any tests
   t <- inputToState $ runAllTests (m ^. miProps)
 
+  -- Evaluate and print any top-level terms
+  forM_ (m ^. miTerms) (mapError EvalErr . evalTerm True . fst)
+
   -- Remember which was the most recently loaded file, so we can :reload
   modify @TopInfo (lastFile ?~ fp)
   info "Loaded."

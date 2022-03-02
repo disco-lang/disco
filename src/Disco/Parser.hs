@@ -75,9 +75,11 @@ import qualified Data.Set                                as S
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Module
+import           Disco.Pretty                            (prettyStr)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
+import           Polysemy                                (run)
 
 ------------------------------------------------------------
 -- Lexer
@@ -105,13 +107,27 @@ makeLenses ''ParserState
 initParserState :: ParserState
 initParserState = ParserState NoIndent S.empty
 
+-- OpaqueTerm is a wrapper around Term just to make ShowErrorComponent
+-- happy, which requires Eq and Ord instances; but we can't make Term
+-- an instance of either.
+newtype OpaqueTerm = OT Term
+instance Show OpaqueTerm where
+  show (OT t) = show t
+instance Eq OpaqueTerm where
+  _ == _ = True
+instance Ord OpaqueTerm where
+  compare _ _ = EQ
+
 data DiscoParseError
   = ReservedVarName String
+  | InvalidPattern OpaqueTerm
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
-  showErrorComponent (ReservedVarName x) = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
+  showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
+  showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
   errorComponentLen (ReservedVarName x) = length x
+  errorComponentLen (InvalidPattern _)  = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -774,7 +790,7 @@ parseAtomicPattern :: Parser Pattern
 parseAtomicPattern = label "pattern" $ do
   t <- parseAtom
   case termToPattern t of
-    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Nothing -> customFailure $ InvalidPattern (OT t)
     Just p  -> return p
 
 -- | Parse a pattern, by parsing a term and then attempting to convert
@@ -783,7 +799,7 @@ parsePattern :: Parser Pattern
 parsePattern = label "pattern" $ do
   t <- parseTerm
   case termToPattern t of
-    Nothing -> fail $ "Invalid pattern: " ++ show t
+    Nothing -> customFailure $ InvalidPattern (OT t)
     Just p  -> return p
 
 -- | Attempt converting a term to a pattern.

@@ -24,8 +24,11 @@ module Disco.Interactive.CmdLine
 
   ) where
 
+import           Data.Version                           (showVersion)
+import           Paths_disco                            (version)
+
 import           Control.Lens                           hiding (use)
-import           Control.Monad                          (unless)
+import           Control.Monad                          (unless, when)
 import qualified Control.Monad.Catch                    as CMC
 import           Control.Monad.IO.Class                 (MonadIO (..))
 import           Data.Foldable                          (forM_)
@@ -55,15 +58,24 @@ import           Polysemy.Error
 
 -- | Command-line options for disco.
 data DiscoOpts = DiscoOpts
-  { evaluate  :: Maybe String  -- ^ A single expression to evaluate
-  , cmdFile   :: Maybe String  -- ^ Execute the commands in a given file
-  , checkFile :: Maybe String  -- ^ Check a file and then exit
-  , debugFlag :: Bool
+  { onlyVersion :: Bool          -- ^ Should we just print the version?
+  , evaluate    :: Maybe String  -- ^ A single expression to evaluate
+  , cmdFile     :: Maybe String  -- ^ Execute the commands in a given file
+  , checkFile   :: Maybe String  -- ^ Check a file and then exit
+  , debugFlag   :: Bool
   }
 
 discoOpts :: O.Parser DiscoOpts
 discoOpts = DiscoOpts
-  <$> O.optional (
+  <$> O.switch (
+        mconcat
+        [ O.long "version"
+        , O.short 'v'
+        , O.help "show current version"
+        ]
+        )
+
+   <*> O.optional (
         O.strOption (mconcat
           [ O.long "evaluate"
           , O.short 'e'
@@ -94,11 +106,14 @@ discoOpts = DiscoOpts
         ]
         )
 
+discoVersion :: String
+discoVersion = showVersion version
+
 discoInfo :: O.ParserInfo DiscoOpts
 discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
   [ O.fullDesc
   , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
-  , O.header "disco v0.1"
+  , O.header $ "disco " ++ discoVersion
   ]
 
 optsToCfg :: DiscoOpts -> DiscoConfig
@@ -109,11 +124,15 @@ optsToCfg opts = initDiscoConfig & debugMode .~ debugFlag opts
 ------------------------------------------------------------
 
 banner :: String
-banner = "Welcome to Disco!\n\nA language for programming discrete mathematics.\n\n"
+banner = "Welcome to Disco, version " ++ discoVersion ++ "!\n\nA language for programming discrete mathematics.\n\n"
 
 discoMain :: IO ()
 discoMain = do
   opts <- O.execParser discoInfo
+
+  when (onlyVersion opts) $ do
+    putStrLn discoVersion
+    exitSuccess
 
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner

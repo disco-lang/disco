@@ -1,3 +1,19 @@
+* 0.1.3.0 (3 March 2022)
+
+  - New features or syntax
+      - `∈` now works as a synonym for `elem`
+      - add `→` and `↔` as synonyms for `->`, `<->`
+
+  - Additional documentation for `|~|`, `power`
+
+  - UI
+      - `--help`, `--version`, and the welcome message now all report
+        the current version number
+      - Typechecking errors now report the name of the thing being
+        typechecked when the failure occurred
+      - The values of top-level expressions are now printed when
+        `:load`ing
+
 * 0.1.2.0 (12 February 2022)
 
   - New features or syntax

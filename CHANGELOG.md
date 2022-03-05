@@ -1,3 +1,9 @@
+* 0.1.3.1 (5 March 2022)
+
+  - Fix [#340](https://github.com/disco-lang/disco/issues/340): disco
+    no longer crashes when encountering an undefined name at runtime,
+    but prints a nice error message instead.
+
 * 0.1.3.0 (3 March 2022)
 
   - New features or syntax

@@ -303,7 +303,7 @@ getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
   case value of
     Just v  -> return (s, ty, v)
-    Nothing -> Left (UnboundError name)
+    Nothing -> Left (UnboundPanic name)
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition

@@ -153,16 +153,12 @@ runCESK cesk = case isFinal cesk of
   Just res -> return res
   Nothing  -> step cesk >>= runCESK
 
-(!!!) :: (Show a, Show b) => Ctx a b -> QName a -> b
-ctx !!! x = case Ctx.lookup' x ctx of
-  Nothing -> error $ "variable " ++ show x ++ " not found in environment\n"
-    ++ ppShow (Ctx.keysSet ctx)
-  Just v  -> v
-
 -- | Advance the CESK machine by one step.
 step :: Members '[Fresh, Random, State Mem] r => CESK -> Sem r CESK
 step cesk = case cesk of
-  (In (CVar x) e k) -> return $ Out (e !!! x) k
+  (In (CVar x) e k) -> case Ctx.lookup' x e of
+    Nothing -> return $ Up (UnboundError x) k
+    Just v  -> return $ Out v k
   (In (CNum d r) _ k) -> return $ Out (VNum d r) k
   (In (CConst OMatchErr) _ k) -> return $ Up NonExhaustive k
   (In (CConst OEmptyGraph) _ k) -> return $ Out (VGraph empty) k

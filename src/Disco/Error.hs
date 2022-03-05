@@ -29,7 +29,7 @@ import           Polysemy.Output
 import           Polysemy.Reader
 
 import           Disco.Messages
-import           Disco.Names                      (ModuleName)
+import           Disco.Names                      (ModuleName, QName)
 import           Disco.Parser                     (DiscoParseError)
 import           Disco.Pretty
 import           Disco.Typecheck.Solve
@@ -65,8 +65,12 @@ data DiscoError where
 -- | Errors that can be generated at runtime.
 data EvalError where
 
-  -- | An unbound name.  This shouldn't happen.
-  UnboundError  :: Name core  -> EvalError
+  -- | An unbound name was encountered.
+  UnboundError  :: QName core  -> EvalError
+
+  -- | An unbound name that really shouldn't happen, coming from some
+  --   kind of internal name generation scheme.
+  UnboundPanic  :: Name core   -> EvalError
 
   -- | Division by zero.
   DivByZero     ::              EvalError
@@ -128,10 +132,11 @@ cyclicImportError ms =
 
 prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
 prettyEvalError = \case
-   UnboundError x ->
+   UnboundPanic x ->
      ("Bug! No variable found named" <+> pretty' x <> ".")
      $+$
      "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
+   UnboundError x -> "Error: encountered undefined name" <+> pretty' x <> ". Maybe you haven't defined it yet?"
    DivByZero      -> "Error: division by zero."
    Overflow       -> "Error: that number would not even fit in the universe!"
    NonExhaustive  -> "Error: value did not match any of the branches in a case expression."
@@ -147,6 +152,7 @@ prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = \case
 
   -- XXX include some potential misspellings along with Unbound
+  --   see https://github.com/disco-lang/disco/issues/180
   Unbound x      -> vcat
     [ "Error: there is nothing named" <+> pretty' x <> "."
     , rtd "unbound"

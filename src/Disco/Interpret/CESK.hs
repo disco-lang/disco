@@ -21,8 +21,6 @@ module Disco.Interpret.CESK
   )
 where
 
-import           Text.Show.Pretty                   (ppShow)
-
 import           Unbound.Generics.LocallyNameless   (Bind, Name)
 
 import           Algebra.Graph

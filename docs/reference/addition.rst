@@ -23,7 +23,7 @@ If you ask for the :doc:`type <types>` of ``+``, you get
     Disco> :type +
     ~+~ : ℕ × ℕ → ℕ
 
-which says that it is a :doc:`function <functions>` taking :doc:`two
+which says that it is a :doc:`function <function>` taking :doc:`two
 <product>` natural numbers and returning a natural number.  However,
 as mentioned above, it also works on other numeric types such as
 integers and rational numbers.

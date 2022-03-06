@@ -33,4 +33,5 @@ with a link to the relevant Disco documentation.
     ℤ      U+2124            ``\mathbb{Z}``    ``Z``            :doc:`Integers <integer>`.
     𝔽      U+1D53D           ``\mathbb{F}``    ``F``            :doc:`Fractional numbers <fraction>`.
     ℚ      U+211A            ``\mathbb{Q}``    ``Q``            :doc:`Rational numbers <rational>`.
+    λ      U+033B            ``\lambda``       ``\``            :doc:`Anonymous function <function>`.
     ====== ================= ================= ================ ====================================

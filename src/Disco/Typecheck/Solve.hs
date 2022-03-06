@@ -687,12 +687,12 @@ simplify origVM cs
       -- original TyVarInfoMap and merge the result with the new TyVarInfoMap,
       -- yielding {b |-> {sub,add}}.
 
-
-    -- Create a subtyping constraint based on the variance of a type
-    -- constructor argument position: in the usual order for
-    -- covariant, and reversed for contravariant.
-    variance Co     ty1 ty2 = ty1 :<: ty2
-    variance Contra ty1 ty2 = ty2 :<: ty1
+    -- Create a constraint based on the variance of a type
+    -- constructor argument position: subtyping in the usual order for
+    -- covariant, reversed for contravariant, equality for invariant.
+    variance Co        = (:<:)
+    variance Contra    = flip (:<:)
+    variance Invariant = (:=:)
 
 --------------------------------------------------
 -- Step 4: Build constraint graph

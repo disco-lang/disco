@@ -14,7 +14,7 @@
 module Disco.Types.Rules
   ( -- * Arity
 
-    Variance(..), arity
+    Variance(..), arity, polarities
 
     -- * Qualifiers
   , Qualifier(..), bopQual
@@ -46,14 +46,19 @@ import qualified Data.Set               as S
 import           Disco.Types
 import           Disco.Types.Qualifiers
 
-------------------------------------------------------------
--- Arity
-------------------------------------------------------------
+--------------------------------------------------
+-- Variance / polarity / arity
+--------------------------------------------------
 
--- | A particular type argument can be either co- or contravariant
---   with respect to subtyping.
-data Variance = Co | Contra
+-- | A particular type argument / type variable can be covariant,
+--   contravariant, or invariant with respect to subtyping.
+data Variance = Co | Contra | Invariant
   deriving (Show, Read, Eq, Ord)
+
+instance Semigroup Variance where
+  Co <> Co         = Co
+  Contra <> Contra = Contra
+  _ <> _           = Invariant
 
 -- | The arity of a type constructor is a list of variances,
 --   expressing both how many type arguments the constructor takes,
@@ -74,6 +79,34 @@ arity CGraph         = [Co]
 arity (CUser _)      = error "Impossible! arity CUser"
   -- CUsers should always be replaced by their definitions before arity
   -- is called.
+
+newtype PolarityMap = PolarityMap { unPM :: Map Var Variance }
+
+instance Semigroup PolarityMap where
+  PolarityMap m1 <> PolarityMap m2 = PolarityMap (M.unionWith (<>) m1 m2)
+
+instance Monoid PolarityMap where
+  mempty = PolarityMap M.empty
+  mappend = (<>)
+
+-- | Compute the polarity of each type variable in a type,
+--   i.e. whether each variable is used in only positive (covariant)
+--   positions, only negative (contravariant), or both (invariant).
+--   This informs how we choose solutions
+polarities :: Type -> PolarityMap
+polarities = go Co
+  where
+    go :: Variance -> Type -> PolarityMap
+    go p (TyAtom (AVar var)) = PolarityMap (M.singleton var p)
+    go _ (TyAtom (ABase _))  = mempty
+    go p (TyCon con tys)     = mconcat $ zipWith (\v -> go (apply v p)) (arity con) tys
+
+    apply :: Variance -> Variance -> Variance
+    apply _ Invariant   = Invariant
+    apply Invariant v   = v
+    apply Co v          = v
+    apply Contra Co     = Contra
+    apply Contra Contra = Co
 
 ------------------------------------------------------------
 -- Subtyping rules

@@ -52,10 +52,11 @@ ignored).  Otherwise, ``0 <= x < 10`` is evaluated; and so on.
 
 There are three types of guards:
 
-* A *boolean guard* has the form ``if <expr>``, where ``<expr>`` is an
+* A *boolean guard* has the form ``if <expr>`` or ``when <expr>``, where ``<expr>`` is an
   expression of type ``Bool``.  It succeeds if the expression
-  evaluates to ``true``.
-* A *pattern guard* has the form ``when <expr> is <pattern>``.  It succeeds
+  evaluates to ``true``.  There is no difference between ``if`` and
+  ``when``; they are simply synonyms.
+* A *pattern guard* has the form ``if <expr> is <pattern>``, or ``when <expr> is <pattern>``.  It succeeds
   if the expression ``<expr>`` matches the pattern ``<pattern>``.
 * For convenience, the special guard ``otherwise`` is equivalent
   to ``if true``.

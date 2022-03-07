@@ -775,12 +775,13 @@ parseBranch = flip bind <$> parseTerm <*> parseGuards
 parseGuards :: Parser (Telescope Guard)
 parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parseGuard)
 
--- | Parse a single guard (either @if@ or @when@)
+-- | Parse a single guard (@if@, @if ... is@, or @let@)
 parseGuard :: Parser Guard
-parseGuard = parseGBool <|> parseGPat <|> parseGLet
+parseGuard = try parseGPat <|> parseGBool <|> parseGLet
   where
-    parseGBool = GBool <$> (embed <$> (reserved "if" *> parseTerm))
-    parseGPat  = GPat <$> (embed <$> (reserved "when" *> parseTerm))
+    guardWord = reserved "if" <|> reserved "when"
+    parseGBool = GBool <$> (embed <$> (guardWord *> parseTerm))
+    parseGPat  = GPat <$> (embed <$> (guardWord *> parseTerm))
                       <*> (reserved "is" *> parsePattern)
     parseGLet  = GLet <$> (reserved "let" *> parseBinding)
 

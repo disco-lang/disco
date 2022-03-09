@@ -545,7 +545,7 @@ valCmp (VType ty1) (VType ty2) = compare ty1 ty2
 valCmp (VBag cs1) (VBag cs2) = compareBags cs1 cs2
 valCmp (VMap m1) (VMap m2) = compareMaps (M.assocs m1) (M.assocs m2)
 valCmp (VGraph g1) (VGraph g2) = valCmp (graphSummary g1) (graphSummary g2)
-valCmp v1 v2 = error $ "valCmp\n  " ++ (take 100 (show v1)) ++ "...\n  " ++ take 100 (show v2) ++ "..."
+valCmp v1 v2 = error $ "valCmp\n  " ++ take 100 (show v1) ++ "...\n  " ++ take 100 (show v2) ++ "..."
 
 compareBags :: [(Value, Integer)] -> [(Value, Integer)] -> Ordering
 compareBags [] [] = EQ

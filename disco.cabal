@@ -455,7 +455,7 @@ library
                        unbound-generics >= 0.3 && < 0.5,
                        polysemy >= 1.6.0.0 && < 1.8,
                        polysemy-plugin >= 0.4 && < 0.5,
-                       polysemy-zoo >= 0.7 && < 0.8,
+                       polysemy-zoo >= 0.7 && < 0.9,
                        lens >= 4.14 && < 5.2,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.13,

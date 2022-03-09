@@ -1135,8 +1135,10 @@ typecheck mode t@(TContainer c xs ell)  = do
       return $ containerTy c tyv
     Check ty -> return ty
   eltTy <- getEltTy c resTy
-  when (c /= ListContainer) $ constraint $ CQual QCmp eltTy
-  when (isJust ell) $ constraint $ CQual QEnum eltTy   -- XXX causes container lib to fail
+
+  -- See Note [Container literal constraints]
+  when (c /= ListContainer && not (P.null xs)) $ constraint $ CQual QCmp eltTy
+  when (isJust ell) $ constraint $ CQual QEnum eltTy
   return $ ATContainer resTy c axns aell
 
   where
@@ -1145,6 +1147,43 @@ typecheck mode t@(TContainer c xs ell)  = do
       => Mode -> Maybe (Ellipsis Term) -> Sem r (Maybe (Ellipsis ATerm))
     typecheckEllipsis _ Nothing           = return Nothing
     typecheckEllipsis m (Just (Until tm)) = Just . Until <$> typecheck m tm
+
+-- ~~~~ Note [Container literal constraints]
+--
+-- It should only be possible to construct something of type Set(a) or
+-- Bag(a) when a is comparable, so we can normalize the set or bag
+-- value.  For example, Set(N) is OK, but Set(N -> N) is not.  On the
+-- other hand, List(a) is fine for any type a.  We want to maintain
+-- the invariant that we can only actually obtain a value of type
+-- Set(a) or Bag(a) if a is comparable.  This means we will be able to
+-- write polymorphic functions that take bags or sets as input without
+-- having to specify any constraints --- the only way to call such
+-- functions is with element types that actually support comparison.
+-- For example, 'unions' can simply have the type Set(Set(a)) ->
+-- Set(a).
+--
+-- Hence, container literals (along with the 'set' and 'bag'
+-- conversion functions) serve as "gatekeepers" to make sure we can
+-- only construct containers with appropriate element types.  So when
+-- we see a container literal, if it is a bag or set literal, we have
+-- to introduce an additional QCmp constraint for the element type.
+--
+-- But not so fast --- with that rule, 'unions' does not type check!
+-- To see why, look at the definition:
+--
+--   unions(ss) = foldr(~∪~, {}, list(ss))
+--
+-- The empty set literal in the definition means we end up generating
+-- a QCmp constraint on the element type anyway.  But there is a
+-- solution: we refine our invariant to say that we can only
+-- actually obtain a *non-empty* value of type Set(a) or Bag(a) if a
+-- is comparable.  Empty bags and sets are allowed to have any element
+-- type.  This is safe because there is no way to generate a non-empty
+-- set from an empty one, without also making use of something like a
+-- non-empty set literal or conversion function.  So we add a special
+-- case to the rule that says we only add a QCmp constraint in the
+-- case of a *non-empty* set or bag literal.  Now the definition of
+-- 'unions' type checks perfectly well.
 
 -- Container comprehensions
 typecheck mode tcc@(TContainerComp c bqt) = do

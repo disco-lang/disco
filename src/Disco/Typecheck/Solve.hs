@@ -421,6 +421,11 @@ decomposeQual = go S.empty
               let ty' = body tys
               go (S.insert (t, tys, q) seen) ty' q
 
+    -- If we have a container type where the container is still a variable,
+    -- just replace it with List for the purposes of generating constraints---
+    -- all containers (lists, bags, sets) have the same qualifier rules.
+    go seen (TyCon (CContainer (AVar _)) tys) q = go seen (TyCon CList tys) q
+
     -- Otherwise, decompose a type constructor according to the qualRules.
     go seen ty@(TyCon c tys) q = case qualRules c q of
       Nothing -> throw $ Unqual q ty

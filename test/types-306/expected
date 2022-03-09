@@ -1,0 +1,13 @@
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: values of type Bool → Bool cannot be compared.
+https://disco-lang.readthedocs.io/en/latest/reference/not-qual.html
+Error: values of type a5 → a6 cannot be compared.
+https://disco-lang.readthedocs.io/en/latest/reference/not-qual.html
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+{}

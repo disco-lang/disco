@@ -1,3 +1,16 @@
+* 0.1.4 (10 March 2022)
+
+  - New features or syntax
+      - `if` and `when` are now synonyms
+
+  - Bug fixes
+      - Only allow constructing sets and bags with element types
+        that can be compared ([#306](https://github.com/disco-lang/disco/issues/306))
+
+  - UI
+      - Test results are now printed in the same order in which
+        they were declared
+
 * 0.1.3.1 (5 March 2022)
 
   - Fix [#340](https://github.com/disco-lang/disco/issues/340): disco

@@ -97,6 +97,9 @@ eraseClause b = bind (map erasePattern ps) (erase t)
 data ModuleInfo = ModuleInfo
   { _miName     :: ModuleName
   , _miImports  :: Map ModuleName ModuleInfo
+
+  -- List of names declared by the module, in the order they occur
+  , _miNames    :: [QName Term]
   , _miDocs     :: Ctx Term Docs
   , _miProps    :: Ctx ATerm [AProperty]
   , _miTys      :: TyCtx
@@ -117,11 +120,12 @@ instance Semigroup ModuleInfo where
   --   taken from the first. Definitions from later modules override
   --   earlier ones.  Note that this function should really only be used
   --   for the special top-level REPL module.
-  ModuleInfo n1 is1 d1 _ ty1 tyd1 tm1 tms1 es1
-    <> ModuleInfo _  is2 d2 p2 ty2 tyd2 tm2 tms2 es2
+  ModuleInfo n1 is1 ns1 d1 _ ty1 tyd1 tm1 tms1 es1
+    <> ModuleInfo _  is2 ns2 d2 p2 ty2 tyd2 tm2 tms2 es2
     = ModuleInfo
         n1
         (is1 <> is2)
+        (ns1 <> ns2)
         (d2 <> d1)
         p2
         (ty2 <> ty1)
@@ -148,7 +152,7 @@ allTydefs = withImports miTydefs
 
 -- | The empty module info record.
 emptyModuleInfo :: ModuleInfo
-emptyModuleInfo = ModuleInfo REPLModule M.empty emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
+emptyModuleInfo = ModuleInfo REPLModule M.empty [] emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
 
 ------------------------------------------------------------
 -- Module resolution

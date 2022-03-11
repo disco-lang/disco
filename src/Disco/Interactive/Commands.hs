@@ -48,7 +48,7 @@ import           Polysemy.Error                   hiding (try)
 import           Polysemy.Output
 import           Polysemy.Reader
 
-import           Data.Maybe                       (maybeToList)
+import           Data.Maybe                       (mapMaybe, maybeToList)
 import           Disco.AST.Surface
 import           Disco.AST.Typed
 import           Disco.Compile
@@ -589,7 +589,7 @@ handleLoad fp = do
   setREPLModule m
 
   -- Now run any tests
-  t <- inputToState $ runAllTests (m ^. miProps)
+  t <- inputToState $ runAllTests (m ^. miNames) (m ^. miProps)
 
   -- Evaluate and print any top-level terms
   forM_ (m ^. miTerms) (mapError EvalErr . evalTerm True . fst)
@@ -602,18 +602,19 @@ handleLoad fp = do
 -- XXX Return a structured summary of the results, not a Bool;
 -- separate out results generation and pretty-printing, & move this
 -- somewhere else.
-runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
-runAllTests aprops
+runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
+runAllTests declNames aprops
   | Ctx.null aprops = return True
   | otherwise     = do
       info "Running tests..."
-      and <$> mapM (uncurry runTests) (Ctx.assocs aprops)
+      -- Use the order the names were defined in the module
+      and <$> mapM (uncurry runTests) (mapMaybe (\n -> (n,) <$> Ctx.lookup' (coerce n) aprops) declNames)
 
   where
     numSamples :: Int
     numSamples = 50   -- XXX make this configurable somehow
 
-    runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName ATerm -> [AProperty] -> Sem r Bool
+    runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName Term -> [AProperty] -> Sem r Bool
     runTests (QName _ n) props = do
       results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
       let failures = P.filter (not . testIsOk . snd) results

@@ -128,9 +128,12 @@ checkModule name imports (Module es _ m docs terms) = do
         [] -> do
           aprops <- mapError noLoc $ checkProperties docCtx  -- XXX location?
           aterms <- mapError noLoc $ mapM inferTop terms     -- XXX location?
-          return $ ModuleInfo name imports docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
+          return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
+
+        getDeclName :: TypeDecl -> Name Term
+        getDeclName (TypeDecl n _) = n
 
 --------------------------------------------------
 -- Type definitions

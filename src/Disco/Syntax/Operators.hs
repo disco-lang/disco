@@ -41,6 +41,7 @@ import qualified Data.Map                         as M
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
+         | UserUOp  -- ^ User-defined unary operator
   deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Binary operators.
@@ -74,6 +75,7 @@ data BOp = Add      -- ^ Addition (@+@)
          | Elem     -- ^ Element test (@∈@)
          | Subset   -- ^ Subset test (@⊆@)
          | ShouldEq -- ^ Equality assertion (@=!=@)
+         | UserBOp  -- ^ User-defined binary operator
   deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.

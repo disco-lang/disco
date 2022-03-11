@@ -341,6 +341,7 @@ reservedWords =
   , "N", "Z", "F", "Q", "ℕ", "ℤ", "𝔽", "ℚ"
   , "∀", "forall", "∃", "exists", "type"
   , "import", "using"
+  , "operator"
   ]
 
 -- | Parse an identifier, i.e. any non-reserved string beginning with
@@ -394,11 +395,10 @@ parseModule mode = do
         Standalone -> withExts
         REPL       -> withAdditionalExts
 
-  extFun exts $ do
-    imports  <- many parseImport
-    topLevel <- many parseTopLevel
-    let theMod = mkModule exts imports topLevel
-    return theMod
+  extFun exts $ mkModule exts
+    <$> many parseImport
+    <*> many parseOpDecl
+    <*> many parseTopLevel
     where
       groupTLs :: [DocThing] -> [TopLevel] -> TLResults
       groupTLs _ [] = emptyTLResults
@@ -431,7 +431,7 @@ parseModule mode = do
               (ts, ds2') = matchDefn ds2
           matchDefn ds2 = ([], ds2)
 
-      mkModule exts imps tls = Module exts imps (defnGroups decls) docs terms
+      mkModule exts imps ops tls = Module exts imps ops (defnGroups decls) docs terms
         where
           TLResults decls docs terms = groupTLs [] tls
 
@@ -455,6 +455,15 @@ parseImport = L.nonIndented sc $
 parseModuleName :: Parser String
 parseModuleName = lexeme $
   intercalate "/" <$> (some (alphaNumChar <|> oneOf "_-") `sepBy` char '/') <* optional (string ".disco")
+
+parseOpDecl :: Parser OperatorDecl
+parseOpDecl = do
+  reserved "operator"
+  -- XXX parse operator: need to update parseStandaloneOp so it will parse
+  -- /any/ standalone-op-like thing instead of just those that are predefined.
+  symbol "="
+  x <- ident
+  return $ OperatorDecl undefined x
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.

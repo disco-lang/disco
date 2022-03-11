@@ -17,7 +17,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..)
+         Module(..), OperatorDecl(..), TopLevel(..)
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -131,11 +131,15 @@ data UD
 data Module = Module
   { modExts    :: Set Ext             -- ^ Enabled extensions
   , modImports :: [String]            -- ^ Module imports
+  , modOpers   :: [OperatorDecl]      -- ^ User-defined operator declarations
   , modDecls   :: [Decl]              -- ^ Declarations
   , modDocs    :: [(Name Term, Docs)] -- ^ Documentation
   , modTerms   :: [Term]              -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
+
+data OperatorDecl = OperatorDecl OpInfo (Name Term)
+  deriving Show
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').

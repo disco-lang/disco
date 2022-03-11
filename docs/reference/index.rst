@@ -20,6 +20,7 @@ them.
    logic-ops
    syntax
    types
+   function
    collection-ops
    errors
    symbols

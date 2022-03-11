@@ -15,7 +15,7 @@ with a link to the relevant Disco documentation.
     ¬      U+AC              ``\neg``          ``not``          :doc:`Not <logic-ops>`
     ∧      U+2227            ``\land``         ``/\``           :doc:`And <logic-ops>`
     ∨      U+2227            ``\lor``          ``\/``           :doc:`Or <logic-ops>`
-    →      U+2192            ``\to``           ``->``           :doc:`Implies <logic-ops>`; :doc:`function type <function-types.rst>`
+    →      U+2192            ``\to``           ``->``           :doc:`Implies <logic-ops>`; :doc:`function type <function-type.rst>`
     ↔      U+2192            ``\iff``          ``<->``          :doc:`If and only if <logic-ops>`
     ≠      U+2260            ``\neq``          ``/=``           :doc:`Not equal to <compare>`.
     ≤      U+2264            ``\leq``          ``<=``           :doc:`Less-than-or-equal-to <compare>`.
@@ -33,5 +33,5 @@ with a link to the relevant Disco documentation.
     ℤ      U+2124            ``\mathbb{Z}``    ``Z``            :doc:`Integers <integer>`.
     𝔽      U+1D53D           ``\mathbb{F}``    ``F``            :doc:`Fractional numbers <fraction>`.
     ℚ      U+211A            ``\mathbb{Q}``    ``Q``            :doc:`Rational numbers <rational>`.
-    λ      U+033B            ``\lambda``       ``\``            :doc:`Anonymous function <function>`.
+    λ      U+033B            ``\lambda``       ``\``            :doc:`Anonymous function <anonymous-func>`.
     ====== ================= ================= ================ ====================================

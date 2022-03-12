@@ -461,8 +461,25 @@ parseModuleName = lexeme $
 parseTopLevel :: Parser TopLevel
 parseTopLevel = L.nonIndented sc $
       TLDoc  <$> parseDocThing
-  <|> TLDecl <$> try parseDecl
+  <|> TLDecl <$> parseDecl         -- See Note [Parsing definitions and top-level expressions]
   <|> TLExpr <$> thenIndented parseTerm
+
+  -- ~~~~ Note [Parsing definitions and top-level expressions]
+  --
+  -- The beginning of a definition might look the same as an
+  -- expression.  e.g. is f(x,y) the start of a definition of f, or an
+  -- expression with a function call?  We used to therefore wrap
+  -- 'parseDecl' in 'try'.  The problem is that if a definition has a
+  -- syntax error on the RHS, it would fail, backtrack, then try
+  -- parsing a top-level expression and fail when it got to the =
+  -- sign, giving an uninformative parse error message.
+  -- See https://github.com/disco-lang/disco/issues/346.
+  --
+  -- The solution is that we now do more careful backtracking within
+  -- parseDecl itself: when parsing a definition, we only backtrack if
+  -- we don't get a complete LHS + '=' sign; once we start parsing the
+  -- RHS of a definition we no longer backtrack, since it can't
+  -- possibly be a valid top-level expression.
 
 -- | Parse a documentation item: either a group of lines beginning
 --   with @|||@ (text documentation), or a group beginning with @!!!@
@@ -507,9 +524,14 @@ parseTyDecl = label "type declaration" $
 -- | Parse a definition of the form @x pat1 .. patn = t@.
 parseDefn :: Parser TermDefn
 parseDefn = label "definition" $
-  TermDefn
-  <$> ident
-  <*> indented ((:[]) <$> (bind <$> many parseAtomicPattern <*> (symbol "=" *> parseTerm)))
+  (\(x, ps) body -> TermDefn x [bind ps body])
+
+  -- Only backtrack if we don't get a complete 'LHS ='.  Once we see
+  -- an = sign, commit to parsing a definition, because it can't be a
+  -- valid standalone expression anymore.  If the RHS fails, we don't
+  -- want to backtrack, we just want to display the parse error.
+  <$> try ((,) <$> ident <*> indented (many parseAtomicPattern) <* reservedOp "=")
+  <*> indented parseTerm
 
 -- | Parse the definition of a user-defined algebraic data type.
 parseTyDefn :: Parser TypeDefn
@@ -518,7 +540,7 @@ parseTyDefn = label "type defintion" $ do
   indented $ do
     name <- parseTyDef
     args <- fromMaybe [] <$> optional (parens $ parseTyVarName `sepBy1` comma)
-    _ <- symbol "="
+    _ <- reservedOp "="
     TypeDefn name args <$> parseType
 
 -- | Parse the entire input as a term (with leading whitespace and

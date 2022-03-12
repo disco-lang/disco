@@ -30,6 +30,8 @@ module Disco.Parser
 
          -- * Disco parser
 
+       , parseStandaloneOp
+
          -- ** Modules
        , wholeModule, parseModule, parseExtName, parseTopLevel, parseDecl
        , parseImport, parseModuleName
@@ -64,7 +66,6 @@ import           Control.Lens                            (makeLenses, toListOf,
                                                           (.=))
 import           Control.Monad.State
 import           Data.Char                               (isAlpha, isDigit)
-import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
 import           Data.Maybe                              (fromMaybe)
@@ -215,7 +216,7 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]
-opChar = "~!@#$%^&*-+=|<>?/\\."
+opChar = "!@#$%^&*-+=|<>?/\\."
 
 parens, braces, angles, brackets, bagdelims, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
@@ -583,7 +584,7 @@ parseAtom = label "expression" $
   <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
   <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
   <|> TWild <$ try parseWild
-  <|> TPrim <$> try parseStandaloneOp
+  <|> TPrim <$> try parseStandaloneOpPrim
 
   -- Note primitives are NOT reserved words, so they are just parsed
   -- as identifiers.  This means that it is possible to shadow a
@@ -617,18 +618,45 @@ parseWild :: Parser ()
 parseWild = (lexeme . try . void) $
   string "_" <* notFollowedBy (alphaNumChar <|> oneOf "_'")
 
+parseStandaloneOp :: Parser OpFixity
+parseStandaloneOp =
+  recognizeBuiltinOp <$> lexeme (try ((char '~' *> parsePostfixOrInfix) <|> parsePrefix))
+  where
+    parsePostfixOrInfix :: Parser OpFixity
+    parsePostfixOrInfix = mkPostfixOrInfix <$> some (noneOf " \t\n\r()[]{},~") <*> optional (char '~')
+
+    mkPostfixOrInfix :: String -> Maybe Char -> OpFixity
+    mkPostfixOrInfix op Nothing  = UOpF Post (UserUOp op)
+    mkPostfixOrInfix op (Just _) = BOpF In (UserBOp op)
+
+    parsePrefix :: Parser OpFixity
+    parsePrefix = UOpF Pre . UserUOp <$> (some (noneOf " \t\n\r()[]{},~") <* char '~')
+
+    recognizeBuiltinOp :: OpFixity -> OpFixity
+    recognizeBuiltinOp op@(UOpF _ (UserUOp s)) = maybe op fst (find ((s `elem`) . snd) opList)
+    recognizeBuiltinOp op@(BOpF _ (UserBOp s)) = maybe op fst (find ((s `elem`) . snd) opList)
+    recognizeBuiltinOp op = op
+
+    opList = [ (op, syns) | OpInfo op syns _ <- concat opTable ]
+
 -- | Parse a standalone operator name with tildes indicating argument
 --   slots, e.g. ~+~ for the addition operator.
-parseStandaloneOp :: Parser Prim
-parseStandaloneOp = asum $ concatMap mkStandaloneOpParsers (concat opTable)
-  where
-    mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
-    mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
-      = map (\syn -> PrimUOp uop <$ try (lexeme (string syn >> char '~'))) syns
-    mkStandaloneOpParsers (OpInfo (UOpF Post uop) syns _)
-      = map (\syn -> PrimUOp uop <$ try (lexeme (char '~' >> string syn))) syns
-    mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
-      = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
+parseStandaloneOpPrim :: Parser Prim
+parseStandaloneOpPrim = do
+  op <- parseStandaloneOp
+  case op of
+    UOpF _ uop -> return $ PrimUOp uop
+    BOpF _ bop -> return $ PrimBOp bop
+
+  -- asum $ concatMap mkStandaloneOpParsers (concat opTable)
+  -- where
+  --   mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
+  --   mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
+  --     = map (\syn -> PrimUOp uop <$ try (lexeme (string syn >> char '~'))) syns
+  --   mkStandaloneOpParsers (OpInfo (UOpF Post uop) syns _)
+  --     = map (\syn -> PrimUOp uop <$ try (lexeme (char '~' >> string syn))) syns
+  --   mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
+  --     = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
 
     -- XXX TODO: improve the above so it first tries to parse a ~,
     --   then parses any postfix or infix thing; or else it looks for
@@ -636,11 +664,6 @@ parseStandaloneOp = asum $ concatMap mkStandaloneOpParsers (concat opTable)
     --   need for 'try' and also potentially improve error messages.
     --   The below may come in useful.
 
-    -- flatOpTable = concat opTable
-
-    -- prefixOps  = [ (uop, syns) | (OpInfo (UOpF Pre uop) syns _)  <- flatOpTable ]
-    -- postfixOps = [ (uop, syns) | (OpInfo (UOpF Post uop) syns _) <- flatOpTable ]
-    -- infixOps   = [ (bop, syns) | (OpInfo (BOpF _ bop) syns _)    <- flatOpTable ]
 
 -- | Parse a primitive name starting with a $.
 parsePrim :: Parser Prim

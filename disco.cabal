@@ -1,6 +1,6 @@
 cabal-version:       2.4
 name:                disco
-version:             0.1.4
+version:             0.1.5
 synopsis:            Functional programming language for teaching discrete math.
 description:         Disco is a simple functional programming language for use in
                      teaching discrete math.  Its syntax is designed to be close

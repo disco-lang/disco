@@ -98,6 +98,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/error-numpatterns/expected
                      test/error-numpatterns/input
                      test/error-numpatterns/numpatterns.disco
+                     test/error-parse-RHS/expected
+                     test/error-parse-RHS/input
                      test/error-pattype/expected
                      test/error-pattype/input
                      test/error-polyrec/expected
@@ -109,6 +111,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/error-tyargs/error-tyargs.disco
                      test/error-tyargs/expected
                      test/error-tyargs/input
+                     test/error-unbound/expected
+                     test/error-unbound/input
                      test/error-unboundtyvar/expected
                      test/error-unboundtyvar/input
                      test/error-unboundtyvar/unboundtyvar.disco
@@ -309,6 +313,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/syntax-types/input
                      test/types-192/expected
                      test/types-192/input
+                     test/types-306/expected
+                     test/types-306/input
                      test/types-bind/expected
                      test/types-bind/input
                      test/types-char-string/expected

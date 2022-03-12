@@ -1,3 +1,10 @@
+* 0.1.5 (12 March 2022)
+
+  - Syntax errors in function definitions now result in much more
+    helpful error messages.  Before, it would just complain about
+    something being wrong with the '=' sign.
+    ([#346](https://github.com/disco-lang/disco/issues/346))
+
 * 0.1.4 (10 March 2022)
 
   - New features or syntax

@@ -1,0 +1,7 @@
+1:11:
+  |
+1 | f(x) = x +
+  |           ^
+unexpected end of input
+expecting expression or operator
+

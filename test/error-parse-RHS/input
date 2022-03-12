@@ -1,0 +1,5 @@
+f : N -> N
+f(x) = x +
+
+g : N -> N
+g(x) = {? 5 if x =< 5, 6 otherwise ?}

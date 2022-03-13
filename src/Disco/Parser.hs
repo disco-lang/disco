@@ -457,14 +457,21 @@ parseModuleName :: Parser String
 parseModuleName = lexeme $
   intercalate "/" <$> (some (alphaNumChar <|> oneOf "_-") `sepBy` char '/') <* optional (string ".disco")
 
+-- | Parse a user-defined operator declaration.
+--   'operator' <op> '=' <name>, 'precedence' 'of' <op> [, ('left' | 'right') 'associative']
 parseOpDecl :: Parser OperatorDecl
 parseOpDecl = do
   reserved "operator"
-  -- XXX parse operator: need to update parseStandaloneOp so it will parse
-  -- /any/ standalone-op-like thing instead of just those that are predefined.
+  op <- parseStandaloneOp
   symbol "="
-  x <- ident
-  return $ OperatorDecl undefined x
+  def <- ident
+  comma
+  reserved "precedence"
+  reserved "of"
+  precExample <- parseStandaloneOp
+  assoc <- optional $
+    comma *> (L <$ reserved "left" <|> R <$ reserved "right") <* reserved "associative"
+  return $ OperatorDecl undefined undefined
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.

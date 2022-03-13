@@ -197,7 +197,7 @@ ensureEnabled e = do
 
 -- | Generically consume whitespace, including comments.
 sc :: Parser ()
-sc = L.space space1 lineComment empty {- no block comments in disco -}
+sc = L.space space1 lineComment empty {- no block comments in disco; see #138 -}
   where
     lineComment  = L.skipLineComment "--"
 
@@ -216,7 +216,7 @@ reservedOp s = (lexeme . try) (string s *> notFollowedBy (oneOf opChar))
 
 -- | Characters that can occur in an operator symbol.
 opChar :: [Char]
-opChar = "!@#$%^&*-+=|<>?/\\."
+opChar = "!@#$%^&*-+=|<>?/\\.~"
 
 parens, braces, angles, brackets, bagdelims, fbrack, cbrack :: Parser a -> Parser a
 parens    = between (symbol "(") (symbol ")")
@@ -647,23 +647,6 @@ parseStandaloneOpPrim = do
   case op of
     UOpF _ uop -> return $ PrimUOp uop
     BOpF _ bop -> return $ PrimBOp bop
-
-  -- asum $ concatMap mkStandaloneOpParsers (concat opTable)
-  -- where
-  --   mkStandaloneOpParsers :: OpInfo -> [Parser Prim]
-  --   mkStandaloneOpParsers (OpInfo (UOpF Pre uop) syns _)
-  --     = map (\syn -> PrimUOp uop <$ try (lexeme (string syn >> char '~'))) syns
-  --   mkStandaloneOpParsers (OpInfo (UOpF Post uop) syns _)
-  --     = map (\syn -> PrimUOp uop <$ try (lexeme (char '~' >> string syn))) syns
-  --   mkStandaloneOpParsers (OpInfo (BOpF _ bop) syns _)
-  --     = map (\syn -> PrimBOp bop <$ try (lexeme (char '~' >> string syn >> char '~'))) syns
-
-    -- XXX TODO: improve the above so it first tries to parse a ~,
-    --   then parses any postfix or infix thing; or else it looks for
-    --   a prefix thing followed by a ~.  This will get rid of the
-    --   need for 'try' and also potentially improve error messages.
-    --   The below may come in useful.
-
 
 -- | Parse a primitive name starting with a $.
 parsePrim :: Parser Prim

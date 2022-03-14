@@ -37,9 +37,9 @@ information about the different types of patterns that can be used.
 
 .. toctree::
 
-  - var-pattern
-  - lit-pattern
-  - wild-pattern
-  - arith-pattern
-  - prod-pattern
-  - sum-pattern
+   lit-pattern
+   var-pattern
+   wild-pattern
+   arith-pattern
+   prod-pattern
+   sum-pattern

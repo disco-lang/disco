@@ -1,0 +1,3 @@
+Literal pattern
+===============
+

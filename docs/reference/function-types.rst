@@ -18,3 +18,7 @@ can be used in the same ways as any other values: for example,
 functions :doc:`can be given as input to other functions
 <higher-order>`, or returned as output, we can have lists of
 functions, etc.
+
+Function values cannot be :doc:`compared <compare>`, because in
+general this would require testing the functions on every single
+possible input, of which there might be infinitely many.

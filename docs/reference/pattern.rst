@@ -15,7 +15,9 @@ to ``f`` is the number ``5``, then the output should be ``29``.
 
 Functions can be defined by multiple pattern-match *clauses*; Disco
 tries the clauses in order, one by one, and picks the first one that
-matches.  For example,
+matches.  (Note that :doc:`case expressions <case>` can also be used
+to define functions, in case more sophisticated logic is needed.)  For
+example,
 
 ::
 

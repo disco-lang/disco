@@ -16,6 +16,7 @@ them.
 .. toctree::
 
    arithmetic
+   compare
    numeric
    logic-ops
    syntax

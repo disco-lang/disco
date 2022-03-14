@@ -159,7 +159,7 @@ opTable =
     ]
   , [ bopInfo InR  Eq      ["=="]
     , bopInfo InR  ShouldEq ["=!="]
-    , bopInfo InR  Neq     ["/=", "≠"]
+    , bopInfo InR  Neq     ["/=", "≠", "!="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]
     , bopInfo InR  Leq     ["<=", "≤", "=<"]

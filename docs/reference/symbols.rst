@@ -17,9 +17,9 @@ with a link to the relevant Disco documentation.
     ∨      U+2227            ``\lor``          ``\/``           :doc:`Or <logic-ops>`
     →      U+2192            ``\to``           ``->``           :doc:`Implies <logic-ops>`; :doc:`function type <function-type.rst>`
     ↔      U+2192            ``\iff``          ``<->``          :doc:`If and only if <logic-ops>`
-    ≠      U+2260            ``\neq``          ``/=``           :doc:`Not equal to <compare>`.
-    ≤      U+2264            ``\leq``          ``<=``           :doc:`Less-than-or-equal-to <compare>`.
-    ≥      U+2265            ``\geq``          ``>=``           :doc:`Greater-than-or-equal-to <compare>`.
+    ≠      U+2260            ``\neq``          ``/=``, ``!=``   :doc:`Not equal to <compare>`.
+    ≤      U+2264            ``\leq``          ``<=``, ``=<``   :doc:`Less-than-or-equal-to <compare>`.
+    ≥      U+2265            ``\geq``          ``>=``, ``=>``   :doc:`Greater-than-or-equal-to <compare>`.
     ∀      U+2200            ``\forall``       ``forall``       :doc:`Universal quantification <prop>`
     ∃      U+2203            ``\exists``       ``exists``       :doc:`Existential quantification <prop>`
     ∸      U+2238                              ``.-``           :doc:`Saturating subtraction <subtraction>`

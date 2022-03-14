@@ -1,0 +1,3 @@
+#!/bin/zsh
+while true; do ack -f reference | entr -d make html; done
+

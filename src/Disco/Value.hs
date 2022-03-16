@@ -522,16 +522,16 @@ prettyBag ty vs
 -- Pretty-printing for test results
 ------------------------------------------------------------
 
-prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> Sem r Doc
-prettyResultCertainty r prop
-  = (if resultIsCertain r then "Certainly" else "Possibly") <+> "false:" <+> pretty (eraseProperty prop)
+prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r Doc
+prettyResultCertainty r prop res
+  = (if resultIsCertain r then "Certainly" else "Possibly") <+> text res <> ":" <+> pretty (eraseProperty prop)
 
 prettyTestFailure
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestResult -> Sem r Doc
 prettyTestFailure _    (TestResult True _ _)    = empty
 prettyTestFailure prop (TestResult False r env) =
-  prettyResultCertainty r prop
+  prettyResultCertainty r prop "false"
   $+$
   prettyFailureReason r
   $+$
@@ -542,7 +542,7 @@ prettyTestResult
   => AProperty -> TestResult -> Sem r Doc
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   =
-  prettyResultCertainty r prop
+  prettyResultCertainty r prop "true"
   $+$
   prettySuccessReason r
 

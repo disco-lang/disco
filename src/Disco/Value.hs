@@ -345,6 +345,17 @@ testReason (TestResult _ r _) = r
 testEnv :: TestResult -> TestEnv
 testEnv (TestResult _ _ e) = e
 
+testIsCertain :: TestResult -> Bool
+testIsCertain (TestResult _ r _) = resultIsCertain r
+
+resultIsCertain :: TestReason -> Bool
+resultIsCertain TestBool                        = True
+resultIsCertain TestEqual {}                    = True
+resultIsCertain (TestNotFound Exhaustive)       = True
+resultIsCertain (TestNotFound (Randomized _ _)) = False
+resultIsCertain (TestFound r)                   = testIsCertain r
+resultIsCertain (TestRuntimeError _)            = True
+
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp
   = VPDone TestResult
@@ -511,12 +522,18 @@ prettyBag ty vs
 -- Pretty-printing for test results
 ------------------------------------------------------------
 
+prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> Sem r Doc
+prettyResultCertainty r prop
+  = (if resultIsCertain r then "Certainly" else "Possibly") <+> "false:" <+> pretty (eraseProperty prop)
+
 prettyTestFailure
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
   => AProperty -> TestResult -> Sem r Doc
 prettyTestFailure _    (TestResult True _ _)    = empty
 prettyTestFailure prop (TestResult False r env) =
-  prettyFailureReason prop r
+  prettyResultCertainty r prop
+  $+$
+  prettyFailureReason r
   $+$
   prettyTestEnv "Counterexample:" env
 
@@ -525,7 +542,7 @@ prettyTestResult
   => AProperty -> TestResult -> Sem r Doc
 prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
 prettyTestResult prop (TestResult _ r _)   =
-  ("Test passed:" <+> pretty (eraseProperty prop))
+  prettyResultCertainty r prop
   $+$
   prettySuccessReason r
 
@@ -540,28 +557,24 @@ prettySuccessReason _ = empty
 
 prettyFailureReason
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => AProperty -> TestReason -> Sem r Doc
-prettyFailureReason prop TestBool = "Test is false:" <+> pretty (eraseProperty prop)
-prettyFailureReason prop (TestEqual ty v1 v2) =
-  "Test result mismatch for:" <+> pretty (eraseProperty prop)
+  => TestReason -> Sem r Doc
+prettyFailureReason TestBool = empty
+prettyFailureReason (TestEqual ty v1 v2) =
+  "Test result mismatch:"
   $+$
   bulletList "-"
   [ "Left side:  " <> prettyValue ty v1
   , "Right side: " <> prettyValue ty v2
   ]
-prettyFailureReason prop (TestRuntimeError e) =
-  "Test failed:" <+> pretty (eraseProperty prop)
+prettyFailureReason (TestRuntimeError e) =
+  "Test failed with an error:"
   $+$
-  pretty (EvalErr e)
-prettyFailureReason prop (TestFound (TestResult _ r _)) = prettyFailureReason prop r
-prettyFailureReason prop (TestNotFound Exhaustive) =
-  "No example exists:" <+> pretty (eraseProperty prop)
-  $+$
-  "All possible values were checked."
-prettyFailureReason prop (TestNotFound (Randomized n m)) = do
-  "No example was found:" <+> pretty (eraseProperty prop)
-  $+$
-  ("Checked" <+> text (show (n + m)) <+> "possibilities.")
+  nest 2 (pretty (EvalErr e))
+prettyFailureReason (TestFound (TestResult _ r _)) = prettyFailureReason r
+prettyFailureReason (TestNotFound Exhaustive) =
+  "No example exists; all possible values were checked."
+prettyFailureReason (TestNotFound (Randomized n m)) = do
+  "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
 
 prettyTestEnv
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r

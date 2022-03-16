@@ -3,17 +3,17 @@ Running tests...
   pand: OK
   por: OK
 Loaded.
-  - Test passed: ∀x. por(x =!= 0, ∃n. n * x >= 1)
+  - Possibly true: ∀x. por(x =!= 0, ∃n. n * x >= 1)
     Checked 100 possibilities without finding a counterexample.
-  - Test passed: ∀f. any([∀x. f(x) =!= not x, ∀x. f(x) =!= x, ∀x. f(x) =!= false, ∀x. f(x) =!= true])
+  - Certainly true: ∀f. any([∀x. f(x) =!= not x, ∀x. f(x) =!= x, ∀x. f(x) =!= false, ∀x. f(x) =!= true])
     No counterexamples exist.
-  - Test is false: all([true, true, true, false, true])
+  - Certainly false: all([true, true, true, false, true])
     Counterexample:
       and_side = right(■)
       and_side = right(■)
       and_side = right(■)
       and_side = left(■)
-  - Test passed: ∃k. hasFactors(2 ^ k + 1)
+  - Certainly true: ∃k. hasFactors(2 ^ k + 1)
     Found example:
       k = 3
       n = 3

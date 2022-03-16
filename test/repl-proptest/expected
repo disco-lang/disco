@@ -1,10 +1,11 @@
-  - Test passed: not false
-  - Test passed: {1, 2} =!= {2, 1}
-  - Test passed: ∃a, b. (a /\ b) =!= (a \/ b)
+  - Certainly true: not false
+  - Certainly true: {1, 2} =!= {2, 1}
+  - Certainly true: ∃a, b. (a /\ b) =!= (a \/ b)
     Found example:
       a = false
       b = false
-  - Test result mismatch for: ∀a, b. (a /\ b) =!= (a \/ b)
+  - Certainly false: ∀a, b. (a /\ b) =!= (a \/ b)
+    Test result mismatch:
     - Left side:  false
     - Right side: true
     Counterexample:

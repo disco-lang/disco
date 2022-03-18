@@ -225,7 +225,13 @@ step cesk = case cesk of
       Left err -> return $ Up err k
       Right e' -> return $ Out (VProp $ extendPropEnv e' result) k
 
-  _ -> error "Impossible! Bad CESK machine state"
+  s -> error $ "Impossible! Bad CESK machine state: " ++ ceskSummary s
+
+ceskSummary :: CESK -> String
+ceskSummary (Out v k)  = mconcat
+  [ "Out (", take 20 (show v), "...) (", take 20 (show k), "...)" ]
+ceskSummary (In _ _ _) = "In"
+ceskSummary (Up _ _)   = "Up"
 
 ------------------------------------------------------------
 -- Interpreting constants

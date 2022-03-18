@@ -23,6 +23,7 @@ import           Unbound.Generics.LocallyNameless (Alpha, Name, Subst, fv,
 import           Data.Coerce
 import           GHC.Generics                     (Generic)
 
+import           Control.Applicative              ((<|>))
 import           Control.Arrow                    ((&&&), (***))
 import           Control.Lens                     hiding (use, (%=), (.=))
 import           Control.Monad                    (unless, zipWithM)
@@ -1046,13 +1047,20 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
             --
             -- For now, let's assume that any situation in which we
             -- have no base sub- or supertypes but we do have
-            -- nontrivial sorts means that we are dealing with numeric
-            -- types; so we can just call N a base subtype and go from there.
+            -- nontrivial sorts means that we are dealing with either
+            -- numeric or propositional types; so we can just try
+            -- either N or B as a base subtype and go from there.
 
             ([], []) ->
-              -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
-              (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
-                (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
+              -- Debug.trace (show v ++ " has no sub- or supertypes.
+              -- Assuming N or B as a subtype.")
+              (coerce v |->) <$>
+                ( lubBySort vm relMap [N] (getSort vm v)
+                  (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
+                  <|>
+                  lubBySort vm relMap [B] (getSort vm v)
+                  (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
+                )
 
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->

@@ -570,14 +570,10 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Logic
 
-    --- XXX restore typing rules for logical operations on Props
-    --- once the evaluator can handle them.
-
     inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff] = do
-      return $ TyBool :*: TyBool :->: TyBool
-      -- a <- freshTy
-      -- constraint $ CQual (bopQual op) a
-      -- return $ a :*: a :->: a
+      a <- freshTy
+      constraint $ CQual (bopQual op) a
+      return $ a :*: a :->: a
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
@@ -587,10 +583,9 @@ typecheck Infer (TPrim prim) = do
     ------------------------------------------------------------
 
     inferPrim (PrimUOp Not) = do
-      return $ TyBool :->: TyBool
-      -- a <- freshTy
-      -- constraint $ CQual QBool a
-      -- return $ a :->: a
+      a <- freshTy
+      constraint $ CQual QBool a
+      return $ a :->: a
 
     ----------------------------------------
     -- Container conversion

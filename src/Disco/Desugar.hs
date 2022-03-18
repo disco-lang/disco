@@ -377,6 +377,9 @@ desugarBinApp :: Member Fresh r => Type -> BOp -> ATerm -> ATerm -> Sem r DTerm
 -- modules/a standard library, including (2) the ability to define
 -- infix operators.
 
+-- XXX Create a new kind of term that /\ on Prop will turn into?
+desugarBinApp TyProp And t1 t2 = undefined
+
 -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
 desugarBinApp _ And t1 t2 = desugarTerm $
   ATCase TyBool

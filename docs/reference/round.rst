@@ -3,8 +3,9 @@ Rounding
 
 Sometimes, when we have a :doc:`fractional <fraction>` or
 :doc:`rational <rational>` number, we want to get rid of the
-fractional part and turn it into an :doc:`integer <integer>`.  This
-can be done with the ``floor`` and ``ceiling`` operators.
+fractional part and turn it into an :doc:`integer <integer>` or
+:doc:`natural number <natural>`.  This can be done with the ``floor``
+and ``ceiling`` operators.
 
 * ``floor x``, also written ``⌊ x ⌋``, returns the largest integer
   which is less than or equal to ``x``.  For example:

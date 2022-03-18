@@ -3,7 +3,7 @@ Factorial
 
 *Factorial*, written ``!``, is a :doc:`unary operator <operator>`
 written after its argument, defined as the product of all the natural
-numbers from 1 up to the :math:`n`, that isx, :math:`n! = 1 \times 2
+numbers from 1 up to :math:`n`, that is, :math:`n! = 1 \times 2
 \times 3 \times \dots \times n`.
 
 ::

@@ -28,7 +28,7 @@ to each other means multiplying them.  For example:
    Disco> 3x
    15
 
-The exception is that putting a :doc:`variable` directly on the left
+The exception is that putting a :doc:`variable <variable>` directly on the left
 of something else is interpreted as :doc:`function application
 <function>`.
 

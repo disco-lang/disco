@@ -6,7 +6,7 @@ operator on :doc:`types <types>`, see :doc:`sum types <sumtype>`; for
 the ``+`` operator on :doc:`graphs <graphs>`, see :doc:`overlay
 <overlay>`.]
 
-All :doc:`numeric types <numeric>` can be added using the ``+``
+Values of all :doc:`numeric types <numeric>` can be added using the ``+``
 operator.  For example:
 
 ::

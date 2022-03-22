@@ -1,0 +1,12 @@
+λxs. each(λx. x + 1, xs) : List(ℕ) → List(ℕ)
+λxs. each(list, xs) : List(List(a)) → List(List(a))
+each(λx. x + 1, [1, 2, 3]) : List(ℕ)
+each(λx. x + 1, ⟅1, 2, 3⟆) : Bag(ℕ)
+each(λx. x + 1, {1, 2, 3}) : Set(ℕ)
+[2, 3, 4]
+⟅2, 3, 4⟆
+⟅0, 1 # 2, 4 # 2⟆
+⟅1 # 100⟆
+{2, 3, 4}
+{0, 1, 4}
+{1}

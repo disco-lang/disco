@@ -94,7 +94,7 @@ for ``N + (N + N)``.  ``sum3`` therefore begins with a ``right`` tag,
 to show that it contains a value of the right-hand type, namely, ``N +
 N``; this value in turn consists of another ``right`` tag along with a
 value of type ``N``.  Other values of the same type ``N + N + N``
-include ``right (left 6)`` and ``left 5``.
+include ``right(left(6))`` and ``left(5)``.
 
 Unit and Void types
 ===================
@@ -102,12 +102,12 @@ Unit and Void types
 Disco has two other special built-in types which are rarely useful on
 their own, but often play an important role in describing other types.
 
-* The type ``Unit`` has just a single value, called ``()``.
+* The type ``Unit`` has just a single value, called ``unit`` or ``■``.
 
     ::
 
-        Disco> :type ()
-        () : Unit
+        Disco> :type unit
+        ■ : Unit
 
 * The type ``Void`` has *no* values.
 

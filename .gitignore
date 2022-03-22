@@ -65,3 +65,5 @@ pubs/WG2.1/diagrams/*
 pubs/WG2.1/*.pdf
 
 tmp/
+
+.ipynb_checkpoints

@@ -1,0 +1,2 @@
+Error: wildcards (_) are not allowed in expressions.
+https://disco-lang.readthedocs.io/en/latest/reference/wildcard-expr.html

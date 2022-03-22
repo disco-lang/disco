@@ -1,7 +1,5 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Operators
@@ -28,6 +26,7 @@ module Disco.Syntax.Operators
 
        ) where
 
+import           Data.Data                        (Data)
 import           GHC.Generics                     (Generic)
 import           Unbound.Generics.LocallyNameless
 
@@ -42,7 +41,7 @@ import qualified Data.Map                         as M
 data UOp = Neg   -- ^ Arithmetic negation (@-@)
          | Not   -- ^ Logical negation (@not@)
          | Fact  -- ^ Factorial (@!@)
-  deriving (Show, Read, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Binary operators.
 data BOp = Add      -- ^ Addition (@+@)
@@ -62,31 +61,25 @@ data BOp = Add      -- ^ Addition (@+@)
          | Max      -- ^ Maximum (@max@)
          | And      -- ^ Logical and (@&&@ / @and@)
          | Or       -- ^ Logical or (@||@ / @or@)
-         | Impl     -- ^ Logical implies (@==>@ / @implies@)
+         | Impl     -- ^ Logical implies (@->@ / @implies@)
+         | Iff      -- ^ Logical biconditional (@<->@ / @iff@)
          | Mod      -- ^ Modulo (@mod@)
          | Divides  -- ^ Divisibility test (@|@)
          | Choose   -- ^ Binomial and multinomial coefficients (@choose@)
          | Cons     -- ^ List cons (@::@)
+         | CartProd -- ^ Cartesian product of sets (@**@ / @⨯@)
          | Union    -- ^ Union of two sets (@union@ / @∪@)
          | Inter    -- ^ Intersection of two sets (@intersect@ / @∩@)
          | Diff     -- ^ Difference between two sets (@\@)
          | Elem     -- ^ Element test (@∈@)
          | Subset   -- ^ Subset test (@⊆@)
          | ShouldEq -- ^ Equality assertion (@=!=@)
-  deriving (Show, Read, Eq, Ord, Generic)
+  deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.
 data TyOp = Enumerate -- ^ List all values of a type
           | Count     -- ^ Count how many values there are of a type
-  deriving (Show, Eq, Ord, Generic)
-
-instance Alpha UOp
-instance Alpha BOp
-instance Alpha TyOp
-
-instance Subst t UOp
-instance Subst t BOp
-instance Subst t TyOp
+  deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 ------------------------------------------------------------
 -- Operator info
@@ -133,8 +126,8 @@ data OpInfo =
 --   parser and the pretty-printer.
 opTable :: [[OpInfo]]
 opTable =
-  assignPrecLevels $
-  [ [ uopInfo Pre  Not     ["¬"]
+  assignPrecLevels
+  [ [ uopInfo Pre  Not     ["not", "¬"]
     ]
   , [ uopInfo Post Fact    ["!"]
     ]
@@ -143,6 +136,8 @@ opTable =
   , [ uopInfo Pre  Neg     ["-"]
     ]
   , [ bopInfo In   Choose  ["choose"]
+    ]
+  , [ bopInfo InR  CartProd ["><", "⨯"]
     ]
   , [ bopInfo InL  Union   ["union", "∪"]
     , bopInfo InL  Inter   ["intersect", "∩"]
@@ -153,8 +148,7 @@ opTable =
     ]
   , [ bopInfo InL  Mul     ["*"]
     , bopInfo InL  Div     ["/"]
-    , bopInfo InL  Mod     ["%"]
-    , bopInfo InL  Mod     ["mod"]
+    , bopInfo InL  Mod     ["mod", "%"]
     , bopInfo InL  IDiv    ["//"]
     ]
   , [ bopInfo InL  Add     ["+"]
@@ -165,27 +159,30 @@ opTable =
     ]
   , [ bopInfo InR  Eq      ["=="]
     , bopInfo InR  ShouldEq ["=!="]
-    , bopInfo InR  Neq     ["≠", "/="]
+    , bopInfo InR  Neq     ["/=", "≠", "!="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]
-    , bopInfo InR  Leq     ["≤", "<="]
-    , bopInfo InR  Geq     ["≥", ">="]
+    , bopInfo InR  Leq     ["<=", "≤", "=<"]
+    , bopInfo InR  Geq     [">=", "≥", "=>"]
     , bopInfo InR  Divides ["divides"]
-    , bopInfo InL  Subset  ["⊆"]
-    , bopInfo InL  Elem    ["∈", "elem"]
+    , bopInfo InL  Subset  ["subset", "⊆"]
+    , bopInfo InL  Elem    ["elem", "∈"]
     ]
-  , [ bopInfo InR  And     ["and", "∧", "&&"]
+  , [ bopInfo InR  And     ["/\\", "and", "∧", "&&"]
     ]
-  , [ bopInfo InR  Or      ["or", "∨", "||"]
+  , [ bopInfo InR  Or      ["\\/", "or", "∨", "||"]
     ]
-  , [ bopInfo InR Impl     ["==>", "implies"]
+  , [ bopInfo InR Impl     ["->", "==>", "→", "implies"]
+    , bopInfo InR Iff      ["<->", "<==>", "↔", "iff"]
     ]
   ]
   where
     uopInfo fx op syns = OpInfo (UOpF fx op) syns (-1)
     bopInfo fx op syns = OpInfo (BOpF fx op) syns (-1)
 
-    assignPrecLevels table = zipWith assignPrecs (reverse [1 .. length table]) table
+    -- Start at precedence level 2 so we can give level 1 to ascription, and level 0
+    -- to the ambient context + parentheses etc.
+    assignPrecLevels table = zipWith assignPrecs (reverse [2 .. length table+1]) table
     assignPrecs p ops      = map (assignPrec p) ops
     assignPrec  p op       = op { opPrec = p }
 
@@ -217,4 +214,4 @@ assoc op =
 -- | The precedence level of function application (higher than any
 --   other precedence level).
 funPrec :: Int
-funPrec = length opTable
+funPrec = length opTable+1

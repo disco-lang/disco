@@ -1,6 +1,12 @@
-Unsolvable NoWeakUnifier
-Unsolvable NoUnify
-Unsolvable NoWeakUnifier
-Unsolvable NoWeakUnifier
-Unsolvable NoUnify
-Unsolvable NoUnify
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

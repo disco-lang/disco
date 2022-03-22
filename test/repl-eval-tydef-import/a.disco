@@ -1,0 +1,4 @@
+import b
+
+x : L
+x = right(3, left(unit))

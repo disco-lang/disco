@@ -1,0 +1,17 @@
+type Maybe(a) = Unit + a
+type Tree(a) = Unit + a × Tree(a) × Tree(a)
+
+unfold : (a → b × Maybe(a) × Maybe(a)) → Maybe(a) → Tree(b)
+unfold f (left(unit)) = left(unit)
+unfold f (right(a))   = {? right (b, unfold f a1, unfold f a2) when f a is (b,a1,a2) ?}
+
+calkinWilf : Tree(F)
+calkinWilf = unfold rule (right 1)
+
+rule : F → F × Maybe(F) × Maybe(F)
+rule (a/b) = (a/b, right (a/(a+b)), right ((a+b)/b))
+
+chop : ℕ → Tree(a) → Tree(a)
+chop 0     _               = left(unit)
+chop _     (left(unit))    = left(unit)
+chop (1+n) (right (a,l,r)) = right (a, chop n l, chop n r)

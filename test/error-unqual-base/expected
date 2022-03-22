@@ -1,0 +1,4 @@
+Loading unqualbase.disco...
+While checking unqualbase.f:
+  Error: values of type ℕ cannot be subtracted.
+  https://disco-lang.readthedocs.io/en/latest/reference/not-qual.html

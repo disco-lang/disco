@@ -1,0 +1,6 @@
+:compile (holds (forall x : N. x > 3))
+:compile \x. \y. x
+:compile {? p when 2/3 is p/q ?}
+:compile {? 1 if 2 > 3, 17 otherwise ?}
+:compile 10 choose 5
+:compile 5!

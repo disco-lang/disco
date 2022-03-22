@@ -1,0 +1,4 @@
+Loading types-tydef-kind.disco...
+While checking types-tydef-kind.Foo:
+  Error: not enough arguments for the type 'Foo'.
+  https://disco-lang.readthedocs.io/en/latest/reference/num-args-type.html

@@ -1,0 +1,3 @@
+Loading duptydefns.disco...
+Error: duplicate definition for type XYZ.
+https://disco-lang.readthedocs.io/en/latest/reference/dup-tydef.html

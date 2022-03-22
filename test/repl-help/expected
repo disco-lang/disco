@@ -1,15 +1,13 @@
 Commands available from the prompt:
 
-:defn <var>                Show a variable's definition
-:doc <term>                Show documentation
-<term>                     Evaluate a term
-:help                      Show help
-:import <module>           Import a library module
-<variable> = <expression>  Temporarily define a variable (until the next :load)
-:load <filename>           Load a file
-:names                     Show all names in current scope
-:reload                    Reloads the most recently loaded file
-:test <property>           Test a property using random examples
-using <extension>          Enable an extension
+:defn <var>       Show a variable's definition
+:doc <term>       Show documentation
+<code>            Evaluate a block of code
+:help             Show help
+:load <filename>  Load a file
+:names            Show all names in current scope
+:print <expr>     Print a string without the double quotes, interpreting special characters
+:reload           Reloads the most recently loaded file
+:test <property>  Test a property using random examples
 
 2

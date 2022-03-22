@@ -1,0 +1,14 @@
+let succ : N -> N = λ x : N. fold (inr x) in
+let zero : N = fold (inl unit) in
+let one : N = succ zero in
+let two : N = succ one in
+let three : N = succ two in
+let iter : N -> (N -> N) -> N -> N =
+  λz:N. λs:N->N. fix it:N -> N. λn:N.
+    case unfold n
+      { inl y -> z
+      | inr n' -> s (it n')
+      }
+  in
+let add : N -> N -> N = λa:N. λb:N. iter b succ a in
+add three two

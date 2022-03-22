@@ -1,0 +1,66 @@
+Loading doc.disco...
+Running tests...
+  f: OK
+Loaded.
+type P = ℕ × ℕ
+
+P is a type of stuff.
+
+f : ℕ → ℕ
+
+f is a function.
+Some more documentation.
+
+No documentation found for 'x'.
+~+~ : ℕ × ℕ → ℕ
+precedence level 7, left associative
+
+The sum of two numbers, types, or graphs.
+
+https://disco-lang.readthedocs.io/en/latest/reference/addition.html
+
+~+~ : ℕ × ℕ → ℕ
+precedence level 7, left associative
+
+The sum of two numbers, types, or graphs.
+
+https://disco-lang.readthedocs.io/en/latest/reference/addition.html
+
+~! : ℕ → ℕ
+precedence level 15
+
+n! computes the factorial of n, that is, 1 * 2 * ... * n.
+
+https://disco-lang.readthedocs.io/en/latest/reference/factorial.html
+
+~! : ℕ → ℕ
+precedence level 15
+
+n! computes the factorial of n, that is, 1 * 2 * ... * n.
+
+https://disco-lang.readthedocs.io/en/latest/reference/factorial.html
+
+not~ : Bool → Bool
+Alternative syntax: ¬~
+precedence level 16
+
+Logical negation: not(true) = false and not(false) = true.
+
+https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
+
+The type of natural numbers: 0, 1, 2, ...
+
+https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+
+The type of natural numbers: 0, 1, 2, ...
+
+https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+
+The type of rational numbers p/q.
+
+https://disco-lang.readthedocs.io/en/latest/reference/rational.html
+
+append : List(a) × List(a) → List(a)
+
+Append two lists into a single list.
+

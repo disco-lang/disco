@@ -1,2 +1,2 @@
 :load test/solver-issue112/diag-iso-bad.disco
-:type (\x.x^(-2) : Z -> Z)
+:type (\x.x^(-2)) : Z -> Z

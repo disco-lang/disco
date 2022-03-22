@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveFunctor    #-}
-{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -16,44 +16,48 @@
 
 module Disco.Messages where
 
-import           Unbound.Generics.LocallyNameless
+import           Control.Lens
+import           Control.Monad   (when)
+import           Polysemy
+import           Polysemy.Output
 
-import           Data.Sequence                    (Seq)
-import qualified Data.Sequence                    as Seq
+import           Disco.Pretty    (Doc, Pretty, pretty', renderDoc')
 
-import           Disco.AST.Core
-import           Disco.AST.Surface
-import           Disco.AST.Typed
+data MessageType
+    = Info
+    | Warning
+    | ErrMsg
+    | Debug
+    deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
-data MessageLevel
-  = Info
-  | Warning
-  | Error
-  | Panic
-  | Debug
-  deriving (Show, Read, Eq, Ord, Enum, Bounded)
+data Message = Message {_messageType :: MessageType, _message :: Doc}
+    deriving (Show)
 
-data Report
-  = RTxt   String
-  | RName  AnyName
-  | RTerm  Term
-  | RPat   Pattern
-  | RATerm ATerm
-  | RCore  Core
-  | RSeq   [Report]
-  | RList  [Report]
-  | RSub   Report
-  deriving (Show)
+makeLenses ''Message
 
-data MessageBody e
-  = Msg  Report
-  | Item e
-  deriving (Show, Functor)
+handleMsg :: Member (Embed IO) r => (Message -> Bool) -> Message -> Sem r ()
+handleMsg p m = when (p m) $ printMsg m
 
-data Message e = Message MessageLevel (MessageBody e)
-  deriving (Show, Functor)
+printMsg :: Member (Embed IO) r => Message -> Sem r ()
+printMsg (Message _ m) = embed $ putStrLn (renderDoc' m)
 
-type MessageLog e = Seq (Message e)
+msg :: Member (Output Message) r => MessageType -> Sem r Doc -> Sem r ()
+msg typ m = m >>= output . Message typ
 
-emptyMessageLog :: MessageLog e
-emptyMessageLog = Seq.empty
+info :: Member (Output Message) r => Sem r Doc -> Sem r ()
+info = msg Info
+
+infoPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
+infoPretty = info . pretty'
+
+warn :: Member (Output Message) r => Sem r Doc -> Sem r ()
+warn = msg Warning
+
+debug :: Member (Output Message) r => Sem r Doc -> Sem r ()
+debug = msg Debug
+
+debugPretty :: (Member (Output Message) r, Pretty t) => t -> Sem r ()
+debugPretty = debug . pretty'
+
+err :: Member (Output Message) r => Sem r Doc -> Sem r ()
+err = msg ErrMsg

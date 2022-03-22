@@ -1,0 +1,11 @@
+import list
+
+tail : List(N) -> List(N)
+tail (_::xs) = xs
+
+fibs : List(N)
+fibs = 0 :: 1 :: zipWith(~+~, fibs, tail fibs)
+
+sum : List(N) -> N
+sum [] = 0
+sum (x::xs) = x + sum xs

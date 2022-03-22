@@ -5,15 +5,15 @@ import oeis
 type BT = Unit + BT*BT
 
 -- Generate the list of all binary tree shapes of a given size.
-treesOfSize : N -> List BT
-treesOfSize(0)   = [left ()]
+treesOfSize : N -> List(BT)
+treesOfSize(0)   = [left(■)]
 treesOfSize(k+1) =
   [ right (l,r) | x <- [0 .. k], l <- treesOfSize(x), r <- treesOfSize(k .- x) ]
 
 -- Compute first few Catalan numbers by brute force.
-catalan1 : List N
-catalan1 = map(\k. length(treesOfSize(k)), [0..4])
+catalan1 : List(N)
+catalan1 = each(\k. length(treesOfSize(k)), [0..4])
 
 -- Extend the sequence via the OEIS.
-catalan : List N
+catalan : List(N)
 catalan = extendSequence(catalan1)

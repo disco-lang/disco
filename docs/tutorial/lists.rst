@@ -10,9 +10,7 @@ Basic lists
 ===========
 
 All the elements of a list must be the same type, and the type of a
-list with elements of type ``T`` is written ``List T``.  Since it is
-unambiguous, nested list types can be written without parentheses,
-*e.g.* ``List List List T``.
+list with elements of type ``T`` is written ``List(T)``.
 
 The basic syntax for constructing and pattern-matching on lists is
 almost exactly the same as in Haskell, with the one difference that
@@ -75,8 +73,6 @@ makes no difference.
     :language: idris
     :caption:
 
-* ``[a ..]`` denotes the infinite list beginning with ``a`` and
-  counting up by ones.
 * ``[a .. b]`` denotes the list that starts with ``a`` and either
   counts up or down by ones (depending on whether ``b`` is greater
   than or less than ``a``, respectively), continuing as long as the
@@ -88,20 +84,20 @@ makes no difference.
   the elements do not "exceed" ``c``, where "exceed" means either
   "greater than" or "less than", depending on whether ``b - a`` is
   positive or negative, respectively.
-* ``[a, b ..]`` is similar but infinite.
 
 All the above is similar to Haskell, except that ``[10 .. 1]`` is the
 empty list in Haskell, and disco's rules about determining when the
 list stops are much less strange (the strangeness of Haskell's rules
 is occasioned by floating-point error, which of course disco does not
-have to deal with).
+have to deal with).  Also, since disco is strict, it does not support
+infinite lists.
 
 However, disco also generalizes things further by allowing notation of
-the form ``[a, b, c ..]`` or ``[a, b, c, d ..]``, and so on.  We have
-already seen that two values ``[a, b ..]`` generate a linear
-progression of values; by analogy, three values generate a quadratic
-progression, four values a cubic, and so on.  In general, when
-:math:`n` values :math:`a_0, a_1, \dots, a_n` are given before an
+the form ``[a, b, c .. d]`` or ``[a, b, c, d .. e]``, and so on.  We
+have already seen that ``[a, b .. c]`` generates a linear progression
+of values; by analogy, ``[a, b, c .. d]`` generates a quadratic
+progression, ``[a, b, c, d .. e]`` a cubic, and so on.  In general, when
+:math:`n` values :math:`a_0, a_1, \dots, a_n` are given before the
 ellipsis, disco finds the unique polynomial :math:`p` of degree
 :math:`n-1` such that :math:`p(i) = a_i`, and uses it to generate
 additional terms of the list. (In practice, the disco interpreter does
@@ -112,13 +108,12 @@ differences*, just like Charles Babbage's Difference Engine.)
     :language: idris
     :caption:
 
-When an ending value is specified, list elements are again included
-until the first one which "exceeds" the ending value.  The precise
-definition of "exceeds" is a bit trickier to state in general, but
-corresponds to the eventual behavior of the polynomial: the list stops
-as soon as elements become either larger than or smaller than the
-ending value, as the polynomial diverges to :math:`+\infty` or
-:math:`-\infty`, respectively.
+The list continues until the first one which "exceeds" the ending
+value.  The precise definition of "exceeds" is a bit trickier to state
+in general, but corresponds to the eventual behavior of the
+polynomial: the list stops as soon as elements become either larger
+than or smaller than the ending value, as the polynomial diverges to
+:math:`+\infty` or :math:`-\infty`, respectively.
 
 Multinomial coefficients
 ========================

@@ -1,0 +1,7 @@
+type String = List(Char)
+
+unlines : List(String) -> String
+unlines([]) = []
+unlines([l]) = l
+unlines(l :: ls) = append(l, append("\n", unlines(ls)))
+

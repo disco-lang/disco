@@ -1,0 +1,9 @@
+-- Another module with some definitions.
+-- For now these should *not* be shown by the :names
+-- command, since showing stuff from imports would also mean
+-- showing thins from implicitly loaded standard library modules...
+
+type Foo = Int
+
+x : Int
+x = 0

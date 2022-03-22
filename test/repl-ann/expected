@@ -1,2 +1,3 @@
 Loading num.disco...
-TVar_ (TyCon CArr [TyAtom (ABase N),TyCon (CContainer (ABase CtrBag)) [TyAtom (ABase N)]]) factor
+factor : ℕ → Bag(ℕ)
+(λx : ℤ, y : a. (~-~ : ℤ × ℤ → ℤ)((x : ℤ, 7 : ℤ) : ℤ × ℤ) : ℤ) : ℤ → a3 → ℤ

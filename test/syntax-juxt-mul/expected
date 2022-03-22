@@ -2,7 +2,11 @@ Loading juxt-mul.disco...
 Loaded.
 200
 200
-NotCon CArr (TVar_ () x) (TyAtom (ABase N))
+Error: the expression
+  x
+must have both a function type and also the incompatible type
+  ℕ.
+https://disco-lang.readthedocs.io/en/latest/reference/notcon.html
 24
 14
 600

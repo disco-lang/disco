@@ -1,10 +1,11 @@
-let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x + x) : ℕ → ℕ
-let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x - x) : ℤ → ℤ
-let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. x / x) : 𝔽 → 𝔽
-let f : (a → a) → a → a = λg. λx. g (g x) in f (λx. -x / x) : ℚ → ℚ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x + x) : ℕ → ℕ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x - x) : ℤ → ℤ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x / x) : 𝔽 → 𝔽
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. -x / x) : ℚ → ℚ
 λx. x : a → a
-λ x, y. x : a1 → a → a1
-λ x, y, z. x + y + z : ℕ → ℕ → ℕ → ℕ
-λ x, (y : ℕ). x - y : ℤ → ℕ → ℤ
-λ w, (x : ℕ), y, (z : 𝔽). w - x + y + z : ℚ → ℕ → ℚ → 𝔽 → ℚ
-Unsolvable NoUnify
+λx, y. x : a1 → a → a1
+λx, y, z. x + y + z : ℕ → ℕ → ℕ → ℕ
+λx, y : ℕ. x - y : ℤ → ℕ → ℤ
+λw, x : ℕ, y, z : 𝔽. w - x + y + z : ℚ → ℕ → ℚ → 𝔽 → ℚ
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

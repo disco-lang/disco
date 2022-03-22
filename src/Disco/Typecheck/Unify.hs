@@ -90,7 +90,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     -- well as the type arguments
     unifyOne' p@(TyCon (CContainer ctr1) tys1, TyCon (CContainer ctr2) tys2) = do
       modify (S.insert p)
-      return $ Right ((TyAtom ctr1, TyAtom ctr2) : zipWith (,) tys1 tys2)
+      return $ Right ((TyAtom ctr1, TyAtom ctr2) : zip tys1 tys2)
 
     -- If one of the types to be unified is a user-defined type,
     -- unfold its definition before continuing the matching
@@ -111,7 +111,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
     unifyOne' p@(TyCon c1 tys1, TyCon c2 tys2)
       | c1 == c2  = do
           modify (S.insert p)
-          return $ Right (zipWith (,) tys1 tys2)
+          return $ Right (zip tys1 tys2)
       | otherwise = mzero
     unifyOne' (TyAtom (ABase b1), TyAtom (ABase b2))
       | baseEq b1 b2 = return $ Left idS
@@ -122,7 +122,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
 equate :: TyDefCtx -> [Type] -> Maybe S
 equate tyDefns tys = unify tyDefns eqns
   where
-    eqns = zipWith (,) tys (tail tys)
+    eqns = zip tys (tail tys)
 
 occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (==x)

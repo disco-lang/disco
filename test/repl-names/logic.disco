@@ -1,22 +1,27 @@
 -- copied from example/logic.disco as it might change, but this file shouldn't
 
+import other
+
 -- Basic logical operators
 
-lnot1 : B -> B
+lnot1 : Bool -> Bool
 lnot1 true  = false
 lnot1 false = true
 
-lnot2 : B -> B
+lnot2 : Bool -> Bool
 lnot2 x =
   {? false if x,
      true  otherwise
   ?}
 
-implication : B -> B -> B
+implication : Bool -> Bool -> Bool
 implication x y =
   {? false   if x and not y,
      true    otherwise
   ?}
 
-exor : B -> B -> B
+exor : Bool -> Bool -> Bool
 exor x y = (x && not y) || (not x && y)
+
+-- A custom type used to validate :names output
+type Maybe(a) = Unit + a

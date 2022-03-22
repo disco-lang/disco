@@ -1,0 +1,5 @@
+:load test/prop-higher-order/higher-order.disco
+:test forall x:F. por(x =!= 0, exists n:N. n * x >= 1)
+:test forall f:Bool->Bool. any [forall (x: Bool). f x =!= not x, forall (x: Bool). f x =!= x, forall (x: Bool). f x =!= false, forall (x: Bool). f x =!= true]
+:test all [true, true, true, false, true]
+:test exists k:N. hasFactors(2^k + 1)

@@ -1,0 +1,66 @@
+{} union {1,2}
+:type {} union {1,2}
+:type {2,-3} union {1/2}
+{1,2,2} union {2,2,2,3}
+{3,4,5} intersect {4,2}
+{3,4,5} intersect {1,6}
+{} >< {1,2,3}
+{1,2} >< {10,20,30}
+{1,2} ⨯ {10,20,30}
+{1,2,3} \ {3,2}
+({5,6} ⊆ {5,6,7} : Bool)
+{} ⊆ {{6}}
+{{6}} ⊆ {{6}}
+power {1,2,3}
+power {}
+power {1,1,1}
+power (power {})
+power (power (power {}))
+:type power (power (power {}))
+power {"hi", "there"}
+bag [] >< bag [1,2]
+bag [1,2,2] >< bag ['x','x','x','y']
+bag [] union bag [1,2]
+bag [] union bag [1,2] : Bag(N)
+:type bag [] union bag [1,2]
+:type bag [2,-3] union bag [1/2]
+bag [1,2,2] union bag [2,2,2,3]
+bag [3,4,5] intersect bag [4,2]
+bag [3,4,5] intersect bag [1,6]
+bag [2,2,2,3,2,4,5] intersect bag [2,3,2,5,5,6]
+bag [1,2,3] \ bag [3,2]
+(bag [5,6] ⊆ bag [5,6,7] : Bool)
+bag [] ⊆ bag [bag [6]]
+bag [bag [6]] ⊆ bag [bag [6]]
+power (bag [])
+power (bag [1])
+power (bag [1,2])
+power (bag ['a', 'b', 'b'])
+power (bag ['a', 'b', 'a', 'b', 'b'])
+[2,1] >< [3,4,4]
+2 elem {1,2,3}
+2 ∈ {1,2,3}
+4 elem {1,2,3}
+4 elem {}
+2 elem (bag [1,3,2,3,2])
+4 elem (bag [1,3,2,3,2])
+4 elem (bag [])
+1 elem [1,2,3]
+2 elem [1,2,3]
+3 elem [1,2,3]
+4 elem [1,2,3]
+4 elem []
+[1,2] elem {[2,3], [1,2], [4,5]}
+[1,2] elem {[2,3], [2,1], [4,5]}
+{1,2} elem {{2,3}, {2,1}, {4,5}}
+{} elem (power {1,2,3})
+⟅ 'x', 'x', 'y', 'y', 'x' ⟆
+⟅ 'x', 'x', 'y', 'x' ⟆
+⟅ 'y', 'x' ⟆
+bagCounts (bag [1,1,2,3,1,3])
+bagFromCounts {(1,1), (1,3), (4,0), (2,3)}
+bagFromCounts (bagCounts (bag [1,1,2,3,1,3]))
+let x = 3 in ⟅ 'a' # (2 + x), 'b', 'b' ⟆
+bagFromCounts [('a', 1), ('a', 1), ('a', 2), ('b', 3), ('b', 1)]
+bagFromCounts {('a', 1), ('a', 1), ('a', 2), ('b', 3), ('b', 1)}
+bagFromCounts ⟅('a', 1), ('a', 1), ('a', 2), ('b', 3), ('b', 1)⟆

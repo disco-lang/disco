@@ -1,0 +1,13 @@
+:load test/repl-doc/doc.disco
+:doc P
+:doc f
+:doc x
+:doc +
+:doc ~+~
+:doc !
+:doc ~!
+:doc not
+:doc N
+:doc ℕ
+:doc Rational
+:doc append

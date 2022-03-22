@@ -1,0 +1,4 @@
+Loading numpatterns.disco...
+While checking numpatterns.f:
+  Error: number of arguments does not match.
+  https://disco-lang.readthedocs.io/en/latest/reference/num-args.html

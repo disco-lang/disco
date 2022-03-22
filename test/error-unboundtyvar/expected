@@ -1,0 +1,4 @@
+Loading unboundtyvar.disco...
+While checking unboundtyvar.T:
+  Error: Unknown type variable 'b'.
+  https://disco-lang.readthedocs.io/en/latest/reference/unbound-tyvar.html

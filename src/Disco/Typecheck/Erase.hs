@@ -1,4 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Typecheck.Erase
@@ -22,11 +21,11 @@ import           Data.Coerce
 import           Disco.AST.Desugared
 import           Disco.AST.Surface
 import           Disco.AST.Typed
-import           Disco.Module                            (Clause)
+import           Disco.Names                             (QName (..))
 
 -- | Erase all the type annotations from a term.
 erase :: ATerm -> Term
-erase (ATVar _ x)           = TVar (coerce x)
+erase (ATVar _ (QName _ x)) = TVar (coerce x)
 erase (ATPrim _ x)          = TPrim x
 erase (ATLet _ bs)          = TLet $ bind (mapTelescope eraseBinding tel) (erase at)
   where (tel,at) = unsafeUnbind bs
@@ -40,7 +39,6 @@ erase (ATAbs q _ b)         = TAbs q $ bind (map erasePattern x) (erase at)
   where (x,at) = unsafeUnbind b
 erase (ATApp _ t1 t2)       = TApp (erase t1) (erase t2)
 erase (ATTup _ ats)         = TTup (map erase ats)
-erase (ATInj _ s at)        = TInj s (erase at)
 erase (ATCase _ brs)        = TCase (map eraseBranch brs)
 erase (ATChain _ at lnks)   = TChain (erase at) (map eraseLink lnks)
 erase (ATTyOp _ op ty)      = TTyOp op ty
@@ -89,15 +87,11 @@ eraseQual (AQGuard (unembed -> at))  = QGuard (embed (erase at))
 eraseProperty :: AProperty -> Property
 eraseProperty = erase
 
-eraseClause :: Clause -> Bind [Pattern] Term
-eraseClause b = bind (map erasePattern ps) (erase t)
-  where (ps, t) = unsafeUnbind b
-
 ------------------------------------------------------------
 -- DTerm erasure
 
 eraseDTerm :: DTerm -> Term
-eraseDTerm (DTVar _ x)      = TVar (coerce x)
+eraseDTerm (DTVar _ (QName _ x)) = TVar (coerce x)
 eraseDTerm (DTPrim _ x)     = TPrim x
 eraseDTerm DTUnit           = TUnit
 eraseDTerm (DTBool _ b)     = TBool b
@@ -108,7 +102,6 @@ eraseDTerm (DTAbs q _ b)    = TAbs q $ bind [PVar . coerce $ x] (eraseDTerm dt)
   where (x, dt) = unsafeUnbind b
 eraseDTerm (DTApp _ d1 d2)  = TApp (eraseDTerm d1) (eraseDTerm d2)
 eraseDTerm (DTPair _ d1 d2) = TTup [eraseDTerm d1, eraseDTerm d2]
-eraseDTerm (DTInj _ s d)    = TInj s (eraseDTerm d)
 eraseDTerm (DTCase _ bs)    = TCase (map eraseDBranch bs)
 eraseDTerm (DTTyOp _ op ty) = TTyOp op ty
 eraseDTerm (DTNil _)        = TList [] Nothing
@@ -126,11 +119,5 @@ eraseDPattern :: DPattern -> Pattern
 eraseDPattern (DPVar _ x)      = PVar (coerce x)
 eraseDPattern (DPWild _)       = PWild
 eraseDPattern DPUnit           = PUnit
-eraseDPattern (DPBool b)       = PBool b
-eraseDPattern (DPChar c)       = PChar c
 eraseDPattern (DPPair _ x1 x2) = PTup (map (PVar . coerce) [x1,x2])
 eraseDPattern (DPInj _ s x)    = PInj s (PVar (coerce x))
-eraseDPattern (DPNat _ n)      = PNat n
-eraseDPattern (DPFrac _ x1 x2) = PFrac (PVar (coerce x1)) (PVar (coerce x2))
-eraseDPattern (DPNil _)        = PList []
-eraseDPattern (DPCons _ x1 x2) = PCons (PVar (coerce x1)) (PVar (coerce x2))

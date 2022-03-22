@@ -1,0 +1,24 @@
+:load example/demo.disco
+:pretty {} : Set(Map(Set(ℕ), Map(Set((N)), ((Graph (Set(N)))))))
+:pretty right(■) : P (Set(N)) + Unit
+:pretty [1, 2 : N, 3]
+:parse \x. x : N
+:pretty \x. (x : ℕ)
+:pretty (\x. x) : ℕ
+:pretty \x. x : ℕ
+:pretty let f = (λx. x + 1 : ℕ → ℕ) in (f : ℕ → ℕ)
+:pretty (let f = λx. x + 1 : ℕ → ℕ in f) : ℕ → ℕ
+:pretty let f = λx. x + 1 : ℕ → ℕ in f (3 : N)
+:pretty let f = λx. x + 1 : ℕ → ℕ in f 3 : N
+:pretty (let f = λx. x + 1 : ℕ → ℕ in f) 3 : N
+:pretty (let f = λx. x + 1 : ℕ → ℕ in f) (3 : N)
+:pretty (let x = 3 in x) : N
+:pretty let x = 3 in (x : N)
+:pretty let x = 3 in x : N
+:pretty \(x:N).x
+:pretty \((x:N)+1).x
+:pretty \(x+1 : N).x
+:pretty (\x.x)(2,3)
+:pretty right(2,3)
+import num
+:pretty (lg 24)!

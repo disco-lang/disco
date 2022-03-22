@@ -79,6 +79,7 @@ lattice:
      \ /
       N
 
+
 Each type is a subset of the type or types above it.  Going northwest
 in this diagram (:math:`\mathbb{N} \to \mathbb{Z}` or
 :math:`\mathbb{F} \to \mathbb{Q}`) corresponds to allowing negatives,
@@ -130,10 +131,10 @@ For now, try executing these commands and see if you can guess what is
 going on:
 
 * ``:type false``
-* ``:type ()``
+* ``:type unit``
 * ``:type [1, 2, 3]``
 * ``:type [1, 2, -3]``
 * ``:type [1, 2, -3, 4/5]``
 * ``:type [[1,2], [3,4,5]]``
 * ``:type (1, true)``
-* ``:type left 3``
+* ``:type left(3)``

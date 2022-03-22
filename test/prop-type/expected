@@ -1,9 +1,12 @@
-∃(x : ℤ). x > 3 : Prop
-∃(x : ℚ). x > 3 : Prop
-∃ (x : ℕ), (y : ℕ). x > y : Prop
-∃(x : ℕ). ∃(y : ℕ). x > y : Prop
-∀ (x : ℕ), (y : ℕ), (z : ℕ). x + y + z == x + (y + z) : Prop
-∃(x : ℕ). ∀(y : ℕ). x ≤ y : Prop
-Unsolvable NoUnify
-Unsolvable NoUnify
-Unsolvable NoUnify
+∃x : ℤ. x > 3 : Prop
+∃x : ℚ. x > 3 : Prop
+∃x : ℕ, y : ℕ. x > y : Prop
+∃x : ℕ. ∃y : ℕ. x > y : Prop
+∀x : ℕ, y : ℕ, z : ℕ. x + y + z == x + (y + z) : Prop
+∃x : ℕ. ∀y : ℕ. x <= y : Prop
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

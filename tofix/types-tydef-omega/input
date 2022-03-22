@@ -1,0 +1,2 @@
+:load test/types-tydef-omega/types-tydef-omega.disco
+f (\y.y)

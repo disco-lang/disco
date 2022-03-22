@@ -1,0 +1,7 @@
+set [\x.x : Bool -> Bool, \x. not x]
+{\x.x : Bool -> Bool, \x. not x}
+{\x.x, \x. not x} : Set (Bool -> Bool)
+{\x.x, \x. not x}
+bag [\x.x : Bool -> Bool, \x. not x]
+[\x.x : Bool -> Bool, \x. not x]
+{} : Set (Bool -> Bool)

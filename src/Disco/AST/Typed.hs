@@ -1,9 +1,5 @@
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternSynonyms       #-}
-{-# LANGUAGE TupleSections         #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE ViewPatterns          #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE PatternSynonyms    #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -21,7 +17,7 @@
 
 module Disco.AST.Typed
        ( -- * Type-annotated terms
-       ATerm
+         ATerm
        , pattern ATVar
        , pattern ATPrim
        , pattern ATLet
@@ -34,7 +30,6 @@ module Disco.AST.Typed
        , pattern ATAbs
        , pattern ATApp
        , pattern ATTup
-       , pattern ATInj
        , pattern ATCase
        , pattern ATChain
        , pattern ATTyOp
@@ -84,6 +79,7 @@ module Disco.AST.Typed
        , varsBound
        , getType
        , setType
+       , substQT
 
        , AProperty
        )
@@ -92,9 +88,16 @@ module Disco.AST.Typed
 import           Unbound.Generics.LocallyNameless
 import           Unbound.Generics.LocallyNameless.Unsafe
 
+import           Control.Arrow                           ((***))
+import           Data.Coerce                             (coerce)
+import           Data.Data                               (Data)
 import           Data.Void
 
+import           Control.Lens.Plated                     (transform)
 import           Disco.AST.Generic
+import           Disco.AST.Surface
+import           Disco.Names
+import           Disco.Pretty
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims
 import           Disco.Types
@@ -102,8 +105,11 @@ import           Disco.Types
 -- | The extension descriptor for Typed specific AST types.
 
 data TY
+  deriving Data
 
 type AProperty = Property_ TY
+
+------------------------------------------------------------
 
 -- TODO: Should probably really do this with a 2-level/open recursion
 -- approach, with a cofree comonad or whatever
@@ -115,7 +121,7 @@ type ATerm = Term_ TY
 
 type instance X_Binder          TY = [APattern]
 
-type instance X_TVar            TY = Type
+type instance X_TVar            TY = Void -- Names are now qualified
 type instance X_TPrim           TY = Type
 type instance X_TLet            TY = Type
 type instance X_TUnit           TY = ()
@@ -126,7 +132,6 @@ type instance X_TChar           TY = ()
 type instance X_TString         TY = ()
 type instance X_TAbs            TY = Type
 type instance X_TApp            TY = Type
-type instance X_TInj            TY = Type
 type instance X_TCase           TY = Type
 type instance X_TChain          TY = Type
 type instance X_TTyOp           TY = Type
@@ -139,10 +144,10 @@ type instance X_TParens         TY = Void -- No more explicit parens
  -- A test frame for reporting counterexamples in a test. These don't appear
  -- in source programs, but because the deugarer manipulates partly-desugared
  -- terms it helps to be able to represent these in 'ATerm'.
-type instance X_Term TY = ([(String, Type, Name ATerm)], ATerm)
+type instance X_Term TY = Either ([(String, Type, Name ATerm)], ATerm) (Type, QName ATerm)
 
-pattern ATVar :: Type -> Name ATerm -> ATerm
-pattern ATVar ty name = TVar_ ty name
+pattern ATVar :: Type -> QName ATerm -> ATerm
+pattern ATVar ty qname = XTerm_ (Right (ty, qname))
 
 pattern ATPrim :: Type -> Prim -> ATerm
 pattern ATPrim ty name = TPrim_ ty name
@@ -177,9 +182,6 @@ pattern ATApp ty term1 term2 = TApp_ ty term1 term2
 pattern ATTup :: Type -> [ATerm] -> ATerm
 pattern ATTup ty termlist = TTup_ ty termlist
 
-pattern ATInj :: Type -> Side -> ATerm -> ATerm
-pattern ATInj ty side term = TInj_ ty side term
-
 pattern ATCase :: Type -> [ABranch] -> ATerm
 pattern ATCase ty branch = TCase_ ty branch
 
@@ -196,10 +198,10 @@ pattern ATContainerComp :: Type -> Container -> Bind (Telescope AQual) ATerm -> 
 pattern ATContainerComp ty c b = TContainerComp_ ty c b
 
 pattern ATTest :: [(String, Type, Name ATerm)] -> ATerm -> ATerm
-pattern ATTest ns t = XTerm_ (ns, t)
+pattern ATTest ns t = XTerm_ (Left (ns, t))
 
 {-# COMPLETE ATVar, ATPrim, ATLet, ATUnit, ATBool, ATNat, ATRat, ATChar,
-             ATString, ATAbs, ATApp, ATTup, ATInj, ATCase, ATChain, ATTyOp,
+             ATString, ATAbs, ATApp, ATTup, ATCase, ATChain, ATTyOp,
              ATContainer, ATContainerComp, ATTest #-}
 
 pattern ATList :: Type -> [ATerm] -> Maybe (Ellipsis ATerm) -> ATerm
@@ -394,7 +396,6 @@ instance HasType ATerm where
   getType (ATAbs _ ty _)           = ty
   getType (ATApp ty _ _)           = ty
   getType (ATTup ty _)             = ty
-  getType (ATInj ty _ _)           = ty
   getType (ATTyOp ty _ _)          = ty
   getType (ATChain ty _ _)         = ty
   getType (ATContainer ty _ _ _)   = ty
@@ -414,7 +415,6 @@ instance HasType ATerm where
   setType ty (ATAbs q _ x    )       = ATAbs q ty x
   setType ty (ATApp _ x y    )       = ATApp ty x y
   setType ty (ATTup _ x      )       = ATTup ty x
-  setType ty (ATInj _ x y    )       = ATInj ty x y
   setType ty (ATTyOp _ x y   )       = ATTyOp ty x y
   setType ty (ATChain _ x y  )       = ATChain ty x y
   setType ty (ATContainer _ x y z)   = ATContainer ty x y z
@@ -443,3 +443,90 @@ instance HasType APattern where
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind
+
+------------------------------------------------------------
+-- subst
+------------------------------------------------------------
+
+substQT :: QName ATerm -> ATerm -> ATerm -> ATerm
+substQT x s = transform $ \case
+  t@(ATVar _ y)
+    | x == y    -> s
+    | otherwise -> t
+  t -> t
+
+------------------------------------------------------------
+-- Exploding a typed term into a surface term with annotations
+------------------------------------------------------------
+
+instance Pretty ATerm where
+  pretty = pretty . explode
+
+explode :: ATerm -> Term
+explode = \case
+  ATVar ty x             -> TAscr (TVar (coerce (qname x))) (toPolyType ty)
+  ATPrim ty x            -> TAscr (TPrim x) (toPolyType ty)
+  ATLet ty tel           -> TAscr (TLet (explodeTelescope explodeBinding tel)) (toPolyType ty)
+  ATUnit                 -> TUnit
+  ATBool _ty b           -> TBool b
+  ATNat ty x             -> TAscr (TNat x) (toPolyType ty)
+  ATRat r                -> TRat r
+  ATChar c               -> TChar c
+  ATString cs            -> TString cs
+  ATAbs q ty a           -> TAscr (TAbs q (explodeAbs a)) (toPolyType ty)
+  ATApp ty x y           -> TAscr (TApp (explode x) (explode y)) (toPolyType ty)
+  ATTup ty xs            -> TAscr (TTup (map explode xs)) (toPolyType ty)
+  ATCase ty bs           -> TAscr (TCase (map explodeBranch bs)) (toPolyType ty)
+  ATChain ty t ls        -> TAscr (TChain (explode t) (map explodeLink ls)) (toPolyType ty)
+  ATTyOp ty x y          -> TAscr (TTyOp x y) (toPolyType ty)
+  ATContainer ty c ts el ->
+    TAscr
+      (TContainer c (map (explode *** fmap explode) ts) (fmap (fmap explode) el))
+      (toPolyType ty)
+  ATContainerComp ty c b -> TAscr (TContainerComp c (explodeTelescope explodeQual b)) (toPolyType ty)
+  ATTest _vs x           -> TAscr (explode x) (toPolyType TyProp)
+
+explodeTelescope
+  :: (Alpha a, Alpha b)
+  => (a -> b) -> Bind (Telescope a) ATerm -> Bind (Telescope b) Term
+explodeTelescope explodeBinder (unsafeUnbind -> (xs,at)) = bind (mapTelescope explodeBinder xs) (explode at)
+
+explodeBinding :: ABinding -> Binding
+explodeBinding (ABinding m b (unembed -> n)) = Binding m (coerce b) (embed (explode n))
+
+explodeAbs :: Bind [APattern] ATerm -> Bind [Pattern] Term
+explodeAbs (unsafeUnbind -> (aps, at)) = bind (map explodePattern aps) (explode at)
+
+explodePattern :: APattern -> Pattern
+explodePattern = \case
+  APVar ty x      -> PAscr (PVar (coerce x)) ty
+  APWild ty       -> PAscr PWild ty
+  APUnit          -> PUnit
+  APBool b        -> PBool b
+  APChar c        -> PChar c
+  APString s      -> PString s
+  APTup ty ps     -> PAscr (PTup (map explodePattern ps)) ty
+  APInj ty s p    -> PAscr (PInj s (explodePattern p)) ty
+  APNat ty n      -> PAscr (PNat n) ty
+  APCons ty p1 p2 -> PAscr (PCons (explodePattern p1) (explodePattern p2)) ty
+  APList ty ps    -> PAscr (PList (map explodePattern ps)) ty
+  APAdd ty s p t  -> PAscr (PAdd s (explodePattern p) (explode t)) ty
+  APMul ty s p t  -> PAscr (PMul s (explodePattern p) (explode t)) ty
+  APSub ty p t    -> PAscr (PSub (explodePattern p) (explode t)) ty
+  APNeg ty p      -> PAscr (PNeg (explodePattern p)) ty
+  APFrac ty p q   -> PAscr (PFrac (explodePattern p) (explodePattern q)) ty
+
+explodeBranch :: ABranch -> Branch
+explodeBranch = explodeTelescope explodeGuard
+
+explodeGuard :: AGuard -> Guard
+explodeGuard (AGBool (unembed -> at))   = GBool (embed (explode at))
+explodeGuard (AGPat (unembed -> at) ap) = GPat (embed (explode at)) (explodePattern ap)
+explodeGuard (AGLet ab)                 = GLet (explodeBinding ab)
+
+explodeLink :: ALink -> Link
+explodeLink (ATLink bop at) = TLink bop (explode at)
+
+explodeQual :: AQual -> Qual
+explodeQual (AQBind x (unembed -> at)) = QBind (coerce x) (embed (explode at))
+explodeQual (AQGuard (unembed -> at))  = QGuard (embed (explode at))

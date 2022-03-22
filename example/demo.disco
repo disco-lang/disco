@@ -1,0 +1,29 @@
+f : Z -> Z
+f x = x - 3
+
+sum : List(Z) -> Z
+sum []      = 0
+sum (x::xs) = x + sum xs
+
+g : N -> N
+g (2n)   = n
+g (2n+1) = n
+
+q : N -> N
+q x =
+  {? 3        if x < 9
+  ,  17       if 10 <= x < 22
+  ,  99       otherwise
+  ?}
+
+type S = Unit + Char × S
+
+len : S -> N
+len (left(unit))  = 0
+len (right(_, s)) = 1 + len s
+
+type P(a) = a + P(a) * P(a)
+
+height : P(a) -> N
+height (left(_)) = 0
+height (right(l, r)) = 1 + (height l) max (height r)

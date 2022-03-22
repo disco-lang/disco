@@ -1,23 +1,24 @@
+cabal-version:       2.4
 name:                disco
-version:             0.1.0.0
+version:             0.1.5
 synopsis:            Functional programming language for teaching discrete math.
 description:         Disco is a simple functional programming language for use in
                      teaching discrete math.  Its syntax is designed to be close
                      to standard mathematical practice.
-license:             BSD3
+license:             BSD-3-Clause
 license-file:        LICENSE
 author:              Disco team
 maintainer:          byorgey@gmail.com
-copyright:           Disco team 2016 (see LICENSE)
+copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 8.6.3
+tested-with:         GHC == 8.10.4
 
 data-dir:            lib
 
 data-files:          *.disco
 
-extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
+extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/*.hs
                      docs/tutorial/example/*.disco
                      --- TEST FILES BEGIN (updated automatically by add-test-files.hs) ---
                      test/README.md
@@ -35,8 +36,6 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/arith-prim/input
                      test/arith-round/expected
                      test/arith-round/input
-                     test/bag-ops/expected
-                     test/bag-ops/input
                      test/case-arith/case-arith.disco
                      test/case-arith/expected
                      test/case-arith/input
@@ -48,35 +47,91 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/case-let/input
                      test/compile-cons/expected
                      test/compile-cons/input
-                     test/container-comp/expected
-                     test/container-comp/input
-                     test/container-ops/expected
-                     test/container-ops/input
+                     test/compile-misc/expected
+                     test/compile-misc/input
                      test/containers-cmp/expected
                      test/containers-cmp/input
+                     test/containers-comp/expected
+                     test/containers-comp/input
                      test/containers-convert/expected
                      test/containers-convert/input
+                     test/containers-each/expected
+                     test/containers-each/input
                      test/containers-ellipsis/expected
                      test/containers-ellipsis/input
                      test/containers-filter/expected
                      test/containers-filter/input
                      test/containers-join/expected
                      test/containers-join/input
-                     test/containers-map/expected
-                     test/containers-map/input
                      test/containers-merge/expected
                      test/containers-merge/input
+                     test/containers-ops/expected
+                     test/containers-ops/input
                      test/containers-reduce/containers-reduce.disco
                      test/containers-reduce/expected
                      test/containers-reduce/input
-                     test/interp-fibs/expected
-                     test/interp-fibs/fiblist.disco
-                     test/interp-fibs/input
-                     test/interp-gc/expected
-                     test/interp-gc/input
-                     test/interp-lazymatch/bomb.disco
-                     test/interp-lazymatch/expected
-                     test/interp-lazymatch/input
+                     test/error-ambiguous/a.disco
+                     test/error-ambiguous/ambiguous.disco
+                     test/error-ambiguous/b.disco
+                     test/error-ambiguous/expected
+                     test/error-ambiguous/input
+                     test/error-cyclic/cyclic.disco
+                     test/error-cyclic/expected
+                     test/error-cyclic/input
+                     test/error-duplicatedecls/dupdecls.disco
+                     test/error-duplicatedecls/expected
+                     test/error-duplicatedecls/input
+                     test/error-duplicatedefns/dupdefns.disco
+                     test/error-duplicatedefns/expected
+                     test/error-duplicatedefns/input
+                     test/error-duplicatetydefns/duptydefns.disco
+                     test/error-duplicatetydefns/expected
+                     test/error-duplicatetydefns/input
+                     test/error-emptycase/expected
+                     test/error-emptycase/input
+                     test/error-names/expected
+                     test/error-names/input
+                     test/error-notcon/expected
+                     test/error-notcon/input
+                     test/error-notype/expected
+                     test/error-notype/input
+                     test/error-numpatterns/expected
+                     test/error-numpatterns/input
+                     test/error-numpatterns/numpatterns.disco
+                     test/error-parse-RHS/expected
+                     test/error-parse-RHS/input
+                     test/error-pattype/expected
+                     test/error-pattype/input
+                     test/error-polyrec/expected
+                     test/error-polyrec/input
+                     test/error-polyrec/polyrec.disco
+                     test/error-qualskolem/expected
+                     test/error-qualskolem/input
+                     test/error-qualskolem/qualskolem.disco
+                     test/error-tyargs/error-tyargs.disco
+                     test/error-tyargs/expected
+                     test/error-tyargs/input
+                     test/error-unbound/expected
+                     test/error-unbound/input
+                     test/error-unboundtyvar/expected
+                     test/error-unboundtyvar/input
+                     test/error-unboundtyvar/unboundtyvar.disco
+                     test/error-unqual-base/expected
+                     test/error-unqual-base/input
+                     test/error-unqual-base/unqualbase.disco
+                     test/error-unqual/expected
+                     test/error-unqual/input
+                     test/error-wildcard/expected
+                     test/error-wildcard/input
+                     test/graphs-basic/expected
+                     test/graphs-basic/input
+                     test/graphs-equality/expected
+                     test/graphs-equality/input
+                     test/interp-loop/expected
+                     test/interp-loop/input
+                     test/interp-strictmatch/bomb.disco
+                     test/interp-strictmatch/expected
+                     test/interp-strictmatch/input
                      test/lib-oeis/expected
                      test/lib-oeis/input
                      test/list-comp/expected
@@ -87,6 +142,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/logic-bools/input
                      test/logic-cmp/expected
                      test/logic-cmp/input
+                     test/map-basic/expected
+                     test/map-basic/input
+                     test/map-compare/expected
+                     test/map-compare/input
                      test/module-basic/a.disco
                      test/module-basic/b.disco
                      test/module-basic/c.disco
@@ -94,12 +153,28 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/module-basic/expected
                      test/module-basic/input
                      test/module-basic/subdir/d.disco
+                     test/module-cycle/cyclic1.disco
+                     test/module-cycle/cyclic2.disco
+                     test/module-cycle/expected
+                     test/module-cycle/input
+                     test/module-notfound/expected
+                     test/module-notfound/input
+                     test/parse-245/expected
+                     test/parse-245/input
+                     test/parse-280/capitalvars.disco
+                     test/parse-280/expected
+                     test/parse-280/input
+                     test/parse-320/expected
+                     test/parse-320/input
                      test/parse-case-expr/expected
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
                      test/parse-quantifiers/expected
                      test/parse-quantifiers/input
+                     test/parse-top-term/expected
+                     test/parse-top-term/input
+                     test/parse-top-term/parse-top-term.disco
                      test/poly-bad/expected
                      test/poly-bad/input
                      test/poly-infer-sort/expected
@@ -110,32 +185,55 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/poly-rectype/expected
                      test/poly-rectype/input
                      test/poly-rectype/poly-rectype.disco
+                     test/pretty-defn/expected
+                     test/pretty-defn/input
                      test/pretty-functions/expected
                      test/pretty-functions/input
-                     test/pretty-lazy/expected
-                     test/pretty-lazy/input
+                     test/pretty-issue258/expected
+                     test/pretty-issue258/input
+                     test/pretty-lit/expected
+                     test/pretty-lit/input
+                     test/pretty-ops/expected
+                     test/pretty-ops/input
+                     test/pretty-pattern/expected
+                     test/pretty-pattern/input
+                     test/pretty-torture/expected
+                     test/pretty-torture/input
                      test/pretty-type/expected
                      test/pretty-type/input
                      test/pretty-whnf/expected
                      test/pretty-whnf/input
+                     test/prim-crash/expected
+                     test/prim-crash/input
+                     test/prim-frac/expected
+                     test/prim-frac/input
+                     test/prim-sum/expected
+                     test/prim-sum/input
                      test/prop-basic/expected
                      test/prop-basic/input
                      test/prop-basic/prop-basic.disco
                      test/prop-cmp/expected
                      test/prop-cmp/input
+                     test/prop-fail/bad-tests.disco
+                     test/prop-fail/expected
+                     test/prop-fail/input
+                     test/prop-fairness/expected
+                     test/prop-fairness/input
+                     test/prop-higher-order/expected
+                     test/prop-higher-order/higher-order.disco
+                     test/prop-higher-order/input
                      test/prop-holds/expected
                      test/prop-holds/input
                      test/prop-impredicative/expected
                      test/prop-impredicative/input
                      test/prop-impredicative/prop-impredicative.disco
+                     test/prop-tests/expected
+                     test/prop-tests/input
+                     test/prop-tests/prop-tests.disco
                      test/prop-type/expected
                      test/prop-type/input
-                     test/props-basic/expected
-                     test/props-basic/input
-                     test/props-basic/props-basic.disco
-                     test/props-fail/bad-tests.disco
-                     test/props-fail/expected
-                     test/props-fail/input
+                     test/repl-ann/expected
+                     test/repl-ann/input
                      test/repl-compile/expected
                      test/repl-compile/input
                      test/repl-defn/expected
@@ -144,6 +242,13 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-defns/input
                      test/repl-desugar/expected
                      test/repl-desugar/input
+                     test/repl-doc/doc.disco
+                     test/repl-doc/expected
+                     test/repl-doc/input
+                     test/repl-eval-tydef-import/a.disco
+                     test/repl-eval-tydef-import/b.disco
+                     test/repl-eval-tydef-import/expected
+                     test/repl-eval-tydef-import/input
                      test/repl-help/expected
                      test/repl-help/input
                      test/repl-import/expected
@@ -151,9 +256,14 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/repl-names/expected
                      test/repl-names/input
                      test/repl-names/logic.disco
+                     test/repl-names/other.disco
+                     test/repl-proptest/expected
+                     test/repl-proptest/input
                      test/solver-issue112/diag-iso-bad.disco
                      test/solver-issue112/expected
                      test/solver-issue112/input
+                     test/syntax-abs/expected
+                     test/syntax-abs/input
                      test/syntax-chain/expected
                      test/syntax-chain/inRange.disco
                      test/syntax-chain/input
@@ -201,6 +311,10 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/syntax-tuples/input
                      test/syntax-types/expected
                      test/syntax-types/input
+                     test/types-192/expected
+                     test/types-192/input
+                     test/types-306/expected
+                     test/types-306/input
                      test/types-bind/expected
                      test/types-bind/input
                      test/types-char-string/expected
@@ -209,150 +323,206 @@ extra-source-files:  README.md, stack.yaml, example/*.disco, repl/*.hs
                      test/types-compare/input
                      test/types-container/expected
                      test/types-container/input
+                     test/types-kinds/expected
+                     test/types-kinds/input
+                     test/types-naked-ops/expected
+                     test/types-naked-ops/input
+                     test/types-numpats/expected
+                     test/types-numpats/input
+                     test/types-numpats/types-numpats.disco
                      test/types-ops/expected
                      test/types-ops/input
                      test/types-rational/expected
                      test/types-rational/input
                      test/types-rec/expected
+                     test/types-rec/input
                      test/types-rec/types-rec.disco
                      test/types-squash/expected
                      test/types-squash/input
                      test/types-standalone-ops/expected
                      test/types-standalone-ops/input
+                     test/types-toomanypats/expected
+                     test/types-toomanypats/input
+                     test/types-toomanypats/toomanypats.disco
+                     test/types-tydef-bad/expected
+                     test/types-tydef-bad/input
+                     test/types-tydef-bad/types-tydef-bad.disco
+                     test/types-tydef-kind/expected
+                     test/types-tydef-kind/input
+                     test/types-tydef-kind/types-tydef-kind.disco
                      test/types-tydef-param/expected
                      test/types-tydef-param/input
                      test/types-tydef-param/types-tydef-param.disco
+                     test/types-tydef-qual/expected
+                     test/types-tydef-qual/input
+                     test/types-tydef-qual/tydef-qual.disco
                      test/types-tydefs/expected
                      test/types-tydefs/input
                      test/types-tydefs/types-tydefs.disco
                      --- TEST FILES END ---
 
-cabal-version:       1.18
 build-type:          Simple
 
 source-repository head
   type:     git
   location: git://github.com/disco-lang/disco.git
 
+common common
+  ghc-options:      -Wall
+                    -Wcompat
+                    -Widentities
+                    -Wincomplete-uni-patterns
+                    -Wincomplete-record-updates
+                    -Wno-star-is-type
+                    -Wpartial-fields
+  default-language: Haskell2010
+
 library
+  import:              common
+  ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
+  default-extensions:  DataKinds
+                       DeriveGeneric
+                       FlexibleContexts
+                       FlexibleInstances
+                       GADTs
+                       LambdaCase
+                       MultiParamTypeClasses
+                       PolyKinds
+                       RankNTypes
+                       ScopedTypeVariables
+                       TupleSections
+                       TypeApplications
+                       TypeOperators
+                       TypeFamilies
+                       ViewPatterns
   exposed-modules:
                        Disco.Syntax.Operators
                        Disco.Syntax.Prims
                        Disco.Extensions
+                       Disco.Effects.Counter
+                       Disco.Effects.Fresh
+                       Disco.Effects.Input
+                       Disco.Effects.LFresh
+                       Disco.Effects.Random
+                       Disco.Effects.State
+                       Disco.Effects.Store
                        Disco.AST.Core
                        Disco.AST.Desugared
                        Disco.AST.Generic
                        Disco.AST.Surface
                        Disco.AST.Typed
+                       Disco.Data
+                       Disco.Names
                        Disco.Context
+                       Disco.Report
                        Disco.Messages
                        Disco.Module
                        Disco.Parser
                        Disco.Pretty
+                       Disco.Pretty.DSL
+                       Disco.Pretty.Prec
                        Disco.Property
                        Disco.Desugar
                        Disco.Compile
                        Disco.Enumerate
+                       Disco.Value
+                       Disco.Error
                        Disco.Eval
-                       Disco.Interpret.Core
+                       Disco.Interpret.CESK
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints
                        Disco.Typecheck.Erase
                        Disco.Typecheck.Graph
-                       Disco.Typecheck.Monad
+                       Disco.Typecheck.Util
                        Disco.Typecheck.Solve
                        Disco.Typecheck.Unify
                        Disco.Types
                        Disco.Types.Qualifiers
                        Disco.Types.Rules
                        Disco.Util
-                       Disco.Interactive.Eval
-                       Disco.Interactive.Parser
                        Disco.Interactive.CmdLine
-                       Disco.Interactive.Types
                        Disco.Interactive.Commands
+                       Disco.Doc
 
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
 
-  other-extensions:
-                       GADTs
-                       RankNTypes
-                       TypeFamilies
-                       ViewPatterns
-                       FlexibleContexts
-                       FlexibleInstances
-                       MultiParamTypeClasses
-                       NondecreasingIndentation
-                       TemplateHaskell
-                       UndecidableInstances
-
-  build-depends:       base >=4.8 && <4.14,
+  build-depends:       base >=4.8 && <4.17,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 8.1,
-                       parser-combinators >= 1.0.0 && < 1.3,
+                       megaparsec >= 6.1.1 && < 9.3,
+                       parser-combinators >= 1.0.0 && < 1.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
-                       transformers >= 0.4 && < 0.6,
+                       transformers >= 0.4 && < 0.7,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 4.19,
+                       polysemy >= 1.6.0.0 && < 1.8,
+                       polysemy-plugin >= 0.4 && < 0.5,
+                       polysemy-zoo >= 0.7 && < 0.9,
+                       lens >= 4.14 && < 5.2,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.10 && < 0.11,
+                       arithmoi >= 0.10 && < 0.13,
                        integer-logarithms >= 1.0 && < 1.1,
                        simple-enumeration >= 0.2 && < 0.3,
-                       haskeline >=0.7 && <0.8,
-                       QuickCheck >= 2.9 && < 2.14,
+                       haskeline >=0.8 && <0.9,
+                       exceptions >= 0.10 && < 0.11,
+                       QuickCheck >= 2.9 && < 2.15,
+                       splitmix >= 0.1 && < 0.2,
                        fgl >= 5.5 && < 5.8,
-                       optparse-applicative >= 0.12 && < 0.16,
-                       oeis >= 0.3.10
+                       optparse-applicative >= 0.12 && < 0.18,
+                       oeis >= 0.3.10,
+                       algebraic-graphs >= 0.5,
+                       pretty-show >= 1.10
 
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable disco
+  import:              common
   hs-source-dirs:      repl
   main-is:             REPL.hs
   build-depends:       base,
                        disco,
                        directory,
                        filepath,
-                       haskeline >=0.7 && <0.8,
+                       haskeline >=0.8 && <0.9,
                        mtl >=2.2 && <2.3,
-                       transformers >= 0.4 && < 0.6,
-                       megaparsec >= 6.1.1 && < 8.1,
+                       transformers >= 0.4 && < 0.7,
+                       megaparsec >= 6.1.1 && < 9.3,
                        containers >= 0.5 && < 0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 4.19,
-                       optparse-applicative >= 0.12 && < 0.16,
+                       lens >= 4.14 && < 5.2,
+                       optparse-applicative >= 0.12 && < 0.18,
                        oeis >= 0.3.10
 
   default-language:    Haskell2010
 
 test-suite disco-tests
+  import:              common
   type: exitcode-stdio-1.0
   main-is: Tests.hs
   hs-source-dirs: test
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.14,
-                    tasty >= 0.10 && < 1.3,
+  build-depends:    base >= 4.7 && < 4.17,
+                    tasty >= 0.10 && < 1.5,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7,
-                    bytestring >= 0.9 && < 0.11,
+                    bytestring >= 0.9 && < 0.12,
                     disco
   default-language: Haskell2010
 
 test-suite disco-examples
+  import:              common
   type: exitcode-stdio-1.0
   main-is: TestExamples.hs
   hs-source-dirs: example
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.14,
+  build-depends:    base >= 4.7 && < 4.17,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

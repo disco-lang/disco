@@ -1,0 +1,4 @@
+map({}) == map({})
+insert(1, 'x', insert(2, 'y', map {})) == insert(2, 'y', insert(1, 'x', map {}))
+map {(1, 'a')} < map {(1, 'b')}
+map {(1, 'a')} < map {(2, 'b')}

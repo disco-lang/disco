@@ -2,13 +2,13 @@ import num
 
 !!! ∀ x : ℕ. (x > 0) ==> reduce(~*~, 1, factor x) == x
 dummy : Unit
-dummy = ()
+dummy = unit
 
 ||| The size (cardinality) of a set.
-!!! setSize {} == 0
-!!! setSize {1} == 1
-!!! setSize {1..10} == 10
-!!! setSize {1,1,1,2,3} == 3
-!!! ∀ s : Set N. setSize s == setSize (s ∪ s)
-setSize : Set N -> N
-setSize s = reduce(~+~, 0, map (\x.1, bag s))
+!!! setSize2 {} == 0
+!!! setSize2 {1} == 1
+!!! setSize2 {1..10} == 10
+!!! setSize2 {1,1,1,2,3} == 3
+!!! ∀ s : Set(N). setSize2 s == setSize2 (s ∪ s)
+setSize2 : Set(N) -> N
+setSize2 s = reduce(~+~, 0, each (\x.1, bag s))

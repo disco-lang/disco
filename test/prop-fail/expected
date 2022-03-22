@@ -1,0 +1,24 @@
+Loading bad-tests.disco...
+Running tests...
+  badmap:
+  - Certainly false: badmap(λx. x / 0)([3, 4, 5]) =!= [6, 7, 8]
+    Test failed with an error:
+      Error: division by zero.
+  - Certainly false: badmap(λx. x)([1, 2]) =!= [1, 2]
+    Test result mismatch:
+    - Left side:  [1, 1, 2, 2, 3]
+    - Right side: [1, 2]
+  - Certainly false: badmap(λx. x + 1)([3, 4]) > [5, 6]
+  divide:
+  - Certainly false: ∀a, b. divide(a)(b) * b =!= a
+    Test failed with an error:
+      Error: division by zero.
+    Counterexample:
+      a = 0
+      b = 0
+  - Certainly false: ∀a. divide(a)(2) < a
+    Counterexample:
+      a = 0
+  - Possibly false: ∃a. divide(a)(2) =!= abs(a) + 1
+    No example was found; checked 50 possibilities.
+Loaded.

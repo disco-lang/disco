@@ -30,8 +30,8 @@ The entire expression is surrounded by ``{? ... ?}``; the curly braces
 are reminiscent of the big brace following :math:`f(x) = \dots` in the
 standard mathematical notation, but we don't want to use plain curly
 braces (since those will be used for sets), so question marks are
-added (which remind us that case expressions are really all about
-asking questions).
+added (which are supposed to be reminiscent of the fact that case
+expressions are about asking questions).
 
 Case syntax and semantics
 =========================
@@ -52,12 +52,14 @@ ignored).  Otherwise, ``0 <= x < 10`` is evaluated; and so on.
 
 There are three types of guards:
 
-* A *boolean guard* has the form ``if <expr>``, where ``<expr>`` is an
+* A *boolean guard* has the form ``if <expr>`` or ``when <expr>``, where ``<expr>`` is an
   expression of type ``Bool``.  It succeeds if the expression
-  evaluates to ``true``.
-* A *pattern guard* has the form ``when <expr> is <pattern>``.  It succeeds
+  evaluates to ``true``.  There is no difference between ``if`` and
+  ``when``; they are simply synonyms.
+* A *pattern guard* has the form ``if <expr> is <pattern>``, or ``when <expr> is <pattern>``.  It succeeds
   if the expression ``<expr>`` matches the pattern ``<pattern>``.
-* The special guard ``otherwise`` always succeeds.
+* For convenience, the special guard ``otherwise`` is equivalent
+  to ``if true``.
 
 Here is an example using both boolean and pattern guards:
 

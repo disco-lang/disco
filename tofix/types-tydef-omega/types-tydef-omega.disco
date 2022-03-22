@@ -1,0 +1,7 @@
+type D = D → D
+
+f : D
+f(x) = x x
+
+ω : D
+ω = f f

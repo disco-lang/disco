@@ -10,10 +10,10 @@ import list
 -- functions can be used to encrypt and decrypt lists of natural
 -- numbers.
 
-encrypt : N * N -> List N -> List N
-encrypt key xs = map (encrypt1 key, xs)
+encrypt : N * N -> List(N) -> List(N)
+encrypt key xs = each (encrypt1 key, xs)
 
-decrypt : N * N -> List N -> List N
+decrypt : N * N -> List(N) -> List(N)
 decrypt = encrypt
 
 -- takes two primes, returns a pair of pairs containing the RSA public/private keys

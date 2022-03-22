@@ -1,8 +1,5 @@
-{-# LANGUAGE DeriveGeneric         #-}
-{-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.Syntax.Prims
@@ -18,7 +15,7 @@
 
 module Disco.Syntax.Prims
        ( Prim(..)
-       , PrimInfo(..), primTable, primMap
+       , PrimInfo(..), primTable, toPrim, primMap
        ) where
 
 import           GHC.Generics                     (Generic)
@@ -27,6 +24,7 @@ import           Unbound.Generics.LocallyNameless
 import           Data.Map                         (Map)
 import qualified Data.Map                         as M
 
+import           Data.Data                        (Data)
 import           Disco.Syntax.Operators
 
 ------------------------------------------------------------
@@ -35,47 +33,58 @@ import           Disco.Syntax.Operators
 
 -- | Primitives, /i.e./ built-in constants.
 data Prim where
-  PrimUOp     :: UOp -> Prim  -- ^ Unary operator
-  PrimBOp     :: BOp -> Prim  -- ^ Binary operator
+  PrimUOp        :: UOp -> Prim -- ^ Unary operator
+  PrimBOp        :: BOp -> Prim -- ^ Binary operator
 
-  PrimSqrt    :: Prim      -- ^ Integer square root (@sqrt@)
-  PrimLg      :: Prim      -- ^ Floor of base-2 logarithm (@lg@)
-  PrimFloor   :: Prim      -- ^ Floor of fractional type (@floor@)
-  PrimCeil    :: Prim      -- ^ Ceiling of fractional type (@ceiling@)
-  PrimAbs     :: Prim      -- ^ Absolute value (@abs@)
+  PrimLeft       :: Prim        -- ^ Left injection into a sum type.
+  PrimRight      :: Prim        -- ^ Right injection into a sum type.
 
-  PrimSize    :: Prim      -- ^ Size of a set (XXX should be in library)
-  PrimPower   :: Prim      -- ^ Power set (XXX or bag?)
+  PrimSqrt       :: Prim        -- ^ Integer square root (@sqrt@)
+  PrimFloor      :: Prim        -- ^ Floor of fractional type (@floor@)
+  PrimCeil       :: Prim        -- ^ Ceiling of fractional type (@ceiling@)
+  PrimAbs        :: Prim        -- ^ Absolute value (@abs@)
 
-  PrimList    :: Prim      -- ^ Container -> list conversion
-  PrimBag     :: Prim      -- ^ Container -> bag conversion
-  PrimSet     :: Prim      -- ^ Container -> set conversion
+  PrimPower      :: Prim        -- ^ Power set (XXX or bag?)
 
-  PrimB2C     :: Prim      -- ^ bag -> set of counts conversion
-  PrimC2B     :: Prim      -- ^ set of counts -> bag conversion
+  PrimList       :: Prim        -- ^ Container -> list conversion
+  PrimBag        :: Prim        -- ^ Container -> bag conversion
+  PrimSet        :: Prim        -- ^ Container -> set conversion
 
-  PrimMap     :: Prim      -- ^ Map operation for containers
-  PrimReduce  :: Prim      -- ^ Reduce operation for containers
-  PrimFilter  :: Prim      -- ^ Filter operation for containers
-  PrimJoin    :: Prim      -- ^ Monadic join for containers
-  PrimMerge   :: Prim      -- ^ Generic merge operation for bags/sets
+  PrimB2C        :: Prim        -- ^ bag -> set of counts conversion
+  PrimC2B        :: Prim        -- ^ set of counts -> bag conversion
+  PrimUC2B       :: Prim        -- ^ unsafe set of counts -> bag conversion
+                                --   that assumes all distinct
+  PrimMapToSet   :: Prim        -- ^ Map k v -> Set (k × v)
+  PrimSetToMap   :: Prim        -- ^ Set (k × v) -> Map k v
 
-  PrimIsPrime :: Prim      -- ^ Efficient primality test
-  PrimFactor  :: Prim      -- ^ Factorization
+  PrimSummary    :: Prim        -- ^ Get Adjacency list of Graph
+  PrimVertex     :: Prim        -- ^ Construct a graph Vertex
+  PrimEmptyGraph :: Prim        -- ^ Empty graph
+  PrimOverlay    :: Prim        -- ^ Overlay two Graphs
+  PrimConnect    :: Prim        -- ^ Connect Graph to another with directed edges
 
-  PrimCrash   :: Prim      -- ^ Crash
+  PrimInsert     :: Prim        -- ^ Insert into map
+  PrimLookup     :: Prim        -- ^ Get value associated with key in map
 
-  PrimForever :: Prim      -- ^ @[x, y, z .. ]@
-  PrimUntil   :: Prim      -- ^ @[x, y, z .. e]@
+  PrimEach       :: Prim        -- ^ Each operation for containers
+  PrimReduce     :: Prim        -- ^ Reduce operation for containers
+  PrimFilter     :: Prim        -- ^ Filter operation for containers
+  PrimJoin       :: Prim        -- ^ Monadic join for containers
+  PrimMerge      :: Prim        -- ^ Generic merge operation for bags/sets
 
-  PrimHolds   :: Prim      -- ^ Test whether a proposition holds
+  PrimIsPrime    :: Prim        -- ^ Efficient primality test
+  PrimFactor     :: Prim        -- ^ Factorization
+  PrimFrac       :: Prim        -- ^ Turn a rational into a pair (num, denom)
 
-  PrimLookupSeq :: Prim    -- ^ Lookup OEIS sequence
-  PrimExtendSeq :: Prim    -- ^ Extend OEIS sequence
-  deriving (Show, Read, Eq, Ord, Generic)
+  PrimCrash      :: Prim        -- ^ Crash
 
-instance Alpha Prim
-instance Subst t Prim
+  PrimUntil      :: Prim        -- ^ @[x, y, z .. e]@
+
+  PrimHolds      :: Prim        -- ^ Test whether a proposition holds
+
+  PrimLookupSeq  :: Prim        -- ^ Lookup OEIS sequence
+  PrimExtendSeq  :: Prim        -- ^ Extend OEIS sequence
+  deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
 -- Concrete syntax for prims
@@ -95,56 +104,74 @@ data PrimInfo =
     -- Is the prim available in the normal syntax of the language?
     --
     --   primExposed = True means that the bare primSyntax can be used
-    --   in the surface syntax, and in particular it is a reserved
-    --   word; the prim will be pretty-printed as the primSyntax.
+    --   in the surface syntax, and the prim will be pretty-printed as
+    --   the primSyntax.
     --
     --   primExposed = False means that the only way to enter it is to
     --   enable the Primitives language extension and write a $
-    --   followed by the primSyntax, and the primSyntax is not a
-    --   reserved word.  The prim will be pretty-printed with a $
+    --   followed by the primSyntax.  The prim will be pretty-printed with a $
     --   prefix.
+    --
+    --   In no case is a prim a reserved word.
   }
 
 -- | A table containing a 'PrimInfo' record for every non-operator
 --   'Prim' recognized by the language.
 primTable :: [PrimInfo]
 primTable =
-  [ PrimInfo (PrimUOp Not) "not"     True
-  , PrimInfo PrimSqrt      "sqrt"    True
-  , PrimInfo PrimLg        "lg"      True
-  , PrimInfo PrimFloor     "floor"   True
-  , PrimInfo PrimCeil      "ceiling" True
-  , PrimInfo PrimAbs       "abs"     True
+  [ PrimInfo PrimLeft      "left"           True
+  , PrimInfo PrimRight     "right"          True
 
-  , PrimInfo PrimSize      "size"    True
-  , PrimInfo PrimPower     "power"   True
+  , PrimInfo (PrimUOp Not) "not"            True
+  , PrimInfo PrimSqrt      "sqrt"           True
+  , PrimInfo PrimFloor     "floor"          True
+  , PrimInfo PrimCeil      "ceiling"        True
+  , PrimInfo PrimAbs       "abs"            True
 
-  , PrimInfo PrimList      "list"    True
-  , PrimInfo PrimBag       "bag"     True
-  , PrimInfo PrimSet       "set"     True
+  , PrimInfo PrimPower     "power"          True
 
-  , PrimInfo PrimB2C       "bagCounts" True
-  , PrimInfo PrimC2B       "bagFromCounts" True
+  , PrimInfo PrimList      "list"           True
+  , PrimInfo PrimBag       "bag"            True
+  , PrimInfo PrimSet       "set"            True
 
-  , PrimInfo PrimMap       "map"     True
-  , PrimInfo PrimReduce    "reduce"  True
-  , PrimInfo PrimFilter    "filter"  True
-  , PrimInfo PrimJoin      "join"    False
-  , PrimInfo PrimMerge     "merge"   False
+  , PrimInfo PrimB2C       "bagCounts"      True
+  , PrimInfo PrimC2B       "bagFromCounts"  True
+  , PrimInfo PrimUC2B      "unsafeBagFromCounts" False
+  , PrimInfo PrimMapToSet  "mapToSet"       True
+  , PrimInfo PrimSetToMap  "map"            True
 
-  , PrimInfo PrimIsPrime   "isPrime" False
-  , PrimInfo PrimFactor    "factor"  False
+  , PrimInfo PrimSummary   "summary"        True
+  , PrimInfo PrimVertex    "vertex"         True
+  , PrimInfo PrimEmptyGraph "emptyGraph"     True
+  , PrimInfo PrimOverlay   "overlay"        True
+  , PrimInfo PrimConnect   "connect"        True
 
-  , PrimInfo PrimCrash     "crash"   False
+  , PrimInfo PrimInsert    "insert"         True
+  , PrimInfo PrimLookup    "lookup"         True
 
-  , PrimInfo PrimForever   "forever" False
-  , PrimInfo PrimUntil     "until"   False
+  , PrimInfo PrimEach      "each"           True
+  , PrimInfo PrimReduce    "reduce"         True
+  , PrimInfo PrimFilter    "filter"         True
+  , PrimInfo PrimJoin      "join"           False
+  , PrimInfo PrimMerge     "merge"          False
 
-  , PrimInfo PrimHolds     "holds"   True
+  , PrimInfo PrimIsPrime   "isPrime"        False
+  , PrimInfo PrimFactor    "factor"         False
+  , PrimInfo PrimFrac      "frac"           False
+
+  , PrimInfo PrimCrash     "crash"          False
+
+  , PrimInfo PrimUntil     "until"          False
+
+  , PrimInfo PrimHolds     "holds"          True
 
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False
   ]
+
+-- | Find any exposed prims with the given name.
+toPrim :: String -> [Prim]
+toPrim x = [ p | PrimInfo p syn True <- primTable, syn == x ]
 
 -- | A convenient map from each 'Prim' to its info record.
 primMap :: Map Prim PrimInfo

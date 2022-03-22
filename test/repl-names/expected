@@ -1,5 +1,7 @@
 Loading logic.disco...
+Loading other.disco...
 Loaded.
+type Maybe(a) = Unit + a
 exor : Bool → Bool → Bool
 implication : Bool → Bool → Bool
 lnot1 : Bool → Bool

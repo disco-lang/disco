@@ -6,15 +6,18 @@ Logic
 Booleans
 ========
 
-The type of booleans, written ``B`` or ``Bool``, represents logical truth
-and falsehood.  The two values of this type are written ``true`` and
-``false``. (For convenience ``True`` and ``False`` also work.)
+The type of booleans, written ``Bool`` or ``Boolean``, represents
+logical truth and falsehood.  The two values of this type are written
+``true`` and ``false``. (For convenience ``True`` and ``False`` also
+work.)
 
 * Logical AND can be written ``and``, ``&&``, or ``∧`` (note that ``∧``
   is ``U+2227 LOGICAL AND``, not a caret symbol ``^``, which is
   reserved for exponentiation).
 * Logical OR  is written ``or``, ``||``, or ``∨`` (``U+2228 LOGICAL OR``).
-* Logical negation (NOT) is written ``not`` or ``¬`` (``U+00AC NOT SIGN``).
+* Logical negation (NOT) is written ``not`` or ``¬`` (``U+00AC NOT
+  SIGN``).
+* Logical implication is written ``implies`` or ``==>``.
 
 ::
 
@@ -26,6 +29,10 @@ and falsehood.  The two values of this type are written ``true`` and
     false
     Disco> ¬ (false or false or false or true)
     false
+    Disco> true implies false
+    false
+    Disco> false implies true
+    true
 
 Equality testing
 ================
@@ -70,4 +77,8 @@ taking the logical AND of all the results. For example:
     Disco> 1 < 3 < 8 < 99
     true
     Disco> 2.2 < 5.9 > 3.7 < 8.8 > 1.0 < 9
+    true
+    Disco> x : Int
+    Disco> x = 5
+    Disco> 2 < x < 10
     true

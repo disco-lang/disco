@@ -1,4 +1,4 @@
-~and~ : Bool × Bool → Bool
-false and true : Bool
-λx. x and true : Bool → Bool
-let f : (Bool × Bool → Bool) → Bool = λg. g (true, false) in f ~and~ : Bool
+~/\~ : Bool × Bool → Bool
+false /\ true : Bool
+λx. x /\ true : Bool → Bool
+let f : (Bool × Bool → Bool) → Bool = λg. g(true, false) in f(~/\~) : Bool

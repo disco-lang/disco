@@ -1,3 +1,4 @@
 Loading syntax-prims.disco...
 Loaded.
-x : ℕ
+x : ℕ → ℕ
+User crash: bad dog!

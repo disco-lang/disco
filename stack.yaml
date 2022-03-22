@@ -2,7 +2,7 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration/
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-15.14
+resolver: lts-18.13
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -13,6 +13,12 @@ extra-deps:
   - unbound-generics-0.4.0
   - simple-enumeration-0.2
   - oeis-0.3.10
+  - capability-0.4.0.0@sha256:d86d85a1691ef0165c77c47ea72eac75c99d21fb82947efe8b2f758991cf1837,3345
+  - polysemy-1.6.0.0@sha256:29a73b1bf3d0049b12041016b7ee25e76bd8f6e99f9c37c2dde2b46368246697,6184
+  - polysemy-plugin-0.4.0.0
+  - polysemy-zoo-0.7.0.1@sha256:60c2921df95f61d43222a75adde4f330e9510320b416132838a354cd81b4bcc5,3846
+  - compact-0.2.0.0@sha256:75ef98cb51201b4a0d6de95cbbb62be6237c092a3d594737346c70c5d56c2380,2413
+  - constraints-0.12   # needed since polysemy-zoo hasn't updated upper bound to allow 0.13
 
 # Override default flag values for local packages and extra-deps
 flags: {}

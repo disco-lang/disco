@@ -1,3 +1,6 @@
 Loading diag-iso-bad.disco...
-Unsolvable NoUnify
-Unsolvable NoUnify
+While checking diag-iso-bad.diagIso':
+  Error: typechecking failed.
+  https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html
+Error: typechecking failed.
+https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

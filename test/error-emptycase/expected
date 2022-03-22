@@ -1,0 +1,2 @@
+Error: empty case expressions {? ?} are not allowed.
+https://disco-lang.readthedocs.io/en/latest/reference/empty-case.html

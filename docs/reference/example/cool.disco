@@ -1,0 +1,5 @@
+-- This is a comment that will be ignored.
+||| f is a cool function which computes a thing.
+||| It has two lines of documentation.
+f : N -> N
+f(x) = x + 7

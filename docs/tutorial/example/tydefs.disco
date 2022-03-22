@@ -9,32 +9,3 @@ type Tree = Unit + (N * Tree * Tree)
 sumTree : Tree -> N
 sumTree (left _) = 0
 sumTree (right (n, l, r)) = n + sumTree(l) + sumTree(r)
-
-type Stream = N * N * Stream
-
-unconsStream : Stream -> N * Stream
-unconsStream s = s
-  -- Just the identity function, because there's no way to tell the difference
-  -- between a Stream and an N * Stream !
-
-
-streamy : N * N * N * Stream -> N * N * Stream
-streamy s = s
-
-streamy2 : Stream -> Stream
-streamy2 (n,s) = (n+1,n+1,s)
-
-type Lst = Unit + N * Lst
-
-nats : Stream
-nats = natsFrom 0
-
-natsFrom : N -> Stream
-natsFrom n = (n, natsFrom (n+1))
-
-addStreams : Stream -> Stream -> Stream
-addStreams (a,s) (b,t) = (a+b, addStreams s t)
-
-takeStream : N -> Stream -> Lst
-takeStream 0     _     = left ()
-takeStream (n+1) (x,s) = right (x, takeStream n s)

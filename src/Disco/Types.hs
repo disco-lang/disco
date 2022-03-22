@@ -102,6 +102,7 @@ import           Control.Lens                      (toListOf)
 import           Data.List                         (nub)
 import           Data.Map                          (Map)
 import qualified Data.Map                          as M
+import           Data.Maybe                        (fromMaybe)
 import           Data.Set                          (Set)
 import qualified Data.Set                          as S
 import           Data.Void
@@ -585,26 +586,16 @@ instance Pretty PolyType where
   pretty (Forall bnd) = lunbind bnd $
     \(tvs, body) -> pretty body <+> prettyQualifiers tvs
 
-prettyQualifiers :: [(Name Type, Embed [Qualifier])] -> Doc
-prettyQualifiers tvs = case filter (not . null . unembed . snd) tvs of
-  []  -> empty
-  vqs -> do
-    ds <- punctuate (text ",") (map prettyQV (concatMap distribQ vqs))
-    brackets (hsep ds)
+    where
+      prettyQualifiers tvs = case filter (not . null . unembed . snd) tvs of
+        []  -> empty
+        vqs -> do
+          ds <- punctuate (text ",") (map prettyQV (concatMap distribQ vqs))
+          brackets (hsep ds)
 
-  where
-    distribQ (v, unembed -> qs) = map (v,) qs
+      distribQ (v, unembed -> qs) = map (v,) qs
 
-prettyQV :: (Name Type, Qualifier) -> Doc
-prettyQV (a, q) = prettyQualifier q <+> prettyName a
-
-prettyQualifier QNum   = text "numeric"
-prettyQualifier QSub   = text "subtractive"
-prettyQualifier QDiv   = text "divisive"
-prettyQualifier QCmp   = text "comparable"
-prettyQualifier QEnum  = text "enumerable"
-prettyQualifier QBool  = text "boolean"
-prettyQualifier QBasic = text "basic"
+      prettyQV (a, q) = pretty q <+> pretty a
 
 -- | Convert a monotype into a trivial polytype that does not quantify
 --   over any type variables.  If the type can contain free type
@@ -778,6 +769,16 @@ class HasType t where
   --   implementation is for 'setType' to do nothing.
   setType :: Type -> t -> t
   setType _ = id
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -14,12 +14,13 @@
 module Disco.Typecheck.Util where
 
 import           Disco.Effects.Fresh
-import           Polysemy
+import           Polysemy                         hiding (Embed)
 import           Polysemy.Error
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name)
+import           Unbound.Generics.LocallyNameless (Embed, Name, bind,
+                                                   string2Name)
 
 import qualified Data.Map                         as M
 import           Data.Tuple                       (swap)

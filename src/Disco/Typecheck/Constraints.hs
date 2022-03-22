@@ -59,7 +59,7 @@ instance Pretty Constraint where
     COr (c:cs)    -> withPA (PA 2 InR) $ lt (pretty c) <+> "\\/" <+> rt (pretty (COr cs))
     COr []        -> "False"
     CAll b        -> lunbind b $ \(xs, c) ->
-      "∀" <+> intercalate "," (map pretty xs) <> "." <+> pretty c
+      "∀" <+> intercalate "," (map undefined xs) <> "." <+> pretty c  -- XXX
 
 -- A helper function for creating a single constraint from a list of constraints.
 cAnd :: [Constraint] -> Constraint

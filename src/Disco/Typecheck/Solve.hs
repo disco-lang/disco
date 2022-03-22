@@ -16,9 +16,9 @@
 
 module Disco.Typecheck.Solve where
 
-import           Unbound.Generics.LocallyNameless (Alpha, Name, Subst, fv,
-                                                   name2Integer, string2Name,
-                                                   substs)
+import           Unbound.Generics.LocallyNameless (Alpha, Embed, Name, Subst,
+                                                   fv, name2Integer,
+                                                   string2Name, substs)
 
 import           Data.Coerce
 import           GHC.Generics                     (Generic)
@@ -41,7 +41,7 @@ import           Data.Tuple
 
 import           Disco.Effects.Fresh
 import           Disco.Effects.State
-import           Polysemy
+import           Polysemy                         hiding (Embed)
 import           Polysemy.Error
 import           Polysemy.Input
 import           Polysemy.Output
@@ -274,7 +274,7 @@ solveConstraint c = do
   debug "------------------------------"
   debug "Decomposing constraints..."
 
-  qcList <- decomposeConstraint mempty c
+  qcList <- decomposeConstraint c
 
   -- Now try continuing with each set and pick the first one that has
   -- a solution.
@@ -413,9 +413,12 @@ decomposeConstraint CTrue        = return [mempty]
 decomposeConstraint (CAll ty)    = do
   (vars, c) <- unbind ty
   let c' = substs (mkSkolems vars) c
-  (map . first . addSkolems) vars <$> decomposeConstraint c'
+  (map . first . addSkolems) (map fst vars) <$> decomposeConstraint c'
 
 decomposeConstraint (COr cs)     = concat <$> filterErrors (map decomposeConstraint cs)
+
+mkSkolems :: [(Name Type, Embed [Qualifier])] -> [(Name Type, Type)]
+mkSkolems = error "not implemented"
 
 decomposeQual
   :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
@@ -933,7 +936,9 @@ glbBySort vm rm = limBySort vm rm SubTy
 solveGraph
   :: Members '[Fresh, Error SolveError, Output Message, Input Bool] r
   => TyVarInfoMap -> Graph UAtom -> Sem r S
-solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
+solveGraph vm g = do
+  allowQTs <- input @Bool
+  atomToTypeSubst . unifyWCC <$> go allowQTs topRelMap
   where
     unifyWCC :: Substitution BaseTy -> Substitution Atom
     unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
@@ -990,8 +995,8 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
 
     go
       :: Members '[Fresh, Error SolveError, Output Message] r
-      => RelMap -> Sem r (Substitution BaseTy)
-    go relMap@(RelMap rm) = debugPretty relMap >> case as of
+      => Bool -> RelMap -> Sem r (Substitution BaseTy)
+    go allowQualifiedTypes relMap@(RelMap rm) = debugPretty relMap >> case as of
 
       -- No variables left that have base type constraints.
       []    -> return idS
@@ -1017,7 +1022,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
           -- variables hang around in it.
           Just s -> do
             debugPretty s
-            (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
+            (@@ s) <$> go allowQualifiedTypes (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
 
       where
         -- NOTE we can't solve a bunch in parallel!  Might end up

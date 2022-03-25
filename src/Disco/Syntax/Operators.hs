@@ -105,7 +105,7 @@ data BFixity
 data OpFixity =
     UOpF UFixity UOp
   | BOpF BFixity BOp
-  deriving (Eq, Show, Generic)
+  deriving (Eq, Ord, Show, Generic)
 
 -- | An @OpInfo@ record contains information about an operator, such
 --   as the operator itself, its fixity, a list of concrete syntax
@@ -116,7 +116,7 @@ data OpInfo =
   , opSyns   :: [String]
   , opPrec   :: Int
   }
-  deriving Show
+  deriving (Show, Eq, Ord)
 
 ------------------------------------------------------------
 -- Operator table

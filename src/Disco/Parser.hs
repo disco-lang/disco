@@ -122,13 +122,16 @@ instance Ord OpaqueTerm where
 data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
+  | RedefineOp OpFixity
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
+  showErrorComponent (RedefineOp info) = "You can't redefine the built-in operator " ++ undefined
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
+  errorComponentLen (RedefineOp info)   = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -461,17 +464,24 @@ parseModuleName = lexeme $
 --   'operator' <op> '=' <name>, 'precedence' 'of' <op> [, ('left' | 'right') 'associative']
 parseOpDecl :: Parser OperatorDecl
 parseOpDecl = do
-  reserved "operator"
-  op <- parseStandaloneOp
-  symbol "="
-  def <- ident
-  comma
-  reserved "precedence"
-  reserved "of"
-  precExample <- parseStandaloneOp
-  assoc <- optional $
+  op <- reserved "operator" *> parseStandaloneOp
+  syn <- maybe (customFailure $ RedefineOp op) return (userOpName op)
+  def <- symbol "=" *> ident
+  precExample <- comma *> reserved "precedence" *> reserved "of" *> parseStandaloneOp
+  massoc <- optional $
     comma *> (L <$ reserved "left" <|> R <$ reserved "right") <* reserved "associative"
-  return $ OperatorDecl undefined undefined
+  return $ OperatorDecl (OpInfo op [syn] _) def
+
+  -- need to make sure precExample IS built in, and look up its
+  -- precedence level.
+
+  -- need to optionally combine associativity with parsed OpFixity.
+  -- For binary ops, the BFixity will have 'In'.
+
+userOpName :: OpFixity -> Maybe String
+userOpName (UOpF _ (UserUOp syn)) = Just syn
+userOpName (BOpF _ (UserBOp syn)) = Just syn
+userOpName _                      = Nothing
 
 -- | Parse a top level item (either documentation or a declaration),
 --   which must start at the left margin.

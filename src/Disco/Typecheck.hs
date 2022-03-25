@@ -42,6 +42,7 @@ import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 import           Disco.Effects.Fresh
 import           Polysemy                                hiding (embed)
 import           Polysemy.Error
+import           Polysemy.Input
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
@@ -106,7 +107,7 @@ inferTelescope inferOne tel = do
 --   imports should already be checked and passed in as the second
 --   argument.
 checkModule
-  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r
+  :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Input Bool, Error LocTCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
 checkModule name imports (Module es _ m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
@@ -258,7 +259,7 @@ checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 -- | Type check a top-level definition in the given module.
 checkDefn
-  :: Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output Message] r
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output Message, Input Bool] r
   => ModuleName -> TermDefn -> Sem r Defn
 checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $ do
 
@@ -276,7 +277,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
   -- patterns, and lazily unrolling type definitions along the way.
   (patTys, bodyTy) <- decomposeDefnTy (numPats (head clauses)) ty
 
-  ((acs, _), theta) <- solve _ $ do
+  ((acs, _), theta) <- solve $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
     return (aclauses, ty)
 
@@ -335,7 +336,7 @@ checkProperty
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
   => Property -> Sem r AProperty
 checkProperty prop = do
-  (at, (theta, _)) <- solve False $ check prop TyProp  -- XXX False?  Ignore TVIMap?
+  (at, (theta, _)) <- runInputConst False $ solve $ check prop TyProp  -- XXX False?  Ignore TVIMap?
   -- XXX do we need to default container variables here?
   return $ applySubst theta at
 
@@ -406,7 +407,7 @@ checkPolyTy t (Forall sig) = do
 
   -- Check t at type tau, then re-quantify over the generated
   -- constraints.
-  forAllC as $ check t tau
+  forAll as $ check t tau
 
 -- | Infer the type of a term.  If it succeeds, it returns the term
 --   with all subterms annotated.
@@ -447,7 +448,7 @@ inferTop' t = do
 
   -- Run inference on the term and try to solve the resulting
   -- constraints.
-  (at, theta) <- solve $ infer t
+  (at, (theta, _)) <- runInputConst False $ solve $ infer t
 
   debug "Final annotated term (before substitution and container monomorphizing):"
   debugPretty at
@@ -465,26 +466,6 @@ inferTop' t = do
   -- the term along with the resulting polymorphic type.
 
   return (at'', closeTypeWith (extractSortMap vm) (getType at''))
-
---------------------------------------------------
--- Turning unbound variables into prims
---------------------------------------------------
-
--- | If we encounter an unbound variable while typechecking, we also
---   try seeing if it is the name of an exposed primitive, and infer
---   the type of that instead.
-checkPrim :: Name Term -> TCError -> TCM ATerm
-checkPrim x (Unbound _) =
-
-  -- If the variable is not bound, check if it is an exposed primitive name.
-  case [ p | PrimInfo p syn True <- primTable, syn == name2String x ] of
-    -- If so, infer the type of the prim instead.
-    (prim:_) -> typecheck Infer (TPrim prim)
-    _        -> throwError (Unbound x)
-
--- For any other error, just rethrow.
-checkPrim _ e = throwError e
-
 
 -- | Top-level type checking algorithm: check that a term has a given
 --   polymorphic type by running type checking and solving the

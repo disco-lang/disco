@@ -16,6 +16,7 @@ module Disco.Typecheck.Util where
 import           Disco.Effects.Fresh
 import           Polysemy                         hiding (Embed)
 import           Polysemy.Error
+import           Polysemy.Input
 import           Polysemy.Output
 import           Polysemy.Reader
 import           Polysemy.Writer
@@ -129,11 +130,11 @@ withConstraint = fmap swap . runWriter
 --   the resulting substitution (or failing with an error).  Note that
 --   this locally dispatches the constraint writer effect.
 solve
-  :: Members '[Reader TyDefCtx, Error TCError, Output Message] r
-  => Sem (Writer Constraint ': r) a -> Sem r (a, S)
+  :: Members '[Reader TyDefCtx, Error TCError, Output Message, Input Bool] r
+  => Sem (Writer Constraint ': r) a -> Sem r (a, (S, TyVarInfoMap))
 solve m = do
   (a, c) <- withConstraint m
-  res <- runSolve . inputToReader . solveConstraint $ c
+  res <- runSolve . inputToReader @TyDefCtx . solveConstraint $ c
   case res of
     Left e  -> throw (Unsolvable e)
     Right s -> return (a, s)

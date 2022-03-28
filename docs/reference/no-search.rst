@@ -26,26 +26,3 @@ The below property is in fact false, but Disco can't handle it:
    Error: the type
      ℕ → ℕ
    is not searchable (i.e. it cannot be used in a forall).
-
-This error can also occur when you forget to put a type on a variable
-in a ``forall``.  For example:
-
-::
-
-   Disco> :test forall x. x == x
-   Error: the type
-     a1
-   is not searchable (i.e. it cannot be used in a forall).
-
-The problem here is really that Disco does not know what type ``x``
-should be.  If we add a type annotation on ``x``, it works fine:
-
-::
-
-   Disco> :test forall x: Bool. x == x
-     - Test passed: ∀x. x == x
-       No counterexamples exist.
-   Disco> :test forall x: N. x == x
-     - Test passed: ∀x. x == x
-       Checked 100 possibilities without finding a counterexample.
-

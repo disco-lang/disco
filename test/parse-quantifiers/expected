@@ -14,24 +14,84 @@ https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
 8
 8
 8
-TAbs_ Ex () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
+1:16:
+  |
+1 | :parse exists x. x > 3
+  |                ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+1:23:
+  |
+1 | :parse exists (x:N), y. x > y
+  |                       ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Ex () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Ex () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
+1:16:
+  |
+1 | :parse exists x, (y:F). x > y
+  |                ^
+Variables introduced by ∀ or ∃ must have a type
+
+1:11:
+  |
+1 | :parse ∃ x. x > 3
+  |           ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+1:18:
+  |
+1 | :parse ∃ (x:N), y. x > y
+  |                  ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ Ex () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Ex () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ All () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
+1:11:
+  |
+1 | :parse ∃ x, (y:F). x > y
+  |           ^
+Variables introduced by ∀ or ∃ must have a type
+
+1:16:
+  |
+1 | :parse forall x. x > 3
+  |                ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+1:23:
+  |
+1 | :parse forall (x:N), y. x > y
+  |                       ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ All () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ All () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
+1:16:
+  |
+1 | :parse forall x, (y:F). x > y
+  |                ^
+Variables introduced by ∀ or ∃ must have a type
+
+1:11:
+  |
+1 | :parse ∀ x. x > 3
+  |           ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+1:18:
+  |
+1 | :parse ∀ (x:N), y. x > y
+  |                  ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ All () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ All () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+1:11:
+  |
+1 | :parse ∀ x, (y:F). x > y
+  |           ^
+Variables introduced by ∀ or ∃ must have a type
+
 TAbs_ All () (<[PTup_ () [PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase N)),PAscr_ () (PVar_ () z) (TyAtom (ABase N))]]> TApp_ () (TPrim_ () (PrimBOp Impl)) (TTup_ () [TApp_ () (TPrim_ () (PrimBOp And)) (TTup_ () [TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1])),TParens_ () (TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@1,TVar_ () 0@2]))]),TApp_ () (TPrim_ () (PrimBOp Eq)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@2])]))

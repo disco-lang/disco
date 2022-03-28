@@ -121,13 +121,16 @@ instance Ord OpaqueTerm where
 data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
+  | MissingAscr
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
+  showErrorComponent MissingAscr        = "Variables introduced by ∀ or ∃ must have a type"
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
+  errorComponentLen MissingAscr         = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -752,9 +755,9 @@ tuple t   = TTup t
 
 -- | Parse a quantified abstraction (λ, ∀, ∃).
 parseQuantified :: Parser Term
-parseQuantified =
-  TAbs <$> parseQuantifier
-       <*> (bind <$> parsePattern `sepBy` comma <*> (dot *> parseTerm))
+parseQuantified = do
+  q <- parseQuantifier
+  TAbs q <$> (bind <$> parsePattern (q /= Lam) `sepBy` comma <*> (dot *> parseTerm))
 
 -- | Parse a quantifier symbol (lambda, forall, or exists).
 parseQuantifier :: Parser Quantifier
@@ -801,7 +804,7 @@ parseGuard = try parseGPat <|> parseGBool <|> parseGLet
     guardWord = reserved "if" <|> reserved "when"
     parseGBool = GBool <$> (embed <$> (guardWord *> parseTerm))
     parseGPat  = GPat <$> (embed <$> (guardWord *> parseTerm))
-                      <*> (reserved "is" *> parsePattern)
+                      <*> (reserved "is" *> parsePattern False)
     parseGLet  = GLet <$> (reserved "let" *> parseBinding)
 
 -- | Parse an atomic pattern, by parsing a term and then attempting to
@@ -814,13 +817,24 @@ parseAtomicPattern = label "pattern" $ do
     Just p  -> return p
 
 -- | Parse a pattern, by parsing a term and then attempting to convert
---   it to a pattern.
-parsePattern :: Parser Pattern
-parsePattern = label "pattern" $ do
+--   it to a pattern.  The Bool parameter says whether to require
+--   a type ascription.
+parsePattern :: Bool -> Parser Pattern
+parsePattern requireAscr = label "pattern" $ do
   t <- parseTerm
   case termToPattern t of
     Nothing -> customFailure $ InvalidPattern (OT t)
-    Just p  -> return p
+    Just p
+      | not requireAscr || hasAscr p -> return p
+      | otherwise -> customFailure MissingAscr
+
+-- | Does a pattern either have a top-level ascription, or consist of
+--   a tuple with each component recursively having ascriptions?
+--   This is required for patterns bound by ∀ and ∃ quantifiers.
+hasAscr :: Pattern -> Bool
+hasAscr PAscr{}   = True
+hasAscr (PTup ps) = all hasAscr ps
+hasAscr _         = False
 
 -- | Attempt converting a term to a pattern.
 termToPattern :: Term -> Maybe Pattern

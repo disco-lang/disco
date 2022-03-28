@@ -108,7 +108,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
-checkModule name imports (Module es _ _ops m docs terms) = do
+checkModule name imports (Module es _ ops m docs terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
       importTyCtx = mconcat (imports ^.. traverse . miTys)
       -- XXX this isn't right, if multiple modules define the same type synonyms.
@@ -128,7 +128,21 @@ checkModule name imports (Module es _ _ops m docs terms) = do
         [] -> do
           aprops <- mapError noLoc $ checkProperties docCtx  -- XXX location?
           aterms <- mapError noLoc $ mapM inferTop terms     -- XXX location?
-          return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
+          return $ ModuleInfo
+            { _miName     = name
+            , _miImports  = imports
+            , _miNames    = map ((name .-) . getDeclName) typeDecls
+            , _miUOps     = _
+            , _miBOps     = _
+            , _miDocs     = docCtx
+            , _miProps    = aprops
+            , _miTys      = tyCtx
+            , _miTydefs   = tyDefnCtx
+            , _miTermdefs = defnCtx
+            , _miTerms    = aterms
+            , _miExts     = es
+            }
+
   where getDefnName :: Defn -> Name ATerm
         getDefnName (Defn n _ _ _) = n
 

@@ -123,15 +123,24 @@ data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
   | RedefineOp OpFixity
+  | UnknownOp OpFixity
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
-  showErrorComponent (RedefineOp info) = "You can't redefine the built-in operator " ++ undefined
+  showErrorComponent (RedefineOp op) = "You can't redefine the built-in operator " ++ show op-- XXX
+  showErrorComponent (UnknownOp op) = "Unknown operator " ++ show op  -- XXX
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
-  errorComponentLen (RedefineOp info)   = 1
+  errorComponentLen (RedefineOp opf)    = opLen opf
+  errorComponentLen (UnknownOp opf)     = opLen opf
+
+opLen :: OpFixity -> Int
+opLen (UOpF _ (UserUOp op)) = length op + 1
+opLen (UOpF _ op)           = 1
+opLen (BOpF _ (UserBOp op)) = length op + 2
+opLen (BOpF _ op)           = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -468,15 +477,19 @@ parseOpDecl = do
   syn <- maybe (customFailure $ RedefineOp op) return (userOpName op)
   def <- symbol "=" *> ident
   precExample <- comma *> reserved "precedence" *> reserved "of" *> parseStandaloneOp
+  prec <- case precExample of
+    UOpF _ (UserUOp _) -> customFailure $ UnknownOp op
+    UOpF _ uop         -> return $ uPrec uop
+    BOpF _ (UserBOp _) -> customFailure $ UnknownOp op
+    BOpF _ bop         -> return $ bPrec bop
   massoc <- optional $
     comma *> (L <$ reserved "left" <|> R <$ reserved "right") <* reserved "associative"
-  return $ OperatorDecl (OpInfo op [syn] _) def
+  return $ OperatorDecl (OpInfo (setAssociativity massoc op) [syn] prec) def
 
-  -- need to make sure precExample IS built in, and look up its
-  -- precedence level.
-
-  -- need to optionally combine associativity with parsed OpFixity.
-  -- For binary ops, the BFixity will have 'In'.
+setAssociativity :: Maybe Side -> OpFixity -> OpFixity
+setAssociativity (Just L) (BOpF _ op) = BOpF InL op
+setAssociativity (Just R) (BOpF _ op) = BOpF InR op
+setAssociativity _ op                 = op
 
 userOpName :: OpFixity -> Maybe String
 userOpName (UOpF _ (UserUOp syn)) = Just syn

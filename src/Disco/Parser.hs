@@ -501,11 +501,8 @@ parseDocString = label "documentation" $ L.nonIndented sc $
   -- line with ||| by itself would cause symbol "|||" to consume the
   -- newline).
 
--- | Parse a top-level property/unit test, of the form
---
---   @!!! forall x1 : ty1, ..., xn : tyn. term@.
---
---   The forall is optional.
+-- | Parse a top-level property/unit test, which is just @!!!@
+--   followed by an arbitrary term.
 parseProperty :: Parser Term
 parseProperty = label "property" $ L.nonIndented sc $ do
   _ <- symbol "!!!"

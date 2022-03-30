@@ -62,3 +62,8 @@ many.
       value is less than or equal to the second.
     - ``>=``, also written ``≥`` or ``=>``, tests whether the first
       value is greater than or equal to the second.
+
+* You can chain multiple comparisons; this always means the same thing
+  as combining all the individual comparisons with "and".  For
+  example, ``3 <= x < y <= 10`` means the same thing as ``3 <= x /\ x
+  < y /\ y <= 10``.

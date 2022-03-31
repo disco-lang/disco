@@ -13,6 +13,7 @@ grammar, but not things like meaning.
    definition
    operator
    precedence
+   case
    comment
    docs
    tydef

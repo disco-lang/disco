@@ -84,6 +84,13 @@ primReference = M.fromList
   , PrimBOp Union ==> "set-ops"
   , PrimBOp Inter ==> "set-ops"
   , PrimBOp Diff  ==> "set-ops"
+  , PrimBOp Eq   ==> "compare"
+  , PrimBOp Neq  ==> "compare"
+  , PrimBOp Lt   ==> "compare"
+  , PrimBOp Gt   ==> "compare"
+  , PrimBOp Leq  ==> "compare"
+  , PrimBOp Geq  ==> "compare"
+
   ]
 
 otherDoc :: Map String String

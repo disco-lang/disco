@@ -1,8 +1,12 @@
 Case expressions
 ================
 
-We can use conditions to choose between alternatives
-using a "case expression", which looks like the following:
+We can use "case expressions" to choose among multiple alternatives.
+
+Basic case expressions with conditions
+--------------------------------------
+
+The basic form of a case expression is as follows:
 
 ::
 
@@ -49,3 +53,32 @@ explanation of each:
 
 - ``caseExample(12) == 144``: the first three conditions are all false,
   so the ``otherwise`` case is used, with the result ``12^2``.
+
+If *none* of the conditions in a case expression are true, it is an
+error: see :doc:`nomatch-case`.
+
+Case expressions with conditions and patterns
+---------------------------------------------
+
+More generally, case expressions can use :doc:`pattern matching
+<pattern>` in addition to Boolean conditions, and each alternative in
+a case expression can have multiple conditions.  The most general form of a
+case expression is as follows:
+
+::
+
+   {? alternative1   guard11 guard12 ...,
+      alternative2   guard21 guard22 ...,
+      ...
+   ?}
+
+where each ``guard`` has one of two forms:
+
+- ``if <condition>``.  This guard succeeds if the condition is true.
+- ``if <expression> is <pattern>``.  This guard succeeds if the given
+  :doc:`expression <expression>` matches the :doc:`pattern <pattern>`;
+  furthermore, any :doc:`variables <var-pattern>` in the pattern will be
+  defined locally within the corresponding ``alternative`` as well as
+  any subsequent guards in the same clause.
+
+The keyword ``when`` can also be used as a synonym for ``if``.

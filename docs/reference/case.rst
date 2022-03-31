@@ -1,5 +1,5 @@
-Case expression
-===============
+Case expressions
+================
 
 We can use conditions to choose between alternatives
 using a "case expression", which looks like the following:

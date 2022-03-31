@@ -55,4 +55,4 @@ follows:
    fact(0) = 1
    fact(n) = n * fact(n .- 1)
 
-(Alternatively, we could define ``fact`` using an :doc:`arithmetic pattern <arith-pat>`; see that page for more info.)
+(Alternatively, we could define ``fact`` using an :doc:`arithmetic pattern <arith-pattern>`; see that page for more info.)

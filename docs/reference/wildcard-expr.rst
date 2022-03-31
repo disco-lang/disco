@@ -1,7 +1,7 @@
 Wildcards are not allowed in expressions
 ========================================
 
-A :doc:`wildcard pattern <wildcard>`, written using an underscore
+A :doc:`wildcard pattern <wild-pattern>`, written using an underscore
 (``_``), can be used in a pattern (on the *left* side of an equals
 sign) to indicate that you don't care about a certain value.
 

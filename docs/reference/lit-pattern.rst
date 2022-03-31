@@ -22,5 +22,5 @@ Literal patterns can be used with
 - :doc:`Strings <string>`, *e.g.* ``f("hello") = ...``
 
 Note that ``f(-5) = ...`` and ``f(1/2) = ...`` are technically
-:doc:`arithmetic patterns <arith-pat>` rather than true literal
+:doc:`arithmetic patterns <arith-pattern>` rather than true literal
 patterns, but the distinction does not matter very much.

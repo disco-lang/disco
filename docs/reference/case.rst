@@ -15,12 +15,12 @@ using a "case expression", which looks like the following:
 This will try each condition, starting with the first,
 until finding the first condition that is true.  Then the value of the
 entire case expression will be equal to the corresponding alternative.
-The 'otherwise' case will always be chosen if it is reached.
+The ``otherwise`` case will always be chosen if it is reached.
 Each condition must be an expression of type :doc:`Bool <bool>`; the
 alternatives can have any type (though they must all have the *same*
 type, whatever it is).
 
-For example, consider the definition of the caseExample function
+For example, consider the definition of the ``caseExample`` function
 below:
 
 ::

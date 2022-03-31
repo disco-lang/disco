@@ -17,6 +17,7 @@ https://github.com/disco-lang/disco/issues !
    missingtype
    notcon
    empty-case
+   nomatch-case
    pattern-type
    dup-sig
    dup-def

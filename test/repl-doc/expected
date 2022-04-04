@@ -1,3 +1,7 @@
+append : List(a) × List(a) → List(a)
+
+Append two lists into a single list.
+
 Loading doc.disco...
 Running tests...
   f: OK

@@ -1,3 +1,4 @@
+:doc append
 :load test/repl-doc/doc.disco
 :doc P
 :doc f

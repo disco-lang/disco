@@ -40,11 +40,14 @@ import           System.Exit                            (exitFailure,
 import qualified Options.Applicative                    as O
 import           System.Console.Haskeline               as H
 
+import           Disco.AST.Surface                      (emptyModule)
 import           Disco.Error
 import           Disco.Eval
 import           Disco.Interactive.Commands
 import           Disco.Messages
-import           Disco.Module                           (miExts)
+import           Disco.Module                           (Resolver (FromStdlib),
+                                                         miExts)
+import           Disco.Names                            (ModuleName (REPLModule))
 import           Disco.Pretty
 
 import           Disco.Effects.State
@@ -137,6 +140,10 @@ discoMain = do
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
   runDisco (optsToCfg opts) $ do
+
+    -- Load an empty module just to force standard libraries to be loaded first
+    _ <- loadParsedDiscoModule True FromStdlib REPLModule emptyModule
+
     case checkFile opts of
       Just file -> do
         res <- handleLoad file
@@ -150,7 +157,8 @@ discoMain = do
           Just cmds -> mapM_ handleCMD (lines cmds)
       Nothing   -> return ()
     forM_ (evaluate opts) handleCMD
-    unless batch loop
+    unless batch $ do
+      loop
 
   where
 

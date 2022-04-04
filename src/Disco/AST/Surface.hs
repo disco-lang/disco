@@ -17,7 +17,7 @@
 
 module Disco.AST.Surface
        ( -- * Modules
-         Module(..), TopLevel(..)
+         Module(..), emptyModule, TopLevel(..)
          -- ** Documentation
        , Docs, DocThing(..), Property
          -- ** Declarations
@@ -110,6 +110,7 @@ import           Control.Lens                     (_1, _2, _3, (%~))
 import           Data.Char                        (toLower)
 import qualified Data.Map                         as M
 import           Data.Set                         (Set)
+import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.Effects.LFresh
@@ -136,6 +137,15 @@ data Module = Module
   , modTerms   :: [Term]              -- ^ Top-level (bare) terms
   }
 deriving instance ForallTerm Show  UD => Show Module
+
+emptyModule :: Module
+emptyModule = Module
+  { modExts = S.empty
+  , modImports = []
+  , modDecls = []
+  , modDocs = []
+  , modTerms = []
+  }
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').

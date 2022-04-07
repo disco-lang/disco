@@ -797,15 +797,18 @@ parseBranch = flip bind <$> parseTerm <*> parseGuards
 parseGuards :: Parser (Telescope Guard)
 parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parseGuard)
 
--- | Parse a single guard (@if@, @if ... is@, or @let@)
+-- | Parse a single guard (@if@, @if ... is ...@, or @let@)
 parseGuard :: Parser Guard
-parseGuard = try parseGPat <|> parseGBool <|> parseGLet
+parseGuard = parseGCond <|> parseGLet
   where
     guardWord = reserved "if" <|> reserved "when"
-    parseGBool = GBool <$> (embed <$> (guardWord *> parseTerm))
-    parseGPat  = GPat <$> (embed <$> (guardWord *> parseTerm))
-                      <*> (reserved "is" *> parsePattern False)
-    parseGLet  = GLet <$> (reserved "let" *> parseBinding)
+    parseGCond = do
+      guardWord
+      t <- parseTerm
+      parseGPat t <|> parseGBool t
+    parseGPat t  = GPat (embed t) <$> (reserved "is" *> parsePattern False)
+    parseGBool t = pure $ GBool (embed t)
+    parseGLet    = GLet <$> (reserved "let" *> parseBinding)
 
 -- | Parse an atomic pattern, by parsing a term and then attempting to
 --   convert it to a pattern.

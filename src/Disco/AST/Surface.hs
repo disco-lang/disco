@@ -99,6 +99,7 @@ module Disco.AST.Surface
        , pattern PSub
        , pattern PNeg
        , pattern PFrac
+       , pattern PNonlinear
 
        , pattern Binding
        )
@@ -454,6 +455,9 @@ pattern PNeg p = PNeg_ () p
 
 pattern PFrac :: Pattern -> Pattern -> Pattern
 pattern PFrac p1 p2 = PFrac_ () p1 p2
+
+pattern PNonlinear :: Name Term -> Pattern
+pattern PNonlinear x = PNonlinear_ x
 
 {-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
              PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}

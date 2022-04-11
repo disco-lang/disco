@@ -591,6 +591,11 @@ data Pattern_ e where
   -- | Fraction pattern, @p1/p2@
   PFrac_ :: X_PFrac e -> Pattern_ e -> Pattern_ e -> Pattern_ e
 
+  -- | A special placeholder node for a nonlinear occurrence of a
+  --   variable; we can only detect this at parse time but need to
+  --   generate an error later.
+  PNonlinear_ :: Name (Term_ e) -> Pattern_ e
+
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e
 

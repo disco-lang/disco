@@ -18,6 +18,7 @@ https://github.com/disco-lang/disco/issues !
    notcon
    empty-case
    nomatch-case
+   nonlinear
    pattern-type
    dup-sig
    dup-def

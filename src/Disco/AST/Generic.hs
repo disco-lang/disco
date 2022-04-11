@@ -594,7 +594,7 @@ data Pattern_ e where
   -- | A special placeholder node for a nonlinear occurrence of a
   --   variable; we can only detect this at parse time but need to
   --   generate an error later.
-  PNonlinear_ :: Name (Term_ e) -> Pattern_ e
+  PNonlinear_ :: Embed (Pattern_ e) -> Name (Term_ e) -> Pattern_ e
 
   -- | Expansion slot.
   XPattern_ :: X_Pattern e -> Pattern_ e

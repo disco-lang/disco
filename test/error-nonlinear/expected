@@ -1,0 +1,5 @@
+While checking REPL.f:
+  Error: pattern (x, x) contains duplicate variable x.
+  https://disco-lang.readthedocs.io/en/latest/reference/nonlinear.html
+Error: pattern (x, left(y, x)) contains duplicate variable x.
+https://disco-lang.readthedocs.io/en/latest/reference/nonlinear.html

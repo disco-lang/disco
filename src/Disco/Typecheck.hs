@@ -1320,6 +1320,8 @@ checkPattern
   :: Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r
   => Pattern -> Type -> Sem r (TyCtx, APattern)
 
+checkPattern (PNonlinear p x) _ = throw $ NonlinearPattern p x
+
 checkPattern p (TyUser name args) = lookupTyDefn name args >>= checkPattern p
 
 checkPattern (PVar x) ty = return (singleCtx (localName x) (toPolyType ty), APVar ty (coerce x))

@@ -124,18 +124,15 @@ data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
   | MissingAscr
-  | Nonlinear
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
   showErrorComponent MissingAscr        = "Variables introduced by ∀ or ∃ must have a type"
-  showErrorComponent Nonlinear          = "Variable names cannot be reused in a pattern"
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
   errorComponentLen MissingAscr         = 1
-  errorComponentLen Nonlinear           = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -822,7 +819,7 @@ parseAtomicPattern = label "pattern" $ do
   t <- parseAtom
   case termToPattern t of
     Nothing -> customFailure $ InvalidPattern (OT t)
-    Just p  -> return p
+    Just p  -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
 
 -- | Parse a pattern, by parsing a term and then attempting to convert
 --   it to a pattern.  The Bool parameter says whether to require
@@ -834,8 +831,7 @@ parsePattern requireAscr = label "pattern" $ do
     Nothing -> customFailure $ InvalidPattern (OT t)
     Just p
       | requireAscr && not (hasAscr p) -> customFailure MissingAscr
-      | hasDuplicatePVars p -> customFailure Nonlinear
-      | otherwise -> return p
+      | otherwise -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
 
 -- | Does a pattern either have a top-level ascription, or consist of
 --   a tuple with each component recursively having ascriptions?
@@ -845,123 +841,114 @@ hasAscr PAscr{}   = True
 hasAscr (PTup ps) = all hasAscr ps
 hasAscr _         = False
 
-anyM :: Monad m => (a -> m Bool) -> [a] -> m Bool
-anyM _ [] = return False
-anyM p (a:as) = do
+-- | Lazy monadic variant of find.
+findM :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+findM _ [] = return Nothing
+findM p (a:as) = do
   b <- p a
   case b of
-    True -> return True
-    _    -> anyM p as
+    Just x -> return $ Just x
+    _      -> findM p as
 
 -- | Does a pattern have the same variable repeated more than once?
-hasDuplicatePVars :: Pattern -> Bool
-hasDuplicatePVars = flip evalState S.empty . go
+findDuplicatePVar :: Pattern -> Maybe (Name Term)
+findDuplicatePVar = flip evalState S.empty . go
   where
-    go :: Pattern -> State (Set String) Bool
+    go :: Pattern -> State (Set String) (Maybe (Name Term))
     go (PVar x) = do
       let xName = name2String x
       seen <- gets (S.member xName)
       if seen
-        then return True
+        then return (Just x)
         else do
           modify (S.insert xName)
-          return False
+          return Nothing
     go (PAscr p _) = go p
-    go (PTup ps) = anyM go ps
+    go (PTup ps) = findM go ps
     go (PInj _ p) = go p
-    go (PCons p1 p2) = anyM go [p1,p2]
-    go (PList ps) = anyM go ps
+    go (PCons p1 p2) = findM go [p1,p2]
+    go (PList ps) = findM go ps
     go (PAdd _ p _) = go p
     go (PMul _ p _) = go p
     go (PSub p _)   = go p
     go (PNeg p) = go p
-    go (PFrac p1 p2) = anyM go [p1,p2]
-    go _ = return False
+    go (PFrac p1 p2) = findM go [p1,p2]
+    go _ = return Nothing
 
--- | Attempt converting a term to a pattern, keeping track of
---   variables seen to ensure none are repeated.
+-- | Attempt converting a term to a pattern.
 termToPattern :: Term -> Maybe Pattern
-termToPattern = flip evalStateT S.empty . go
-  where
-    go :: Term -> State (Set String) (Maybe Pattern)
-    go TWild       = pure (Just PWild)
-    go (TVar x)    = do
-      let xName = name2String x
-      seen <- gets (S.member xName)
-      if seen
-        then pure . Just $ PNonlinear x
-        else do
-          modify (S.insert xName)
-          pure . Just $ PVar x
-    go (TParens t) = go t
-    go TUnit       = pure (Just PUnit)
-    go (TBool b)   = pure . Just $ PBool b
-    go (TNat n)    = pure . Just $ PNat n
-    go (TChar c)   = pure . Just $ PChar c
-    go (TString s) = pure . Just $ PString s
-    go (TTup ts)   = PTup <$> mapM go ts
-    go (TApp (TVar i) t)
-      | i == string2Name "left"  = PInj L <$> go t
-      | i == string2Name "right" = PInj R <$> go t
+termToPattern TWild       = Just PWild
+termToPattern (TVar x)    = Just $ PVar x
+termToPattern (TParens t) = termToPattern t
+termToPattern TUnit       = Just PUnit
+termToPattern (TBool b)   = Just $ PBool b
+termToPattern (TNat n)    = Just $ PNat n
+termToPattern (TChar c)   = Just $ PChar c
+termToPattern (TString s) = Just $ PString s
+termToPattern (TTup ts)   = PTup <$> mapM termToPattern ts
+termToPattern (TApp (TVar i) t)
+  | i == string2Name "left"  = PInj L <$> termToPattern t
+  | i == string2Name "right" = PInj R <$> termToPattern t
+-- termToPattern (TInj s t)  = PInj s <$> termToPattern t
 
-    go (TAscr t s) = case s of
-      Forall (unsafeUnbind -> ([], s')) -> PAscr <$> go t <*> pure s'
-      _                                 -> Nothing
+termToPattern (TAscr t s) = case s of
+  Forall (unsafeUnbind -> ([], s')) -> PAscr <$> termToPattern t <*> pure s'
+  _                                 -> Nothing
 
-    go (TBin Cons t1 t2)
-      = PCons <$> go t1 <*> go t2
+termToPattern (TBin Cons t1 t2)
+  = PCons <$> termToPattern t1 <*> termToPattern t2
 
-    go (TBin Add t1 t2)
-      = case (go t1, go t2) of
-          (Just p, _)
-            |  length (toListOf fvAny p) == 1
-            && null (toListOf fvAny t2)
-            -> Just $ PAdd L p t2
-          (_, Just p)
-            |  length (toListOf fvAny p) == 1
-            && null (toListOf fvAny t1)
-            -> Just $ PAdd R p t1
-          _ -> Nothing
-          -- If t1 is a pattern binding one variable, and t2 has no fvs,
-          -- this can be a PAdd L.  Also vice versa for PAdd R.
+termToPattern (TBin Add t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && null (toListOf fvAny t2)
+        -> Just $ PAdd L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && null (toListOf fvAny t1)
+        -> Just $ PAdd R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PAdd L.  Also vice versa for PAdd R.
 
-    go (TBin Mul t1 t2)
-      = case (go t1, go t2) of
-          (Just p, _)
-            |  length (toListOf fvAny p) == 1
-            && null (toListOf fvAny t2)
-            -> Just $ PMul L p t2
-          (_, Just p)
-            |  length (toListOf fvAny p) == 1
-            && null (toListOf fvAny t1)
-            -> Just $ PMul R p t1
-          _ -> Nothing
-          -- If t1 is a pattern binding one variable, and t2 has no fvs,
-          -- this can be a PMul L.  Also vice versa for PMul R.
+termToPattern (TBin Mul t1 t2)
+  = case (termToPattern t1, termToPattern t2) of
+      (Just p, _)
+        |  length (toListOf fvAny p) == 1
+        && null (toListOf fvAny t2)
+        -> Just $ PMul L p t2
+      (_, Just p)
+        |  length (toListOf fvAny p) == 1
+        && null (toListOf fvAny t1)
+        -> Just $ PMul R p t1
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PMul L.  Also vice versa for PMul R.
 
-    go (TBin Sub t1 t2)
-      = case go t1 of
-          Just p
-            |  length (toListOf fvAny p) == 1
-            && null (toListOf fvAny t2)
-            -> Just $ PSub p t2
-          _ -> Nothing
-          -- If t1 is a pattern binding one variable, and t2 has no fvs,
-          -- this can be a PSub.
+termToPattern (TBin Sub t1 t2)
+  = case termToPattern t1 of
+      Just p
+        |  length (toListOf fvAny p) == 1
+        && null (toListOf fvAny t2)
+        -> Just $ PSub p t2
+      _ -> Nothing
+      -- If t1 is a pattern binding one variable, and t2 has no fvs,
+      -- this can be a PSub.
 
-          -- For now we don't handle the case of t - p, since it seems
-          -- less useful (and desugaring it would require extra code since
-          -- subtraction is not commutative).
+      -- For now we don't handle the case of t - p, since it seems
+      -- less useful (and desugaring it would require extra code since
+      -- subtraction is not commutative).
 
-    go (TBin Div t1 t2)
-      = PFrac <$> go t1 <*> go t2
+termToPattern (TBin Div t1 t2)
+  = PFrac <$> termToPattern t1 <*> termToPattern t2
 
-    go (TUn Neg t) = PNeg <$> go t
+termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
-    go (TContainer ListContainer ts Nothing)
-      = PList <$> mapM (go . fst) ts
+termToPattern (TContainer ListContainer ts Nothing)
+  = PList <$> mapM (termToPattern . fst) ts
 
-    go _           = Nothing
+termToPattern _           = Nothing
 
 -- | Parse an expression built out of unary and binary operators.
 parseExpr :: Parser Term

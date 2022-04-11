@@ -50,11 +50,13 @@ module Disco.Parser
        where
 
 import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
-                                                          fvAny, string2Name)
+                                                          fvAny, name2String,
+                                                          string2Name)
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
-import           Text.Megaparsec                         hiding (runParser)
+import           Text.Megaparsec                         hiding (State,
+                                                          runParser)
 import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
@@ -797,15 +799,18 @@ parseBranch = flip bind <$> parseTerm <*> parseGuards
 parseGuards :: Parser (Telescope Guard)
 parseGuards = (TelEmpty <$ reserved "otherwise") <|> (toTelescope <$> many parseGuard)
 
--- | Parse a single guard (@if@, @if ... is@, or @let@)
+-- | Parse a single guard (@if@, @if ... is ...@, or @let@)
 parseGuard :: Parser Guard
-parseGuard = try parseGPat <|> parseGBool <|> parseGLet
+parseGuard = parseGCond <|> parseGLet
   where
     guardWord = reserved "if" <|> reserved "when"
-    parseGBool = GBool <$> (embed <$> (guardWord *> parseTerm))
-    parseGPat  = GPat <$> (embed <$> (guardWord *> parseTerm))
-                      <*> (reserved "is" *> parsePattern False)
-    parseGLet  = GLet <$> (reserved "let" *> parseBinding)
+    parseGCond = do
+      guardWord
+      t <- parseTerm
+      parseGPat t <|> parseGBool t
+    parseGPat t  = GPat (embed t) <$> (reserved "is" *> parsePattern False)
+    parseGBool t = pure $ GBool (embed t)
+    parseGLet    = GLet <$> (reserved "let" *> parseBinding)
 
 -- | Parse an atomic pattern, by parsing a term and then attempting to
 --   convert it to a pattern.
@@ -814,7 +819,7 @@ parseAtomicPattern = label "pattern" $ do
   t <- parseAtom
   case termToPattern t of
     Nothing -> customFailure $ InvalidPattern (OT t)
-    Just p  -> return p
+    Just p  -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
 
 -- | Parse a pattern, by parsing a term and then attempting to convert
 --   it to a pattern.  The Bool parameter says whether to require
@@ -825,8 +830,8 @@ parsePattern requireAscr = label "pattern" $ do
   case termToPattern t of
     Nothing -> customFailure $ InvalidPattern (OT t)
     Just p
-      | not requireAscr || hasAscr p -> return p
-      | otherwise -> customFailure MissingAscr
+      | requireAscr && not (hasAscr p) -> customFailure MissingAscr
+      | otherwise -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
 
 -- | Does a pattern either have a top-level ascription, or consist of
 --   a tuple with each component recursively having ascriptions?
@@ -835,6 +840,40 @@ hasAscr :: Pattern -> Bool
 hasAscr PAscr{}   = True
 hasAscr (PTup ps) = all hasAscr ps
 hasAscr _         = False
+
+-- | Lazy monadic variant of find.
+findM :: Monad m => (a -> m (Maybe b)) -> [a] -> m (Maybe b)
+findM _ [] = return Nothing
+findM p (a:as) = do
+  b <- p a
+  case b of
+    Just x -> return $ Just x
+    _      -> findM p as
+
+-- | Does a pattern have the same variable repeated more than once?
+findDuplicatePVar :: Pattern -> Maybe (Name Term)
+findDuplicatePVar = flip evalState S.empty . go
+  where
+    go :: Pattern -> State (Set String) (Maybe (Name Term))
+    go (PVar x) = do
+      let xName = name2String x
+      seen <- gets (S.member xName)
+      if seen
+        then return (Just x)
+        else do
+          modify (S.insert xName)
+          return Nothing
+    go (PAscr p _) = go p
+    go (PTup ps) = findM go ps
+    go (PInj _ p) = go p
+    go (PCons p1 p2) = findM go [p1,p2]
+    go (PList ps) = findM go ps
+    go (PAdd _ p _) = go p
+    go (PMul _ p _) = go p
+    go (PSub p _)   = go p
+    go (PNeg p) = go p
+    go (PFrac p1 p2) = findM go [p1,p2]
+    go _ = return Nothing
 
 -- | Attempt converting a term to a pattern.
 termToPattern :: Term -> Maybe Pattern

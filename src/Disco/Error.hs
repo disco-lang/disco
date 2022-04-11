@@ -220,6 +220,11 @@ prettyTCError = \case
     , rtd "num-args"
     ]
 
+  NonlinearPattern p x  -> vcat
+    [ "Error: pattern" <+> pretty' p <+> "contains duplicate variable" <+> pretty' x <> "."
+    , rtd "nonlinear"
+    ]
+
   NoSearch ty ->
     vcat
     [ "Error: the type"

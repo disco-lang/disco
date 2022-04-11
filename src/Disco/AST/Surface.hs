@@ -99,6 +99,7 @@ module Disco.AST.Surface
        , pattern PSub
        , pattern PNeg
        , pattern PFrac
+       , pattern PNonlinear
 
        , pattern Binding
        )
@@ -114,7 +115,7 @@ import qualified Data.Set                         as S
 import           Data.Void
 
 import           Disco.Effects.LFresh
-import           Polysemy                         hiding (Embed)
+import           Polysemy                         hiding (Embed, embed)
 import           Polysemy.Reader
 
 import           Disco.AST.Generic
@@ -454,6 +455,10 @@ pattern PNeg p = PNeg_ () p
 
 pattern PFrac :: Pattern -> Pattern -> Pattern
 pattern PFrac p1 p2 = PFrac_ () p1 p2
+
+pattern PNonlinear :: Pattern -> Name Term -> Pattern
+pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x where
+  PNonlinear p x = PNonlinear_ (embed p) x
 
 {-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
              PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}

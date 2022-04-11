@@ -10,5 +10,5 @@ expecting expression or operator
 1 | g(x) = {? 5 if x > 5 .+ 4, 6 otherwise ?}
   |                      ^^
 unexpected ".+"
-expecting "?}", "if", "let", "when", ',', expression, operator, or type annotation
+expecting "?}", "if", "is", "let", "when", ',', expression, operator, or type annotation
 

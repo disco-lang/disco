@@ -115,6 +115,7 @@ otherDoc = M.fromList
   , "Prop"       ==> "The type of propositions."
   , "Set"        ==> "The type of finite sets."
   , "|~|"        ==> "Absolute value, or the size of a collection."
+  , "{?"         ==> "{? ... ?} is a case expression, for choosing a result based on conditions."
   ]
   where
     docN = "The type of natural numbers: 0, 1, 2, ..."
@@ -145,4 +146,5 @@ otherReference = M.fromList
   , "Prop"       ==> "prop"
   , "Set"        ==> "set"
   , "|~|"        ==> "size"
+  , "{?"         ==> "case"
   ]

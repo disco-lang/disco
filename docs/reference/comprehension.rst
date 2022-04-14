@@ -84,11 +84,13 @@ In the end, the result is the set ``{12, 26, 27, 28, 29, 30}``.
 Specification
 -------------
 
-In case you are curious about the precise definition and are not
-afraid of the details, the exact way that set comprehensions
-work can be defined by the following three equations, making use of
-the standard functions ``each`` and ``unions``:
+.. note::
 
-* ``{ e | } = e``
-* ``{ e | x in xs, gs } = unions(each(\x. {e | gs}, xs))``
-* ``{ e | g, gs } = {? { e | gs } if g, {} otherwise ?}``
+   In case you are curious about the precise definition and are not
+   afraid of the details, the exact way that set comprehensions
+   work can be defined by the following three equations, making use of
+   the standard functions ``each`` and ``unions``:
+
+   * ``{ e | } = e``
+   * ``{ e | x in xs, gs } = unions(each(\x. {e | gs}, xs))``
+   * ``{ e | g, gs } = {? { e | gs } if g, {} otherwise ?}``

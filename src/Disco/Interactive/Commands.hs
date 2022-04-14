@@ -350,7 +350,8 @@ docCmd =
       parser = Doc <$> parseDoc
     }
 
--- XXX
+-- An input to the :doc command can be either a term, a primitive
+-- operator, or something else.
 data DocInput = DocTerm Term | DocPrim Prim | DocOther String
   deriving (Show)
 
@@ -365,6 +366,7 @@ handleDoc ::
   REPLExpr 'CDoc ->
   Sem r ()
 handleDoc (Doc (DocTerm (TBool _))) = handleDocBool
+handleDoc (Doc (DocTerm TWild))     = handleDocWild
 handleDoc (Doc (DocTerm (TPrim p))) = handleDocPrim p
 handleDoc (Doc (DocTerm (TVar x)))  = handleDocVar x
 handleDoc (Doc (DocTerm _))         =
@@ -378,6 +380,13 @@ handleDocBool =
     "true and false (also written True and False) are the two possible values of type Boolean."
     $+$
     mkReference "bool"
+
+handleDocWild :: Members '[Output Message] r => Sem r ()
+handleDocWild =
+  info $
+    "A wildcard pattern."
+    $+$
+    mkReference "wild-pattern"
 
 handleDocVar ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>

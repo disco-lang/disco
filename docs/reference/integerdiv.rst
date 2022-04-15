@@ -20,7 +20,7 @@ times (with some left over).
    -4
 
 In fact, ``//`` is simply defined in terms of regular :doc:`division
-<division>` as well as the :doc:`floor operation <round>`:
+<division>` along with the :doc:`floor operation <round>`:
 
 ::
 

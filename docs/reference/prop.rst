@@ -46,7 +46,7 @@ whether a proposition is true or false, you have two options:
 
         ::
 
-             - Test is false: ∀p. ∀q. p \/ q <-> p /\ q
+             - Certainly false: ∀p. ∀q. p \/ q <-> p /\ q
                Counterexample:
                  p = false
                  q = true
@@ -55,9 +55,8 @@ whether a proposition is true or false, you have two options:
 
         ::
 
-             - Test passed: ∀n. n < 529
+             - Possibly true: ∀n. n < 529
                Checked 100 possibilities without finding a counterexample.
-
 
       Obviously this proposition is false, but Disco apparently does
       not try a big enough value of ``n`` to be able to tell.

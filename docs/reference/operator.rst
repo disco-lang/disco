@@ -42,7 +42,7 @@ argument to a :doc:`higher-order function <hof>`:
 
 ::
 
-   Disco> foldr(~+~, 0, [1 .. 10])
+   Disco> reduce(~+~, 0, [1 .. 10])
    55
 
 Operator documentation

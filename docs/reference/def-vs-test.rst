@@ -11,7 +11,7 @@ at least two distinct (yet related) contexts:
 - As a *relation* which can hold, or not, as in, "If :math:`x = 3y +
   2`, then ... but otherwise ...".  In this example sentence,
   :math:`x` and :math:`y` must already be defined, and :math:`x = 3y + 2`
-  is something that will be either true or false.
+  is something that is either true or false.
 
 Notice how the exact same expression :math:`x = 3y + 2` is used in
 both examples, but means two very different things depending on the

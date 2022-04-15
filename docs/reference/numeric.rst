@@ -48,25 +48,27 @@ Disco has four :doc:`types <types>` which represent numbers:
 
 We can arrange the four numeric types in a diamond shape, like this:
 
-::
-
-      Q
-     / \
-    Z   F
-     \ /
-      N
+.. image:: ../images/diamond.png
+   :width: 300
+   :alt: Diamond lattice
+   :align: center
 
 Each type is a subset, or :doc:`subtype`, of the type or types above
-it.  For example, the fact that N is below Z means that every natural
-number is also an integer.
+it.  For example, the fact that :math:`\mathbb{N}` is below
+:math:`\mathbb{Z}` means that every natural number is also an integer.
 
 * The values of every numeric type can be :doc:`added <addition>`
   and :doc:`multiplied <multiplication>`.
-* The types on the upper left of the diamond (``Z`` and ``Q``) can
-  also be :doc:`subtracted <subtraction>`.
-* The types on the upper right of the diamond (``F`` and ``Q``) can
-  also be :doc:`divided <division>`.
-* To move down and to the right (*i.e.* from ``Z`` to ``N``, or from
-  ``Q`` to ``F``), you can use :doc:`absolute value <abs>`.
-* To move down and to the left (*i.e.* from ``F`` to ``N``, or from
-  ``Q`` to ``Z``), you can take the :doc:`floor or ceiling <round>`.
+* The arrow labelled :math:`x-y` indicates that going up and to the
+  left in the diamond (*i.e.* from :math:`\mathbb{N}` to Z or F to Q)
+  corresponds to adding the ability to do subtraction. That is, values
+  of types on the upper left of the diamond (:math:`\mathbb{Z}` and
+  :math:`\mathbb{Q}`) can also be :doc:`subtracted <subtraction>`.
+* Going up and to the right corresponds to adding the ability to do
+  division; that is, values of the types on the upper right of the
+  diamond (:math:`\mathbb{F}` and :math:`\mathbb{Q}`) can also be
+  :doc:`divided <division>`.
+* To move down and to the right (*i.e.* from :math:`\mathbb{Z}` to :math:`\mathbb{N}`, or from
+  :math:`\mathbb{Q}` to :math:`\mathbb{F}`), you can use :doc:`absolute value <abs>`.
+* To move down and to the left (*i.e.* from :math:`\mathbb{F}` to :math:`\mathbb{N}`, or from
+  :math:`\mathbb{Q}` to :math:`\mathbb{Z}`), you can take the :doc:`floor or ceiling <round>`.

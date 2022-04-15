@@ -22,6 +22,6 @@ them.
    syntax
    types
    function
-   collection-ops
+   collections
    errors
    symbols

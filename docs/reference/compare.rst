@@ -1,8 +1,9 @@
 Comparison
 ==========
 
-*Comparison operators* can be used to compare two values, either to
-test if they are equal, or to see what order they are in.
+*Comparison operators* can be used to compare two values, to test if
+they are equal or to see what order they are in.  Comparison operators
+always return a :doc:`boolean <bool>` value.
 
 Values of almost any type can be compared: :doc:`numeric types
 <numeric>`, :doc:`booleans <bool>`, :doc:`characters <char>`,
@@ -46,7 +47,7 @@ many.
   equal.  For more information on the difference, see the page on
   :doc:`definition vs equality testing <def-vs-test>`.
 
-* The ``/=`` operator (also written ``≠``, or ``!=``) means "not equal
+* The ``/=`` operator (also written ``≠`` or ``!=``) means "not equal
   to".  It is true if and only if its two arguments are not equal. The
   syntax ``/=`` is supposed to remind us of the standard mathematical
   notation of an equality sign with a slash through it (``≠``).

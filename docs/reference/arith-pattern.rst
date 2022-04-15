@@ -34,3 +34,13 @@ variable.  Otherwise, the pattern is ambiguous.  For example, ``f(a+b)
 given ``n``; there is no way to determine what ``a`` and ``b`` must
 be.
 
+Arithmetic patterns can sometimes allow us to define things in an
+alternative way that does not require :doc:`subtraction
+<subtraction>`.  For example, one way to define the :doc:`factorial
+<factorial>` function is as follows:
+
+::
+
+   fact : N -> N
+   fact(0)   = 1
+   fact(n+1) = (n+1) * fact(n)

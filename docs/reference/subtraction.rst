@@ -19,7 +19,7 @@ be automatically converted to integers or rationals as appropriate.
 
 In some situations, you really do need to subtract natural or fractional
 numbers. For example, consider this incorrect definition of the
-:doc:`factorial` function:
+:doc:`factorial <factorial>` function:
 
 ::
 
@@ -55,4 +55,5 @@ follows:
    fact(0) = 1
    fact(n) = n * fact(n .- 1)
 
-(Alternatively, we could define ``fact`` using an :doc:`arithmetic pattern <arith-pattern>`; see that page for more info.)
+(Alternatively, we could define ``fact`` using an :doc:`arithmetic
+pattern <arith-pattern>`; see that page for more info.)

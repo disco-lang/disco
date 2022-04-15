@@ -21,4 +21,5 @@ have the same type as the base.  If the exponent is an :doc:`integer
 :doc:`rational <rational>`, depending on the type of the base.
 
 Fractional exponents may not be used, as the result could be
-irrational.
+irrational, and Disco has no way to represent irrational numbers.  For
+example, :math:`2^{1/2} = \sqrt{2}`.

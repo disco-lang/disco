@@ -20,9 +20,9 @@ signature <type-sig>`.  We can also give Disco hints about the
 intended type of an expression using a :doc:`type annotation
 <type-annot>`.
 
-In some situations, Disco may be willing to accept something of type
-``B`` when it was expecting an ``A``: specifically, when ``B`` is a
-:doc:`subtype <subtypes>` of ``A``.
+In some situations, Disco may be willing to accept something of one
+type when it was expecting another: specifically, when the given type
+is a :doc:`subtype <subtypes>` of the one it was expecting.
 
 .. toctree::
    :maxdepth: 1

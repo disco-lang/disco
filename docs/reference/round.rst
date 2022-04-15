@@ -21,11 +21,14 @@ and ``ceiling`` operators.
        Disco> floor(-1/2)
        -1
 
-    Notice that ``floor`` always rounds *down*, even for negative
-    numbers. (This is how mathematicians think about ``floor``, and is
-    the most mathematically elegant definition; however, note that in
-    some other programming languages, ``floor`` always rounds *towards
-    zero* instead, so *e.g.* ``floor(-1/2)`` would be ``0``.)
+    .. note::
+
+       That ``floor`` always rounds *down*, even for negative
+       numbers. This is how mathematicians think about ``floor``, and
+       is the most mathematically elegant definition; however, note
+       that in some other programming languages, ``floor`` always
+       rounds *towards zero* instead, so *e.g.* ``floor(-1/2)`` would
+       be ``0``.
 
 * Likewise, ``ceiling x``, also written ``⌈ x ⌉``, returns the
   smallest integer which is greater than or equal to ``x``.  For example:

@@ -11,5 +11,5 @@ on one line together.  For example,
 
 is a type signature declaring the variable ``x`` to have type ``Z``.
 
-Every top-level :doc:`definition <definition>` must have a type
+Every :doc:`definition <definition>` must have a type
 signature that comes before it.

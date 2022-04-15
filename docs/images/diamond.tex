@@ -1,0 +1,18 @@
+% -*- compile-command: "pdflatex diamond.tex" -*-
+
+\documentclass{article}
+
+\usepackage[all]{xy}
+\usepackage{amsfonts}
+
+\begin{document}
+
+\[
+\xymatrix{
+  & \mathbb{Q} \ar@{-}[dl] \ar@<-2ex>[dl]_{\lfloor - \rfloor} \ar@{-}[dr] \ar@<2ex>[dr]^{|-|}& \\
+  \mathbb{Z} \ar@{-}[dr] & & \mathbb{F} \ar@{-}[dl] \\
+  & \mathbb{N} \ar@<2ex>[ul]^{x-y} \ar@<-2ex>[ur]_{x/y} &
+}
+\]
+
+\end{document}

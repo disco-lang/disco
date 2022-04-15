@@ -1,5 +1,5 @@
-Collection operations
-=====================
+Collections
+===========
 
 .. toctree::
 

@@ -112,6 +112,7 @@ otherDoc = M.fromList
   , "Rational"   ==> docQ
   , "Bool"       ==> docB
   , "Boolean"    ==> docB
+  , "Unit"       ==> "The unit type, i.e. a type with only a single value."
   , "Prop"       ==> "The type of propositions."
   , "Set"        ==> "The type of finite sets."
   , "|~|"        ==> "Absolute value, or the size of a collection."
@@ -143,6 +144,7 @@ otherReference = M.fromList
   , "Rational"   ==> "rational"
   , "Bool"       ==> "bool"
   , "Boolean"    ==> "bool"
+  , "Unit"       ==> "unit"
   , "Prop"       ==> "prop"
   , "Set"        ==> "set"
   , "|~|"        ==> "size"

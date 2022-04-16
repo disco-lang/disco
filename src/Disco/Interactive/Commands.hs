@@ -366,6 +366,7 @@ handleDoc ::
   REPLExpr 'CDoc ->
   Sem r ()
 handleDoc (Doc (DocTerm (TBool _))) = handleDocBool
+handleDoc (Doc (DocTerm TUnit))     = handleDocUnit
 handleDoc (Doc (DocTerm TWild))     = handleDocWild
 handleDoc (Doc (DocTerm (TPrim p))) = handleDocPrim p
 handleDoc (Doc (DocTerm (TVar x)))  = handleDocVar x
@@ -380,6 +381,13 @@ handleDocBool =
     "true and false (also written True and False) are the two possible values of type Boolean."
     $+$
     mkReference "bool"
+
+handleDocUnit :: Members '[Output Message] r => Sem r ()
+handleDocUnit =
+  info $
+    "The unit value, i.e. the single value of type Unit."
+    $+$
+    mkReference "unit"
 
 handleDocWild :: Members '[Output Message] r => Sem r ()
 handleDocWild =

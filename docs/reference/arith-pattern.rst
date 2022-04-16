@@ -13,26 +13,26 @@ example,
    f(-p/(q+1)) = ...
 
 are all examples of arithmetic patterns.  A full description of how
-arithmetic patterns work would be too complex; put simply, an
-arithmetic pattern matches whenever the input is a number of the given
-form.  For example, ``f(2n+1) = ...`` matches whenever there is a
-number ``n`` such that the input is of the form ``2n+1``.  This is a
-common way to define functions depending on whether the input is even
-or odd:
+arithmetic patterns work would be too complex to include here; put
+simply, an arithmetic pattern matches whenever the input is a number
+of the given form.  For example, ``f(2n+1) = ...`` matches whenever
+there is a number ``n`` such that the input is of the form ``2n+1``.
+This is a common way to define functions depending on whether the
+input is even or odd:
 
 ::
 
    f : N -> N
-   f(2n) = ... n ...     -- even inputs
-   f(2n+1) = ... n ...   -- odd inputs
+   f(2n)   = ... n ...     -- even inputs
+   f(2n+1) = ... n ...     -- odd inputs
 
 Note that ``f(p/q)`` matches whenever the input is a rational number
 with a numerator of ``p`` and a denominator of ``q``.  In all other
 cases, arithmetic patterns are generally required to have only one
 variable.  Otherwise, the pattern is ambiguous.  For example, ``f(a+b)
 = ...`` is not allowed, since ``a + b = n`` has many solutions for a
-given ``n``; there is no way to determine what ``a`` and ``b`` must
-be.
+given ``n``; for a given input, there is generally no way to determine
+what ``a`` and ``b`` should be.
 
 Arithmetic patterns can sometimes allow us to define things in an
 alternative way that does not require :doc:`subtraction
@@ -44,3 +44,7 @@ alternative way that does not require :doc:`subtraction
    fact : N -> N
    fact(0)   = 1
    fact(n+1) = (n+1) * fact(n)
+
+In the second clause, instead of writing ``fact(n) = n * fact(n .-
+1)``, we can express that the clause only applies to natural numbers
+that are one more than another natural number.

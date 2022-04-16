@@ -3,8 +3,8 @@ Anonymous functions
 
 Sometimes, especially when using :doc:`higher-order functions
 <higher-order>`, it is convenient to write down a :doc:`function <function>` without
-having to give it a name.  This can be done using so-called "lambda
-notation".  In its simplest form, this looks like
+having to give it a name.  This can be done using a so-called "lambda
+expression".  In its simplest form, this looks like
 
 ::
 

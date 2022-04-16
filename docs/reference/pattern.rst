@@ -31,7 +31,7 @@ means:
   return ``12``;
 - next, if the input to ``f`` is even (*i.e.* of the form ``2k`` for
   some integer ``k``), return ``k+1``;
-- otherwise, for any other input, which we will call ``n``, return
+- finally, for any other input, which we will call ``n``, return
   ``2n+1``.
 
 (If none of the clauses in a function definition matches an input, it

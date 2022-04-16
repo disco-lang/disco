@@ -11,7 +11,7 @@ set comprehension is
 
 with a single expression, followed by a vertical bar ``|``, followed
 by a list of one or more *qualifiers*.  The idea is introduced through
-a bunch of examples below; for the precise details, see the
+some examples below; for the precise details, see the
 `Details`_ section.
 
 :doc:`List <list>` comprehensions are similar, but use square brackets
@@ -22,16 +22,25 @@ Examples
 
 ::
 
-   Disco> {x | x in {1..5}}
+   Disco> {x | x in {1..5}}   -- same as {1..5}
    {1, 2, 3, 4, 5}
-   Disco> {3x | x in {1..5}}
+   
+   Disco> {3x | x in {1..5}}  -- multiply each element of {1..5} by 3
    {3, 6, 9, 12, 15}
+   
+   -- Pick out the elements of {1..10} that satisfy the condition
    Disco> {x | x in {1 .. 10}, x^2 + 20 == 9x}
    {4, 5}
+
+   -- Pick out the elements of {1..100} that satisfy all the conditions
    Disco> {x | x in {1 .. 100}, x =< 10 \/ x >= 90, x mod 2 == 0}
    {2, 4, 6, 8, 10, 90, 92, 94, 96, 98, 100}
+
+   -- Products of all combinations of elements from {1..4} and {1, 10, 100}
    Disco> {x * y | x in {1 .. 4}, y in {1, 10, 100}}
    {1, 2, 3, 4, 10, 20, 30, 40, 100, 200, 300, 400}
+
+   -- Pairs of elements from {1..4} where the first is >= the second
    Disco> {(x,y) | x in {1 .. 4}, y in {1 .. x}}
    {(1, 1), (2, 1), (2, 2), (3, 1), (3, 2), (3, 3), (4, 1), (4, 2), (4, 3), (4, 4)}
 

@@ -67,6 +67,8 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
+import           Disco.Property                   (prettyTestFailure,
+                                                   prettyTestResult)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
                                                    toPrim)
@@ -616,9 +618,8 @@ handleLoad fp = do
   info "Loaded."
   return t
 
--- XXX Return a structured summary of the results, not a Bool;
--- separate out results generation and pretty-printing, & move this
--- somewhere else.
+-- XXX Return a structured summary of the results, not a Bool; & move
+-- this somewhere else?
 runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
 runAllTests declNames aprops
   | Ctx.null aprops = return True

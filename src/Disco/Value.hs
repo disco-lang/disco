@@ -36,7 +36,7 @@ module Disco.Value
   , ValProp(..), TestResult(..), TestReason_(..), TestReason
   , SearchType(..), SearchMotive(.., SMExists, SMForall)
   , TestVars(..), TestEnv(..), emptyTestEnv, getTestEnv, extendPropEnv, extendResultEnv
-  , testIsOk, testIsError, testReason, testEnv
+  , testIsOk, testIsError, testReason, testEnv, resultIsCertain
 
   -- * Environments
 
@@ -47,7 +47,7 @@ module Disco.Value
 
   -- * Pretty-printing
 
-  , prettyValue', prettyValue, prettyTestFailure, prettyTestResult
+  , prettyValue', prettyValue
   ) where
 
 import           Prelude                          hiding ((<>))
@@ -67,13 +67,11 @@ import           Algebra.Graph                    (Graph, foldg)
 
 import           Disco.AST.Core
 import           Disco.AST.Generic                (Side (..))
-import           Disco.AST.Typed                  (AProperty)
 import           Disco.Context                    as Ctx
 import           Disco.Error
 import           Disco.Names
 import           Disco.Pretty
 import           Disco.Syntax.Operators           (BOp (Add, Mul))
-import           Disco.Typecheck.Erase            (eraseProperty)
 import           Disco.Types
 
 import           Disco.Effects.LFresh
@@ -517,71 +515,3 @@ prettyBag ty vs
   where
     prettyCount (v,1) = prettyValue ty v
     prettyCount (v,n) = prettyValue ty v <+> "#" <+> text (show n)
-
-------------------------------------------------------------
--- Pretty-printing for test results
-------------------------------------------------------------
-
-prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r Doc
-prettyResultCertainty r prop res
-  = (if resultIsCertain r then "Certainly" else "Possibly") <+> text res <> ":" <+> pretty (eraseProperty prop)
-
-prettyTestFailure
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => AProperty -> TestResult -> Sem r Doc
-prettyTestFailure _    (TestResult True _ _)    = empty
-prettyTestFailure prop (TestResult False r env) =
-  prettyResultCertainty r prop "false"
-  $+$
-  prettyFailureReason r
-  $+$
-  prettyTestEnv "Counterexample:" env
-
-prettyTestResult
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => AProperty -> TestResult -> Sem r Doc
-prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
-prettyTestResult prop (TestResult _ r _)   =
-  prettyResultCertainty r prop "true"
-  $+$
-  prettySuccessReason r
-
-prettySuccessReason
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => TestReason -> Sem r Doc
-prettySuccessReason (TestFound (TestResult _ _ vs)) = prettyTestEnv "Found example:" vs
-prettySuccessReason (TestNotFound Exhaustive) = "No counterexamples exist."
-prettySuccessReason (TestNotFound (Randomized n m)) =
-  "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
-prettySuccessReason _ = empty
-
-prettyFailureReason
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => TestReason -> Sem r Doc
-prettyFailureReason TestBool = empty
-prettyFailureReason (TestEqual ty v1 v2) =
-  "Test result mismatch:"
-  $+$
-  bulletList "-"
-  [ "Left side:  " <> prettyValue ty v1
-  , "Right side: " <> prettyValue ty v2
-  ]
-prettyFailureReason (TestRuntimeError e) =
-  "Test failed with an error:"
-  $+$
-  nest 2 (pretty (EvalErr e))
-prettyFailureReason (TestFound (TestResult _ r _)) = prettyFailureReason r
-prettyFailureReason (TestNotFound Exhaustive) =
-  "No example exists; all possible values were checked."
-prettyFailureReason (TestNotFound (Randomized n m)) = do
-  "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-
-prettyTestEnv
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => String -> TestEnv -> Sem r Doc
-prettyTestEnv _ (TestEnv []) = empty
-prettyTestEnv s (TestEnv vs) = text s $+$ nest 2 (vcat (map prettyBind vs))
-  where
-    maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
-    prettyBind (x, ty, v) =
-      text x <> text (replicate (maxNameLen - length x) ' ') <+> "=" <+> prettyValue ty v

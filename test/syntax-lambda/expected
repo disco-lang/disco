@@ -6,9 +6,9 @@ let f = λx. x + 1 : ℕ in f : ℕ → ℕ
 let f = λx. x + 1 : ℕ in f : ℕ → ℕ
 (9, 8)
 5
-λx : ℤ, y : ℕ. x * y : ℤ → ℕ → ℤ
+λx : ℤ. λy : ℕ. x * y : ℤ → ℕ → ℤ
 [false, true, true]
-let f = λg : ℤ → ℕ → Bool. [g(1)(1), g(1)(2), g(-1)(0)] in f(λx, y : ℤ. x + 1 == y) : List(Bool)
+let f = λg : ℤ → ℕ → Bool. [g(1)(1), g(1)(2), g(-1)(0)] in f(λx. λy : ℤ. x + 1 == y) : List(Bool)
 3
 TAbs_ Lam () (<[PWild_ ()]> TNat_ () 3)
 3

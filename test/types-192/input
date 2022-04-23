@@ -1,1 +1,1 @@
-:type \x,y,z. x + y / z
+:type \x. \y. \z. x + y / z

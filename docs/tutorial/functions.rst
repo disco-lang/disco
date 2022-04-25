@@ -68,13 +68,13 @@ Anonymous functions
 ===================
 
 The syntax for an anonymous function in disco consists of a *lambda*
-(either a backslash or an actual ``λ``) followed by one or more
-*bindings*, a period, and an arbitrary disco expression (the *body*).
+(either a backslash or an actual ``λ``) followed by a pattern, a
+period, and an arbitrary disco expression (the *body*).
 
-Each *binding* is a *pattern*, which could be a single variable name,
-or a more complex pattern. Note that patterns can also contain type
-annotations. There can be multiple bindings separated by commas, which
-creates a (curried) "multi-argument" function.
+The pattern can be a single variable name or a more complex
+pattern. Note that patterns can also contain type annotations.  Unlike
+in, say, Haskell, there is no special syntactic sugar for curried
+multi-argument functions; one can just write nested lambdas.
 
 Here are a few examples to illustrate the possibilities:
 
@@ -86,7 +86,7 @@ Here are a few examples to illustrate the possibilities:
     17859076
     Disco> (\(x,y). x + y) (3,2)
     5
-    Disco> (\x:N, y:Q. x > y) 5 (9/2)
+    Disco> (\x:N. \y:Q. x > y) 5 (9/2)
     true
 
 Let expressions

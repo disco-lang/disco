@@ -1155,4 +1155,3 @@ parseTyOp =
 
 parseTypeOp :: Parser Term
 parseTypeOp = TTyOp <$> parseTyOp <*> parseAtomicType
-e

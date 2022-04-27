@@ -131,7 +131,7 @@ instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
   showErrorComponent MissingAscr        = "Variables introduced by ∀ or ∃ must have a type"
-  showErrorComponent MultiArgLambda     = "Anonymous functions (lambdas) can only have a single argument. XXX link, suggestion"
+  showErrorComponent MultiArgLambda     = "Anonymous functions (lambdas) can only have a single argument.\nInstead of \\x, y. ... you can write  \\x. \\y. ...\nhttps://disco-lang.readthedocs.io/en/latest/reference/anonymous-func.html"
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
   errorComponentLen MissingAscr         = 1

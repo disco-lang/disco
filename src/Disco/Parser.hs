@@ -766,7 +766,7 @@ parseQuantified = do
   where
     parseArgs notLam = (parsePattern notLam `sepBy1` comma) >>= checkMulti
       -- ∀ and ∃ can have multiple bindings separated by commas,
-      -- like ∀ x:N, y:N. ...
+      -- like ∀ x:N, y:N. ...  but we don't allow this for λ.
       where
         checkMulti :: [Pattern] -> Parser [Pattern]
         checkMulti ps

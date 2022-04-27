@@ -124,15 +124,18 @@ data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
   | MissingAscr
+  | MultiArgLambda
   deriving (Show, Eq, Ord)
 
 instance ShowErrorComponent DiscoParseError where
   showErrorComponent (ReservedVarName x)     = "keyword \"" ++ x ++ "\" cannot be used as a variable name"
   showErrorComponent (InvalidPattern (OT t)) = "Invalid pattern: " ++ run (prettyStr t)
   showErrorComponent MissingAscr        = "Variables introduced by ∀ or ∃ must have a type"
+  showErrorComponent MultiArgLambda     = "Anonymous functions (lambdas) can only have a single argument.\nInstead of \\x, y. ... you can write  \\x. \\y. ...\nhttps://disco-lang.readthedocs.io/en/latest/reference/anonymous-func.html"
   errorComponentLen (ReservedVarName x) = length x
   errorComponentLen (InvalidPattern _)  = 1
   errorComponentLen MissingAscr         = 1
+  errorComponentLen MultiArgLambda      = 1
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and
@@ -759,7 +762,18 @@ tuple t   = TTup t
 parseQuantified :: Parser Term
 parseQuantified = do
   q <- parseQuantifier
-  TAbs q <$> (bind <$> parsePattern (q /= Lam) `sepBy` comma <*> (dot *> parseTerm))
+  TAbs q <$> (bind <$> parseArgs (q /= Lam) <*> (dot *> parseTerm))
+  where
+    parseArgs notLam = (parsePattern notLam `sepBy1` comma) >>= checkMulti
+      -- ∀ and ∃ can have multiple bindings separated by commas,
+      -- like ∀ x:N, y:N. ...  but we don't allow this for λ.
+      where
+        checkMulti :: [Pattern] -> Parser [Pattern]
+        checkMulti ps
+          | notLam = return ps
+          | otherwise = case ps of
+              [p] -> return [p]
+              _   -> customFailure MultiArgLambda
 
 -- | Parse a quantifier symbol (lambda, forall, or exists).
 parseQuantifier :: Parser Quantifier

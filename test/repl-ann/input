@@ -1,3 +1,3 @@
 import num
 :ann factor
-:ann \x, y. x - 7
+:ann \x. \y. x - 7

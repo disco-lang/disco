@@ -1,17 +1,16 @@
 TAbs_ Lam () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
 TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Lam () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TAbs_ Lam () (<[PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
+TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TAbs_ Lam () (<[PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
+TAbs_ Lam () (<[PVar_ () x]> TAbs_ Lam () (<[PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
 TAbs_ Lam () (<[PVar_ () x]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
 TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TNat_ () 3]))
-TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N)),PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
-TAbs_ Lam () (<[PVar_ () x,PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 0@0,TVar_ () 0@1]))
+TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TAbs_ Lam () (<[PVar_ () y]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
+TAbs_ Lam () (<[PAscr_ () (PVar_ () x) (TyAtom (ABase N))]> TAbs_ Lam () (<[PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
+TAbs_ Lam () (<[PVar_ () x]> TAbs_ Lam () (<[PAscr_ () (PVar_ () y) (TyAtom (ABase F))]> TApp_ () (TPrim_ () (PrimBOp Gt)) (TTup_ () [TVar_ () 1@0,TVar_ () 0@0])))
 8
 Error: the shape of two types does not match.
 https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
-8
 8
 8
 1:16:

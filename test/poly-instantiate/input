@@ -1,11 +1,11 @@
 :load test/poly-instantiate/poly-instantiate.disco
 :type foldr
-:type foldr (\x, y. x)
-:type foldr (\x, y. y)
-:type foldr (\x, y. x+1)
-:type foldr (\x, y. y+1)
-:type foldr (\x, y. y+1) 1
-:type foldr (\x, y. y+1) (-1)
-:type foldr (\x, y. x) false
-:type foldr (\x, y. x+1) (1/2)
-:type foldr (\x, y. x-1) (1/2)
+:type foldr (\x. \y. x)
+:type foldr (\x. \y. y)
+:type foldr (\x. \y. x+1)
+:type foldr (\x. \y. y+1)
+:type foldr (\x. \y. y+1) 1
+:type foldr (\x. \y. y+1) (-1)
+:type foldr (\x. \y. x) false
+:type foldr (\x. \y. x+1) (1/2)
+:type foldr (\x. \y. x-1) (1/2)

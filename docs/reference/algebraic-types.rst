@@ -8,5 +8,5 @@ complex types.
 
    void
    unit
-   sum-type
    product-type
+   sum-type

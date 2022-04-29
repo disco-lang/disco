@@ -128,7 +128,7 @@ types, more complex algebraic types can be subtypes of each other too.
     ``Q``, therefore ``N + N`` is a subtype of ``Z + Q``.
 
 - Function types work a little differently.  ``A -> B`` is a subtype
-  of ``C -> D`` exactly when **``C`` is a subtype of ``A``** and ``B``
+  of ``C -> D`` exactly when ``C`` **is a subtype of** ``A`` and ``B``
   is a subtype of ``D``.  Notice how the relationship is reversed for
   the input types.  Working out why this makes sense is left as an
   interesting exercise for the reader.

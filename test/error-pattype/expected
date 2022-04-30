@@ -10,7 +10,7 @@ While checking REPL.g:
     (x1, y)
   is supposed to have type
     ℕ,
-  but instead it has a product type.
+  but instead it has a pair type.
   https://disco-lang.readthedocs.io/en/latest/reference/pattern-type.html
 While checking REPL.h:
   Error: the shape of two types does not match.

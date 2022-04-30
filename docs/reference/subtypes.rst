@@ -77,7 +77,7 @@ Subtyping for algebraic types
 In addition to the subtype relationships between the basic numeric
 types, more complex algebraic types can be subtypes of each other too.
 
-- For :doc:`product types <product-type>`, ``A * B`` is a subtype of
+- For :doc:`pair types <product-type>`, ``A * B`` is a subtype of
   ``C * D`` exactly when ``A`` is a subtype of ``C``, and ``B`` is a
   subtype of ``D``.  For example, given these definitions:
 

@@ -4,7 +4,7 @@ Multiplication
 .. note::
 
    This page concerns the ``*`` operator on numbers; for the ``*``
-   operator on :doc:`types <types>`, see :doc:`product types
+   operator on :doc:`types <types>`, see :doc:`pair types
    <product-type>`; for the ``*`` operator on :doc:`graphs <graphs>`, see
    :doc:`connect <connect>`.
 

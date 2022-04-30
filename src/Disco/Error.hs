@@ -279,7 +279,7 @@ prettyTCError = \case
 conWord :: Con -> Sem r Doc
 conWord = \case
   CArr         -> "function"
-  CProd        -> "product"
+  CProd        -> "pair"
   CSum         -> "sum"
   CSet         -> "set"
   CBag         -> "bag"

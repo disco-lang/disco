@@ -14,6 +14,6 @@ can be written ``unit`` (or ``■``, U+25A0 BLACK SQUARE).
    ■
 
 This is not very useful on its own, but becomes very useful when
-combined with :doc:`sum <sum-type>` and :doc:`product types
+combined with :doc:`sum <sum-type>` and :doc:`pair types
 <product-type>` to create custom recursive :doc:`algebraic types
 <algebraic-types>`.

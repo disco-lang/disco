@@ -18,10 +18,10 @@ type.  For example,
      (x, y)
    is supposed to have type
      ℕ,
-   but instead it has a product type.
+   but instead it has a pair type.
 
 In this example, we have declared the type of ``f`` to be ``N -> N``,
 that is, a function which takes a natural number as input and yields
 another natural number as output.  However, we have used the pattern
 ``(x,y)`` for the input of ``f``, which looks like a value of a
-:doc:`product type <product-type>`.
+:doc:`pair type <product-type>`.

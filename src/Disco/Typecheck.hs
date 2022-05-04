@@ -328,7 +328,7 @@ checkProperties docs =
     <$> (traverse . traverse) checkProperty properties
   where
     properties :: Ctx Term [Property]
-    properties = fmap (\ds -> [p | DocProperty p <- ds]) docs
+    properties = fmap (\ds -> [p | DocProperty _ p <- ds]) docs  -- XXX
 
 -- | Check the types of the terms embedded in a property.
 checkProperty

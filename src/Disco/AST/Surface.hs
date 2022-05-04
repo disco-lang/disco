@@ -160,8 +160,9 @@ type Docs = [DocThing]
 data DocThing
   = DocString   [String]    -- ^ A documentation string, i.e. a block
                             --   of @||| text@ items
-  | DocProperty Property    -- ^ An example/doctest/property of the
-                            --   form @!!! forall (x1:ty1) ... . property@
+  | DocProperty (Maybe String) Property
+                            -- ^ An optionally labelled example/doctest/property of the
+                            --   form @!!![label] property@
 deriving instance ForallTerm Show  UD => Show DocThing
 
 -- | A property is a universally quantified term of the form

@@ -495,7 +495,7 @@ parseTopLevel = L.nonIndented sc $
 parseDocThing :: Parser DocThing
 parseDocThing
   =   DocString   <$> some parseDocString
-  <|> DocProperty <$> parseProperty
+  <|> parseProperty
 
 -- | Parse one line of documentation beginning with @|||@.
 parseDocString :: Parser String
@@ -511,10 +511,11 @@ parseDocString = label "documentation" $ L.nonIndented sc $
 
 -- | Parse a top-level property/unit test, which is just @!!!@
 --   followed by an arbitrary term.
-parseProperty :: Parser Term
-parseProperty = label "property" $ L.nonIndented sc $ do
-  _ <- symbol "!!!"
-  indented parseTerm
+parseProperty :: Parser DocThing
+parseProperty = label "property" $ L.nonIndented sc $
+  DocProperty
+    <$> lexeme (string "!!!" *> optional (char '[' *> some (noneOf "[]") <* char ']'))
+    <*> indented parseTerm
 
 -- | Parse a single top-level declaration (either a type declaration
 --   or single definition clause).

@@ -379,14 +379,14 @@ ident = string2Name <$> identifier letterChar
 -- | Results from parsing a block of top-level things.
 data TLResults = TLResults
   { _tlDecls     :: [Decl]                            -- declarations
-  , _tlDocs      :: [(Name Term, [DocThing])] -- docstrings (|||) + tests (!!!)
-    -- XXX eventually going to split out tests separately, once refactoring is done
+  , _tlDocs      :: [(Name Term, [[String]])]         -- docstrings (|||)
+  , _tlProps     :: [(Maybe String, Property)]        -- tests (!!!)
   , _tlTerms     :: [Term]                            -- standalone terms
   , _tlFirstName :: Maybe (Name Term)                 -- first name encountered
   }
 
 emptyTLResults :: TLResults
-emptyTLResults = TLResults [] [] [] Nothing
+emptyTLResults = TLResults [] [] [] [] Nothing
 
 makeLenses ''TLResults
 
@@ -415,11 +415,13 @@ processTL (TLExpr t)    = tlTerms %~ (t:)
 
 -- When we process a doc thing, attach it to the first name declared
 -- following it.
-processTL (TLDoc doc)   = addDoc doc
+processTL (TLDoc (DocString doc))   = addDoc doc
 
--- | Add a piece of documentation to a current TLResults record,
+processTL (TLDoc (DocProperty label prop)) = undefined
+
+-- | Add a docstring to a current TLResults record,
 --   attaching it to the top-level name which is declared next.
-addDoc :: DocThing -> TLResults -> TLResults
+addDoc :: [String] -> TLResults -> TLResults
 addDoc d res = case (mAttach, res ^. tlDocs) of
   (Nothing, _) -> res
   (Just attach, (n, ds) : ds')
@@ -469,7 +471,7 @@ parseModule mode = do
     where
       mkModule exts imps tls = Module exts imps (defnGroups decls) docs terms
         where
-          TLResults decls docs terms _ = processTLs tls
+          TLResults decls docs props terms _ = processTLs tls
 
 -- | Parse an extension.
 parseExtension :: Parser Ext

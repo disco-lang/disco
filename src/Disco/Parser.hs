@@ -63,8 +63,10 @@ import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (%=), (%~), (&),
-                                                          (.=))
+                                                          (.=), (.~), (?~),
+                                                          (^.))
 import           Control.Monad.State
+import           Data.Bifunctor                          (first)
 import           Data.Char                               (isAlpha, isDigit)
 import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
@@ -74,6 +76,7 @@ import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
 
+import           Data.Semigroup                          (Endo (Endo, appEndo))
 import           Disco.AST.Surface
 import           Disco.Extensions
 import           Disco.Module
@@ -371,19 +374,75 @@ ident :: Parser (Name Term)
 ident = string2Name <$> identifier letterChar
 
 ------------------------------------------------------------
--- Parser
+-- Top-level module processing
 
 -- | Results from parsing a block of top-level things.
 data TLResults = TLResults
-  { _tlDecls :: [Decl]
-  , _tlDocs  :: [(Name Term, [DocThing])]
-  , _tlTerms :: [Term]
+  { _tlDecls     :: [Decl]                            -- declarations
+  , _tlDocs      :: [(Name Term, [DocThing])] -- docstrings (|||) + tests (!!!)
+    -- XXX eventually going to split out tests separately, once refactoring is done
+  , _tlTerms     :: [Term]                            -- standalone terms
+  , _tlFirstName :: Maybe (Name Term)                 -- first name encountered
   }
 
 emptyTLResults :: TLResults
-emptyTLResults = TLResults [] [] []
+emptyTLResults = TLResults [] [] [] Nothing
 
 makeLenses ''TLResults
+
+-- | Process a list of top-level module contents into a more
+--   structured form, i.e. collect up documentation attached to
+--   declarations, collect up labelled tests, separate out
+--   declarations, documentation, and standalone terms, etc.
+processTLs :: [TopLevel] -> TLResults
+processTLs = flip appEndo emptyTLResults . foldMap (Endo . processTL)
+
+-- | Process a single top-level item by updating a current TLResults
+--   record.
+processTL :: TopLevel -> (TLResults -> TLResults)
+
+-- When we process a type declaration or type definition, keep track
+-- of its name as the first name encountered so far, so we know which
+-- name to attach documentation to.
+processTL (TLDecl decl@(DType (TypeDecl x _)))
+  = (tlDecls %~ (decl :)) . (tlFirstName ?~ x)
+processTL (TLDecl decl@(DTyDef (TypeDefn x _ _)))
+  = (tlDecls %~ (decl :)) . (tlFirstName ?~ string2Name x)
+
+-- Definitions and expressions just get added to their respective lists.
+processTL (TLDecl defn) = tlDecls %~ (defn:)
+processTL (TLExpr t)    = tlTerms %~ (t:)
+
+-- When we process a doc thing, attach it to the first name declared
+-- following it.
+processTL (TLDoc doc)   = addDoc doc
+
+-- | Add a piece of documentation to a current TLResults record,
+--   attaching it to the top-level name which is declared next.
+addDoc :: DocThing -> TLResults -> TLResults
+addDoc d res = case (mAttach, res ^. tlDocs) of
+  (Nothing, _) -> res
+  (Just attach, (n, ds) : ds')
+    | n == attach -> res & tlDocs .~ ((n, d:ds) : ds')
+  (Just attach, _) -> res & tlDocs %~ ((attach, [d]):)
+  where
+    mAttach = res ^. tlFirstName
+
+-- | Group declarations which are clauses of the same definition into
+--   single compound declarations.
+defnGroups :: [Decl] -> [Decl]
+defnGroups []                = []
+defnGroups (d@DType{}  : ds)  = d : defnGroups ds
+defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
+defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
+  where
+    (grp, rest) = matchDefn ds
+    matchDefn :: [Decl] -> ([TermDefn], [Decl])
+    matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = first (t:) (matchDefn ds2)
+    matchDefn ds2 = ([], ds2)
+
+------------------------------------------------------------
+-- Parser
 
 -- | Parse the entire input as a module (with leading whitespace and
 --   no leftovers).
@@ -408,40 +467,9 @@ parseModule mode = do
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      groupTLs :: [DocThing] -> [TopLevel] -> TLResults
-      groupTLs _ [] = emptyTLResults
-      groupTLs revDocs (TLDoc doc : rest)
-        = groupTLs (doc : revDocs) rest
-      groupTLs revDocs (TLDecl decl@(DType (TypeDecl x _)) : rest)
-        = groupTLs [] rest
-          & tlDecls %~ (decl :)
-          & tlDocs  %~ ((x, reverse revDocs) :)
-      groupTLs revDocs (TLDecl decl@(DTyDef (TypeDefn x _ _)) : rest)
-        = groupTLs [] rest
-          & tlDecls %~ (decl :)
-          & tlDocs  %~ ((string2Name x, reverse revDocs) :)
-      groupTLs _ (TLDecl defn : rest)
-        = groupTLs [] rest
-          & tlDecls %~ (defn :)
-      groupTLs _ (TLExpr t : rest)
-        = groupTLs [] rest & tlTerms %~ (t:)
-
-      defnGroups :: [Decl] -> [Decl]
-      defnGroups []                = []
-      defnGroups (d@DType{}  : ds)  = d : defnGroups ds
-      defnGroups (d@DTyDef{} : ds)  = d : defnGroups ds
-      defnGroups (DDefn (TermDefn x bs) : ds)  = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
-        where
-          (grp, rest) = matchDefn ds
-          matchDefn :: [Decl] -> ([TermDefn], [Decl])
-          matchDefn (DDefn t@(TermDefn x' _) : ds2) | x == x' = (t:ts, ds2')
-            where
-              (ts, ds2') = matchDefn ds2
-          matchDefn ds2 = ([], ds2)
-
       mkModule exts imps tls = Module exts imps (defnGroups decls) docs terms
         where
-          TLResults decls docs terms = groupTLs [] tls
+          TLResults decls docs terms _ = processTLs tls
 
 -- | Parse an extension.
 parseExtension :: Parser Ext

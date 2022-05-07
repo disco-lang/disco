@@ -340,7 +340,7 @@ stdLib = ["list", "container"]
 loadParsedDiscoModule'
   :: Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r
   => Bool -> LoadingMode -> Resolver -> [ModuleName] -> ModuleName -> Module -> Sem r ModuleInfo
-loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _) = do
+loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _ _) = do
 
   -- Recursively load any modules imported by this one, plus standard
   -- library modules (unless NoStdLib is enabled), and build a map with the results.

@@ -21,7 +21,7 @@ import           Control.Arrow                           ((&&&))
 import           Control.Lens                            ((^..))
 import           Control.Monad.Except
 import           Control.Monad.Trans.Maybe
-import           Data.Bifunctor                          (first)
+import           Data.Bifunctor                          (first, second)
 import           Data.Coerce
 import qualified Data.Foldable                           as F
 import           Data.List                               (group, sort)
@@ -108,7 +108,7 @@ inferTelescope inferOne tel = do
 checkModule
   :: Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r
   => ModuleName -> Map ModuleName ModuleInfo -> Module -> Sem r ModuleInfo
-checkModule name imports (Module es _ m docs terms) = do
+checkModule name imports (Module es _ m docs props terms) = do
   let (typeDecls, defns, tydefs) = partitionDecls m
       importTyCtx = mconcat (imports ^.. traverse . miTys)
       -- XXX this isn't right, if multiple modules define the same type synonyms.
@@ -126,7 +126,7 @@ checkModule name imports (Module es _ m docs terms) = do
       case dups of
         (x:_) -> throw $ noLoc $ DuplicateDefns (coerce x)
         [] -> do
-          aprops <- mapError noLoc $ checkProperties docCtx  -- XXX location?
+          aprops <- mapError noLoc $ processProperties props   -- XXX location?
           aterms <- mapError noLoc $ mapM inferTop terms     -- XXX location?
           return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
   where getDefnName :: Defn -> Name ATerm
@@ -318,17 +318,19 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
 --------------------------------------------------
 -- Properties
 
--- | Given a context mapping names to documentation, extract the
---   properties attached to each name and typecheck them.
+-- | Typecheck a list of labelled properties, and group them into a map.
+processProperties
+  :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
+  => [(Maybe String, Property)] -> Sem r (Map (Maybe String) [AProperty])
+processProperties ps = do
+  aps <- checkProperties ps
+  return $ M.fromListWith (++) ((map . second) (:[]) aps)
+
+-- | Given a list of labelled properties, typecheck them.
 checkProperties
   :: Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r
-  => Ctx Term Docs -> Sem r (Ctx ATerm [AProperty])
-checkProperties docs =
-  Ctx.coerceKeys . Ctx.filter (not . P.null)
-    <$> (traverse . traverse) checkProperty properties
-  where
-    properties :: Ctx Term [Property]
-    properties = fmap (\ds -> [p | DocProperty _ p <- ds]) docs  -- XXX
+  => [(Maybe String, Property)] -> Sem r [(Maybe String, AProperty)]
+checkProperties = (traverse . traverse) checkProperty
 
 -- | Check the types of the terms embedded in a property.
 checkProperty

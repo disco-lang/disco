@@ -100,8 +100,8 @@ data ModuleInfo = ModuleInfo
 
   -- List of names declared by the module, in the order they occur
   , _miNames    :: [QName Term]
-  , _miDocs     :: Ctx Term Docs
-  , _miProps    :: Ctx ATerm [AProperty]
+  , _miDocs     :: Ctx Term [[String]]
+  , _miProps    :: [(Maybe String, AProperty)]
   , _miTys      :: TyCtx
   , _miTydefs   :: TyDefCtx
   , _miTermdefs :: Ctx ATerm Defn
@@ -152,7 +152,18 @@ allTydefs = withImports miTydefs
 
 -- | The empty module info record.
 emptyModuleInfo :: ModuleInfo
-emptyModuleInfo = ModuleInfo REPLModule M.empty [] emptyCtx emptyCtx emptyCtx M.empty emptyCtx [] S.empty
+emptyModuleInfo = ModuleInfo
+  { _miName = REPLModule
+  , _miImports = M.empty
+  , _miNames = []
+  , _miDocs = emptyCtx
+  , _miProps = []
+  , _miTys = emptyCtx
+  , _miTydefs = M.empty
+  , _miTermdefs = emptyCtx
+  , _miTerms = []
+  , _miExts = S.empty
+  }
 
 ------------------------------------------------------------
 -- Module resolution

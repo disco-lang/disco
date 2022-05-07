@@ -431,14 +431,14 @@ handleDocVar x = do
       hsep [pretty' x, ":", pretty' ty]
       $+$
       case Ctx.lookup' qn docMap of
-        Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
-        _                       -> Pretty.empty
+        Just (ss : _) -> vcat (text "" : map text ss ++ [text ""])
+        _             -> Pretty.empty
     showDoc docMap (Right tdBody) = info $
       pretty' (name2String x, tdBody)
       $+$
       case Ctx.lookupAll' x docMap of
-        ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
-        _                           -> Pretty.empty
+        ((_, ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
+        _                 -> Pretty.empty
 
 handleDocPrim ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
@@ -620,9 +620,9 @@ handleLoad fp = do
 
 -- XXX Return a structured summary of the results, not a Bool; & move
 -- this somewhere else?
-runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
+runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> [(Maybe String, AProperty)] -> Sem r Bool -- (Ctx ATerm [TestResult])
 runAllTests declNames aprops
-  | Ctx.null aprops = return True
+  | P.null aprops = return True
   | otherwise     = do
       info "Running tests..."
       -- Use the order the names were defined in the module

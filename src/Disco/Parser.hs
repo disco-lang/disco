@@ -417,6 +417,7 @@ processTL (TLExpr t)    = tlTerms %~ (t:)
 -- following it.
 processTL (TLDoc (DocString doc))   = addDoc doc
 
+-- XXX TODO!
 processTL (TLDoc (DocProperty label prop)) = undefined
 
 -- | Add a docstring to a current TLResults record,
@@ -469,7 +470,7 @@ parseModule mode = do
     let theMod = mkModule exts imports topLevel
     return theMod
     where
-      mkModule exts imps tls = Module exts imps (defnGroups decls) docs terms
+      mkModule exts imps tls = Module exts imps (defnGroups decls) docs props terms
         where
           TLResults decls docs props terms _ = processTLs tls
 

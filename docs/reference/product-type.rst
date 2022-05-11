@@ -34,4 +34,21 @@ are often defined via :doc:`pattern matching <pattern>` on the pair,
 Nested pairs and n-tuples
 =========================
 
-Coming soon!
+Pair types and values both *associate to the right*.  That is:
+
+- The type ``A * B * C`` is the same as ``A * (B * C)``.
+- Correspondingly, ``(x, y, z)`` is the same as ``(x, (y, z))``.
+
+This means that triples, quadruples, 5-tuples, ... can all be encoded
+as nested pairs.  For example, to write a function that takes a
+5-tuple, one could write
+
+::
+
+   funTaking5Tuple : N * Z * List(N) * Q * Bool -> Int
+   funTaking5Tuple(n,z,l,q,b) = ...
+
+However, what this really means under the hood is
+
+   funTaking5Tuple : N * (Z * (List(N) * (Q * Bool))) -> Int
+   funTaking5Tuple(n,(z,(l,(q,b)))) = ...

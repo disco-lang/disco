@@ -33,7 +33,7 @@ are often defined via :doc:`pattern matching <pattern>` on the pair,
 
 
 n-tuples and nested pairs
-=========================
+-------------------------
 
 We have seen that ``A * B`` is a type of *pairs* of values.  What
 about triples, quadruples, ... n-tuples of values?  The answer is

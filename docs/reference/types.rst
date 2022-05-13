@@ -29,6 +29,7 @@ is a :doc:`subtype <subtypes>` of the one it was expecting.
 
    base-types
    function-types
+   polymorphism
    algebraic-types
    collection-types
    prop

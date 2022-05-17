@@ -24,7 +24,12 @@ be automatically converted to fractionals or rationals as appropriate:
    Disco> :type 1 / (-2)
    1 / (-2) : ℚ
 
-If you want only the *quotient* when dividing (*i.e.* the integer
-number of times one thing fits into another, disregarding any
-remainder), you can use :doc:`integer division <integerdiv>`.  If you
-want the *remainder* instead, you can use :doc:`the mod operator <mod>`.
+Some related operations:
+
+- If you want only the *quotient* when dividing (*i.e.* the integer
+  number of times one thing fits into another, disregarding any
+  remainder), you can use :doc:`integer division <integerdiv>`.
+- If you want the *remainder* instead, you can use :doc:`the mod operator
+  <mod>`.
+- If you just want to test whether one number evenly divides another,
+  you should use the :doc:`divides operator <divides>`.

@@ -12,6 +12,7 @@ types of numbers Disco supports, see :doc:`numeric`.
    division
    integerdiv
    mod
+   divides
    exponentiation
    factorial
    round

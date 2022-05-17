@@ -18,7 +18,8 @@ similar "shape".
 The type of each variable in Disco must be declared with a :doc:`type
 signature <type-sig>`.  We can also give Disco hints about the
 intended type of an expression using a :doc:`type annotation
-<type-annot>`.
+<type-annot>`.  We can define our own new types using a :doc:`type
+definition <typedef>`.
 
 In some situations, Disco may be willing to accept something of one
 type when it was expecting another: specifically, when the given type

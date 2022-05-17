@@ -87,7 +87,5 @@ represents, they must be the same.  The function that results takes an
 input of type ``a`` and ultimately produces an output of type ``c``
 after running the input through both functions.
 
-Polymorphic types
-=================
-
-To be written...
+Note that :doc:`type definitions <typedef>` can also be polymorphic;
+see that page for more information.

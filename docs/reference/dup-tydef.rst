@@ -2,7 +2,7 @@ Duplicate definition for type T
 ===============================
 
 This is very similar to :doc:`dup-def`, but for :doc:`type
-definitions <tydef>` instead of variables.  For example,
+definitions <typedef>` instead of variables.  For example,
 
 ::
 

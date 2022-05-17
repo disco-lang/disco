@@ -2,7 +2,7 @@ Recursive occurrences of T may only have type variables as arguments
 ====================================================================
 
 For technical reasons, when :doc:`defining a parameterized type
-<tydef>`, any recursive occurrences of the type in its own definition
+<typedef>`, any recursive occurrences of the type in its own definition
 can only have type variables as arguments.  For example, this is
 perfectly OK:
 

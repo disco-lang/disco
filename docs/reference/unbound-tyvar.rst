@@ -1,7 +1,7 @@
 Unknown type variable
 =====================
 
-This error always refers to a :doc:`type definition <tydef>`, which
+This error always refers to a :doc:`type definition <typedef>`, which
 uses a type variable that was not a parameter of the type being
 defined.  For example:
 

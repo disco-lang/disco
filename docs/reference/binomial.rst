@@ -29,14 +29,14 @@ the Disco syntax is ``n choose k``.  For example:
 Multinomial coefficients
 ------------------------
 
-Disco also has support for *multinomial coefficients*.
+Disco also has support for *multinomial coefficients*:
 
 :math:`\displaystyle \binom{n}{k_1 \quad k_2 \quad \dots \quad k_r} = \frac{n!}{k_1! k_2! \dots k_r! (n - k_1 - k_2 - \dots - k_r)!}`
 
-is the number of ways to simultaneously choose subsets of size $k_1,
-k_2, \dots, k_r$ out of a set of size $n$.  In Disco, a multinomial
+is the number of ways to simultaneously choose subsets of size :math:`k_1,
+k_2, \dots, k_r` out of a set of size :math:`n`.  In Disco, a multinomial
 coefficient results when the second argument to ``choose`` is a list
-instead of a natural number:
+instead of a natural number.  For example:
 
 ::
 
@@ -48,3 +48,5 @@ instead of a natural number:
    2520
    Disco> 10 choose [2,3,5]
    2520
+   Disco> 10 choose [2,3,5] == (10 choose 2) * (8 choose 3) * (5 choose 5)
+   true

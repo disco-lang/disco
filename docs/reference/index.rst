@@ -17,11 +17,11 @@ them.
 
    arithmetic
    compare
-   numeric
    logic-ops
    syntax
    types
    function
    collections
+   combinatorics
    errors
    symbols

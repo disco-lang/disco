@@ -14,6 +14,6 @@ types of numbers Disco supports, see :doc:`numeric`.
    mod
    divides
    exponentiation
-   factorial
    round
    abs
+   combinatorics

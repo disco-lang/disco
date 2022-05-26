@@ -484,6 +484,7 @@ executable disco
   import:              common
   hs-source-dirs:      repl
   main-is:             REPL.hs
+  ghc-options:         +RTS --io-manager=native -RTS
   build-depends:       base,
                        disco,
                        directory,

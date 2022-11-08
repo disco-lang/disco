@@ -116,7 +116,14 @@ prettyFailureReason
   => TestReason -> Sem r Doc
 prettyFailureReason TestBool = empty
 prettyFailureReason (TestEqual ty v1 v2) =
-  "Test result mismatch:"
+  "Test result mismatch, the two sides are not equal:"
+  $+$
+  bulletList "-"
+  [ "Left side:  " <> prettyValue ty v1
+  , "Right side: " <> prettyValue ty v2
+  ]
+prettyFailureReason (TestLt ty v1 v2)    =
+  "Test result mismatch, the left side is not less than the right:"
   $+$
   bulletList "-"
   [ "Left side:  " <> prettyValue ty v1
@@ -131,6 +138,35 @@ prettyFailureReason (TestNotFound Exhaustive) =
   "No example exists; all possible values were checked."
 prettyFailureReason (TestNotFound (Randomized n m)) = do
   "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
+prettyFailureReason (TestOr (TestResult _ tr1 _) (TestResult _ tr2 _)) =
+  "Test did not evaluate to true:"
+  $+$
+  bulletList "-"
+  [ "Left side:  " <> prettyFailureReason tr1
+  , "Right side: " <> prettyFailureReason tr2
+  ]
+prettyFailureReason (TestAnd (TestResult b1 tr1 _) (TestResult b2 tr2 _))
+  | b1 =
+    "Test did not evaluate to true:"
+    $+$
+    bulletList "-"
+    [ "Left side:  " <> prettySuccessReason tr1
+    , "Right side: " <> prettyFailureReason tr2
+    ]
+  | b2 =
+    "Test did not evaluate to true:"
+    $+$
+    bulletList "-"
+    [ "Left side:  " <> prettyFailureReason tr1
+    , "Right side: " <> prettySuccessReason tr2
+    ]
+  | otherwise =
+    "Test did not evaluate to true:"
+    $+$
+    bulletList "-"
+    [ "Left side:  " <> prettyFailureReason tr1
+    , "Right side: " <> prettyFailureReason tr2
+    ]
 
 prettyTestEnv
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r

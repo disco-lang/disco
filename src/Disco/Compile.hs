@@ -492,13 +492,16 @@ compileBOp _ _ _ op
           Divides ==> ODivides,
           Choose ==> OMultinom,
           Eq ==> OEq,
-          Lt ==> OLt
+          Lt ==> OLt,
+          And ==> OAnd,
+          Or ==> OOr
         ]
 
 -- ShouldEq needs to know the type at which the comparison is
 -- occurring, so values can be correctly pretty-printed if the test
 -- fails.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
+compileBOp ty _ _ ShouldLt  = CConst (OShouldLt ty)
 compileBOp _ty (TyList _) _ Elem = CConst OListElem
 compileBOp _ty _ _ Elem = CConst OBagElem
 compileBOp ty1 ty2 resTy op =

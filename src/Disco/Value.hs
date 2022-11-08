@@ -312,10 +312,15 @@ data TestReason_ a
   | TestEqual Type a a
     -- ^ The test was an equality test. Records the values being
     --   compared and also their type (which is needed for printing).
+  | TestLt Type a a
+    -- ^ The test was a less than test. Records the values being 
+    --   compared and also their type (which is needed for printing).
   | TestNotFound SearchType
     -- ^ The search didn't find any examples/counterexamples.
   | TestFound TestResult
     -- ^ The search found an example/counterexample.
+  | TestAnd TestResult TestResult
+  | TestOr  TestResult TestResult
   | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
@@ -349,10 +354,27 @@ testIsCertain (TestResult _ r _) = resultIsCertain r
 resultIsCertain :: TestReason -> Bool
 resultIsCertain TestBool                        = True
 resultIsCertain TestEqual {}                    = True
+resultIsCertain TestLt    {}                    = True
 resultIsCertain (TestNotFound Exhaustive)       = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r)                   = testIsCertain r
 resultIsCertain (TestRuntimeError _)            = True
+resultIsCertain (TestAnd tr1 tr2)               
+  | c1 && c2           = True
+  | otherwise          = False
+  where
+    c1 = testIsCertain tr1
+    c2 = testIsCertain tr2
+    -- ok1 = testIsOk tr1
+    -- ok2 = testIsOk tr2
+resultIsCertain (TestOr tr1 tr2)
+  | c1 || c2   = True
+  | otherwise  = False
+  where
+    c1 = testIsCertain tr1
+    c2 = testIsCertain tr2
+    -- ok1 = testIsOk tr1
+    -- ok2 = testIsOk tr2
 
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp
@@ -360,11 +382,15 @@ data ValProp
     -- ^ A prop that has already either succeeded or failed.
   | VPSearch SearchMotive [Type] Value TestEnv
     -- ^ A pending search.
+  | VPAnd ValProp ValProp
+  | VPOr  ValProp ValProp
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
 extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g P.<> e)
+extendPropEnv g (VPAnd vp1 vp2)             = VPAnd (extendPropEnv g vp1) (extendPropEnv g vp2)
+extendPropEnv g (VPOr vp1 vp2)             = VPOr (extendPropEnv g vp1) (extendPropEnv g vp2)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g P.<> e)

@@ -74,6 +74,7 @@ data BOp = Add      -- ^ Addition (@+@)
          | Elem     -- ^ Element test (@∈@)
          | Subset   -- ^ Subset test (@⊆@)
          | ShouldEq -- ^ Equality assertion (@=!=@)
+         | ShouldLt  -- ^ Less than assertion (@!<@)
   deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.
@@ -159,6 +160,7 @@ opTable =
     ]
   , [ bopInfo InR  Eq      ["=="]
     , bopInfo InR  ShouldEq ["=!="]
+    , bopInfo InR  ShouldLt ["!<"]
     , bopInfo InR  Neq     ["/=", "≠", "!="]
     , bopInfo InR  Lt      ["<"]
     , bopInfo InR  Gt      [">"]

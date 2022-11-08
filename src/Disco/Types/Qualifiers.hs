@@ -98,9 +98,9 @@ bopQual Mul  = QNum
 bopQual Div  = QDiv
 bopQual Sub  = QSub
 bopQual SSub = QNum
--- bopQual And  = QBool
--- bopQual Or   = QBool
--- bopQual Impl = QBool
+bopQual And  = QBool
+bopQual Or   = QBool
+bopQual Impl = QBool
 bopQual _    = error "No qualifier for binary operation"
 
 ------------------------------------------------------------

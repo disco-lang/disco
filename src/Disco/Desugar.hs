@@ -326,6 +326,8 @@ desugarPrimUOp argTy resTy op = do
 bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
+-- Add the case here for TyProp with /\, \/. Similar to above commented line.
+bopDesugars _ _ TyProp bop | bop `elem` [And, Or] = False
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl, Iff
   , Neq, Gt, Leq, Geq, Min, Max

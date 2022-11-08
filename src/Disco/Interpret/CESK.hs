@@ -441,6 +441,12 @@ appConst k = \case
   ONotProp -> out . VProp . notProp . ensureProp
   OShouldEq ty -> arity2 $ \v1 v2 ->
     out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
+  OShouldLt ty -> arity2 $ \v1 v2 ->
+    out $ VProp (VPDone (TestResult (valLt v1 v2) (TestLt ty v1 v2) emptyTestEnv))
+  OAnd -> arity2 $ \p1 p2 -> 
+    out $ VProp (VPAnd (ensureProp p1) (ensureProp p2))
+  OOr -> arity2 $ \p1 p2 -> 
+    out $ VProp (VPOr (ensureProp p1) (ensureProp p2))
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where
@@ -722,6 +728,8 @@ resultToBool (TestResult b _ _)                    = return $ enumv b
 notProp :: ValProp -> ValProp
 notProp (VPDone r)            = VPDone (invertPropResult r)
 notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
+notProp (VPAnd vp1 vp2)       = VPOr (notProp vp1) (notProp vp2)
+notProp (VPOr vp1 vp2)        = VPAnd (notProp vp1) (notProp vp2)
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
 ensureProp :: Value -> ValProp
@@ -729,6 +737,9 @@ ensureProp (VProp p)  = p
 ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _          = error "ensureProp: non-prop value"
+
+combineTestResultBool :: (Bool -> Bool -> Bool) -> TestResult -> TestResult -> Bool
+combineTestResultBool f (TestResult b1 _ _) (TestResult b2 _ _) = f b1 b2
 
 testProperty
   :: Members '[Random, State Mem] r
@@ -739,6 +750,14 @@ testProperty initialSt = checkProp . ensureProp
       :: Members '[Random, State Mem] r
       => ValProp -> Sem r TestResult
     checkProp (VPDone r) = return r
+    checkProp (VPOr vp1 vp2) = do 
+      tr1 <- checkProp vp1
+      tr2 <- checkProp vp2
+      return $ TestResult (combineTestResultBool (||) tr1 tr2) (TestOr tr1 tr2) emptyTestEnv
+    checkProp (VPAnd vp1 vp2) = do 
+      tr1 <- checkProp vp1
+      tr2 <- checkProp vp2
+      return $ TestResult (combineTestResultBool (&&) tr1 tr2) (TestAnd tr1 tr2) emptyTestEnv
     checkProp (VPSearch sm tys f e) =
       extendResultEnv e <$> (generateSamples initialSt vals >>= go)
       where

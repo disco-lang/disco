@@ -1,4 +1,4 @@
-% -*- compile-command: "pdflatex disco-tfpie23.tex" -*-
+% -*- compile-command: "rubber -d disco-tfpie23.tex" -*-
 
 \documentclass[submission,copyright,creativecommons]{eptcs}
 \providecommand{\event}{TFPIE 2023} % Name of the event you are submitting to
@@ -8,6 +8,10 @@
 \usepackage{underscore}         % Only needed if you use pdflatex.
 \usepackage[T1]{fontenc}        % Recommended with pdflatex
 
+\usepackage{xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \title{\textsc{Disco}: A Functional Programming Language for Discrete Mathematics}
 \author{Brent A. Yorgey
 \institute{Hendrix College\\ Conway, Arkansas, USA}
@@ -15,340 +19,447 @@
 }
 \def\titlerunning{\textsc{Disco}: A Functional Programming Language for Discrete Mathematics}
 \def\authorrunning{B. A. Yorgey}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\disco}{\textsc{Disco}\xspace}
+
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This is a sentence in the abstract.
-This is another sentence in the abstract.
-This is yet another sentence in the abstract.
-This is the final sentence in the abstract.
+  \disco is a pure functional programming language designed to be used
+  in a Discrete Mathematics course.
 \end{abstract}
 
 \section{Introduction}
 
-The optional arguments of {\ttfamily $\backslash$documentclass$\{$eptcs$\}$} are
+Many computer science curricula at the university level include
+\emph{discrete mathematics} as a core requirement \cite{ACM:2013}.
+Often taken in the first or second year, a discrete mathematics course
+introduces mathematical structures and techniques of foundational
+importance in computer science, such as induction and recursion, set
+theory, logic, modular arithmetic, functions, relations, and graphs.
+In addition, it often serves as an introduction to writing formal
+proofs.  Although there is wide agreement that discrete mathematics is
+foundational, students sometimes struggle to see its relevance to
+computer science.
+
+\emph{Functional programming} is a style of programming, embodied in
+languages such as Haskell, OCaml, Scala, F\#, and Racket, which
+emphasizes functions (\emph{i.e.}\ input-output processes) rather than
+sequences of instructions. It enables working at high levels of
+abstraction as well as rapid prototyping and refactoring, and provides
+a concise and powerful vocabulary to talk about many other topics in
+computer science. It is seeing increasing adoption in industry, with
+applications as diverse as high-frequency trading algorithms,
+interactive web applications, and Facebook's anti-spam system.  For
+these reasons, it is becoming critical to expose undergraduate
+students to functional programming early, but many computer science
+programs struggle to make space for it.  The Association for Computing
+Machinery's 2013 curricular guidelines \cite{ACM:2013} do not include
+functional programming as a core topic.
+
+One creative idea is to combine functional programming and discrete
+mathematics into a single course.  This is not a new idea
+\cite{Wainwright:1992, Henderson:2002, Scharff:2002, Doets:2004,
+  ODonnell:2006, VanDrunen:2011, Xing:2008}, and even shows up
+in the 2007 model curriculum of the Liberal Arts Computer Science
+Consortium \cite{LiberalArtsComputerScienceConsortium:2007}. The
+benefits of such an approach are numerous:
 \begin{itemize}
-\item at most one of
-{\ttfamily adraft},
-{\ttfamily submission} or
-{\ttfamily preliminary},
-\item at most one of {\ttfamily publicdomain} or {\ttfamily copyright},
-\item and optionally {\ttfamily creativecommons},
-  \begin{itemize}
-  \item possibly augmented with
-    \begin{itemize}
-    \item {\ttfamily noderivs}
-    \item or {\ttfamily sharealike},
-    \end{itemize}
-  \item and possibly augmented with {\ttfamily noncommercial}.
-  \end{itemize}
+\item It allows functional programming to be introduced at an early
+  point in undergraduates' careers, since discrete mathematics is
+  typically taken in the first or second year.  This allows ideas from
+  functional programming to inform students' thinking about the rest
+  of the curriculum.  By contrast, when functional programming is left
+  until later in the course of study, it is in danger of being seen as
+  esoteric or as a mere curiosity.
+\item The two subjects complement each other well: discrete math
+  topics make good functional programming exercises, and ideas from
+  functional programming help illuminate discrete math topics.
+\item In a discrete mathematics course with both math and
+  computer science majors, math majors can have a ``home turf
+  advantage'' since the course deals with topics that may be already
+  familiar to them (such as writing proofs), whereas computer science
+  majors may struggle to connect the course content to computer
+  science skills and concepts they already know.  Including functional
+  programming levels the playing field, giving both groups of students
+  a way to connect the course content to their previous experience.
+  Computer science majors will be more comfortable learning math
+  concepts that they can play with computationally; math majors can
+  leverage their math experience to learn a bit about programming.
+\item It is just plain fun: using programming enables interactive
+  exploration of mathematics concepts, which leads to higher
+  engagement and increased retention.
 \end{itemize}
-We use {\ttfamily adraft} rather than {\ttfamily draft} so as not to confuse hyperref.
-The style-file option {\ttfamily submission} is for papers that are
-submitted to {\ttfamily $\backslash$event}, where the value of the latter is
-to be filled in in line 2 of the tex file. Use {\ttfamily preliminary} only
-for papers that are accepted but not yet published. The final version
-of your paper to be uploaded to the EPTCS website should have
-none of these style-file options.
 
-Using the style-file option
-\href{http://creativecommons.org/licenses/}{creativecommons}
-authors equip their paper with a Creative Commons license that allows
-everyone to copy, distribute, display, and perform their copyrighted
-work and derivative works based upon it, but only if they give credit
-the way you request. By invoking the additional style-file option {\ttfamily
-noderivs} you let others copy, distribute, display, and perform only
-verbatim copies of your work, but not derivative works based upon
-it. Alternatively, the {\ttfamily sharealike} option allows others to
-distribute derivative works only under a license identical to the
-license that governs your work. Finally, you can invoke the option
-{\ttfamily noncommercial} that let others copy, distribute, display, and
-perform your work and derivative works based upon it for
-noncommercial purposes only.
+However, despite its benefits, this model is not widespread in
+practice.  This may be due partly to lack of awareness, but there are
+also some real roadblocks to adoption that make it impractical or
+impossible for many departments.
 
-Authors' (multiple) affiliations and emails use the commands
-{\ttfamily $\backslash$institute} and {\ttfamily $\backslash$email}.
-Both are optional.
-Authors should moreover supply
-{\ttfamily $\backslash$titlerunning} and {\ttfamily $\backslash$authorrunning},
-and in case the copyrightholders are not the authors also
-{\ttfamily $\backslash$copyrightholders}.
-As illustrated above, heuristic solutions may be called for to share
-affiliations. Authors may apply their own creativity here \cite{multipleauthors}.
+\begin{itemize}
+\item Existing functional languages---such as Haskell, Racket, OCaml,
+  or SML---are general-purpose languages which (with the notable
+  exception of Racket) were not designed specifically with teaching in
+  mind.  The majority of their features are not needed in the setting
+  of discrete mathematics, and teachers must waste a lot of time and
+  energy explaining incidental detail or trying to hide it from
+  students.
+\item With the notable exception of Racket, tooling for existing
+  functional languages is designed for professional programmers, not
+  for students.  The systems can be difficult to set up, generate
+  confusing error messages, and are generally designed to facilitate
+  efficient production of code rather than interactive exploration and
+  learning.
+\item As with any subject, effective teaching of a functional language
+  requires expertise in the language and its use, or at least thorough
+  familiarity, on the part of the instructor. General-purpose
+  functional languages are large, complex systems, requiring deep
+  study and years of experience to master.  Even if only a small part
+  of the language is presented to students, a high level of expertise
+  is still required to be able to select and present a relevant subset
+  of the language and to help students navigate around the features
+  they do not need.  For many instructors, spending years learning a
+  general-purpose functional language just to teach discrete
+  mathematics is a non-starter.  This is especially a problem at
+  schools where the discrete mathematics course is taught by
+  mathematics faculty rather than computer science faculty.
+\item There is often an impedance mismatch between standard
+  mathematics notation and the notation used by existing functional
+  programming languages.  As one simple example, in mathematics one
+  can write $2x$ to denote multiplication of $x$ by $2$; but many
+  programming languages require writing a multiplication operator, for
+  example, \texttt{2*x}.  Any one such impedance mismatch is small, but taken
+  as a whole they can be a real impediment to students as they move
+  back and forth between the worlds of abstract mathematics and
+  concrete computer programs.
+\end{itemize}
 
-EPTCS recommends using {\ttfamily $\backslash$documentclass[copyright,creativecommons]\{eptcs\}}.\\
-Additionally, the title should be set in \href{https://en.wikipedia.org/wiki/Title_case}{title case},
-meaning that major words start with a capital letter, and only articles, prepositions and
-conjunctions appear in lower case.
 
-Exactly 46 lines fit on a page.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill6\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill11\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
 
-Here starts a new paragraph. The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill16\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill21\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill26\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill31\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill36\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill41\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.\hfill46\\
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
-The rest is like any normal {\LaTeX} article.
-We will spare you the details.
+% The optional arguments of {\ttfamily $\backslash$documentclass$\{$eptcs$\}$} are
+% \begin{itemize}
+% \item at most one of
+% {\ttfamily adraft},
+% {\ttfamily submission} or
+% {\ttfamily preliminary},
+% \item at most one of {\ttfamily publicdomain} or {\ttfamily copyright},
+% \item and optionally {\ttfamily creativecommons},
+%   \begin{itemize}
+%   \item possibly augmented with
+%     \begin{itemize}
+%     \item {\ttfamily noderivs}
+%     \item or {\ttfamily sharealike},
+%     \end{itemize}
+%   \item and possibly augmented with {\ttfamily noncommercial}.
+%   \end{itemize}
+% \end{itemize}
+% We use {\ttfamily adraft} rather than {\ttfamily draft} so as not to confuse hyperref.
+% The style-file option {\ttfamily submission} is for papers that are
+% submitted to {\ttfamily $\backslash$event}, where the value of the latter is
+% to be filled in in line 2 of the tex file. Use {\ttfamily preliminary} only
+% for papers that are accepted but not yet published. The final version
+% of your paper to be uploaded to the EPTCS website should have
+% none of these style-file options.
 
-\section{Ancillary files}
+% Using the style-file option
+% \href{http://creativecommons.org/licenses/}{creativecommons}
+% authors equip their paper with a Creative Commons license that allows
+% everyone to copy, distribute, display, and perform their copyrighted
+% work and derivative works based upon it, but only if they give credit
+% the way you request. By invoking the additional style-file option {\ttfamily
+% noderivs} you let others copy, distribute, display, and perform only
+% verbatim copies of your work, but not derivative works based upon
+% it. Alternatively, the {\ttfamily sharealike} option allows others to
+% distribute derivative works only under a license identical to the
+% license that governs your work. Finally, you can invoke the option
+% {\ttfamily noncommercial} that let others copy, distribute, display, and
+% perform your work and derivative works based upon it for
+% noncommercial purposes only.
 
-Authors may upload ancillary files to be linked alongside their paper.
-These can, for instance, contain raw data for tables and plots in the
-article or program code.  Ancillary files are included with an EPTCS
-submission by placing them in a directory \texttt{anc} next to the
-main latex file. See also \url{https://arxiv.org/help/ancillary_files}.
-Please add a file README in the directory \texttt{anc}, explaining the
-nature of the ancillary files, as in
-\url{http://eptcs.org/paper.cgi?226.21}.
+% Authors' (multiple) affiliations and emails use the commands
+% {\ttfamily $\backslash$institute} and {\ttfamily $\backslash$email}.
+% Both are optional.
+% Authors should moreover supply
+% {\ttfamily $\backslash$titlerunning} and {\ttfamily $\backslash$authorrunning},
+% and in case the copyrightholders are not the authors also
+% {\ttfamily $\backslash$copyrightholders}.
+% As illustrated above, heuristic solutions may be called for to share
+% affiliations. Authors may apply their own creativity here \cite{multipleauthors}.
 
-\section{Prefaces}
+% EPTCS recommends using {\ttfamily $\backslash$documentclass[copyright,creativecommons]\{eptcs\}}.\\
+% Additionally, the title should be set in \href{https://en.wikipedia.org/wiki/Title_case}{title case},
+% meaning that major words start with a capital letter, and only articles, prepositions and
+% conjunctions appear in lower case.
 
-Volume editors may create prefaces using this very template,
-with {\ttfamily $\backslash$title$\{$Preface$\}$} and {\ttfamily $\backslash$author$\{\}$}.
+% Exactly 46 lines fit on a page.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill6\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill11\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
 
-\section{Bibliography}
+% Here starts a new paragraph. The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill16\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill21\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill26\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill31\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill36\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill41\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.\hfill46\\
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
+% The rest is like any normal {\LaTeX} article.
+% We will spare you the details.
 
-We request that you use
-\href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
-{\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$}
-\cite{bibliographystylewebpage}, or one of its variants
-\href{http://eptcs.web.cse.unsw.edu.au/eptcsalpha.bst}{eptcsalpha},
-\href{http://eptcs.web.cse.unsw.edu.au/eptcsini.bst}{eptcsini} or
-\href{http://eptcs.web.cse.unsw.edu.au/eptcsalphaini.bst}{eptcsalphaini}
-\cite{bibliographystylewebpage}. Compared to the original {\LaTeX}
-{\ttfamily $\backslash$biblio\-graphystyle$\{$plain$\}$},
-it ignores the field {\ttfamily month}, and uses the extra
-bibtex fields {\ttfamily eid}, {\ttfamily doi}, {\ttfamily eprint} and {\ttfamily url}.
-The first is for electronic identifiers (typically the number $n$
-indicating the $n^\mathrm{th}$ paper in an issue) of papers in electronic
-journals that do not use page numbers. The other three are to refer,
-with life links, to electronic incarnations of the paper.
+% \section{Ancillary files}
 
-\paragraph{DOIs}
+% Authors may upload ancillary files to be linked alongside their paper.
+% These can, for instance, contain raw data for tables and plots in the
+% article or program code.  Ancillary files are included with an EPTCS
+% submission by placing them in a directory \texttt{anc} next to the
+% main latex file. See also \url{https://arxiv.org/help/ancillary_files}.
+% Please add a file README in the directory \texttt{anc}, explaining the
+% nature of the ancillary files, as in
+% \url{http://eptcs.org/paper.cgi?226.21}.
 
-Almost all publishers use digital object identifiers (DOIs) as a
-persistent way to locate electronic publications. Prefixing the DOI of
-any paper with {\ttfamily https://doi.org/} yields a URI that resolves to the
-current location (URL) of the response page\footnote{Nowadays, papers
-  that are published electronically tend
-  to have a \emph{response page} that lists the title, authors and
-  abstract of the paper, and links to the actual manifestations of
-  the paper (e.g., as {\ttfamily dvi} or {\ttfamily pdf} file). Sometimes
-  publishers charge money to access the paper itself, but the response
-  page is always freely available.}
-of that paper. When the location of the response page changes (for
-instance, through a merge of publishers), the DOI of the paper remains
-the same and (through an update by the publisher) the corresponding
-URI will then resolve to the new location. For that reason, a reference
-ought to contain the DOI of a paper, with a live link to the corresponding
-URI, rather than a direct reference or link to the current URL of the
-publisher's response page. This is the r\^ole of the bibtex field {\ttfamily doi}.
-{\bfseries EPTCS requires the inclusion of a DOI in each cited paper, when available.}
+% \section{Prefaces}
 
-DOIs of papers can often be found through
-\url{http://www.crossref.org/guestquery};\footnote{For papers that will appear
-  in EPTCS and use \href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
-  {\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$} there is no need to
-  find DOIs on this website, as EPTCS will look them up for you
-  automatically upon submission of the first version of your paper;
-  these DOIs can then be incorporated into the final version, together
-  with the remaining DOIs that need to be found at DBLP or the publisher's web pages.}
-the second method {\itshape Search on article title}, only using the {\bfseries
-surname} of the first-listed author, works best.
-Other places to find DOIs are DBLP and the response pages for cited
-papers (maintained by their publishers).
+% Volume editors may create prefaces using this very template,
+% with {\ttfamily $\backslash$title$\{$Preface$\}$} and {\ttfamily $\backslash$author$\{\}$}.
 
-\paragraph{The bibtex fields {\ttfamily eprint} and {\ttfamily url}}
+% \section{Bibliography}
 
-Often an official publication is only available against payment. However,
-as a courtesy to readers that do not wish to pay, the authors also
-make the paper available free of charge at a repository such as
-\url{arXiv.org}. In such a case, it is recommended to also refer and
-link to the URL of the response page of the paper in such a
-repository.  This can be done using the bibtex fields {\ttfamily eprint}
-or {\ttfamily url}.  The latter field should \textbf{not} be used
-to duplicate information that is also provided through {\ttfamily doi} or {\ttfamily eprint}.
-You can find archival-quality URLs for most recently published papers
-in DBLP, but please suppress repetition of DOI or {\ttfamily eprint} information though {\ttfamily url}.
-In fact, it is often useful to check your references against DBLP records anyway,
-or just find them there in the first place.
+% We request that you use
+% \href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
+% {\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$}
+% \cite{bibliographystylewebpage}, or one of its variants
+% \href{http://eptcs.web.cse.unsw.edu.au/eptcsalpha.bst}{eptcsalpha},
+% \href{http://eptcs.web.cse.unsw.edu.au/eptcsini.bst}{eptcsini} or
+% \href{http://eptcs.web.cse.unsw.edu.au/eptcsalphaini.bst}{eptcsalphaini}
+% \cite{bibliographystylewebpage}. Compared to the original {\LaTeX}
+% {\ttfamily $\backslash$biblio\-graphystyle$\{$plain$\}$},
+% it ignores the field {\ttfamily month}, and uses the extra
+% bibtex fields {\ttfamily eid}, {\ttfamily doi}, {\ttfamily eprint} and {\ttfamily url}.
+% The first is for electronic identifiers (typically the number $n$
+% indicating the $n^\mathrm{th}$ paper in an issue) of papers in electronic
+% journals that do not use page numbers. The other three are to refer,
+% with life links, to electronic incarnations of the paper.
 
-\paragraph{Typesetting DOIs and URLs}
+% \paragraph{DOIs}
 
-When using {\LaTeX} rather than {\ttfamily pdflatex} to typeset your paper, by
-default no line breaks within long URLs are allowed. This leads often
-to very ugly output, that moreover is different from the output
-generated when using {\ttfamily pdflatex}. This problem is repaired when
-invoking \href{http://eptcs.web.cse.unsw.edu.au/breakurl.sty}
-{\ttfamily $\backslash$usepackage$\{$breakurl$\}$}: it allows line breaks
-within links and yield the same output as obtained by default with
-{\ttfamily pdflatex}.
-When invoking {\ttfamily pdflatex}, the package {\ttfamily breakurl} is ignored.
+% Almost all publishers use digital object identifiers (DOIs) as a
+% persistent way to locate electronic publications. Prefixing the DOI of
+% any paper with {\ttfamily https://doi.org/} yields a URI that resolves to the
+% current location (URL) of the response page\footnote{Nowadays, papers
+%   that are published electronically tend
+%   to have a \emph{response page} that lists the title, authors and
+%   abstract of the paper, and links to the actual manifestations of
+%   the paper (e.g., as {\ttfamily dvi} or {\ttfamily pdf} file). Sometimes
+%   publishers charge money to access the paper itself, but the response
+%   page is always freely available.}
+% of that paper. When the location of the response page changes (for
+% instance, through a merge of publishers), the DOI of the paper remains
+% the same and (through an update by the publisher) the corresponding
+% URI will then resolve to the new location. For that reason, a reference
+% ought to contain the DOI of a paper, with a live link to the corresponding
+% URI, rather than a direct reference or link to the current URL of the
+% publisher's response page. This is the r\^ole of the bibtex field {\ttfamily doi}.
+% {\bfseries EPTCS requires the inclusion of a DOI in each cited paper, when available.}
 
-The package {\ttfamily $\backslash$usepackage$\{$underscore$\}$} is
-recommended to deal with underscores in DOIs. This is not needed when
-using {\ttfamily $\backslash$usepackage$\{$breakurl$\}$} and not {\ttfamily pdflatex}.
+% DOIs of papers can often be found through
+% \url{http://www.crossref.org/guestquery};\footnote{For papers that will appear
+%   in EPTCS and use \href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
+%   {\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$} there is no need to
+%   find DOIs on this website, as EPTCS will look them up for you
+%   automatically upon submission of the first version of your paper;
+%   these DOIs can then be incorporated into the final version, together
+%   with the remaining DOIs that need to be found at DBLP or the publisher's web pages.}
+% the second method {\itshape Search on article title}, only using the {\bfseries
+% surname} of the first-listed author, works best.
+% Other places to find DOIs are DBLP and the response pages for cited
+% papers (maintained by their publishers).
 
-\paragraph{References to papers in the same EPTCS volume}
+% \paragraph{The bibtex fields {\ttfamily eprint} and {\ttfamily url}}
 
-To refer to another paper in the same volume as your own contribution,
-use a bibtex entry with
-\begin{center}
-  {\ttfamily series    = $\{\backslash$thisvolume$\{5\}\}$},
-\end{center}
-where 5 is the submission number of the paper you want to cite.
-You may need to contact the author, volume editors, or EPTCS staff to
-find that submission number; it becomes known (and unchangeable)
-as soon as the cited paper is first uploaded at EPTCS\@.
-Furthermore, omit the fields {\ttfamily publisher} and {\ttfamily volume}.
-Then in your main paper, you put something like:
+% Often an official publication is only available against payment. However,
+% as a courtesy to readers that do not wish to pay, the authors also
+% make the paper available free of charge at a repository such as
+% \url{arXiv.org}. In such a case, it is recommended to also refer and
+% link to the URL of the response page of the paper in such a
+% repository.  This can be done using the bibtex fields {\ttfamily eprint}
+% or {\ttfamily url}.  The latter field should \textbf{not} be used
+% to duplicate information that is also provided through {\ttfamily doi} or {\ttfamily eprint}.
+% You can find archival-quality URLs for most recently published papers
+% in DBLP, but please suppress repetition of DOI or {\ttfamily eprint} information though {\ttfamily url}.
+% In fact, it is often useful to check your references against DBLP records anyway,
+% or just find them there in the first place.
 
-\noindent
-{\small \ttfamily $\backslash$providecommand$\{\backslash$thisvolume$\}$[1]$\{$this
-  volume of EPTCS, Open Publishing Association$\}$}
+% \paragraph{Typesetting DOIs and URLs}
 
-\noindent
-This acts as a placeholder macro-expansion until EPTCS software adds
-something like
+% When using {\LaTeX} rather than {\ttfamily pdflatex} to typeset your paper, by
+% default no line breaks within long URLs are allowed. This leads often
+% to very ugly output, that moreover is different from the output
+% generated when using {\ttfamily pdflatex}. This problem is repaired when
+% invoking \href{http://eptcs.web.cse.unsw.edu.au/breakurl.sty}
+% {\ttfamily $\backslash$usepackage$\{$breakurl$\}$}: it allows line breaks
+% within links and yield the same output as obtained by default with
+% {\ttfamily pdflatex}.
+% When invoking {\ttfamily pdflatex}, the package {\ttfamily breakurl} is ignored.
 
-\noindent
-{\small \ttfamily $\backslash$newcommand$\{\backslash$thisvolume$\}$[1]%
-  $\{\{\backslash$eptcs$\}$ 157$\backslash$opa, pp 45--56, doi:\dots$\}$},
+% The package {\ttfamily $\backslash$usepackage$\{$underscore$\}$} is
+% recommended to deal with underscores in DOIs. This is not needed when
+% using {\ttfamily $\backslash$usepackage$\{$breakurl$\}$} and not {\ttfamily pdflatex}.
 
-\noindent
-where the relevant numbers are pulled out of the database at publication time.
-Here the newcommand wins from the providecommand, and {\ttfamily \small $\backslash$eptcs}
-resp.\ {\ttfamily \small $\backslash$opa} expand to
+% \paragraph{References to papers in the same EPTCS volume}
 
-\noindent
-{\small \ttfamily $\backslash$sl Electronic Proceedings in Theoretical Computer Science} \hfill and\\
-{\small \ttfamily , Open Publishing Association} \hfill .
+% To refer to another paper in the same volume as your own contribution,
+% use a bibtex entry with
+% \begin{center}
+%   {\ttfamily series    = $\{\backslash$thisvolume$\{5\}\}$},
+% \end{center}
+% where 5 is the submission number of the paper you want to cite.
+% You may need to contact the author, volume editors, or EPTCS staff to
+% find that submission number; it becomes known (and unchangeable)
+% as soon as the cited paper is first uploaded at EPTCS\@.
+% Furthermore, omit the fields {\ttfamily publisher} and {\ttfamily volume}.
+% Then in your main paper, you put something like:
 
-\noindent
-Hence putting {\small \ttfamily $\backslash$def$\backslash$opa$\{\}$} in
-your paper suppresses the addition of a publisher upon expansion of the citation by EPTCS\@.
-An optional argument like
-\begin{center}
-  {\ttfamily series    = $\{\backslash$thisvolume[EPTCS]$\{5\}\}$},
-\end{center}
-overwrites the value of {\ttfamily \small $\backslash$eptcs}.
+% \noindent
+% {\small \ttfamily $\backslash$providecommand$\{\backslash$thisvolume$\}$[1]$\{$this
+%   volume of EPTCS, Open Publishing Association$\}$}
 
-\nocite{*}
+% \noindent
+% This acts as a placeholder macro-expansion until EPTCS software adds
+% something like
+
+% \noindent
+% {\small \ttfamily $\backslash$newcommand$\{\backslash$thisvolume$\}$[1]%
+%   $\{\{\backslash$eptcs$\}$ 157$\backslash$opa, pp 45--56, doi:\dots$\}$},
+
+% \noindent
+% where the relevant numbers are pulled out of the database at publication time.
+% Here the newcommand wins from the providecommand, and {\ttfamily \small $\backslash$eptcs}
+% resp.\ {\ttfamily \small $\backslash$opa} expand to
+
+% \noindent
+% {\small \ttfamily $\backslash$sl Electronic Proceedings in Theoretical Computer Science} \hfill and\\
+% {\small \ttfamily , Open Publishing Association} \hfill .
+
+% \noindent
+% Hence putting {\small \ttfamily $\backslash$def$\backslash$opa$\{\}$} in
+% your paper suppresses the addition of a publisher upon expansion of the citation by EPTCS\@.
+% An optional argument like
+% \begin{center}
+%   {\ttfamily series    = $\{\backslash$thisvolume[EPTCS]$\{5\}\}$},
+% \end{center}
+% overwrites the value of {\ttfamily \small $\backslash$eptcs}.
+
 \bibliographystyle{eptcs}
-\bibliography{generic}
+\bibliography{references}
 \end{document}

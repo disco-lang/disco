@@ -35,6 +35,8 @@ ott/*.tex
 *.snm
 *.toc
 *.vrb
+*.pag
+*.rubbercache
 nsf/*.pdf
 nsf/main.tex
 nsf/description.tex
@@ -63,6 +65,8 @@ test/*/output
 *.pgf
 pubs/WG2.1/diagrams/*
 pubs/WG2.1/*.pdf
+
+pubs/TFPIE23/*.pdf
 
 tmp/
 

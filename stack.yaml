@@ -2,7 +2,7 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration/
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-19.8
+resolver: lts-20.3
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -10,9 +10,10 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-  - polysemy-zoo-0.8.0.0@sha256:902bb663a6ae7151e548727dd91a8d642fc6ed0dcd7b312aac8d75e37013e638,3880
-  - constraints-0.12   # needed since polysemy-zoo hasn't updated upper bound to allow 0.13
   - simple-enumeration-0.2.1@sha256:8625b269c1650d3dd0e3887351c153049f4369853e0d525219e07480ea004b9f,1178
+  - oeis-0.3.10@sha256:d543b6693a842772c2b7daaeab65001e1e94a284f28e406a6adb268da989e8ad,1959
+  - HTTP-4000.3.16@sha256:6042643c15a0b43e522a6693f1e322f05000d519543a84149cb80aeffee34f71,5947
+    # HTTP-4000.3 needed for oeis-0.3.10
 
 # Override default flag values for local packages and extra-deps
 flags: {}

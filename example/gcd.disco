@@ -16,8 +16,8 @@
 !!! gcd(7,6)   == 1
 !!! gcd(12,18) == 6
 !!! gcd(0,0)   == 0
-!!! forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
-!!! forall a:N, b:N, d:N. (d divides a /\ d divides b) ==> d divides gcd(a,b)
+!!! forall a:N, b:N. gcd(a,b) divides a /\ gcd(a,b) divides b
+!!! forall a:N, b:N, g:N. (g divides a /\ g divides b) ==> g divides gcd(a,b)
 
 gcd : N * N -> N
 gcd(a,0) = a

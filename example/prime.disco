@@ -47,7 +47,4 @@ ld = ldf 2
 !!! isPrime 113
 
 isPrime : N -> Bool
-isPrime n =
-  {? false      if n <= 1,
-     ld n == n  otherwise
-  ?}
+isPrime n = (n >= 2) and (ld n == n)

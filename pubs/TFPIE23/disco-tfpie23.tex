@@ -7,6 +7,16 @@
 
 \usepackage{underscore}         % Only needed if you use pdflatex.
 \usepackage[T1]{fontenc}        % Recommended with pdflatex
+\usepackage[utf8]{inputenc}
+\usepackage{stmaryrd}
+\usepackage{amssymb}
+
+\DeclareUnicodeCharacter{27C5}{$\Lbag$}
+\DeclareUnicodeCharacter{27C6}{$\Rbag$}
+\DeclareUnicodeCharacter{2115}{$\mathbb{N}$}
+\DeclareUnicodeCharacter{2192}{$\to$}
+\DeclareUnicodeCharacter{D7}{$\times$}
+\DeclareUnicodeCharacter{2200}{$\forall$}
 
 \usepackage{xspace}
 
@@ -29,7 +39,10 @@
 
 \begin{abstract}
   \disco is a pure functional programming language designed to be used
-  in a Discrete Mathematics course.
+  in a Discrete Mathematics course.  XXX statically typed, math
+  notation.
+  features: property testing, arithmetic patterns, equirecursive
+  types, subtyping.
 \end{abstract}
 
 \section{Introduction}
@@ -138,11 +151,169 @@ impossible for many departments.
   concrete computer programs.
 \end{itemize}
 
+\section{Disco by Example}
+
+In order to introduce the main features of the language, XXX
+
+\subsection{Greatest common divisor}
+\label{sec:gcd}
+
+Our first example is an implementation of the classic Euclidean
+Algorithm for computing the greatest common divisor of two natural numbers.
+
+\begin{verbatim}
+||| The greatest common divisor of two natural numbers.
+
+!!! gcd(7,6)   == 1
+!!! gcd(12,18) == 6
+!!! gcd(0,0)   == 0
+!!! forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
+!!! forall a:N, b:N, d:N. (d divides a /\ d divides b) ==> d divides gcd(a,b)
+
+gcd : N * N -> N
+gcd(a,0) = a                 -- base case
+gcd(a,b) = gcd(b, a mod b)   -- recursive case
+\end{verbatim}
+
+Lines beginning with \texttt{|||} denote special documentation
+comments attached to the subsequent definition (regular comments start with
+\texttt{-{}-}).  This documentation can be later accessed with the
+\texttt{:doc} command at the REPL prompt:
+
+\begin{verbatim}
+Disco> :doc gcd
+Disco> :doc gcd
+gcd : ℕ × ℕ → ℕ
+
+The greatest common divisor of two natural numbers.
+\end{verbatim}
+
+Lines beginning with \texttt{!!!} denote \emph{tests} attached to the
+subsequent definition, which can be either simple Boolean unit tests
+(such as \verb|gcd(7,6) == 1|), or quantified properties (such as the
+last two tests, expressing the fact that \verb|gcd(a,b)| always evenly
+divides both \verb|a| and \verb|b|, and any common divisor of \verb|a|
+and \verb|b| must also be a divisor of their \verb|gcd|).  Such
+properties will be tested exhaustively when feasible, or, when
+exhaustive testing is impossible (as in this case), tested with a
+finite number of randomly chosen inputs. (XXX using QuickCheck +
+enumeration library).  For example:
+
+\begin{verbatim}
+Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
+  - Possibly true: ∀a, b. let g = gcd(a, b) in g divides a /\ g divides b
+    Checked 100 possibilities without finding a counterexample.
+Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ (2g) divides b
+  - Certainly false: ∀a, b. let g = gcd(a, b) in g divides a /\ 2 * g divides b
+    Counterexample:
+      a = 0
+      b = 1
+\end{verbatim}
+
+In the first case, Disco reports that 100 sample inputs were checked
+without finding a counterexample, leading to the conclusion that the
+property is \emph{possibly} true.  In the second case, when we modify
+the test by demanding that \verb|b| must be divisible by twice
+\verb|gcd(a,b)|, Disco is quickly able to find a counterexample,
+proving that the property is \emph{certainly} false.
+
+Every top-level definition in Disco must have a type signature;
+\verb|gcd : N * N -> N| indicates that \verb|gcd| is a function which
+takes a pair of natural numbers as input and produces a natural number
+result.  The recursive definition of \verb|gcd| is then
+straightforward, featuring multiple clauses and pattern-matching on
+the input.
+
 \section{Functional Programming in Disco}
 \label{sec:FP}
 
+\disco is first and foremost a pure, functional programming language,
+with all the usual features one might typically expect from such a thing:
+\begin{itemize}
+\item Functions are first-class objects
+\item Anonymous functions can be written using lambda notation
+\item Support for recursive algebraic data types and pattern-matching
+\end{itemize}
+
+Multi-argument functions can be expressed in curried form, although
+the language and standard library are designed to encourage instead
+taking tuples as arguments.  This is because tuple notation for
+multi-argument functions is entirely standard in mathematics, and
+students likely have already seen this notation in a previous
+mathematics class.
+
+\begin{verbatim}
+f : N * N -> N
+f(x,y) = x + 3y
+\end{verbatim}
+
+Of course, prior to taking a Discrete Math course, students probably
+will not know about Cartesian product of sets, or how multi-argument
+functions can be thought of as single-argument functions whose domain
+is a product set/type; those topics are covered in the course.
+
 \section{Mathematics in Disco}
 \label{sec:math}
+
+\disco supports the usual arithmetic operations (addition,
+subtraction, multiplication, division, exponentiation, modulo,
+rounding), comparisons, and Boolean operations.  Whenever possible,
+\disco tries to support standard mathematical notation alongside more
+traditional programming language notations.  For example:
+\begin{itemize}
+\item Multiplication may (often) be written via juxtaposition, without
+  using an explicit multiplication operator:
+\begin{verbatim}
+Disco> x : N
+Disco> x = 5
+Disco> 3x + 7
+22
+Disco> (2 + 3)(5 - 1)
+20
+\end{verbatim}
+\item In addition to traditional notation like \verb|&&| and
+  \verb+||+ for binary operations, Disco also allows more
+  math-inspired notation:
+\begin{verbatim}
+Disco> true /\ (false \/ (false -> true))
+true
+\end{verbatim}
+\end{itemize}
+
+\disco also has some operations which are less typical but
+particularly useful in a Discrete Mathematics context, such as
+factorial, binomial and multinomial coefficients, divisibility and
+primality testing, and factoring.
+
+\begin{verbatim}
+Disco> 50!
+30414093201713378043612608166064768844377641568960512000000000000
+Disco> 10 choose 3
+120
+Disco> 10 choose [3,5,2]
+2520
+Disco> 13 divides 91
+true
+Disco> import num
+Loading num.disco...
+Disco> factor(2520)
+⟅2 # 3, 3 # 2, 5, 7⟆
+\end{verbatim}
+
+XXX Lists, bags, and sets built in?
+
+\disco allows ``arithmetic patterns'' in function definitions:
+\begin{verbatim}
+f : N -> N
+f(3k) = k
+f(3k+1) = 2k + 7
+f(3k+2) = k^2
+\end{verbatim}
+
+Finally, ``case expressions'' XXX
+\begin{verbatim}
+
+\end{verbatim}
 
 \section{Types}
 \label{sec:types}

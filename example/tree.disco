@@ -4,7 +4,7 @@ leaf : Tree
 leaf = left(■)
 
 node : N * Tree * Tree -> Tree
-node(x, l, r) = right(x, l, r)
+node = right
 
 tree1 : Tree
 tree1 = node(3, node(5, node(1, leaf, leaf), leaf), node(6, node(2, leaf, leaf), node(8, leaf, leaf)))

@@ -3,13 +3,82 @@
 \documentclass[submission,copyright,creativecommons]{eptcs}
 \providecommand{\event}{TFPIE 2023} % Name of the event you are submitting to
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Package imports
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \usepackage{iftex}
 
 \usepackage{underscore}         % Only needed if you use pdflatex.
 \usepackage[T1]{fontenc}        % Recommended with pdflatex
 \usepackage[utf8]{inputenc}
 \usepackage{stmaryrd}
+\usepackage{amsmath}
 \usepackage{amssymb}
+\usepackage{xspace}
+\usepackage{prettyref}
+\usepackage{xcolor}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Semantic markup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newcommand{\disco}{\textsc{Disco}\xspace}
+
+\newcommand{\term}[1]{\emph{#1}}
+
+\newcommand{\pkg}[1]{\texttt{#1}}
+\newcommand{\ext}[1]{\texttt{#1}}
+\newcommand{\module}[1]{\texttt{#1}}
+
+\newcommand{\ie}{i.e.\xspace}
+\newcommand{\eg}{e.g.\xspace}
+\newcommand{\etal}{\emph{et al.}\xspace}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Prettyref
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newrefformat{fig}{Fig.~\ref{#1}}
+\newrefformat{sec}{Sect.~\ref{#1}}
+\newrefformat{eq}{Equation~\eqref{#1}}
+\newrefformat{prob}{Problem~\ref{#1}}
+\newrefformat{tab}{Table~\ref{#1}}
+\newrefformat{thm}{Theorem~\ref{#1}}
+\newrefformat{lem}{Lemma~\ref{#1}}
+\newrefformat{prop}{Proposition~\ref{#1}}
+\newrefformat{defn}{Definition~\ref{#1}}
+\newrefformat{cor}{Corollary~\ref{#1}}
+\newcommand{\pref}[1]{\prettyref{#1}}
+
+% \Pref is just like \pref but it uppercases the first letter; for use
+% at the beginning of a sentence.
+\newcommand{\Pref}[1]{%
+  \expandafter\ifx\csname r@@#1\endcsname\relax {\scriptsize[ref]}
+    \else
+    \edef\reftext{\prettyref{#1}}\expandafter\MakeUppercase\reftext
+    \fi
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Notes
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newif\ifcomments\commentstrue
+
+\ifcomments
+\newcommand{\authornote}[3]{\textcolor{#1}{[#3 ---#2]}}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\else
+\newcommand{\authornote}[3]{}
+\newcommand{\todo}[1]{}
+\fi
+
+\newcommand{\brent}[1]{\authornote{blue}{BAY}{#1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Math typesetting
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\N}{\mathbb{N}}
 
@@ -20,8 +89,8 @@
 \DeclareUnicodeCharacter{D7}{$\times$}
 \DeclareUnicodeCharacter{2200}{$\forall$}
 
-\usepackage{xspace}
-
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Title
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \title{\textsc{Disco}: A Functional Programming Language for Discrete Mathematics}
@@ -33,20 +102,20 @@
 \def\authorrunning{B. A. Yorgey}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newcommand{\disco}{\textsc{Disco}\xspace}
+%% Main document
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \begin{document}
 \maketitle
 
-XXX set up todo package
+\todo{make code sections into figures}
 
 \begin{abstract}
   \disco is a pure functional programming language designed to be used
-  in a Discrete Mathematics course.  XXX statically typed, math
-  notation.
-  features: property testing, arithmetic patterns, equirecursive
-  types, subtyping.
+  in a Discrete Mathematics course. \todo{statically typed, math
+  notation. features: property testing, arithmetic patterns, equirecursive
+  types, subtyping.}
+  \todo{available on GitHub.}
 \end{abstract}
 
 \section{Introduction}
@@ -155,9 +224,12 @@ impossible for many departments.
   concrete computer programs.
 \end{itemize}
 
-\section{Disco by Example}
+\todo{say what Disco is.}
 
-In order to introduce the main features of the language, XXX
+\section{\disco by Example}
+
+In order to introduce the main features of the language, \todo{a series
+of examples.}
 
 \subsection{Greatest common divisor}
 \label{sec:gcd}
@@ -165,7 +237,7 @@ In order to introduce the main features of the language, XXX
 Our first example is an implementation of the classic Euclidean
 Algorithm for computing the greatest common divisor of two natural numbers.
 
-XXX get these from files stored alongside the paper, make sure they check?
+\todo{get these from files stored alongside the paper, make sure they check?}
 \begin{verbatim}
 ||| The greatest common divisor of two natural numbers.
 
@@ -185,7 +257,7 @@ comments attached to the subsequent definition (regular comments start with
 \texttt{-{}-}).  This documentation can be later accessed with the
 \texttt{:doc} command at the REPL prompt:
 
-XXX automatically typeset REPL interactions from just input?
+\todo{automatically typeset REPL interactions from just input?}
 \begin{verbatim}
 Disco> :doc gcd
 Disco> :doc gcd
@@ -200,8 +272,8 @@ subsequent definition, which can be either simple Boolean unit tests
 last two tests, which together express the universal property defining
 \verb|gcd|).  Such properties will be tested exhaustively when
 feasible, or, when exhaustive testing is impossible (as in this case),
-tested with a finite number of randomly chosen inputs. (XXX using
-QuickCheck + enumeration library).  For example:
+tested with a finite number of randomly chosen inputs. \todo{using
+QuickCheck + enumeration library.}  For example:
 
 \begin{verbatim}
 Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
@@ -214,26 +286,29 @@ Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ (2g) divides b
       b = 1
 \end{verbatim}
 
-In the first case, Disco reports that 100 sample inputs were checked
+In the first case, \disco reports that 100 sample inputs were checked
 without finding a counterexample, leading to the conclusion that the
 property is \emph{possibly} true.  In the second case, when we modify
 the test by demanding that \verb|b| must be divisible by twice
-\verb|gcd(a,b)|, Disco is quickly able to find a counterexample,
+\verb|gcd(a,b)|, \disco is quickly able to find a counterexample,
 proving that the property is \emph{certainly} false.
 
-Every top-level definition in Disco must have a type signature;
+Every top-level definition in \disco must have a type signature;
 \verb|gcd : N * N -> N| indicates that \verb|gcd| is a function which
 takes a pair of natural numbers as input and produces a natural number
 result.  The recursive definition of \verb|gcd| is then
 straightforward, featuring multiple clauses and pattern-matching on
 the input.
 
+\todo{tuples for products of more than 2 types}
+
 \subsection{Primality testing}
 \label{sec:primetest}
 
-The following example is taken from XXX Jan van Eijck, "The Haskell Road
-to Logic, Maths, and Programming", 2nd Edition, pp. 4--11, and has
-been transcribed from Haskell into \disco.
+The following example, testing natural numbers for primality via trial
+division, is taken from \todo{Jan van Eijck, "The Haskell Road to Logic,
+Maths, and Programming", 2nd Edition, pp. 4--11}, and has been
+transcribed from Haskell into \disco.
 
 \begin{verbatim}
 ||| ldf k n calculates the least divisor of n that is at least k and
@@ -255,13 +330,59 @@ isPrime : N -> Bool
 isPrime n = (n > 1) and (ld n == n)
 \end{verbatim}
 
-XXX Bool type, \verb|and| syntax.  Multiple syntaxes for many things.
-Makes code harder to read perhaps but (1) get students used to the
-idea of multiple ways to write things, (2) spend less time trying to
-remember the precisely correct syntax; if they can remember one they
-are good.  Case notation.
+There are a few interesting things to point out about this example.
+The most obvious is the use of a \emph{case expression} in the
+definition of \verb|ldf|.  It is supposed to be reminiscent of
+mathematical notation
+like \[ \mathit{ldf}\;k\;n = \begin{cases} k & \text{if } k \mid n \\ n & \text{if } k^2 > n \\ \mathit{ldf}\;(k+1)\;n & \text{otherwise} \end{cases} \]
+However, we can't use a bare curly brace since it would conflict with
+the notation for literal sets; the hope is that writing %
+\verb|{? ... ?}| lends itself to the mnemonic of ``asking questions'' to see
+which branch of the case expression to choose.  In general, each
+branch can have multiple chained conditions, each of which can either be
+a Boolean guard as in this example, or a pattern match introduced with
+the \verb|is| keyword.  In fact, all
+multi-clause function definitions with pattern matching really desugar
+into a single case expression. For example, the definition of
+\verb|gcd| in \todo{ref} desugars to
+\begin{verbatim}
+gcd : N * N -> N
+gcd = \p. {? a if p is (a,0), gcd(b, a mod b) if p is (a,b) ?}
+\end{verbatim}
 
-Support currying and partial application, but encourage tupling.
+This example introduces the primitive \verb|Bool| type in addition to
+the natural number type \verb|N| seen previously.  \disco also has a
+primitive \verb|Char| type for Unicode codepoints, and several other
+numeric types to be discussed later.
+
+Notice that the definition of \verb|isPrime| uses the keyword
+\verb|and| instead of \verb|/\|.  These are synonymous---in fact,
+\verb|&&| and the Unicode character $\land$ are also accepted.  In
+general, \disco's philosophy is to allow multiple syntaxes for various
+things.  Typically a Unicode representation of the ``real'' math
+notation is supported (and used when pretty-printing), along with an
+ASCII equivalent, as well as (when applicable) syntax common in other
+functional programming languages.  Another good example is the natural
+number type, which can be written $\N$, \verb|N|, \verb|Nat|, or
+\verb|Natural|.  There are several reasons for this design choice:
+\begin{itemize}
+\item It makes code easier to \emph{write} since students have to
+  spend less time trying to remember the one and only correct syntax
+  choice, or worrying about whether a particular syntax they remember
+  comes from math class, Python, or \disco.
+\item Although having many different syntax choices can make code
+  harder to \emph{read}, helping students learn how to interpret
+  formal notation and how to translate between mathematics and
+  programming notation are typical explicit learning goals of the
+  course, so this could be considered a feature.
+\end{itemize}
+
+Finally, notice that \verb|ldf| is defined via currying, and is
+partially applied in the definition of \verb|ld|. Just as in Haskell,
+every function in \disco takes exactly one argument; it's just that
+some functions return other functions (curried style) and some
+functions take a product type as input (uncurried style). \todo{std lib
++ documentation encourage uncurried style}
 
 \subsection{Z-order}
 \label{sec:zorder}
@@ -286,7 +407,13 @@ zOrder'(2n)   = {? (2y,x) when zOrder'(n) is (x,y) ?}
 zOrder'(2n+1) = {? (2y+1,x) when zOrder'(n) is (x,y) ?}
 \end{verbatim}
 
-\section{Functional Programming in Disco}
+\subsection{Finite sets}
+
+\todo{example with finite sets, comprehensions, etc. (use HW assignment)}
+
+\todo{Talk about sets vs types.}
+
+\section{Functional Programming in \disco}
 \label{sec:FP}
 
 \disco is first and foremost a pure, functional programming language,
@@ -314,7 +441,7 @@ will not know about Cartesian product of sets, or how multi-argument
 functions can be thought of as single-argument functions whose domain
 is a product set/type; those topics are covered in the course.
 
-\section{Mathematics in Disco}
+\section{Mathematics in \disco}
 \label{sec:math}
 
 \disco supports the usual arithmetic operations (addition,
@@ -334,7 +461,7 @@ Disco> (2 + 3)(5 - 1)
 20
 \end{verbatim}
 \item In addition to traditional notation like \verb|&&| and
-  \verb+||+ for binary operations, Disco also allows more
+  \verb+||+ for binary operations, \disco also allows more
   math-inspired notation:
 \begin{verbatim}
 Disco> true /\ (false \/ (false -> true))
@@ -362,7 +489,7 @@ Disco> factor(2520)
 ⟅2 # 3, 3 # 2, 5, 7⟆
 \end{verbatim}
 
-XXX Lists, bags, and sets built in?
+\todo{Lists, bags, and sets built in?}
 
 \disco allows ``arithmetic patterns'' in function definitions:
 \begin{verbatim}
@@ -372,10 +499,11 @@ f(3k+1) = 2k + 7
 f(3k+2) = k^2
 \end{verbatim}
 
-Finally, ``case expressions'' XXX
-\begin{verbatim}
+\section{Syntax}
 
-\end{verbatim}
+\todo{Places where \disco can't use same syntax as math: vertical bar for
+divisible; single equals vs double equals; can't always use
+juxtaposition for multiplication;} \verb|{| vs \verb|{?|
 
 \section{Types}
 \label{sec:types}

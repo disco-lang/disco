@@ -1,4 +1,4 @@
-% -*- compile-command: "rubber -d disco-tfpie23.tex" -*-
+% -*- compile-command: "rubber --unsafe -d disco-tfpie23.tex" -*-
 
 \documentclass[submission,copyright,creativecommons]{eptcs}
 \providecommand{\event}{TFPIE 2023} % Name of the event you are submitting to
@@ -8,7 +8,6 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \usepackage{iftex}
-
 \usepackage{underscore}         % Only needed if you use pdflatex.
 \usepackage[T1]{fontenc}        % Recommended with pdflatex
 \usepackage[utf8]{inputenc}
@@ -18,6 +17,7 @@
 \usepackage{xspace}
 \usepackage{prettyref}
 \usepackage{xcolor}
+\usepackage{minted}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Semantic markup
@@ -49,6 +49,7 @@
 \newrefformat{prop}{Proposition~\ref{#1}}
 \newrefformat{defn}{Definition~\ref{#1}}
 \newrefformat{cor}{Corollary~\ref{#1}}
+\newrefformat{lst}{Listing~\ref{#1}}
 \newcommand{\pref}[1]{\prettyref{#1}}
 
 % \Pref is just like \pref but it uppercases the first letter; for use
@@ -235,22 +236,14 @@ of examples.}
 \label{sec:gcd}
 
 Our first example is an implementation of the classic Euclidean
-Algorithm for computing the greatest common divisor of two natural numbers.
+Algorithm for computing the greatest common divisor of two natural
+numbers, shown in \pref{lst:gcd}.
 
-\todo{get these from files stored alongside the paper, make sure they check?}
-\begin{verbatim}
-||| The greatest common divisor of two natural numbers.
-
-!!! gcd(7,6)   == 1
-!!! gcd(12,18) == 6
-!!! gcd(0,0)   == 0
-!!! forall a:N, b:N. gcd(a,b) divides a /\ gcd(a,b) divides b
-!!! forall a:N, b:N, g:N. (g divides a /\ g divides b) ==> g divides gcd(a,b)
-
-gcd : N * N -> N
-gcd(a,0) = a                 -- base case
-gcd(a,b) = gcd(b, a mod b)   -- recursive case
-\end{verbatim}
+\begin{listing}[!htp]
+\inputminted{text}{examples/gcd.disco}
+\caption{Definition of \texttt{gcd} in \disco}
+\label{lst:gcd}
+\end{listing}
 
 Lines beginning with \texttt{|||} denote special documentation
 comments attached to the subsequent definition (regular comments start with
@@ -260,10 +253,10 @@ comments attached to the subsequent definition (regular comments start with
 \todo{automatically typeset REPL interactions from just input?}
 \begin{verbatim}
 Disco> :doc gcd
-Disco> :doc gcd
 gcd : ℕ × ℕ → ℕ
 
 The greatest common divisor of two natural numbers.
+
 \end{verbatim}
 
 Lines beginning with \texttt{!!!} denote \emph{tests} attached to the
@@ -279,11 +272,13 @@ QuickCheck + enumeration library.}  For example:
 Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
   - Possibly true: ∀a, b. let g = gcd(a, b) in g divides a /\ g divides b
     Checked 100 possibilities without finding a counterexample.
+
 Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ (2g) divides b
   - Certainly false: ∀a, b. let g = gcd(a, b) in g divides a /\ 2 * g divides b
     Counterexample:
       a = 0
       b = 1
+
 \end{verbatim}
 
 In the first case, \disco reports that 100 sample inputs were checked
@@ -305,55 +300,41 @@ the input.
 \subsection{Primality testing}
 \label{sec:primetest}
 
-The following example, testing natural numbers for primality via trial
-division, is taken from \todo{Jan van Eijck, "The Haskell Road to Logic,
-Maths, and Programming", 2nd Edition, pp. 4--11}, and has been
-transcribed from Haskell into \disco.
+The example shown in \pref{lst:prime}, testing natural numbers for
+primality via trial division, is taken from Doets and van Eijck
+pp. 4--11~\cite{Doets:2004}, and has been transcribed from Haskell
+into \disco. (\disco also has a much more efficient built-in primality
+testing function, so this can be used as an example to teach students,
+but need not be used in practice.)
 
-\begin{verbatim}
-||| ldf k n calculates the least divisor of n that is at least k and
-||| at most sqrt n.  If no such divisor exists, then it returns n.
-ldf : N -> N -> N
-ldf k n =
-  {? k            if k divides n,
-     n            if k^2 > n,
-     ldf (k+1) n  otherwise
-  ?}
-
-||| ld n calculates the least nontrivial divisor of n, or returns n if
-||| n has no nontrivial divisors.
-ld : N -> N
-ld = ldf 2
-
-||| Test whether n is prime or not.
-isPrime : N -> Bool
-isPrime n = (n > 1) and (ld n == n)
-\end{verbatim}
+\begin{listing}[!htp]
+\inputminted{text}{examples/prime.disco}
+\caption{Primality testing in \disco}
+\label{lst:prime}
+\end{listing}
 
 There are a few interesting things to point out about this example.
 The most obvious is the use of a \emph{case expression} in the
 definition of \verb|ldf|.  It is supposed to be reminiscent of
-mathematical notation
-like \[ \mathit{ldf}\;k\;n = \begin{cases} k & \text{if } k \mid n \\ n & \text{if } k^2 > n \\ \mathit{ldf}\;(k+1)\;n & \text{otherwise} \end{cases} \]
-However, we can't use a bare curly brace since it would conflict with
-the notation for literal sets; the hope is that writing %
-\verb|{? ... ?}| lends itself to the mnemonic of ``asking questions'' to see
-which branch of the case expression to choose.  In general, each
-branch can have multiple chained conditions, each of which can either be
-a Boolean guard as in this example, or a pattern match introduced with
-the \verb|is| keyword.  In fact, all
-multi-clause function definitions with pattern matching really desugar
-into a single case expression. For example, the definition of
-\verb|gcd| in \todo{ref} desugars to
+mathematical notation like
+\[ \mathit{ldf}\;k\;n = \begin{cases} k & \text{if } k \mid n, \\ n &
+    \text{if } k^2 > n, \\ \mathit{ldf}\;(k+1)\;n &
+    \text{otherwise.} \end{cases} \] However, we can't use a bare
+curly brace as \disco syntax since it would conflict with the notation
+for literal sets (and we can't use a giant curly brace in any case).
+The intention is that writing %
+\verb|{? ... ?}| lends itself to the mnemonic of ``asking questions''
+to see which branch of the case expression to choose.  In general,
+each branch can have multiple chained conditions, each of which can
+either be a Boolean guard, as in this example, or a pattern match
+introduced with the \verb|is| keyword.  In fact, all multi-clause
+function definitions with pattern matching really desugar into a
+single case expression. For example, the definition of \verb|gcd| in
+\pref{lst:gcd} desugars to
 \begin{verbatim}
 gcd : N * N -> N
 gcd = \p. {? a if p is (a,0), gcd(b, a mod b) if p is (a,b) ?}
 \end{verbatim}
-
-This example introduces the primitive \verb|Bool| type in addition to
-the natural number type \verb|N| seen previously.  \disco also has a
-primitive \verb|Char| type for Unicode codepoints, and several other
-numeric types to be discussed later.
 
 Notice that the definition of \verb|isPrime| uses the keyword
 \verb|and| instead of \verb|/\|.  These are synonymous---in fact,
@@ -377,12 +358,20 @@ number type, which can be written $\N$, \verb|N|, \verb|Nat|, or
   course, so this could be considered a feature.
 \end{itemize}
 
-Finally, notice that \verb|ldf| is defined via currying, and is
-partially applied in the definition of \verb|ld|. Just as in Haskell,
-every function in \disco takes exactly one argument; it's just that
-some functions return other functions (curried style) and some
-functions take a product type as input (uncurried style). \todo{std lib
-+ documentation encourage uncurried style}
+Notice that \verb|ldf| is defined via currying, and is partially
+applied in the definition of \verb|ld|. Just as in Haskell, every
+function in \disco takes exactly one argument; it's just that some
+functions return other functions (curried style) and some functions
+take a product type as input (uncurried style).  Via tutorials,
+documentation, and the types of standard library functions, \disco
+encourages the use of an \emph{uncurried} style, since students are
+already used to notation like \verb|f(x,y)| for multi-argument
+functions.
+
+Finally, this example introduces the primitive \verb|Bool| type in
+addition to the natural number type \verb|N| seen previously.  \disco
+also has a primitive \verb|Char| type for Unicode codepoints, and
+several other numeric types to be discussed later.
 
 \subsection{Z-order}
 \label{sec:zorder}
@@ -390,22 +379,29 @@ functions take a product type as input (uncurried style). \todo{std lib
 The ``Morton Z-order'' is one of my favorite bijections showing that
 $\N \times \N$ has the same cardinality as $\N$; it takes a pair of
 natural numbers, expresses them in binary, and interleaves their
-binary representations to form a single natural number.
+binary representations to form a single natural number.  \disco code
+to compute this bijection (and tests to check that it really is a
+bijection) is shown in~\pref{lst:zorder}.
 
-\begin{verbatim}
-!!! forall n:N. zOrder(zOrder'(n)) == n
-!!! forall p:N*N. zOrder'(zOrder(p)) == p
+\begin{listing}[!htp]
+\inputminted{text}{examples/zorder.disco}
+\caption{Morton Z-Order}
+\label{lst:zorder}
+\end{listing}
 
-zOrder : ℕ×ℕ → ℕ
-zOrder(0,0) = 0
-zOrder(2m,n) = 2 * zOrder(n,m)
-zOrder(2m+1,n) = 2 * zOrder(n,m) + 1
-
-zOrder' : ℕ → ℕ×ℕ
-zOrder'(0)    = (0,0)
-zOrder'(2n)   = {? (2y,x) when zOrder'(n) is (x,y) ?}
-zOrder'(2n+1) = {? (2y+1,x) when zOrder'(n) is (x,y) ?}
-\end{verbatim}
+This example again uses case expressions; it may seem odd to use case
+expressions with only one case, but this is done in order to be able
+to pattern-match on the result of the recursive call to
+\texttt{zOrder'}.  The most interesting thing about this example is
+its use of \emph{arithmetic patterns}, such as \texttt{zOrder'(2n) =
+  ...}  and \texttt{zOrder'(2n+1) = ...}  This is common mathematical
+notation, but perhaps less common in programming languages.  Any
+expression can be used as a pattern, as long as it has exactly one
+variable and uses only basic arithmetic operators, and the pattern
+matches if there exists a value for the variable which makes the
+expression equal to the input.  For example, the pattern \texttt{2n}
+will match only even natural numbers, and \texttt{n} will then be
+bound to half of the input.
 
 \subsection{Finite sets}
 
@@ -717,6 +713,7 @@ juxtaposition for multiplication;} \verb|{| vs \verb|{?|
 % \end{center}
 % overwrites the value of {\ttfamily \small $\backslash$eptcs}.
 
+\nocite{*}
 \bibliographystyle{eptcsalpha}
 \bibliography{references}
 \end{document}

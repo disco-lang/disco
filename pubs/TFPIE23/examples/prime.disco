@@ -1,0 +1,17 @@
+||| ldf k n calculates the least divisor of n that is at least k and
+||| at most sqrt n.  If no such divisor exists, then it returns n.
+ldf : N -> N -> N
+ldf k n =
+  {? k            if k divides n,
+     n            if k^2 > n,
+     ldf (k+1) n  otherwise
+  ?}
+
+||| ld n calculates the least nontrivial divisor of n, or returns n if
+||| n has no nontrivial divisors.
+ld : N -> N
+ld = ldf 2
+
+||| Test whether n is prime or not.
+isPrime : N -> Bool
+isPrime n = (n > 1) and (ld n == n)

@@ -1,0 +1,29 @@
+import list
+import oeis
+
+-- The type of binary tree shapes: empty tree, or a pair of subtrees.
+type BT = Unit + BT*BT
+
+||| Compute the size (= number of binary nodes) of a binary tree shape.
+size : BT -> N
+size(left(unit)) = 0
+size(right(l,r)) = 1 + size(l) + size(r)
+
+||| Check whether all the items in a list satisfy a predicate.
+all : (a -> Bool) * List(a) -> Bool
+all(P, as) = reduce(~/\~, true, each(P, as))
+
+||| Generate the list of all binary tree shapes of a given size.
+!!! all(\n. all(\t. size(t) == n, treesOfSize(n)), [0..4])
+treesOfSize : N -> List(BT)
+treesOfSize(0)   = [left(unit)]
+treesOfSize(k+1) =
+  [ right (l,r) | x <- [0 .. k], l <- treesOfSize(x), r <- treesOfSize(k .- x) ]
+
+||| The first few Catalan numbers, computed by brute force.
+catalan1 : List(N)
+catalan1 = each(\k. length(treesOfSize(k)), [0..4])
+
+||| More Catalan numbers, extended via OEIS lookup.
+catalan : List(N)
+catalan = extendSequence(catalan1)

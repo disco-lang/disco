@@ -31,8 +31,8 @@
 \newcommand{\ext}[1]{\texttt{#1}}
 \newcommand{\module}[1]{\texttt{#1}}
 
-\newcommand{\ie}{i.e.\xspace}
-\newcommand{\eg}{e.g.\xspace}
+\newcommand{\ie}{\emph{i.e.}\xspace}
+\newcommand{\eg}{\emph{e.g.}\xspace}
 \newcommand{\etal}{\emph{et al.}\xspace}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -108,8 +108,6 @@
 
 \begin{document}
 \maketitle
-
-\todo{make code sections into figures}
 
 \begin{abstract}
   \disco is a pure functional programming language designed to be used
@@ -225,7 +223,10 @@ impossible for many departments.
   concrete computer programs.
 \end{itemize}
 
-\todo{say what Disco is.}
+\todo{say what Disco is.  Say where to find it, where to find
+  documentation.  Note it is available via repl.it!}
+\todo{Note this also contains my very opinionated ideas about how to
+  teach these things, what language features we should want.}
 
 \section{\disco by Example}
 
@@ -331,10 +332,10 @@ introduced with the \verb|is| keyword.  In fact, all multi-clause
 function definitions with pattern matching really desugar into a
 single case expression. For example, the definition of \verb|gcd| in
 \pref{lst:gcd} desugars to
-\begin{verbatim}
+\begin{minted}{text}
 gcd : N * N -> N
 gcd = \p. {? a if p is (a,0), gcd(b, a mod b) if p is (a,b) ?}
-\end{verbatim}
+\end{minted}
 
 Notice that the definition of \verb|isPrime| uses the keyword
 \verb|and| instead of \verb|/\|.  These are synonymous---in fact,
@@ -380,8 +381,8 @@ The ``Morton Z-order'' is one of my favorite bijections showing that
 $\N \times \N$ has the same cardinality as $\N$; it takes a pair of
 natural numbers, expresses them in binary, and interleaves their
 binary representations to form a single natural number.  \disco code
-to compute this bijection (and tests to check that it really is a
-bijection) is shown in~\pref{lst:zorder}.
+to compute this bijection (and check that it really is a bijection) is
+shown in~\pref{lst:zorder}.
 
 \begin{listing}[!htp]
 \inputminted{text}{examples/zorder.disco}
@@ -397,103 +398,209 @@ its use of \emph{arithmetic patterns}, such as \texttt{zOrder'(2n) =
   ...}  and \texttt{zOrder'(2n+1) = ...}  This is common mathematical
 notation, but perhaps less common in programming languages.  Any
 expression can be used as a pattern, as long as it has exactly one
-variable and uses only basic arithmetic operators, and the pattern
-matches if there exists a value for the variable which makes the
-expression equal to the input.  For example, the pattern \texttt{2n}
-will match only even natural numbers, and \texttt{n} will then be
-bound to half of the input.
+variable and uses only basic arithmetic operators; the pattern matches
+if there exists a value for the variable which makes the expression
+equal to the input.  For example, the pattern \texttt{2n} will match
+only even natural numbers, and \texttt{n} will then be bound to half
+of the input.
 
 \subsection{Finite sets}
 
-\todo{example with finite sets, comprehensions, etc. (use HW assignment)}
+Disco has built-in \emph{finite sets}; in particular, values of the
+type \texttt{Set(A)} are finite sets with elements of type
+\texttt{A}. Disco supports the usual set operations (union,
+intersection, difference, power set), and sets can be created by
+writing a finite set literal (\verb|{1,3,5,7}|), using ellipsis
+notation (\verb|{1, 3 .. 7}|), or using a set comprehension
+(\verb-{2x+1 | x in {0 .. 3}}-). \pref{lst:sets} shows a small portion
+of an exercise (with answers filled in) to help students practice
+their understanding of set comprehensions.
+
+\begin{listing}[!htp]
+\inputminted{text}{examples/sets.disco}
+\caption{Set comprehension exercise}
+\label{lst:sets}
+\end{listing}
+
+Set comprehensions in \disco work similarly to list comprehensions in
+Haskell (\disco has list and multiset comprehensions as well).  In
+these examples we can see both \emph{filtering} the generated values via
+Boolean guards, as well as \emph{transforming} the outputs via an
+expression to the left of the vertical bar.
+
+One thing this example highlights is that there is extensive,
+student-centered documentation available at
+\url{https://disco-lang.readthedocs.io/}.  Students are pointed to
+this documentation not just from links in homework assignments such as
+this, but also by the \disco REPL itself. Encountering an error, or
+asking for documentation about a function, type, or operator, are
+all likely to result in documentation links for further reading, as
+illustrated in \pref{lst:doc}.
+
+\begin{listing}[!htp]
+\begin{minted}{text}
+Disco> :doc +
+~+~ : ℕ × ℕ → ℕ
+precedence level 7, left associative
+
+The sum of two numbers, types, or graphs.
+
+https://disco-lang.readthedocs.io/en/latest/reference/addition.html
+
+Disco> x + 3
+Error: there is nothing named x.
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
+\end{minted}
+\caption{\disco generates links to online documentation}
+\label{lst:doc}
+\end{listing}
 
 \todo{Talk about sets vs types.}
 
-\section{Functional Programming in \disco}
-\label{sec:FP}
+\subsection{Trees and Catalan numbers}
 
-\disco is first and foremost a pure, functional programming language,
-with all the usual features one might typically expect from such a thing:
+\pref{lst:catalan} is a fun example generating and counting binary
+trees. It defines a recursive type \texttt{BT} of binary tree shapes,
+along with a function to generate a list of all possible tree shapes
+of a given size (via a list comprehension), and uses it to generate
+the first few Catalan numbers.  This list is then extended via lookup
+in the Online Encyclopedia of Integer Sequences (OEIS) \todo{cite}.
+
+\begin{listing}
+  \inputminted{text}{examples/catalan.disco}
+  \caption{Counting trees}
+  \label{lst:catalan}
+\end{listing}
+
+The first thing to note is that \disco has \emph{equirecursive}
+algebraic types.  The \texttt{type} declaration defines the type
+\texttt{BT} to be \emph{the same type as} \texttt{Unit + BT*BT} (\ie
+the tagged union of the primitive one-element \texttt{Unit} type with
+pairs of \texttt{BT} values).  This is a big departure from the
+\emph{isorecursive} types of Haskell and OCaml, where
+\emph{constructors} are required to explicitly ``roll'' and ``unroll''
+values of recursive types.  We can see in the example that
+\texttt{size} takes a value of type \texttt{BT} as input, but can
+directly pattern-match on \texttt{left(unit)} and \texttt{right(l,r)}
+without having to ``unfold'' or ``unroll'' it first.  This makes the
+implementation of the type system more complex, but using
+equirecursive types is a very deliberate choice:
 \begin{itemize}
-\item Functions are first-class objects
-\item Anonymous functions can be written using lambda notation
-\item Support for recursive algebraic data types and pattern-matching
+\item There is less incidental complexity for students to stumble
+  over.  In my experience, students learning Haskell often get
+  confused over the idea of constructors and how to use them to create
+  and pattern-match on data types.
+\item \disco has no special syntax for declaring
+  (recursive) sums-of-products; it simply has sum types, product
+  types, and recursive type synonyms. It would be very tedious to
+  write ``real'' programs in such a language---values of large sum
+  types like \texttt{type T = A + B + C + ...} have to be written as
+  \texttt{left(a)}, \texttt{right(left(b))},
+  \texttt{right(right(left(c)))}, and so on. However, the sum types
+  used as examples in a Discrete Math class rarely have more than two
+  or three summands, and working directly with primitive sum and
+  product types helps students make connections to other things they
+  have already seen, such as Cartesian product and disjoint union of sets.
 \end{itemize}
 
-Multi-argument functions can be expressed in curried form, although
-the language and standard library are designed to encourage instead
-taking tuples as arguments.  This is because tuple notation for
-multi-argument functions is entirely standard in mathematics, and
-students likely have already seen this notation in a previous
-mathematics class.
-
+The OEIS interface is somewhat frivolous, but fun.  In addition to
+\texttt{extendSequence}, the \texttt{oeis} module also provides a
+function \texttt{lookupSequence : List(N) -> Unit + List(Char)}, which
+returns the URL of the first OEIS result, if there is any.
 \begin{verbatim}
-f : N * N -> N
-f(x,y) = x + 3y
+Disco> lookupSequence(catalan1)
+right("https://oeis.org/A000108")
 \end{verbatim}
 
-Of course, prior to taking a Discrete Math course, students probably
-will not know about Cartesian product of sets, or how multi-argument
-functions can be thought of as single-argument functions whose domain
-is a product set/type; those topics are covered in the course.
+Programming with collections (lists, bags, sets): \texttt{reduce}, \texttt{each}
 
-\section{Mathematics in \disco}
-\label{sec:math}
+\subsection{Injective, surjective, and bijective functions}
 
-\disco supports the usual arithmetic operations (addition,
-subtraction, multiplication, division, exponentiation, modulo,
-rounding), comparisons, and Boolean operations.  Whenever possible,
-\disco tries to support standard mathematical notation alongside more
-traditional programming language notations.  For example:
-\begin{itemize}
-\item Multiplication may (often) be written via juxtaposition, without
-  using an explicit multiplication operator:
-\begin{verbatim}
-Disco> x : N
-Disco> x = 5
-Disco> 3x + 7
-22
-Disco> (2 + 3)(5 - 1)
-20
-\end{verbatim}
-\item In addition to traditional notation like \verb|&&| and
-  \verb+||+ for binary operations, \disco also allows more
-  math-inspired notation:
-\begin{verbatim}
-Disco> true /\ (false \/ (false -> true))
-true
-\end{verbatim}
-\end{itemize}
+% \section{Functional Programming in \disco}
+% \label{sec:FP}
 
-\disco also has some operations which are less typical but
-particularly useful in a Discrete Mathematics context, such as
-factorial, binomial and multinomial coefficients, divisibility and
-primality testing, and factoring.
+% \disco is first and foremost a pure, functional programming language,
+% with all the usual features one might typically expect from such a thing:
+% \begin{itemize}
+% \item Functions are first-class objects
+% \item Anonymous functions can be written using lambda notation
+% \item Support for recursive algebraic data types and pattern-matching
+% \end{itemize}
 
-\begin{verbatim}
-Disco> 50!
-30414093201713378043612608166064768844377641568960512000000000000
-Disco> 10 choose 3
-120
-Disco> 10 choose [3,5,2]
-2520
-Disco> 13 divides 91
-true
-Disco> import num
-Loading num.disco...
-Disco> factor(2520)
-⟅2 # 3, 3 # 2, 5, 7⟆
-\end{verbatim}
+% Multi-argument functions can be expressed in curried form, although
+% the language and standard library are designed to encourage instead
+% taking tuples as arguments.  This is because tuple notation for
+% multi-argument functions is entirely standard in mathematics, and
+% students likely have already seen this notation in a previous
+% mathematics class.
 
-\todo{Lists, bags, and sets built in?}
+% \begin{verbatim}
+% f : N * N -> N
+% f(x,y) = x + 3y
+% \end{verbatim}
 
-\disco allows ``arithmetic patterns'' in function definitions:
-\begin{verbatim}
-f : N -> N
-f(3k) = k
-f(3k+1) = 2k + 7
-f(3k+2) = k^2
-\end{verbatim}
+% Of course, prior to taking a Discrete Math course, students probably
+% will not know about Cartesian product of sets, or how multi-argument
+% functions can be thought of as single-argument functions whose domain
+% is a product set/type; those topics are covered in the course.
+
+% \section{Mathematics in \disco}
+% \label{sec:math}
+
+% \disco supports the usual arithmetic operations (addition,
+% subtraction, multiplication, division, exponentiation, modulo,
+% rounding), comparisons, and Boolean operations.  Whenever possible,
+% \disco tries to support standard mathematical notation alongside more
+% traditional programming language notations.  For example:
+% \begin{itemize}
+% \item Multiplication may (often) be written via juxtaposition, without
+%   using an explicit multiplication operator:
+% \begin{verbatim}
+% Disco> x : N
+% Disco> x = 5
+% Disco> 3x + 7
+% 22
+% Disco> (2 + 3)(5 - 1)
+% 20
+% \end{verbatim}
+% \item In addition to traditional notation like \verb|&&| and
+%   \verb+||+ for binary operations, \disco also allows more
+%   math-inspired notation:
+% \begin{verbatim}
+% Disco> true /\ (false \/ (false -> true))
+% true
+% \end{verbatim}
+% \end{itemize}
+
+% \disco also has some operations which are less typical but
+% particularly useful in a Discrete Mathematics context, such as
+% factorial, binomial and multinomial coefficients, divisibility and
+% primality testing, and factoring.
+
+% \begin{verbatim}
+% Disco> 50!
+% 30414093201713378043612608166064768844377641568960512000000000000
+% Disco> 10 choose 3
+% 120
+% Disco> 10 choose [3,5,2]
+% 2520
+% Disco> 13 divides 91
+% true
+% Disco> import num
+% Loading num.disco...
+% Disco> factor(2520)
+% ⟅2 # 3, 3 # 2, 5, 7⟆
+% \end{verbatim}
+
+% \todo{Lists, bags, and sets built in?}
+
+% \disco allows ``arithmetic patterns'' in function definitions:
+% \begin{verbatim}
+% f : N -> N
+% f(3k) = k
+% f(3k+1) = 2k + 7
+% f(3k+2) = k^2
+% \end{verbatim}
 
 \section{Syntax}
 

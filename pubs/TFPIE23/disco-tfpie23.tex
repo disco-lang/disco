@@ -18,6 +18,9 @@
 \usepackage{prettyref}
 \usepackage{xcolor}
 \usepackage{minted}
+\usepackage[all]{xy}
+\usepackage{amsfonts}
+\usepackage{graphicx}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Semantic markup
@@ -31,9 +34,10 @@
 \newcommand{\ext}[1]{\texttt{#1}}
 \newcommand{\module}[1]{\texttt{#1}}
 
-\newcommand{\ie}{\emph{i.e.}\xspace}
-\newcommand{\eg}{\emph{e.g.}\xspace}
+\newcommand{\ie}{\emph{i.e.}\ }
+\newcommand{\eg}{\emph{e.g.}\ }
 \newcommand{\etal}{\emph{et al.}\xspace}
+\newcommand{\etc}{\emph{etc.}\xspace}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Prettyref
@@ -82,13 +86,19 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\F}{\mathbb{F}}
+\newcommand{\Q}{\mathbb{Q}}
 
 \DeclareUnicodeCharacter{27C5}{$\Lbag$}
 \DeclareUnicodeCharacter{27C6}{$\Rbag$}
-\DeclareUnicodeCharacter{2115}{$\N$}
 \DeclareUnicodeCharacter{2192}{$\to$}
 \DeclareUnicodeCharacter{D7}{$\times$}
 \DeclareUnicodeCharacter{2200}{$\forall$}
+\DeclareUnicodeCharacter{2115}{$\N$}
+\DeclareUnicodeCharacter{2124}{$\Z$}
+\DeclareUnicodeCharacter{211A}{$\Q$}
+\DeclareUnicodeCharacter{1D53D}{$\F$}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Title
@@ -126,25 +136,22 @@ Often taken in the first or second year, a discrete mathematics course
 introduces mathematical structures and techniques of foundational
 importance in computer science, such as induction and recursion, set
 theory, logic, modular arithmetic, functions, relations, and graphs.
-In addition, it often serves as an introduction to writing formal
+In addition, it sometimes serves as an introduction to writing formal
 proofs.  Although there is wide agreement that discrete mathematics is
-foundational, students sometimes struggle to see its relevance to
+foundational, students often struggle to see its relevance to
 computer science.
 
 \emph{Functional programming} is a style of programming, embodied in
 languages such as Haskell, OCaml, Scala, F\#, and Racket, which
-emphasizes functions (\emph{i.e.}\ input-output processes) rather than
+emphasizes functions (\ie input-output processes) rather than
 sequences of instructions. It enables working at high levels of
 abstraction as well as rapid prototyping and refactoring, and provides
 a concise and powerful vocabulary to talk about many other topics in
-computer science. It is seeing increasing adoption in industry, with
-applications as diverse as high-frequency trading algorithms,
-interactive web applications, and Facebook's anti-spam system.  For
-these reasons, it is becoming critical to expose undergraduate
+computer science.  It is becoming critical to expose undergraduate
 students to functional programming early, but many computer science
 programs struggle to make space for it.  The Association for Computing
-Machinery's 2013 curricular guidelines \cite{ACM:2013} do not include
-functional programming as a core topic.
+Machinery's 2013 curricular guidelines \cite{ACM:2013} do not even
+include functional programming as a core topic.
 
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea
@@ -217,10 +224,26 @@ impossible for many departments.
   programming languages.  As one simple example, in mathematics one
   can write $2x$ to denote multiplication of $x$ by $2$; but many
   programming languages require writing a multiplication operator, for
-  example, \texttt{2*x}.  Any one such impedance mismatch is small, but taken
-  as a whole they can be a real impediment to students as they move
-  back and forth between the worlds of abstract mathematics and
-  concrete computer programs.
+  example, \texttt{2*x}.  Any one such impedance mismatch is small,
+  but the accumulation of many such mismatches can be a real
+  impediment to students as they attempt to move back and forth
+  between the worlds of abstract mathematics and concrete computer
+  programs.
+\end{itemize}
+
+\disco is a new functional programming language, specifically designed
+for use in a discrete mathematics course, which attempts to solve many
+of these issues:
+
+\begin{itemize}
+\item Although \disco is Turing-complete, it is a teaching language,
+  not a general-purpose language.  It includes only features which are
+  of direct relevance to teaching core functional programming and
+  discrete mathematics topics; for example, it does not include a
+  floating-point number type.  \todo{examples in section 2}
+\item As much as possible, the language \todo{exceptions in section 3}
+\item Although there is as yet no data to back this up, the language
+  should be easy for instructors to learn, even mathematicians without 
 \end{itemize}
 
 \todo{say what Disco is.  Say where to find it, where to find
@@ -503,74 +526,116 @@ equirecursive types is a very deliberate choice:
   have already seen, such as Cartesian product and disjoint union of sets.
 \end{itemize}
 
-The OEIS interface is somewhat frivolous, but fun.  In addition to
-\texttt{extendSequence}, the \texttt{oeis} module also provides a
-function \texttt{lookupSequence : List(N) -> Unit + List(Char)}, which
-returns the URL of the first OEIS result, if there is any.
+In addition to \texttt{extendSequence}, the \texttt{oeis} module also
+provides a function \texttt{lookupSequence : List(N) -> Unit +
+  List(Char)}, which returns the URL of the first OEIS result, if
+there is any.
 \begin{verbatim}
 Disco> lookupSequence(catalan1)
 right("https://oeis.org/A000108")
 \end{verbatim}
 
-Programming with collections (lists, bags, sets): \texttt{reduce}, \texttt{each}
+The last things illustrated by this example are some facilities for
+computing with collections.  The built-in \texttt{each} function is
+like Haskell's \texttt{map}, but works for sets and multisets in
+addition to lists.  \texttt{reduce} is like \texttt{foldr}, but again
+working over sets and multisets in addition to lists.  In this case,
+the \texttt{all} function is defined by first mapping a predicate over
+\texttt{each} element of a list, then reducing the resulting list of
+booleans via logical conjunction.  (Putting twiddles (\verb|~|) in
+place of arguments is the way to turn operators into standalone
+functions, thus: \verb|~/\~|.)  Notice also that the \texttt{all}
+function is polymorphic: \disco has support for parametric
+polymorphism.  (Internally, it also supports qualified polymorphism,
+but this feature is not available through the surface syntax.)
 
-\subsection{Injective, surjective, and bijective functions}
+\subsection{Defining and testing bijections}
 
-% \section{Functional Programming in \disco}
-% \label{sec:FP}
+\pref{lst:bijection} shows part of another exercise I give to my
+students, asking them to define the inverse of a given function and
+use Disco to check that their inverse is correct.  This exercise makes
+essential use of the testing facility we have aleady seen: if a
+student defines a function which is not inverse to the given function,
+\disco is usually able to very quickly find a counterexample.  Running
+this counterexample through the functions hopefully gives the student
+some insight into why their function is not correct.  For example, if
+we try (incorrectly) defining \texttt{g2(x) = x - 1/2}, \disco reports
+\begin{verbatim}
+  g2:
+  - Certainly false: ∀x. f2(g2(x)) == x
+    Counterexample:
+      x = 1
+\end{verbatim}
 
-% \disco is first and foremost a pure, functional programming language,
-% with all the usual features one might typically expect from such a thing:
-% \begin{itemize}
-% \item Functions are first-class objects
-% \item Anonymous functions can be written using lambda notation
-% \item Support for recursive algebraic data types and pattern-matching
-% \end{itemize}
+\begin{listing}
+  \inputminted{text}{examples/bijection.disco}
+  \caption{Defining and testing bijections}
+  \label{lst:bijection}
+\end{listing}
 
-% Multi-argument functions can be expressed in curried form, although
-% the language and standard library are designed to encourage instead
-% taking tuples as arguments.  This is because tuple notation for
-% multi-argument functions is entirely standard in mathematics, and
-% students likely have already seen this notation in a previous
-% mathematics class.
+In this example we can also see more numeric types besides the natural
+numbers.  \disco actually has four primitive numeric types:
+\begin{itemize}
+\item The natural numbers $\N = \{0, 1, 2, \dots\}$, which support
+  addition and multiplication.
+\item The integers $\Z = \{\dots, -2, -1, 0, 1, 2, \dots\}$, which
+  besides addition and multiplication also support subtraction.
+\item The \emph{fractional numbers} $\F = \{ a/b \mid a, b \in \N, b
+  \neq 0 \}$, \ie nonnegative rationals, which besides addition and
+  multiplication also support division.
+\item The \emph{rational numbers} $\Q$, which support all four
+  arithmetic operations.
+\end{itemize}
 
-% \begin{verbatim}
-% f : N * N -> N
-% f(x,y) = x + 3y
-% \end{verbatim}
+\disco uses \emph{subtyping} to match standard mathematical practice.
+For example, it is valid to pass a natural number value to a function
+expecting an integer input.  Mathematicians (and students!) would find
+it very strange and tedious if one were required to apply some sort of
+coercion function to turn a natural number into an integer.
 
-% Of course, prior to taking a Discrete Math course, students probably
-% will not know about Cartesian product of sets, or how multi-argument
-% functions can be thought of as single-argument functions whose domain
-% is a product set/type; those topics are covered in the course.
+These four types naturally form a diamond-shaped lattice, as shown in
+\pref{fig:lattice}.
+\begin{figure}[htp]
+  \centering
+  \includegraphics[width=0.3\textwidth]{../../docs/images/diamond.png}
+  \caption{\disco's numeric type lattice}
+  \label{fig:lattice}
+\end{figure}
+$\N$ is a subtype of both $\Z$ and $\F$, which are in turn both
+subtypes of $\Q$.  Moving up and left in the lattice (from $\N$ to
+$\Z$, or $\F$ to $\Q$) corresponds to allowing subtraction; moving up
+and right corresponds to allowing division.  Moving down and left can
+be accomplished via a rounding operation such as floor or ceiling;
+moving down and right can be accomplished via absolute
+value. \pref{lst:subtype} demonstrates these ideas by requesting the
+types of various expressions.  In the last example, in particular,
+notice how \disco infers the type $\Q$ for the elements of the list,
+since that is the only type that supports both negation and division.
+\begin{listing}
+\begin{minted}{text}
+Disco> :type -3
+-3 : ℤ
+Disco> :type |-3|
+abs(-3) : ℕ
+Disco> :type 2/3
+2 / 3 : 𝔽
+Disco> :type -2/3
+-2 / 3 : ℚ
+Disco> :type floor(-2/3)
+floor(-2 / 3) : ℤ
+Disco> :type [1,2,3]
+[1, 2, 3] : List(ℕ)
+Disco> :type [1,-2,3/5]
+[1, -2, 3 / 5] : List(ℚ)
+\end{minted}
+\caption{Numeric types and subtyping}
+\label{lst:subtype}
+\end{listing}
 
-% \section{Mathematics in \disco}
-% \label{sec:math}
+\disco has no floating-point type, because floating-point numbers are
+the worst \cite{goldberg1991every} and there is no particular need for real numbers
+in a Discrete Mathematics course.
 
-% \disco supports the usual arithmetic operations (addition,
-% subtraction, multiplication, division, exponentiation, modulo,
-% rounding), comparisons, and Boolean operations.  Whenever possible,
-% \disco tries to support standard mathematical notation alongside more
-% traditional programming language notations.  For example:
-% \begin{itemize}
-% \item Multiplication may (often) be written via juxtaposition, without
-%   using an explicit multiplication operator:
-% \begin{verbatim}
-% Disco> x : N
-% Disco> x = 5
-% Disco> 3x + 7
-% 22
-% Disco> (2 + 3)(5 - 1)
-% 20
-% \end{verbatim}
-% \item In addition to traditional notation like \verb|&&| and
-%   \verb+||+ for binary operations, \disco also allows more
-%   math-inspired notation:
-% \begin{verbatim}
-% Disco> true /\ (false \/ (false -> true))
-% true
-% \end{verbatim}
-% \end{itemize}
 
 % \disco also has some operations which are less typical but
 % particularly useful in a Discrete Mathematics context, such as
@@ -592,27 +657,52 @@ Programming with collections (lists, bags, sets): \texttt{reduce}, \texttt{each}
 % ⟅2 # 3, 3 # 2, 5, 7⟆
 % \end{verbatim}
 
-% \todo{Lists, bags, and sets built in?}
-
-% \disco allows ``arithmetic patterns'' in function definitions:
-% \begin{verbatim}
-% f : N -> N
-% f(3k) = k
-% f(3k+1) = 2k + 7
-% f(3k+2) = k^2
-% \end{verbatim}
-
 \section{Syntax}
 
-\todo{Places where \disco can't use same syntax as math: vertical bar for
-divisible; single equals vs double equals; can't always use
-juxtaposition for multiplication;} \verb|{| vs \verb|{?|
+For the most part, \disco tries to use syntax as close to standard
+mathematical syntax as possible.  However, there are a few notable
+cases where this was deemed impossible, typically because standard
+mathematical syntax is particularly ambiguous or overloaded.  Thinking
+about these cases is worthwhile, since they are likely to confuse
+students anyway.
+
+\begin{itemize}
+\item Mathematicians are very fond of using vertical bars for multiple
+  unrelated things, and \disco actually does well to allow them in
+  many cases: absolute value, set cardinality, and the separator
+  between expression and guards in a comprehension all can be written
+  in \disco with vertical bars.  However, the ``evenly divides''
+  relation is also traditionally written with a vertical bar, as in $3
+  \mid 21$, but \disco does not support this notation.  Including it
+  makes the grammar extremely ambiguous.  (And besides, Dijkstra tells
+  us that we should not use a physically symmetric operator symbol for
+  a nonsymmetric relation! \todo{cite}) Instead, \disco provides
+  \texttt{divides} as an infix operator.  In my experience students
+  had no problem remembering the difference.
+\item The equality symbol $=$ is also overloaded to denote both
+  definition and equality testing.  Disco cannot use the same symbol
+  for both, since otherwise it would be impossible to tell whether the
+  user is writing a definition or entering a Boolean test to be
+  evaluated.
+\item \disco allows juxtaposition to denote both function application,
+  as in \texttt{f(3)}, and multiplication, as in \texttt{2x}.  It uses
+  a simple syntax-directed approach to tell them apart: if the
+  expression on the left-hand side of a juxtaposition is a numeric
+  literal, or a parenthesized expression with an operator, then it is
+  interpreted as multiplication; otherwise it is interpreted as
+  function application.  However, this does not always get it right,
+  and there are times when an explicit multiplication operator must be
+  written.  It might be worth exploring a more type-directed approach,
+  although that would be considerably more complex.  It seems like to
+  really get this ``right'' requires general intelligence: for
+  example, does the expression $f(x+2)$ denote multiplication or
+  function application?  Are you sure?  How do you know?  What about
+  in the expression $x(y+2)$?  Or how about ``Let $x$ be the function
+  which doubles its argument, and consider $x(y+2)$ \dots''?
+\end{itemize}
 
 \section{Types}
 \label{sec:types}
-
-\section{Propositions, testing, and proving}
-\label{sec:props}
 
 \section{Tooling}
 \label{sec:tools}
@@ -620,7 +710,12 @@ juxtaposition for multiplication;} \verb|{| vs \verb|{?|
 \section{Discussion}
 \label{sec:discussion}
 
-\cite{Yorgey:2012:promotion}
+
+\section{Acknowledgements}
+\label{sec:acks}
+
+Harley Eades, Callahan Hirrel, Bosco Ndemeye, Sanjit Kalapatapu, Jacob
+Hines, Daniel Burnett
 
 % The optional arguments of {\ttfamily $\backslash$documentclass$\{$eptcs$\}$} are
 % \begin{itemize}
@@ -820,7 +915,7 @@ juxtaposition for multiplication;} \verb|{| vs \verb|{?|
 % \end{center}
 % overwrites the value of {\ttfamily \small $\backslash$eptcs}.
 
-\nocite{*}
+% \nocite{*}
 \bibliographystyle{eptcsalpha}
 \bibliography{references}
 \end{document}

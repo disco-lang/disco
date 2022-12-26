@@ -21,6 +21,7 @@
 \usepackage[all]{xy}
 \usepackage{amsfonts}
 \usepackage{graphicx}
+\usepackage{hyperref}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Semantic markup
@@ -30,7 +31,7 @@
 
 \newcommand{\term}[1]{\emph{#1}}
 
-\newcommand{\pkg}[1]{\texttt{#1}}
+\newcommand{\pkg}[1]{\href{https://hackage.haskell.org/package/#1}{\texttt{#1}}}
 \newcommand{\ext}[1]{\texttt{#1}}
 \newcommand{\module}[1]{\texttt{#1}}
 
@@ -55,15 +56,6 @@
 \newrefformat{cor}{Corollary~\ref{#1}}
 \newrefformat{lst}{Listing~\ref{#1}}
 \newcommand{\pref}[1]{\prettyref{#1}}
-
-% \Pref is just like \pref but it uppercases the first letter; for use
-% at the beginning of a sentence.
-\newcommand{\Pref}[1]{%
-  \expandafter\ifx\csname r@@#1\endcsname\relax {\scriptsize[ref]}
-    \else
-    \edef\reftext{\prettyref{#1}}\expandafter\MakeUppercase\reftext
-    \fi
-}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Notes
@@ -104,12 +96,12 @@
 %% Title
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\title{\textsc{Disco}: A Functional Programming Language for Discrete Mathematics}
+\title{\disco: A Functional Programming Language for Discrete Mathematics}
 \author{Brent A. Yorgey
 \institute{Hendrix College\\ Conway, Arkansas, USA}
 \email{yorgey@hendrix.edu}
 }
-\def\titlerunning{\textsc{Disco}: A Functional Programming Language for Discrete Mathematics}
+\def\titlerunning{\disco: A Functional Programming Language for Discrete Mathematics}
 \def\authorrunning{B. A. Yorgey}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -119,12 +111,22 @@
 \begin{document}
 \maketitle
 
+\todo{automatically typeset REPL interactions from just input?}
+
 \begin{abstract}
-  \disco is a pure functional programming language designed to be used
-  in a Discrete Mathematics course. \todo{statically typed, math
-  notation. features: property testing, arithmetic patterns, equirecursive
-  types, subtyping.}
-  \todo{available on GitHub.}
+  \disco is a pure, strict, statically typed functional programming
+  language designed to be used in the setting of a discrete
+  mathematics course. The goals of the language are to introduce
+  students to functional programming concepts early, and to enhance
+  their learning of mathematics by providing a computational platform
+  for them to play with.  It features mathematical notation,
+  property-based testing, equirecursive algebraic types, subtyping,
+  built-in list, bag, and finite set types, a REPL, and extensive
+  documentation.  \disco is implemented in Haskell, with source code
+  available on
+  GitHub,\footnote{\url{https://github.com/disco-lang/disco}} and
+  interactive web-based REPL available through
+  replit.\footnote{\url{https://replit.com/@BrentYorgey/Disco\#README.md}}
 \end{abstract}
 
 \section{Introduction}
@@ -200,7 +202,7 @@ impossible for many departments.
   of discrete mathematics, and teachers must waste a lot of time and
   energy explaining incidental detail or trying to hide it from
   students.
-\item With the notable exception of Racket, tooling for existing
+\item Again with the notable exception of Racket, tooling for existing
   functional languages is designed for professional programmers, not
   for students.  The systems can be difficult to set up, generate
   confusing error messages, and are generally designed to facilitate
@@ -217,7 +219,7 @@ impossible for many departments.
   they do not need.  For many instructors, spending years learning a
   general-purpose functional language just to teach discrete
   mathematics is a non-starter.  This is especially a problem at
-  schools where the discrete mathematics course is taught by
+  institutions where the discrete mathematics course is taught by
   mathematics faculty rather than computer science faculty.
 \item There is often an impedance mismatch between standard
   mathematics notation and the notation used by existing functional
@@ -240,27 +242,47 @@ of these issues:
   not a general-purpose language.  It includes only features which are
   of direct relevance to teaching core functional programming and
   discrete mathematics topics; for example, it does not include a
-  floating-point number type.  \todo{examples in section 2}
-\item As much as possible, the language \todo{exceptions in section 3}
-\item Although there is as yet no data to back this up, the language
-  should be easy for instructors to learn, even mathematicians without 
+  floating-point number type.  \pref{sec:examples} has many examples
+  of the language's features and some discussion of features which are
+  explicitly excluded.
+\item As much as possible, the language's features and syntax mirror
+  common mathematical practice rather than other functional
+  languages.  \pref{sec:syntax} discusses some notable exceptions.
+\item As a result---although there is as yet no data to back this
+  up---the language should be easy for instructors to learn, even
+  mathematicians without much prior programming experience.
 \end{itemize}
 
-\todo{say what Disco is.  Say where to find it, where to find
-  documentation.  Note it is available via repl.it!}
-\todo{Note this also contains my very opinionated ideas about how to
-  teach these things, what language features we should want.}
+\disco is an open-source project, implemented in Haskell \todo{cite
+  Haskell}, with source code licensed under a BSD 3-clause license and
+available on
+GitHub.\footnote{\url{https://github.com/disco-lang/disco}}  Although
+it is possible to install \disco locally, either from
+Hackage\footnote{\url{https://hackage.haskell.org/package/disco}} or
+directly from source, it is also possible to interact with \disco in
+the cloud via a web browser, through the magic of
+replit.\footnote{\url{https://replit.com/@BrentYorgey/Disco\#README.md}}
+This is the primary way that students will be instructed to use Disco,
+so that students do not need to install a Haskell toolchain or worry
+about exhausting the computational resources of their device.  Via
+replit,\footnote{As an aside, this is in no way unique to
+  \disco---replit can be easily configured to run any language with an
+  implementation in nixpkgs, which includes all mainstream languages
+  and many obscure ones as well!} it is entirely feasible to play
+with \disco on any device with a web browser, including Chromebooks,
+tablets, or phones.  Documentation for \disco is available on Read the Docs.\footnote{\url{https://disco-lang.readthedocs.io}}
 
 \section{\disco by Example}
+\label{sec:examples}
 
-In order to introduce the main features of the language, \todo{a series
-of examples.}
+We will begin by exploring the major features and uses of the language
+via a series of examples.
 
 \subsection{Greatest common divisor}
 \label{sec:gcd}
 
 Our first example is an implementation of the classic Euclidean
-Algorithm for computing the greatest common divisor of two natural
+algorithm for computing the greatest common divisor of two natural
 numbers, shown in \pref{lst:gcd}.
 
 \begin{listing}[!htp]
@@ -270,11 +292,11 @@ numbers, shown in \pref{lst:gcd}.
 \end{listing}
 
 Lines beginning with \texttt{|||} denote special documentation
-comments attached to the subsequent definition (regular comments start with
-\texttt{-{}-}).  This documentation can be later accessed with the
-\texttt{:doc} command at the REPL prompt:
+comments attached to the subsequent definition, similar to docstrings
+in Python (regular comments start with \texttt{-{}-}).  This
+documentation can be later accessed with the \texttt{:doc} command at
+the REPL prompt:
 
-\todo{automatically typeset REPL interactions from just input?}
 \begin{verbatim}
 Disco> :doc gcd
 gcd : ℕ × ℕ → ℕ
@@ -289,8 +311,9 @@ subsequent definition, which can be either simple Boolean unit tests
 last two tests, which together express the universal property defining
 \verb|gcd|).  Such properties will be tested exhaustively when
 feasible, or, when exhaustive testing is impossible (as in this case),
-tested with a finite number of randomly chosen inputs. \todo{using
-QuickCheck + enumeration library.}  For example:
+tested with a finite number of randomly chosen inputs. Under the hood,
+this uses the \pkg{QuickCheck} \todo{cite} and
+\pkg{simple-enumeration} packages to generate inputs.  For example:
 
 \begin{verbatim}
 Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ g divides b
@@ -302,7 +325,6 @@ Disco> :test forall a:N, b:N. let g = gcd(a,b) in g divides a /\ (2g) divides b
     Counterexample:
       a = 0
       b = 1
-
 \end{verbatim}
 
 In the first case, \disco reports that 100 sample inputs were checked
@@ -319,17 +341,15 @@ result.  The recursive definition of \verb|gcd| is then
 straightforward, featuring multiple clauses and pattern-matching on
 the input.
 
-\todo{tuples for products of more than 2 types}
-
 \subsection{Primality testing}
 \label{sec:primetest}
 
 The example shown in \pref{lst:prime}, testing natural numbers for
-primality via trial division, is taken from Doets and van Eijck
-pp. 4--11~\cite{Doets:2004}, and has been transcribed from Haskell
-into \disco. (\disco also has a much more efficient built-in primality
-testing function, so this can be used as an example to teach students,
-but need not be used in practice.)
+primality via trial division, is taken from Doets and van
+Eijck~\cite[pp. 4--11]{Doets:2004}, and has been transcribed from
+Haskell into \disco. (\disco also has a much more efficient built-in
+primality testing function that calls out to the highly optimized
+\pkg{arithmoi} package.)
 
 \begin{listing}[!htp]
 \inputminted{text}{examples/prime.disco}
@@ -339,14 +359,14 @@ but need not be used in practice.)
 
 There are a few interesting things to point out about this example.
 The most obvious is the use of a \emph{case expression} in the
-definition of \verb|ldf|.  It is supposed to be reminiscent of
-mathematical notation like
+definition of \verb|ldf| delimited by \verb|{? ... ?}|.  It is
+supposed to be reminiscent of typical mathematical notation like
 \[ \mathit{ldf}\;k\;n = \begin{cases} k & \text{if } k \mid n, \\ n &
     \text{if } k^2 > n, \\ \mathit{ldf}\;(k+1)\;n &
     \text{otherwise.} \end{cases} \] However, we can't use a bare
 curly brace as \disco syntax since it would conflict with the notation
-for literal sets (and we can't use a giant curly brace in any case).
-The intention is that writing %
+for literal sets (and we can't use a giant, multi-line curly brace in
+any case!).  The intention is that writing %
 \verb|{? ... ?}| lends itself to the mnemonic of ``asking questions''
 to see which branch of the case expression to choose.  In general,
 each branch can have multiple chained conditions, each of which can
@@ -360,13 +380,14 @@ gcd : N * N -> N
 gcd = \p. {? a if p is (a,0), gcd(b, a mod b) if p is (a,b) ?}
 \end{minted}
 
-Notice that the definition of \verb|isPrime| uses the keyword
-\verb|and| instead of \verb|/\|.  These are synonymous---in fact,
-\verb|&&| and the Unicode character $\land$ are also accepted.  In
-general, \disco's philosophy is to allow multiple syntaxes for various
-things.  Typically a Unicode representation of the ``real'' math
-notation is supported (and used when pretty-printing), along with an
-ASCII equivalent, as well as (when applicable) syntax common in other
+Notice that the definition of \verb|isPrime| uses the \verb|and|
+keyword instead of \verb|/\|.  These are synonymous---in fact,
+\verb|&&| and $\land$ (U+2227 LOGICAL AND) are also accepted.  In
+general, \disco's philosophy is to allow multiple syntaxes for things
+with common synonyms rather than imposing one particular choice.
+Typically a Unicode representation of the ``real'' math notation is
+supported (and used when pretty-printing), along with an ASCII
+equivalent, as well as (when applicable) syntax common in other
 functional programming languages.  Another good example is the natural
 number type, which can be written $\N$, \verb|N|, \verb|Nat|, or
 \verb|Natural|.  There are several reasons for this design choice:
@@ -384,13 +405,13 @@ number type, which can be written $\N$, \verb|N|, \verb|Nat|, or
 
 Notice that \verb|ldf| is defined via currying, and is partially
 applied in the definition of \verb|ld|. Just as in Haskell, every
-function in \disco takes exactly one argument; it's just that some
-functions return other functions (curried style) and some functions
-take a product type as input (uncurried style).  Via tutorials,
+function in \disco takes exactly one argument, but some
+functions can return other functions (curried style) and some functions
+can take a product type as input (uncurried style).  Via tutorials,
 documentation, and the types of standard library functions, \disco
 encourages the use of an \emph{uncurried} style, since students are
 already used to notation like \verb|f(x,y)| for multi-argument
-functions.
+functions in mathematics.
 
 Finally, this example introduces the primitive \verb|Bool| type in
 addition to the natural number type \verb|N| seen previously.  \disco
@@ -414,28 +435,29 @@ shown in~\pref{lst:zorder}.
 \end{listing}
 
 This example again uses case expressions; it may seem odd to use case
-expressions with only one case, but this is done in order to be able
+expressions with only one branch, but this is done in order to be able
 to pattern-match on the result of the recursive call to
-\texttt{zOrder'}.  The most interesting thing about this example is
-its use of \emph{arithmetic patterns}, such as \texttt{zOrder'(2n) =
-  ...}  and \texttt{zOrder'(2n+1) = ...}  This is common mathematical
+\mintinline{text}{zOrder'}.  The most interesting thing about this
+example is its use of \emph{arithmetic patterns}, such as %
+\mintinline{text}{zOrder'(2n) = ...} and
+\mintinline{text}{zOrder'(2n+1) = ...}.  This is common mathematical
 notation, but perhaps less common in programming languages.  Any
-expression can be used as a pattern, as long as it has exactly one
-variable and uses only basic arithmetic operators; the pattern matches
-if there exists a value for the variable which makes the expression
-equal to the input.  For example, the pattern \texttt{2n} will match
-only even natural numbers, and \texttt{n} will then be bound to half
-of the input.
+expression with exactly one variable and only basic arithmetic
+operators can be used as a pattern; the pattern matches if there
+exists a value for the variable which makes the expression equal to
+the input.  For example, the pattern \texttt{2n} will match only even
+natural numbers, and \texttt{n} will then be bound to half of the
+input.
 
 \subsection{Finite sets}
 
-Disco has built-in \emph{finite sets}; in particular, values of the
-type \texttt{Set(A)} are finite sets with elements of type
-\texttt{A}. Disco supports the usual set operations (union,
-intersection, difference, power set), and sets can be created by
-writing a finite set literal (\verb|{1,3,5,7}|), using ellipsis
-notation (\verb|{1, 3 .. 7}|), or using a set comprehension
-(\verb-{2x+1 | x in {0 .. 3}}-). \pref{lst:sets} shows a small portion
+\disco has built-in \emph{finite sets}; in particular, values of type
+\texttt{Set(A)} are finite sets with elements of type
+\texttt{A}. \disco supports the usual set operations (union,
+intersection, difference, cardinality, power set), and sets can be created by
+writing a finite set literal, like \verb|{1,3,5,7}|, using ellipsis
+notation, like \verb|{1, 3 .. 7}|, or using a set comprehension, as in
+\verb-{2x+1 | x in {0 .. 3}}-. \pref{lst:sets} shows a portion
 of an exercise (with answers filled in) to help students practice
 their understanding of set comprehensions.
 
@@ -446,12 +468,19 @@ their understanding of set comprehensions.
 \end{listing}
 
 Set comprehensions in \disco work similarly to list comprehensions in
-Haskell (\disco has list and multiset comprehensions as well).  In
+Haskell (\disco has list and bag comprehensions as well).  In
 these examples we can see both \emph{filtering} the generated values via
 Boolean guards, as well as \emph{transforming} the outputs via an
 expression to the left of the vertical bar.
 
-One thing this example highlights is that there is extensive,
+While on the subject of sets, it is worth mentioning that the
+distinction between \emph{types} and \emph{sets} is a pedagogical
+minefield: the distinction is nonexistent in typical presentations of
+mathematics, but crucial in a computational system with static type
+checking.  This issue is discussed in more detail in
+\pref{sec:typesvsets}.
+
+One other thing this example highlights is that there is extensive,
 student-centered documentation available at
 \url{https://disco-lang.readthedocs.io/}.  Students are pointed to
 this documentation not just from links in homework assignments such as
@@ -478,8 +507,6 @@ https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
 \label{lst:doc}
 \end{listing}
 
-\todo{Talk about sets vs types.}
-
 \subsection{Trees and Catalan numbers}
 
 \pref{lst:catalan} is a fun example generating and counting binary
@@ -505,31 +532,34 @@ pairs of \texttt{BT} values).  This is a big departure from the
 values of recursive types.  We can see in the example that
 \texttt{size} takes a value of type \texttt{BT} as input, but can
 directly pattern-match on \texttt{left(unit)} and \texttt{right(l,r)}
-without having to ``unfold'' or ``unroll'' it first.  This makes the
-implementation of the type system more complex, but using
-equirecursive types is a very deliberate choice:
+without having to ``unfold'' or ``unroll'' it first.  Using
+equirecursive types makes the implementation of the type system more
+complex, but it is a very deliberate choice:
 \begin{itemize}
 \item There is less incidental complexity for students to stumble
   over.  In my experience, students learning Haskell often get
   confused over the idea of constructors and how to use them to create
   and pattern-match on data types.
-\item \disco has no special syntax for declaring
-  (recursive) sums-of-products; it simply has sum types, product
-  types, and recursive type synonyms. It would be very tedious to
+\item \disco has no special syntax for declaring (recursive)
+  sums-of-products; it simply has sum types, product types, and
+  recursive type synonyms. Of course, it would be very tedious to
   write ``real'' programs in such a language---values of large sum
   types like \texttt{type T = A + B + C + ...} have to be written as
   \texttt{left(a)}, \texttt{right(left(b))},
   \texttt{right(right(left(c)))}, and so on. However, the sum types
   used as examples in a Discrete Math class rarely have more than two
   or three summands, and working directly with primitive sum and
-  product types helps students make connections to other things they
-  have already seen, such as Cartesian product and disjoint union of sets.
+  product types helps students explicitly make connections to other
+  things they have already seen, such as Cartesian product and
+  disjoint union of sets.  It also reinforces the \emph{algebraic}
+  nature of algebraic data types.
 \end{itemize}
 
-In addition to \texttt{extendSequence}, the \texttt{oeis} module also
-provides a function \texttt{lookupSequence : List(N) -> Unit +
-  List(Char)}, which returns the URL of the first OEIS result, if
-there is any.
+The \texttt{oeis} module is somewhat frivolous, but can be a fun way
+for students to explore integer sequences and the OEIS.  In addition
+to \texttt{extendSequence}, the module also provides a function
+\texttt{lookupSequence : List(N) -> Unit + List(Char)}, which returns
+the URL of the first OEIS result, if there is any:
 \begin{verbatim}
 Disco> lookupSequence(catalan1)
 right("https://oeis.org/A000108")
@@ -545,18 +575,17 @@ the \texttt{all} function is defined by first mapping a predicate over
 booleans via logical conjunction.  (Putting twiddles (\verb|~|) in
 place of arguments is the way to turn operators into standalone
 functions, thus: \verb|~/\~|.)  Notice also that the \texttt{all}
-function is polymorphic: \disco has support for parametric
-polymorphism.  (Internally, it also supports qualified polymorphism,
-but this feature is not available through the surface syntax.)
+function is polymorphic: \disco has support for standard parametric
+polymorphism.
 
 \subsection{Defining and testing bijections}
 
 \pref{lst:bijection} shows part of another exercise I give to my
 students, asking them to define the inverse of a given function and
-use Disco to check that their inverse is correct.  This exercise makes
+use \disco to check that their inverse is correct.  This exercise makes
 essential use of the testing facility we have aleady seen: if a
 student defines a function which is not inverse to the given function,
-\disco is usually able to very quickly find a counterexample.  Running
+\disco is usually able to quickly find a counterexample.  Running
 this counterexample through the functions hopefully gives the student
 some insight into why their function is not correct.  For example, if
 we try (incorrectly) defining \texttt{g2(x) = x - 1/2}, \disco reports
@@ -636,54 +665,41 @@ Disco> :type [1,-2,3/5]
 the worst \cite{goldberg1991every} and there is no particular need for real numbers
 in a Discrete Mathematics course.
 
-
-% \disco also has some operations which are less typical but
-% particularly useful in a Discrete Mathematics context, such as
-% factorial, binomial and multinomial coefficients, divisibility and
-% primality testing, and factoring.
-
-% \begin{verbatim}
-% Disco> 50!
-% 30414093201713378043612608166064768844377641568960512000000000000
-% Disco> 10 choose 3
-% 120
-% Disco> 10 choose [3,5,2]
-% 2520
-% Disco> 13 divides 91
-% true
-% Disco> import num
-% Loading num.disco...
-% Disco> factor(2520)
-% ⟅2 # 3, 3 # 2, 5, 7⟆
-% \end{verbatim}
+\todo{example about container types, Boom hierarchy etc?}
 
 \section{Syntax}
+\label{sec:syntax}
 
 For the most part, \disco tries to use syntax as close to standard
 mathematical syntax as possible.  However, there are a few notable
 cases where this was deemed impossible, typically because standard
 mathematical syntax is particularly ambiguous or overloaded.  Thinking
-about these cases is worthwhile, since they are likely to confuse
-students anyway.
+explicitly about these cases is a worthwhile exercise, since they are
+likely to be confusing to students anyway.
 
 \begin{itemize}
 \item Mathematicians are very fond of using vertical bars for multiple
   unrelated things, and \disco actually does well to allow them in
   many cases: absolute value, set cardinality, and the separator
   between expression and guards in a comprehension all can be written
-  in \disco with vertical bars.  However, the ``evenly divides''
-  relation is also traditionally written with a vertical bar, as in $3
-  \mid 21$, but \disco does not support this notation.  Including it
-  makes the grammar extremely ambiguous.  (And besides, Dijkstra tells
-  us that we should not use a physically symmetric operator symbol for
-  a nonsymmetric relation! \todo{cite}) Instead, \disco provides
+  in \disco with vertical bars.  However, the ``is a divisor of''
+  relation is also traditionally written with a vertical bar, as in
+  $3 \mid 21$, but \disco does not support this notation.  Including
+  it makes the grammar extremely ambiguous.  (And besides, Dijkstra
+  would tell us that we should not use a physically symmetric operator
+  symbol for a nonsymmetric relation!) Instead, \disco provides
   \texttt{divides} as an infix operator.  In my experience students
-  had no problem remembering the difference.
-\item The equality symbol $=$ is also overloaded to denote both
-  definition and equality testing.  Disco cannot use the same symbol
-  for both, since otherwise it would be impossible to tell whether the
-  user is writing a definition or entering a Boolean test to be
-  evaluated.
+  have no problem remembering the difference.
+\item In mathematics, the equality symbol $=$ is also typically
+  overloaded to denote both definition (``\emph{let $x = 3$, and
+    consider\dots}'') and equality testing (``\emph{if $x = 3$,
+    then\dots}'').  \disco cannot use the same symbol for both, since
+  otherwise it would be impossible to tell whether the user is writing
+  a definition or entering a Boolean test to be evaluated.  This is
+  confusing for students but it seems like it can't be helped, and in
+  any case I would argue that trying to gloss over the difference is
+  not really doing students any favors, but simply allowing them to
+  persist in some fundamental misunderstandings.
 \item \disco allows juxtaposition to denote both function application,
   as in \texttt{f(3)}, and multiplication, as in \texttt{2x}.  It uses
   a simple syntax-directed approach to tell them apart: if the
@@ -701,219 +717,62 @@ students anyway.
   which doubles its argument, and consider $x(y+2)$ \dots''?
 \end{itemize}
 
-\section{Types}
-\label{sec:types}
-
-\section{Tooling}
-\label{sec:tools}
-
-\section{Discussion}
+\section{Discussion and Future Work}
 \label{sec:discussion}
 
+\subsection{Student experience}
+\label{sec:students}
+
+I have used \disco in my discrete mathematics course once, in the
+spring of 2022, and I plan to use it again in spring 2023.  Anecdotally,
+student experience seems mostly positive, although I do not
+have any data to back this up. \todo{add more tutorials/assignments to
+repository itself}
+
+\subsection{Type system}
+\label{sec:types}
+
+\disco and its type system were designed to be intuitive for students
+and to corresponding closely to mathematical practice, but this has
+not always led to the simplest type system from an implementation
+point of view!  In particular, the combination of qualified parametric
+polymorphism, subtyping, and equirecursive types makes for an overall
+system which is only barely on the edge of being tractable.
+For the implementation of type inference and checking I relied heavily
+on Traytel \etal \cite{traytel2011extending} who describe the
+implementation of a similar type system for Isabelle/HOL.  There are
+almost certainly bugs, but \todo{XXX}.
+
+\todo{Internally, disco has qualified polymorphism, necessary to
+  support type inference; for example,
+  \verb|\x. x - 2| has type \verb|a -> a| for any type \verb|a| which
+  supports subtraction (i.e. either $\Z$ or $\Q$, potentially more
+  types in the future).  Want to allow it in surface syntax but tricky.}
+
+\todo{Fact that it isn't allowed in surface syntax can also be
+  confusing since types are monomorphized.  Talk about previous
+  example. Want to show multiple potential types.}
+
+\subsection{Types vs sets}
+\label{sec:typesvsets}
+
+\todo{Summarize discussion of types vs sets}
+
+\subsection{Tooling and error messages}
+\label{sec:errors}
+
+\todo{cite previous OBT thing, desire vs reality of type errors etc.}
 
 \section{Acknowledgements}
 \label{sec:acks}
 
-Harley Eades, Callahan Hirrel, Bosco Ndemeye, Sanjit Kalapatapu, Jacob
-Hines, Daniel Burnett
-
-% The optional arguments of {\ttfamily $\backslash$documentclass$\{$eptcs$\}$} are
-% \begin{itemize}
-% \item at most one of
-% {\ttfamily adraft},
-% {\ttfamily submission} or
-% {\ttfamily preliminary},
-% \item at most one of {\ttfamily publicdomain} or {\ttfamily copyright},
-% \item and optionally {\ttfamily creativecommons},
-%   \begin{itemize}
-%   \item possibly augmented with
-%     \begin{itemize}
-%     \item {\ttfamily noderivs}
-%     \item or {\ttfamily sharealike},
-%     \end{itemize}
-%   \item and possibly augmented with {\ttfamily noncommercial}.
-%   \end{itemize}
-% \end{itemize}
-% We use {\ttfamily adraft} rather than {\ttfamily draft} so as not to confuse hyperref.
-% The style-file option {\ttfamily submission} is for papers that are
-% submitted to {\ttfamily $\backslash$event}, where the value of the latter is
-% to be filled in in line 2 of the tex file. Use {\ttfamily preliminary} only
-% for papers that are accepted but not yet published. The final version
-% of your paper to be uploaded to the EPTCS website should have
-% none of these style-file options.
-
-% Using the style-file option
-% \href{http://creativecommons.org/licenses/}{creativecommons}
-% authors equip their paper with a Creative Commons license that allows
-% everyone to copy, distribute, display, and perform their copyrighted
-% work and derivative works based upon it, but only if they give credit
-% the way you request. By invoking the additional style-file option {\ttfamily
-% noderivs} you let others copy, distribute, display, and perform only
-% verbatim copies of your work, but not derivative works based upon
-% it. Alternatively, the {\ttfamily sharealike} option allows others to
-% distribute derivative works only under a license identical to the
-% license that governs your work. Finally, you can invoke the option
-% {\ttfamily noncommercial} that let others copy, distribute, display, and
-% perform your work and derivative works based upon it for
-% noncommercial purposes only.
-
-% Authors' (multiple) affiliations and emails use the commands
-% {\ttfamily $\backslash$institute} and {\ttfamily $\backslash$email}.
-% Both are optional.
-% Authors should moreover supply
-% {\ttfamily $\backslash$titlerunning} and {\ttfamily $\backslash$authorrunning},
-% and in case the copyrightholders are not the authors also
-% {\ttfamily $\backslash$copyrightholders}.
-% As illustrated above, heuristic solutions may be called for to share
-% affiliations. Authors may apply their own creativity here \cite{multipleauthors}.
-
-% EPTCS recommends using {\ttfamily $\backslash$documentclass[copyright,creativecommons]\{eptcs\}}.\\
-% Additionally, the title should be set in \href{https://en.wikipedia.org/wiki/Title_case}{title case},
-% meaning that major words start with a capital letter, and only articles, prepositions and
-% conjunctions appear in lower case.
-
-% \section{Ancillary files}
-
-% Authors may upload ancillary files to be linked alongside their paper.
-% These can, for instance, contain raw data for tables and plots in the
-% article or program code.  Ancillary files are included with an EPTCS
-% submission by placing them in a directory \texttt{anc} next to the
-% main latex file. See also \url{https://arxiv.org/help/ancillary_files}.
-% Please add a file README in the directory \texttt{anc}, explaining the
-% nature of the ancillary files, as in
-% \url{http://eptcs.org/paper.cgi?226.21}.
-
-% \section{Prefaces}
-
-% Volume editors may create prefaces using this very template,
-% with {\ttfamily $\backslash$title$\{$Preface$\}$} and {\ttfamily $\backslash$author$\{\}$}.
-
-\section{Bibliography}
-
-% We request that you use
-% \href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
-% {\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$}
-% \cite{bibliographystylewebpage}, or one of its variants
-% \href{http://eptcs.web.cse.unsw.edu.au/eptcsalpha.bst}{eptcsalpha},
-% \href{http://eptcs.web.cse.unsw.edu.au/eptcsini.bst}{eptcsini} or
-% \href{http://eptcs.web.cse.unsw.edu.au/eptcsalphaini.bst}{eptcsalphaini}
-% \cite{bibliographystylewebpage}. Compared to the original {\LaTeX}
-% {\ttfamily $\backslash$biblio\-graphystyle$\{$plain$\}$},
-% it ignores the field {\ttfamily month}, and uses the extra
-% bibtex fields {\ttfamily eid}, {\ttfamily doi}, {\ttfamily eprint} and {\ttfamily url}.
-% The first is for electronic identifiers (typically the number $n$
-% indicating the $n^\mathrm{th}$ paper in an issue) of papers in electronic
-% journals that do not use page numbers. The other three are to refer,
-% with life links, to electronic incarnations of the paper.
-
-% \paragraph{DOIs}
-
-% Almost all publishers use digital object identifiers (DOIs) as a
-% persistent way to locate electronic publications. Prefixing the DOI of
-% any paper with {\ttfamily https://doi.org/} yields a URI that resolves to the
-% current location (URL) of the response page\footnote{Nowadays, papers
-%   that are published electronically tend
-%   to have a \emph{response page} that lists the title, authors and
-%   abstract of the paper, and links to the actual manifestations of
-%   the paper (e.g., as {\ttfamily dvi} or {\ttfamily pdf} file). Sometimes
-%   publishers charge money to access the paper itself, but the response
-%   page is always freely available.}
-% of that paper. When the location of the response page changes (for
-% instance, through a merge of publishers), the DOI of the paper remains
-% the same and (through an update by the publisher) the corresponding
-% URI will then resolve to the new location. For that reason, a reference
-% ought to contain the DOI of a paper, with a live link to the corresponding
-% URI, rather than a direct reference or link to the current URL of the
-% publisher's response page. This is the r\^ole of the bibtex field {\ttfamily doi}.
-% {\bfseries EPTCS requires the inclusion of a DOI in each cited paper, when available.}
-
-% DOIs of papers can often be found through
-% \url{http://www.crossref.org/guestquery};\footnote{For papers that will appear
-%   in EPTCS and use \href{http://eptcs.web.cse.unsw.edu.au/eptcs.bst}
-%   {\ttfamily $\backslash$bibliographystyle$\{$eptcs$\}$} there is no need to
-%   find DOIs on this website, as EPTCS will look them up for you
-%   automatically upon submission of the first version of your paper;
-%   these DOIs can then be incorporated into the final version, together
-%   with the remaining DOIs that need to be found at DBLP or the publisher's web pages.}
-% the second method {\itshape Search on article title}, only using the {\bfseries
-% surname} of the first-listed author, works best.
-% Other places to find DOIs are DBLP and the response pages for cited
-% papers (maintained by their publishers).
-
-% \paragraph{The bibtex fields {\ttfamily eprint} and {\ttfamily url}}
-
-% Often an official publication is only available against payment. However,
-% as a courtesy to readers that do not wish to pay, the authors also
-% make the paper available free of charge at a repository such as
-% \url{arXiv.org}. In such a case, it is recommended to also refer and
-% link to the URL of the response page of the paper in such a
-% repository.  This can be done using the bibtex fields {\ttfamily eprint}
-% or {\ttfamily url}.  The latter field should \textbf{not} be used
-% to duplicate information that is also provided through {\ttfamily doi} or {\ttfamily eprint}.
-% You can find archival-quality URLs for most recently published papers
-% in DBLP, but please suppress repetition of DOI or {\ttfamily eprint} information though {\ttfamily url}.
-% In fact, it is often useful to check your references against DBLP records anyway,
-% or just find them there in the first place.
-
-% \paragraph{Typesetting DOIs and URLs}
-
-% When using {\LaTeX} rather than {\ttfamily pdflatex} to typeset your paper, by
-% default no line breaks within long URLs are allowed. This leads often
-% to very ugly output, that moreover is different from the output
-% generated when using {\ttfamily pdflatex}. This problem is repaired when
-% invoking \href{http://eptcs.web.cse.unsw.edu.au/breakurl.sty}
-% {\ttfamily $\backslash$usepackage$\{$breakurl$\}$}: it allows line breaks
-% within links and yield the same output as obtained by default with
-% {\ttfamily pdflatex}.
-% When invoking {\ttfamily pdflatex}, the package {\ttfamily breakurl} is ignored.
-
-% The package {\ttfamily $\backslash$usepackage$\{$underscore$\}$} is
-% recommended to deal with underscores in DOIs. This is not needed when
-% using {\ttfamily $\backslash$usepackage$\{$breakurl$\}$} and not {\ttfamily pdflatex}.
-
-% \paragraph{References to papers in the same EPTCS volume}
-
-% To refer to another paper in the same volume as your own contribution,
-% use a bibtex entry with
-% \begin{center}
-%   {\ttfamily series    = $\{\backslash$thisvolume$\{5\}\}$},
-% \end{center}
-% where 5 is the submission number of the paper you want to cite.
-% You may need to contact the author, volume editors, or EPTCS staff to
-% find that submission number; it becomes known (and unchangeable)
-% as soon as the cited paper is first uploaded at EPTCS\@.
-% Furthermore, omit the fields {\ttfamily publisher} and {\ttfamily volume}.
-% Then in your main paper, you put something like:
-
-% \noindent
-% {\small \ttfamily $\backslash$providecommand$\{\backslash$thisvolume$\}$[1]$\{$this
-%   volume of EPTCS, Open Publishing Association$\}$}
-
-% \noindent
-% This acts as a placeholder macro-expansion until EPTCS software adds
-% something like
-
-% \noindent
-% {\small \ttfamily $\backslash$newcommand$\{\backslash$thisvolume$\}$[1]%
-%   $\{\{\backslash$eptcs$\}$ 157$\backslash$opa, pp 45--56, doi:\dots$\}$},
-
-% \noindent
-% where the relevant numbers are pulled out of the database at publication time.
-% Here the newcommand wins from the providecommand, and {\ttfamily \small $\backslash$eptcs}
-% resp.\ {\ttfamily \small $\backslash$opa} expand to
-
-% \noindent
-% {\small \ttfamily $\backslash$sl Electronic Proceedings in Theoretical Computer Science} \hfill and\\
-% {\small \ttfamily , Open Publishing Association} \hfill .
-
-% \noindent
-% Hence putting {\small \ttfamily $\backslash$def$\backslash$opa$\{\}$} in
-% your paper suppresses the addition of a publisher upon expansion of the citation by EPTCS\@.
-% An optional argument like
-% \begin{center}
-%   {\ttfamily series    = $\{\backslash$thisvolume[EPTCS]$\{5\}\}$},
-% \end{center}
-% overwrites the value of {\ttfamily \small $\backslash$eptcs}.
+\disco was originally born out of a conversation with Harley Eades at
+TFPIE in 2016, and Harley contributed many early ideas.  I am grateful
+to the many people who have contributed to the \disco codebase over
+the years, including my students Callahan Hirrel, Bosco Ndemeye,
+Sanjit Kalapatapu, Jacob Hines, Eric Pinter, and Daniel Burnett, and
+other collaborators on GitHub including Shay Lewis, Ryan Yates,
+Tristan de Cacqueray, and Chris Smith.
 
 % \nocite{*}
 \bibliographystyle{eptcsalpha}

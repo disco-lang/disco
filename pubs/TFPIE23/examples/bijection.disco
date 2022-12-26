@@ -31,5 +31,4 @@ f2(x) = 2x + 1
 !!! forall x:Q. g2(f2(x)) == x
 
 g2 : Q -> Q
-g2(x) = x - 1/2
 -- FILL IN YOUR DEFINITION HERE

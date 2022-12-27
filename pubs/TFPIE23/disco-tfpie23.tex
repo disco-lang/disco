@@ -45,7 +45,7 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \newrefformat{fig}{Fig.~\ref{#1}}
-\newrefformat{sec}{Sect.~\ref{#1}}
+\newrefformat{sec}{Section~\ref{#1}}
 \newrefformat{eq}{Equation~\eqref{#1}}
 \newrefformat{prob}{Problem~\ref{#1}}
 \newrefformat{tab}{Table~\ref{#1}}
@@ -91,6 +91,7 @@
 \DeclareUnicodeCharacter{2124}{$\Z$}
 \DeclareUnicodeCharacter{211A}{$\Q$}
 \DeclareUnicodeCharacter{1D53D}{$\F$}
+\DeclareUnicodeCharacter{03BB}{$\lambda$}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Title
@@ -111,7 +112,7 @@
 \begin{document}
 \maketitle
 
-\todo{automatically typeset REPL interactions from just input?}
+% \todo{automatically typeset REPL interactions from just input?}
 
 \begin{abstract}
   \disco is a pure, strict, statically typed functional programming
@@ -119,9 +120,9 @@
   mathematics course. The goals of the language are to introduce
   students to functional programming concepts early, and to enhance
   their learning of mathematics by providing a computational platform
-  for them to play with.  It features mathematical notation,
+  for them to play with.  It features mathematically-inspired notation,
   property-based testing, equirecursive algebraic types, subtyping,
-  built-in list, bag, and finite set types, a REPL, and extensive
+  built-in list, bag, and finite set types, a REPL, and student-focused
   documentation.  \disco is implemented in Haskell, with source code
   available on
   GitHub,\footnote{\url{https://github.com/disco-lang/disco}} and
@@ -246,37 +247,40 @@ of these issues:
   of the language's features and some discussion of features which are
   explicitly excluded.
 \item As much as possible, the language's features and syntax mirror
-  common mathematical practice rather than other functional
-  languages.  \pref{sec:syntax} discusses some notable exceptions.
+  common mathematical practice rather than other functional languages.
+  \pref{sec:examples} has many examples, and \pref{sec:syntax} discusses
+  some notable exceptions.
 \item As a result---although there is as yet no data to back this
   up---the language should be easy for instructors to learn, even
   mathematicians without much prior programming experience.
 \end{itemize}
 
-\disco is an open-source project, implemented in Haskell \todo{cite
-  Haskell}, with source code licensed under a BSD 3-clause license and
-available on
-GitHub.\footnote{\url{https://github.com/disco-lang/disco}}  Although
+\disco is an open-source project, implemented in Haskell, with source
+code licensed under a BSD 3-clause license and available on
+GitHub.\footnote{\url{https://github.com/disco-lang/disco}} Although
 it is possible to install \disco locally, either from
 Hackage\footnote{\url{https://hackage.haskell.org/package/disco}} or
-directly from source, it is also possible to interact with \disco in
-the cloud via a web browser, through the magic of
+directly from source, one can also interact with \disco in the cloud
+via a web browser, through the magic of
 replit.\footnote{\url{https://replit.com/@BrentYorgey/Disco\#README.md}}
 This is the primary way that students will be instructed to use Disco,
 so that students do not need to install a Haskell toolchain or worry
 about exhausting the computational resources of their device.  Via
-replit,\footnote{As an aside, this is in no way unique to
-  \disco---replit can be easily configured to run any language with an
-  implementation in nixpkgs, which includes all mainstream languages
-  and many obscure ones as well!} it is entirely feasible to play
-with \disco on any device with a web browser, including Chromebooks,
-tablets, or phones.  Documentation for \disco is available on Read the Docs.\footnote{\url{https://disco-lang.readthedocs.io}}
+replit, it is entirely feasible to play with \disco on any device with
+a web browser, including Chromebooks, tablets, or phones.
+Documentation for \disco is hosted on
+\texttt{readthedocs.org}.\footnote{\url{https://disco-lang.readthedocs.io}}
+
+% \footnote{As an aside, this is in no way unique to
+%   \disco---replit can be easily configured to run any language with an
+%   implementation in nixpkgs, which includes all mainstream languages
+%   and many obscure ones as well!}
 
 \section{\disco by Example}
 \label{sec:examples}
 
-We will begin by exploring the major features and uses of the language
-via a series of examples.
+We will begin by exploring some of the major features and uses of the
+language via a series of examples.
 
 \subsection{Greatest common divisor}
 \label{sec:gcd}
@@ -312,7 +316,7 @@ last two tests, which together express the universal property defining
 \verb|gcd|).  Such properties will be tested exhaustively when
 feasible, or, when exhaustive testing is impossible (as in this case),
 tested with a finite number of randomly chosen inputs. Under the hood,
-this uses the \pkg{QuickCheck} \todo{cite} and
+this uses the \pkg{QuickCheck} \cite{claessen2000quickcheck} and
 \pkg{simple-enumeration} packages to generate inputs.  For example:
 
 \begin{verbatim}
@@ -474,10 +478,10 @@ Boolean guards, as well as \emph{transforming} the outputs via an
 expression to the left of the vertical bar.
 
 While on the subject of sets, it is worth mentioning that the
-distinction between \emph{types} and \emph{sets} is a pedagogical
-minefield: the distinction is nonexistent in typical presentations of
-mathematics, but crucial in a computational system with static type
-checking.  This issue is discussed in more detail in
+distinction between \emph{types} and \emph{sets} is something of a
+pedagogical minefield: the distinction is nonexistent in typical
+presentations of mathematics, but crucial in a computational system
+with static type checking.  This issue is discussed in more detail in
 \pref{sec:typesvsets}.
 
 One other thing this example highlights is that there is extensive,
@@ -514,7 +518,7 @@ trees. It defines a recursive type \texttt{BT} of binary tree shapes,
 along with a function to generate a list of all possible tree shapes
 of a given size (via a list comprehension), and uses it to generate
 the first few Catalan numbers.  This list is then extended via lookup
-in the Online Encyclopedia of Integer Sequences (OEIS) \todo{cite}.
+in the Online Encyclopedia of Integer Sequences (OEIS) \cite{oeis}.
 
 \begin{listing}
   \inputminted{text}{examples/catalan.disco}
@@ -547,7 +551,7 @@ complex, but it is a very deliberate choice:
   types like \texttt{type T = A + B + C + ...} have to be written as
   \texttt{left(a)}, \texttt{right(left(b))},
   \texttt{right(right(left(c)))}, and so on. However, the sum types
-  used as examples in a Discrete Math class rarely have more than two
+  used as examples in a discrete mathematics class rarely have more than two
   or three summands, and working directly with primitive sum and
   product types helps students explicitly make connections to other
   things they have already seen, such as Cartesian product and
@@ -555,11 +559,11 @@ complex, but it is a very deliberate choice:
   nature of algebraic data types.
 \end{itemize}
 
-The \texttt{oeis} module is somewhat frivolous, but can be a fun way
-for students to explore integer sequences and the OEIS.  In addition
-to \texttt{extendSequence}, the module also provides a function
-\texttt{lookupSequence : List(N) -> Unit + List(Char)}, which returns
-the URL of the first OEIS result, if there is any:
+The \texttt{oeis} module is inessential, but can be a fun way for
+students to explore integer sequences and the OEIS.  In addition to
+\texttt{extendSequence}, the module also provides a
+\texttt{lookupSequence} function, which returns the URL of the first
+OEIS result, if there is any:
 \begin{verbatim}
 Disco> lookupSequence(catalan1)
 right("https://oeis.org/A000108")
@@ -662,12 +666,15 @@ Disco> :type [1,-2,3/5]
 \end{listing}
 
 \disco has no floating-point type, because floating-point numbers are
-the worst \cite{goldberg1991every} and there is no particular need for real numbers
-in a Discrete Mathematics course.
+\emph{the worst} \cite{goldberg1991every} and there is no particular
+need for real numbers in a discrete mathematics course.
 
-\todo{example about container types, Boom hierarchy etc?}
+% \todo{example about container types, Boom hierarchy etc?}
 
-\section{Syntax}
+\section{Discussion and Future Work}
+\label{sec:discussion}
+
+\subsection{Syntax}
 \label{sec:syntax}
 
 For the most part, \disco tries to use syntax as close to standard
@@ -686,7 +693,7 @@ likely to be confusing to students anyway.
   relation is also traditionally written with a vertical bar, as in
   $3 \mid 21$, but \disco does not support this notation.  Including
   it makes the grammar extremely ambiguous.  (And besides, Dijkstra
-  would tell us that we should not use a physically symmetric operator
+  would tell us that we should not use a visually symmetric operator
   symbol for a nonsymmetric relation!) Instead, \disco provides
   \texttt{divides} as an infix operator.  In my experience students
   have no problem remembering the difference.
@@ -708,26 +715,32 @@ likely to be confusing to students anyway.
   interpreted as multiplication; otherwise it is interpreted as
   function application.  However, this does not always get it right,
   and there are times when an explicit multiplication operator must be
-  written.  It might be worth exploring a more type-directed approach,
-  although that would be considerably more complex.  It seems like to
-  really get this ``right'' requires general intelligence: for
-  example, does the expression $f(x+2)$ denote multiplication or
-  function application?  Are you sure?  How do you know?  What about
-  in the expression $x(y+2)$?  Or how about ``Let $x$ be the function
-  which doubles its argument, and consider $x(y+2)$ \dots''?
+  written (one notable example is when scaling the output of a
+  function call, as in $2f(x)$; in \disco this must sadly be written
+  \mintinline{text}{2*f(x)}).  It might be worth exploring a more
+  type-directed approach, although that would be considerably more
+  complex.  It seems like to really get this ``right'' requires
+  general intelligence: for example, does the expression $f(x+2)$
+  denote multiplication or function application?  Are you sure?  How
+  do you know?  What about in the expression $x(y+2)$?  Or how about
+  ``Let $x$ be the function which doubles its argument, and consider
+  $x(y+2)$ \dots''?
 \end{itemize}
-
-\section{Discussion and Future Work}
-\label{sec:discussion}
 
 \subsection{Student experience}
 \label{sec:students}
 
-I have used \disco in my discrete mathematics course once, in the
-spring of 2022, and I plan to use it again in spring 2023.  Anecdotally,
-student experience seems mostly positive, although I do not
-have any data to back this up. \todo{add more tutorials/assignments to
-repository itself}
+So far, I have used \disco in my discrete mathematics course once, in
+the spring of 2022, and I plan to use it again in the spring of 2023.
+Anecdotally, student experience seems mostly positive, although I do
+not have any data to back this up.  One of my main tasks for the
+spring of 2023 will be to develop a solid sequence of exercises that
+can serve as a tutorial for the language, and commit these exercises
+back into the disco repository itself, to make it easier for other
+instructors or independent learners to make use of the language.  I
+plan to also start collecting some very informal, qualitative data
+about students' experience using the language and its effect on their
+learning.
 
 \subsection{Type system}
 \label{sec:types}
@@ -735,35 +748,92 @@ repository itself}
 \disco and its type system were designed to be intuitive for students
 and to corresponding closely to mathematical practice, but this has
 not always led to the simplest type system from an implementation
-point of view!  In particular, the combination of qualified parametric
-polymorphism, subtyping, and equirecursive types makes for an overall
-system which is only barely on the edge of being tractable.
-For the implementation of type inference and checking I relied heavily
-on Traytel \etal \cite{traytel2011extending} who describe the
-implementation of a similar type system for Isabelle/HOL.  There are
-almost certainly bugs, but \todo{XXX}.
+point of view!
 
-\todo{Internally, disco has qualified polymorphism, necessary to
-  support type inference; for example,
-  lam x. x - 2 has type a -> a for any type a which
-  supports subtraction (i.e. either $\Z$ or $\Q$, potentially more
-  types in the future).  Want to allow it in surface syntax but tricky.}
+\begin{itemize}
+\item As previously mentioned, \disco has \emph{subtyping} in order to
+  accommodate typical mathematical practice.  \disco's subtyping is
+  \emph{structural}, meaning that we only really need concern
+  ourselves with subtyping relationships between primitive types; a
+  subtyping relation between complex types (for example, sum, product,
+  or function types) can always ultimately be broken down into
+  subtyping relations between simpler types.  Subtyping complicates
+  the type system since, for example, when typechecking the
+  application of a function to an argument, we cannot just check that
+  the types match via unification, but we must instead emit a
+  subtyping constraint which we check later.
 
-\todo{Fact that it isn't allowed in surface syntax can also be
-  confusing since types are monomorphized.  Talk about previous
-  example. Want to show multiple potential types.}
+\item \disco also has parametric polymorphism, since a language
+  without polymorphism would not really give students a good idea of
+  the expressive power of statically typed functional programming.  Of
+  course, this means that typing constraints can involve unification
+  variables as well as \emph{skolem variables} (when \emph{checking} a
+  polymorphic type).
+
+\item \disco's type system must actually support \emph{qualified}
+  polymorphism (similar to Haskell's type classes, but with only a
+  specific set of built-in classes) in order to be able to infer types
+  in a setting where some types support certain operations (\eg
+  subtraction or division) and some do not.  For example, what is the
+  type of \mintinline{text}{\x. x - 2}?  Most generally, this function
+  has a type like
+  $\forall a.\; (\textit{sub}(a), \Z <: a) \Rightarrow a \to a$, that
+  is, is a polymorphic function with type $a \to a$ for any type $a$
+  which supports subtraction and has $\Z$ as a subtype, \ie either
+  $\Z$ or $\Q$.  (As a nice exercise, you might like to convince
+  yourself that none of $\Z \to \Z$, $\Z \to \Q$, $\Q \to \Z$, or $\Q
+  \to \Q$ will work---some of them are invalid types for the function,
+  and some of them, although valid, are not general enough.)
+
+  Such types are currently only allowed internally, during type
+  inference, but must be monomorphized away before showing types to
+  users. This is sound, but can be rather confusing.  For example,
+  \disco will report that the type of \mintinline{text}{\x. x - 2} is
+  $\Z \to \Z$, but will also happily allow it to be applied to a
+  fractional input such as $5/2$, which would be a type error if its
+  most general type were really $\Z \to \Z$.
+\begin{verbatim}
+Disco> :type \x. x - 2
+λx. x - 2 : ℤ → ℤ
+Disco> (\x. x - 2) (5/2)
+1/2
+\end{verbatim}
+  One interesting idea to improve the situation would be to show the
+  user \emph{multiple} potential monomorphic instantiations of a
+  general type scheme, something like this, perhaps:
+\begin{verbatim}
+Disco> :type \x. x - 2
+λx. x - 2
+  : ℤ → ℤ
+  : ℚ → ℚ
+\end{verbatim}
+\item As mentioned before, \disco has equirecursive types.  The big
+  wrinkle this adds to the type system is that simple structural
+  equality (or unification) no longer suffices; when recursive type
+  synonyms are involved, two types can be the same even though they
+  look different.
+\end{itemize}
+
+The combination of qualified parametric polymorphism, subtyping, and
+equirecursive types makes for an overall system which seems only
+barely on the edge of tractability.  For the implementation of type
+inference and checking I relied heavily on Traytel \etal
+\cite{traytel2011extending} who describe the implementation of a
+similar type system for Isabelle/HOL.  There are almost certainly
+bugs, but overall I am fairly confident in the soundness of the type
+system.
 
 \subsection{Types vs sets}
 \label{sec:typesvsets}
 
 Axiomatic set theory is usually taken as the \emph{de facto}
-foundation for mathematics.  In practice, mathematicians
-usually behave more as if they were working in some kind of
-type-theoretic foundation, which makes a statically typed functional
-language a good match for mathematics as it is practiced (for example,
-see \todo{cite HoTT and Lean}).  However, one area where there is a
-big mismatch is in the distinction between \emph{types} and
-\emph{sets}.
+foundation for mathematics.  On the other hand, in practice,
+mathematicians usually behave more as if they were working in some
+kind of type-theoretic foundation, which makes a statically typed
+functional language a good match for mathematics as it is practiced
+(for example, see HoTT \cite{hottbook} and Lean \cite{moura2021lean}).
+However, one area where there seems to be a big mismatch is in the
+distinction between \emph{types} and \emph{sets}.
 
 To most mathematicians and every discrete mathematics textbook ever,
 $\{2,4,7\}$ and $\N$ are both examples of \emph{sets}.  The former is
@@ -773,44 +843,44 @@ fundamentally the same kind of thing, and it makes sense to talk about
 In \disco, however, $\{2,4,7\}$ and $\N$ are very different things:
 the former is a value of type \mintinline{text}{Set(N)}, whereas the
 latter is a type.  $\N - \{2,4,7\}$ is so nonsensical that it is a
-\emph{syntax} error.  Why the mismatch?  And what (if anything) can be
-done about it?
+\emph{syntax} error.  One might reasonably wonder: why the mismatch?
+Why not try to make \disco more closely align with common mathematical
+practice, in accordance with \disco's stated philosophy?
 
-In a typical discrete math course, sets are used for everything: in
-addition to describing various finite, countably infinite, and
-uncountably infinite collections of values, sets are used to describe
-the domains and codomains of functions, or used as the domain of
-discourse for quantifiers like $\forall$ and $\exists$.  \todo{Conflating
-types and sets in a statically-typed functional language is
-problematic:}
-
-\todo{One way to think of types is as a particular collection of
-  ``ur-sets'' with particularly nice structural properties.  For
-  example, $\N$ is the unique set that includes $0$ and is closed
-  under the successor operation; in contrast, there is nice
-  structural way to define $\{2,4,7\}$ other than just listing its
-  elements.  These nice structural properties is what enables
-  decidable typechecking without having to resort to SMT solvers.}
+Although conflating sets and types might be fine on a theoretical
+level (at least, as long as one does not worry about deeper
+foundational issues), on a practical level it introduces several
+big problems:
 
 \begin{itemize}
 \item The ability to use arbitrary finite sets as types would lead to
-  the need for tools like SMT solvers for typechecking, which would
-  necessarily be incomplete.  For example, to typecheck %
+  what is essentially a system of \emph{refinement types}.  Although
+  this is well-studied and has many practical motivations, it quickly
+  leads to undecidable typechecking, the need for tools like SMT
+  solvers, and the requirement for users to provide annotations to
+  help the system understand why a given type is valid.  For example,
+  to typecheck %
   \verb|f : N -> {2,3,7}| would require somehow checking that for any
   natural number input, the function \verb|f| will always return a
-  either $2$, $3$, or $7$.  This sort of \emph{refinement type} system
+  either $2$, $3$, or $7$, which could depend on complex reasoning
+  about the behavior of the function.  This sort of \emph{refinement type} system
   is well-studied, but calling out to an SMT solver in order to
   typecheck a teaching language to be used by students seems like a
   non-starter.
-\item The ability to use types as value-level sets introduces all
-  sorts of difficulties, chief among which is the fact that most types
-  correspond to \emph{infinite} sets.  Set values would have to be
-  represented as some kind of syntax trees rather than simply as sets
-  of values, and operations like membership checking become
-  only \emph{semi}-decidable at best.
+\item Conversely, the ability to use types as value-level sets
+  introduces all sorts of difficulties, chief among which is the fact
+  that most types correspond to \emph{infinite} sets.  Set values
+  would have to be represented as some kind of abstract set
+  expressions rather than simply as sets of values, and operations
+  like membership checking become only \emph{semi}-decidable at best.
+  What's more, these infinite set values would not really correspond
+  to their supposed mathematical counterparts in some subtle ways.
+  For example, as everyone knows, the power set of the natural numbers
+  is uncountable; but if \texttt{N} were usable as a value of type
+  \texttt{Set(N)} in \disco, then \texttt{power(N)} would actually
+  represent the set of \emph{computable} subsets of $\N$, which is
+  countable!
 \end{itemize}
-
-\todo{link to online discussions}
 
 The one slight blurring of categories which seems both feasible and
 desirable would be the ability to use finite set values as domains for
@@ -819,21 +889,55 @@ example, \mintinline{text}{forall x in [0..10]. x^2 <= 100}.  It
 should be easy to incorporate such finite sets into the existing
 machinery for property checking.
 
-\subsection{Tooling and error messages}
+In any case, how should we present and explain the relevant
+distinctions to students?  Honestly, I'm not entirely sure.  My best
+approach at the moment revolves around two ideas:
+\begin{itemize}
+\item First, explain to students that \disco can only represent
+  \emph{finite} sets.  This is easy enough to understand: if we
+  allowed infinite sets, then certain operations might require
+  infinitely long computations.
+\item We can then explain that types can be thought of as a particular
+  collection of ``ur-sets'' out of which we can build and carve out
+  all other sets.  For particularly keen students, we can explain that
+  types are sets with particularly nice structural properties.  For
+  example, $\N$ is the unique set that includes $0$ and is closed
+  under the successor operation; in contrast, there is nice structural
+  way to define $\{2,4,7\}$ other than just listing its elements.
+  These nice structural properties are precisely what enable decidable
+  typechecking without having to resort to SMT solvers.
+\end{itemize}
+
+\subsection{Error messages}
 \label{sec:errors}
 
-\todo{cite previous OBT thing, desire vs reality of type errors etc.}
+When the \disco project first started, I had grand designs for the way
+the system would interact with the user in the case of type errors
+\cite{yorgey2018explaining}. Unfortunately, partly because I was
+intimidated by my own grand designs, and partly because error messages
+are hard, the system currently does not have very good error messages!
+For example, here is a terribly uninformative one:
+\begin{verbatim}
+Disco> each(3, [1,2,3])
+Error: the shape of two types does not match.
+https://disco-lang.readthedocs.io/en/latest/reference/shape-mismatch.html
+\end{verbatim}
+In practice, I just tell students to ask me for help when they run
+into errors they can't figure out, but this obviously limits wider
+adoption.  Improving error messages will be another big focus for work
+in the upcoming year.
 
 \section{Acknowledgements}
 \label{sec:acks}
 
 \disco was originally born out of a conversation with Harley Eades at
-TFPIE in 2016, and Harley contributed many early ideas.  I am grateful
-to the many people who have contributed to the \disco codebase over
-the years, including my students Callahan Hirrel, Bosco Ndemeye,
-Sanjit Kalapatapu, Jacob Hines, Eric Pinter, and Daniel Burnett, and
-other collaborators on GitHub including Shay Lewis, Ryan Yates,
-Tristan de Cacqueray, and Chris Smith.
+TFPIE in 2016, and I'm very grateful to Harley for those initial
+conversations and many good ideas.  I am also grateful to the many
+people who have contributed to the \disco codebase over the years,
+including my students Callahan Hirrel, Bosco Ndemeye, Sanjit
+Kalapatapu, Jacob Hines, Eric Pinter, and Daniel Burnett, as well as
+other collaborators including Shay Lewis, Ryan Yates, Tristan de
+Cacqueray, and Chris Smith.
 
 % \nocite{*}
 \bibliographystyle{eptcsalpha}

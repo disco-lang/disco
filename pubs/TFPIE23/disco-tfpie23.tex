@@ -745,7 +745,7 @@ almost certainly bugs, but \todo{XXX}.
 
 \todo{Internally, disco has qualified polymorphism, necessary to
   support type inference; for example,
-  \verb|\x. x - 2| has type \verb|a -> a| for any type \verb|a| which
+  lam x. x - 2 has type a -> a for any type a which
   supports subtraction (i.e. either $\Z$ or $\Q$, potentially more
   types in the future).  Want to allow it in surface syntax but tricky.}
 
@@ -756,7 +756,68 @@ almost certainly bugs, but \todo{XXX}.
 \subsection{Types vs sets}
 \label{sec:typesvsets}
 
-\todo{Summarize discussion of types vs sets}
+Axiomatic set theory is usually taken as the \emph{de facto}
+foundation for mathematics.  In practice, mathematicians
+usually behave more as if they were working in some kind of
+type-theoretic foundation, which makes a statically typed functional
+language a good match for mathematics as it is practiced (for example,
+see \todo{cite HoTT and Lean}).  However, one area where there is a
+big mismatch is in the distinction between \emph{types} and
+\emph{sets}.
+
+To most mathematicians and every discrete mathematics textbook ever,
+$\{2,4,7\}$ and $\N$ are both examples of \emph{sets}.  The former is
+finite and the latter (countably) infinite, but they are both
+fundamentally the same kind of thing, and it makes sense to talk about
+(for example) their difference, $\N - \{2,4,7\}$, which is also a set.
+In \disco, however, $\{2,4,7\}$ and $\N$ are very different things:
+the former is a value of type \mintinline{text}{Set(N)}, whereas the
+latter is a type.  $\N - \{2,4,7\}$ is so nonsensical that it is a
+\emph{syntax} error.  Why the mismatch?  And what (if anything) can be
+done about it?
+
+In a typical discrete math course, sets are used for everything: in
+addition to describing various finite, countably infinite, and
+uncountably infinite collections of values, sets are used to describe
+the domains and codomains of functions, or used as the domain of
+discourse for quantifiers like $\forall$ and $\exists$.  \todo{Conflating
+types and sets in a statically-typed functional language is
+problematic:}
+
+\todo{One way to think of types is as a particular collection of
+  ``ur-sets'' with particularly nice structural properties.  For
+  example, $\N$ is the unique set that includes $0$ and is closed
+  under the successor operation; in contrast, there is nice
+  structural way to define $\{2,4,7\}$ other than just listing its
+  elements.  These nice structural properties is what enables
+  decidable typechecking without having to resort to SMT solvers.}
+
+\begin{itemize}
+\item The ability to use arbitrary finite sets as types would lead to
+  the need for tools like SMT solvers for typechecking, which would
+  necessarily be incomplete.  For example, to typecheck %
+  \verb|f : N -> {2,3,7}| would require somehow checking that for any
+  natural number input, the function \verb|f| will always return a
+  either $2$, $3$, or $7$.  This sort of \emph{refinement type} system
+  is well-studied, but calling out to an SMT solver in order to
+  typecheck a teaching language to be used by students seems like a
+  non-starter.
+\item The ability to use types as value-level sets introduces all
+  sorts of difficulties, chief among which is the fact that most types
+  correspond to \emph{infinite} sets.  Set values would have to be
+  represented as some kind of syntax trees rather than simply as sets
+  of values, and operations like membership checking become
+  only \emph{semi}-decidable at best.
+\end{itemize}
+
+\todo{link to online discussions}
+
+The one slight blurring of categories which seems both feasible and
+desirable would be the ability to use finite set values as domains for
+$\forall$ and $\exists$ property quantifiers, so one could write, for
+example, \mintinline{text}{forall x in [0..10]. x^2 <= 100}.  It
+should be easy to incorporate such finite sets into the existing
+machinery for property checking.
 
 \subsection{Tooling and error messages}
 \label{sec:errors}

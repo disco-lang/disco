@@ -5,12 +5,28 @@ Disco is a programming language intended to teach basic functional
 programming principles in the context of a discrete mathematics
 course.
 
+Using Disco on replit.com
+---------------------------
+
+If you just want to *use* disco (*i.e.* if you are a student, or just
+checking out the language), the recommended way is to use it via
+`replit.com`.  Simply [visit this
+REPL](https://replit.com/@BrentYorgey/Disco#README.md) and follow the
+instructions there to fork your own copy, where you will be able to
+evaluate Disco expressions, and edit and run your own `.disco` files,
+all via your web browser, without installing anything on your computer.
+
 Installation
 ------------
 
-If you just want to *use* disco (*i.e.* if you are a student), follow
-these instructions.  If you want to *contribute* to disco development,
-you should skip to the instructions below about building with stack.
+If for some reasons you want to actually install `disco` on your
+computer, follow the below instructions.  (If you want to *contribute*
+to disco development, you should skip to the instructions about
+building with stack.)
+
+**Note**, if you are a student, you should **not** need to do this!
+The above instructions about using `disco` on `replit.com` should be
+all you need.  The below instructions are kept here for completeness.
 
 - Follow the instructions to [install
   ghcup](https://www.haskell.org/ghcup/) by opening a terminal or

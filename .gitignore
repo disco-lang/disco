@@ -67,7 +67,11 @@ pubs/WG2.1/diagrams/*
 pubs/WG2.1/*.pdf
 
 pubs/TFPIE23/*.pdf
+pubs/TFPIE23/talk/*.pdf
 
 tmp/
 
 .ipynb_checkpoints
+
+*.pygtex
+*.pygstyle

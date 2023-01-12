@@ -1,3 +1,39 @@
+% Talk outline
+% Want to tell you about Disco.
+% Goals of disco
+% - Teach FP concepts.
+%   - At small institution, don't have luxury of
+%     teaching intro FP.
+%   - Idea of teaching FP + Discrete is not at all new.
+% - Connect math & computation
+% - Enhance learning
+% - Minimize friction.  Many existing approaches use a
+%   general-purpose functional language.  But let's talk about that.
+% Show example function.
+% Haskell implementation:
+% - Int/Rational instead of N/Q
+% - Can't match on 2n, 2n+1.  Can't write 3n.
+% - Have to convert Int to Rational with fromIntegral
+% Show Disco implementation.
+%   Anecdotally, this works.  Students were able to use it with very
+%   little issue.
+
+% Demo
+% First, show calculator.  Addition, subtraction, mult, big power
+% (arbitrary sized integers), division (fractions)
+% Show types of things.  Subtyping.  :type [1,-2,1/3]
+% Show subtyping diamond (on slides).
+% Back to demo.
+% - Show gcd.  Talk about docs, tests, randomized property-based
+%   testing.
+% - Show zorder. each(zOrder', [0..15])
+% - Show module6, using properties to create an assignment.  Exercise
+%   4.
+% - Show catalan.  Algebraic types, equirecursive types.  Great way
+%   to introduce students to algebraic data types.
+
+% Then talk about issues / future work.  Take more or less time as needed.
+
 % -*- mode: LaTeX; compile-command: "rubber --unsafe -d disco-tfpie23-talk.tex" -*-
 
 \documentclass[fleqn,xcolor={usenames,dvipsnames,svgnames,table},12pt,aspectratio=169]{beamer}
@@ -134,6 +170,9 @@
   \item Functional teaching language
   \item Designed for use in a Discrete Mathematics course
   \item Birthplace: TFPIE 2016, Maryland, USA!
+  \item Have used it in a Discrete Math class once, in
+    Spring 2022.
+  \item Plan to use it again starting next week.
   \end{itemize}
 \end{frame}
 
@@ -151,7 +190,7 @@
     f &: \N \to \Q \\
     f(2n)   &= 0 \\
     f(2n+1) &= \begin{cases} n/2 & \text{if } n > 5, \\
-      n + 7 & \text{otherwise}
+      3n + 7 & \text{otherwise}
       \end{cases}
   \end{align*}
 
@@ -164,7 +203,7 @@ f :: Int -> Rational
 f x
   | even x    = 0
   | n > 5     = fromIntegral n / 2
-  | otherwise = n + 7
+  | otherwise = 3*n + 7
   where
     n = x `div` 2
   \end{minted}
@@ -174,17 +213,81 @@ f x
   \begin{minted}{text}
 f : N -> Q
 f(2n)   = 0
-f(2n+1) =
-  {? n/2     if n > 5,
-     n + 7   otherwise
-  ?}
+f(2n+1) = {? n/2      if n > 5,
+             3n + 7   otherwise
+          ?}
   \end{minted}
   \end{overprint}
 \end{xframe}
 
-\begin{frame}{Demo!}
+\begin{xframe}{Demo!}
   \url{https://replit.com/@BrentYorgey/Disco#README.md}
+\end{xframe}
+
+\begin{xframe}{Numeric types in \disco}
+  \begin{center}
+    \includegraphics[width=0.3\textwidth]{../../../docs/images/diamond.png}
+  \end{center}
+\end{xframe}
+
+\begin{xframe}{Issues / Future work}
+  \begin{itemize}
+  \item Error messages!
+  \item Showing multiple type instantiations
+  \item Types vs sets
+  \end{itemize}
+\end{xframe}
+
+\begin{xframe}{Showing multiple type instantiations}
+  What is the most general type of $\lambda x. x - 2$?
+  \bigskip
+
+  \onslide<2-> Internally, it is something like $\forall
+  a. (\mathrm{HasSubtraction}(a), \Z <: a) \Rightarrow a \to a$
+  \bigskip
+
+  \onslide<3-> \dots but we definitely don't want to show that to
+  students! \bigskip
+
+  \onslide<4-> We do this instead, but it's confusing:
+  \begin{verbatim}
+Disco> :type \x. x - 2
+λx. x - 2 : ℤ → ℤ
+Disco> (\x. x - 2) (5/2)
+1/2
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}{Showing multiple type instantiations}
+  What about something like this instead?
+  \begin{verbatim}
+  Disco> :type \x. x - 2
+  λx. x - 2
+    : ℤ → ℤ
+    : ℚ → ℚ
+  \end{verbatim}
+\end{xframe}
+
+\begin{xframe}{Types vs sets}
+  \begin{itemize}
+  \item<+-> $\{2,4,7\}$ is an example of a \underline{\hspace{2in}}
+  \item<+-> $\N$ is an example of a \underline{\hspace{2in}}
+  \item<+-> In a math class, $\N - \{2,4,7\}$ is a perfectly well-defined,
+  countably infinite set.
+  \item<+-> In \disco, $\N - \{2,4,7\}$ is a \emph{syntax error}!
+  \item<+-> Why the difference, and how do we explain/frame it for
+    students??
+  \end{itemize}
+  \bigskip
+\end{xframe}
+
+\begin{xframe}
+  \begin{center}
   \url{https://github.com/disco-lang/disco}
-\end{frame}
+  \bigskip
+
+  \includegraphics[width=0.75in]{logo.png}
+  \end{center}
+\end{xframe}
 
 \end{document}

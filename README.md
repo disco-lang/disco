@@ -16,6 +16,73 @@ instructions there to fork your own copy, where you will be able to
 evaluate Disco expressions, and edit and run your own `.disco` files,
 all via your web browser, without installing anything on your computer.
 
+Design principles
+-----------------
+
+* Includes those features, and *only* those features, useful in the
+  context of a discrete math course. This is *not* intended to be a
+  general-purpose language.
+* Syntax is as close to standard *mathematical* practice as possible,
+  to make it easier for mathematicians to pick up, and to reduce as
+  much as possible the incongruity between the language and the
+  mathematics being explored and modeled.
+* Tooling, error messages, etc. are very important---the language
+  needs to be accessible to undergrads with no prior programming
+  experience. (However, this principle is, as of yet, only
+  that---there is no tooling or nice error messages to speak of.)
+
+Feel free to look around, ask questions, etc.  You can also
+[contribute](CONTRIBUTING.md)---collaborators are most welcome.
+
+Community
+---------
+
+Check out the disco IRC channel, `#disco-lang` on Libera.Chat.  If
+you're not familiar with IRC, you can connect via [this web client](https://kiwiirc.com/nextclient/irc.libera.chat/?nick=Guest?#disco-lang).
+
+Documentation
+-------------
+
+Documentation is [hosted on
+readthedocs.io](http://disco-lang.readthedocs.io/en/latest/).
+
+Contributing
+------------
+
+If you'd like to contribute to disco development, check out
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+Building with stack
+-------------------
+
+First, make sure you have
+[the `stack` tool](https://docs.haskellstack.org/en/stable/README/)
+(the easiest way to install it is via [ghcup](https://www.haskell.org/ghcup/)).
+Then open a command prompt, navigate to the root directory of this
+repository, and execute
+
+```
+stack build
+```
+
+After this completes, you should be able to
+
+```
+stack exec disco
+```
+
+to run the Disco command-line REPL.
+
+While developing, you may want to use a command like
+
+```
+stack test --fast --file-watch --ghc-options='-Wall'
+```
+
+which will turn on warnings, turn off optimizations for a faster
+edit-compile-test cycle, and automatically recompile and run the test
+suite every time a source file changes.
+
 Installation
 ------------
 
@@ -126,70 +193,3 @@ instructions will be kept up-to-date with whatever helpful tips or
 workarounds I learn. So even if you encounter a difficulty but figure
 out the solution youself, let me know --- that way I can include the
 problem and solution here so others can benefit!
-
-Design principles
------------------
-
-* Includes those features, and *only* those features, useful in the
-  context of a discrete math course. This is *not* intended to be a
-  general-purpose language.
-* Syntax is as close to standard *mathematical* practice as possible,
-  to make it easier for mathematicians to pick up, and to reduce as
-  much as possible the incongruity between the language and the
-  mathematics being explored and modeled.
-* Tooling, error messages, etc. are very important---the language
-  needs to be accessible to undergrads with no prior programming
-  experience. (However, this principle is, as of yet, only
-  that---there is no tooling or nice error messages to speak of.)
-
-Feel free to look around, ask questions, etc.  You can also
-[contribute](CONTRIBUTING.md)---collaborators are most welcome.
-
-Community
----------
-
-Check out the disco IRC channel, `#disco-lang` on Libera.Chat.  If
-you're not familiar with IRC, you can connect via [this web client](https://kiwiirc.com/nextclient/irc.libera.chat/?nick=Guest?#disco-lang).
-
-Documentation
--------------
-
-Documentation is [hosted on
-readthedocs.io](http://disco-lang.readthedocs.io/en/latest/).
-
-Contributing
-------------
-
-If you'd like to contribute to disco development, check out
-[CONTRIBUTING.md](CONTRIBUTING.md).
-
-Building with stack
--------------------
-
-First, make sure you have
-[the `stack` tool](https://docs.haskellstack.org/en/stable/README/)
-(the easiest way to install it is via [ghcup](https://www.haskell.org/ghcup/)).
-Then open a command prompt, navigate to the root directory of this
-repository, and execute
-
-```
-stack build
-```
-
-After this completes, you should be able to
-
-```
-stack exec disco
-```
-
-to run the Disco command-line REPL.
-
-While developing, you may want to use a command like
-
-```
-stack test --fast --file-watch --ghc-options='-Wall'
-```
-
-which will turn on warnings, turn off optimizations for a faster
-edit-compile-test cycle, and automatically recompile and run the test
-suite every time a source file changes.

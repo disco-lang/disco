@@ -817,7 +817,7 @@ elimCyclesGen genSubst genUnify g
 
 isBaseEdge :: (UAtom, UAtom) -> Either (BaseTy, BaseTy) (UAtom, UAtom)
 isBaseEdge (UB b1, UB b2) = Left (b1,b2)
-isBaseEdge e = Right e
+isBaseEdge e              = Right e
 
 checkBaseEdge :: Members '[Error SolveError] r => (BaseTy, BaseTy) -> Sem r ()
 checkBaseEdge (b1, b2)

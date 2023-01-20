@@ -91,6 +91,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/error-emptycase/input
                      test/error-names/expected
                      test/error-names/input
+                     test/error-nonlinear/expected
+                     test/error-nonlinear/input
                      test/error-notcon/expected
                      test/error-notcon/input
                      test/error-notype/expected
@@ -170,6 +172,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/parse-patguard/expected
+                     test/parse-patguard/input
                      test/parse-quantifiers/expected
                      test/parse-quantifiers/input
                      test/parse-top-term/expected
@@ -315,6 +319,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/types-192/input
                      test/types-306/expected
                      test/types-306/input
+                     test/types-357/expected
+                     test/types-357/input
                      test/types-bind/expected
                      test/types-bind/input
                      test/types-char-string/expected

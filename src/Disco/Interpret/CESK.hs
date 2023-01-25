@@ -447,6 +447,8 @@ appConst k = \case
     out $ VProp (VPAnd (ensureProp p1) (ensureProp p2))
   OOr -> arity2 $ \p1 p2 -> 
     out $ VProp (VPOr (ensureProp p1) (ensureProp p2))
+  OImpl -> arity2 $ \p1 p2 ->
+    out $ VProp (VPImpl (ensureProp p1) (ensureProp p2))
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where
@@ -730,6 +732,7 @@ notProp (VPDone r)            = VPDone (invertPropResult r)
 notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
 notProp (VPAnd vp1 vp2)       = VPOr (notProp vp1) (notProp vp2)
 notProp (VPOr vp1 vp2)        = VPAnd (notProp vp1) (notProp vp2)
+notProp (VPImpl vp1 vp2)      = VPAnd vp1 (notProp vp2)
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
 ensureProp :: Value -> ValProp
@@ -758,6 +761,14 @@ testProperty initialSt = checkProp . ensureProp
       tr1 <- checkProp vp1
       tr2 <- checkProp vp2
       return $ TestResult (combineTestResultBool (&&) tr1 tr2) (TestAnd tr1 tr2) emptyTestEnv
+    checkProp (VPImpl vp1 vp2) = do 
+      tr1 <- checkProp vp1
+      tr2 <- checkProp vp2
+      return $ TestResult (combineTestResultBool (==>) tr1 tr2) (TestImpl tr1 tr2) emptyTestEnv
+      where
+        (==>) :: Bool -> Bool -> Bool
+        (==>) True False = False
+        (==>) _ _        = True
     checkProp (VPSearch sm tys f e) =
       extendResultEnv e <$> (generateSamples initialSt vals >>= go)
       where

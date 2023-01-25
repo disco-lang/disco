@@ -321,6 +321,7 @@ data TestReason_ a
     -- ^ The search found an example/counterexample.
   | TestAnd TestResult TestResult
   | TestOr  TestResult TestResult
+  | TestImpl TestResult TestResult
   | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
@@ -360,21 +361,33 @@ resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r)                   = testIsCertain r
 resultIsCertain (TestRuntimeError _)            = True
 resultIsCertain (TestAnd tr1 tr2)               
-  | c1 && c2           = True
-  | otherwise          = False
+  | c1 && c2      = True
+  | c1 && not ok1 = True
+  | c2 && not ok2 = True
+  | otherwise     = False
   where
     c1 = testIsCertain tr1
     c2 = testIsCertain tr2
-    -- ok1 = testIsOk tr1
-    -- ok2 = testIsOk tr2
+    ok1 = testIsOk tr1
+    ok2 = testIsOk tr2
 resultIsCertain (TestOr tr1 tr2)
-  | c1 || c2   = True
-  | otherwise  = False
+  | c1 && c2  = True
+  | c1 && ok1 = True
+  | c2 && ok2 = True
+  | otherwise = False
   where
     c1 = testIsCertain tr1
     c2 = testIsCertain tr2
-    -- ok1 = testIsOk tr1
-    -- ok2 = testIsOk tr2
+    ok1 = testIsOk tr1
+    ok2 = testIsOk tr2
+resultIsCertain (TestImpl tr1 tr2)
+  | c1 && c2      = True
+  | not ok1 && c1 = True
+  | otherwise     = False
+  where
+    c1 = testIsCertain tr1
+    c2 = testIsCertain tr2
+    ok1 = testIsOk tr1
 
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp
@@ -384,13 +397,15 @@ data ValProp
     -- ^ A pending search.
   | VPAnd ValProp ValProp
   | VPOr  ValProp ValProp
+  | VPImpl ValProp ValProp
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
 extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g P.<> e)
 extendPropEnv g (VPAnd vp1 vp2)             = VPAnd (extendPropEnv g vp1) (extendPropEnv g vp2)
-extendPropEnv g (VPOr vp1 vp2)             = VPOr (extendPropEnv g vp1) (extendPropEnv g vp2)
+extendPropEnv g (VPOr vp1 vp2)              = VPOr (extendPropEnv g vp1) (extendPropEnv g vp2)
+extendPropEnv g (VPImpl vp1 vp2)            = VPImpl (extendPropEnv g vp1) (extendPropEnv g vp2)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g P.<> e)

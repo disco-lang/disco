@@ -423,7 +423,8 @@ compileUOp _ op = CConst (coreUOps ! op)
     coreUOps =
       M.fromList
         [ Neg ==> ONeg,
-          Fact ==> OFact
+          Fact ==> OFact,
+          Not ==> ONotProp
         ]
 
 -- | Compile a binary operator.  This function needs to know the types
@@ -494,7 +495,8 @@ compileBOp _ _ _ op
           Eq ==> OEq,
           Lt ==> OLt,
           And ==> OAnd,
-          Or ==> OOr
+          Or ==> OOr,
+          Impl ==> OImpl
         ]
 
 -- ShouldEq needs to know the type at which the comparison is

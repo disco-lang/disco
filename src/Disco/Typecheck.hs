@@ -574,7 +574,6 @@ typecheck Infer (TPrim prim) = do
     --- once the evaluator can handle them.
 
     inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff] = do
-      --return $ TyBool :*: TyBool :->: TyBool
       a <- freshTy
       constraint $ CQual (bopQual op) a
       return $ a :*: a :->: a
@@ -587,7 +586,6 @@ typecheck Infer (TPrim prim) = do
     ------------------------------------------------------------
 
     inferPrim (PrimUOp Not) = do
-      --return $ TyBool :->: TyBool
       a <- freshTy
       constraint $ CQual QBool a
       return $ a :->: a

@@ -313,6 +313,7 @@ desugarProperty p = DTTest [] <$> desugarTerm p
 --   desugared, given the type of the argument and result.
 uopDesugars :: Type -> Type -> UOp -> Bool
 -- uopDesugars _ (TyFin _) Neg = True
+uopDesugars TyProp TyProp Not = False
 uopDesugars _ _         uop = uop == Not
 
 desugarPrimUOp :: Member Fresh r => Type -> Type -> UOp -> Sem r DTerm
@@ -327,7 +328,7 @@ bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 -- Add the case here for TyProp with /\, \/. Similar to above commented line.
-bopDesugars _ _ TyProp bop | bop `elem` [And, Or] = False
+bopDesugars _ _ TyProp bop | bop `elem` [And, Or, Impl] = False
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl, Iff
   , Neq, Gt, Leq, Geq, Min, Max

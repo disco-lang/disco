@@ -658,13 +658,11 @@ parsePrim = do
 -- <container-contents>
 --   ::= empty | <nonempty-container>
 --
--- <nonempty-container>
---   ::= <term> [ <ellipsis> ]
---     | <term> <container-end>
+-- <nonempty-container> ::= <term> <container-end>
 --
 -- <container-end>
 --   ::= '|' <comprehension>
---     | ',' [ <term> (',' <item>)* ] [ <ellipsis> ]
+--     | (',' <term>)* [ <ellipsis> ]   -- XXX requires backtracking!
 --
 -- <comprehension> ::= <qual> [ ',' <qual> ]*
 --
@@ -672,7 +670,7 @@ parsePrim = do
 --   ::= <ident> 'in' <term>
 --     | <term>
 --
--- <ellipsis> ::= '..' [ <term> ]
+-- <ellipsis> ::= [ ',' ] '..' [ ',' ] <term>
 -- @
 
 parseContainer :: Container -> Parser Term
@@ -685,8 +683,8 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
     -- Any non-empty container starts with a term, followed by some
     -- remainder (which could either be the rest of a literal
     -- container, or a container comprehension).  If there is no
-    -- remainder just return a singleton container, optionally with an
-    -- ellipsis.
+    -- remainder just return a "singleton" container (which could
+    -- include a trailing ellipsis + final term).
     nonEmptyContainer = do
       t <- parseRepTerm
 

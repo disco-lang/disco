@@ -351,15 +351,26 @@ solveConstraintChoice quals cs = do
   debug "Updated sort map:"
   debugPretty vm
 
+  debug "------------------------------"
+  debug "Checking edges between base types..."
+
+  -- Step 6b. Collapsing SCCs can create some edges between base
+  -- types.  Check that any such edges are consistent, then remove
+  -- them, since they no longer give us any information about type
+  -- variables.  See https://github.com/disco-lang/disco/issues/357.
+
+  g''' <- checkBaseEdges g''
+
   -- Steps 7 & 8: solve the graph, iteratively finding satisfying
   -- assignments for each type variable based on its successor and
   -- predecessor base types in the graph; then unify all the type
   -- variables in any remaining weakly connected components.
 
+
   debug "------------------------------"
   debug "Solving for type variables..."
 
-  theta_sol       <- solveGraph vm' g''
+  theta_sol       <- solveGraph vm' g'''
   debugPretty theta_sol
 
   debug "------------------------------"
@@ -799,6 +810,25 @@ elimCyclesGen genSubst genUnify g
     unifySCC uatoms = case S.toList uatoms of
       []       -> error "Impossible! unifySCC on the empty set"
       as@(a:_) -> (flip applySubst a &&& id) <$> genUnify as
+
+------------------------------------------------------------
+-- Step 6a: check base type edges
+------------------------------------------------------------
+
+isBaseEdge :: (UAtom, UAtom) -> Either (BaseTy, BaseTy) (UAtom, UAtom)
+isBaseEdge (UB b1, UB b2) = Left (b1,b2)
+isBaseEdge e              = Right e
+
+checkBaseEdge :: Members '[Error SolveError] r => (BaseTy, BaseTy) -> Sem r ()
+checkBaseEdge (b1, b2)
+  | isSubB b1 b2 = return ()
+  | otherwise    = throw NoUnify
+
+checkBaseEdges :: Members '[Error SolveError] r => Graph UAtom -> Sem r (Graph UAtom)
+checkBaseEdges g = do
+  let (baseEdges, varEdges) = partitionEithers . map isBaseEdge . S.toList . G.edges $ g
+  mapM_ checkBaseEdge baseEdges
+  return $ G.mkGraph (G.nodes g) (S.fromList varEdges)
 
 ------------------------------------------------------------
 -- Steps 7 and 8: Constraint resolution

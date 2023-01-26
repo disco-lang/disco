@@ -459,7 +459,7 @@ library
                        transformers >= 0.4 && < 0.7,
                        containers >=0.5 && <0.7,
                        unbound-generics >= 0.3 && < 0.5,
-                       polysemy >= 1.6.0.0 && < 1.8,
+                       polysemy >= 1.6.0.0 && < 1.10,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.9,
                        lens >= 4.14 && < 5.3,

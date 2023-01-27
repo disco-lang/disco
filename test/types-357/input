@@ -1,2 +1,5 @@
 f : Z -> N
 f(n) = 2n
+
+sumto : N -> N
+sumto(n) = (n^2 + n)*(0.5)

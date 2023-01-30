@@ -55,9 +55,9 @@ import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec                         hiding (State,
                                                           runParser)
-import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 

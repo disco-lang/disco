@@ -700,7 +700,11 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
 
     parseLitContainerRemainder :: Term -> Maybe Term -> Parser Term
     parseLitContainerRemainder t n = do
-      ts <- many (comma *> parseRepTerm)
+      -- Wrapping the (',' term) production in 'try' is important: if
+      -- it consumes a comma but then fails when parsing a term, we
+      -- want to be able to backtrack so we can potentially parse an
+      -- ellipsis beginning with a comma.
+      ts <- many (try (comma *> parseRepTerm))
       e  <- optional parseEllipsis
       return $ TContainer c ((t,n):ts) e
 

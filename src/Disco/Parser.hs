@@ -55,15 +55,16 @@ import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec                         hiding (State,
                                                           runParser)
-import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (%=), (%~), (&),
                                                           (.=))
+import           Control.Monad                           (void)
 import           Control.Monad.State
 import           Data.Char                               (isAlpha, isDigit)
 import           Data.Foldable                           (asum)
@@ -252,10 +253,10 @@ lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
 forall :: Parser ()
-forall = () <$ symbol "∀" <|> reserved "forall"
+forall = void (symbol "∀") <|> reserved "forall"
 
 exists :: Parser ()
-exists = () <$ symbol "∃" <|> reserved "exists"
+exists = void (symbol "∃") <|> reserved "exists"
 
 -- | Parse a natural number.
 natural :: Parser Integer

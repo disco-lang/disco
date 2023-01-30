@@ -55,21 +55,22 @@ import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec                         hiding (State,
                                                           runParser)
-import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
 import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (%=), (%~), (&),
                                                           (.=))
+import           Control.Monad                           (void)
 import           Control.Monad.State
 import           Data.Char                               (isAlpha, isDigit)
 import           Data.Foldable                           (asum)
 import           Data.List                               (find, intercalate)
 import qualified Data.Map                                as M
-import           Data.Maybe                              (fromMaybe)
+import           Data.Maybe                              (fromMaybe, isNothing)
 import           Data.Ratio
 import           Data.Set                                (Set)
 import qualified Data.Set                                as S
@@ -252,10 +253,10 @@ lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
 forall :: Parser ()
-forall = () <$ symbol "∀" <|> reserved "forall"
+forall = void (symbol "∀") <|> reserved "forall"
 
 exists :: Parser ()
-exists = () <$ symbol "∃" <|> reserved "exists"
+exists = void (symbol "∃") <|> reserved "exists"
 
 -- | Parse a natural number.
 natural :: Parser Integer
@@ -651,20 +652,14 @@ parsePrim = do
 --   comprehension (not including the square or curly brackets).
 --
 -- @
--- <container>
---   ::= '[' <container-contents> ']'
---     | '{' <container-contents> '}'
---
 -- <container-contents>
---   ::= empty | <nonempty-container>
+--   ::= <nonempty-container> | empty
 --
--- <nonempty-container>
---   ::= <term> [ <ellipsis> ]
---     | <term> <container-end>
+-- <nonempty-container> ::= <term> <container-end>
 --
 -- <container-end>
 --   ::= '|' <comprehension>
---     | ',' [ <term> (',' <item>)* ] [ <ellipsis> ]
+--        | (',' <term>)* [ <ellipsis> ]
 --
 -- <comprehension> ::= <qual> [ ',' <qual> ]*
 --
@@ -672,7 +667,7 @@ parsePrim = do
 --   ::= <ident> 'in' <term>
 --     | <term>
 --
--- <ellipsis> ::= '..' [ <term> ]
+-- <ellipsis> ::= [ ',' ] '..' [ ',' ] <term>
 -- @
 
 parseContainer :: Container -> Parser Term
@@ -685,12 +680,9 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
     -- Any non-empty container starts with a term, followed by some
     -- remainder (which could either be the rest of a literal
     -- container, or a container comprehension).  If there is no
-    -- remainder just return a singleton container, optionally with an
-    -- ellipsis.
-    nonEmptyContainer = do
-      t <- parseRepTerm
-
-      containerRemainder t <|> singletonContainer t
+    -- remainder just return a "singleton" container (which could
+    -- include a trailing ellipsis + final term).
+    nonEmptyContainer = parseRepTerm >>= containerRemainder
 
     parseRepTerm = do
       t <- parseTerm
@@ -700,33 +692,27 @@ parseContainer c = nonEmptyContainer <|> return (TContainer c [] Nothing)
         parseTerm
       return (t, n)
 
-    singletonContainer t = TContainer c [t] <$> optional parseEllipsis
-
     -- The remainder of a container after the first term starts with
     -- either a pipe (for a comprehension) or a comma (for a literal
     -- container).
     containerRemainder :: (Term, Maybe Term) -> Parser Term
-    containerRemainder (t,n) = do
-      s <- pipe <|> comma
-      case (s, n) of
-        ("|", Nothing) -> parseContainerComp c t
-        ("|", Just _)  -> fail "no comprehension with bag repetition syntax"
-        (",", _)       -> do
-          -- Parse the rest of the terms in a literal container after
-          -- the first, then an optional ellipsis, and return
-          -- everything together.
-          ts <- parseRepTerm `sepBy` comma
-          e  <- optional parseEllipsis
+    containerRemainder (t,n) =
+      (guard (isNothing n) *> parseContainerComp c t) <|> parseLitContainerRemainder t n
 
-          return $ TContainer c ((t,n):ts) e
-        _   -> error "Impossible, got a symbol other than '|' or ',' in containerRemainder"
+    parseLitContainerRemainder :: Term -> Maybe Term -> Parser Term
+    parseLitContainerRemainder t n = do
+      -- Wrapping the (',' term) production in 'try' is important: if
+      -- it consumes a comma but then fails when parsing a term, we
+      -- want to be able to backtrack so we can potentially parse an
+      -- ellipsis beginning with a comma.
+      ts <- many (try (comma *> parseRepTerm))
+      e  <- optional parseEllipsis
+      return $ TContainer c ((t,n):ts) e
 
 -- | Parse an ellipsis at the end of a literal list, of the form
 --   @.. t@.  Any number > 1 of dots may be used, just for fun.
 parseEllipsis :: Parser (Ellipsis Term)
-parseEllipsis = do
-  _ <- ellipsis
-  Until <$> parseTerm
+parseEllipsis = optional comma *> ellipsis *> optional comma *> (Until <$> parseTerm)
 
 -- | Parse the part of a list comprehension after the | (without
 --   square brackets), i.e. a list of qualifiers.
@@ -734,6 +720,7 @@ parseEllipsis = do
 --   @q [,q]*@
 parseContainerComp :: Container -> Term -> Parser Term
 parseContainerComp c t = do
+  _ <- pipe
   qs <- toTelescope <$> (parseQual `sepBy` comma)
   return (TContainerComp c $ bind qs t)
 

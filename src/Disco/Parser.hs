@@ -252,10 +252,10 @@ lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
 forall :: Parser ()
-forall = () <$ symbol "∀" <|> reserved "forall"
+forall = Control.Monad.void (symbol "∀") <|> reserved "forall"
 
 exists :: Parser ()
-exists = () <$ symbol "∃" <|> reserved "exists"
+exists = Control.Monad.void (symbol "∃") <|> reserved "exists"
 
 -- | Parse a natural number.
 natural :: Parser Integer

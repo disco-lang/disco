@@ -383,11 +383,13 @@ resultIsCertain (TestOr tr1 tr2)
 resultIsCertain (TestImpl tr1 tr2)
   | c1 && c2      = True
   | not ok1 && c1 = True
+  | ok2 && c2     = True
   | otherwise     = False
   where
     c1 = testIsCertain tr1
     c2 = testIsCertain tr2
     ok1 = testIsOk tr1
+    ok2 = testIsOk tr2
 
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp

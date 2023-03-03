@@ -67,8 +67,7 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
-import           Disco.Property                   (prettyTestFailure,
-                                                   prettyTestResult)
+import           Disco.Property                   (prettyTestResult)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
                                                    toPrim)
@@ -644,7 +643,7 @@ runAllTests declNames aprops
           tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
           let prettyFailures =
                 runInputConst tydefs . runReader initPA . runLFresh $
-                  bulletList "-" $ map (uncurry prettyTestFailure) failures
+                  bulletList "-" $ map (uncurry prettyTestResult) failures
           info $ nest 2 $ hdr $+$ prettyFailures
       return (P.null failures)
 

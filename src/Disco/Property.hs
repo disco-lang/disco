@@ -24,7 +24,7 @@ module Disco.Property
   , invertMotive, invertPropResult
 
   -- * Pretty-printing
-  , prettyTestFailure, prettyTestResult
+  , prettyTestResult
   )
        where
 
@@ -33,12 +33,12 @@ import           Prelude                     hiding ((<>))
 import           Debug.Trace
 
 import qualified Data.Enumeration.Invertible as E
-import qualified Test.QuickCheck             as QC
+-- import qualified Test.QuickCheck             as QC
 
 import           Disco.Effects.Random
 import           Polysemy
 
-import           Disco.AST.Typed             
+import           Disco.AST.Typed
 import           Disco.Syntax.Prims
 import           Disco.Syntax.Operators
 import           Disco.Effects.Input
@@ -63,6 +63,11 @@ invertPropResult res@(TestResult b r env)
   | TestRuntimeError _ <- r = res
   | otherwise               = TestResult (not b) r env
 
+randomLarge :: Member Random r => [Integer] -> Sem r [Integer]
+randomLarge [] = return []
+randomLarge [x] = return []
+randomLarge (x : y : xs) = (:) <$> randomR (x, y) <*> randomLarge (y : xs)
+
 -- | Select samples from an enumeration according to a search type. Also returns
 --   a 'SearchType' describing the results, which may be 'Exhaustive' if the
 --   enumeration is no larger than the number of samples requested.
@@ -72,11 +77,15 @@ generateSamples (Randomized n m) e
   | E.Finite k <- E.card e, k <= n + m = return (E.enumerate e, Exhaustive)
   | otherwise                          = do
     let small = [0 .. n]
-    rs <- runGen . mapM sizedNat $ [n .. n + m]
+    -- we don't have to worry about getting too large a number since we handle finite lengths in the case above.
+    -- rs <- runGen . mapM sizedNat $ [n .. n + m]
+    -- in this moment, we want 50 random numbers such that the first one is in [n, n^2],
+    -- the second one is in [n^2, n^3] ... etc. 
+    rs <- randomLarge [100, 1000, 10000, 100000, 1000000]
     let samples = map (E.select e) $ small ++ rs
     return (samples, Randomized n m)
-  where
-    sizedNat k = QC.resize (fromIntegral k) QC.arbitrarySizedNatural
+  -- where
+  --   sizedNat k = QC.resize (fromIntegral k) QC.arbitrarySizedNatural
 
 -- XXX do shrinking for randomly generated test cases?
 
@@ -88,128 +97,61 @@ prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProper
 prettyResultCertainty r prop res
   = (if resultIsCertain r then "Certainly" else "Possibly") <+> text res <> ":" <+> pretty (eraseProperty prop)
 
--- prettyTestResult
---   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
---   => AProperty -> TestResult -> Sem r Doc
--- prettyTestResult prop r | not (testIsOk r) = prettyTestFailure prop r
--- prettyTestResult prop (TestResult _ r _)   =
---   prettyResultCertainty r prop "true"
---   $+$
---   prettySuccessReason r prop
-
-prettyTestResult 
+prettyTestReason
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => AProperty -> TestResult -> Sem r Doc
-prettyTestResult prop (TestResult b r _) = prettyReason b r prop
-
-prettyTestFailure
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => AProperty -> TestResult -> Sem r Doc
-prettyTestFailure _    (TestResult True _ _)    = empty
-prettyTestFailure prop (TestResult False r env) =
-  prettyResultCertainty r prop "false"
-  $+$
-  prettyFailureReason r prop
-  $+$
-  prettyTestEnv "Counterexample:" env
-
-prettyReason 
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => Bool -> TestReason -> AProperty -> Sem r Doc
-prettyReason True (TestFound (TestResult _ _ vs)) _ = prettyTestEnv "Found example:" vs
-prettyReason False (TestFound (TestResult _ r _)) p = prettyFailureReason r p
-prettyReason True (TestNotFound Exhaustive) _ = "No counterexamples exist."
-prettyReason False (TestNotFound Exhaustive) _ = 
-  "No example exists; all possible values were checked."
-prettyReason True (TestNotFound (Randomized n m)) _ =
-  "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
-prettyReason False (TestNotFound (Randomized n m)) _ = do
-  "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-prettyReason b (TestEqual ty v1 v2) p =
-  prettyResultCertainty (TestEqual ty v1 v2) p (show b)
-  $+$
+  => Bool -> AProperty -> TestReason -> Sem r Doc
+prettyTestReason b _ TestBool = empty
+prettyTestReason b prop (TestFound (TestResult bool tr env))
+  | b = prettyTestEnv "Found example:" env
+  | not b = prettyTestReason b prop tr $+$ prettyTestEnv "Found counterexample:" env
+prettyTestReason b _ (TestNotFound Exhaustive)
+  | b = "No counterexamples exist"
+  | not b = "No example exists; all possible values were checked."
+prettyTestReason b _ (TestNotFound (Randomized n m))
+  | b = "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
+  | not b = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
+prettyTestReason b _ (TestEqual t a1 a2) =
   bulletList "-"
-  [ "Left side:  " <> prettyValue ty v1
-  , "Right side: " <> prettyValue ty v2
+  [ "Left side:  " <> prettyValue t a1
+  , "Right side: " <> prettyValue t a2
   ]
-prettyReason b (TestLt ty v1 v2) p =
-  prettyResultCertainty (TestLt ty v1 v2) p (show b)  
-  $+$
+prettyTestReason b _ (TestLt t a1 a2) =
   bulletList "-"
-  [ "Left side:  " <> prettyValue ty v1
-  , "Right side: " <> prettyValue ty v2
+  [ "Left side:  " <> prettyValue t a1
+  , "Right side: " <> prettyValue t a2
   ]
-prettyReason b (TestAnd (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp And)) (ATTup t3 [p1, p2])) = 
-  prettyResultCertainty (TestAnd (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp And)) (ATTup t3 [p1, p2])) (show b)
-  $+$
-  bulletList "-"
-  [ "Left side:  " $+$ nest 2 (prettyReason b1 tr1 p1)
-  , "Right side: " $+$ nest 2 (prettyReason b2 tr2 p2)
-  ]
-prettyReason b (TestOr (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp Or)) (ATTup t3 [p1, p2])) = 
-  prettyResultCertainty (TestOr (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp Or)) (ATTup t3 [p1, p2])) (show b)
-  $+$
-  bulletList "-"
-  [ "Left side:  " $+$ nest 2 (prettyReason b1 tr1 p1)
-  , "Right side: " $+$ nest 2 (prettyReason b2 tr2 p2)
-  ]
-prettyReason b (TestImpl (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp Impl)) (ATTup t3 [p1, p2])) = 
-  prettyResultCertainty (TestOr (TestResult b1 tr1 e1) (TestResult b2 tr2 e2)) (ATApp t1 (ATPrim t2 (PrimBOp Impl)) (ATTup t3 [p1, p2])) (show b)
-  $+$
-  bulletList "-"
-  [ "Left side:  " $+$ nest 2 (prettyReason b1 tr1 p1)
-  , "Right side: " $+$ nest 2 (prettyReason b2 tr2 p2)
-  ]
-prettyReason b tr p = traceShow tr $ traceShow p $ prettyResultCertainty tr p (show b)
-
-prettySuccessReason
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => TestReason -> AProperty -> Sem r Doc
-prettySuccessReason (TestFound (TestResult _ _ vs)) _ = prettyTestEnv "Found example:" vs
-prettySuccessReason (TestNotFound Exhaustive) _ = "No counterexamples exist."
-prettySuccessReason (TestNotFound (Randomized n m)) _ =
-  "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
-prettySuccessReason (TestAnd tr1 tr2) p = prettyTestResult p tr1 $+$ prettyTestResult p tr2
-prettySuccessReason (TestOr tr1 tr2) p  = prettyTestResult p tr1 $+$ prettyTestResult p tr2
-prettySuccessReason tr p = traceShow tr $ traceShow p $ prettyResultCertainty tr p "True"
-
-prettyFailureReason
-  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
-  => TestReason -> AProperty -> Sem r Doc
-prettyFailureReason TestBool _ = empty
-prettyFailureReason (TestEqual ty v1 v2) _ =
-  "Test result mismatch, the two sides are not equal:"
-  $+$
-  bulletList "-"
-  [ "Left side:  " <> prettyValue ty v1
-  , "Right side: " <> prettyValue ty v2
-  ]
-prettyFailureReason (TestLt ty v1 v2) _    =
-  "Test result mismatch, the left side is not less than the right:"
-  $+$
-  bulletList "-"
-  [ "Left side:  " <> prettyValue ty v1
-  , "Right side: " <> prettyValue ty v2
-  ]
-prettyFailureReason (TestRuntimeError e) _ =
+prettyTestReason b _ (TestRuntimeError ee) =
   "Test failed with an error:"
   $+$
-  nest 2 (pretty (EvalErr e))
-prettyFailureReason (TestFound (TestResult _ r _)) p = prettyFailureReason r p
-prettyFailureReason (TestNotFound Exhaustive) _ =
-  "No example exists; all possible values were checked."
-prettyFailureReason (TestNotFound (Randomized n m)) _ = do
-  "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-prettyFailureReason (TestOr (TestResult _ tr1 _) (TestResult _ tr2 _))  p =
+  nest 2 (pretty (EvalErr ee))
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp And)) (ATTup _ [p1, p2])) (TestAnd tr1 tr2) =
   bulletList "-"
-  [ "Left side:  " <> prettyFailureReason tr1 p
-  , "Right side: " <> prettyFailureReason tr2 p
+  [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
+  , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
-prettyFailureReason (TestAnd (TestResult b1 tr1 _) (TestResult b2 tr2 _)) p =
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Or)) (ATTup _ [p1, p2])) (TestOr tr1 tr2) =
   bulletList "-"
-  [ "Left side:  " $+$ nest 2 ((if b1 then prettySuccessReason else prettyFailureReason) tr1 p)
-  , "Right side: " $+$ nest 2 ((if b2 then prettySuccessReason else prettyFailureReason) tr2 p)
+  [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
+  , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Impl)) (ATTup _ [p1, p2])) (TestImpl tr1 tr2) =
+  bulletList "-"
+  [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
+  , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
+  ]
+
+prettyTestResult'
+  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
+  => Bool -> AProperty -> TestResult -> Sem r Doc
+prettyTestResult' _ prop (TestResult bool tr env) = 
+  prettyResultCertainty tr prop (show bool)
+  $+$  
+  prettyTestReason bool prop tr
+
+prettyTestResult
+  :: Members '[Input TyDefCtx, LFresh, Reader PA] r
+  => AProperty -> TestResult -> Sem r Doc
+prettyTestResult prop (TestResult b r env) = prettyTestResult' b prop (TestResult b r env)
 
 prettyTestEnv
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r

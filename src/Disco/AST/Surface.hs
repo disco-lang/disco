@@ -99,6 +99,7 @@ module Disco.AST.Surface
        , pattern PSub
        , pattern PNeg
        , pattern PFrac
+       , pattern PElem
        , pattern PNonlinear
 
        , pattern Binding
@@ -401,6 +402,7 @@ type instance X_PMul UD    = ()
 type instance X_PSub UD    = ()
 type instance X_PNeg UD    = ()
 type instance X_PFrac UD   = ()
+type instance X_PElem UD   = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -456,12 +458,16 @@ pattern PNeg p = PNeg_ () p
 pattern PFrac :: Pattern -> Pattern -> Pattern
 pattern PFrac p1 p2 = PFrac_ () p1 p2
 
+pattern PElem :: Pattern -> Term -> Pattern
+pattern PElem p t <- PElem_ () p (unembed -> t) where
+  PElem p t = PElem_ () p (embed t)
+
 pattern PNonlinear :: Pattern -> Name Term -> Pattern
 pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x where
   PNonlinear p x = PNonlinear_ (embed p) x
 
 {-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}
+             PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac, PElem #-}
 
 ------------------------------------------------------------
 -- Pretty-printing for surface-syntax terms
@@ -666,4 +672,6 @@ instance Pretty Pattern where
       text "-" <> rt (pretty p)
     PFrac p1 p2 -> withPA (getPA Div) $
       lt (pretty p1) <+> text "/" <+> rt (pretty p2)
+    PElem x t -> withPA (getPA Elem) $
+      lt (pretty x) <+> text "in" <+> rt (pretty t)
 

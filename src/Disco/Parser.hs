@@ -55,9 +55,9 @@ import           Unbound.Generics.LocallyNameless        (Name, bind, embed,
 import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 import           Control.Monad.Combinators.Expr
+import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec                         hiding (State,
                                                           runParser)
-import qualified Text.Megaparsec                         as MP
 import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer              as L
 
@@ -835,17 +835,30 @@ parseAtomicPattern = label "pattern" $ do
     Nothing -> customFailure $ InvalidPattern (OT t)
     Just p  -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
 
+-- | Parse a pattern.  The Bool parameter says whether to require a
+--   type ascription.
+parsePattern :: Bool -> Parser Pattern
+parsePattern requireAscr = try parseElemPattern <|> parseTermPattern requireAscr
+  -- parseElemPattern is a special case to have patterns like 'x in
+  -- S', so we can write things like 'forall x in S. P'.  Otherwise,
+  -- 'x in S' is not a valid term so we cannot get it by parsing a
+  -- term and then converting to a pattern.
+
 -- | Parse a pattern, by parsing a term and then attempting to convert
 --   it to a pattern.  The Bool parameter says whether to require
 --   a type ascription.
-parsePattern :: Bool -> Parser Pattern
-parsePattern requireAscr = label "pattern" $ do
-  t <- parseTerm
+parseTermPattern :: Bool -> Parser Pattern
+parseTermPattern requireAscr = label "pattern" $ do
+  t <- try parseTerm
   case termToPattern t of
     Nothing -> customFailure $ InvalidPattern (OT t)
     Just p
       | requireAscr && not (hasAscr p) -> customFailure MissingAscr
       | otherwise -> return $ maybe p (PNonlinear p) (findDuplicatePVar p)
+
+-- | Parse a set binding pattern like @p in S@.
+parseElemPattern :: Parser Pattern
+parseElemPattern = PElem <$> parseTermPattern False <*> (reserved "in" *> parseTerm)
 
 -- | Does a pattern either have a top-level ascription, or consist of
 --   a tuple with each component recursively having ascriptions?

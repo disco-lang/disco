@@ -67,6 +67,7 @@ erasePattern (APMul _ s p t)    = PMul s (erasePattern p) (erase t)
 erasePattern (APSub _ p t)      = PSub (erasePattern p) (erase t)
 erasePattern (APNeg _ p)        = PNeg (erasePattern p)
 erasePattern (APFrac _ p1 p2)   = PFrac (erasePattern p1) (erasePattern p2)
+erasePattern (APElem _ p t)     = PElem (erasePattern p) (erase t)
 
 eraseBranch :: ABranch -> Branch
 eraseBranch b = bind (mapTelescope eraseGuard tel) (erase at)

@@ -121,6 +121,9 @@ infix 4 ==.
 (==.) :: ATerm -> ATerm -> ATerm
 (==.) = mkBin TyBool Eq
 
+telem :: ATerm -> ATerm -> ATerm
+telem = mkBin TyBool Elem
+
 tnot :: ATerm -> ATerm
 tnot = tapp (ATPrim (TyBool :->: TyBool) (PrimUOp Not))
 
@@ -190,6 +193,7 @@ desugarAbs Lam ty [cl@(unsafeUnbind -> ([APVar _ _], _))] = do
   return $ DTAbs Lam ty (bind (getVar (head ps)) d)
   where
     getVar (APVar _ x) = coerce x
+    getVar p = error $ "Impossible! desugarAbs.getVar on non-APVar " ++ show p
 -- General case
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
@@ -233,7 +237,7 @@ desugarAbs quant overallTy body = do
     -- Wrap a term in a test frame to report the values of all variables
     -- bound in the patterns.
     addDbgInfo :: [APattern] -> ATerm -> ATerm
-    addDbgInfo ps t = ATTest (map withName $ concatMap varsBound ps) t
+    addDbgInfo ps = ATTest (map withName $ concatMap varsBound ps)
       where withName (n, ty) = (name2String n, ty, n)
 
 ------------------------------------------------------------
@@ -362,7 +366,7 @@ desugarUnApp :: Member Fresh r => Type -> UOp -> ATerm -> Sem r DTerm
 -- not t ==> {? false if t, true otherwise ?}
 desugarUnApp _ Not t = desugarTerm $
   ATCase TyBool
-    [ fls <==. [AGBool (embed t)]
+    [ fls <==. [tif t]
     , tru <==. []
     ]
 
@@ -738,11 +742,27 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
       (x0, g1) <- varFor dt
 
       -- if x0 < 0
-      g2  <- desugarGuard $ AGBool (embed (atVar ty (coerce x0) <. ATNat ty 0))
+      g2  <- desugarGuard $ tif (atVar ty (coerce x0) <. ATNat ty 0)
 
       -- when -x0 is p
       neg <- desugarTerm $ mkUn ty Neg (atVar ty (coerce x0))
       g3  <- desugarMatch neg p
+
+      return (g1 ++ g2 ++ g3)
+
+    -- when dt is (p in s) ==> when dt is x0; when x0 is p; if x0 in s
+    desugarMatch dt (APElem ty p s) = do
+
+      -- when dt is x0
+      (x0, g1) <- varFor dt
+      let x0t = atVar ty (coerce x0)
+      x0d <- desugarTerm x0t
+
+      -- when x0 is p
+      g2 <- desugarMatch x0d p
+
+      -- if x0 in s
+      g3 <- desugarGuard $ tif (x0t `telem` s)
 
       return (g1 ++ g2 ++ g3)
 

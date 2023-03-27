@@ -440,7 +440,7 @@ inferTop t = do
       cvs = containerVars (getType at')
 
       -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+      at'' = applySubst (Subst.fromList $ map (, TyAtom (ABase CtrList)) (S.toList cvs)) at'
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
@@ -1133,9 +1133,14 @@ typecheck mode t@(TContainer c xs ell)  = do
   resTy <- case mode of
     Infer -> do
       let tys = [ getType at | Just (Until at) <- [aell] ] ++ map (getType . fst) axns
-      tyv  <- freshTy
-      constraints $ map (`CSub` tyv) tys
-      return $ containerTy c tyv
+
+      -- special case for when all types are the same, don't bother making unification var
+      case S.size (S.fromList tys) of
+        1 -> return $ containerTy c (head tys)
+        _ -> do
+          tyv  <- freshTy
+          constraints $ map (`CSub` tyv) tys
+          return $ containerTy c tyv
     Check ty -> return ty
   eltTy <- getEltTy c resTy
 
@@ -1443,6 +1448,14 @@ checkPattern (PFrac p q) ty = do
   (ctx1, ap1) <- checkPattern p tyP
   (ctx2, ap2) <- checkPattern q tyQ
   return (ctx1 <> ctx2, APFrac ty ap1 ap2)
+
+checkPattern (PElem p t) ty = do
+  -- Infer element type from type of set
+  at <- infer t
+  tye <- ensureConstr1 CSet (getType at) (Left t)
+  constraint $ CEq ty tye
+  (ctx, apt) <- checkPattern p tye
+  return (ctx, APElem tye apt at)
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

@@ -129,6 +129,7 @@ module Disco.AST.Generic
        , X_PSub
        , X_PNeg
        , X_PFrac
+       , X_PElem
        , X_Pattern
        , ForallPattern
 
@@ -535,6 +536,7 @@ type family X_PMul e
 type family X_PSub e
 type family X_PNeg e
 type family X_PFrac e
+type family X_PElem e
 type family X_Pattern e
 
 -- | Patterns.
@@ -591,6 +593,9 @@ data Pattern_ e where
   -- | Fraction pattern, @p1/p2@
   PFrac_ :: X_PFrac e -> Pattern_ e -> Pattern_ e -> Pattern_ e
 
+  -- | Set element pattern, @p in e@.
+  PElem_ :: X_PElem e -> Pattern_ e -> Embed (Term_ e) -> Pattern_ e
+
   -- | A special placeholder node for a nonlinear occurrence of a
   --   variable; we can only detect this at parse time but need to
   --   generate an error later.
@@ -619,6 +624,7 @@ type ForallPattern (a :: * -> Constraint) e
         , a (X_PSub e)
         , a (X_PNeg e)
         , a (X_PFrac e)
+        , a (X_PElem e)
         , a (X_Pattern e)
         , a (Term_ e)
         )

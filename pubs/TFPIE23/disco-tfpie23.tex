@@ -133,16 +133,16 @@
 \section{Introduction}
 \label{sec:introduction}
 
-Many computer science curricula at the university level include
-\emph{discrete mathematics} as a core requirement \cite{ACM:2013}.
-Often taken in the first or second year, a discrete mathematics course
-introduces mathematical structures and techniques of foundational
-importance in computer science, such as induction and recursion, set
-theory, logic, modular arithmetic, functions, relations, and graphs.
-In addition, it sometimes serves as an introduction to writing formal
-proofs.  Although there is wide agreement that discrete mathematics is
-foundational, students often struggle to see its relevance to
-computer science.
+Many computer science curricula at the university level include a
+\emph{discrete mathematics} course as a core requirement
+\cite{ACM:2013}.  Often taken in the first or second year, a discrete
+mathematics course introduces mathematical structures and techniques
+of foundational importance in computer science, such as induction and
+recursion, set theory, logic, modular arithmetic, functions,
+relations, and graphs.  In addition, it sometimes serves as an
+introduction to writing formal proofs.  Although there is wide
+agreement that discrete mathematics is foundational, students often
+struggle to see its relevance to computer science.
 
 \emph{Functional programming} is a style of programming, embodied in
 languages such as Haskell, OCaml, Scala, F\#, and Racket, which
@@ -370,7 +370,9 @@ supposed to be reminiscent of typical mathematical notation like
     \text{otherwise.} \end{cases} \] However, we can't use a bare
 curly brace as \disco syntax since it would conflict with the notation
 for literal sets (and we can't use a giant, multi-line curly brace in
-any case!).  The intention is that writing %
+any case!\footnote{One might imagine using vertically aligned curly
+  brace characters to simulate a giant curly brace, but that would require
+  tricky indentation-sensitive parsing.}).  The intention is that writing %
 \verb|{? ... ?}| lends itself to the mnemonic of ``asking questions''
 to see which branch of the case expression to choose.  In general,
 each branch can have multiple chained conditions, each of which can
@@ -448,10 +450,10 @@ example is its use of \emph{arithmetic patterns}, such as %
 notation, but perhaps less common in programming languages.  Any
 expression with exactly one variable and only basic arithmetic
 operators can be used as a pattern; the pattern matches if there
-exists a value for the variable which makes the expression equal to
-the input.  For example, the pattern \texttt{2n} will match only even
-natural numbers, and \texttt{n} will then be bound to half of the
-input.
+exists a value of the appropriate type for the variable which makes
+the expression equal to the input.  For example, the pattern
+\texttt{2n} will match only even natural numbers, and \texttt{n} will
+then be bound to half of the input.
 
 \subsection{Finite sets}
 
@@ -541,8 +543,8 @@ equirecursive types makes the implementation of the type system more
 complex, but it is a very deliberate choice:
 \begin{itemize}
 \item There is less incidental complexity for students to stumble
-  over.  In my experience, students learning Haskell often get
-  confused over the idea of constructors and how to use them to create
+  over.  In my experience, students learning Haskell are often
+  confused by the idea of constructors and how to use them to create
   and pattern-match on data types.
 \item \disco has no special syntax for declaring (recursive)
   sums-of-products; it simply has sum types, product types, and
@@ -716,31 +718,30 @@ likely to be confusing to students anyway.
   function application.  However, this does not always get it right,
   and there are times when an explicit multiplication operator must be
   written (one notable example is when scaling the output of a
-  function call, as in $2f(x)$; in \disco this must sadly be written
-  \mintinline{text}{2*f(x)}).  It might be worth exploring a more
-  type-directed approach, although that would be considerably more
-  complex.  It seems like to really get this ``right'' requires
-  general intelligence: for example, does the expression $f(x+2)$
-  denote multiplication or function application?  Are you sure?  How
-  do you know?  What about in the expression $x(y+2)$?  Or how about
-  ``Let $x$ be the function which doubles its argument, and consider
-  $x(y+2)$ \dots''?
+  function call, as in $2f(x)$; in \disco this must currently be
+  written \mintinline{text}{2*f(x)}, although this can hopefully be
+  fixed).  It might be worth exploring a more type-directed approach,
+  although that would be considerably more complex.  It seems like to
+  really get this ``right'' requires general intelligence: for
+  example, does the expression $f(x+2)$ denote multiplication or
+  function application?  Are you sure?  How do you know?  What about
+  in the expression $x(y+2)$?  Or how about ``Let $x$ be the function
+  which doubles its argument, and consider $x(y+2)$ \dots''?
 \end{itemize}
 
 \subsection{Student experience}
 \label{sec:students}
 
-So far, I have used \disco in my discrete mathematics course once, in
-the spring of 2022, and I plan to use it again in the spring of 2023.
-Anecdotally, student experience seems mostly positive, although I do
-not have any data to back this up.  One of my main tasks for the
-spring of 2023 will be to develop a solid sequence of exercises that
-can serve as a tutorial for the language, and commit these exercises
-back into the disco repository itself, to make it easier for other
-instructors or independent learners to make use of the language.  I
-plan to also start collecting some very informal, qualitative data
-about students' experience using the language and its effect on their
-learning.
+So far, I have used \disco in my discrete mathematics course twice, in
+the spring semesters of 2022 and 2023.  Anecdotally, student
+experience seems mostly positive, although I do not have any data to
+back this up.  One of my main tasks for the spring of 2023 has been to
+develop a solid sequence of exercises that can serve as a tutorial for
+the language, and commit these exercises back into the disco
+repository itself, to make it easier for other instructors or
+independent learners to make use of the language.  I  have also
+started collecting some very informal, qualitative data about students'
+experience using the language and its effect on their learning.
 
 \subsection{Type system}
 \label{sec:types}
@@ -842,8 +843,8 @@ fundamentally the same kind of thing, and it makes sense to talk about
 (for example) their difference, $\N - \{2,4,7\}$, which is also a set.
 In \disco, however, $\{2,4,7\}$ and $\N$ are very different things:
 the former is a value of type \mintinline{text}{Set(N)}, whereas the
-latter is a type.  $\N - \{2,4,7\}$ is so nonsensical that it is a
-\emph{syntax} error.  One might reasonably wonder: why the mismatch?
+latter is a type, and $\N - \{2,4,7\}$ is so nonsensical that it is a
+\emph{syntax} error!  One might reasonably wonder: why the mismatch?
 Why not try to make \disco more closely align with common mathematical
 practice, in accordance with \disco's stated philosophy?
 
@@ -861,33 +862,33 @@ big problems:
   help the system understand why a given type is valid.  For example,
   to typecheck %
   \verb|f : N -> {2,3,7}| would require somehow checking that for any
-  natural number input, the function \verb|f| will always return a
+  natural number input, the function \verb|f| will always return
   either $2$, $3$, or $7$, which could depend on complex reasoning
-  about the behavior of the function.  This sort of \emph{refinement type} system
-  is well-studied, but calling out to an SMT solver in order to
-  typecheck a teaching language to be used by students seems like a
-  non-starter.
+  about the behavior of the function.  Calling out to an SMT solver in
+  order to typecheck a teaching language to be used by students seems
+  like a non-starter.
 \item Conversely, the ability to use types as value-level sets
   introduces all sorts of difficulties, chief among which is the fact
   that most types correspond to \emph{infinite} sets.  Set values
-  would have to be represented as some kind of abstract set
+  would have to be represented at runtime as some kind of abstract set
   expressions rather than simply as sets of values, and operations
   like membership checking become only \emph{semi}-decidable at best.
   What's more, these infinite set values would not really correspond
   to their supposed mathematical counterparts in some subtle ways.
-  For example, as everyone knows, the power set of the natural numbers
-  is uncountable; but if \texttt{N} were usable as a value of type
-  \texttt{Set(N)} in \disco, then \texttt{power(N)} would actually
-  represent the set of \emph{computable} subsets of $\N$, which is
-  countable!
+  For example---as we often teach discrete mathematics students---the
+  power set of the natural numbers is uncountable; but if \texttt{N}
+  were usable as a value of type \texttt{Set(N)} in \disco, then
+  \texttt{power(N)} would actually represent the set of
+  \emph{computable} subsets of $\N$, which is countable!
 \end{itemize}
 
 The one slight blurring of categories which seems both feasible and
 desirable would be the ability to use finite set values as domains for
 $\forall$ and $\exists$ property quantifiers, so one could write, for
-example, \mintinline{text}{forall x in [0..10]. x^2 <= 100}.  It
-should be easy to incorporate such finite sets into the existing
-machinery for property checking.
+example, \mintinline{text}{forall x in [0..10]. x^2 <= 100}.  It seems
+theoretically straightforward to incorporate such finite sets into the
+existing machinery for property checking, though this has not been
+done yet.
 
 In any case, how should we present and explain the relevant
 distinctions to students?  Honestly, I'm not entirely sure.  My best
@@ -902,10 +903,11 @@ approach at the moment revolves around two ideas:
   all other sets.  For particularly keen students, we can explain that
   types are sets with particularly nice structural properties.  For
   example, $\N$ is the unique set that includes $0$ and is closed
-  under the successor operation; in contrast, there is nice structural
-  way to define $\{2,4,7\}$ other than just listing its elements.
-  These nice structural properties are precisely what enable decidable
-  typechecking without having to resort to SMT solvers.
+  under the successor operation; in contrast, there is no nice
+  structural way to define $\{2,4,7\}$ besides just listing its
+  elements.  These nice structural properties are precisely what
+  enable decidable typechecking without having to resort to SMT
+  solvers.
 \end{itemize}
 
 \subsection{Error messages}

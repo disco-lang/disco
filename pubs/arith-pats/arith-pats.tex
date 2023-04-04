@@ -147,8 +147,35 @@
 
 \section{Introduction}
 
-In mathematical texts it is relatively common to see functions defined
-via arithmetic expressions
+In mathematical texts it is relatively common to see function
+definitions where the function parameters are arithmetic expressions
+rather than simple variables.  For example:
+\begin{align*}
+  h(0)    &= 1 \\
+  h(2n+1) &= h(n) \\
+  h(2n+2) &= h(n+1) + h(n)
+\end{align*}
+The meaning of such a definition is intuitively clear: each clause of
+the definition applies when the input is ``of the appropriate form''.
+For example, to evaluate $h(8)$, we must use the third clause in the
+above definition, because $8$ is ``of the form'' $2n+2$---that is,
+there exists a natural number $n$ (namely, $n = 3$) for which $8 =
+2n+2$.  We then proceed evaluate the right-hand side of the clause
+by substituting $3$ for $n$, so $h(8) = h(4) + h(3)$.
+
+XXX raises a lot of questions
+\begin{itemize}
+\item What about types other than natural numbers?
+\item What about operations besides addition and multiplication?
+\item How can we tell if the clauses cover all possible inputs?
+\item How can we tell if any of the clauses are redundant?
+\end{itemize}
+
+XXX Mention Haskell used to have these, but got rid of them.
+
+XXX Teaching language Disco.  Have implemented all of these things.
+Show examples of defining functions in Disco, errors that you get if
+not complete.
 
 \section{Template Overview}
 As noted in the introduction, the ``\verb|acmart|'' document class can

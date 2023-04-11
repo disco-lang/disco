@@ -59,9 +59,30 @@
 %% the next command will enable that style.
 %%\citestyle{acmauthoryear}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Packages
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%%
-%% end of the preamble, start of the body of the document source.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Comments
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newif\ifcomments\commentstrue
+
+\ifcomments
+\renewcommand{\authornote}[3]{\textcolor{#1}{[#3 ---#2]}}
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\else
+\renewcommand{\authornote}[3]{}
+\newcommand{\todo}[1]{}
+\fi
+
+\newcommand{\brent}[1]{\authornote{blue}{BAY}{#1}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \begin{document}
 
 %%
@@ -147,35 +168,55 @@
 
 \section{Introduction}
 
-In mathematical texts it is relatively common to see function
-definitions where the function parameters are arithmetic expressions
-rather than simple variables.  For example:
+Consider the following definition of a function $h$ on the natural
+numbers:
 \begin{align*}
   h(0)    &= 1 \\
   h(2n+1) &= h(n) \\
   h(2n+2) &= h(n+1) + h(n)
 \end{align*}
-The meaning of such a definition is intuitively clear: each clause of
-the definition applies when the input is ``of the appropriate form''.
-For example, to evaluate $h(8)$, we must use the third clause in the
-above definition, because $8$ is ``of the form'' $2n+2$---that is,
-there exists a natural number $n$ (namely, $n = 3$) for which $8 =
-2n+2$.  We then proceed evaluate the right-hand side of the clause
-by substituting $3$ for $n$, so $h(8) = h(4) + h(3)$.
+Hopefully, the meaning of this definition is intuitively clear: the
+definition is given by three clauses, where each clause applies when
+the input is ``of the appropriate form''.  For example, to evaluate
+$h(8)$, we must use the third clause: $8 \neq 0$, and there is no $n$
+such that $8 = 2n+1$, but $8 = 2n+2$ when $n = 3$.  We then proceed
+evaluate the right-hand side of the clause by substituting $3$ for
+$n$, so $h(8) = h(4) + h(3)$.
 
-XXX raises a lot of questions
+There are many interesting things to say about $h$,\footnote{For
+  example, $h(n)$ counts the number of \emph{hyperbinary
+    representations} of $n$, and the sequence
+  $\{h(n+1)/h(n)\}_{n \geq 0}$ includes every positive rational number
+  exactly once \todo{citations!}.} but we are chiefly interested in
+the form of its definition.  In particular, it is defined with
+\emph{arithmetic expressions} (such as $2n+1$) used as
+\emph{patterns}; from here on we will refer to them as
+\emph{arithmetic patterns}.  This style of definition is common in
+mathematics, but not so common in programming languages.  The above
+example may be intuitively clear enough, but trying to generalize
+raises a number of questions:
+
 \begin{itemize}
-\item What about types other than natural numbers?
-\item What about operations besides addition and multiplication?
-\item How can we tell if the clauses cover all possible inputs?
-\item How can we tell if any of the clauses are redundant?
+\item How did we know that we were only looking for \emph{natural
+    numbers} that could stand in for $n$?
+\item Relatedly, can we use arithmetic patterns when defining
+  functions on numeric types besides natural numbers?
+\item Can we allow other arithmetic operations besides addition and
+  multiplication?
+\item How can we tell if the clauses cover all possible inputs, or if
+  any are redundant?
 \end{itemize}
 
-XXX Mention Haskell used to have these, but got rid of them.
+\todo{Mention Haskell used to have these, but got rid of them.
+  Perhaps somewhere else.}
 
-XXX Teaching language Disco.  Have implemented all of these things.
+\todo{Teaching language Disco.  Have implemented all of these things.
 Show examples of defining functions in Disco, errors that you get if
-not complete.
+not complete.}
+
+\todo{Contributions}
+
+\section{Arithmetic patterns by example}
 
 \section{Template Overview}
 As noted in the introduction, the ``\verb|acmart|'' document class can

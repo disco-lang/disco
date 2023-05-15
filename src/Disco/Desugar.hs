@@ -327,7 +327,10 @@ desugarPrimUOp argTy resTy op = do
 bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _   TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
--- Add the case here for TyProp with /\, \/. Similar to above commented line.
+
+-- And, Or, Impl for Props don't desugar because they are primitive
+-- Prop constructors.  On the other hand, logical operations on Bool
+-- can desugar in terms of more primitive conditional expressions.
 bopDesugars _ _ TyProp bop | bop `elem` [And, Or, Impl] = False
 bopDesugars _   _   _ bop = bop `elem`
   [ And, Or, Impl, Iff

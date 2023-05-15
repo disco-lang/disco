@@ -80,7 +80,7 @@ generateSamples (Randomized n m) e
     -- we don't have to worry about getting too large a number since we handle finite lengths in the case above.
     -- rs <- runGen . mapM sizedNat $ [n .. n + m]
     -- in this moment, we want 50 random numbers such that the first one is in [n, n^2],
-    -- the second one is in [n^2, n^3] ... etc. 
+    -- the second one is in [n^2, n^3] ... etc.
     rs <- randomLarge [100, 1000, 10000, 100000, 1000000]
     let samples = map (E.select e) $ small ++ rs
     return (samples, Randomized n m)
@@ -143,9 +143,9 @@ prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Impl)) (ATTup _ [p1, p2])) (TestI
 prettyTestResult'
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
   => Bool -> AProperty -> TestResult -> Sem r Doc
-prettyTestResult' _ prop (TestResult bool tr env) = 
+prettyTestResult' _ prop (TestResult bool tr env) =
   prettyResultCertainty tr prop (show bool)
-  $+$  
+  $+$
   prettyTestReason bool prop tr
 
 prettyTestResult

@@ -30,10 +30,7 @@ module Disco.Property
 
 import           Prelude                     hiding ((<>))
 
-import           Debug.Trace
-
 import qualified Data.Enumeration.Invertible as E
--- import qualified Test.QuickCheck             as QC
 
 import           Disco.Effects.Random
 import           Polysemy

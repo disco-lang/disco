@@ -570,9 +570,6 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Logic
 
-    --- XXX restore typing rules for logical operations on Props
-    --- once the evaluator can handle them.
-
     inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff] = do
       a <- freshTy
       constraint $ CQual (bopQual op) a

@@ -313,7 +313,7 @@ data TestReason_ a
     -- ^ The test was an equality test. Records the values being
     --   compared and also their type (which is needed for printing).
   | TestLt Type a a
-    -- ^ The test was a less than test. Records the values being 
+    -- ^ The test was a less than test. Records the values being
     --   compared and also their type (which is needed for printing).
   | TestNotFound SearchType
     -- ^ The search didn't find any examples/counterexamples.
@@ -360,7 +360,7 @@ resultIsCertain (TestNotFound Exhaustive)       = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r)                   = testIsCertain r
 resultIsCertain (TestRuntimeError _)            = True
-resultIsCertain (TestAnd tr1 tr2)               
+resultIsCertain (TestAnd tr1 tr2)
   | c1 && c2      = True
   | c1 && not ok1 = True
   | c2 && not ok2 = True

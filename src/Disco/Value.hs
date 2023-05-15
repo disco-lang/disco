@@ -303,6 +303,9 @@ getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
     Just v  -> return (s, ty, v)
     Nothing -> Left (UnboundPanic name)
 
+-- | Binary logical operators.
+data LOp = LAnd | LOr | LImpl deriving (Eq, Ord, Show, Enum, Bounded)
+
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
@@ -319,9 +322,8 @@ data TestReason_ a
     -- ^ The search didn't find any examples/counterexamples.
   | TestFound TestResult
     -- ^ The search found an example/counterexample.
-  | TestAnd TestResult TestResult
-  | TestOr  TestResult TestResult
-  | TestImpl TestResult TestResult
+  | TestBin LOp TestResult TestResult
+    -- ^ A binary logical operator was used to combine the given two results.
   | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
@@ -360,31 +362,11 @@ resultIsCertain (TestNotFound Exhaustive)       = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r)                   = testIsCertain r
 resultIsCertain (TestRuntimeError _)            = True
-resultIsCertain (TestAnd tr1 tr2)
-  | c1 && c2      = True
-  | c1 && not ok1 = True
-  | c2 && not ok2 = True
-  | otherwise     = False
-  where
-    c1 = testIsCertain tr1
-    c2 = testIsCertain tr2
-    ok1 = testIsOk tr1
-    ok2 = testIsOk tr2
-resultIsCertain (TestOr tr1 tr2)
-  | c1 && c2  = True
-  | c1 && ok1 = True
-  | c2 && ok2 = True
-  | otherwise = False
-  where
-    c1 = testIsCertain tr1
-    c2 = testIsCertain tr2
-    ok1 = testIsOk tr1
-    ok2 = testIsOk tr2
-resultIsCertain (TestImpl tr1 tr2)
-  | c1 && c2      = True
-  | not ok1 && c1 = True
-  | ok2 && c2     = True
-  | otherwise     = False
+resultIsCertain (TestBin op tr1 tr2)
+  | c1 && c2                    = True
+  | c1 && ((op == LOr) == ok1)  = True
+  | c2 && ((op /= LAnd) == ok2) = True
+  | otherwise                   = False
   where
     c1 = testIsCertain tr1
     c2 = testIsCertain tr2
@@ -397,17 +379,14 @@ data ValProp
     -- ^ A prop that has already either succeeded or failed.
   | VPSearch SearchMotive [Type] Value TestEnv
     -- ^ A pending search.
-  | VPAnd ValProp ValProp
-  | VPOr  ValProp ValProp
-  | VPImpl ValProp ValProp
+  | VPBin BOp ValProp ValProp
+    -- ^ A binary logical operator combining two prop values.
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
 extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g P.<> e)
-extendPropEnv g (VPAnd vp1 vp2)             = VPAnd (extendPropEnv g vp1) (extendPropEnv g vp2)
-extendPropEnv g (VPOr vp1 vp2)              = VPOr (extendPropEnv g vp1) (extendPropEnv g vp2)
-extendPropEnv g (VPImpl vp1 vp2)            = VPImpl (extendPropEnv g vp1) (extendPropEnv g vp2)
+extendPropEnv g (VPBin op vp1 vp2)          = VPBin op (extendPropEnv g vp1) (extendPropEnv g vp2)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g P.<> e)

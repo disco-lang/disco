@@ -42,6 +42,7 @@ import           Disco.Enumerate
 import           Disco.Error
 import           Disco.Names
 import           Disco.Property
+import           Disco.Syntax.Operators             (BOp(And, Or, Impl))
 import           Disco.Types                        hiding (V)
 import           Disco.Value
 import           Math.Combinatorics.Exact.Binomial  (choose)
@@ -443,12 +444,12 @@ appConst k = \case
     out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
   OShouldLt ty -> arity2 $ \v1 v2 ->
     out $ VProp (VPDone (TestResult (valLt v1 v2) (TestLt ty v1 v2) emptyTestEnv))
-  OAnd -> arity2 $ \p1 p2 -> 
-    out $ VProp (VPAnd (ensureProp p1) (ensureProp p2))
-  OOr -> arity2 $ \p1 p2 -> 
-    out $ VProp (VPOr (ensureProp p1) (ensureProp p2))
+  OAnd -> arity2 $ \p1 p2 ->
+    out $ VProp (VPBin And (ensureProp p1) (ensureProp p2))
+  OOr -> arity2 $ \p1 p2 ->
+    out $ VProp (VPBin Or (ensureProp p1) (ensureProp p2))
   OImpl -> arity2 $ \p1 p2 ->
-    out $ VProp (VPImpl (ensureProp p1) (ensureProp p2))
+    out $ VProp (VPBin Impl (ensureProp p1) (ensureProp p2))
 
   c -> error $ "Unimplemented: appConst " ++ show c
   where
@@ -730,9 +731,9 @@ resultToBool (TestResult b _ _)                    = return $ enumv b
 notProp :: ValProp -> ValProp
 notProp (VPDone r)            = VPDone (invertPropResult r)
 notProp (VPSearch sm tys p e) = VPSearch (invertMotive sm) tys p e
-notProp (VPAnd vp1 vp2)       = VPOr (notProp vp1) (notProp vp2)
-notProp (VPOr vp1 vp2)        = VPAnd (notProp vp1) (notProp vp2)
-notProp (VPImpl vp1 vp2)      = VPAnd vp1 (notProp vp2)
+notProp (VPBin And vp1 vp2)   = VPBin Or (notProp vp1) (notProp vp2)
+notProp (VPBin Or vp1 vp2)    = VPBin And (notProp vp1) (notProp vp2)
+notProp (VPBin Impl vp1 vp2)  = VPBin And vp1 (notProp vp2)
 
 -- | Convert a @Value@ to a @ValProp@, embedding booleans if necessary.
 ensureProp :: Value -> ValProp
@@ -753,18 +754,18 @@ testProperty initialSt = checkProp . ensureProp
       :: Members '[Random, State Mem] r
       => ValProp -> Sem r TestResult
     checkProp (VPDone r) = return r
-    checkProp (VPOr vp1 vp2) = do 
+    checkProp (VPBin op vp1 vp2) = do
       tr1 <- checkProp vp1
       tr2 <- checkProp vp2
-      return $ TestResult (combineTestResultBool (||) tr1 tr2) (TestOr tr1 tr2) emptyTestEnv
-    checkProp (VPAnd vp1 vp2) = do 
+      return $ TestResult (combineTestResultBool (||) tr1 tr2) (TestBin Or tr1 tr2) emptyTestEnv
+    checkProp (VPAnd vp1 vp2) = do
       tr1 <- checkProp vp1
       tr2 <- checkProp vp2
-      return $ TestResult (combineTestResultBool (&&) tr1 tr2) (TestAnd tr1 tr2) emptyTestEnv
-    checkProp (VPImpl vp1 vp2) = do 
+      return $ TestResult (combineTestResultBool (&&) tr1 tr2) (TestBin And tr1 tr2) emptyTestEnv
+    checkProp (VPImpl vp1 vp2) = do
       tr1 <- checkProp vp1
       tr2 <- checkProp vp2
-      return $ TestResult (combineTestResultBool (==>) tr1 tr2) (TestImpl tr1 tr2) emptyTestEnv
+      return $ TestResult (combineTestResultBool (==>) tr1 tr2) (TestBin Impl tr1 tr2) emptyTestEnv
       where
         (==>) :: Bool -> Bool -> Bool
         (==>) True False = False

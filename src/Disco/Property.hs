@@ -113,17 +113,17 @@ prettyTestReason _ _ (TestRuntimeError ee) =
   "Test failed with an error:"
   $+$
   nest 2 (pretty (EvalErr ee))
-prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp And)) (ATTup _ [p1, p2])) (TestAnd tr1 tr2) =
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp And)) (ATTup _ [p1, p2])) (TestBin And tr1 tr2) =
   bulletList "-"
   [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
   , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
-prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Or)) (ATTup _ [p1, p2])) (TestOr tr1 tr2) =
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Or)) (ATTup _ [p1, p2])) (TestBin Or tr1 tr2) =
   bulletList "-"
   [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
   , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
-prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Impl)) (ATTup _ [p1, p2])) (TestImpl tr1 tr2) =
+prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp Impl)) (ATTup _ [p1, p2])) (TestBin Impl tr1 tr2) =
   bulletList "-"
   [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
   , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)

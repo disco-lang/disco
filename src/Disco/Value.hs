@@ -38,6 +38,8 @@ module Disco.Value
   , TestVars(..), TestEnv(..), emptyTestEnv, getTestEnv, extendPropEnv, extendResultEnv
   , testIsOk, testIsError, testReason, testEnv, resultIsCertain
 
+  , LOp(..), interpLOp
+
   -- * Environments
 
   , Env
@@ -306,6 +308,14 @@ getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
 -- | Binary logical operators.
 data LOp = LAnd | LOr | LImpl deriving (Eq, Ord, Show, Enum, Bounded)
 
+interpLOp :: LOp -> Bool -> Bool -> Bool
+interpLOp LAnd = (&&)
+interpLOp LOr = (||)
+interpLOp LImpl = (==>)
+  where
+    True ==> False = False
+    _ ==> _ = True
+
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
@@ -379,7 +389,7 @@ data ValProp
     -- ^ A prop that has already either succeeded or failed.
   | VPSearch SearchMotive [Type] Value TestEnv
     -- ^ A pending search.
-  | VPBin BOp ValProp ValProp
+  | VPBin LOp ValProp ValProp
     -- ^ A binary logical operator combining two prop values.
   deriving Show
 

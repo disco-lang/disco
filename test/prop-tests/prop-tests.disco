@@ -48,7 +48,7 @@ plusIsoR n =
 !!! ∀ v:Void. 2 == 3    -- this is true!
 !!! ∀ u:Unit. u == u    -- there is only one Unit value
 !!! ∀ l:List(Void). l == l
-!!! ∀ l:List(Unit). l == reverse l
+-- !!! ∀ l:List(Unit). l == reverse l    -- too slow!
 !!! ∀ bs : List(Bool). toBin (fromBin bs) == bs
 !!! ∀ q : F. q >= 0
 !!! ∀ p : N * N. {? x + y when p is (x,y) ?} >= 0

@@ -28,17 +28,18 @@ module Disco.Property
 
 import           Prelude                     hiding ((<>))
 
+import           Data.Char                   (toLower)
 import qualified Data.Enumeration.Invertible as E
 
 import           Disco.Effects.Random
 import           Polysemy
 
 import           Disco.AST.Typed
-import           Disco.Syntax.Prims
 import           Disco.Effects.Input
 import           Disco.Effects.LFresh
 import           Disco.Error
 import           Disco.Pretty
+import           Disco.Syntax.Prims
 import           Disco.Typecheck.Erase       (eraseProperty)
 import           Disco.Types                 (TyDefCtx)
 import           Disco.Value
@@ -58,8 +59,8 @@ invertPropResult res@(TestResult b r env)
   | otherwise               = TestResult (not b) r env
 
 randomLarge :: Member Random r => [Integer] -> Sem r [Integer]
-randomLarge [] = return []
-randomLarge [_] = return []
+randomLarge []           = return []
+randomLarge [_]          = return []
 randomLarge (x : y : xs) = (:) <$> randomR (x, y) <*> randomLarge (y : xs)
 
 -- | Select samples from an enumeration according to a search type. Also returns
@@ -123,7 +124,7 @@ prettyTestResult'
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r
   => Bool -> AProperty -> TestResult -> Sem r Doc
 prettyTestResult' _ prop (TestResult bool tr _) =
-  prettyResultCertainty tr prop (show bool)
+  prettyResultCertainty tr prop (map toLower (show bool))
   $+$
   prettyTestReason bool prop tr
 

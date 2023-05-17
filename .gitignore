@@ -35,6 +35,8 @@ ott/*.tex
 *.snm
 *.toc
 *.vrb
+*.pag
+*.rubbercache
 nsf/*.pdf
 nsf/main.tex
 nsf/description.tex
@@ -64,6 +66,12 @@ test/*/output
 pubs/WG2.1/diagrams/*
 pubs/WG2.1/*.pdf
 
+pubs/TFPIE23/*.pdf
+pubs/TFPIE23/talk/*.pdf
+
 tmp/
 
 .ipynb_checkpoints
+
+*.pygtex
+*.pygstyle

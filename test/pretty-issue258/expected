@@ -7,6 +7,6 @@ treesOfSize(0) = [left(■)]
 treesOfSize(k + 1) = [right(l, r) | x in [0 .. k], l in treesOfSize(x), r in treesOfSize(k .- x)]
 Loading tree.disco...
 Loaded.
-treeFold : r11 × (ℕ × r11 × r11 → r11) × Tree → r11
+treeFold : r4 × (ℕ × r4 × r4 → r4) × Tree → r4
 treeFold(x, f, left(■)) = x
 treeFold(x, f, right(n, l, r)) = f(n, treeFold(x, f, l), treeFold(x, f, r))

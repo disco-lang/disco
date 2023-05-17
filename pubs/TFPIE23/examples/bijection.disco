@@ -1,0 +1,34 @@
+----------------------------------------------------------------------
+-- Each of the functions below is a bijection.  Define another Disco
+-- function which is its inverse, and write properties showing that
+-- the functions are inverse.  Part (a) has already been done for you
+-- as an example.  Part (b) has been done partially.  You should
+-- complete parts (c)-(g) on your own.
+
+-- (a) --------------------------------------------------
+
+f1 : Z -> Z
+f1(n) = n - 5
+
+-- EXAMPLE SOLUTION for part (a).  Definition of g1 as the inverse of
+-- f1, with two test properties demonstrating they are inverse.
+
+!!! forall z:Z. f1(g1(z)) == z
+!!! forall z:Z. g1(f1(z)) == z
+
+g1 : Z -> Z
+g1(n) = n + 5
+
+-- (b) --------------------------------------------------
+
+f2 : Q -> Q
+f2(x) = 2x + 1
+
+-- PARTIAL SOLUTION for part (b).  Some test properties and a type
+-- declaration for g2; you should fill in a definition for g2.
+
+!!! forall x:Q. f2(g2(x)) == x
+!!! forall x:Q. g2(f2(x)) == x
+
+g2 : Q -> Q
+-- FILL IN YOUR DEFINITION HERE

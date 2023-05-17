@@ -12,7 +12,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC == 8.10.4
+tested-with:         GHC ==8.10.7 || ==9.2.5 || ==9.4.3
 
 data-dir:            lib
 
@@ -91,6 +91,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/error-emptycase/input
                      test/error-names/expected
                      test/error-names/input
+                     test/error-nonlinear/expected
+                     test/error-nonlinear/input
                      test/error-notcon/expected
                      test/error-notcon/input
                      test/error-notype/expected
@@ -170,6 +172,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/parse-case-expr/input
                      test/parse-nested-list/expected
                      test/parse-nested-list/input
+                     test/parse-patguard/expected
+                     test/parse-patguard/input
                      test/parse-quantifiers/expected
                      test/parse-quantifiers/input
                      test/parse-top-term/expected
@@ -315,6 +319,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/types-192/input
                      test/types-306/expected
                      test/types-306/input
+                     test/types-357/expected
+                     test/types-357/input
                      test/types-bind/expected
                      test/types-bind/input
                      test/types-char-string/expected
@@ -448,21 +454,24 @@ library
   other-modules:       Paths_disco
   autogen-modules:     Paths_disco
 
-  build-depends:       base >=4.8 && <4.17,
+  build-depends:       base >=4.8 && <4.18,
                        filepath,
                        directory,
-                       mtl >=2.2 && <2.3,
-                       megaparsec >= 6.1.1 && < 9.3,
+                       mtl >=2.2 && <2.4,
+                       megaparsec >= 6.1.1 && < 9.4,
                        parser-combinators >= 1.0.0 && < 1.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.7,
                        containers >=0.5 && <0.7,
-                       unbound-generics >= 0.3 && < 0.5,
-                       polysemy >= 1.6.0.0 && < 1.8,
+                       unbound-generics >= 0.3 && < 0.4.3,
+                       -- unbound-generics 0.4.3 added substBvs to
+                       -- Subst class which adds a new Generic
+                       -- constraint, hence a breaking change
+                       polysemy >= 1.6.0.0 && < 1.10,
                        polysemy-plugin >= 0.4 && < 0.5,
                        polysemy-zoo >= 0.7 && < 0.9,
-                       lens >= 4.14 && < 5.2,
+                       lens >= 4.14 && < 5.3,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.13,
                        integer-logarithms >= 1.0 && < 1.1,
@@ -471,7 +480,7 @@ library
                        exceptions >= 0.10 && < 0.11,
                        QuickCheck >= 2.9 && < 2.15,
                        splitmix >= 0.1 && < 0.2,
-                       fgl >= 5.5 && < 5.8,
+                       fgl >= 5.5 && < 5.9,
                        optparse-applicative >= 0.12 && < 0.18,
                        oeis >= 0.3.10,
                        algebraic-graphs >= 0.5,
@@ -490,12 +499,12 @@ executable disco
                        directory,
                        filepath,
                        haskeline >=0.8 && <0.9,
-                       mtl >=2.2 && <2.3,
+                       mtl >=2.2 && <2.4,
                        transformers >= 0.4 && < 0.7,
-                       megaparsec >= 6.1.1 && < 9.3,
+                       megaparsec >= 6.1.1 && < 9.4,
                        containers >= 0.5 && < 0.7,
-                       unbound-generics >= 0.3 && < 0.5,
-                       lens >= 4.14 && < 5.2,
+                       unbound-generics >= 0.3 && < 0.4.3,
+                       lens >= 4.14 && < 5.3,
                        optparse-applicative >= 0.12 && < 0.18,
                        oeis >= 0.3.10
 
@@ -507,7 +516,7 @@ test-suite disco-tests
   main-is: Tests.hs
   hs-source-dirs: test
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.17,
+  build-depends:    base >= 4.7 && < 4.18,
                     tasty >= 0.10 && < 1.5,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
@@ -523,7 +532,7 @@ test-suite disco-examples
   main-is: TestExamples.hs
   hs-source-dirs: example
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.17,
+  build-depends:    base >= 4.7 && < 4.18,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

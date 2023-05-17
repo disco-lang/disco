@@ -18,7 +18,7 @@
 # -- Project information -----------------------------------------------------
 
 project = 'disco'
-copyright = '2022, disco team'
+copyright = '2023, disco team'
 author = 'disco team'
 
 # The full version, including alpha/beta/rc tags

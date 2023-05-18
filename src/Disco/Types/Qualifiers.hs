@@ -101,6 +101,7 @@ bopQual SSub = QNum
 bopQual And  = QBool
 bopQual Or   = QBool
 bopQual Impl = QBool
+bopQual Iff  = QBool
 bopQual _    = error "No qualifier for binary operation"
 
 ------------------------------------------------------------

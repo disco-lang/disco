@@ -1074,15 +1074,23 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
             -- the sort, but this is wrong; see
             -- https://github.com/disco-lang/disco/issues/192.
             --
-            -- For now, let's assume that any situation in which we
+            -- If the sort is 'bool', we'll pick the Boolean base
+            -- type, since there are no other sorts which could cause
+            -- a conflict as in #192.
+            --
+            -- Otherwise, we assume that any situation in which we
             -- have no base sub- or supertypes but we do have
             -- nontrivial sorts means that we are dealing with numeric
-            -- types; so we can just call N a base subtype and go from there.
+            -- types; so we can just call N a base subtype and go from
+            -- there.
 
             ([], []) ->
-              -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
-              (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
-                (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
+              if getSort vm v == S.fromList [QBool]
+                then Just (coerce v |-> B)
+                else
+                  -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
+                  (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
+                    (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
 
             -- Only supertypes.  Just assign a to their inf, if one exists.
             (bsupers, []) ->

@@ -113,8 +113,8 @@ prettyTestReason _ _ (TestRuntimeError ee) =
   "Test failed with an error:"
   $+$
   nest 2 (pretty (EvalErr ee))
-  $+$
-  prettyTestEnv "Example inputs that caused the error:" env
+  -- $+$
+  -- prettyTestEnv "Example inputs that caused the error:" env
 prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
   bulletList "-"
   [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)

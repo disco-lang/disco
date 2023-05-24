@@ -393,7 +393,7 @@ opToStr = \case
   OHolds             -> "holds"
   ONotProp           -> "not"
   OShouldEq _        -> "=!="
-  OShouldLt _         -> "!<"
+  OShouldLt _        -> "!<"
   OMatchErr          -> "matchErr"
   OCrash             -> "crash"
   OId                -> "id"

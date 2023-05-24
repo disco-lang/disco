@@ -185,8 +185,8 @@ opTable =
     -- Start at precedence level 2 so we can give level 1 to ascription, and level 0
     -- to the ambient context + parentheses etc.
     assignPrecLevels table = zipWith assignPrecs (reverse [2 .. length table+1]) table
-    assignPrecs p ops      = map (assignPrec p) ops
     assignPrec  p op       = op { opPrec = p }
+    assignPrecs p = map (assignPrec p)
 
 -- | A map from all unary operators to their associated 'OpInfo' records.
 uopMap :: Map UOp OpInfo

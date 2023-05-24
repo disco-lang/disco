@@ -846,10 +846,10 @@ typecheck Infer (TPrim prim) = do
       ty <- freshTy
       constraint $ CQual QCmp ty
       return $ ty :*: ty :->: TyProp
-      
+
     inferPrim (PrimBOp ShouldLt) = do
       ty <- freshTy
-      constraint $ CQual QCmp ty 
+      constraint $ CQual QCmp ty
       return $ ty :*: ty :->: TyProp
 
     ----------------------------------------

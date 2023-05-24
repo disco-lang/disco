@@ -314,7 +314,7 @@ interpLOp LOr = (||)
 interpLOp LImpl = (==>)
   where
     True ==> False = False
-    _ ==> _ = True
+    _ ==> _        = True
 
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition

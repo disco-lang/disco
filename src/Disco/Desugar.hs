@@ -314,7 +314,7 @@ desugarProperty p = DTTest [] <$> desugarTerm p
 uopDesugars :: Type -> Type -> UOp -> Bool
 -- uopDesugars _ (TyFin _) Neg = True
 uopDesugars TyProp TyProp Not = False
-uopDesugars _ _         uop = uop == Not
+uopDesugars _ _         uop   = uop == Not
 
 desugarPrimUOp :: Member Fresh r => Type -> Type -> UOp -> Sem r DTerm
 desugarPrimUOp argTy resTy op = do

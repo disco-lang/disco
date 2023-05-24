@@ -216,6 +216,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/prop-basic/expected
                      test/prop-basic/input
                      test/prop-basic/prop-basic.disco
+                     test/prop-binary/expected
+                     test/prop-binary/input
                      test/prop-cmp/expected
                      test/prop-cmp/input
                      test/prop-fail/bad-tests.disco
@@ -284,6 +286,8 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/syntax-doc/expected
                      test/syntax-doc/input
                      test/syntax-doc/syntax-doc.disco
+                     test/syntax-ellipsis/expected
+                     test/syntax-ellipsis/input
                      test/syntax-exts/expected
                      test/syntax-exts/input
                      test/syntax-exts/syntax-exts.disco

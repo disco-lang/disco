@@ -118,8 +118,8 @@ prettyTestReason _ _ (TestRuntimeError ee) =
   -- See #364
 prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
   bulletList "-"
-  [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
-  , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
+  [ "Left side:"  $+$ nest 2 (prettyTestResult' b p1 tr1)
+  , "Right side:" $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
 
 -- See Note [prettyTestReason fallback]

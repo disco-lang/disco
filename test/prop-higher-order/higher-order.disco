@@ -1,30 +1,8 @@
-||| 'and' for propositions.
-
-!!! pand(true, true)
-
-pand : Prop * Prop -> Prop
-pand(p, q) = forall and_side : Unit + Unit. {?
-    p when and_side is left _,
-    q otherwise
-  ?}
-
 all : List(Prop) -> Prop
-all ps = reduce(pand, true, ps)
-
-||| 'or' for propositions.
-
-!!! por(false, true)
-!!! por(true, false)
-!!! por(true, true)
-
-por : Prop * Prop -> Prop
-por(p, q) = exists or_side : Unit + Unit. {?
-    p when or_side is left _,
-    q otherwise
-  ?}
+all ps = reduce(~/\~, true, ps)
 
 any : List(Prop) -> Prop
-any ps = reduce(por, false, ps)
+any ps = reduce(~\/~, false, ps)
 
 ||| Assert that a proposition holds on some number in a range.
 

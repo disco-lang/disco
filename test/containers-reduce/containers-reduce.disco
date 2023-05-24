@@ -1,6 +1,6 @@
 import num
 
-!!! ∀ x : ℕ. (x > 0) ==> reduce(~*~, 1, factor x) == x
+!!! ∀ x : ℕ. reduce(~*~, 1, factor (x+1)) == (x+1)
 dummy : Unit
 dummy = unit
 

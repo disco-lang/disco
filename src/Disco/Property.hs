@@ -115,12 +115,35 @@ prettyTestReason _ _ (TestRuntimeError ee) =
   nest 2 (pretty (EvalErr ee))
   -- $+$
   -- prettyTestEnv "Example inputs that caused the error:" env
+  -- See #364
 prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
   bulletList "-"
   [ "Left side:  " $+$ nest 2 (prettyTestResult' b p1 tr1)
   , "Right side: " $+$ nest 2 (prettyTestResult' b p2 tr2)
   ]
-prettyTestReason _ _ _ = "!!! unexpected arguments in prettyTestReason!"
+
+-- See Note [prettyTestReason fallback]
+prettyTestReason _ _ _ = empty
+
+-- ~~~~ Note [prettyTestReason fallback]
+--
+-- prettyTestReason can do a decent job printing out reasons for a
+-- test result when operators like /\, \/, etc. are written
+-- explicitly; then it can structurally recurse on the original Prop
+-- expression in parllel with the TestReason.  However, it is possible
+-- to e.g. write a function which returns a Prop, making the structure
+-- of the Prop expression opaque.  For example, consider this example
+-- (from test/prop-higher-order):
+--
+-- !!! all [true, true, true, false, true]
+-- all : List(Prop) -> Prop
+-- all ps = reduce(~/\~, true, ps)
+--
+-- This test is false, and the TestReason ends up with a bunch of
+-- nested TestBin LAnd.  However, the proposition is literally a
+-- function application so we cannot see that it matches the structure
+-- of the test result.  So we just give up and decline to print a
+-- reason.
 
 prettyTestResult'
   :: Members '[Input TyDefCtx, LFresh, Reader PA] r

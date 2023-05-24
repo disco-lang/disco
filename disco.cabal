@@ -134,8 +134,6 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/interp-strictmatch/bomb.disco
                      test/interp-strictmatch/expected
                      test/interp-strictmatch/input
-                     test/lib-oeis/expected
-                     test/lib-oeis/input
                      test/list-comp/expected
                      test/list-comp/input
                      test/list-poly/expected
@@ -193,8 +191,6 @@ extra-source-files:  README.md, CHANGELOG.md, stack.yaml, example/*.disco, repl/
                      test/pretty-defn/input
                      test/pretty-functions/expected
                      test/pretty-functions/input
-                     test/pretty-issue258/expected
-                     test/pretty-issue258/input
                      test/pretty-lit/expected
                      test/pretty-lit/input
                      test/pretty-ops/expected

@@ -1,13 +1,14 @@
   - Certainly true: not false
   - Certainly true: {1, 2} =!= {2, 1}
+    - Left side:  {1, 2}
+    - Right side: {1, 2}
   - Certainly true: ∃a, b. (a /\ b) =!= (a \/ b)
     Found example:
       a = false
       b = false
   - Certainly false: ∀a, b. (a /\ b) =!= (a \/ b)
-    Test result mismatch:
     - Left side:  false
     - Right side: true
-    Counterexample:
+    Found counterexample:
       a = false
       b = true

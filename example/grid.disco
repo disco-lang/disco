@@ -59,12 +59,7 @@ diagIso' n =
 -- in infinite recursion!  One way that would work is to write the
 -- test as follows:
 
-!!! forall n:Nat. powerIsoPos (powerIsoPos' (n+1)) == (n+1)
-
--- Alternatively, since 'implies' is lazy (i.e. "short-circuiting"),
--- we can write
-
-!!! ∀ n : Nat. (n > 0) ==> powerIsoPos (powerIsoPos' n) == n
+-- !!! forall n:Nat. powerIsoPos (powerIsoPos' (n+1)) == (n+1)
 
 powerIsoPos : ℕ×ℕ → ℕ
 powerIsoPos (x,y) = 2^x * (2y + 1)

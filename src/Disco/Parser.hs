@@ -64,7 +64,6 @@ import qualified Text.Megaparsec.Char.Lexer              as L
 import           Control.Lens                            (makeLenses, toListOf,
                                                           use, (%=), (%~), (&),
                                                           (.=))
-import           Control.Monad                           (void)
 import           Control.Monad.State
 import           Data.Char                               (isAlpha, isDigit)
 import           Data.Foldable                           (asum)

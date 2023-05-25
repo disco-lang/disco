@@ -67,8 +67,7 @@ import           Disco.Parser                     (Parser, ident, reservedOp,
                                                    wholeModule, withExts)
 import           Disco.Pretty                     hiding (empty, (<>))
 import qualified Disco.Pretty                     as Pretty
-import           Disco.Property                   (prettyTestFailure,
-                                                   prettyTestResult)
+import           Disco.Property                   (prettyTestResult)
 import           Disco.Syntax.Operators
 import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
                                                    toPrim)
@@ -279,7 +278,7 @@ annCmd =
       shortHelp = "Show type-annotated typechecked term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleAnn $ x,
+      action = inputToState @TopInfo . handleAnn,
       parser = Ann <$> term
     }
 
@@ -302,7 +301,7 @@ compileCmd =
       shortHelp = "Show a compiled term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleCompile $ x,
+      action = inputToState @TopInfo . handleCompile,
       parser = Compile <$> term
     }
 
@@ -325,7 +324,7 @@ desugarCmd =
       shortHelp = "Show a desugared term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleDesugar $ x,
+      action = inputToState @TopInfo . handleDesugar,
       parser = Desugar <$> term
     }
 
@@ -348,7 +347,7 @@ docCmd =
       shortHelp = "Show documentation",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleDoc $ x,
+      action = inputToState @TopInfo . handleDoc,
       parser = Doc <$> parseDoc
     }
 
@@ -503,7 +502,7 @@ evalCmd = REPLCommand
   , shortHelp = "Evaluate a block of code"
   , category  = User
   , cmdtype   = BuiltIn
-  , action    = \x -> handleEval x
+  , action    = handleEval
   , parser    = Eval <$> wholeModule REPL
   }
 
@@ -543,7 +542,7 @@ helpCmd =
       shortHelp = "Show help",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> handleHelp x,
+      action = handleHelp,
       parser = return Help
     }
 
@@ -560,11 +559,11 @@ handleHelp Help =
     maxlen = longestCmd discoCommands
     sortedList cmds =
       sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
-    --  don't show dev-only commands by default
-    filteredCommands cmds = P.filter (\(SomeCmd c) -> category c == User) cmds
     showCmd c = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
     longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
     padRight s maxsize = take maxsize (s ++ repeat ' ')
+    --  don't show dev-only commands by default
+    filteredCommands = P.filter (\(SomeCmd c) -> category c == User)
 
 ------------------------------------------------------------
 -- :load
@@ -577,7 +576,7 @@ loadCmd =
       shortHelp = "Load a file",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> handleLoadWrapper x,
+      action = handleLoadWrapper,
       parser = Load <$> fileParser
     }
 
@@ -644,7 +643,7 @@ runAllTests declNames aprops
           tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
           let prettyFailures =
                 runInputConst tydefs . runReader initPA . runLFresh $
-                  bulletList "-" $ map (uncurry prettyTestFailure) failures
+                  bulletList "-" $ map (uncurry prettyTestResult) failures
           info $ nest 2 $ hdr $+$ prettyFailures
       return (P.null failures)
 
@@ -659,7 +658,7 @@ namesCmd =
       shortHelp = "Show all names in current scope",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> inputToState . handleNames $ x,
+      action = inputToState . handleNames,
       parser = return Names
     }
 
@@ -689,7 +688,7 @@ nopCmd =
       shortHelp = "No-op, e.g. if the user just enters a comment",
       category = Dev,
       cmdtype = BuiltIn,
-      action = \x -> handleNop x,
+      action = handleNop,
       parser = Nop <$ (sc <* eof)
     }
 
@@ -707,7 +706,7 @@ parseCmd =
       shortHelp = "Show the parsed AST",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> handleParse x,
+      action = handleParse,
       parser = Parse <$> term
     }
 
@@ -725,7 +724,7 @@ prettyCmd =
       shortHelp = "Pretty-print a term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> handlePretty x,
+      action = handlePretty,
       parser = Pretty <$> term
     }
 
@@ -743,7 +742,7 @@ printCmd =
       shortHelp = "Print a string without the double quotes, interpreting special characters",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> handlePrint x,
+      action = handlePrint,
       parser = Print <$> term
     }
 
@@ -764,7 +763,7 @@ reloadCmd =
       shortHelp = "Reloads the most recently loaded file",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> handleReload x,
+      action = handleReload,
       parser = return Reload
     }
 
@@ -789,7 +788,7 @@ showDefnCmd =
       shortHelp = "Show a variable's definition",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleShowDefn $ x,
+      action = inputToState @TopInfo . handleShowDefn,
       parser = ShowDefn <$> (sc *> ident)
     }
 
@@ -822,7 +821,7 @@ testPropCmd =
       shortHelp = "Test a property using random examples",
       category = User,
       cmdtype = ColonCmd,
-      action = \x -> handleTest x,
+      action = handleTest,
       parser = TestProp <$> term
     }
 
@@ -848,7 +847,7 @@ typeCheckCmd =
       shortHelp = "Typecheck a term",
       category = Dev,
       cmdtype = ColonCmd,
-      action = \x -> inputToState @TopInfo . handleTypeCheck $ x,
+      action = inputToState @TopInfo . handleTypeCheck,
       parser = parseTypeCheck
     }
 

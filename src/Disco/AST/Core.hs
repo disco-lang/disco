@@ -231,7 +231,8 @@ data Op
   | -- | Equality assertion, @=!=@
     OShouldEq Type
   | -- Other primitives
-
+    OShouldLt Type
+  |
     -- | Error for non-exhaustive pattern match
     OMatchErr
   | -- | Crash with a user-supplied message
@@ -242,6 +243,16 @@ data Op
     OLookupSeq
   | -- | Extend a List via OEIS
     OExtendSeq
+  | -- | Not the Boolean `And`, but instead a propositional BOp
+    -- | Should only be seen and used with Props.
+    OAnd
+  | -- | Not the Boolean `Or`, but instead a propositional BOp
+    -- | Should only be seen and used with Props.
+    OOr
+  | -- | Not the Boolean `Impl`, but instead a propositional BOp
+    -- | Should only be seen and used with Props.
+    OImpl
+
   deriving (Show, Generic, Data, Alpha, Eq, Ord)
 
 -- | Get the arity (desired number of arguments) of a function
@@ -312,8 +323,9 @@ prettyTestVars = brackets . intercalate "," . map prettyTestVar
 
 isInfix, isPrefix, isPostfix :: Op -> Bool
 isInfix OShouldEq{} = True
+isInfix OShouldLt{} = True
 isInfix op = op `S.member` S.fromList
-  [ OAdd, OMul, ODiv, OExp, OMod, ODivides, OMultinom, OEq, OLt]
+  [ OAdd, OMul, ODiv, OExp, OMod, ODivides, OMultinom, OEq, OLt, OAnd, OOr, OImpl]
 
 isPrefix ONeg = True
 isPrefix _    = False
@@ -381,6 +393,7 @@ opToStr = \case
   OHolds             -> "holds"
   ONotProp           -> "not"
   OShouldEq _        -> "=!="
+  OShouldLt _        -> "!<"
   OMatchErr          -> "matchErr"
   OCrash             -> "crash"
   OId                -> "id"
@@ -388,3 +401,6 @@ opToStr = \case
   OExtendSeq         -> "extendSeq"
   OForall{}          -> "∀"
   OExists{}          -> "∃"
+  OAnd               -> "and"
+  OOr                -> "or"
+  OImpl              -> "implies"

@@ -570,14 +570,10 @@ typecheck Infer (TPrim prim) = do
     ----------------------------------------
     -- Logic
 
-    --- XXX restore typing rules for logical operations on Props
-    --- once the evaluator can handle them.
-
     inferPrim (PrimBOp op) | op `elem` [And, Or, Impl, Iff] = do
-      return $ TyBool :*: TyBool :->: TyBool
-      -- a <- freshTy
-      -- constraint $ CQual (bopQual op) a
-      -- return $ a :*: a :->: a
+      a <- freshTy
+      constraint $ CQual (bopQual op) a
+      return $ a :*: a :->: a
 
     -- See Note [Pattern coverage] -----------------------------
     inferPrim (PrimBOp And)  = error "inferPrim And should be unreachable"
@@ -587,10 +583,9 @@ typecheck Infer (TPrim prim) = do
     ------------------------------------------------------------
 
     inferPrim (PrimUOp Not) = do
-      return $ TyBool :->: TyBool
-      -- a <- freshTy
-      -- constraint $ CQual QBool a
-      -- return $ a :->: a
+      a <- freshTy
+      constraint $ CQual QBool a
+      return $ a :->: a
 
     ----------------------------------------
     -- Container conversion
@@ -848,6 +843,11 @@ typecheck Infer (TPrim prim) = do
     -- An equality assertion =!= is just like a comparison ==, except
     -- the result is a Prop.
     inferPrim (PrimBOp ShouldEq) = do
+      ty <- freshTy
+      constraint $ CQual QCmp ty
+      return $ ty :*: ty :->: TyProp
+
+    inferPrim (PrimBOp ShouldLt) = do
       ty <- freshTy
       constraint $ CQual QCmp ty
       return $ ty :*: ty :->: TyProp

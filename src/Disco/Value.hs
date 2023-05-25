@@ -38,6 +38,8 @@ module Disco.Value
   , TestVars(..), TestEnv(..), emptyTestEnv, getTestEnv, extendPropEnv, extendResultEnv
   , testIsOk, testIsError, testReason, testEnv, resultIsCertain
 
+  , LOp(..), interpLOp
+
   -- * Environments
 
   , Env
@@ -303,6 +305,17 @@ getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
     Just v  -> return (s, ty, v)
     Nothing -> Left (UnboundPanic name)
 
+-- | Binary logical operators.
+data LOp = LAnd | LOr | LImpl deriving (Eq, Ord, Show, Enum, Bounded)
+
+interpLOp :: LOp -> Bool -> Bool -> Bool
+interpLOp LAnd = (&&)
+interpLOp LOr = (||)
+interpLOp LImpl = (==>)
+  where
+    True ==> False = False
+    _ ==> _        = True
+
 -- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
@@ -312,10 +325,15 @@ data TestReason_ a
   | TestEqual Type a a
     -- ^ The test was an equality test. Records the values being
     --   compared and also their type (which is needed for printing).
+  | TestLt Type a a
+    -- ^ The test was a less than test. Records the values being
+    --   compared and also their type (which is needed for printing).
   | TestNotFound SearchType
     -- ^ The search didn't find any examples/counterexamples.
   | TestFound TestResult
     -- ^ The search found an example/counterexample.
+  | TestBin LOp TestResult TestResult
+    -- ^ A binary logical operator was used to combine the given two results.
   | TestRuntimeError EvalError
     -- ^ The prop failed at runtime. This is always a failure, no
     --   matter which quantifiers or negations it's under.
@@ -349,10 +367,21 @@ testIsCertain (TestResult _ r _) = resultIsCertain r
 resultIsCertain :: TestReason -> Bool
 resultIsCertain TestBool                        = True
 resultIsCertain TestEqual {}                    = True
+resultIsCertain TestLt    {}                    = True
 resultIsCertain (TestNotFound Exhaustive)       = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r)                   = testIsCertain r
 resultIsCertain (TestRuntimeError _)            = True
+resultIsCertain (TestBin op tr1 tr2)
+  | c1 && c2                    = True
+  | c1 && ((op == LOr) == ok1)  = True
+  | c2 && ((op /= LAnd) == ok2) = True
+  | otherwise                   = False
+  where
+    c1 = testIsCertain tr1
+    c2 = testIsCertain tr2
+    ok1 = testIsOk tr1
+    ok2 = testIsOk tr2
 
 -- | A @ValProp@ is the normal form of a Disco value of type @Prop@.
 data ValProp
@@ -360,11 +389,14 @@ data ValProp
     -- ^ A prop that has already either succeeded or failed.
   | VPSearch SearchMotive [Type] Value TestEnv
     -- ^ A pending search.
+  | VPBin LOp ValProp ValProp
+    -- ^ A binary logical operator combining two prop values.
   deriving Show
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
 extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
 extendPropEnv g (VPSearch sm tys v e)       = VPSearch sm tys v (g P.<> e)
+extendPropEnv g (VPBin op vp1 vp2)          = VPBin op (extendPropEnv g vp1) (extendPropEnv g vp2)
 
 extendResultEnv :: TestEnv -> TestResult -> TestResult
 extendResultEnv g (TestResult b r e) = TestResult b r (g P.<> e)

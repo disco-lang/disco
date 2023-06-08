@@ -726,10 +726,10 @@ parseContainerComp c t = do
 -- | Parse a qualifier in a comprehension: either a binder @x in t@ or
 --   a guard @t@.
 parseQual :: Parser Qual
-parseQual = try parseSelection <|> parseQualGuard
+parseQual = parseSelection <|> parseQualGuard
   where
     parseSelection = label "membership expression (x in ...)" $
-      QBind <$> ident <*> (selector *> (embed <$> parseTerm))
+      QBind <$> try (ident <* selector) <*> (embed <$> parseTerm)
     selector = reservedOp "<-" <|> reserved "in"
 
     parseQualGuard = label "boolean expression" $

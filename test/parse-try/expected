@@ -1,0 +1,7 @@
+1:14:
+  |
+1 | [x | x in 1 +]
+  |              ^
+unexpected ']'
+expecting expression or operator
+

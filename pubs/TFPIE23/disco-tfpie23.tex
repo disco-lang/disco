@@ -145,7 +145,7 @@ agreement that discrete mathematics is foundational, students often
 struggle to see its relevance to computer science.
 
 \emph{Functional programming} is a style of programming, embodied in
-languages such as Haskell, OCaml, Scala, F\#, and Racket, which
+languages such as Haskell, Standard ML, OCaml, Scala, F\#, and Racket, which
 emphasizes functions (\ie input-output processes) rather than
 sequences of instructions. It enables working at high levels of
 abstraction as well as rapid prototyping and refactoring, and provides
@@ -159,7 +159,8 @@ include functional programming as a core topic.
 One creative idea is to combine functional programming and discrete
 mathematics into a single course.  This is not a new idea
 \cite{Wainwright:1992, Henderson:2002, Scharff:2002, Doets:2004,
-  ODonnell:2006, VanDrunen:2011, Xing:2008}, and even shows up
+  ODonnell:2006, VanDrunen:2011, vandrunen2013discrete,
+  10.1145/3078325, Xing:2008}, and even shows up
 in the 2007 model curriculum of the Liberal Arts Computer Science
 Consortium \cite{LiberalArtsComputerScienceConsortium:2007}. The
 benefits of such an approach are numerous:
@@ -173,20 +174,21 @@ benefits of such an approach are numerous:
   esoteric or as a mere curiosity.
 \item The two subjects complement each other well: discrete math
   topics make good functional programming exercises, and ideas from
-  functional programming help illuminate discrete math topics.
-\item In a discrete mathematics course with both math and
-  computer science majors, math majors can have a ``home turf
+  functional programming help illuminate topics in discrete mathematics.
+\item In a discrete mathematics course with both mathematics and
+  computer science majors, mathematics majors can have a ``home turf
   advantage'' since the course deals with topics that may be already
   familiar to them (such as writing proofs), whereas computer science
   majors may struggle to connect the course content to computer
   science skills and concepts they already know.  Including functional
   programming levels the playing field, giving both groups of students
   a way to connect the course content to their previous experience.
-  Computer science majors will be more comfortable learning math
-  concepts that they can play with computationally; math majors can
-  leverage their math experience to learn a bit about programming.
+  Computer science majors will be more comfortable learning
+  mathematical concepts that they can play with computationally;
+  mathematics majors can leverage their experience with mathematics to
+  learn a bit about programming.
 \item It is just plain fun: using programming enables interactive
-  exploration of mathematics concepts, which leads to higher
+  exploration of mathematical concepts, which leads to higher
   engagement and increased retention.
 \end{itemize}
 
@@ -222,16 +224,38 @@ impossible for many departments.
   mathematics is a non-starter.  This is especially a problem at
   institutions where the discrete mathematics course is taught by
   mathematics faculty rather than computer science faculty.
-\item There is often an impedance mismatch between standard
-  mathematics notation and the notation used by existing functional
-  programming languages.  As one simple example, in mathematics one
-  can write $2x$ to denote multiplication of $x$ by $2$; but many
-  programming languages require writing a multiplication operator, for
-  example, \texttt{2*x}.  Any one such impedance mismatch is small,
-  but the accumulation of many such mismatches can be a real
+\item Students often experience friction caused by differences between
+  standard mathematics notation and the notation used by existing
+  functional programming languages.  As one simple example, in
+  mathematics one can write $2x$ to denote multiplication of $x$ by
+  $2$; but many programming languages require writing a multiplication
+  operator, for example, \texttt{2*x}. Any one such difference is
+  small, but the accumulation of many such differences can be a real
   impediment to students as they attempt to move back and forth
   between the worlds of abstract mathematics and concrete computer
-  programs.
+  programs.  For example, consider the following function defined
+  using typical mathematical notation:
+  \begin{align*}
+    f &: \N \to \Q \\
+    f(2n)   &= 0 \\
+    f(2n+1) &= \begin{cases} n/2 & \text{if } n > 5, \\
+      3n + 7 & \text{otherwise}
+      \end{cases}
+  \end{align*}
+  Now consider this translation of the function into idiomatic
+  Haskell:
+  \begin{minted}{haskell}
+f :: Int -> Rational
+f x
+  | even x    = 0
+  | n > 5     = fromIntegral n / 2
+  | otherwise = 3*n + 7
+  where
+    n = x `div` 2
+  \end{minted}
+  Although the translation may seem trivial to experienced functional
+  programmers, from the point of view of a student these are extremely
+  different.
 \end{itemize}
 
 \disco is a new functional programming language, specifically designed
@@ -247,9 +271,19 @@ of these issues:
   of the language's features and some discussion of features which are
   explicitly excluded.
 \item As much as possible, the language's features and syntax mirror
-  common mathematical practice rather than other functional languages.
-  \pref{sec:examples} has many examples, and \pref{sec:syntax} discusses
-  some notable exceptions.
+  common mathematical practice rather than other functional
+  languages. For example, a translation into \disco of the example
+  function introduced previously is shown below.
+    \begin{minted}{text}
+f : N -> Q
+f(2n)   = 0
+f(2n+1) = {? n/2      if n > 5,
+             3n + 7   otherwise
+          ?}
+  \end{minted}
+  \pref{sec:examples}
+  has many more examples, and \pref{sec:syntax} discusses some notable
+  exceptions.
 \item As a result---although there is as yet no data to back this
   up---the language should be easy for instructors to learn, even
   mathematicians without much prior programming experience.
@@ -391,7 +425,7 @@ keyword instead of \verb|/\|.  These are synonymous---in fact,
 \verb|&&| and $\land$ (U+2227 LOGICAL AND) are also accepted.  In
 general, \disco's philosophy is to allow multiple syntaxes for things
 with common synonyms rather than imposing one particular choice.
-Typically a Unicode representation of the ``real'' math notation is
+Typically, a Unicode representation of the ``real'' notation is
 supported (and used when pretty-printing), along with an ASCII
 equivalent, as well as (when applicable) syntax common in other
 functional programming languages.  Another good example is the natural
@@ -578,7 +612,7 @@ addition to lists.  \texttt{reduce} is like \texttt{foldr}, but again
 working over sets and multisets in addition to lists.  In this case,
 the \texttt{all} function is defined by first mapping a predicate over
 \texttt{each} element of a list, then reducing the resulting list of
-booleans via logical conjunction.  (Putting twiddles (\verb|~|) in
+Booleans via logical conjunction.  (Putting twiddles (\verb|~|) in
 place of arguments is the way to turn operators into standalone
 functions, thus: \verb|~/\~|.)  Notice also that the \texttt{all}
 function is polymorphic: \disco has support for standard parametric
@@ -694,8 +728,8 @@ likely to be confusing to students anyway.
   in \disco with vertical bars.  However, the ``is a divisor of''
   relation is also traditionally written with a vertical bar, as in
   $3 \mid 21$, but \disco does not support this notation.  Including
-  it makes the grammar extremely ambiguous.  (And besides, Dijkstra
-  would tell us that we should not use a visually symmetric operator
+  it would make the grammar extremely ambiguous.  (And besides,
+  Dijkstra would tell us that we should not use a visually symmetric
   symbol for a nonsymmetric relation!) Instead, \disco provides
   \texttt{divides} as an infix operator.  In my experience students
   have no problem remembering the difference.
@@ -733,15 +767,32 @@ likely to be confusing to students anyway.
 \label{sec:students}
 
 So far, I have used \disco in my discrete mathematics course twice, in
-the spring semesters of 2022 and 2023.  Anecdotally, student
-experience seems mostly positive, although I do not have any data to
-back this up.  One of my main tasks for the spring of 2023 has been to
-develop a solid sequence of exercises that can serve as a tutorial for
-the language, and commit these exercises back into the disco
-repository itself, to make it easier for other instructors or
-independent learners to make use of the language.  I  have also
-started collecting some very informal, qualitative data about students'
-experience using the language and its effect on their learning.
+the spring semesters of 2022 and 2023.  Both courses had about 25
+students, mostly sophomore computer science majors, with a few
+mathematics majors in the mix as well.  In the spring of 2023 I asked
+students a couple questions about Disco on the end-of-semester course
+evaluation.  The results are shown below.  Although I did not get a
+good response rate and the results have no statistical significance,
+they are at least encouraging.  The few students who wrote optional
+textual comments also had very positive things to say.
+
+\begin{table}[]
+\begin{tabular}{p{2in}p{0.75in}p{0.75in}p{0.75in}p{0.75in}p{0.75in}}
+& Strongly Disagree & Disagree & Neutral & Agree & Strongly Agree \\
+Using Disco helped me learn the mathematical ideas in this course better. & 0                 & 2        & 0                          & 7     & 7              \\
+Learning Disco helped me improve my computer programming skills.          & 0                 & 0        & 4                          & 7     & 5
+\end{tabular}
+\end{table}
+
+% Anecdotally, student
+% experience seems mostly positive, although I do not have any data to
+% back this up.  One of my main tasks for the spring of 2023 has been to
+% develop a solid sequence of exercises that can serve as a tutorial for
+% the language, and commit these exercises back into the disco
+% repository itself, to make it easier for other instructors or
+% independent learners to make use of the language.  I  have also
+% started collecting some very informal, qualitative data about students'
+% experience using the language and its effect on their learning.
 
 \subsection{Type system}
 \label{sec:types}
@@ -909,6 +960,17 @@ approach at the moment revolves around two ideas:
   enable decidable typechecking without having to resort to SMT
   solvers.
 \end{itemize}
+
+\subsection{Formal proofs}
+\label{sec:formal-proof}
+
+A discrete mathematics course often includes an introduction to proof
+writing.  Currently, Disco only helps with this indirectly: it helps
+students practice expressing themselves formally, and property-based
+testing can give early feedback to see whether a particular
+proposition is worth trying to prove.  Ideally, however, there would
+be a way to use Disco more directly in constructing formal proofs, or
+a way to integrate it with existing tools for doing so.
 
 \subsection{Error messages}
 \label{sec:errors}

@@ -1,0 +1,30 @@
+-- Exercise D1. For each of exA through exF below, replace the empty
+-- set with a *set comprehension* so that the tests all pass, as in
+-- the example.  (Remember, Disco will run the tests when you :load
+-- this file.)
+--
+-- Some relevant documentation you may find useful:
+--
+-- https://disco-lang.readthedocs.io/en/latest/reference/set.html
+-- https://disco-lang.readthedocs.io/en/latest/reference/comprehension.html
+-- https://disco-lang.readthedocs.io/en/latest/reference/size.html
+-- https://disco-lang.readthedocs.io/en/latest/reference/power.html
+
+||| An example to illustrate the kind of thing you are supposed to do
+||| in the exercises below.  We have defined the set using a *set
+||| comprehension* so that it has the specified elements and the test
+||| passes.
+
+!!! example == {1, 4, 9, 16, 36}   -- the test specifying the elements of 'example'
+example : Set(N)
+example = {x^2 | x in {1 .. 6}, x /= 5}  -- a set comprehension defining it
+
+-- Now you try.
+
+!!! exA == {1, 3, 5, 7, 9, 11, 13, 15}
+exA : Set(N)
+exA = {2x+1 | x in {0..7}}
+
+!!! exD == {{1,2,3}, {1,2,4}, {1,3,4}, {2,3,4}}
+exD : Set(Set(N))
+exD = {S | S in power({1..4}), |S| == 3}

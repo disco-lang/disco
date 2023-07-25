@@ -15,7 +15,7 @@
 ||| comprehension* so that it has the specified elements and the test
 ||| passes.
 
-!!! example == {1, 4, 9, 16, 36}   -- the test specifying the elements of 'example'
+!!! example == {1, 4, 9, 16, 36}   -- test specifying 'example' elements
 example : Set(N)
 example = {x^2 | x in {1 .. 6}, x /= 5}  -- a set comprehension defining it
 

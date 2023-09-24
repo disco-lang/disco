@@ -36,6 +36,11 @@ ott/*.tex
 *.toc
 *.vrb
 *.pag
+*.dvi
+*.ps
+*.pyg
+*.pdf
+*.cut
 *.rubbercache
 nsf/*.pdf
 nsf/main.tex

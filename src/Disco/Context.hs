@@ -1,6 +1,11 @@
 {-# LANGUAGE DeriveTraversable #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
+
 -- |
 -- Module      :  Disco.Context
 -- Copyright   :  disco team and contributors
@@ -9,81 +14,80 @@
 -- A *context* is a mapping from names to other things (such as types
 -- or values).  This module defines a generic type of contexts which
 -- is used in many different places throughout the disco codebase.
---
------------------------------------------------------------------------------
+module Disco.Context (
+  -- * Context type
+  Ctx,
 
--- SPDX-License-Identifier: BSD-3-Clause
+  -- * Construction
+  emptyCtx,
+  singleCtx,
+  fromList,
+  ctxForModule,
+  localCtx,
 
-module Disco.Context
-       ( -- * Context type
-         Ctx
+  -- * Insertion
+  insert,
+  extend,
+  extends,
 
-         -- * Construction
-       , emptyCtx
-       , singleCtx
-       , fromList
-       , ctxForModule
-       , localCtx
+  -- * Query
+  null,
+  lookup,
+  lookup',
+  lookupNonLocal,
+  lookupNonLocal',
+  lookupAll,
+  lookupAll',
 
-       -- * Insertion
-       , insert
-       , extend
-       , extends
+  -- * Conversion
+  names,
+  elems,
+  assocs,
+  keysSet,
 
-       -- * Query
-       , null
-       , lookup, lookup'
-       , lookupNonLocal, lookupNonLocal'
-       , lookupAll, lookupAll'
+  -- * Traversal
+  coerceKeys,
+  restrictKeys,
 
-       -- * Conversion
-       , names
-       , elems
-       , assocs
-       , keysSet
+  -- * Combination
+  joinCtx,
+  joinCtxs,
 
-       -- * Traversal
-       , coerceKeys
-       , restrictKeys
+  -- * Filter
+  filter,
+) where
 
-       -- * Combination
-       , joinCtx
-       , joinCtxs
+import Control.Monad ((<=<))
+import Data.Bifunctor (first, second)
+import Data.Coerce
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Map.Merge.Lazy as MM
+import Data.Set (Set)
+import qualified Data.Set as S
+import Prelude hiding (filter, lookup, null)
 
-       -- * Filter
-       , filter
+import Unbound.Generics.LocallyNameless (Name)
 
-       ) where
+import Polysemy
+import Polysemy.Reader
 
-import           Control.Monad                    ((<=<))
-import           Data.Bifunctor                   (first, second)
-import           Data.Coerce
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Map.Merge.Lazy              as MM
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
-import           Prelude                          hiding (filter, lookup, null)
-
-import           Unbound.Generics.LocallyNameless (Name)
-
-import           Polysemy
-import           Polysemy.Reader
-
-import           Disco.Names                      (ModuleName,
-                                                   NameProvenance (..),
-                                                   QName (..))
+import Disco.Names (
+  ModuleName,
+  NameProvenance (..),
+  QName (..),
+ )
 
 -- | A context maps qualified names to things.  In particular a @Ctx a
 --   b@ maps qualified names for @a@s to values of type @b@.
-newtype Ctx a b = Ctx { getCtx :: M.Map NameProvenance (M.Map (Name a) b) }
+newtype Ctx a b = Ctx {getCtx :: M.Map NameProvenance (M.Map (Name a) b)}
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
-  -- Note that we implement a context as a nested map from
-  -- NameProvenance to Name to b, rather than as a Map QName b.  They
-  -- are isomorphic, but this way it is easier to do name resolution,
-  -- because given an (unqualified) Name, we can look it up in each
-  -- inner map corresponding to modules that are in scope.
+-- Note that we implement a context as a nested map from
+-- NameProvenance to Name to b, rather than as a Map QName b.  They
+-- are isomorphic, but this way it is easier to do name resolution,
+-- because given an (unqualified) Name, we can look it up in each
+-- inner map corresponding to modules that are in scope.
 
 instance Semigroup (Ctx a b) where
   (<>) = joinCtx
@@ -159,8 +163,8 @@ lookupNonLocal n = lookupNonLocal' n <$> ask
 -- | Look up all the non-local bindings of a name in a context.
 lookupNonLocal' :: Name a -> Ctx a b -> [(ModuleName, b)]
 lookupNonLocal' n = nonLocal . lookupAll' n
-  where
-    nonLocal bs = [(m,b) | (QName (QualifiedName m) _, b) <- bs]
+ where
+  nonLocal bs = [(m, b) | (QName (QualifiedName m) _, b) <- bs]
 
 -- | Look up all the bindings of an (unqualified) name in an ambient context.
 lookupAll :: Member (Reader (Ctx a b)) r => Name a -> Sem r [(QName a, b)]
@@ -186,9 +190,9 @@ elems = concatMap M.elems . M.elems . getCtx
 --   context.
 assocs :: Ctx a b -> [(QName a, b)]
 assocs = concatMap (uncurry modAssocs) . M.assocs . getCtx
-  where
-    modAssocs :: NameProvenance -> Map (Name a) b -> [(QName a, b)]
-    modAssocs p = map (first (QName p)) . M.assocs
+ where
+  modAssocs :: NameProvenance -> Map (Name a) b -> [(QName a, b)]
+  modAssocs p = map (first (QName p)) . M.assocs
 
 -- | Return a set of all qualified names in the context.
 keysSet :: Ctx a b -> Set (QName a)
@@ -205,9 +209,9 @@ coerceKeys = Ctx . M.map (M.mapKeys coerce) . getCtx
 -- | Restrict a context to only the keys in the given set.
 restrictKeys :: Ctx a b -> Set (QName a) -> Ctx a b
 restrictKeys ctx xs = Ctx . restrict m . getCtx $ ctx
-  where
-    restrict = MM.merge MM.dropMissing MM.dropMissing (MM.zipWithMatched (\_ ns m' -> M.restrictKeys m' ns))
-    m = M.fromListWith S.union . map (\(QName p n) -> (p, S.singleton n)) . S.toList $ xs
+ where
+  restrict = MM.merge MM.dropMissing MM.dropMissing (MM.zipWithMatched (\_ ns m' -> M.restrictKeys m' ns))
+  m = M.fromListWith S.union . map (\(QName p n) -> (p, S.singleton n)) . S.toList $ xs
 
 ------------------------------------------------------------
 -- Combination
@@ -217,7 +221,7 @@ restrictKeys ctx xs = Ctx . restrict m . getCtx $ ctx
 --   exists in both contexts, the result will use the value from the
 --   first context, and throw away the value from the second.).
 joinCtx :: Ctx a b -> Ctx a b -> Ctx a b
-joinCtx a b = joinCtxs [a,b]
+joinCtx a b = joinCtxs [a, b]
 
 -- | Join a list of contexts (left-biased).
 joinCtxs :: [Ctx a b] -> Ctx a b

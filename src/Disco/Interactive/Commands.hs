@@ -1,8 +1,11 @@
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE PatternSynonyms    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Interactive.Commands
 -- Copyright   :  disco team and contributors
@@ -12,69 +15,86 @@
 --
 -- Defining and dispatching all commands/functionality available at
 -- the REPL prompt.
------------------------------------------------------------------------------
+module Disco.Interactive.Commands (
+  dispatch,
+  discoCommands,
+  handleLoad,
+  loadFile,
+  parseLine,
+) where
 
-module Disco.Interactive.Commands
-  ( dispatch,
-    discoCommands,
-    handleLoad,
-    loadFile,
-    parseLine
-  ) where
+import Control.Arrow ((&&&))
+import Control.Lens (
+  to,
+  view,
+  (%~),
+  (.~),
+  (?~),
+  (^.),
+ )
+import Control.Monad.Except
+import Data.Char (isSpace)
+import Data.Coerce
+import Data.List (find, isPrefixOf, sortBy)
+import Data.Map ((!))
+import qualified Data.Map as M
+import Data.Typeable
+import System.FilePath (splitFileName)
+import Prelude as P
 
-import           Control.Arrow                    ((&&&))
-import           Control.Lens                     (to, view, (%~), (.~), (?~),
-                                                   (^.))
-import           Control.Monad.Except
-import           Data.Char                        (isSpace)
-import           Data.Coerce
-import           Data.List                        (find, isPrefixOf, sortBy)
-import           Data.Map                         ((!))
-import qualified Data.Map                         as M
-import           Data.Typeable
-import           Prelude                          as P
-import           System.FilePath                  (splitFileName)
+import Text.Megaparsec hiding (State, runParser)
+import qualified Text.Megaparsec.Char as C
+import Unbound.Generics.LocallyNameless (
+  Name,
+  name2String,
+  string2Name,
+ )
 
-import           Text.Megaparsec                  hiding (State, runParser)
-import qualified Text.Megaparsec.Char             as C
-import           Unbound.Generics.LocallyNameless (Name, name2String,
-                                                   string2Name)
+import Disco.Effects.Input
+import Disco.Effects.LFresh
+import Disco.Effects.State
+import Polysemy
+import Polysemy.Error hiding (try)
+import Polysemy.Output
+import Polysemy.Reader
 
-import           Disco.Effects.Input
-import           Disco.Effects.LFresh
-import           Disco.Effects.State
-import           Polysemy
-import           Polysemy.Error                   hiding (try)
-import           Polysemy.Output
-import           Polysemy.Reader
-
-import           Data.Maybe                       (mapMaybe, maybeToList)
-import           Disco.AST.Surface
-import           Disco.AST.Typed
-import           Disco.Compile
-import           Disco.Context                    as Ctx
-import           Disco.Desugar
-import           Disco.Doc
-import           Disco.Error
-import           Disco.Eval
-import           Disco.Extensions
-import           Disco.Interpret.CESK
-import           Disco.Messages
-import           Disco.Module
-import           Disco.Names
-import           Disco.Parser                     (Parser, ident, reservedOp,
-                                                   runParser, sc, symbol, term,
-                                                   wholeModule, withExts)
-import           Disco.Pretty                     hiding (empty, (<>))
-import qualified Disco.Pretty                     as Pretty
-import           Disco.Property                   (prettyTestResult)
-import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims               (Prim (PrimBOp, PrimUOp),
-                                                   toPrim)
-import           Disco.Typecheck
-import           Disco.Typecheck.Erase
-import           Disco.Types                      (pattern TyString, toPolyType)
-import           Disco.Value
+import Data.Maybe (mapMaybe, maybeToList)
+import Disco.AST.Surface
+import Disco.AST.Typed
+import Disco.Compile
+import Disco.Context as Ctx
+import Disco.Desugar
+import Disco.Doc
+import Disco.Error
+import Disco.Eval
+import Disco.Extensions
+import Disco.Interpret.CESK
+import Disco.Messages
+import Disco.Module
+import Disco.Names
+import Disco.Parser (
+  Parser,
+  ident,
+  reservedOp,
+  runParser,
+  sc,
+  symbol,
+  term,
+  wholeModule,
+  withExts,
+ )
+import Disco.Pretty hiding (empty, (<>))
+import qualified Disco.Pretty as Pretty
+import Disco.Property (prettyTestResult)
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims (
+  Prim (PrimBOp, PrimUOp),
+  toPrim,
+ )
+import Disco.Typecheck
+import Disco.Typecheck.Erase
+import Disco.Types (toPolyType, pattern TyString)
+import Disco.Value
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -83,24 +103,24 @@ import           Disco.Value
 -- | Data type to represent things typed at the Disco REPL.  Each
 --   constructor has a singleton type to facilitate dispatch.
 data REPLExpr :: CmdTag -> * where
-  TypeCheck :: Term      -> REPLExpr 'CTypeCheck -- Typecheck a term
-  Eval      :: Module    -> REPLExpr 'CEval      -- Evaluate a block
-  TestProp  :: Term      -> REPLExpr 'CTestProp  -- Run a property test
-  ShowDefn  :: Name Term -> REPLExpr 'CShowDefn  -- Show a variable's definition
-  Parse     :: Term      -> REPLExpr 'CParse     -- Show the parsed AST
-  Pretty    :: Term      -> REPLExpr 'CPretty    -- Pretty-print a term
-  Print     :: Term      -> REPLExpr 'CPrint     -- Print a string
-  Ann       :: Term      -> REPLExpr 'CAnn       -- Show type-annotated term
-  Desugar   :: Term      -> REPLExpr 'CDesugar   -- Show a desugared term
-  Compile   :: Term      -> REPLExpr 'CCompile   -- Show a compiled term
-  Load      :: FilePath  -> REPLExpr 'CLoad      -- Load a file.
-  Reload    ::              REPLExpr 'CReload    -- Reloads the most recently
-                                                 -- loaded file.
-  Doc       :: DocInput  -> REPLExpr 'CDoc       -- Show documentation.
-  Nop       ::              REPLExpr 'CNop       -- No-op, e.g. if the user
-                                                 -- just enters a comment
-  Help      ::              REPLExpr 'CHelp      -- Show help
-  Names     ::              REPLExpr 'CNames     -- Show bound names
+  TypeCheck :: Term -> REPLExpr 'CTypeCheck -- Typecheck a term
+  Eval :: Module -> REPLExpr 'CEval -- Evaluate a block
+  TestProp :: Term -> REPLExpr 'CTestProp -- Run a property test
+  ShowDefn :: Name Term -> REPLExpr 'CShowDefn -- Show a variable's definition
+  Parse :: Term -> REPLExpr 'CParse -- Show the parsed AST
+  Pretty :: Term -> REPLExpr 'CPretty -- Pretty-print a term
+  Print :: Term -> REPLExpr 'CPrint -- Print a string
+  Ann :: Term -> REPLExpr 'CAnn -- Show type-annotated term
+  Desugar :: Term -> REPLExpr 'CDesugar -- Show a desugared term
+  Compile :: Term -> REPLExpr 'CCompile -- Show a compiled term
+  Load :: FilePath -> REPLExpr 'CLoad -- Load a file.
+  Reload :: REPLExpr 'CReload -- Reloads the most recently
+  -- loaded file.
+  Doc :: DocInput -> REPLExpr 'CDoc -- Show documentation.
+  Nop :: REPLExpr 'CNop -- No-op, e.g. if the user
+  -- just enters a comment
+  Help :: REPLExpr 'CHelp -- Show help
+  Names :: REPLExpr 'CNames -- Show bound names
 
 deriving instance Show (REPLExpr c)
 
@@ -153,23 +173,23 @@ data CmdTag
 -- | Data type to represent all the information about a single REPL
 --   command.
 data REPLCommand (c :: CmdTag) = REPLCommand
-  { -- | Name of the command
-    name      :: String,
-    -- | Help text showing how to use the command, e.g. ":ann <term>"
-    helpcmd   :: String,
-    -- | Short free-form text explaining the command.
-    --   We could also consider adding long help text as well.
-    shortHelp :: String,
-    -- | Is the command for users or devs?
-    category  :: REPLCommandCategory,
-    -- | Is it a built-in command or colon command?
-    cmdtype   :: REPLCommandType,
-    -- | The action to execute,
-    -- given the input to the
-    -- command.
-    action    :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ()),
-    -- | Parser for the command argument(s).
-    parser    :: Parser (REPLExpr c)
+  { name :: String
+  -- ^ Name of the command
+  , helpcmd :: String
+  -- ^ Help text showing how to use the command, e.g. ":ann <term>"
+  , shortHelp :: String
+  -- ^ Short free-form text explaining the command.
+  --   We could also consider adding long help text as well.
+  , category :: REPLCommandCategory
+  -- ^ Is the command for users or devs?
+  , cmdtype :: REPLCommandType
+  -- ^ Is it a built-in command or colon command?
+  , action :: REPLExpr c -> (forall r. Members DiscoEffects r => Sem r ())
+  -- ^ The action to execute,
+  -- given the input to the
+  -- command.
+  , parser :: Parser (REPLExpr c)
+  -- ^ Parser for the command argument(s).
   }
 
 -- | An existential wrapper around any REPL command info record.
@@ -201,22 +221,22 @@ dispatch (SomeCmd c : cs) r@(SomeREPL e) = case gcast e of
 --   to the first matching command.
 discoCommands :: REPLCommands
 discoCommands =
-  [ SomeCmd annCmd,
-    SomeCmd compileCmd,
-    SomeCmd desugarCmd,
-    SomeCmd docCmd,
-    SomeCmd evalCmd,
-    SomeCmd helpCmd,
-    SomeCmd loadCmd,
-    SomeCmd namesCmd,
-    SomeCmd nopCmd,
-    SomeCmd parseCmd,
-    SomeCmd prettyCmd,
-    SomeCmd printCmd,
-    SomeCmd reloadCmd,
-    SomeCmd showDefnCmd,
-    SomeCmd typeCheckCmd,
-    SomeCmd testPropCmd
+  [ SomeCmd annCmd
+  , SomeCmd compileCmd
+  , SomeCmd desugarCmd
+  , SomeCmd docCmd
+  , SomeCmd evalCmd
+  , SomeCmd helpCmd
+  , SomeCmd loadCmd
+  , SomeCmd namesCmd
+  , SomeCmd nopCmd
+  , SomeCmd parseCmd
+  , SomeCmd prettyCmd
+  , SomeCmd printCmd
+  , SomeCmd reloadCmd
+  , SomeCmd showDefnCmd
+  , SomeCmd typeCheckCmd
+  , SomeCmd testPropCmd
   ]
 
 ------------------------------------------------------------
@@ -237,12 +257,12 @@ commandParser allCommands =
 --   colon, return a parser for its arguments.
 parseCommandArgs :: REPLCommands -> String -> Parser SomeREPLExpr
 parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) . fst) parsers
-  where
-    badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
+ where
+  badCmd = fail $ "Command \":" ++ cmd ++ "\" is unrecognized."
 
-    parsers =
-      map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) $
-        byCmdType ColonCmd allCommands
+  parsers =
+    map (\(SomeCmd rc) -> (name rc, SomeREPL <$> parser rc)) $
+      byCmdType ColonCmd allCommands
 
 -- | Parse a file name.
 fileParser :: Parser FilePath
@@ -260,7 +280,7 @@ lineParser allCommands =
 parseLine :: REPLCommands -> ExtSet -> String -> Either String SomeREPLExpr
 parseLine allCommands exts s =
   case runParser (withExts exts (lineParser allCommands)) "" s of
-    Left e  -> Left $ errorBundlePretty e
+    Left e -> Left $ errorBundlePretty e
     Right l -> Right l
 
 --------------------------------------------------------------------------------
@@ -273,13 +293,13 @@ parseLine allCommands exts s =
 annCmd :: REPLCommand 'CAnn
 annCmd =
   REPLCommand
-    { name = "ann",
-      helpcmd = ":ann",
-      shortHelp = "Show type-annotated typechecked term",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleAnn,
-      parser = Ann <$> term
+    { name = "ann"
+    , helpcmd = ":ann"
+    , shortHelp = "Show type-annotated typechecked term"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleAnn
+    , parser = Ann <$> term
     }
 
 handleAnn ::
@@ -296,13 +316,13 @@ handleAnn (Ann t) = do
 compileCmd :: REPLCommand 'CCompile
 compileCmd =
   REPLCommand
-    { name = "compile",
-      helpcmd = ":compile",
-      shortHelp = "Show a compiled term",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleCompile,
-      parser = Compile <$> term
+    { name = "compile"
+    , helpcmd = ":compile"
+    , shortHelp = "Show a compiled term"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleCompile
+    , parser = Compile <$> term
     }
 
 handleCompile ::
@@ -319,13 +339,13 @@ handleCompile (Compile t) = do
 desugarCmd :: REPLCommand 'CDesugar
 desugarCmd =
   REPLCommand
-    { name = "desugar",
-      helpcmd = ":desugar",
-      shortHelp = "Show a desugared term",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleDesugar,
-      parser = Desugar <$> term
+    { name = "desugar"
+    , helpcmd = ":desugar"
+    , shortHelp = "Show a desugared term"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleDesugar
+    , parser = Desugar <$> term
     }
 
 handleDesugar ::
@@ -342,13 +362,13 @@ handleDesugar (Desugar t) = do
 docCmd :: REPLCommand 'CDoc
 docCmd =
   REPLCommand
-    { name = "doc",
-      helpcmd = ":doc <term>",
-      shortHelp = "Show documentation",
-      category = User,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleDoc,
-      parser = Doc <$> parseDoc
+    { name = "doc"
+    , helpcmd = ":doc <term>"
+    , shortHelp = "Show documentation"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleDoc
+    , parser = Doc <$> parseDoc
     }
 
 -- An input to the :doc command can be either a term, a primitive
@@ -358,51 +378,48 @@ data DocInput = DocTerm Term | DocPrim Prim | DocOther String
 
 parseDoc :: Parser DocInput
 parseDoc =
-      (DocTerm <$> try term)
-  <|> (DocPrim <$> try (parseNakedOpPrim <?> "operator"))
-  <|> (DocOther <$> (sc *> many (anySingleBut ' ')))
+  (DocTerm <$> try term)
+    <|> (DocPrim <$> try (parseNakedOpPrim <?> "operator"))
+    <|> (DocOther <$> (sc *> many (anySingleBut ' ')))
 
 handleDoc ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
 handleDoc (Doc (DocTerm (TBool _))) = handleDocBool
-handleDoc (Doc (DocTerm TUnit))     = handleDocUnit
-handleDoc (Doc (DocTerm TWild))     = handleDocWild
+handleDoc (Doc (DocTerm TUnit)) = handleDocUnit
+handleDoc (Doc (DocTerm TWild)) = handleDocWild
 handleDoc (Doc (DocTerm (TPrim p))) = handleDocPrim p
-handleDoc (Doc (DocTerm (TVar x)))  = handleDocVar x
-handleDoc (Doc (DocTerm _))         =
+handleDoc (Doc (DocTerm (TVar x))) = handleDocVar x
+handleDoc (Doc (DocTerm _)) =
   err "Can't display documentation for an expression.  Try asking about a function, operator, or type name."
-handleDoc (Doc (DocPrim p))         = handleDocPrim p
-handleDoc (Doc (DocOther s))        = handleDocOther s
+handleDoc (Doc (DocPrim p)) = handleDocPrim p
+handleDoc (Doc (DocOther s)) = handleDocOther s
 
 handleDocBool :: Members '[Output Message] r => Sem r ()
 handleDocBool =
   info $
     "true and false (also written True and False) are the two possible values of type Boolean."
-    $+$
-    mkReference "bool"
+      $+$ mkReference "bool"
 
 handleDocUnit :: Members '[Output Message] r => Sem r ()
 handleDocUnit =
   info $
     "The unit value, i.e. the single value of type Unit."
-    $+$
-    mkReference "unit"
+      $+$ mkReference "unit"
 
 handleDocWild :: Members '[Output Message] r => Sem r ()
 handleDocWild =
   info $
     "A wildcard pattern."
-    $+$
-    mkReference "wild-pattern"
+      $+$ mkReference "wild-pattern"
 
 handleDocVar ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   Name Term ->
   Sem r ()
 handleDocVar x = do
-  replCtx  <- inputs @TopInfo (view (replModInfo . miTys))
+  replCtx <- inputs @TopInfo (view (replModInfo . miTys))
   replTydefs <- inputs @TopInfo (view (replModInfo . miTydefs))
   replDocs <- inputs @TopInfo (view (replModInfo . miDocs))
 
@@ -420,24 +437,23 @@ handleDocVar x = do
     ([], Nothing) ->
       -- Maybe the variable name entered by the user is actually a prim.
       case toPrim (name2String x) of
-        (prim:_) -> handleDocPrim prim
-        _        -> err $ "No documentation found for '" <> pretty' x <> "'."
+        (prim : _) -> handleDocPrim prim
+        _ -> err $ "No documentation found for '" <> pretty' x <> "'."
     (binds, def) ->
       mapM_ (showDoc docs) (map Left binds ++ map Right (maybeToList def))
-
-  where
-    showDoc docMap (Left (qn, ty)) = info $
+ where
+  showDoc docMap (Left (qn, ty)) =
+    info $
       hsep [pretty' x, ":", pretty' ty]
-      $+$
-      case Ctx.lookup' qn docMap of
-        Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
-        _                       -> Pretty.empty
-    showDoc docMap (Right tdBody) = info $
+        $+$ case Ctx.lookup' qn docMap of
+          Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
+          _ -> Pretty.empty
+  showDoc docMap (Right tdBody) =
+    info $
       pretty' (name2String x, tdBody)
-      $+$
-      case Ctx.lookupAll' x docMap of
-        ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
-        _                           -> Pretty.empty
+        $+$ case Ctx.lookupAll' x docMap of
+          ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
+          _ -> Pretty.empty
 
 handleDocPrim ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
@@ -445,37 +461,39 @@ handleDocPrim ::
   Sem r ()
 handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  info $ vcat
-    [ case prim of
-        PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
-          where
+  info $
+    vcat
+      [ case prim of
+          PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
+           where
             OpInfo (UOpF f _) syns _ = uopMap ! u
-        PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
-        _         -> Pretty.empty
-    , case prim of
-        PrimUOp u -> describePrec (uPrec u)
-        PrimBOp b -> describePrec (bPrec b) <> describeFixity (assoc b)
-        _         -> Pretty.empty
-    ]
+          PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
+          _ -> Pretty.empty
+      , case prim of
+          PrimUOp u -> describePrec (uPrec u)
+          PrimBOp b -> describePrec (bPrec b) <> describeFixity (assoc b)
+          _ -> Pretty.empty
+      ]
   case (M.lookup prim primDoc, M.lookup prim primReference) of
     (Nothing, Nothing) -> return ()
-    (Nothing, Just p)  -> info $ mkReference p
-    (Just d, mp)  ->
+    (Nothing, Just p) -> info $ mkReference p
+    (Just d, mp) ->
       info $ "" $+$ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
-  where
-    describePrec p = "precedence level" <+> text (show p)
-    describeFixity In  = Pretty.empty
-    describeFixity InL = ", left associative"
-    describeFixity InR = ", right associative"
-    describeAlts _ _ []            = Pretty.empty
-    describeAlts _ _ [_]           = Pretty.empty
-    describeAlts pre post (_:alts) = "Alternative syntax:" <+> intercalate "," (map showOp alts)
-      where
-        showOp op = hcat
-          [ if pre then "~" else Pretty.empty
-          , text op
-          , if post then "~" else Pretty.empty]
-
+ where
+  describePrec p = "precedence level" <+> text (show p)
+  describeFixity In = Pretty.empty
+  describeFixity InL = ", left associative"
+  describeFixity InR = ", right associative"
+  describeAlts _ _ [] = Pretty.empty
+  describeAlts _ _ [_] = Pretty.empty
+  describeAlts pre post (_ : alts) = "Alternative syntax:" <+> intercalate "," (map showOp alts)
+   where
+    showOp op =
+      hcat
+        [ if pre then "~" else Pretty.empty
+        , text op
+        , if post then "~" else Pretty.empty
+        ]
 
 mkReference :: String -> Sem r Doc
 mkReference p =
@@ -488,32 +506,35 @@ handleDocOther ::
 handleDocOther s =
   case (M.lookup s otherDoc, M.lookup s otherReference) of
     (Nothing, Nothing) -> info $ "No documentation found for '" <> text s <> "'."
-    (Nothing, Just p)  -> info $ mkReference p
-    (Just d, mp)  ->
+    (Nothing, Just p) -> info $ mkReference p
+    (Just d, mp) ->
       info $ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
 
 ------------------------------------------------------------
 -- eval
 
 evalCmd :: REPLCommand 'CEval
-evalCmd = REPLCommand
-  { name      = "eval"
-  , helpcmd   = "<code>"
-  , shortHelp = "Evaluate a block of code"
-  , category  = User
-  , cmdtype   = BuiltIn
-  , action    = handleEval
-  , parser    = Eval <$> wholeModule REPL
-  }
+evalCmd =
+  REPLCommand
+    { name = "eval"
+    , helpcmd = "<code>"
+    , shortHelp = "Evaluate a block of code"
+    , category = User
+    , cmdtype = BuiltIn
+    , action = handleEval
+    , parser = Eval <$> wholeModule REPL
+    }
 
-handleEval
-  :: Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r
-  => REPLExpr 'CEval -> Sem r ()
+handleEval ::
+  Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r =>
+  REPLExpr 'CEval ->
+  Sem r ()
 handleEval (Eval m) = do
   mi <- inputToState @TopInfo $ loadParsedDiscoModule False FromCwdOrStdlib REPLModule m
   addToREPLModule mi
   forM_ (mi ^. miTerms) (mapError EvalErr . evalTerm True . fst)
-  -- garbageCollect?
+
+-- garbageCollect?
 
 -- First argument = should the value be printed?
 evalTerm :: Members (Error EvalError ': State TopInfo ': Output Message ': EvalEffects) r => Bool -> ATerm -> Sem r Value
@@ -525,11 +546,11 @@ evalTerm pr at = do
   when pr $ info $ runInputConst tydefs $ prettyValue' ty v
 
   modify @TopInfo $
-    (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty)) .
-    (topEnv %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) v)
+    (replModInfo . miTys %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) (toPolyType ty))
+      . (topEnv %~ Ctx.insert (QName (QualifiedName REPLModule) (string2Name "it")) v)
   return v
-  where
-    ty = getType at
+ where
+  ty = getType at
 
 ------------------------------------------------------------
 -- :help
@@ -537,33 +558,33 @@ evalTerm pr at = do
 helpCmd :: REPLCommand 'CHelp
 helpCmd =
   REPLCommand
-    { name = "help",
-      helpcmd = ":help",
-      shortHelp = "Show help",
-      category = User,
-      cmdtype = ColonCmd,
-      action = handleHelp,
-      parser = return Help
+    { name = "help"
+    , helpcmd = ":help"
+    , shortHelp = "Show help"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handleHelp
+    , parser = return Help
     }
 
 handleHelp :: Member (Output Message) r => REPLExpr 'CHelp -> Sem r ()
 handleHelp Help =
   info $
     vcat
-    [ "Commands available from the prompt:"
-    , text ""
-    , vcat (map (\(SomeCmd c) -> showCmd c) $ sortedList discoCommands)
-    , text ""
-    ]
-  where
-    maxlen = longestCmd discoCommands
-    sortedList cmds =
-      sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
-    showCmd c = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
-    longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
-    padRight s maxsize = take maxsize (s ++ repeat ' ')
-    --  don't show dev-only commands by default
-    filteredCommands = P.filter (\(SomeCmd c) -> category c == User)
+      [ "Commands available from the prompt:"
+      , text ""
+      , vcat (map (\(SomeCmd c) -> showCmd c) $ sortedList discoCommands)
+      , text ""
+      ]
+ where
+  maxlen = longestCmd discoCommands
+  sortedList cmds =
+    sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
+  showCmd c = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
+  longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
+  padRight s maxsize = take maxsize (s ++ repeat ' ')
+  --  don't show dev-only commands by default
+  filteredCommands = P.filter (\(SomeCmd c) -> category c == User)
 
 ------------------------------------------------------------
 -- :load
@@ -571,13 +592,13 @@ handleHelp Help =
 loadCmd :: REPLCommand 'CLoad
 loadCmd =
   REPLCommand
-    { name = "load",
-      helpcmd = ":load <filename>",
-      shortHelp = "Load a file",
-      category = User,
-      cmdtype = ColonCmd,
-      action = handleLoadWrapper,
-      parser = Load <$> fileParser
+    { name = "load"
+    , helpcmd = ":load <filename>"
+    , shortHelp = "Load a file"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handleLoadWrapper
+    , parser = Load <$> fileParser
     }
 
 -- | Parses, typechecks, and loads a module by first recursively loading any imported
@@ -622,30 +643,29 @@ handleLoad fp = do
 runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
 runAllTests declNames aprops
   | Ctx.null aprops = return True
-  | otherwise     = do
+  | otherwise = do
       info "Running tests..."
       -- Use the order the names were defined in the module
       and <$> mapM (uncurry runTests) (mapMaybe (\n -> (n,) <$> Ctx.lookup' (coerce n) aprops) declNames)
+ where
+  numSamples :: Int
+  numSamples = 50 -- XXX make this configurable somehow
+  runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName Term -> [AProperty] -> Sem r Bool
+  runTests (QName _ n) props = do
+    results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
+    let failures = P.filter (not . testIsOk . snd) results
+        hdr = pretty' n <> ":"
 
-  where
-    numSamples :: Int
-    numSamples = 50   -- XXX make this configurable somehow
-
-    runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName Term -> [AProperty] -> Sem r Bool
-    runTests (QName _ n) props = do
-      results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
-      let failures = P.filter (not . testIsOk . snd) results
-          hdr = pretty' n <> ":"
-
-      case P.null failures of
-        True  -> info $ nest 2 $ hdr <+> "OK"
-        False -> do
-          tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
-          let prettyFailures =
-                runInputConst tydefs . runReader initPA . runLFresh $
-                  bulletList "-" $ map (uncurry prettyTestResult) failures
-          info $ nest 2 $ hdr $+$ prettyFailures
-      return (P.null failures)
+    case P.null failures of
+      True -> info $ nest 2 $ hdr <+> "OK"
+      False -> do
+        tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
+        let prettyFailures =
+              runInputConst tydefs . runReader initPA . runLFresh $
+                bulletList "-" $
+                  map (uncurry prettyTestResult) failures
+        info $ nest 2 $ hdr $+$ prettyFailures
+    return (P.null failures)
 
 ------------------------------------------------------------
 -- :names
@@ -653,13 +673,13 @@ runAllTests declNames aprops
 namesCmd :: REPLCommand 'CNames
 namesCmd =
   REPLCommand
-    { name = "names",
-      helpcmd = ":names",
-      shortHelp = "Show all names in current scope",
-      category = User,
-      cmdtype = ColonCmd,
-      action = inputToState . handleNames,
-      parser = return Names
+    { name = "names"
+    , helpcmd = ":names"
+    , shortHelp = "Show all names in current scope"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = inputToState . handleNames
+    , parser = return Names
     }
 
 -- | Show names and types for each item in the top-level context.
@@ -672,10 +692,9 @@ handleNames Names = do
   ctx <- inputs @TopInfo (view (replModInfo . miTys))
   info $
     vcat (map pretty' (M.assocs tyDef))
-    $+$
-    vcat (map showFn (Ctx.assocs ctx))
-  where
-    showFn (QName _ x, ty) = hsep [pretty' x, text ":", pretty' ty]
+      $+$ vcat (map showFn (Ctx.assocs ctx))
+ where
+  showFn (QName _ x, ty) = hsep [pretty' x, text ":", pretty' ty]
 
 ------------------------------------------------------------
 -- nop
@@ -683,13 +702,13 @@ handleNames Names = do
 nopCmd :: REPLCommand 'CNop
 nopCmd =
   REPLCommand
-    { name = "nop",
-      helpcmd = "",
-      shortHelp = "No-op, e.g. if the user just enters a comment",
-      category = Dev,
-      cmdtype = BuiltIn,
-      action = handleNop,
-      parser = Nop <$ (sc <* eof)
+    { name = "nop"
+    , helpcmd = ""
+    , shortHelp = "No-op, e.g. if the user just enters a comment"
+    , category = Dev
+    , cmdtype = BuiltIn
+    , action = handleNop
+    , parser = Nop <$ (sc <* eof)
     }
 
 handleNop :: REPLExpr 'CNop -> Sem r ()
@@ -701,13 +720,13 @@ handleNop Nop = pure ()
 parseCmd :: REPLCommand 'CParse
 parseCmd =
   REPLCommand
-    { name = "parse",
-      helpcmd = ":parse <expr>",
-      shortHelp = "Show the parsed AST",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = handleParse,
-      parser = Parse <$> term
+    { name = "parse"
+    , helpcmd = ":parse <expr>"
+    , shortHelp = "Show the parsed AST"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = handleParse
+    , parser = Parse <$> term
     }
 
 handleParse :: Member (Output Message) r => REPLExpr 'CParse -> Sem r ()
@@ -719,13 +738,13 @@ handleParse (Parse t) = info (text (show t))
 prettyCmd :: REPLCommand 'CPretty
 prettyCmd =
   REPLCommand
-    { name = "pretty",
-      helpcmd = ":pretty <expr>",
-      shortHelp = "Pretty-print a term",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = handlePretty,
-      parser = Pretty <$> term
+    { name = "pretty"
+    , helpcmd = ":pretty <expr>"
+    , shortHelp = "Pretty-print a term"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = handlePretty
+    , parser = Pretty <$> term
     }
 
 handlePretty :: Members '[LFresh, Output Message] r => REPLExpr 'CPretty -> Sem r ()
@@ -737,13 +756,13 @@ handlePretty (Pretty t) = info $ pretty' t
 printCmd :: REPLCommand 'CPrint
 printCmd =
   REPLCommand
-    { name = "print",
-      helpcmd = ":print <expr>",
-      shortHelp = "Print a string without the double quotes, interpreting special characters",
-      category = User,
-      cmdtype = ColonCmd,
-      action = handlePrint,
-      parser = Print <$> term
+    { name = "print"
+    , helpcmd = ":print <expr>"
+    , shortHelp = "Print a string without the double quotes, interpreting special characters"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handlePrint
+    , parser = Print <$> term
     }
 
 handlePrint :: Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r => REPLExpr 'CPrint -> Sem r ()
@@ -758,13 +777,13 @@ handlePrint (Print t) = do
 reloadCmd :: REPLCommand 'CReload
 reloadCmd =
   REPLCommand
-    { name = "reload",
-      helpcmd = ":reload",
-      shortHelp = "Reloads the most recently loaded file",
-      category = User,
-      cmdtype = ColonCmd,
-      action = handleReload,
-      parser = return Reload
+    { name = "reload"
+    , helpcmd = ":reload"
+    , shortHelp = "Reloads the most recently loaded file"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handleReload
+    , parser = return Reload
     }
 
 handleReload ::
@@ -775,7 +794,7 @@ handleReload Reload = do
   file <- use lastFile
   case file of
     Nothing -> info "No file to reload."
-    Just f  -> void (handleLoad f)
+    Just f -> void (handleLoad f)
 
 ------------------------------------------------------------
 -- :defn
@@ -783,13 +802,13 @@ handleReload Reload = do
 showDefnCmd :: REPLCommand 'CShowDefn
 showDefnCmd =
   REPLCommand
-    { name = "defn",
-      helpcmd = ":defn <var>",
-      shortHelp = "Show a variable's definition",
-      category = User,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleShowDefn,
-      parser = ShowDefn <$> (sc *> ident)
+    { name = "defn"
+    , helpcmd = ":defn <var>"
+    , shortHelp = "Show a variable's definition"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleShowDefn
+    , parser = ShowDefn <$> (sc *> ident)
     }
 
 handleShowDefn ::
@@ -798,7 +817,7 @@ handleShowDefn ::
   Sem r ()
 handleShowDefn (ShowDefn x) = do
   let name2s = name2String x
-  defns   <- inputs @TopInfo (view (replModInfo . miTermdefs))
+  defns <- inputs @TopInfo (view (replModInfo . miTermdefs))
   tyDefns <- inputs @TopInfo (view (replModInfo . miTydefs))
 
   let xdefs = Ctx.lookupAll' (coerce x) defns
@@ -808,7 +827,7 @@ handleShowDefn (ShowDefn x) = do
     let ds = map (pretty' . snd) xdefs ++ maybe [] (pure . pretty' . (name2s,)) mtydef
     case ds of
       [] -> text "No definition for" <+> pretty' x
-      _  -> vcat ds
+      _ -> vcat ds
 
 ------------------------------------------------------------
 -- :test
@@ -816,13 +835,13 @@ handleShowDefn (ShowDefn x) = do
 testPropCmd :: REPLCommand 'CTestProp
 testPropCmd =
   REPLCommand
-    { name = "test",
-      helpcmd = ":test <property>",
-      shortHelp = "Test a property using random examples",
-      category = User,
-      cmdtype = ColonCmd,
-      action = handleTest,
-      parser = TestProp <$> term
+    { name = "test"
+    , helpcmd = ":test <property>"
+    , shortHelp = "Test a property using random examples"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handleTest
+    , parser = TestProp <$> term
     }
 
 handleTest ::
@@ -842,13 +861,13 @@ handleTest (TestProp t) = do
 typeCheckCmd :: REPLCommand 'CTypeCheck
 typeCheckCmd =
   REPLCommand
-    { name = "type",
-      helpcmd = ":type <term>",
-      shortHelp = "Typecheck a term",
-      category = Dev,
-      cmdtype = ColonCmd,
-      action = inputToState @TopInfo . handleTypeCheck,
-      parser = parseTypeCheck
+    { name = "type"
+    , helpcmd = ":type <term>"
+    , shortHelp = "Typecheck a term"
+    , category = Dev
+    , cmdtype = ColonCmd
+    , action = inputToState @TopInfo . handleTypeCheck
+    , parser = parseTypeCheck
     }
 
 handleTypeCheck ::
@@ -875,7 +894,7 @@ parseNakedOp = TPrim <$> parseNakedOpPrim
 
 parseNakedOpPrim :: Parser Prim
 parseNakedOpPrim = sc *> choice (map mkOpParser (concat opTable))
-  where
-    mkOpParser :: OpInfo -> Parser Prim
-    mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((PrimUOp op <$) . reservedOp) syns)
-    mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((PrimBOp op <$) . reservedOp) syns)
+ where
+  mkOpParser :: OpInfo -> Parser Prim
+  mkOpParser (OpInfo (UOpF _ op) syns _) = choice (map ((PrimUOp op <$) . reservedOp) syns)
+  mkOpParser (OpInfo (BOpF _ op) syns _) = choice (map ((PrimBOp op <$) . reservedOp) syns)

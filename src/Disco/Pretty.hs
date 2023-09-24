@@ -1,8 +1,13 @@
-{-# LANGUAGE DerivingVia               #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE OverloadedStrings         #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-- TODO: the calls to 'error' should be replaced with logging/error capabilities.
+
 -- |
 -- Module      :  Disco.Pretty
 -- Copyright   :  disco team and contributors
@@ -11,40 +16,35 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Various pretty-printing facilities for disco.
---
------------------------------------------------------------------------------
+module Disco.Pretty (
+  module Disco.Pretty.DSL,
+  module Disco.Pretty,
+  module Disco.Pretty.Prec,
+  Doc,
+)
+where
 
--- TODO: the calls to 'error' should be replaced with logging/error capabilities.
+import Prelude hiding ((<>))
 
-module Disco.Pretty
-  ( module Disco.Pretty.DSL
-  , module Disco.Pretty
-  , module Disco.Pretty.Prec
-  , Doc
-  )
-  where
+import Data.Bifunctor
+import Data.Char (isAlpha)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Ratio
+import Data.Set (Set)
+import qualified Data.Set as S
 
-import           Prelude                          hiding ((<>))
+import Disco.Effects.LFresh
+import Polysemy
 
-import           Data.Bifunctor
-import           Data.Char                        (isAlpha)
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Ratio
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
+import Polysemy.Reader
 
-import           Disco.Effects.LFresh
-import           Polysemy
+import Text.PrettyPrint (Doc)
+import Unbound.Generics.LocallyNameless (Name)
 
-import           Polysemy.Reader
-
-import           Text.PrettyPrint                 (Doc)
-import           Unbound.Generics.LocallyNameless (Name)
-
-import           Disco.Pretty.DSL
-import           Disco.Pretty.Prec
-import           Disco.Syntax.Operators
+import Disco.Pretty.DSL
+import Disco.Pretty.Prec
+import Disco.Syntax.Operators
 
 ------------------------------------------------------------
 -- Utilities for handling precedence and associativity
@@ -103,7 +103,7 @@ instance Pretty a => Pretty [a] where
 
 instance (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty m = do
-    let es = map (\(k,v) -> pretty k <+> "->" <+> pretty v) (M.assocs m)
+    let es = map (\(k, v) -> pretty k <+> "->" <+> pretty v) (M.assocs m)
     ds <- setPA initPA $ punctuate "," es
     braces (hsep ds)
 
@@ -119,13 +119,13 @@ instance Pretty (Name a) where
 instance Pretty TyOp where
   pretty = \case
     Enumerate -> text "enumerate"
-    Count     -> text "count"
+    Count -> text "count"
 
 -- | Pretty-print a unary operator, by looking up its concrete syntax
 --   in the 'uopMap'.
 instance Pretty UOp where
   pretty op = case M.lookup op uopMap of
-    Just (OpInfo _ (syn:_) _) ->
+    Just (OpInfo _ (syn : _) _) ->
       text $ syn ++ (if all isAlpha syn then " " else "")
     _ -> error $ "UOp " ++ show op ++ " not in uopMap!"
 
@@ -133,8 +133,8 @@ instance Pretty UOp where
 --   in the 'bopMap'.
 instance Pretty BOp where
   pretty op = case M.lookup op bopMap of
-    Just (OpInfo _ (syn:_) _) -> text syn
-    _                         -> error $ "BOp " ++ show op ++ " not in bopMap!"
+    Just (OpInfo _ (syn : _) _) -> text syn
+    _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 --------------------------------------------------
 -- Pretty-printing decimals
@@ -144,19 +144,19 @@ instance Pretty BOp where
 --   in square brackets.
 prettyDecimal :: Rational -> String
 prettyDecimal r = printedDecimal
+ where
+  (n, d) = properFraction r :: (Integer, Rational)
+  (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
+  printedDecimal
+    | length first102 > 101 || length first102 == 101 && last first102 /= 0 =
+        show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
+    | rep == [0] =
+        show n ++ "." ++ (if null pre then "0" else concatMap show pre)
+    | otherwise =
+        show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
    where
-     (n,d) = properFraction r :: (Integer, Rational)
-     (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
-     printedDecimal
-       | length first102 > 101 || length first102 == 101 && last first102 /= 0
-         = show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
-       | rep == [0]
-         = show n ++ "." ++ (if null pre then "0" else concatMap show pre)
-       | otherwise
-         = show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
-       where
-         (pre, rep) = splitAt len expan
-         first102   = take 102 expan
+    (pre, rep) = splitAt len expan
+    first102 = take 102 expan
 
 -- Given a list, find the indices of the list giving the first and
 -- second occurrence of the first element to repeat, or Nothing if
@@ -166,9 +166,9 @@ findRep = findRep' M.empty 0
 
 findRep' :: Ord a => M.Map a Int -> Int -> [a] -> ([a], Int)
 findRep' _ _ [] = error "Impossible. Empty list in findRep'"
-findRep' prevs ix (x:xs)
+findRep' prevs ix (x : xs)
   | x `M.member` prevs = ([], prevs M.! x)
-  | otherwise          = first (x:) $ findRep' (M.insert x ix prevs) (ix+1) xs
+  | otherwise = first (x :) $ findRep' (M.insert x ix prevs) (ix + 1) xs
 
 -- | @digitalExpansion b n d@ takes the numerator and denominator of a
 --   fraction n/d between 0 and 1, and returns a pair of (1) a list of
@@ -185,7 +185,7 @@ findRep' prevs ix (x:xs)
 --   looking for the first time that the remainder repeats.
 digitalExpansion :: Integer -> Integer -> Integer -> ([Integer], Int)
 digitalExpansion b n d = digits
-  where
-    longDivStep (_, r) = (b*r) `divMod` d
-    res       = tail $ iterate longDivStep (0,n)
-    digits    = first (map fst) (findRep res)
+ where
+  longDivStep (_, r) = (b * r) `divMod` d
+  res = tail $ iterate longDivStep (0, n)
+  digits = first (map fst) (findRep res)

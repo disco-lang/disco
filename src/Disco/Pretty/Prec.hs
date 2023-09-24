@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Pretty.Prec
 -- Copyright   :  disco team and contributors
@@ -7,12 +10,9 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Precedence and associativity for pretty-printing.
---
------------------------------------------------------------------------------
-
 module Disco.Pretty.Prec where
 
-import           Disco.Syntax.Operators
+import Disco.Syntax.Operators
 
 -- Types for storing precedence + associativity together
 

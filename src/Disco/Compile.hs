@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Compile
 -- Copyright   :  disco team and contributors
@@ -8,37 +11,39 @@
 --
 -- Compiling the typechecked, desugared AST to the untyped core
 -- language.
------------------------------------------------------------------------------
-
 module Disco.Compile where
 
-import           Control.Monad                    ((<=<))
-import           Data.Bool                        (bool)
-import           Data.Coerce
-import qualified Data.Map                         as M
-import           Data.Ratio
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
-import           Data.Set.Lens                    (setOf)
+import Control.Monad ((<=<))
+import Data.Bool (bool)
+import Data.Coerce
+import qualified Data.Map as M
+import Data.Ratio
+import Data.Set (Set)
+import qualified Data.Set as S
+import Data.Set.Lens (setOf)
 
-import           Disco.Effects.Fresh
-import           Polysemy                         (Member, Sem, run)
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name,
-                                                   unembed)
+import Disco.Effects.Fresh
+import Polysemy (Member, Sem, run)
+import Unbound.Generics.LocallyNameless (
+  Name,
+  bind,
+  string2Name,
+  unembed,
+ )
 
-import           Disco.AST.Core
-import           Disco.AST.Desugared
-import           Disco.AST.Generic
-import           Disco.AST.Typed
-import           Disco.Context                    as Ctx
-import           Disco.Desugar
-import           Disco.Module
-import           Disco.Names
-import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims
-import qualified Disco.Typecheck.Graph            as G
-import           Disco.Types
-import           Disco.Util
+import Disco.AST.Core
+import Disco.AST.Desugared
+import Disco.AST.Generic
+import Disco.AST.Typed
+import Disco.Context as Ctx
+import Disco.Desugar
+import Disco.Module
+import Disco.Names
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims
+import qualified Disco.Typecheck.Graph as G
+import Disco.Types
+import Disco.Util
 
 ------------------------------------------------------------
 -- Convenience operations
@@ -106,19 +111,18 @@ compileDefnGroup [(f, defn)]
   -- have
   --
   --   fT = force (delay fL. [force fL / fT] body)
-  | f `S.member` setOf fvQ defn = return . (:[]) $
-    (fT, CForce (CProj L (CDelay (bind [qname fL] [substQC fT (CForce (CVar fL)) cdefn]))))
-
+  | f `S.member` setOf fvQ defn =
+      return . (: []) $
+        (fT, CForce (CProj L (CDelay (bind [qname fL] [substQC fT (CForce (CVar fL)) cdefn]))))
   -- A non-recursive definition just compiles simply.
   | otherwise =
-    return [(fT, cdefn)]
+      return [(fT, cdefn)]
+ where
+  fT, fL :: QName Core
+  fT = coerce f
+  fL = localName (coerce (qname f))
 
-  where
-    fT, fL :: QName Core
-    fT = coerce f
-    fL = localName (coerce (qname f))
-
-    cdefn = compileThing desugarDefn defn
+  cdefn = compileThing desugarDefn defn
 
 -- A group of mutually recursive definitions  {f = fbody, g = gbody, ...}
 -- compiles to
@@ -140,12 +144,12 @@ compileDefnGroup defs = do
       bodies' :: [Core]
       bodies' = map (substsQC forceVars . compileThing desugarDefn) bodies
   return $
-    (grp, CDelay (bind (map qname varsL) bodies')) :
-    zip varsT (for [0 ..] $ CForce . flip proj (CVar grp))
-  where
-    proj :: Int -> Core -> Core
-    proj 0 = CProj L
-    proj n = proj (n -1) . CProj R
+    (grp, CDelay (bind (map qname varsL) bodies'))
+      : zip varsT (for [0 ..] $ CForce . flip proj (CVar grp))
+ where
+  proj :: Int -> Core -> Core
+  proj 0 = CProj L
+  proj n = proj (n - 1) . CProj R
 
 ------------------------------------------------------------
 -- Compiling terms
@@ -166,22 +170,22 @@ compileDTerm term@(DTAbs q _ _) = do
   cbody <- compileDTerm body
   case q of
     Lam -> return $ abstract xs cbody
-    Ex  -> return $ quantify (OExists tys) (abstract xs cbody)
+    Ex -> return $ quantify (OExists tys) (abstract xs cbody)
     All -> return $ quantify (OForall tys) (abstract xs cbody)
-  where
-    -- Gather nested abstractions with the same quantifier.
-    unbindDeep :: Member Fresh r => DTerm -> Sem r ([Name DTerm], [Type], DTerm)
-    unbindDeep (DTAbs q' ty l) | q == q' = do
-      (name, inner) <- unbind l
-      (ns, tys, body) <- unbindDeep inner
-      return (name : ns, ty : tys, body)
-    unbindDeep t = return ([], [], t)
+ where
+  -- Gather nested abstractions with the same quantifier.
+  unbindDeep :: Member Fresh r => DTerm -> Sem r ([Name DTerm], [Type], DTerm)
+  unbindDeep (DTAbs q' ty l) | q == q' = do
+    (name, inner) <- unbind l
+    (ns, tys, body) <- unbindDeep inner
+    return (name : ns, ty : tys, body)
+  unbindDeep t = return ([], [], t)
 
-    abstract :: [Name DTerm] -> Core -> Core
-    abstract xs body = CAbs (bind (map coerce xs) body)
+  abstract :: [Name DTerm] -> Core -> Core
+  abstract xs body = CAbs (bind (map coerce xs) body)
 
-    quantify :: Op -> Core -> Core
-    quantify op = CApp (CConst op)
+  quantify :: Op -> Core -> Core
+  quantify op = CApp (CConst op)
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -197,12 +201,12 @@ compileDTerm (DTPair _ t1 t2) =
   CPair <$> compileDTerm t1 <*> compileDTerm t2
 compileDTerm (DTCase _ bs) = CApp <$> compileCase bs <*> pure CUnit
 compileDTerm (DTTyOp _ op ty) = return $ CApp (CConst (tyOps ! op)) (CType ty)
-  where
-    tyOps =
-      M.fromList
-        [ Enumerate ==> OEnum,
-          Count ==> OCount
-        ]
+ where
+  tyOps =
+    M.fromList
+      [ Enumerate ==> OEnum
+      , Count ==> OCount
+      ]
 compileDTerm (DTNil _) = return $ CInj L CUnit
 compileDTerm (DTTest info t) = CTest (coerce info) <$> compileDTerm t
 
@@ -231,27 +235,27 @@ compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
   return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
-
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
   return $ CAbs $ bind [a] $ CInj L (CVar (localName a))
-
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
   return $ CAbs $ bind [a] $ CInj R (CVar (localName a))
-
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 compilePrim _ PrimSqrt = return $ CConst OSqrt
 compilePrim _ PrimFloor = return $ CConst OFloor
 compilePrim _ PrimCeil = return $ CConst OCeil
-compilePrim (TySet _ :->: _) PrimAbs = return $
-  CVar (Named Stdlib "container" .- string2Name "setSize")
-compilePrim (TyBag _ :->: _) PrimAbs = return $
-  CVar (Named Stdlib "container" .- string2Name "bagSize")
-compilePrim (TyList _ :->: _) PrimAbs = return $
-  CVar (Named Stdlib "list" .- string2Name "length")
-compilePrim _                PrimAbs = return $ CConst OAbs
+compilePrim (TySet _ :->: _) PrimAbs =
+  return $
+    CVar (Named Stdlib "container" .- string2Name "setSize")
+compilePrim (TyBag _ :->: _) PrimAbs =
+  return $
+    CVar (Named Stdlib "container" .- string2Name "bagSize")
+compilePrim (TyList _ :->: _) PrimAbs =
+  return $
+    CVar (Named Stdlib "list" .- string2Name "length")
+compilePrim _ PrimAbs = return $ CConst OAbs
 compilePrim (TySet _ :->: _) PrimPower = return $ CConst OPower
 compilePrim (TyBag _ :->: _) PrimPower = return $ CConst OPower
 compilePrim ty PrimPower = compilePrimErr PrimPower ty
@@ -284,34 +288,38 @@ compilePrim ty PrimOverlay = compilePrimErr PrimOverlay ty
 compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
 compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
-compilePrim (_ :*: TyList _ :->: _) PrimEach = return $
-  CVar (Named Stdlib "list" .- string2Name "eachlist")
+compilePrim (_ :*: TyList _ :->: _) PrimEach =
+  return $
+    CVar (Named Stdlib "list" .- string2Name "eachlist")
 compilePrim (_ :*: TyBag _ :->: TyBag _) PrimEach = return $ CConst OEachBag
 compilePrim (_ :*: TySet _ :->: TySet _) PrimEach = return $ CConst OEachSet
 compilePrim ty PrimEach = compilePrimErr PrimEach ty
 compilePrim (_ :*: _ :*: TyList _ :->: _) PrimReduce =
   return $ CVar (Named Stdlib "list" .- string2Name "foldr")
-compilePrim (_ :*: _ :*: TyBag _ :->: _) PrimReduce = return $
-  CVar (Named Stdlib "container" .- string2Name "reducebag")
-compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce = return $
-  CVar (Named Stdlib "container" .- string2Name "reduceset")
+compilePrim (_ :*: _ :*: TyBag _ :->: _) PrimReduce =
+  return $
+    CVar (Named Stdlib "container" .- string2Name "reducebag")
+compilePrim (_ :*: _ :*: TySet _ :->: _) PrimReduce =
+  return $
+    CVar (Named Stdlib "container" .- string2Name "reduceset")
 compilePrim ty PrimReduce = compilePrimErr PrimReduce ty
-compilePrim (_ :*: TyList _ :->: _) PrimFilter = return $
-  CVar (Named Stdlib "list" .- string2Name "filterlist")
+compilePrim (_ :*: TyList _ :->: _) PrimFilter =
+  return $
+    CVar (Named Stdlib "list" .- string2Name "filterlist")
 compilePrim (_ :*: TyBag _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim (_ :*: TySet _ :->: _) PrimFilter = return $ CConst OFilterBag
 compilePrim ty PrimFilter = compilePrimErr PrimFilter ty
-compilePrim (_ :->: TyList _) PrimJoin = return $
-  CVar (Named Stdlib "list" .- string2Name "concat")
+compilePrim (_ :->: TyList _) PrimJoin =
+  return $
+    CVar (Named Stdlib "list" .- string2Name "concat")
 compilePrim (_ :->: TyBag _) PrimJoin = return $ CConst OBagUnions
-compilePrim (_ :->: TySet _) PrimJoin = return $
-  CVar (Named Stdlib "container" .- string2Name "unions")
+compilePrim (_ :->: TySet _) PrimJoin =
+  return $
+    CVar (Named Stdlib "container" .- string2Name "unions")
 compilePrim ty PrimJoin = compilePrimErr PrimJoin ty
-
 compilePrim (_ :*: TyBag _ :*: _ :->: _) PrimMerge = return $ CConst OMerge
 compilePrim (_ :*: TySet _ :*: _ :->: _) PrimMerge = return $ CConst OMerge
-compilePrim ty                           PrimMerge = compilePrimErr PrimMerge ty
-
+compilePrim ty PrimMerge = compilePrimErr PrimMerge ty
 compilePrim _ PrimIsPrime = return $ CConst OIsPrime
 compilePrim _ PrimFactor = return $ CConst OFactor
 compilePrim _ PrimFrac = return $ CConst OFrac
@@ -418,14 +426,14 @@ compileUOp ::
   UOp ->
   Core
 compileUOp _ op = CConst (coreUOps ! op)
-  where
-    -- Just look up the corresponding core operator.
-    coreUOps =
-      M.fromList
-        [ Neg ==> ONeg,
-          Fact ==> OFact,
-          Not ==> ONotProp
-        ]
+ where
+  -- Just look up the corresponding core operator.
+  coreUOps =
+    M.fromList
+      [ Neg ==> ONeg
+      , Fact ==> OFact
+      , Not ==> ONotProp
+      ]
 
 -- | Compile a binary operator.  This function needs to know the types
 --   of the arguments and result since some operators are overloaded
@@ -463,13 +471,13 @@ compileBOp :: Type -> Type -> Type -> BOp -> Core
 -- addition and multiplication.
 compileBOp (TyGraph _) (TyGraph _) (TyGraph _) op
   | op `elem` [Add, Mul] =
-    CConst (regularOps ! op)
-  where
-    regularOps =
-      M.fromList
-        [ Add ==> OOverlay,
-          Mul ==> OConnect
-        ]
+      CConst (regularOps ! op)
+ where
+  regularOps =
+    M.fromList
+      [ Add ==> OOverlay
+      , Mul ==> OConnect
+      ]
 
 -- The Cartesian product operator just compiles to library function calls.
 compileBOp (TySet _) _ _ CartProd =
@@ -478,32 +486,31 @@ compileBOp (TyBag _) _ _ CartProd =
   CVar (Named Stdlib "container" .- string2Name "bagCP")
 compileBOp (TyList _) _ _ CartProd =
   CVar (Named Stdlib "list" .- string2Name "listCP")
-
 -- Some regular arithmetic operations that just translate straightforwardly.
 compileBOp _ _ _ op
   | op `M.member` regularOps = CConst (regularOps ! op)
-  where
-    regularOps =
-      M.fromList
-        [ Add ==> OAdd,
-          Mul ==> OMul,
-          Div ==> ODiv,
-          Exp ==> OExp,
-          Mod ==> OMod,
-          Divides ==> ODivides,
-          Choose ==> OMultinom,
-          Eq ==> OEq,
-          Lt ==> OLt,
-          And ==> OAnd,
-          Or ==> OOr,
-          Impl ==> OImpl
-        ]
+ where
+  regularOps =
+    M.fromList
+      [ Add ==> OAdd
+      , Mul ==> OMul
+      , Div ==> ODiv
+      , Exp ==> OExp
+      , Mod ==> OMod
+      , Divides ==> ODivides
+      , Choose ==> OMultinom
+      , Eq ==> OEq
+      , Lt ==> OLt
+      , And ==> OAnd
+      , Or ==> OOr
+      , Impl ==> OImpl
+      ]
 
 -- ShouldEq needs to know the type at which the comparison is
 -- occurring, so values can be correctly pretty-printed if the test
 -- fails.
 compileBOp ty _ _ ShouldEq = CConst (OShouldEq ty)
-compileBOp ty _ _ ShouldLt  = CConst (OShouldLt ty)
+compileBOp ty _ _ ShouldLt = CConst (OShouldLt ty)
 compileBOp _ty (TyList _) _ Elem = CConst OListElem
 compileBOp _ty _ _ Elem = CConst OBagElem
 compileBOp ty1 ty2 resTy op =

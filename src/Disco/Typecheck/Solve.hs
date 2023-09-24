@@ -1,8 +1,11 @@
-{-# LANGUAGE DeriveAnyClass    #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Typecheck.Solve
 -- Copyright   :  disco team and contributors
@@ -12,51 +15,62 @@
 --
 -- Constraint solver for the constraints generated during type
 -- checking/inference.
------------------------------------------------------------------------------
-
 module Disco.Typecheck.Solve where
 
-import           Unbound.Generics.LocallyNameless (Alpha, Name, Subst, fv,
-                                                   name2Integer, string2Name,
-                                                   substs)
+import Unbound.Generics.LocallyNameless (
+  Alpha,
+  Name,
+  Subst,
+  fv,
+  name2Integer,
+  string2Name,
+  substs,
+ )
 
-import           Data.Coerce
-import           GHC.Generics                     (Generic)
+import Data.Coerce
+import GHC.Generics (Generic)
 
-import           Control.Arrow                    ((&&&), (***))
-import           Control.Lens                     hiding (use, (%=), (.=))
-import           Control.Monad                    (unless, zipWithM)
-import           Data.Bifunctor                   (first, second)
-import           Data.Either                      (partitionEithers)
-import           Data.List                        (find, foldl', intersect,
-                                                   partition)
-import           Data.Map                         (Map, (!))
-import qualified Data.Map                         as M
-import           Data.Maybe                       (fromJust, fromMaybe,
-                                                   mapMaybe)
-import           Data.Monoid                      (First (..))
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
-import           Data.Tuple
+import Control.Arrow ((&&&), (***))
+import Control.Lens hiding (use, (%=), (.=))
+import Control.Monad (unless, zipWithM)
+import Data.Bifunctor (first, second)
+import Data.Either (partitionEithers)
+import Data.List (
+  find,
+  foldl',
+  intersect,
+  partition,
+ )
+import Data.Map (Map, (!))
+import qualified Data.Map as M
+import Data.Maybe (
+  fromJust,
+  fromMaybe,
+  mapMaybe,
+ )
+import Data.Monoid (First (..))
+import Data.Set (Set)
+import qualified Data.Set as S
+import Data.Tuple
 
-import           Disco.Effects.Fresh
-import           Disco.Effects.State
-import           Polysemy
-import           Polysemy.Error
-import           Polysemy.Input
-import           Polysemy.Output
+import Disco.Effects.Fresh
+import Disco.Effects.State
+import Polysemy
+import Polysemy.Error
+import Polysemy.Input
+import Polysemy.Output
 
-import           Disco.Messages
-import           Disco.Pretty                     hiding ((<>))
-import           Disco.Subst
-import qualified Disco.Subst                      as Subst
-import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Graph            (Graph)
-import qualified Disco.Typecheck.Graph            as G
-import           Disco.Typecheck.Unify
-import           Disco.Types
-import           Disco.Types.Qualifiers
-import           Disco.Types.Rules
+import Disco.Messages
+import Disco.Pretty hiding ((<>))
+import Disco.Subst
+import qualified Disco.Subst as Subst
+import Disco.Typecheck.Constraints
+import Disco.Typecheck.Graph (Graph)
+import qualified Disco.Typecheck.Graph as G
+import Disco.Typecheck.Unify
+import Disco.Types
+import Disco.Types.Qualifiers
+import Disco.Types.Rules
 
 --------------------------------------------------
 -- Solver errors
@@ -65,11 +79,11 @@ import           Disco.Types.Rules
 --   process.
 data SolveError where
   NoWeakUnifier :: SolveError
-  NoUnify       :: SolveError
-  UnqualBase    :: Qualifier -> BaseTy    -> SolveError
-  Unqual        :: Qualifier -> Type      -> SolveError
-  QualSkolem    :: Qualifier -> Name Type -> SolveError
-  deriving Show
+  NoUnify :: SolveError
+  UnqualBase :: Qualifier -> BaseTy -> SolveError
+  Unqual :: Qualifier -> Type -> SolveError
+  QualSkolem :: Qualifier -> Name Type -> SolveError
+  deriving (Show)
 
 instance Semigroup SolveError where
   e <> _ = e
@@ -87,16 +101,16 @@ filterErrors :: Member (Error e) r => [Sem r a] -> Sem r [a]
 filterErrors ms = do
   es <- mapM try ms
   case partitionEithers es of
-    (e:_, []) -> throw e
-    (_, as)   -> return as
+    (e : _, []) -> throw e
+    (_, as) -> return as
 
 -- | A variant of 'asum' which picks the first action that succeeds,
 --   or re-throws the error of the last one if none of them
 --   do. Precondition: the list must not be empty.
 asum' :: Member (Error e) r => [Sem r a] -> Sem r a
-asum' []     = error "Impossible: asum' []"
-asum' [m]    = m
-asum' (m:ms) = m `catch` (\_ -> asum' ms)
+asum' [] = error "Impossible: asum' []"
+asum' [m] = m
+asum' (m : ms) = m `catch` (\_ -> asum' ms)
 
 --------------------------------------------------
 -- Simple constraints
@@ -122,8 +136,10 @@ instance Pretty SimpleConstraint where
 -- | Information about a particular type variable.  More information
 --   may be added in the future (e.g. polarity).
 data TyVarInfo = TVI
-  { _tyVarIlk  :: First Ilk   -- ^ The ilk (unification or skolem) of the variable, if known
-  , _tyVarSort :: Sort        -- ^ The sort (set of qualifiers) of the type variable.
+  { _tyVarIlk :: First Ilk
+  -- ^ The ilk (unification or skolem) of the variable, if known
+  , _tyVarSort :: Sort
+  -- ^ The sort (set of qualifiers) of the type variable.
   }
   deriving (Show)
 
@@ -144,7 +160,7 @@ instance Semigroup TyVarInfo where
 
 -- | A 'TyVarInfoMap' records what we know about each type variable;
 --   it is a mapping from type variable names to 'TyVarInfo' records.
-newtype TyVarInfoMap = VM { unVM :: Map (Name Type) TyVarInfo }
+newtype TyVarInfoMap = VM {unVM :: Map (Name Type) TyVarInfo}
   deriving (Show)
 
 instance Pretty TyVarInfoMap where
@@ -154,7 +170,8 @@ instance Pretty TyVarInfoMap where
 --   underlying 'Map'.
 onVM ::
   (Map (Name Type) TyVarInfo -> Map (Name Type) TyVarInfo) ->
-  TyVarInfoMap -> TyVarInfoMap
+  TyVarInfoMap ->
+  TyVarInfoMap
 onVM f (VM m) = VM (f m)
 
 -- | Look up a given variable name in a 'TyVarInfoMap'.
@@ -178,7 +195,7 @@ instance Semigroup TyVarInfoMap where
   VM sm1 <> VM sm2 = VM (M.unionWith (<>) sm1 sm2)
 
 instance Monoid TyVarInfoMap where
-  mempty  = VM M.empty
+  mempty = VM M.empty
   mappend = (<>)
 
 -- | Get the sort of a particular variable recorded in a
@@ -209,18 +226,19 @@ extendSort x s = onVM (at x . _Just . tyVarSort %~ (`S.union` s))
 -- expansion of recursive types can stop when encountering a
 -- previously seen constraint.
 data SimplifyState = SS
-  { _ssVarMap      :: TyVarInfoMap
+  { _ssVarMap :: TyVarInfoMap
   , _ssConstraints :: [SimpleConstraint]
-  , _ssSubst       :: S
-  , _ssSeen        :: Set SimpleConstraint
+  , _ssSubst :: S
+  , _ssSeen :: Set SimpleConstraint
   }
 
 makeLenses ''SimplifyState
 
 lkup :: (Ord k, Show k, Show (Map k a)) => String -> Map k a -> k -> a
 lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
-  where
-    errMsg = unlines
+ where
+  errMsg =
+    unlines
       [ "Key lookup error:"
       , "  Key = " ++ show k
       , "  Map = " ++ show m
@@ -230,11 +248,11 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 --------------------------------------------------
 -- Top-level solver algorithm
 
-solveConstraint
-  :: Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r
-  => Constraint -> Sem r S
+solveConstraint ::
+  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+  Constraint ->
+  Sem r S
 solveConstraint c = do
-
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers; also expand disjunctions.  Result in a
   -- list of possible constraint sets; each one consists of equational
@@ -252,11 +270,12 @@ solveConstraint c = do
   -- a solution.
   asum' (map (uncurry solveConstraintChoice) qcList)
 
-solveConstraintChoice
-  :: Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r
-  => TyVarInfoMap -> [SimpleConstraint] -> Sem r S
+solveConstraintChoice ::
+  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+  TyVarInfoMap ->
+  [SimpleConstraint] ->
+  Sem r S
 solveConstraintChoice quals cs = do
-
   debugPretty quals
   debug $ vcat (map pretty' cs)
 
@@ -265,8 +284,8 @@ solveConstraintChoice quals cs = do
   -- Step 2. Check for weak unification to ensure termination. (a la
   -- Traytel et al).
 
-  let toEqn (t1 :<: t2) = (t1,t2)
-      toEqn (t1 :=: t2) = (t1,t2)
+  let toEqn (t1 :<: t2) = (t1, t2)
+      toEqn (t1 :=: t2) = (t1, t2)
   _ <- note NoWeakUnifier $ weakUnify tyDefns (map toEqn cs)
 
   -- Step 3. Simplify constraints, resulting in a set of atomic
@@ -280,7 +299,7 @@ solveConstraintChoice quals cs = do
   debug "Done running simplifier. Results:"
 
   debugPretty vm
-  debug $ vcat $ map (pretty' . (\(x,y) -> TyAtom x :<: TyAtom y)) atoms
+  debug $ vcat $ map (pretty' . (\(x, y) -> TyAtom x :<: TyAtom y)) atoms
   debugPretty theta_simp
 
   -- Step 4. Turn the atomic constraints into a directed constraint
@@ -294,7 +313,7 @@ solveConstraintChoice quals cs = do
   -- extract them and include them in the constraint graph as isolated
   -- vertices
   let mkAVar (v, First (Just Skolem)) = AVar (S v)
-      mkAVar (v, _                  ) = AVar (U v)
+      mkAVar (v, _) = AVar (U v)
       vars = S.fromList . map (mkAVar . second (view tyVarIlk)) . M.assocs . unVM $ vm
       g = mkConstraintGraph vars atoms
 
@@ -315,7 +334,6 @@ solveConstraintChoice quals cs = do
   -- We don't need to ensure that theta_skolem respects sorts since
   -- checkSkolems will only unify skolem vars with unsorted variables.
 
-
   -- Step 6. Eliminate cycles from the graph, turning each strongly
   -- connected component into a single node, unifying all the atoms in
   -- each component.
@@ -329,11 +347,11 @@ solveConstraintChoice quals cs = do
   debugPretty theta_cyc
 
   -- Check that the resulting substitution respects sorts...
-  let sortOK (x, TyAtom (ABase ty))   = hasSort ty (getSort vm x)
+  let sortOK (x, TyAtom (ABase ty)) = hasSort ty (getSort vm x)
       sortOK (_, TyAtom (AVar (U _))) = True
-      sortOK p                        = error $ "Impossible! sortOK " ++ show p
-  unless (all sortOK (Subst.toList theta_cyc))
-    $ throw NoUnify
+      sortOK p = error $ "Impossible! sortOK " ++ show p
+  unless (all sortOK (Subst.toList theta_cyc)) $
+    throw NoUnify
 
   -- ... and update the sort map if we unified any type variables.
   -- Just make sure that if theta_cyc maps x |-> y, then y picks up
@@ -343,10 +361,10 @@ solveConstraintChoice quals cs = do
   debugPretty vm
 
   let vm' = foldr updateVarMap vm (Subst.toList theta_cyc)
-        where
-          updateVarMap :: (Name Type, Type) -> TyVarInfoMap -> TyVarInfoMap
-          updateVarMap (x, TyAtom (AVar (U y))) vmm = extendSort y (getSort vmm x) vmm
-          updateVarMap _                        vmm = vmm
+       where
+        updateVarMap :: (Name Type, Type) -> TyVarInfoMap -> TyVarInfoMap
+        updateVarMap (x, TyAtom (AVar (U y))) vmm = extendSort y (getSort vmm x) vmm
+        updateVarMap _ vmm = vmm
 
   debug "Updated sort map:"
   debugPretty vm
@@ -366,11 +384,10 @@ solveConstraintChoice quals cs = do
   -- predecessor base types in the graph; then unify all the type
   -- variables in any remaining weakly connected components.
 
-
   debug "------------------------------"
   debug "Solving for type variables..."
 
-  theta_sol       <- solveGraph vm' g'''
+  theta_sol <- solveGraph vm' g'''
   debugPretty theta_sol
 
   debug "------------------------------"
@@ -381,75 +398,79 @@ solveConstraintChoice quals cs = do
 
   return theta_final
 
-
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
 
-decomposeConstraint
-  :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
-  => Constraint -> Sem r [(TyVarInfoMap, [SimpleConstraint])]
+decomposeConstraint ::
+  Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
+  Constraint ->
+  Sem r [(TyVarInfoMap, [SimpleConstraint])]
 decomposeConstraint (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
-decomposeConstraint (CEq  t1 t2) = return [(mempty, [t1 :=: t2])]
-decomposeConstraint (CQual q ty) = (:[]) . (, []) <$> decomposeQual ty q
-decomposeConstraint (CAnd cs)    = map mconcat . sequence <$> mapM decomposeConstraint cs
-decomposeConstraint CTrue        = return [mempty]
-decomposeConstraint (CAll ty)    = do
+decomposeConstraint (CEq t1 t2) = return [(mempty, [t1 :=: t2])]
+decomposeConstraint (CQual q ty) = (: []) . (,[]) <$> decomposeQual ty q
+decomposeConstraint (CAnd cs) = map mconcat . sequence <$> mapM decomposeConstraint cs
+decomposeConstraint CTrue = return [mempty]
+decomposeConstraint (CAll ty) = do
   (vars, c) <- unbind ty
   let c' = substs (mkSkolems vars) c
   (map . first . addSkolems) vars <$> decomposeConstraint c'
+ where
+  mkSkolems :: [Name Type] -> [(Name Type, Type)]
+  mkSkolems = map (id &&& TySkolem)
+decomposeConstraint (COr cs) = concat <$> filterErrors (map decomposeConstraint cs)
 
-  where
-    mkSkolems :: [Name Type] -> [(Name Type, Type)]
-    mkSkolems = map (id &&& TySkolem)
-
-decomposeConstraint (COr cs)     = concat <$> filterErrors (map decomposeConstraint cs)
-
-decomposeQual
-  :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
-  => Type -> Qualifier -> Sem r TyVarInfoMap
+decomposeQual ::
+  Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
+  Type ->
+  Qualifier ->
+  Sem r TyVarInfoMap
 decomposeQual = go S.empty
-  where
-    go :: Members '[Fresh, Error SolveError, Input TyDefCtx] r
-       => Set (String, [Type], Qualifier) -> Type -> Qualifier -> Sem r TyVarInfoMap
+ where
+  go ::
+    Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
+    Set (String, [Type], Qualifier) ->
+    Type ->
+    Qualifier ->
+    Sem r TyVarInfoMap
 
-    -- For a type atom, call out to checkQual.
-    go _ (TyAtom a) q = checkQual q a
+  -- For a type atom, call out to checkQual.
+  go _ (TyAtom a) q = checkQual q a
+  -- Coinductively check user-defined types for a qualifier.  Keep
+  -- track of a set of user-defined types and qualifiers we have
+  -- seen.  Every time we encounter a new one, add it to the set and
+  -- recurse on its unfolding.  If we ever encounter one we have
+  -- already seen, we can assume by coinduction that the qualifier
+  -- is satisfied.
+  go seen (TyCon (CUser t) tys) q = do
+    case (t, tys, q) `S.member` seen of
+      True -> return mempty
+      False -> do
+        tyDefns <- input @TyDefCtx
+        case M.lookup t tyDefns of
+          Nothing -> error $ show t ++ " not in ty defn map!!"
+          Just (TyDefBody _ body) -> do
+            let ty' = body tys
+            go (S.insert (t, tys, q) seen) ty' q
 
-    -- Coinductively check user-defined types for a qualifier.  Keep
-    -- track of a set of user-defined types and qualifiers we have
-    -- seen.  Every time we encounter a new one, add it to the set and
-    -- recurse on its unfolding.  If we ever encounter one we have
-    -- already seen, we can assume by coinduction that the qualifier
-    -- is satisfied.
-    go seen (TyCon (CUser t) tys) q = do
-      case (t, tys, q) `S.member` seen of
-        True -> return mempty
-        False -> do
-          tyDefns <- input @TyDefCtx
-          case M.lookup t tyDefns of
-            Nothing  -> error $ show t ++ " not in ty defn map!!"
-            Just (TyDefBody _ body) -> do
-              let ty' = body tys
-              go (S.insert (t, tys, q) seen) ty' q
+  -- If we have a container type where the container is still a variable,
+  -- just replace it with List for the purposes of generating constraints---
+  -- all containers (lists, bags, sets) have the same qualifier rules.
+  go seen (TyCon (CContainer (AVar _)) tys) q = go seen (TyCon CList tys) q
+  -- Otherwise, decompose a type constructor according to the qualRules.
+  go seen ty@(TyCon c tys) q = case qualRules c q of
+    Nothing -> throw $ Unqual q ty
+    Just qs -> mconcat <$> zipWithM (maybe (return mempty) . go seen) tys qs
 
-    -- If we have a container type where the container is still a variable,
-    -- just replace it with List for the purposes of generating constraints---
-    -- all containers (lists, bags, sets) have the same qualifier rules.
-    go seen (TyCon (CContainer (AVar _)) tys) q = go seen (TyCon CList tys) q
-
-    -- Otherwise, decompose a type constructor according to the qualRules.
-    go seen ty@(TyCon c tys) q = case qualRules c q of
-      Nothing -> throw $ Unqual q ty
-      Just qs -> mconcat <$> zipWithM (maybe (return mempty) . go seen) tys qs
-
-checkQual
-  :: Members '[Fresh, Error SolveError] r
-  => Qualifier -> Atom -> Sem r TyVarInfoMap
+checkQual ::
+  Members '[Fresh, Error SolveError] r =>
+  Qualifier ->
+  Atom ->
+  Sem r TyVarInfoMap
 checkQual q (AVar (U v)) = return . VM . M.singleton v $ mkTVI Unification (S.singleton q)
 checkQual q (AVar (S v)) = throw $ QualSkolem q v
-checkQual q (ABase bty)  =
+checkQual q (ABase bty) =
   case hasQual bty q of
-    True  -> return mempty
+    True -> return mempty
     False -> throw $ UnqualBase q bty
 
 --------------------------------------------------
@@ -465,250 +486,249 @@ checkQual q (ABase bty)  =
 --   After this step, the remaining constraints will all be atomic
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
+simplify ::
+  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+  TyVarInfoMap ->
+  [SimpleConstraint] ->
+  Sem r (TyVarInfoMap, [(Atom, Atom)], S)
+simplify origVM cs =
+  (\(SS vm' cs' s' _) -> (vm', map extractAtoms cs', s'))
+    -- contFreshMT :: Monad m => FreshMT m a -> Integer -> m a
+    -- "Run a FreshMT computation given a starting index for fresh name generation."
+    <$> runFresh' n (execState (SS origVM cs idS S.empty) simplify')
+ where
+  fvNums :: Alpha a => [a] -> [Integer]
+  fvNums = map (name2Integer :: Name Type -> Integer) . toListOf fv
 
-simplify
-  :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
-  => TyVarInfoMap -> [SimpleConstraint] -> Sem r (TyVarInfoMap, [(Atom, Atom)], S)
-simplify origVM cs
-  = (\(SS vm' cs' s' _) -> (vm', map extractAtoms cs', s'))
-  -- contFreshMT :: Monad m => FreshMT m a -> Integer -> m a
-  -- "Run a FreshMT computation given a starting index for fresh name generation."
-  <$> runFresh' n (execState (SS origVM cs idS S.empty) simplify')
-  where
+  -- Find first unused integer in constraint free vars and sort map
+  -- domain, and use it to start the fresh var generation, so we don't
+  -- generate any "fresh" names that interfere with existing names
+  n1 = maximum0 . fvNums $ cs
+  n = succ . maximum . (n1 :) . fvNums . M.keys . unVM $ origVM
 
-    fvNums :: Alpha a => [a] -> [Integer]
-    fvNums = map (name2Integer :: Name Type -> Integer) . toListOf fv
+  maximum0 [] = 0
+  maximum0 xs = maximum xs
 
-    -- Find first unused integer in constraint free vars and sort map
-    -- domain, and use it to start the fresh var generation, so we don't
-    -- generate any "fresh" names that interfere with existing names
-    n1 = maximum0 . fvNums $ cs
-    n = succ . maximum . (n1:) . fvNums . M.keys . unVM $ origVM
+  -- Extract the type atoms from an atomic constraint.
+  extractAtoms :: SimpleConstraint -> (Atom, Atom)
+  extractAtoms (TyAtom a1 :<: TyAtom a2) = (a1, a2)
+  extractAtoms c = error $ "Impossible: simplify left non-atomic or non-subtype constraint " ++ show c
 
-    maximum0 [] = 0
-    maximum0 xs = maximum xs
+  -- Iterate picking one simplifiable constraint and simplifying it
+  -- until none are left.
+  simplify' ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+    Sem r ()
+  simplify' = do
+    -- q <- gets fst
+    -- debug (pretty q)
+    -- debug ""
 
-    -- Extract the type atoms from an atomic constraint.
-    extractAtoms :: SimpleConstraint -> (Atom, Atom)
-    extractAtoms (TyAtom a1 :<: TyAtom a2) = (a1, a2)
-    extractAtoms c = error $ "Impossible: simplify left non-atomic or non-subtype constraint " ++ show c
+    mc <- pickSimplifiable
+    case mc of
+      Nothing -> return ()
+      Just s -> do
+        debug $ "Simplifying:" <+> pretty' s
 
-    -- Iterate picking one simplifiable constraint and simplifying it
-    -- until none are left.
-    simplify'
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Output Message, Input TyDefCtx] r
-      => Sem r ()
-    simplify' = do
-      -- q <- gets fst
-      -- debug (pretty q)
-      -- debug ""
+        simplifyOne s
+        simplify'
 
-      mc <- pickSimplifiable
-      case mc of
-        Nothing -> return ()
-        Just s  -> do
+  -- Pick out one simplifiable constraint, removing it from the list
+  -- of constraints in the state.  Return Nothing if no more
+  -- constraints can be simplified.
+  pickSimplifiable ::
+    Members '[State SimplifyState, Fresh, Error SolveError] r =>
+    Sem r (Maybe SimpleConstraint)
+  pickSimplifiable = do
+    curCs <- use ssConstraints
+    case pick simplifiable curCs of
+      Nothing -> return Nothing
+      Just (a, as) -> do
+        ssConstraints .= as
+        return (Just a)
 
-          debug $ "Simplifying:" <+> pretty' s
+  -- Pick the first element from a list satisfying the given
+  -- predicate, returning the element and the list with the element
+  -- removed.
+  pick :: (a -> Bool) -> [a] -> Maybe (a, [a])
+  pick _ [] = Nothing
+  pick p (a : as)
+    | p a = Just (a, as)
+    | otherwise = second (a :) <$> pick p as
 
-          simplifyOne s
-          simplify'
+  -- Check if a constraint can be simplified.  An equality
+  -- constraint can always be "simplified" via unification.  A
+  -- subtyping constraint can be simplified if either it involves a
+  -- type constructor (in which case we can decompose it), or if it
+  -- involves two base types (in which case it can be removed if the
+  -- relationship holds).
+  simplifiable :: SimpleConstraint -> Bool
+  simplifiable (_ :=: _) = True
+  simplifiable (TyCon {} :<: TyCon {}) = True
+  simplifiable (TyVar {} :<: TyCon {}) = True
+  simplifiable (TyCon {} :<: TyVar {}) = True
+  simplifiable (TyCon (CUser _) _ :<: _) = True
+  simplifiable (_ :<: TyCon (CUser _) _) = True
+  simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
+  simplifiable _ = False
 
-    -- Pick out one simplifiable constraint, removing it from the list
-    -- of constraints in the state.  Return Nothing if no more
-    -- constraints can be simplified.
-    pickSimplifiable
-      :: Members '[State SimplifyState, Fresh, Error SolveError] r
-      => Sem r (Maybe SimpleConstraint)
-    pickSimplifiable = do
-      curCs <- use ssConstraints
-      case pick simplifiable curCs of
-        Nothing     -> return Nothing
-        Just (a,as) -> do
-          ssConstraints .= as
-          return (Just a)
+  -- Simplify the given simplifiable constraint.  If the constraint
+  -- has already been seen before (due to expansion of a recursive
+  -- type), just throw it away and stop.
+  simplifyOne ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r =>
+    SimpleConstraint ->
+    Sem r ()
+  simplifyOne c = do
+    seen <- use ssSeen
+    case c `S.member` seen of
+      True -> return ()
+      False -> do
+        ssSeen %= S.insert c
+        simplifyOne' c
 
-    -- Pick the first element from a list satisfying the given
-    -- predicate, returning the element and the list with the element
-    -- removed.
-    pick :: (a -> Bool) -> [a] -> Maybe (a,[a])
-    pick _ [] = Nothing
-    pick p (a:as)
-      | p a       = Just (a,as)
-      | otherwise = second (a:) <$> pick p as
+  simplifyOne' ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r =>
+    SimpleConstraint ->
+    Sem r ()
 
-    -- Check if a constraint can be simplified.  An equality
-    -- constraint can always be "simplified" via unification.  A
-    -- subtyping constraint can be simplified if either it involves a
-    -- type constructor (in which case we can decompose it), or if it
-    -- involves two base types (in which case it can be removed if the
-    -- relationship holds).
-    simplifiable :: SimpleConstraint -> Bool
-    simplifiable (_ :=: _)                               = True
-    simplifiable (TyCon {} :<: TyCon {})                 = True
-    simplifiable (TyVar {} :<: TyCon {})                 = True
-    simplifiable (TyCon {} :<: TyVar {})                 = True
-    simplifiable (TyCon (CUser _) _ :<: _)               = True
-    simplifiable (_ :<: TyCon (CUser _) _)               = True
-    simplifiable (TyAtom (ABase _) :<: TyAtom (ABase _)) = True
+  -- If we have an equality constraint, run unification on it.  The
+  -- resulting substitution is applied to the remaining constraints
+  -- as well as prepended to the current substitution.
 
-    simplifiable _                                       = False
+  simplifyOne' (ty1 :=: ty2) = do
+    tyDefns <- input @TyDefCtx
+    case unify tyDefns [(ty1, ty2)] of
+      Nothing -> throw NoUnify
+      Just s' -> extendSubst s'
 
-    -- Simplify the given simplifiable constraint.  If the constraint
-    -- has already been seen before (due to expansion of a recursive
-    -- type), just throw it away and stop.
-    simplifyOne
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
-      => SimpleConstraint -> Sem r ()
-    simplifyOne c = do
-      seen <- use ssSeen
-      case c `S.member` seen of
-        True  -> return ()
-        False -> do
-          ssSeen %= S.insert c
-          simplifyOne' c
+  -- If we see a constraint of the form (T <: a), where T is a
+  -- user-defined type and a is a type variable, then just turn it
+  -- into an equality (T = a).  This is sound but probably not
+  -- complete.  The alternative seems quite complicated, possibly
+  -- even undecidable.  See https://github.com/disco-lang/disco/issues/207 .
+  simplifyOne' (ty1@(TyCon (CUser _) _) :<: ty2@TyVar {}) =
+    simplifyOne' (ty1 :=: ty2)
+  -- Otherwise, expand the user-defined type and continue.
+  simplifyOne' (TyCon (CUser t) ts :<: ty2) = do
+    tyDefns <- input @TyDefCtx
+    case M.lookup t tyDefns of
+      Nothing -> error $ show t ++ " not in ty defn map!"
+      Just (TyDefBody _ body) ->
+        ssConstraints %= ((body ts :<: ty2) :)
 
-    simplifyOne'
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
-      => SimpleConstraint -> Sem r ()
+  -- Turn  a <: T  into  a = T.  See comment above.
+  simplifyOne' (ty1@TyVar {} :<: ty2@(TyCon (CUser _) _)) =
+    simplifyOne' (ty1 :=: ty2)
+  simplifyOne' (ty1 :<: TyCon (CUser t) ts) = do
+    tyDefns <- input @TyDefCtx
+    case M.lookup t tyDefns of
+      Nothing -> error $ show t ++ " not in ty defn map!"
+      Just (TyDefBody _ body) ->
+        ssConstraints %= ((ty1 :<: body ts) :)
 
-    -- If we have an equality constraint, run unification on it.  The
-    -- resulting substitution is applied to the remaining constraints
-    -- as well as prepended to the current substitution.
-
-    simplifyOne' (ty1 :=: ty2) = do
-      tyDefns <- input @TyDefCtx
-      case unify tyDefns [(ty1, ty2)] of
-        Nothing -> throw NoUnify
-        Just s' -> extendSubst s'
-
-    -- If we see a constraint of the form (T <: a), where T is a
-    -- user-defined type and a is a type variable, then just turn it
-    -- into an equality (T = a).  This is sound but probably not
-    -- complete.  The alternative seems quite complicated, possibly
-    -- even undecidable.  See https://github.com/disco-lang/disco/issues/207 .
-    simplifyOne' (ty1@(TyCon (CUser _) _) :<: ty2@TyVar{})
-      = simplifyOne' (ty1 :=: ty2)
-
-    -- Otherwise, expand the user-defined type and continue.
-    simplifyOne' (TyCon (CUser t) ts :<: ty2) = do
-      tyDefns <- input @TyDefCtx
-      case M.lookup t tyDefns of
-        Nothing  -> error $ show t ++ " not in ty defn map!"
-        Just (TyDefBody _ body) ->
-          ssConstraints %= ((body ts :<: ty2) :)
-
-    -- Turn  a <: T  into  a = T.  See comment above.
-    simplifyOne' (ty1@TyVar{} :<: ty2@(TyCon (CUser _) _))
-      = simplifyOne' (ty1 :=: ty2)
-
-    simplifyOne' (ty1 :<: TyCon (CUser t) ts) = do
-      tyDefns <- input @TyDefCtx
-      case M.lookup t tyDefns of
-        Nothing  -> error $ show t ++ " not in ty defn map!"
-        Just (TyDefBody _ body) ->
-          ssConstraints %= ((ty1 :<: body ts) :)
-
-    -- Given a subtyping constraint between two type constructors,
-    -- decompose it if the constructors are the same (or fail if they
-    -- aren't), taking into account the variance of each argument to
-    -- the constructor.  Container types are a special case;
-    -- recursively generate a subtyping constraint for their
-    -- constructors as well.
-    simplifyOne' (TyCon c1@(CContainer ctr1) tys1 :<: TyCon (CContainer ctr2) tys2) =
-      ssConstraints %=
-        (( (TyAtom ctr1 :<: TyAtom ctr2)
-         : zipWith3 variance (arity c1) tys1 tys2
+  -- Given a subtyping constraint between two type constructors,
+  -- decompose it if the constructors are the same (or fail if they
+  -- aren't), taking into account the variance of each argument to
+  -- the constructor.  Container types are a special case;
+  -- recursively generate a subtyping constraint for their
+  -- constructors as well.
+  simplifyOne' (TyCon c1@(CContainer ctr1) tys1 :<: TyCon (CContainer ctr2) tys2) =
+    ssConstraints
+      %= ( ( (TyAtom ctr1 :<: TyAtom ctr2)
+              : zipWith3 variance (arity c1) tys1 tys2
+           )
+            ++
          )
-         ++)
+  simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
+    | c1 /= c2 = throw NoUnify
+    | otherwise =
+        ssConstraints %= (zipWith3 variance (arity c1) tys1 tys2 ++)
+  -- Given a subtyping constraint between a variable and a type
+  -- constructor, expand the variable into the same constructor
+  -- applied to fresh type variables.
+  simplifyOne' con@(TyVar a :<: TyCon c _) = expandStruct a c con
+  simplifyOne' con@(TyCon c _ :<: TyVar a) = expandStruct a c con
+  -- Given a subtyping constraint between two base types, just check
+  -- whether the first is indeed a subtype of the second.  (Note
+  -- that we only pattern match here on type atoms, which could
+  -- include variables, but this will only ever get called if
+  -- 'simplifiable' was true, which checks that both are base
+  -- types.)
+  simplifyOne' (TyAtom (ABase b1) :<: TyAtom (ABase b2)) = do
+    case isSubB b1 b2 of
+      True -> return ()
+      False -> throw NoUnify
+  simplifyOne' (s :<: t) =
+    error $ "Impossible! simplifyOne' " ++ show s ++ " :<: " ++ show t
 
-    simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
-      | c1 /= c2  = throw NoUnify
-      | otherwise =
-          ssConstraints %= (zipWith3 variance (arity c1) tys1 tys2 ++)
+  expandStruct ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r =>
+    Name Type ->
+    Con ->
+    SimpleConstraint ->
+    Sem r ()
+  expandStruct a c con = do
+    as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
+    let s' = a |-> TyCon c as
+    ssConstraints %= (con :)
+    extendSubst s'
 
-    -- Given a subtyping constraint between a variable and a type
-    -- constructor, expand the variable into the same constructor
-    -- applied to fresh type variables.
-    simplifyOne' con@(TyVar a   :<: TyCon c _) = expandStruct a c con
-    simplifyOne' con@(TyCon c _ :<: TyVar a  ) = expandStruct a c con
+  -- 1. compose s' with current subst
+  -- 2. apply s' to constraints
+  -- 3. apply s' to qualifier map and decompose
+  extendSubst ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r =>
+    S ->
+    Sem r ()
+  extendSubst s' = do
+    ssSubst %= (s' @@)
+    ssConstraints %= applySubst s'
+    substVarMap s'
 
-    -- Given a subtyping constraint between two base types, just check
-    -- whether the first is indeed a subtype of the second.  (Note
-    -- that we only pattern match here on type atoms, which could
-    -- include variables, but this will only ever get called if
-    -- 'simplifiable' was true, which checks that both are base
-    -- types.)
-    simplifyOne' (TyAtom (ABase b1) :<: TyAtom (ABase b2)) = do
-      case isSubB b1 b2 of
-        True  -> return ()
-        False -> throw NoUnify
+  substVarMap ::
+    Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r =>
+    S ->
+    Sem r ()
+  substVarMap s' = do
+    vm <- use ssVarMap
 
-    simplifyOne' (s :<: t) =
-      error $ "Impossible! simplifyOne' " ++ show s ++ " :<: " ++ show t
+    -- 1. Get quals for each var in domain of s' and match them with
+    -- the types being substituted for those vars.
 
-    expandStruct
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
-      => Name Type -> Con -> SimpleConstraint -> Sem r ()
-    expandStruct a c con = do
-      as <- mapM (const (TyVar <$> fresh (string2Name "a"))) (arity c)
-      let s' = a |-> TyCon c as
-      ssConstraints %= (con:)
-      extendSubst s'
+    let tySorts :: [(Type, Sort)]
+        tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (`lookupVM` vm) . swap) $ Subst.toList s'
 
-    -- 1. compose s' with current subst
-    -- 2. apply s' to constraints
-    -- 3. apply s' to qualifier map and decompose
-    extendSubst
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
-      => S -> Sem r ()
-    extendSubst s' = do
-      ssSubst %= (s'@@)
-      ssConstraints %= applySubst s'
-      substVarMap s'
+        tyQualList :: [(Type, Qualifier)]
+        tyQualList = concatMap (sequenceA . second S.toList) tySorts
 
-    substVarMap
-      :: Members '[State SimplifyState, Fresh, Error SolveError, Input TyDefCtx] r
-      => S -> Sem r ()
-    substVarMap s' = do
-      vm <- use ssVarMap
+    -- 2. Decompose the resulting qualifier constraints
 
-      -- 1. Get quals for each var in domain of s' and match them with
-      -- the types being substituted for those vars.
+    vm' <- mconcat <$> mapM (uncurry decomposeQual) tyQualList
 
-      let tySorts :: [(Type, Sort)]
-          tySorts = map (second (view tyVarSort)) . mapMaybe (traverse (`lookupVM` vm) . swap) $ Subst.toList s'
+    -- 3. delete domain of s' from vm and merge in decomposed quals.
 
-          tyQualList :: [(Type, Qualifier)]
-          tyQualList = concatMap (sequenceA . second S.toList) tySorts
+    ssVarMap .= vm' <> foldl' (flip deleteVM) vm (dom s')
 
-      -- 2. Decompose the resulting qualifier constraints
+  -- The above works even when unifying two variables.  Say we have
+  -- the TyVarInfoMap
+  --
+  --   a |-> {add}
+  --   b |-> {sub}
+  --
+  -- and we get back theta = [a |-> b].  The domain of theta
+  -- consists solely of a, so we look up a in the TyVarInfoMap and get
+  -- {add}.  We therefore generate the constraint 'add (theta a)'
+  -- = 'add b' which can't be decomposed at all, and hence yields
+  -- the TyVarInfoMap {b |-> {add}}.  We then delete a from the
+  -- original TyVarInfoMap and merge the result with the new TyVarInfoMap,
+  -- yielding {b |-> {sub,add}}.
 
-      vm' <- mconcat <$> mapM (uncurry decomposeQual) tyQualList
-
-      -- 3. delete domain of s' from vm and merge in decomposed quals.
-
-      ssVarMap .= vm' <> foldl' (flip deleteVM) vm (dom s')
-
-      -- The above works even when unifying two variables.  Say we have
-      -- the TyVarInfoMap
-      --
-      --   a |-> {add}
-      --   b |-> {sub}
-      --
-      -- and we get back theta = [a |-> b].  The domain of theta
-      -- consists solely of a, so we look up a in the TyVarInfoMap and get
-      -- {add}.  We therefore generate the constraint 'add (theta a)'
-      -- = 'add b' which can't be decomposed at all, and hence yields
-      -- the TyVarInfoMap {b |-> {add}}.  We then delete a from the
-      -- original TyVarInfoMap and merge the result with the new TyVarInfoMap,
-      -- yielding {b |-> {sub,add}}.
-
-
-    -- Create a subtyping constraint based on the variance of a type
-    -- constructor argument position: in the usual order for
-    -- covariant, and reversed for contravariant.
-    variance Co     ty1 ty2 = ty1 :<: ty2
-    variance Contra ty1 ty2 = ty2 :<: ty1
+  -- Create a subtyping constraint based on the variance of a type
+  -- constructor argument position: in the usual order for
+  -- covariant, and reversed for contravariant.
+  variance Co ty1 ty2 = ty1 :<: ty2
+  variance Contra ty1 ty2 = ty2 :<: ty1
 
 --------------------------------------------------
 -- Step 4: Build constraint graph
@@ -718,8 +738,8 @@ simplify origVM cs
 --   corresponding constraint graph.
 mkConstraintGraph :: (Show a, Ord a) => Set a -> [(a, a)] -> Graph a
 mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
-  where
-    nodes = as `S.union` S.fromList (cs ^.. traverse . each)
+ where
+  nodes = as `S.union` S.fromList (cs ^.. traverse . each)
 
 --------------------------------------------------
 -- Step 5: Check skolems
@@ -730,18 +750,24 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   If there are any WCCs with a single skolem, no base types, and
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
-checkSkolems
-  :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
-  => TyVarInfoMap -> Graph Atom -> Sem r (Graph UAtom, S)
+checkSkolems ::
+  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+  TyVarInfoMap ->
+  Graph Atom ->
+  Sem r (Graph UAtom, S)
 checkSkolems vm graph = do
   let skolemWCCs :: [Set Atom]
       skolemWCCs = filter (any isSkolem) $ G.wcc graph
 
-      ok wcc =  S.size (S.filter isSkolem wcc) <= 1
-             && all (\case { ABase _    -> False
-                           ; AVar (S _) -> True
-                           ; AVar (U v) -> maybe True (S.null . view tyVarSort) (lookupVM v vm) })
-                wcc
+      ok wcc =
+        S.size (S.filter isSkolem wcc) <= 1
+          && all
+            ( \case
+                ABase _ -> False
+                AVar (S _) -> True
+                AVar (U v) -> maybe True (S.null . view tyVarSort) (lookupVM v vm)
+            )
+            wcc
 
       (good, bad) = partition ok skolemWCCs
 
@@ -751,28 +777,30 @@ checkSkolems vm graph = do
   --   (1) delete them from the graph
   --   (2) unify them all with the skolem
   unifyWCCs graph idS good
+ where
+  noSkolems :: Atom -> UAtom
+  noSkolems (ABase b) = UB b
+  noSkolems (AVar (U v)) = UV v
+  noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
 
-  where
-    noSkolems :: Atom -> UAtom
-    noSkolems (ABase b)    = UB b
-    noSkolems (AVar (U v)) = UV v
-    noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
+  unifyWCCs ::
+    Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+    Graph Atom ->
+    S ->
+    [Set Atom] ->
+    Sem r (Graph UAtom, S)
+  unifyWCCs g s [] = return (G.map noSkolems g, s)
+  unifyWCCs g s (u : us) = do
+    debug $ "Unifying" <+> pretty' (u : us) <> "..."
 
-    unifyWCCs
-      :: Members '[Error SolveError, Output Message, Input TyDefCtx] r
-      => Graph Atom -> S -> [Set Atom] -> Sem r (Graph UAtom, S)
-    unifyWCCs g s []     = return (G.map noSkolems g, s)
-    unifyWCCs g s (u:us) = do
-      debug $ "Unifying" <+> pretty' (u:us) <> "..."
+    tyDefns <- input @TyDefCtx
 
-      tyDefns <- input @TyDefCtx
+    let g' = foldl' (flip G.delete) g u
 
-      let g' = foldl' (flip G.delete) g u
-
-          ms' = unifyAtoms tyDefns (S.toList u)
-      case ms' of
-        Nothing -> throw NoUnify
-        Just s' -> unifyWCCs g' (atomToTypeSubst s' @@ s) us
+        ms' = unifyAtoms tyDefns (S.toList u)
+    case ms' of
+      Nothing -> throw NoUnify
+      Just s' -> unifyWCCs g' (atomToTypeSubst s' @@ s) us
 
 --------------------------------------------------
 -- Step 6: Eliminate cycles
@@ -789,40 +817,44 @@ checkSkolems vm graph = do
 --   Of course, this step can fail if the types in a SCC are not
 --   unifiable.  If it succeeds, it returns the collapsed graph (which
 --   is now guaranteed to be acyclic, i.e. a DAG) and a substitution.
-elimCycles
-  :: Members '[Error SolveError] r
-  => TyDefCtx -> Graph UAtom -> Sem r (Graph UAtom, S)
+elimCycles ::
+  Members '[Error SolveError] r =>
+  TyDefCtx ->
+  Graph UAtom ->
+  Sem r (Graph UAtom, S)
 elimCycles tyDefns = elimCyclesGen uatomToTypeSubst (unifyUAtoms tyDefns)
 
-elimCyclesGen
-  :: forall a b r. (Subst a a, Ord a, Members '[Error SolveError] r)
-  => (Substitution a -> Substitution b) -> ([a] -> Maybe (Substitution a))
-  -> Graph a -> Sem r (Graph a, Substitution b)
-elimCyclesGen genSubst genUnify g
-  = note NoUnify
-  $ (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
-  where
+elimCyclesGen ::
+  forall a b r.
+  (Subst a a, Ord a, Members '[Error SolveError] r) =>
+  (Substitution a -> Substitution b) ->
+  ([a] -> Maybe (Substitution a)) ->
+  Graph a ->
+  Sem r (Graph a, Substitution b)
+elimCyclesGen genSubst genUnify g =
+  note NoUnify $
+    (G.map fst &&& (genSubst . compose . S.map snd . G.nodes)) <$> g'
+ where
+  g' :: Maybe (Graph (a, Substitution a))
+  g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
 
-    g' :: Maybe (Graph (a, Substitution a))
-    g' = G.sequenceGraph $ G.map unifySCC (G.condensation g)
-
-    unifySCC :: Set a -> Maybe (a, Substitution a)
-    unifySCC uatoms = case S.toList uatoms of
-      []       -> error "Impossible! unifySCC on the empty set"
-      as@(a:_) -> (flip applySubst a &&& id) <$> genUnify as
+  unifySCC :: Set a -> Maybe (a, Substitution a)
+  unifySCC uatoms = case S.toList uatoms of
+    [] -> error "Impossible! unifySCC on the empty set"
+    as@(a : _) -> (flip applySubst a &&& id) <$> genUnify as
 
 ------------------------------------------------------------
 -- Step 6a: check base type edges
 ------------------------------------------------------------
 
 isBaseEdge :: (UAtom, UAtom) -> Either (BaseTy, BaseTy) (UAtom, UAtom)
-isBaseEdge (UB b1, UB b2) = Left (b1,b2)
-isBaseEdge e              = Right e
+isBaseEdge (UB b1, UB b2) = Left (b1, b2)
+isBaseEdge e = Right e
 
 checkBaseEdge :: Members '[Error SolveError] r => (BaseTy, BaseTy) -> Sem r ()
 checkBaseEdge (b1, b2)
   | isSubB b1 b2 = return ()
-  | otherwise    = throw NoUnify
+  | otherwise = throw NoUnify
 
 checkBaseEdges :: Members '[Error SolveError] r => Graph UAtom -> Sem r (Graph UAtom)
 checkBaseEdges g = do
@@ -839,22 +871,22 @@ checkBaseEdges g = do
 --   successors, but not both).
 data Rels = Rels
   { baseRels :: Set BaseTy
-  , varRels  :: Set (Name Type)
+  , varRels :: Set (Name Type)
   }
   deriving (Show, Eq)
 
 -- | A RelMap associates each variable to its sets of base type and
 --   variable predecessors and successors in the constraint graph.
-newtype RelMap = RelMap { unRelMap :: Map (Name Type, Dir) Rels}
+newtype RelMap = RelMap {unRelMap :: Map (Name Type, Dir) Rels}
 
 instance Pretty RelMap where
   pretty (RelMap rm) = vcat (map prettyVar byVar)
-    where
-      vars = S.map fst (M.keysSet rm)
-      byVar = map (\x -> (rm!(x,SubTy), x, rm!(x,SuperTy))) (S.toList vars)
+   where
+    vars = S.map fst (M.keysSet rm)
+    byVar = map (\x -> (rm ! (x, SubTy), x, rm ! (x, SuperTy))) (S.toList vars)
 
-      prettyVar (subs, x, sups) = hsep [prettyRel subs, "<:", pretty x, "<:", prettyRel sups]
-      prettyRel rs = pretty (baseRels rs) <> ", " <> pretty (varRels rs)
+    prettyVar (subs, x, sups) = hsep [prettyRel subs, "<:", pretty x, "<:", prettyRel sups]
+    prettyRel rs = pretty (baseRels rs) <> ", " <> pretty (varRels rs)
 
 -- | Modify a @RelMap@ to record the fact that we have solved for a
 --   type variable.  In particular, delete the variable from the
@@ -862,57 +894,57 @@ instance Pretty RelMap where
 --   other variable to remove this variable and add the base type we
 --   chose for it.
 substRel :: Name Type -> BaseTy -> RelMap -> RelMap
-substRel x ty
-  = RelMap
-  . M.delete (x,SuperTy)
-  . M.delete (x,SubTy)
-  . M.map (\r@(Rels b v) -> if x `S.member` v then Rels (S.insert ty b) (S.delete x v) else r)
-  . unRelMap
+substRel x ty =
+  RelMap
+    . M.delete (x, SuperTy)
+    . M.delete (x, SubTy)
+    . M.map (\r@(Rels b v) -> if x `S.member` v then Rels (S.insert ty b) (S.delete x v) else r)
+    . unRelMap
 
 -- | Essentially dirtypesBySort vm rm dir t s x finds all the
 --   dir-types (sub- or super-) of t which have sort s, relative to
 --   the variables in x.  This is \overbar{T}_S^X (resp. \underbar...)
 --   from Traytel et al.
 dirtypesBySort :: TyVarInfoMap -> RelMap -> Dir -> BaseTy -> Sort -> Set (Name Type) -> [BaseTy]
-dirtypesBySort vm (RelMap relMap) dir t s x
-
-    -- Keep only those supertypes t' of t
-  = keep (dirtypes dir t) $ \t' ->
-      -- which have the right sort, and such that
-      hasSort t' s &&
-
+dirtypesBySort vm (RelMap relMap) dir t s x =
+  -- Keep only those supertypes t' of t
+  keep (dirtypes dir t) $ \t' ->
+    -- which have the right sort, and such that
+    hasSort t' s
+      &&
       -- for all variables beta \in x,
-      forAll x (\beta ->
+      forAll
+        x
+        ( \beta ->
+            -- there is at least one type t'' which is a subtype of t'
+            -- which would be a valid solution for beta, that is,
+            exists (dirtypes (other dir) t') $ \t'' ->
+              -- t'' has the sort beta is supposed to have, and
+              hasSort t'' (getSort vm beta)
+                &&
+                -- t'' is a supertype of every base type predecessor of beta.
+                forAll
+                  (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir)))
+                  (isDirB dir t'')
+        )
+ where
+  -- The above comments are written assuming dir = Super; of course,
+  -- if dir = Sub then just swap "super" and "sub" everywhere.
 
-        -- there is at least one type t'' which is a subtype of t'
-        -- which would be a valid solution for beta, that is,
-        exists (dirtypes (other dir) t') $ \t'' ->
-
-          -- t'' has the sort beta is supposed to have, and
-          hasSort t'' (getSort vm beta) &&
-
-          -- t'' is a supertype of every base type predecessor of beta.
-          forAll (baseRels (lkup "dirtypesBySort, beta rel" relMap (beta, other dir)))
-            (isDirB dir t''))
-
-    -- The above comments are written assuming dir = Super; of course,
-    -- if dir = Sub then just swap "super" and "sub" everywhere.
-
-  where
-    forAll, exists :: Foldable t => t a -> (a -> Bool) -> Bool
-    forAll = flip all
-    exists = flip any
-    keep   = flip filter
+  forAll, exists :: Foldable t => t a -> (a -> Bool) -> Bool
+  forAll = flip all
+  exists = flip any
+  keep = flip filter
 
 -- | Sort-aware infimum or supremum.
 limBySort :: TyVarInfoMap -> RelMap -> Dir -> [BaseTy] -> Sort -> Set (Name Type) -> Maybe BaseTy
-limBySort vm rm dir ts s x
-  = (\is -> find (\lim -> all (\u -> isDirB dir u lim) is) is)
-  . isects
-  . map (\t -> dirtypesBySort vm rm dir t s x)
-  $ ts
-  where
-    isects = foldr1 intersect
+limBySort vm rm dir ts s x =
+  (\is -> find (\lim -> all (\u -> isDirB dir u lim) is) is)
+    . isects
+    . map (\t -> dirtypesBySort vm rm dir t s x)
+    $ ts
+ where
+  isects = foldr1 intersect
 
 lubBySort, glbBySort :: TyVarInfoMap -> RelMap -> [BaseTy] -> Sort -> Set (Name Type) -> Maybe BaseTy
 lubBySort vm rm = limBySort vm rm SuperTy
@@ -931,77 +963,85 @@ glbBySort vm rm = limBySort vm rm SubTy
 --   complete algorithm.  We choose to assign it the sup of its
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
-solveGraph
-  :: Members '[Fresh, Error SolveError, Output Message] r
-  => TyVarInfoMap -> Graph UAtom -> Sem r S
+solveGraph ::
+  Members '[Fresh, Error SolveError, Output Message] r =>
+  TyVarInfoMap ->
+  Graph UAtom ->
+  Sem r S
 solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
-  where
-    unifyWCC :: Substitution BaseTy -> Substitution Atom
-    unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
-      where
-        wccVarGroups :: [Set (Name Type)]
-        wccVarGroups  = map (S.map getVar) . filter (all uisVar) . applySubst s $ G.wcc g
-        getVar (UV v) = v
-        getVar (UB b) = error
-          $ "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
+ where
+  unifyWCC :: Substitution BaseTy -> Substitution Atom
+  unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
+   where
+    wccVarGroups :: [Set (Name Type)]
+    wccVarGroups = map (S.map getVar) . filter (all uisVar) . applySubst s $ G.wcc g
+    getVar (UV v) = v
+    getVar (UB b) =
+      error $
+        "Impossible! Base type " ++ show b ++ " in solveGraph.getVar"
 
-        mkEquateSubst :: Set (Name Type) -> Substitution Atom
-        mkEquateSubst = mkEquations . S.toList
+    mkEquateSubst :: Set (Name Type) -> Substitution Atom
+    mkEquateSubst = mkEquations . S.toList
 
-        mkEquations (a:as) = Subst.fromList . map (\v -> (coerce v, AVar (U a))) $ as
-        mkEquations []     = error "Impossible! Empty set of names in mkEquateSubst"
+    mkEquations (a : as) = Subst.fromList . map (\v -> (coerce v, AVar (U a))) $ as
+    mkEquations [] = error "Impossible! Empty set of names in mkEquateSubst"
 
-            -- After picking concrete base types for all the type
-            -- variables we can, the only thing possibly remaining in
-            -- the graph are components containing only type variables
-            -- and no base types.  It is sound, and simplifies the
-            -- generated types considerably, to simply unify any type
-            -- variables which are related by subtyping constraints.
-            -- That is, we collect all the type variables in each
-            -- weakly connected component and unify them.
-            --
-            -- As an example where this final step makes a difference,
-            -- consider a term like @\x. (\y.y) x@.  A fresh type
-            -- variable is generated for the type of @x@, and another
-            -- for the type of @y@; the application of @(\y.y)@ to @x@
-            -- induces a subtyping constraint between the two type
-            -- variables.  The most general type would be something
-            -- like @forall a b. (a <: b) => a -> b@, but we want to
-            -- avoid generating unnecessary subtyping constraints (the
-            -- type system might not even support subtyping qualifiers
-            -- like this).  Instead, we unify the two type variables
-            -- and the resulting type is @forall a. a -> a@.
+  -- After picking concrete base types for all the type
+  -- variables we can, the only thing possibly remaining in
+  -- the graph are components containing only type variables
+  -- and no base types.  It is sound, and simplifies the
+  -- generated types considerably, to simply unify any type
+  -- variables which are related by subtyping constraints.
+  -- That is, we collect all the type variables in each
+  -- weakly connected component and unify them.
+  --
+  -- As an example where this final step makes a difference,
+  -- consider a term like @\x. (\y.y) x@.  A fresh type
+  -- variable is generated for the type of @x@, and another
+  -- for the type of @y@; the application of @(\y.y)@ to @x@
+  -- induces a subtyping constraint between the two type
+  -- variables.  The most general type would be something
+  -- like @forall a b. (a <: b) => a -> b@, but we want to
+  -- avoid generating unnecessary subtyping constraints (the
+  -- type system might not even support subtyping qualifiers
+  -- like this).  Instead, we unify the two type variables
+  -- and the resulting type is @forall a. a -> a@.
 
-    -- Get the successor and predecessor sets for all the type variables.
-    topRelMap :: RelMap
-    topRelMap
-      = RelMap
-      . M.map (uncurry Rels . (S.fromAscList *** S.fromAscList)
-               . partitionEithers . map uatomToEither . S.toList)
+  -- Get the successor and predecessor sets for all the type variables.
+  topRelMap :: RelMap
+  topRelMap =
+    RelMap
+      . M.map
+        ( uncurry Rels
+            . (S.fromAscList *** S.fromAscList)
+            . partitionEithers
+            . map uatomToEither
+            . S.toList
+        )
       $ M.mapKeys (,SuperTy) subMap `M.union` M.mapKeys (,SubTy) superMap
 
-    subMap, superMap :: Map (Name Type) (Set UAtom)
-    (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
+  subMap, superMap :: Map (Name Type) (Set UAtom)
+  (subMap, superMap) = (onlyVars *** onlyVars) $ G.cessors g
 
-    onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
-    onlyVars = M.mapKeys fromVar . M.filterWithKey (\a _ -> uisVar a)
-      where
-        fromVar (UV x) = x
-        fromVar _      = error "Impossible! UB but uisVar."
+  onlyVars :: Map UAtom (Set UAtom) -> Map (Name Type) (Set UAtom)
+  onlyVars = M.mapKeys fromVar . M.filterWithKey (\a _ -> uisVar a)
+   where
+    fromVar (UV x) = x
+    fromVar _ = error "Impossible! UB but uisVar."
 
-    go
-      :: Members '[Fresh, Error SolveError, Output Message] r
-      => RelMap -> Sem r (Substitution BaseTy)
-    go relMap@(RelMap rm) = debugPretty relMap >> case as of
-
+  go ::
+    Members '[Fresh, Error SolveError, Output Message] r =>
+    RelMap ->
+    Sem r (Substitution BaseTy)
+  go relMap@(RelMap rm) =
+    debugPretty relMap >> case as of
       -- No variables left that have base type constraints.
-      []    -> return idS
-
+      [] -> return idS
       -- Solve one variable at a time.  See below.
-      (a:_) -> do
+      (a : _) -> do
         debug $ "Solving for" <+> pretty' a
         case solveVar a of
-          Nothing       -> do
+          Nothing -> do
             debug $ "Couldn't solve for" <+> pretty' a
             throw NoUnify
 
@@ -1019,103 +1059,124 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
           Just s -> do
             debugPretty s
             (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
+   where
+    -- NOTE we can't solve a bunch in parallel!  Might end up
+    -- assigning them conflicting solutions if some depend on
+    -- others.  For example, consider the situation
+    --
+    --            Z
+    --            |
+    --            a3
+    --           /  \
+    --          a1   N
+    --
+    -- If we try to solve in parallel we will end up assigning a1
+    -- -> Z (since it only has base types as an upper bound) and
+    -- a3 -> N (since it has both upper and lower bounds, and by
+    -- default we pick the lower bound), but this is wrong since
+    -- we should have a1 < a3.
+    --
+    -- If instead we solve them one at a time, we could e.g. first
+    -- solve a1 -> Z, and then we would find a3 -> Z as well.
+    -- Alternately, if we first solve a3 -> N then we will have a1
+    -- -> N as well.  Both are acceptable.
+    --
+    -- In fact, this exact graph comes from (^x.x+1) which was
+    -- erroneously being inferred to have type Z -> N when I first
+    -- wrote the code.
 
-      where
-        -- NOTE we can't solve a bunch in parallel!  Might end up
-        -- assigning them conflicting solutions if some depend on
-        -- others.  For example, consider the situation
+    -- Get only the variables we can solve on this pass, which
+    -- have base types in their predecessor or successor set.  If
+    -- there are no such variables, then start picking any
+    -- remaining variables with a sort and pick types for them
+    -- (disco doesn't have qualified polymorphism so we can't just
+    -- leave them).
+    asBase =
+      map fst
+        . filter (not . S.null . baseRels . lkup "solveGraph.go.as" rm)
+        $ M.keys rm
+    as = case asBase of
+      [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys rm
+      _ -> asBase
+
+    -- Solve for a variable, failing if it has no solution, otherwise returning
+    -- a substitution for it.
+    solveVar :: Name Type -> Maybe (Substitution BaseTy)
+    solveVar v =
+      case ((v, SuperTy), (v, SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" rm) of
+        -- No sub- or supertypes; the only way this can happen is
+        -- if it has a nontrivial sort.
         --
-        --            Z
-        --            |
-        --            a3
-        --           /  \
-        --          a1   N
+        -- Traytel et al. don't seem to have a rule saying what to
+        -- do in this case (see Fig. 16 on p. 16 of their long
+        -- version).  We used to just pick a type that inhabits
+        -- the sort, but this is wrong; see
+        -- https://github.com/disco-lang/disco/issues/192.
         --
-        -- If we try to solve in parallel we will end up assigning a1
-        -- -> Z (since it only has base types as an upper bound) and
-        -- a3 -> N (since it has both upper and lower bounds, and by
-        -- default we pick the lower bound), but this is wrong since
-        -- we should have a1 < a3.
+        -- If the sort is 'bool', we'll pick the Boolean base
+        -- type, since there are no other sorts which could cause
+        -- a conflict as in #192.
         --
-        -- If instead we solve them one at a time, we could e.g. first
-        -- solve a1 -> Z, and then we would find a3 -> Z as well.
-        -- Alternately, if we first solve a3 -> N then we will have a1
-        -- -> N as well.  Both are acceptable.
-        --
-        -- In fact, this exact graph comes from (^x.x+1) which was
-        -- erroneously being inferred to have type Z -> N when I first
-        -- wrote the code.
+        -- Otherwise, we assume that any situation in which we
+        -- have no base sub- or supertypes but we do have
+        -- nontrivial sorts means that we are dealing with numeric
+        -- types; so we can just call N a base subtype and go from
+        -- there.
 
-        -- Get only the variables we can solve on this pass, which
-        -- have base types in their predecessor or successor set.  If
-        -- there are no such variables, then start picking any
-        -- remaining variables with a sort and pick types for them
-        -- (disco doesn't have qualified polymorphism so we can't just
-        -- leave them).
-        asBase
-          = map fst
-          . filter (not . S.null . baseRels . lkup "solveGraph.go.as" rm)
-          $ M.keys rm
-        as = case asBase of
-          [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys rm
-          _  -> asBase
+        ([], []) ->
+          if getSort vm v == S.fromList [QBool]
+            then Just (coerce v |-> B)
+            else -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
 
-        -- Solve for a variable, failing if it has no solution, otherwise returning
-        -- a substitution for it.
-        solveVar :: Name Type -> Maybe (Substitution BaseTy)
-        solveVar v =
-          case ((v,SuperTy), (v,SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" rm) of
-            -- No sub- or supertypes; the only way this can happen is
-            -- if it has a nontrivial sort.
-            --
-            -- Traytel et al. don't seem to have a rule saying what to
-            -- do in this case (see Fig. 16 on p. 16 of their long
-            -- version).  We used to just pick a type that inhabits
-            -- the sort, but this is wrong; see
-            -- https://github.com/disco-lang/disco/issues/192.
-            --
-            -- If the sort is 'bool', we'll pick the Boolean base
-            -- type, since there are no other sorts which could cause
-            -- a conflict as in #192.
-            --
-            -- Otherwise, we assume that any situation in which we
-            -- have no base sub- or supertypes but we do have
-            -- nontrivial sorts means that we are dealing with numeric
-            -- types; so we can just call N a base subtype and go from
-            -- there.
-
-            ([], []) ->
-              if getSort vm v == S.fromList [QBool]
-                then Just (coerce v |-> B)
-                else
-                  -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
-                  (coerce v |->) <$> lubBySort vm relMap [N] (getSort vm v)
-                    (varRels (lkup "solveVar none, rels" rm (v,SubTy)))
-
-            -- Only supertypes.  Just assign a to their inf, if one exists.
-            (bsupers, []) ->
-              -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
-              (coerce v |->) <$> glbBySort vm relMap bsupers (getSort vm v)
-                (varRels (lkup "solveVar bsupers, rels" rm (v,SuperTy)))
-
-            -- Only subtypes.  Just assign a to their sup.
-            ([], bsubs)   ->
-              -- Debug.trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
-              -- Debug.trace ("sortmap: " ++ show vm) $
-              -- Debug.trace ("relmap: " ++ show relMap) $
-              -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
-              -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
-              (coerce v |->) <$> lubBySort vm relMap bsubs (getSort vm v)
-                (varRels (lkup "solveVar bsubs, rels" rm (v,SubTy)))
-
-            -- Both successors and predecessors.  Both must have a
-            -- valid bound, and the bounds must not overlap.  Assign a
-            -- to the sup of its predecessors.
-            (bsupers, bsubs) -> do
-              ub <- glbBySort vm relMap bsupers (getSort vm v)
-                      (varRels (rm ! (v,SuperTy)))
-              lb <- lubBySort vm relMap bsubs   (getSort vm v)
-                      (varRels (rm ! (v,SubTy)))
-              case isSubB lb ub of
-                True  -> Just (coerce v |-> lb)
-                False -> Nothing
+              (coerce v |->)
+                <$> lubBySort
+                  vm
+                  relMap
+                  [N]
+                  (getSort vm v)
+                  (varRels (lkup "solveVar none, rels" rm (v, SubTy)))
+        -- Only supertypes.  Just assign a to their inf, if one exists.
+        (bsupers, []) ->
+          -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
+          (coerce v |->)
+            <$> glbBySort
+              vm
+              relMap
+              bsupers
+              (getSort vm v)
+              (varRels (lkup "solveVar bsupers, rels" rm (v, SuperTy)))
+        -- Only subtypes.  Just assign a to their sup.
+        ([], bsubs) ->
+          -- Debug.trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
+          -- Debug.trace ("sortmap: " ++ show vm) $
+          -- Debug.trace ("relmap: " ++ show relMap) $
+          -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
+          -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
+          (coerce v |->)
+            <$> lubBySort
+              vm
+              relMap
+              bsubs
+              (getSort vm v)
+              (varRels (lkup "solveVar bsubs, rels" rm (v, SubTy)))
+        -- Both successors and predecessors.  Both must have a
+        -- valid bound, and the bounds must not overlap.  Assign a
+        -- to the sup of its predecessors.
+        (bsupers, bsubs) -> do
+          ub <-
+            glbBySort
+              vm
+              relMap
+              bsupers
+              (getSort vm v)
+              (varRels (rm ! (v, SuperTy)))
+          lb <-
+            lubBySort
+              vm
+              relMap
+              bsubs
+              (getSort vm v)
+              (varRels (rm ! (v, SubTy)))
+          case isSubB lb ub of
+            True -> Just (coerce v |-> lb)
+            False -> Nothing

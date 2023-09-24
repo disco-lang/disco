@@ -6,17 +6,17 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Optional extensions to the disco language.
-module Disco.Extensions
-  ( Ext (..),
-    ExtSet,
-    defaultExts,
-    allExts,
-    allExtsList,
-    addExtension,
-  )
+module Disco.Extensions (
+  Ext (..),
+  ExtSet,
+  defaultExts,
+  allExts,
+  allExtsList,
+  addExtension,
+)
 where
 
-import           Data.Set (Set)
+import Data.Set (Set)
 import qualified Data.Set as S
 
 type ExtSet = Set Ext

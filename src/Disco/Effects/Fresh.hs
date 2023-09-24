@@ -1,8 +1,11 @@
-{-# LANGUAGE BlockArguments             #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Effects.Fresh
 -- Copyright   :  disco team and contributors
@@ -12,50 +15,47 @@
 --
 -- Polysemy effect for fresh name generation, compatible with the
 -- unbound-generics library.
---
------------------------------------------------------------------------------
-
 module Disco.Effects.Fresh where
 
-import           Disco.Effects.Counter
-import           Disco.Names                           (QName, localName)
-import           Polysemy
-import           Polysemy.ConstraintAbsorber
-import qualified Unbound.Generics.LocallyNameless      as U
-import           Unbound.Generics.LocallyNameless.Name
+import Disco.Effects.Counter
+import Disco.Names (QName, localName)
+import Polysemy
+import Polysemy.ConstraintAbsorber
+import qualified Unbound.Generics.LocallyNameless as U
+import Unbound.Generics.LocallyNameless.Name
 
 -- | Fresh name generation effect, supporting raw generation of fresh
 --   names, and opening binders with automatic freshening.  Simply
 --   increments a global counter every time 'fresh' is called and
 --   makes a variable with that numeric suffix.
 data Fresh m a where
-  Fresh  :: Name x -> Fresh m (Name x)
+  Fresh :: Name x -> Fresh m (Name x)
 
 makeSem ''Fresh
 
 -- | Dispatch the fresh name generation effect, starting at a given
 --   integer.
 runFresh' :: Integer -> Sem (Fresh ': r) a -> Sem r a
-runFresh' i
-  = runCounter' i
-  . reinterpret \case
+runFresh' i =
+  runCounter' i
+    . reinterpret \case
       Fresh x -> case x of
-        Fn s _  -> Fn s <$> next
-        nm@Bn{} -> return nm
+        Fn s _ -> Fn s <$> next
+        nm@Bn {} -> return nm
 
-    -- Above code copied from
-    -- https://hackage.haskell.org/package/unbound-generics-0.4.1/docs/src/Unbound.Generics.LocallyNameless.Fresh.html ;
-    -- see instance Monad m => Fresh (FreshMT m) .
+-- Above code copied from
+-- https://hackage.haskell.org/package/unbound-generics-0.4.1/docs/src/Unbound.Generics.LocallyNameless.Fresh.html ;
+-- see instance Monad m => Fresh (FreshMT m) .
 
-    -- It turns out to make things much simpler to reimplement the
-    -- Fresh effect ourselves in terms of a state effect, since then
-    -- we can immediately dispatch it.  The alternative would be to
-    -- implement it in terms of (Embed U.FreshM), but then we are
-    -- stuck with that constraint.  Given the constraint-absorbing
-    -- machinery below, just impementing the 'fresh' effect itself
-    -- means we can then reuse other things from unbound-generics that
-    -- depend on a Fresh constraint, such as the 'unbind' function
-    -- below.
+-- It turns out to make things much simpler to reimplement the
+-- Fresh effect ourselves in terms of a state effect, since then
+-- we can immediately dispatch it.  The alternative would be to
+-- implement it in terms of (Embed U.FreshM), but then we are
+-- stuck with that constraint.  Given the constraint-absorbing
+-- machinery below, just impementing the 'fresh' effect itself
+-- means we can then reuse other things from unbound-generics that
+-- depend on a Fresh constraint, such as the 'unbind' function
+-- below.
 
 -- | Run a computation requiring fresh name generation, beginning with
 --   0 for the initial freshly generated name.
@@ -92,7 +92,7 @@ absorbFresh :: Member Fresh r => (U.Fresh (Sem r) => Sem r a) -> Sem r a
 absorbFresh = absorbWithSem @U.Fresh @Action (FreshDict fresh) (Sub Dict)
 {-# INLINEABLE absorbFresh #-}
 
-newtype FreshDict m = FreshDict { fresh_ :: forall x. Name x -> m (Name x) }
+newtype FreshDict m = FreshDict {fresh_ :: forall x. Name x -> m (Name x)}
 
 -- | Wrapper for a monadic action with phantom type parameter for reflection.
 --   Locally defined so that the instance we are going to build with reflection
@@ -100,8 +100,11 @@ newtype FreshDict m = FreshDict { fresh_ :: forall x. Name x -> m (Name x) }
 newtype Action m s' a = Action (m a)
   deriving (Functor, Applicative, Monad)
 
-instance ( Monad m
-         , Reifies s' (FreshDict m)
-         ) => U.Fresh (Action m s') where
+instance
+  ( Monad m
+  , Reifies s' (FreshDict m)
+  ) =>
+  U.Fresh (Action m s')
+  where
   fresh x = Action $ fresh_ (reflect $ Proxy @s') x
   {-# INLINEABLE fresh #-}

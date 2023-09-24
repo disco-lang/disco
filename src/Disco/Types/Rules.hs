@@ -1,4 +1,9 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
+
 -- |
 -- Module      :  Disco.Types.Rules
 -- Copyright   :  disco team and contributors
@@ -6,45 +11,46 @@
 --
 -- "Disco.Types.Rules" defines some generic rules about arity,
 -- subtyping, and sorts for disco base types.
---
------------------------------------------------------------------------------
+module Disco.Types.Rules (
+  -- * Arity
+  Variance (..),
+  arity,
 
--- SPDX-License-Identifier: BSD-3-Clause
+  -- * Qualifiers
+  Qualifier (..),
+  bopQual,
 
-module Disco.Types.Rules
-  ( -- * Arity
+  -- * Sorts
+  Sort,
+  topSort,
 
-    Variance(..), arity
+  -- * Subtyping rules
+  Dir (..),
+  other,
+  isSubA,
+  isSubB,
+  isDirB,
+  supertypes,
+  subtypes,
+  dirtypes,
 
-    -- * Qualifiers
-  , Qualifier(..), bopQual
+  -- * Qualifier and sort rules
+  hasQual,
+  hasSort,
+  qualRules,
+  sortRules,
+  pickSortBaseTy,
+)
+where
 
-    -- * Sorts
-  , Sort, topSort
+import Control.Monad ((>=>))
+import Data.List (foldl')
+import Data.Map (Map)
+import qualified Data.Map as M
+import qualified Data.Set as S
 
-    -- * Subtyping rules
-
-  , Dir(..), other
-
-  , isSubA, isSubB, isDirB
-  , supertypes, subtypes, dirtypes
-
-    -- * Qualifier and sort rules
-
-  , hasQual, hasSort
-  , qualRules, sortRules
-  , pickSortBaseTy
-  )
-  where
-
-import           Control.Monad          ((>=>))
-import           Data.List              (foldl')
-import           Data.Map               (Map)
-import qualified Data.Map               as M
-import qualified Data.Set               as S
-
-import           Disco.Types
-import           Disco.Types.Qualifiers
+import Disco.Types
+import Disco.Types.Qualifiers
 
 ------------------------------------------------------------
 -- Arity
@@ -65,15 +71,16 @@ data Variance = Co | Contra
 --   That is, @S1 -> T1 <: S2 -> T2@ (@<:@ means "is a subtype of") if
 --   and only if @S2 <: S1@ and @T1 <: T2@.
 arity :: Con -> [Variance]
-arity CArr           = [Contra, Co]
-arity CProd          = [Co, Co]
-arity CSum           = [Co, Co]
+arity CArr = [Contra, Co]
+arity CProd = [Co, Co]
+arity CSum = [Co, Co]
 arity (CContainer _) = [Co]
-arity CMap           = [Contra, Co]
-arity CGraph         = [Co]
-arity (CUser _)      = error "Impossible! arity CUser"
-  -- CUsers should always be replaced by their definitions before arity
-  -- is called.
+arity CMap = [Contra, Co]
+arity CGraph = [Co]
+arity (CUser _) = error "Impossible! arity CUser"
+
+-- CUsers should always be replaced by their definitions before arity
+-- is called.
 
 ------------------------------------------------------------
 -- Subtyping rules
@@ -86,7 +93,7 @@ data Dir = SubTy | SuperTy
 
 -- | Swap directions.
 other :: Dir -> Dir
-other SubTy   = SuperTy
+other SubTy = SuperTy
 other SuperTy = SubTy
 
 --------------------------------------------------
@@ -96,45 +103,45 @@ other SuperTy = SubTy
 --   @True@ if either they are equal, or if they are base types and
 --   'isSubB' returns true.
 isSubA :: Atom -> Atom -> Bool
-isSubA a1 a2                 | a1 == a2 = True
+isSubA a1 a2 | a1 == a2 = True
 isSubA (ABase t1) (ABase t2) = isSubB t1 t2
-isSubA _ _                   = False
+isSubA _ _ = False
 
 -- | Check whether one base type is a subtype of another.
 isSubB :: BaseTy -> BaseTy -> Bool
 isSubB b1 b2 | b1 == b2 = True
-isSubB N Z   = True
-isSubB N F   = True
-isSubB N Q   = True
-isSubB Z Q   = True
-isSubB F Q   = True
-isSubB B P   = True
-isSubB _ _   = False
+isSubB N Z = True
+isSubB N F = True
+isSubB N Q = True
+isSubB Z Q = True
+isSubB F Q = True
+isSubB B P = True
+isSubB _ _ = False
 
 -- | Check whether one base type is a sub- or supertype of another.
 isDirB :: Dir -> BaseTy -> BaseTy -> Bool
-isDirB SubTy   b1 b2 = isSubB b1 b2
+isDirB SubTy b1 b2 = isSubB b1 b2
 isDirB SuperTy b1 b2 = isSubB b2 b1
 
 -- | List all the supertypes of a given base type.
 supertypes :: BaseTy -> [BaseTy]
-supertypes N  = [N, Z, F, Q]
-supertypes Z  = [Z, Q]
-supertypes F  = [F, Q]
-supertypes B  = [B, P]
+supertypes N = [N, Z, F, Q]
+supertypes Z = [Z, Q]
+supertypes F = [F, Q]
+supertypes B = [B, P]
 supertypes ty = [ty]
 
 -- | List all the subtypes of a given base type.
 subtypes :: BaseTy -> [BaseTy]
-subtypes Q  = [Q, F, Z, N]
-subtypes F  = [F, N]
-subtypes Z  = [Z, N]
-subtypes P  = [P, B]
+subtypes Q = [Q, F, Z, N]
+subtypes F = [F, N]
+subtypes Z = [Z, N]
+subtypes P = [P, B]
 subtypes ty = [ty]
 
 -- | List all the sub- or supertypes of a given base type.
 dirtypes :: Dir -> BaseTy -> [BaseTy]
-dirtypes SubTy   = subtypes
+dirtypes SubTy = subtypes
 dirtypes SuperTy = supertypes
 
 ------------------------------------------------------------
@@ -143,19 +150,19 @@ dirtypes SuperTy = supertypes
 
 -- | Check whether a given base type satisfies a qualifier.
 hasQual :: BaseTy -> Qualifier -> Bool
-hasQual P       QCmp    = False    -- can't compare Props
-hasQual _       QCmp    = True
-hasQual P       QBasic  = False
-hasQual _       QBasic  = True
-hasQual P       QSimple = False
-hasQual _       QSimple = True
+hasQual P QCmp = False -- can't compare Props
+hasQual _ QCmp = True
+hasQual P QBasic = False
+hasQual _ QBasic = True
+hasQual P QSimple = False
+hasQual _ QSimple = True
 -- hasQual (Fin _) q     | q `elem` [QNum, QSub, QEnum] = True
 -- hasQual (Fin n) QDiv  = isPrime n
-hasQual b       QNum    = b `elem` [N, Z, F, Q]
-hasQual b       QSub    = b `elem` [Z, Q]
-hasQual b       QDiv    = b `elem` [F, Q]
-hasQual b       QEnum   = b `elem` [N, Z, F, Q, C]
-hasQual b       QBool   = b `elem` [B, P]
+hasQual b QNum = b `elem` [N, Z, F, Q]
+hasQual b QSub = b `elem` [Z, Q]
+hasQual b QDiv = b `elem` [F, Q]
+hasQual b QEnum = b `elem` [N, Z, F, Q, C]
+hasQual b QBool = b `elem` [B, P]
 
 -- | Check whether a base type has a certain sort, which simply
 --   amounts to whether it satisfies every qualifier in the sort.
@@ -177,57 +184,65 @@ hasSort = all . hasQual
 --   set of qualifiers (i.e. a general sort) on a type argument.  In
 --   that case one would just have to encode 'sortRules' directly.
 qualRulesMap :: Map Con (Map Qualifier [Maybe Qualifier])
-qualRulesMap = M.fromList
-  [ CProd ==> M.fromList
-    [ QCmp ==> [Just QCmp, Just QCmp],
-      QSimple ==> [Just QSimple, Just QSimple]
+qualRulesMap =
+  M.fromList
+    [ CProd
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp, Just QCmp]
+          , QSimple ==> [Just QSimple, Just QSimple]
+          ]
+    , CSum
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp, Just QCmp]
+          , QSimple ==> [Just QSimple, Just QSimple]
+          ]
+    , CList
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp]
+          , QSimple ==> [Just QSimple]
+          ]
+    , CBag
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp]
+          , QSimple ==> [Just QSimple]
+          ]
+    , CSet
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp]
+          , QSimple ==> [Just QSimple]
+          ]
+    , CGraph
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp]
+          , QNum ==> [Nothing]
+          ]
+    , CMap
+        ==> M.fromList
+          [ QCmp ==> [Just QCmp, Just QCmp]
+          ]
     ]
-  , CSum ==> M.fromList
-    [ QCmp ==> [Just QCmp, Just QCmp],
-      QSimple ==> [Just QSimple, Just QSimple]
-    ]
-  , CList ==> M.fromList
-    [ QCmp ==> [Just QCmp],
-      QSimple ==> [Just QSimple]
-    ]
-  , CBag ==> M.fromList
-    [ QCmp ==> [Just QCmp],
-      QSimple ==> [Just QSimple]
-    ]
-  , CSet ==> M.fromList
-    [ QCmp ==> [Just QCmp],
-      QSimple ==> [Just QSimple]
-    ]
-  , CGraph ==> M.fromList
-    [ QCmp ==> [Just QCmp],
-      QNum ==> [Nothing]
-    ]
-  , CMap ==> M.fromList
-    [ QCmp ==> [Just QCmp, Just QCmp]
-    ]
-  ]
-  where
-    (==>) :: a -> b -> (a,b)
-    (==>) = (,)
+ where
+  (==>) :: a -> b -> (a, b)
+  (==>) = (,)
 
-  -- We could (theoretically) make graphs and maps also be simple values if we require the map's values are also simple.
+-- We could (theoretically) make graphs and maps also be simple values if we require the map's values are also simple.
 
-  -- Eventually we can easily imagine adding an opt-in mode where
-  -- numeric operations can be used on pairs and functions, then the
-  -- qualRules would become dependent on what language extension/mode
-  -- was chosen.  For example we could have rules like
-  --
-  -- [ CArr ==> M.fromList
-  --   [ QNum ==> [Nothing, Just QNum]  -- (a -> b) can be +, * iff b can
-  --   , QSub ==> [Nothing, Just QSub]  -- ditto for subtraction
-  --   , QDiv ==> [Nothing, Just QDiv]  -- and division
-  --   ]
-  -- , CProd ==> M.fromList
-  --   [ QNum ==> [Just QNum, Just QNum] -- (a,b) can be +, * iff a and b can
-  --   , QSub ==> [Just QSub, Just QSub] -- etc.
-  --   , QDiv ==> [Just QDiv, Just QDiv]
-  --   ]
-  -- ]
+-- Eventually we can easily imagine adding an opt-in mode where
+-- numeric operations can be used on pairs and functions, then the
+-- qualRules would become dependent on what language extension/mode
+-- was chosen.  For example we could have rules like
+--
+-- [ CArr ==> M.fromList
+--   [ QNum ==> [Nothing, Just QNum]  -- (a -> b) can be +, * iff b can
+--   , QSub ==> [Nothing, Just QSub]  -- ditto for subtraction
+--   , QDiv ==> [Nothing, Just QDiv]  -- and division
+--   ]
+-- , CProd ==> M.fromList
+--   [ QNum ==> [Just QNum, Just QNum] -- (a,b) can be +, * iff a and b can
+--   , QSub ==> [Just QSub, Just QSub] -- etc.
+--   , QDiv ==> [Just QDiv, Just QDiv]
+--   ]
+-- ]
 
 -- | Given a constructor T and a qualifier we want to hold of a type T
 --   t1 t2 ..., return a list of qualifiers that need to hold of t1,
@@ -236,7 +251,7 @@ qualRules :: Con -> Qualifier -> Maybe [Maybe Qualifier]
 -- T t1 t2 ... is basic (contains no Prop) iff t1, t2 ... all are.
 qualRules c QBasic = Just (map (const (Just QBasic)) (arity c))
 -- Otherwise, just look up in the qualRulesMap.
-qualRules c q      = (M.lookup c >=> M.lookup q) qualRulesMap
+qualRules c q = (M.lookup c >=> M.lookup q) qualRulesMap
 
 -- | @sortRules T s = [s1, ..., sn]@ means that sort @s@ holds of
 --   type @(T t1 ... tn)@ if and only if  @s1 t1 /\ ... /\ sn tn@.
@@ -259,12 +274,12 @@ sortRules c s = do
 -- | Pick a base type (generally the "simplest") that satisfies a given sort.
 pickSortBaseTy :: Sort -> BaseTy
 pickSortBaseTy s
-  | QDiv    `S.member` s && QSub `S.member` s = Q
-  | QDiv    `S.member` s = F
-  | QSub    `S.member` s = Z
-  | QNum    `S.member` s = N
-  | QCmp    `S.member` s = N
-  | QEnum   `S.member` s = N
-  | QBool   `S.member` s = B
+  | QDiv `S.member` s && QSub `S.member` s = Q
+  | QDiv `S.member` s = F
+  | QSub `S.member` s = Z
+  | QNum `S.member` s = N
+  | QCmp `S.member` s = N
+  | QEnum `S.member` s = N
+  | QBool `S.member` s = B
   | QSimple `S.member` s = N
-  | otherwise            = Unit
+  | otherwise = Unit

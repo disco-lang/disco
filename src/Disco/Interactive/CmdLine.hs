@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Interactive.CmdLine
 -- Copyright   :  disco team and contributors
@@ -7,53 +10,52 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Definition of the command-line REPL interface for Disco.
---
------------------------------------------------------------------------------
+module Disco.Interactive.CmdLine (
+  -- * Command-line options record
+  DiscoOpts (..),
 
-module Disco.Interactive.CmdLine
-  ( -- * Command-line options record
+  -- * optparse-applicative command line parsers
+  discoOpts,
+  discoInfo,
 
-    DiscoOpts(..)
+  -- * main
+  discoMain,
+) where
 
-    -- * optparse-applicative command line parsers
-  , discoOpts, discoInfo
+import Data.Version (showVersion)
+import Paths_disco (version)
 
-    -- * main
+import Control.Lens hiding (use)
+import Control.Monad (unless, when)
+import qualified Control.Monad.Catch as CMC
+import Control.Monad.IO.Class (MonadIO (..))
+import Data.Foldable (forM_)
+import Data.List (isPrefixOf)
+import Data.Maybe (isJust)
+import System.Exit (
+  exitFailure,
+  exitSuccess,
+ )
 
-  , discoMain
+import qualified Options.Applicative as O
+import System.Console.Haskeline as H
 
-  ) where
+import Disco.AST.Surface (emptyModule)
+import Disco.Error
+import Disco.Eval
+import Disco.Interactive.Commands
+import Disco.Messages
+import Disco.Module (
+  Resolver (FromStdlib),
+  miExts,
+ )
+import Disco.Names (ModuleName (REPLModule))
+import Disco.Pretty
 
-import           Data.Version                           (showVersion)
-import           Paths_disco                            (version)
-
-import           Control.Lens                           hiding (use)
-import           Control.Monad                          (unless, when)
-import qualified Control.Monad.Catch                    as CMC
-import           Control.Monad.IO.Class                 (MonadIO (..))
-import           Data.Foldable                          (forM_)
-import           Data.List                              (isPrefixOf)
-import           Data.Maybe                             (isJust)
-import           System.Exit                            (exitFailure,
-                                                         exitSuccess)
-
-import qualified Options.Applicative                    as O
-import           System.Console.Haskeline               as H
-
-import           Disco.AST.Surface                      (emptyModule)
-import           Disco.Error
-import           Disco.Eval
-import           Disco.Interactive.Commands
-import           Disco.Messages
-import           Disco.Module                           (Resolver (FromStdlib),
-                                                         miExts)
-import           Disco.Names                            (ModuleName (REPLModule))
-import           Disco.Pretty
-
-import           Disco.Effects.State
-import           Polysemy
-import           Polysemy.ConstraintAbsorber.MonadCatch
-import           Polysemy.Error
+import Disco.Effects.State
+import Polysemy
+import Polysemy.ConstraintAbsorber.MonadCatch
+import Polysemy.Error
 
 ------------------------------------------------------------
 -- Command-line options parser
@@ -61,63 +63,75 @@ import           Polysemy.Error
 
 -- | Command-line options for disco.
 data DiscoOpts = DiscoOpts
-  { onlyVersion :: Bool          -- ^ Should we just print the version?
-  , evaluate    :: Maybe String  -- ^ A single expression to evaluate
-  , cmdFile     :: Maybe String  -- ^ Execute the commands in a given file
-  , checkFile   :: Maybe String  -- ^ Check a file and then exit
-  , debugFlag   :: Bool
+  { onlyVersion :: Bool
+  -- ^ Should we just print the version?
+  , evaluate :: Maybe String
+  -- ^ A single expression to evaluate
+  , cmdFile :: Maybe String
+  -- ^ Execute the commands in a given file
+  , checkFile :: Maybe String
+  -- ^ Check a file and then exit
+  , debugFlag :: Bool
   }
 
 discoOpts :: O.Parser DiscoOpts
-discoOpts = DiscoOpts
-  <$> O.switch (
-        mconcat
-        [ O.long "version"
-        , O.short 'v'
-        , O.help "show current version"
-        ]
-        )
-
-   <*> O.optional (
-        O.strOption (mconcat
-          [ O.long "evaluate"
-          , O.short 'e'
-          , O.help "evaluate an expression"
-          , O.metavar "TERM"
-          ])
+discoOpts =
+  DiscoOpts
+    <$> O.switch
+      ( mconcat
+          [ O.long "version"
+          , O.short 'v'
+          , O.help "show current version"
+          ]
       )
-  <*> O.optional (
-        O.strOption (mconcat
-          [ O.long "file"
-          , O.short 'f'
-          , O.help "execute the commands in a file"
-          , O.metavar "FILE"
-          ])
+    <*> O.optional
+      ( O.strOption
+          ( mconcat
+              [ O.long "evaluate"
+              , O.short 'e'
+              , O.help "evaluate an expression"
+              , O.metavar "TERM"
+              ]
+          )
       )
-  <*> O.optional (
-        O.strOption (mconcat
-          [ O.long "check"
-          , O.help "check a file without starting the interactive REPL"
-          , O.metavar "FILE"
-          ])
+    <*> O.optional
+      ( O.strOption
+          ( mconcat
+              [ O.long "file"
+              , O.short 'f'
+              , O.help "execute the commands in a file"
+              , O.metavar "FILE"
+              ]
+          )
       )
-  <*> O.switch (
-        mconcat
-        [ O.long "debug"
-        , O.help "print debugging information"
-        , O.short 'd'
-        ]
-        )
+    <*> O.optional
+      ( O.strOption
+          ( mconcat
+              [ O.long "check"
+              , O.help "check a file without starting the interactive REPL"
+              , O.metavar "FILE"
+              ]
+          )
+      )
+    <*> O.switch
+      ( mconcat
+          [ O.long "debug"
+          , O.help "print debugging information"
+          , O.short 'd'
+          ]
+      )
 
 discoVersion :: String
 discoVersion = showVersion version
 
 discoInfo :: O.ParserInfo DiscoOpts
-discoInfo = O.info (O.helper <*> discoOpts) $ mconcat
-  [ O.fullDesc
-  , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
-  , O.header $ "disco " ++ discoVersion
-  ]
+discoInfo =
+  O.info (O.helper <*> discoOpts) $
+    mconcat
+      [ O.fullDesc
+      , O.progDesc "Command-line interface for Disco, a programming language for discrete mathematics."
+      , O.header $ "disco " ++ discoVersion
+      ]
 
 optsToCfg :: DiscoOpts -> DiscoConfig
 optsToCfg opts = initDiscoConfig & debugMode .~ debugFlag opts
@@ -140,7 +154,6 @@ discoMain = do
   let batch = any isJust [evaluate opts, cmdFile opts, checkFile opts]
   unless batch $ putStr banner
   runDisco (optsToCfg opts) $ do
-
     -- Load an empty module just to force standard libraries to be loaded first
     _ <- loadParsedDiscoModule True FromStdlib REPLModule emptyModule
 
@@ -148,65 +161,63 @@ discoMain = do
       Just file -> do
         res <- handleLoad file
         liftIO $ if res then exitSuccess else exitFailure
-      Nothing   -> return ()
+      Nothing -> return ()
     case cmdFile opts of
       Just file -> do
         mcmds <- loadFile file
         case mcmds of
-          Nothing   -> return ()
+          Nothing -> return ()
           Just cmds -> mapM_ handleCMD (lines cmds)
-      Nothing   -> return ()
+      Nothing -> return ()
     forM_ (evaluate opts) handleCMD
     unless batch $ do
       loop
+ where
+  -- These types used to involve InputT Disco, but we now use Final
+  -- (InputT IO) in the list of effects.  see
+  -- https://github.com/polysemy-research/polysemy/issues/395 for
+  -- inspiration.
 
-  where
+  ctrlC :: MonadIO m => m a -> SomeException -> m a
+  ctrlC act e = do
+    liftIO $ print e
+    act
 
-    -- These types used to involve InputT Disco, but we now use Final
-    -- (InputT IO) in the list of effects.  see
-    -- https://github.com/polysemy-research/polysemy/issues/395 for
-    -- inspiration.
+  withCtrlC :: (MonadIO m, CMC.MonadCatch m) => m a -> m a -> m a
+  withCtrlC resume act = CMC.catch act (ctrlC resume)
 
-    ctrlC :: MonadIO m => m a -> SomeException -> m a
-    ctrlC act e = do
-      liftIO $ print e
-      act
-
-    withCtrlC :: (MonadIO m, CMC.MonadCatch m) => m a -> m a -> m a
-    withCtrlC resume act = CMC.catch act (ctrlC resume)
-
-    loop :: Members DiscoEffects r => Sem r ()
-    loop = do
-      minput <- embedFinal $ withCtrlC (return $ Just "") (getInputLine "Disco> ")
-      case minput of
-        Nothing -> return ()
-        Just input
-          | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
-              liftIO $ putStrLn "Goodbye!"
-              return ()
-          | ":{" `isPrefixOf` input -> do
-              multiLineLoop []
-              loop
-          | otherwise -> do
-              mapError @_ @DiscoError (Panic . show) $
-                absorbMonadCatch $
+  loop :: Members DiscoEffects r => Sem r ()
+  loop = do
+    minput <- embedFinal $ withCtrlC (return $ Just "") (getInputLine "Disco> ")
+    case minput of
+      Nothing -> return ()
+      Just input
+        | ":q" `isPrefixOf` input && input `isPrefixOf` ":quit" -> do
+            liftIO $ putStrLn "Goodbye!"
+            return ()
+        | ":{" `isPrefixOf` input -> do
+            multiLineLoop []
+            loop
+        | otherwise -> do
+            mapError @_ @DiscoError (Panic . show) $
+              absorbMonadCatch $
                 withCtrlC (return ()) $
-                handleCMD input
-              loop
+                  handleCMD input
+            loop
 
-    multiLineLoop :: Members DiscoEffects r => [String] -> Sem r ()
-    multiLineLoop ls = do
-      minput <- embedFinal $ withCtrlC (return Nothing) (getInputLine "Disco| ")
-      case minput of
-        Nothing -> return ()
-        Just input
-          | ":}" `isPrefixOf` input -> do
-              mapError @_ @DiscoError (Panic . show) $
-                absorbMonadCatch $
+  multiLineLoop :: Members DiscoEffects r => [String] -> Sem r ()
+  multiLineLoop ls = do
+    minput <- embedFinal $ withCtrlC (return Nothing) (getInputLine "Disco| ")
+    case minput of
+      Nothing -> return ()
+      Just input
+        | ":}" `isPrefixOf` input -> do
+            mapError @_ @DiscoError (Panic . show) $
+              absorbMonadCatch $
                 withCtrlC (return ()) $
-                handleCMD (unlines (reverse ls))
-          | otherwise -> do
-              multiLineLoop (input:ls)
+                  handleCMD (unlines (reverse ls))
+        | otherwise -> do
+            multiLineLoop (input : ls)
 
 -- | Parse and run the command corresponding to some REPL input.
 handleCMD :: Members DiscoEffects r => String -> Sem r ()
@@ -214,7 +225,8 @@ handleCMD "" = return ()
 handleCMD s = do
   exts <- use @TopInfo (replModInfo . miExts)
   case parseLine discoCommands exts s of
-    Left m  -> info (text m)
+    Left m -> info (text m)
     Right l -> catch @DiscoError (dispatch discoCommands l) (info . pretty')
-                -- The above has to be catch, not outputErrors, because
-                -- the latter won't resume afterwards.
+
+-- The above has to be catch, not outputErrors, because
+-- the latter won't resume afterwards.

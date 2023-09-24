@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+-----------------------------------------------------------------------------
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 -- |
 -- Module      :  Disco.Pretty.DSL
 -- Copyright   :  disco team and contributors
@@ -7,24 +10,19 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Adapter DSL on top of Text.PrettyPrint for Applicative pretty-printing.
---
------------------------------------------------------------------------------
-
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-
 module Disco.Pretty.DSL where
 
-import           Control.Applicative hiding (empty)
-import           Data.String         (IsString (..))
-import           Prelude             hiding ((<>))
+import Control.Applicative hiding (empty)
+import Data.String (IsString (..))
+import Prelude hiding ((<>))
 
-import           Polysemy
-import           Polysemy.Reader
+import Polysemy
+import Polysemy.Reader
 
-import           Text.PrettyPrint    (Doc)
-import qualified Text.PrettyPrint    as PP
+import Text.PrettyPrint (Doc)
+import qualified Text.PrettyPrint as PP
 
-import           Disco.Pretty.Prec
+import Disco.Pretty.Prec
 
 instance IsString (Sem r Doc) where
   fromString = text
@@ -36,16 +34,16 @@ instance IsString (Sem r Doc) where
 -- operates over a generic functor/monad.
 
 vcat :: Applicative f => [f Doc] -> f Doc
-vcat ds  = PP.vcat <$> sequenceA ds
+vcat ds = PP.vcat <$> sequenceA ds
 
 hcat :: Applicative f => [f Doc] -> f Doc
-hcat ds  = PP.hcat <$> sequenceA ds
+hcat ds = PP.hcat <$> sequenceA ds
 
 hsep :: Applicative f => [f Doc] -> f Doc
-hsep ds  = PP.hsep <$> sequenceA ds
+hsep ds = PP.hsep <$> sequenceA ds
 
 parens :: Functor f => f Doc -> f Doc
-parens   = fmap PP.parens
+parens = fmap PP.parens
 
 brackets :: Functor f => f Doc -> f Doc
 brackets = fmap PP.brackets
@@ -63,10 +61,10 @@ doubleQuotes :: Functor f => f Doc -> f Doc
 doubleQuotes = fmap PP.doubleQuotes
 
 text :: Applicative m => String -> m Doc
-text     = pure . PP.text
+text = pure . PP.text
 
 integer :: Applicative m => Integer -> m Doc
-integer  = pure . PP.integer
+integer = pure . PP.integer
 
 nest :: Functor f => Int -> f Doc -> f Doc
 nest n d = PP.nest n <$> d
@@ -75,13 +73,13 @@ hang :: Applicative f => f Doc -> Int -> f Doc -> f Doc
 hang d1 n d2 = PP.hang <$> d1 <*> pure n <*> d2
 
 empty :: Applicative m => m Doc
-empty    = pure PP.empty
+empty = pure PP.empty
 
 (<+>) :: Applicative f => f Doc -> f Doc -> f Doc
 (<+>) = liftA2 (PP.<+>)
 
 (<>) :: Applicative f => f Doc -> f Doc -> f Doc
-(<>)  = liftA2 (PP.<>)
+(<>) = liftA2 (PP.<>)
 
 ($+$) :: Applicative f => f Doc -> f Doc -> f Doc
 ($+$) = liftA2 (PP.$+$)

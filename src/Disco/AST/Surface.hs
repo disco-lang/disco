@@ -1,8 +1,11 @@
-{-# LANGUAGE PatternSynonyms      #-}
-{-# LANGUAGE StandaloneDeriving   #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.AST.Surface
 -- Copyright   :  disco team and contributors
@@ -12,157 +15,172 @@
 --
 -- Abstract syntax trees representing the surface syntax of the Disco
 -- language.
---
------------------------------------------------------------------------------
+module Disco.AST.Surface (
+  -- * Modules
+  Module (..),
+  emptyModule,
+  TopLevel (..),
 
-module Disco.AST.Surface
-       ( -- * Modules
-         Module(..), emptyModule, TopLevel(..)
-         -- ** Documentation
-       , Docs, DocThing(..), Property
-         -- ** Declarations
-       , TypeDecl(..), TermDefn(..), TypeDefn(..)
-       , Decl(..), partitionDecls, prettyTyDecl
+  -- ** Documentation
+  Docs,
+  DocThing (..),
+  Property,
 
-         -- * Terms
-       , UD
-       , Term
-       , pattern TVar
-       , pattern TPrim
-       , pattern TUn
-       , pattern TBin
-       , pattern TLet
-       , pattern TParens
-       , pattern TUnit
-       , pattern TBool
-       , pattern TChar
-       , pattern TString
-       , pattern TNat
-       , pattern TRat
-       , pattern TAbs
-       , pattern TApp
-       , pattern TTup
-       , pattern TCase
-       , pattern TChain
-       , pattern TTyOp
-       , pattern TContainerComp
-       , pattern TContainer
-       , pattern TAscr
-       , pattern TWild
-       , pattern TList
-       , pattern TListComp
+  -- ** Declarations
+  TypeDecl (..),
+  TermDefn (..),
+  TypeDefn (..),
+  Decl (..),
+  partitionDecls,
+  prettyTyDecl,
 
-       , Quantifier(..)
+  -- * Terms
+  UD,
+  Term,
+  pattern TVar,
+  pattern TPrim,
+  pattern TUn,
+  pattern TBin,
+  pattern TLet,
+  pattern TParens,
+  pattern TUnit,
+  pattern TBool,
+  pattern TChar,
+  pattern TString,
+  pattern TNat,
+  pattern TRat,
+  pattern TAbs,
+  pattern TApp,
+  pattern TTup,
+  pattern TCase,
+  pattern TChain,
+  pattern TTyOp,
+  pattern TContainerComp,
+  pattern TContainer,
+  pattern TAscr,
+  pattern TWild,
+  pattern TList,
+  pattern TListComp,
+  Quantifier (..),
 
-         -- ** Telescopes
-       , Telescope(..), foldTelescope, mapTelescope, toTelescope, fromTelescope
-         -- ** Expressions
-       , Side(..)
+  -- ** Telescopes
+  Telescope (..),
+  foldTelescope,
+  mapTelescope,
+  toTelescope,
+  fromTelescope,
 
-       , Link
-       , pattern TLink
+  -- ** Expressions
+  Side (..),
+  Link,
+  pattern TLink,
+  Binding,
 
-       , Binding
+  -- ** Lists
+  Qual,
+  pattern QBind,
+  pattern QGuard,
+  Container (..),
+  Ellipsis (..),
 
-         -- ** Lists
-       , Qual
-       , pattern QBind
-       , pattern QGuard
+  -- ** Case expressions and patterns
+  Branch,
+  Guard,
+  pattern GBool,
+  pattern GPat,
+  pattern GLet,
+  Pattern,
+  pattern PVar,
+  pattern PWild,
+  pattern PAscr,
+  pattern PUnit,
+  pattern PBool,
+  pattern PChar,
+  pattern PString,
+  pattern PTup,
+  pattern PInj,
+  pattern PNat,
+  pattern PCons,
+  pattern PList,
+  pattern PAdd,
+  pattern PMul,
+  pattern PSub,
+  pattern PNeg,
+  pattern PFrac,
+  pattern PNonlinear,
+  pattern Binding,
+)
+where
 
-       , Container(..)
+import Prelude hiding ((<>))
 
-       , Ellipsis(..)
+import Control.Lens ((%~), _1, _2, _3)
+import Data.Char (toLower)
+import qualified Data.Map as M
+import Data.Set (Set)
+import qualified Data.Set as S
+import Data.Void
 
-         -- ** Case expressions and patterns
-       , Branch
+import Disco.Effects.LFresh
+import Polysemy hiding (Embed, embed)
+import Polysemy.Reader
 
-       , Guard
-       , pattern GBool
-       , pattern GPat
-       , pattern GLet
-
-       , Pattern
-       , pattern PVar
-       , pattern PWild
-       , pattern PAscr
-       , pattern PUnit
-       , pattern PBool
-       , pattern PChar
-       , pattern PString
-       , pattern PTup
-       , pattern PInj
-       , pattern PNat
-       , pattern PCons
-       , pattern PList
-       , pattern PAdd
-       , pattern PMul
-       , pattern PSub
-       , pattern PNeg
-       , pattern PFrac
-       , pattern PNonlinear
-
-       , pattern Binding
-       )
-       where
-
-import           Prelude                          hiding ((<>))
-
-import           Control.Lens                     (_1, _2, _3, (%~))
-import           Data.Char                        (toLower)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
-import qualified Data.Set                         as S
-import           Data.Void
-
-import           Disco.Effects.LFresh
-import           Polysemy                         hiding (Embed, embed)
-import           Polysemy.Reader
-
-import           Disco.AST.Generic
-import           Disco.Extensions
-import           Disco.Pretty
-import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims
-import           Disco.Types
-import           Unbound.Generics.LocallyNameless hiding (LFresh (..), lunbind)
+import Disco.AST.Generic
+import Disco.Extensions
+import Disco.Pretty
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims
+import Disco.Types
+import Unbound.Generics.LocallyNameless hiding (LFresh (..), lunbind)
 
 -- | The extension descriptor for Surface specific AST types.
 data UD
 
 -- | A module contains all the information from one disco source file.
 data Module = Module
-  { modExts    :: Set Ext             -- ^ Enabled extensions
-  , modImports :: [String]            -- ^ Module imports
-  , modDecls   :: [Decl]              -- ^ Declarations
-  , modDocs    :: [(Name Term, Docs)] -- ^ Documentation
-  , modTerms   :: [Term]              -- ^ Top-level (bare) terms
+  { modExts :: Set Ext
+  -- ^ Enabled extensions
+  , modImports :: [String]
+  -- ^ Module imports
+  , modDecls :: [Decl]
+  -- ^ Declarations
+  , modDocs :: [(Name Term, Docs)]
+  -- ^ Documentation
+  , modTerms :: [Term]
+  -- ^ Top-level (bare) terms
   }
-deriving instance ForallTerm Show  UD => Show Module
+
+deriving instance ForallTerm Show UD => Show Module
 
 emptyModule :: Module
-emptyModule = Module
-  { modExts = S.empty
-  , modImports = []
-  , modDecls = []
-  , modDocs = []
-  , modTerms = []
-  }
+emptyModule =
+  Module
+    { modExts = S.empty
+    , modImports = []
+    , modDecls = []
+    , modDocs = []
+    , modTerms = []
+    }
 
 -- | A @TopLevel@ is either documentation (a 'DocThing') or a
 --   declaration ('Decl').
 data TopLevel = TLDoc DocThing | TLDecl Decl | TLExpr Term
-deriving instance ForallTerm Show  UD => Show TopLevel
+
+deriving instance ForallTerm Show UD => Show TopLevel
 
 -- | Convenient synonym for a list of 'DocThing's.
 type Docs = [DocThing]
 
 -- | An item of documentation.
 data DocThing
-  = DocString   [String]    -- ^ A documentation string, i.e. a block
-                            --   of @||| text@ items
-  | DocProperty Property    -- ^ An example/doctest/property of the
-                            --   form @!!! forall (x1:ty1) ... . property@
-deriving instance ForallTerm Show  UD => Show DocThing
+  = -- | A documentation string, i.e. a block
+    --   of @||| text@ items
+    DocString [String]
+  | -- | An example/doctest/property of the
+    --   form @!!! forall (x1:ty1) ... . property@
+    DocProperty Property
+
+deriving instance ForallTerm Show UD => Show DocThing
 
 -- | A property is a universally quantified term of the form
 --   @forall v1 : T1, v2 : T2. term@.
@@ -180,24 +198,24 @@ data TermDefn = TermDefn (Name Term) [Bind [Pattern] Term]
 --
 --   @type T arg1 arg2 ... = body
 data TypeDefn = TypeDefn String [String] Type
-  deriving Show
+  deriving (Show)
 
 -- | A declaration is either a type declaration, a term definition, or
 --   a type definition.
 data Decl where
-  DType  :: TypeDecl -> Decl
-  DDefn  :: TermDefn -> Decl
+  DType :: TypeDecl -> Decl
+  DDefn :: TermDefn -> Decl
   DTyDef :: TypeDefn -> Decl
 
-deriving instance ForallTerm Show  UD => Show TypeDecl
-deriving instance ForallTerm Show  UD => Show TermDefn
-deriving instance ForallTerm Show  UD => Show Decl
+deriving instance ForallTerm Show UD => Show TypeDecl
+deriving instance ForallTerm Show UD => Show TermDefn
+deriving instance ForallTerm Show UD => Show Decl
 
 partitionDecls :: [Decl] -> ([TypeDecl], [TermDefn], [TypeDefn])
-partitionDecls (DType  tyDecl : ds) = (_1 %~ (tyDecl:)) (partitionDecls ds)
-partitionDecls (DDefn  def    : ds) = (_2 %~ (def:))    (partitionDecls ds)
-partitionDecls (DTyDef def    : ds) = (_3 %~ (def:))    (partitionDecls ds)
-partitionDecls []                   = ([], [], [])
+partitionDecls (DType tyDecl : ds) = (_1 %~ (tyDecl :)) (partitionDecls ds)
+partitionDecls (DDefn def : ds) = (_2 %~ (def :)) (partitionDecls ds)
+partitionDecls (DTyDef def : ds) = (_3 %~ (def :)) (partitionDecls ds)
+partitionDecls [] = ([], [], [])
 
 ------------------------------------------------------------
 -- Pretty-printing top-level declarations
@@ -207,10 +225,10 @@ partitionDecls []                   = ([], [], [])
 
 instance Pretty Decl where
   pretty = \case
-    DType  (TypeDecl x ty) -> pretty x <+> text ":" <+> pretty ty
+    DType (TypeDecl x ty) -> pretty x <+> text ":" <+> pretty ty
     DTyDef (TypeDefn x args body) ->
       text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> pretty body
-    DDefn  (TermDefn x bs) -> vcat $ map (pretty . (x,)) bs
+    DDefn (TermDefn x bs) -> vcat $ map (pretty . (x,)) bs
 
 -- | Pretty-print a single clause in a definition.
 instance Pretty (Name a, Bind [Pattern] Term) where
@@ -230,28 +248,28 @@ type Term = Term_ UD
 -- (nonempty) list of patterns. Each pattern might contain any
 -- number of variables, and might have type annotations on some
 -- of its components.
-type instance X_Binder          UD = [Pattern]
+type instance X_Binder UD = [Pattern]
 
-type instance X_TVar            UD = ()
-type instance X_TPrim           UD = ()
-type instance X_TLet            UD = ()
-type instance X_TParens         UD = ()
-type instance X_TUnit           UD = ()
-type instance X_TBool           UD = ()
-type instance X_TNat            UD = ()
-type instance X_TRat            UD = ()
-type instance X_TChar           UD = ()
-type instance X_TString         UD = ()
-type instance X_TAbs            UD = ()
-type instance X_TApp            UD = ()
-type instance X_TTup            UD = ()
-type instance X_TCase           UD = ()
-type instance X_TChain          UD = ()
-type instance X_TTyOp           UD = ()
-type instance X_TContainer      UD = ()
-type instance X_TContainerComp  UD = ()
-type instance X_TAscr           UD = ()
-type instance X_Term            UD = ()  -- TWild
+type instance X_TVar UD = ()
+type instance X_TPrim UD = ()
+type instance X_TLet UD = ()
+type instance X_TParens UD = ()
+type instance X_TUnit UD = ()
+type instance X_TBool UD = ()
+type instance X_TNat UD = ()
+type instance X_TRat UD = ()
+type instance X_TChar UD = ()
+type instance X_TString UD = ()
+type instance X_TAbs UD = ()
+type instance X_TApp UD = ()
+type instance X_TTup UD = ()
+type instance X_TCase UD = ()
+type instance X_TChain UD = ()
+type instance X_TTyOp UD = ()
+type instance X_TContainer UD = ()
+type instance X_TContainerComp UD = ()
+type instance X_TAscr UD = ()
+type instance X_Term UD = () -- TWild
 
 pattern TVar :: Name Term -> Term
 pattern TVar name = TVar_ () name
@@ -269,7 +287,7 @@ pattern TLet :: Bind (Telescope Binding) Term -> Term
 pattern TLet bind = TLet_ () bind
 
 pattern TParens :: Term -> Term
-pattern TParens term  = TParens_ () term
+pattern TParens term = TParens_ () term
 
 pattern TUnit :: Term
 pattern TUnit = TUnit_ ()
@@ -277,7 +295,7 @@ pattern TUnit = TUnit_ ()
 pattern TBool :: Bool -> Term
 pattern TBool bool = TBool_ () bool
 
-pattern TNat  :: Integer -> Term
+pattern TNat :: Integer -> Term
 pattern TNat int = TNat_ () int
 
 pattern TRat :: Rational -> Term
@@ -292,7 +310,7 @@ pattern TString s = TString_ () s
 pattern TAbs :: Quantifier -> Bind [Pattern] Term -> Term
 pattern TAbs q bind = TAbs_ q () bind
 
-pattern TApp  :: Term -> Term -> Term
+pattern TApp :: Term -> Term -> Term
 pattern TApp term1 term2 = TApp_ () term1 term2
 
 pattern TTup :: [Term] -> Term
@@ -322,9 +340,28 @@ pattern TAscr term ty = TAscr_ () term ty
 pattern TWild :: Term
 pattern TWild = XTerm_ ()
 
-{-# COMPLETE TVar, TPrim, TLet, TParens, TUnit, TBool, TNat, TRat, TChar,
-             TString, TAbs, TApp, TTup, TCase, TChain, TTyOp,
-             TContainer, TContainerComp, TAscr, TWild #-}
+{-# COMPLETE
+  TVar
+  , TPrim
+  , TLet
+  , TParens
+  , TUnit
+  , TBool
+  , TNat
+  , TRat
+  , TChar
+  , TString
+  , TAbs
+  , TApp
+  , TTup
+  , TCase
+  , TChain
+  , TTyOp
+  , TContainer
+  , TContainerComp
+  , TAscr
+  , TWild
+  #-}
 
 pattern TList :: [Term] -> Maybe (Ellipsis Term) -> Term
 pattern TList ts e <- TContainer_ () ListContainer (map fst -> ts) e
@@ -368,8 +405,8 @@ type Branch = Branch_ UD
 type Guard = Guard_ UD
 
 type instance X_GBool UD = ()
-type instance X_GPat  UD = ()
-type instance X_GLet  UD = ()
+type instance X_GPat UD = ()
+type instance X_GLet UD = ()
 
 pattern GBool :: Embed Term -> Guard
 pattern GBool embedt = GBool_ () embedt
@@ -384,23 +421,23 @@ pattern GLet b = GLet_ () b
 
 type Pattern = Pattern_ UD
 
-type instance X_PVar UD    = ()
-type instance X_PWild UD   = ()
-type instance X_PAscr UD   = ()
-type instance X_PUnit UD   = ()
-type instance X_PBool UD   = ()
-type instance X_PTup UD    = ()
-type instance X_PInj UD    = ()
-type instance X_PNat UD    = ()
-type instance X_PChar UD   = ()
+type instance X_PVar UD = ()
+type instance X_PWild UD = ()
+type instance X_PAscr UD = ()
+type instance X_PUnit UD = ()
+type instance X_PBool UD = ()
+type instance X_PTup UD = ()
+type instance X_PInj UD = ()
+type instance X_PNat UD = ()
+type instance X_PChar UD = ()
 type instance X_PString UD = ()
-type instance X_PCons UD   = ()
-type instance X_PList UD   = ()
-type instance X_PAdd UD    = ()
-type instance X_PMul UD    = ()
-type instance X_PSub UD    = ()
-type instance X_PNeg UD    = ()
-type instance X_PFrac UD   = ()
+type instance X_PCons UD = ()
+type instance X_PList UD = ()
+type instance X_PAdd UD = ()
+type instance X_PMul UD = ()
+type instance X_PSub UD = ()
+type instance X_PNeg UD = ()
+type instance X_PFrac UD = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -409,8 +446,8 @@ pattern PVar name = PVar_ () name
 pattern PWild :: Pattern
 pattern PWild = PWild_ ()
 
- -- (?) TAscr uses a PolyType, but without higher rank types
- -- I think we can't possibly need that here.
+-- (?) TAscr uses a PolyType, but without higher rank types
+-- I think we can't possibly need that here.
 pattern PAscr :: Pattern -> Type -> Pattern
 pattern PAscr p ty = PAscr_ () p ty
 
@@ -418,7 +455,7 @@ pattern PUnit :: Pattern
 pattern PUnit = PUnit_ ()
 
 pattern PBool :: Bool -> Pattern
-pattern PBool  b = PBool_ () b
+pattern PBool b = PBool_ () b
 
 pattern PChar :: Char -> Pattern
 pattern PChar c = PChar_ () c
@@ -426,17 +463,17 @@ pattern PChar c = PChar_ () c
 pattern PString :: String -> Pattern
 pattern PString s = PString_ () s
 
-pattern PTup  :: [Pattern] -> Pattern
+pattern PTup :: [Pattern] -> Pattern
 pattern PTup lp = PTup_ () lp
 
-pattern PInj  :: Side -> Pattern -> Pattern
+pattern PInj :: Side -> Pattern -> Pattern
 pattern PInj s p = PInj_ () s p
 
-pattern PNat  :: Integer -> Pattern
+pattern PNat :: Integer -> Pattern
 pattern PNat n = PNat_ () n
 
 pattern PCons :: Pattern -> Pattern -> Pattern
-pattern PCons  p1 p2 = PCons_ () p1 p2
+pattern PCons p1 p2 = PCons_ () p1 p2
 
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
@@ -457,11 +494,29 @@ pattern PFrac :: Pattern -> Pattern -> Pattern
 pattern PFrac p1 p2 = PFrac_ () p1 p2
 
 pattern PNonlinear :: Pattern -> Name Term -> Pattern
-pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x where
-  PNonlinear p x = PNonlinear_ (embed p) x
+pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
+  where
+    PNonlinear p x = PNonlinear_ (embed p) x
 
-{-# COMPLETE PVar, PWild, PAscr, PUnit, PBool, PTup, PInj, PNat,
-             PChar, PString, PCons, PList, PAdd, PMul, PSub, PNeg, PFrac #-}
+{-# COMPLETE
+  PVar
+  , PWild
+  , PAscr
+  , PUnit
+  , PBool
+  , PTup
+  , PInj
+  , PNat
+  , PChar
+  , PString
+  , PCons
+  , PList
+  , PAdd
+  , PMul
+  , PSub
+  , PNeg
+  , PFrac
+  #-}
 
 ------------------------------------------------------------
 -- Pretty-printing for surface-syntax terms
@@ -472,85 +527,87 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x where
 
 -- | Pretty-print a term with guaranteed parentheses.
 prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
-prettyTermP t@TTup{} = setPA initPA $ pretty t
+prettyTermP t@TTup {} = setPA initPA $ pretty t
 -- prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
-prettyTermP t        = withPA initPA $ pretty t
+prettyTermP t = withPA initPA $ pretty t
 
 instance Pretty Term where
   pretty = \case
-    TVar x      -> pretty x
+    TVar x -> pretty x
     TPrim (PrimUOp uop) ->
       case M.lookup uop uopMap of
-        Just (OpInfo (UOpF Pre _) (syn:_) _)  -> text syn <> text "~"
-        Just (OpInfo (UOpF Post _) (syn:_) _) -> text "~" <> text syn
+        Just (OpInfo (UOpF Pre _) (syn : _) _) -> text syn <> text "~"
+        Just (OpInfo (UOpF Post _) (syn : _) _) -> text "~" <> text syn
         _ -> error $ "pretty @Term: " ++ show uop ++ " is not in the uopMap!"
     TPrim (PrimBOp bop) -> text "~" <> pretty bop <> text "~"
     TPrim p ->
       case M.lookup p primMap of
-        Just (PrimInfo _ nm True)  -> text nm
+        Just (PrimInfo _ nm True) -> text nm
         Just (PrimInfo _ nm False) -> text "$" <> text nm
         Nothing -> error $ "pretty @Term: Prim " ++ show p ++ " is not in the primMap!"
-    TParens t   -> pretty t
-    TUnit       -> text "■"
-    (TBool b)     -> text (map toLower $ show b)
-    TChar c     -> text (show c)
-    TString cs  -> doubleQuotes $ text cs
-    TAbs q bnd  -> withPA initPA $
+    TParens t -> pretty t
+    TUnit -> text "■"
+    (TBool b) -> text (map toLower $ show b)
+    TChar c -> text (show c)
+    TString cs -> doubleQuotes $ text cs
+    TAbs q bnd -> withPA initPA $
       lunbind bnd $ \(args, body) ->
-      prettyQ q
-        <> (hsep =<< punctuate (text ",") (map pretty args))
-        <> text "."
-        <+> lt (pretty body)
-      where
-        prettyQ Lam = text "λ"
-        prettyQ All = text "∀"
-        prettyQ Ex  = text "∃"
+        prettyQ q
+          <> (hsep =<< punctuate (text ",") (map pretty args))
+          <> text "."
+          <+> lt (pretty body)
+     where
+      prettyQ Lam = text "λ"
+      prettyQ All = text "∀"
+      prettyQ Ex = text "∃"
 
     -- special case for fully applied unary operators
     TApp (TPrim (PrimUOp uop)) t ->
       case M.lookup uop uopMap of
-        Just (OpInfo (UOpF Post _) _ _) -> withPA (ugetPA uop) $
-          lt (pretty t) <> pretty uop
-        Just (OpInfo (UOpF Pre  _) _ _) -> withPA (ugetPA uop) $
-          pretty uop <> rt (pretty t)
+        Just (OpInfo (UOpF Post _) _ _) ->
+          withPA (ugetPA uop) $
+            lt (pretty t) <> pretty uop
+        Just (OpInfo (UOpF Pre _) _ _) ->
+          withPA (ugetPA uop) $
+            pretty uop <> rt (pretty t)
         _ -> error $ "pretty @Term: uopMap doesn't contain " ++ show uop
-
     -- special case for fully applied binary operators
-    TApp (TPrim (PrimBOp bop)) (TTup [t1, t2]) -> withPA (getPA bop) $
-      hsep
-      [ lt (pretty t1)
-      , pretty bop
-      , rt (pretty t2)
-      ]
-
+    TApp (TPrim (PrimBOp bop)) (TTup [t1, t2]) ->
+      withPA (getPA bop) $
+        hsep
+          [ lt (pretty t1)
+          , pretty bop
+          , rt (pretty t2)
+          ]
     -- Always pretty-print function applications with parentheses
-    TApp t1 t2  -> withPA funPA $
-      lt (pretty t1) <> prettyTermP t2
-
-    TTup ts     -> setPA initPA $ do
+    TApp t1 t2 ->
+      withPA funPA $
+        lt (pretty t1) <> prettyTermP t2
+    TTup ts -> setPA initPA $ do
       ds <- punctuate (text ",") (map pretty ts)
       parens (hsep ds)
-    TContainer c ts e  -> setPA initPA $ do
+    TContainer c ts e -> setPA initPA $ do
       ds <- punctuate (text ",") (map prettyCount ts)
       let pe = case e of
-                 Nothing        -> []
-                 Just (Until t) -> [text "..", pretty t]
+            Nothing -> []
+            Just (Until t) -> [text "..", pretty t]
       containerDelims c (hsep (ds ++ pe))
-      where
-        prettyCount (t, Nothing) = pretty t
-        prettyCount (t, Just n)  = lt (pretty t) <+> text "#" <+> rt (pretty n)
+     where
+      prettyCount (t, Nothing) = pretty t
+      prettyCount (t, Just n) = lt (pretty t) <+> text "#" <+> rt (pretty n)
     TContainerComp c bqst ->
-      lunbind bqst $ \(qs,t) ->
-      setPA initPA $ containerDelims c (hsep [pretty t, text "|", pretty qs])
-    TNat n       -> integer n
-    TChain t lks -> withPA (getPA Eq) . hsep $
+      lunbind bqst $ \(qs, t) ->
+        setPA initPA $ containerDelims c (hsep [pretty t, text "|", pretty qs])
+    TNat n -> integer n
+    TChain t lks ->
+      withPA (getPA Eq) . hsep $
         lt (pretty t)
-        : concatMap prettyLink lks
-      where
-        prettyLink (TLink op t2) =
-          [ pretty op
-          , setPA (getPA op) . rt $ pretty t2
-          ]
+          : concatMap prettyLink lks
+     where
+      prettyLink (TLink op t2) =
+        [ pretty op
+        , setPA (getPA op) . rt $ pretty t2
+        ]
     TLet bnd -> withPA initPA $
       lunbind bnd $ \(bs, t2) -> do
         ds <- punctuate (text ",") (map pretty (fromTelescope bs))
@@ -560,46 +617,47 @@ instance Pretty Term where
           , text "in"
           , pretty t2
           ]
-
-    TCase b    -> withPA initPA $
-      (text "{?" <+> prettyBranches b) $+$ text "?}"
-    TAscr t ty -> withPA ascrPA $
-      lt (pretty t) <+> text ":" <+> rt (pretty ty)
-    TRat  r    -> text (prettyDecimal r)
-    TTyOp op ty  -> withPA funPA $
-      pretty op <+> pretty ty
+    TCase b ->
+      withPA initPA $
+        (text "{?" <+> prettyBranches b) $+$ text "?}"
+    TAscr t ty ->
+      withPA ascrPA $
+        lt (pretty t) <+> text ":" <+> rt (pretty ty)
+    TRat r -> text (prettyDecimal r)
+    TTyOp op ty ->
+      withPA funPA $
+        pretty op <+> pretty ty
     TWild -> text "_"
 
 -- | Print appropriate delimiters for a container literal.
 containerDelims :: Member (Reader PA) r => Container -> (Sem r Doc -> Sem r Doc)
 containerDelims ListContainer = brackets
-containerDelims BagContainer  = bag
-containerDelims SetContainer  = braces
+containerDelims BagContainer = bag
+containerDelims SetContainer = braces
 
 prettyBranches :: Members '[Reader PA, LFresh] r => [Branch] -> Sem r Doc
 prettyBranches = \case
   [] -> error "Empty branches are disallowed."
-  b:bs ->
+  b : bs ->
     pretty b
-    $+$
-    foldr (($+$) . (text "," <+>) . pretty) empty bs
+      $+$ foldr (($+$) . (text "," <+>) . pretty) empty bs
 
 -- | Pretty-print a single branch in a case expression.
 instance Pretty Branch where
-  pretty br = lunbind br $ \(gs,t) ->
+  pretty br = lunbind br $ \(gs, t) ->
     pretty t <+> pretty gs
 
 -- | Pretty-print the guards in a single branch of a case expression.
 instance Pretty (Telescope Guard) where
   pretty = \case
     TelEmpty -> text "otherwise"
-    gs       -> foldr (\g r -> pretty g <+> r) (text "") (fromTelescope gs)
+    gs -> foldr (\g r -> pretty g <+> r) (text "") (fromTelescope gs)
 
 instance Pretty Guard where
   pretty = \case
-    GBool et  -> text "if" <+> pretty (unembed et)
+    GBool et -> text "if" <+> pretty (unembed et)
     GPat et p -> text "when" <+> pretty (unembed et) <+> text "is" <+> pretty p
-    GLet b    -> text "let" <+> pretty b
+    GLet b -> text "let" <+> pretty b
 
 -- | Pretty-print a binding, i.e. a pairing of a name (with optional
 --   type annotation) and term.
@@ -620,12 +678,12 @@ instance Pretty (Telescope Qual) where
 instance Pretty Qual where
   pretty = \case
     QBind x (unembed -> t) -> hsep [pretty x, text "in", pretty t]
-    QGuard (unembed -> t)  -> pretty t
+    QGuard (unembed -> t) -> pretty t
 
 -- | Pretty-print a pattern with guaranteed parentheses.
 prettyPatternP :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
-prettyPatternP p@PTup{} = setPA initPA $ pretty p
-prettyPatternP p        = withPA initPA $ pretty p
+prettyPatternP p@PTup {} = setPA initPA $ pretty p
+prettyPatternP p = withPA initPA $ pretty p
 
 -- We could probably alternatively write a function to turn a pattern
 -- back into a term, and pretty-print that instead of the below.
@@ -633,37 +691,46 @@ prettyPatternP p        = withPA initPA $ pretty p
 
 instance Pretty Pattern where
   pretty = \case
-    PVar x      -> pretty x
-    PWild       -> text "_"
-    PAscr p ty  -> withPA ascrPA $
-      lt (pretty p) <+> text ":" <+> rt (pretty ty)
-    PUnit       -> text "■"
-    PBool b     -> text $ map toLower $ show b
-    PChar c     -> text (show c)
-    PString s   -> text (show s)
-    PTup ts     -> setPA initPA $ do
+    PVar x -> pretty x
+    PWild -> text "_"
+    PAscr p ty ->
+      withPA ascrPA $
+        lt (pretty p) <+> text ":" <+> rt (pretty ty)
+    PUnit -> text "■"
+    PBool b -> text $ map toLower $ show b
+    PChar c -> text (show c)
+    PString s -> text (show s)
+    PTup ts -> setPA initPA $ do
       ds <- punctuate (text ",") (map pretty ts)
       parens (hsep ds)
-    PInj s p    -> withPA funPA $
-      pretty s <> prettyPatternP p
-    PNat n      -> integer n
-    PCons p1 p2 -> withPA (getPA Cons) $
-      lt (pretty p1) <+> text "::" <+> rt (pretty p2)
-    PList ps    -> setPA initPA $ do
+    PInj s p ->
+      withPA funPA $
+        pretty s <> prettyPatternP p
+    PNat n -> integer n
+    PCons p1 p2 ->
+      withPA (getPA Cons) $
+        lt (pretty p1) <+> text "::" <+> rt (pretty p2)
+    PList ps -> setPA initPA $ do
       ds <- punctuate (text ",") (map pretty ps)
       brackets (hsep ds)
-    PAdd L p t  -> withPA (getPA Add) $
-      lt (pretty p) <+> text "+" <+> rt (pretty t)
-    PAdd R p t  -> withPA (getPA Add) $
-      lt (pretty t) <+> text "+" <+> rt (pretty p)
-    PMul L p t  -> withPA (getPA Mul) $
-      lt (pretty p) <+> text "*" <+> rt (pretty t)
-    PMul R p t  -> withPA (getPA Mul) $
-      lt (pretty t) <+> text "*" <+> rt (pretty p)
-    PSub p t    -> withPA (getPA Sub) $
-      lt (pretty p) <+> text "-" <+> rt (pretty t)
-    PNeg p      -> withPA (ugetPA Neg) $
-      text "-" <> rt (pretty p)
-    PFrac p1 p2 -> withPA (getPA Div) $
-      lt (pretty p1) <+> text "/" <+> rt (pretty p2)
-
+    PAdd L p t ->
+      withPA (getPA Add) $
+        lt (pretty p) <+> text "+" <+> rt (pretty t)
+    PAdd R p t ->
+      withPA (getPA Add) $
+        lt (pretty t) <+> text "+" <+> rt (pretty p)
+    PMul L p t ->
+      withPA (getPA Mul) $
+        lt (pretty p) <+> text "*" <+> rt (pretty t)
+    PMul R p t ->
+      withPA (getPA Mul) $
+        lt (pretty t) <+> text "*" <+> rt (pretty p)
+    PSub p t ->
+      withPA (getPA Sub) $
+        lt (pretty p) <+> text "-" <+> rt (pretty t)
+    PNeg p ->
+      withPA (ugetPA Neg) $
+        text "-" <> rt (pretty p)
+    PFrac p1 p2 ->
+      withPA (getPA Div) $
+        lt (pretty p1) <+> text "/" <+> rt (pretty p2)

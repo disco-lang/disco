@@ -1,4 +1,7 @@
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Effects.Random
 -- Copyright   :  disco team and contributors
@@ -7,22 +10,19 @@
 -- SPDX-License-Identifier: BSD-3-Clause
 --
 -- Utility functions for random effect.
---
------------------------------------------------------------------------------
+module Disco.Effects.Random (
+  module Polysemy.Random,
+  runGen,
+)
+where
 
-module Disco.Effects.Random
-  ( module Polysemy.Random
-  , runGen
-  )
-  where
-
-import           Polysemy
-import           Polysemy.Random
+import Polysemy
+import Polysemy.Random
 import qualified System.Random.SplitMix as SM
-import qualified Test.QuickCheck.Gen    as QC
+import qualified Test.QuickCheck.Gen as QC
 import qualified Test.QuickCheck.Random as QCR
 
-import           Data.Word              (Word64)
+import Data.Word (Word64)
 
 -- | Run a QuickCheck generator using a 'Random' effect.
 runGen :: Member Random r => QC.Gen a -> Sem r a

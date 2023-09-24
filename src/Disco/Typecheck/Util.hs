@@ -1,5 +1,7 @@
+-----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Typecheck.Util
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
@@ -8,30 +10,27 @@
 --
 -- Definition of type contexts, type errors, and various utilities
 -- used during type checking.
---
------------------------------------------------------------------------------
-
 module Disco.Typecheck.Util where
 
-import           Disco.Effects.Fresh
-import           Polysemy
-import           Polysemy.Error
-import           Polysemy.Output
-import           Polysemy.Reader
-import           Polysemy.Writer
-import           Unbound.Generics.LocallyNameless (Name, bind, string2Name)
+import Disco.Effects.Fresh
+import Polysemy
+import Polysemy.Error
+import Polysemy.Output
+import Polysemy.Reader
+import Polysemy.Writer
+import Unbound.Generics.LocallyNameless (Name, bind, string2Name)
 
-import qualified Data.Map                         as M
-import           Data.Tuple                       (swap)
-import           Prelude                          hiding (lookup)
+import qualified Data.Map as M
+import Data.Tuple (swap)
+import Prelude hiding (lookup)
 
-import           Disco.AST.Surface
-import           Disco.Context
-import           Disco.Messages
-import           Disco.Names                      (ModuleName, QName)
-import           Disco.Typecheck.Constraints
-import           Disco.Typecheck.Solve
-import           Disco.Types
+import Disco.AST.Surface
+import Disco.Context
+import Disco.Messages
+import Disco.Names (ModuleName, QName)
+import Disco.Typecheck.Constraints
+import Disco.Typecheck.Solve
+import Disco.Types
 
 ------------------------------------------------------------
 -- Contexts
@@ -47,7 +46,7 @@ type TyCtx = Ctx Term PolyType
 -- | A typechecking error, wrapped up together with the name of the
 --   thing that was being checked when the error occurred.
 data LocTCError = LocTCError (Maybe (QName Term)) TCError
-  deriving Show
+  deriving (Show)
 
 -- | Wrap a @TCError@ into a @LocTCError@ with no explicit provenance
 --   information.
@@ -56,39 +55,60 @@ noLoc = LocTCError Nothing
 
 -- | Potential typechecking errors.
 data TCError
-  = Unbound (Name Term)    -- ^ Encountered an unbound variable
-  | Ambiguous (Name Term) [ModuleName] -- ^ Encountered an ambiguous name.
-  | NoType  (Name Term)    -- ^ No type is specified for a definition
-  | NotCon Con Term Type   -- ^ The type of the term should have an
-                           --   outermost constructor matching Con, but
-                           --   it has type 'Type' instead
-  | EmptyCase              -- ^ Case analyses cannot be empty.
-  | PatternType Con Pattern Type  -- ^ The given pattern should have the type, but it doesn't.
-                                  -- instead it has a kind of type given by the Con.
-  | DuplicateDecls (Name Term)  -- ^ Duplicate declarations.
-  | DuplicateDefns (Name Term)  -- ^ Duplicate definitions.
-  | DuplicateTyDefns String -- ^ Duplicate type definitions.
-  | CyclicTyDef String     -- ^ Cyclic type definition.
-  | NumPatterns            -- ^ # of patterns does not match type in definition
-  | NonlinearPattern Pattern (Name Term)       -- ^ Duplicate variable in a pattern
-  | NoSearch Type          -- ^ Type can't be quantified over.
-  | Unsolvable SolveError  -- ^ The constraint solver couldn't find a solution.
-  | NotTyDef String        -- ^ An undefined type name was used.
-  | NoTWild                -- ^ Wildcards are not allowed in terms.
-  | NotEnoughArgs Con      -- ^ Not enough arguments provided to type constructor.
-  | TooManyArgs Con        -- ^ Too many arguments provided to type constructor.
-  | UnboundTyVar (Name Type) -- ^ Unbound type variable
-  | NoPolyRec String [String] [Type] -- ^ Polymorphic recursion is not allowed
-  | NoError                -- ^ Not an error.  The identity of the
-                           --   @Monoid TCError@ instance.
-  deriving Show
+  = -- | Encountered an unbound variable
+    Unbound (Name Term)
+  | -- | Encountered an ambiguous name.
+    Ambiguous (Name Term) [ModuleName]
+  | -- | No type is specified for a definition
+    NoType (Name Term)
+  | -- | The type of the term should have an
+    --   outermost constructor matching Con, but
+    --   it has type 'Type' instead
+    NotCon Con Term Type
+  | -- | Case analyses cannot be empty.
+    EmptyCase
+  | -- | The given pattern should have the type, but it doesn't.
+    -- instead it has a kind of type given by the Con.
+    PatternType Con Pattern Type
+  | -- | Duplicate declarations.
+    DuplicateDecls (Name Term)
+  | -- | Duplicate definitions.
+    DuplicateDefns (Name Term)
+  | -- | Duplicate type definitions.
+    DuplicateTyDefns String
+  | -- | Cyclic type definition.
+    CyclicTyDef String
+  | -- | # of patterns does not match type in definition
+    NumPatterns
+  | -- | Duplicate variable in a pattern
+    NonlinearPattern Pattern (Name Term)
+  | -- | Type can't be quantified over.
+    NoSearch Type
+  | -- | The constraint solver couldn't find a solution.
+    Unsolvable SolveError
+  | -- | An undefined type name was used.
+    NotTyDef String
+  | -- | Wildcards are not allowed in terms.
+    NoTWild
+  | -- | Not enough arguments provided to type constructor.
+    NotEnoughArgs Con
+  | -- | Too many arguments provided to type constructor.
+    TooManyArgs Con
+  | -- | Unbound type variable
+    UnboundTyVar (Name Type)
+  | -- | Polymorphic recursion is not allowed
+    NoPolyRec String [String] [Type]
+  | -- | Not an error.  The identity of the
+    --   @Monoid TCError@ instance.
+    NoError
+  deriving (Show)
 
 instance Semigroup TCError where
   _ <> r = r
 
 -- | 'TCError' is a monoid where we simply discard the first error.
 instance Monoid TCError where
-  mempty  = NoError
+  mempty = NoError
   mappend = (<>)
 
 ------------------------------------------------------------
@@ -127,14 +147,15 @@ withConstraint = fmap swap . runWriter
 -- | Run a computation and solve its generated constraint, returning
 --   the resulting substitution (or failing with an error).  Note that
 --   this locally dispatches the constraint writer effect.
-solve
-  :: Members '[Reader TyDefCtx, Error TCError, Output Message] r
-  => Sem (Writer Constraint ': r) a -> Sem r (a, S)
+solve ::
+  Members '[Reader TyDefCtx, Error TCError, Output Message] r =>
+  Sem (Writer Constraint ': r) a ->
+  Sem r (a, S)
 solve m = do
   (a, c) <- withConstraint m
   res <- runSolve . inputToReader . solveConstraint $ c
   case res of
-    Left e  -> throw (Unsolvable e)
+    Left e -> throw (Unsolvable e)
     Right s -> return (a, s)
 
 ------------------------------------------------------------
@@ -144,12 +165,14 @@ solve m = do
 -- | Look up the definition of a named type.  Throw a 'NotTyDef' error
 --   if it is not found.
 lookupTyDefn ::
-  Members '[Reader TyDefCtx, Error TCError] r
-  => String -> [Type] -> Sem r Type
+  Members '[Reader TyDefCtx, Error TCError] r =>
+  String ->
+  [Type] ->
+  Sem r Type
 lookupTyDefn x args = do
   d <- ask @TyDefCtx
   case M.lookup x d of
-    Nothing                 -> throw (NotTyDef x)
+    Nothing -> throw (NotTyDef x)
     Just (TyDefBody _ body) -> return $ body args
 
 -- | Run a subcomputation with an extended type definition context.

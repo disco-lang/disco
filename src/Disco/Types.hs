@@ -1,12 +1,16 @@
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE OverloadedStrings    #-}
-{-# LANGUAGE PatternSynonyms      #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
+
 -- |
 -- Module      :  Disco.Types
 -- Copyright   :  disco team and contributors
@@ -14,104 +18,111 @@
 --
 -- The "Disco.Types" module defines the set of types used in the disco
 -- language type system, along with various utility functions.
---
------------------------------------------------------------------------------
+module Disco.Types (
+  -- * Disco language types
 
--- SPDX-License-Identifier: BSD-3-Clause
+  -- ** Atomic types
+  BaseTy (..),
+  isCtr,
+  Var (..),
+  Ilk (..),
+  pattern U,
+  pattern S,
+  Atom (..),
+  isVar,
+  isBase,
+  isSkolem,
+  UAtom (..),
+  uisVar,
+  uatomToAtom,
+  uatomToEither,
 
-module Disco.Types
-       (
-       -- * Disco language types
-       -- ** Atomic types
+  -- ** Type constructors
+  Con (..),
+  pattern CList,
+  pattern CBag,
+  pattern CSet,
 
-         BaseTy(..), isCtr, Var(..), Ilk(..), pattern U, pattern S
-       , Atom(..)
-       , isVar, isBase, isSkolem
-       , UAtom(..), uisVar, uatomToAtom, uatomToEither
+  -- ** Types
+  Type (..),
+  pattern TyVar,
+  pattern TySkolem,
+  pattern TyVoid,
+  pattern TyUnit,
+  pattern TyBool,
+  pattern TyProp,
+  pattern TyN,
+  pattern TyZ,
+  pattern TyF,
+  pattern TyQ,
+  pattern TyC,
+  -- , pattern TyFin
+  pattern (:->:),
+  pattern (:*:),
+  pattern (:+:),
+  pattern TyList,
+  pattern TyBag,
+  pattern TySet,
+  pattern TyGraph,
+  pattern TyMap,
+  pattern TyContainer,
+  pattern TyUser,
+  pattern TyString,
 
-       -- ** Type constructors
+  -- ** Quantified types
+  PolyType (..),
+  toPolyType,
+  closeType,
 
-       , Con(..)
-       , pattern CList, pattern CBag, pattern CSet
+  -- * Type predicates
+  isNumTy,
+  isEmptyTy,
+  isFiniteTy,
+  isSearchable,
 
-       -- ** Types
+  -- * Type substitutions
+  Substitution,
+  atomToTypeSubst,
+  uatomToTypeSubst,
 
-       , Type(..)
+  -- * Strictness
+  Strictness (..),
+  strictness,
 
-       , pattern TyVar
-       , pattern TySkolem
-       , pattern TyVoid
-       , pattern TyUnit
-       , pattern TyBool
-       , pattern TyProp
-       , pattern TyN
-       , pattern TyZ
-       , pattern TyF
-       , pattern TyQ
-       , pattern TyC
-       -- , pattern TyFin
-       , pattern (:->:)
-       , pattern (:*:)
-       , pattern (:+:)
-       , pattern TyList
-       , pattern TyBag
-       , pattern TySet
-       , pattern TyGraph
-       , pattern TyMap
-       , pattern TyContainer
-       , pattern TyUser
-       , pattern TyString
+  -- * Utilities
+  isTyVar,
+  containerVars,
+  countType,
+  unpair,
+  S,
+  TyDefBody (..),
+  TyDefCtx,
 
-       -- ** Quantified types
+  -- * HasType class
+  HasType (..),
+)
+where
 
-       , PolyType(..)
-       , toPolyType, closeType
+import Data.Coerce
+import Data.Data (Data)
+import Disco.Data ()
+import GHC.Generics (Generic)
+import Unbound.Generics.LocallyNameless hiding (lunbind)
 
-       -- * Type predicates
+import Control.Lens (toListOf)
+import Data.List (nub)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Set (Set)
+import qualified Data.Set as S
+import Data.Void
+import Math.Combinatorics.Exact.Binomial (choose)
 
-       , isNumTy, isEmptyTy, isFiniteTy, isSearchable
+import Disco.Effects.LFresh
 
-       -- * Type substitutions
-
-       , Substitution, atomToTypeSubst, uatomToTypeSubst
-
-       -- * Strictness
-       , Strictness(..), strictness
-
-       -- * Utilities
-       , isTyVar
-       , containerVars
-       , countType
-       , unpair
-       , S
-       , TyDefBody(..)
-       , TyDefCtx
-
-       -- * HasType class
-       , HasType(..)
-       )
-       where
-
-import           Data.Coerce
-import           Data.Data                         (Data)
-import           Disco.Data                        ()
-import           GHC.Generics                      (Generic)
-import           Unbound.Generics.LocallyNameless  hiding (lunbind)
-
-import           Control.Lens                      (toListOf)
-import           Data.List                         (nub)
-import           Data.Map                          (Map)
-import qualified Data.Map                          as M
-import           Data.Set                          (Set)
-import qualified Data.Set                          as S
-import           Data.Void
-import           Math.Combinatorics.Exact.Binomial (choose)
-
-import           Disco.Effects.LFresh
-
-import           Disco.Pretty                      hiding ((<>))
-import           Disco.Subst                       (Substitution)
-import           Disco.Types.Qualifiers
+import Disco.Pretty hiding ((<>))
+import Disco.Subst (Substitution)
+import Disco.Types.Qualifiers
 
 --------------------------------------------------
 -- Disco types
@@ -123,34 +134,24 @@ import           Disco.Types.Qualifiers
 -- | Base types are the built-in types which form the basis of the
 --   disco type system, out of which more complex types can be built.
 data BaseTy where
-
   -- | The void type, with no inhabitants.
   Void :: BaseTy
-
   -- | The unit type, with one inhabitant.
   Unit :: BaseTy
-
   -- | Booleans.
-  B    :: BaseTy
-
+  B :: BaseTy
   -- | Propositions.
-  P    :: BaseTy
-
+  P :: BaseTy
   -- | Natural numbers.
-  N    :: BaseTy
-
+  N :: BaseTy
   -- | Integers.
-  Z    :: BaseTy
-
+  Z :: BaseTy
   -- | Fractionals (i.e. nonnegative rationals).
-  F    :: BaseTy
-
+  F :: BaseTy
   -- | Rationals.
-  Q    :: BaseTy
-
+  Q :: BaseTy
   -- | Unicode characters.
-  C    :: BaseTy
-
+  C :: BaseTy
   -- Finite types. The single argument is a natural number defining
   -- the exact number of inhabitants.
   -- Fin  :: Integer -> BaseTy
@@ -161,29 +162,26 @@ data BaseTy where
   --   particular this allows us to reuse all the existing constraint
   --   solving machinery for container subtyping.
   CtrSet :: BaseTy
-
   -- | Bag container type.
   CtrBag :: BaseTy
-
   -- | List container type.
   CtrList :: BaseTy
-
   deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst BaseTy, Subst Atom, Subst UAtom, Subst Type)
 
 instance Pretty BaseTy where
   pretty = \case
-    Void    -> text "Void"
-    Unit    -> text "Unit"
-    B       -> text "Bool"
-    P       -> text "Prop"
-    N       -> text "ℕ"
-    Z       -> text "ℤ"
-    Q       -> text "ℚ"
-    F       -> text "𝔽"
-    C       -> text "Char"
+    Void -> text "Void"
+    Unit -> text "Unit"
+    B -> text "Bool"
+    P -> text "Prop"
+    N -> text "ℕ"
+    Z -> text "ℤ"
+    Q -> text "ℚ"
+    F -> text "𝔽"
+    C -> text "Char"
     CtrList -> text "List"
-    CtrBag  -> text "Bag"
-    CtrSet  -> text "Set"
+    CtrBag -> text "Bag"
+    CtrSet -> text "Set"
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool
@@ -218,7 +216,7 @@ data Ilk = Skolem | Unification
 
 instance Pretty Ilk where
   pretty = \case
-    Skolem      -> "S"
+    Skolem -> "S"
     Unification -> "U"
 
 -- | 'Var' represents /type variables/, that is, variables which stand
@@ -247,24 +245,24 @@ pattern S v = V Skolem v
 --   simplification step, we want to be able to work with collections
 --   of constraints that are guaranteed to contain only atomic types.
 data Atom where
-  AVar  :: Var -> Atom
+  AVar :: Var -> Atom
   ABase :: BaseTy -> Atom
   deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst Type)
 
 instance Subst Atom Atom where
   isvar (AVar (U x)) = Just (SubstName (coerce x))
-  isvar _            = Nothing
+  isvar _ = Nothing
 
 instance Pretty Atom where
   pretty = \case
     AVar (U v) -> pretty v
     AVar (S v) -> text "$" <> pretty v
-    ABase b    -> pretty b
+    ABase b -> pretty b
 
 -- | Is this atomic type a variable?
 isVar :: Atom -> Bool
 isVar (AVar _) = True
-isVar _        = False
+isVar _ = False
 
 -- | Is this atomic type a base type?
 isBase :: Atom -> Bool
@@ -273,7 +271,7 @@ isBase = not . isVar
 -- | Is this atomic type a skolem variable?
 isSkolem :: Atom -> Bool
 isSkolem (AVar (S _)) = True
-isSkolem _            = False
+isSkolem _ = False
 
 -- | /Unifiable/ atomic types are the same as atomic types but without
 --   skolem variables.  Hence, a unifiable atomic type is either a base
@@ -287,13 +285,13 @@ isSkolem _            = False
 --   these things, we can just focus on base types and unification
 --   variables.
 data UAtom where
-  UB :: BaseTy    -> UAtom
+  UB :: BaseTy -> UAtom
   UV :: Name Type -> UAtom
   deriving (Show, Eq, Ord, Generic, Alpha, Subst BaseTy)
 
 instance Subst UAtom UAtom where
   isvar (UV x) = Just (SubstName (coerce x))
-  isvar _      = Nothing
+  isvar _ = Nothing
 
 instance Pretty UAtom where
   pretty (UB b) = pretty b
@@ -302,7 +300,7 @@ instance Pretty UAtom where
 -- | Is this unifiable atomic type a (unification) variable?
 uisVar :: UAtom -> Bool
 uisVar (UV _) = True
-uisVar _      = False
+uisVar _ = False
 
 -- | Convert a unifiable atomic type into a regular atomic type.
 uatomToAtom :: UAtom -> Atom
@@ -322,12 +320,11 @@ uatomToEither (UV v) = Right v
 --   argument types.
 data Con where
   -- | Function type constructor, @T1 -> T2@.
-  CArr  :: Con
+  CArr :: Con
   -- | Product type constructor, @T1 * T2@.
   CProd :: Con
   -- | Sum type constructor, @T1 + T2@.
-  CSum  :: Con
-
+  CSum :: Con
   -- | Container type (list, bag, or set) constructor.  Note this
   --   looks like it could contain any 'Atom', but it will only ever
   --   contain either a type variable or a 'CtrList', 'CtrBag', or
@@ -335,29 +332,24 @@ data Con where
   --
   --   See also 'CList', 'CBag', and 'CSet'.
   CContainer :: Atom -> Con
-
-
   -- | Key value maps, Map k v
   CMap :: Con
-
   -- | Graph constructor, Graph a
   CGraph :: Con
-
   -- | The name of a user defined algebraic datatype.
   CUser :: String -> Con
-
   deriving (Show, Eq, Ord, Generic, Data, Alpha)
 
 instance Pretty Con where
   pretty = \case
-    CMap         -> text "Map"
-    CGraph       -> text "Graph"
-    CUser s      -> text s
-    CList        -> text "List"
-    CBag         -> text "Bag"
-    CSet         -> text "Set"
+    CMap -> text "Map"
+    CGraph -> text "Graph"
+    CUser s -> text s
+    CList -> text "List"
+    CBag -> text "Bag"
+    CSet -> text "Set"
     CContainer v -> pretty v
-    c            -> error $ "Impossible: got Con " ++ show c ++ " in pretty @Con"
+    c -> error $ "Impossible: got Con " ++ show c ++ " in pretty @Con"
 
 -- | 'CList' is provided for convenience; it represents a list type
 --   constructor (/i.e./ @List a@).
@@ -395,49 +387,49 @@ pattern CSet = CContainer (ABase CtrSet)
 --   pattern-match on types when convenient.  For example, using these
 --   synonyms the foregoing example can be written @TyN :->: TyVar a@.
 data Type where
-
   -- | Atomic types (variables and base types), /e.g./ @N@, @Bool@, /etc./
   TyAtom :: Atom -> Type
-
   -- | Application of a type constructor to type arguments, /e.g./ @N
   --   -> Bool@ is the application of the arrow type constructor to the
   --   arguments @N@ and @Bool@.
-  TyCon  :: Con -> [Type] -> Type
-
+  TyCon :: Con -> [Type] -> Type
   deriving (Show, Eq, Ord, Generic, Data, Alpha)
 
 instance Pretty Type where
-  pretty (TyAtom a)     = pretty a
-  pretty (ty1 :->: ty2) = withPA tarrPA $
-    lt (pretty ty1) <+> text "→" <+> rt (pretty ty2)
-  pretty (ty1 :*: ty2)  = withPA tmulPA $
-    lt (pretty ty1) <+> text "×" <+> rt (pretty ty2)
-  pretty (ty1 :+: ty2)  = withPA taddPA $
-    lt (pretty ty1) <+> text "+" <+> rt (pretty ty2)
-  pretty (TyCon c [])   = pretty c
-  pretty (TyCon c tys)  = do
+  pretty (TyAtom a) = pretty a
+  pretty (ty1 :->: ty2) =
+    withPA tarrPA $
+      lt (pretty ty1) <+> text "→" <+> rt (pretty ty2)
+  pretty (ty1 :*: ty2) =
+    withPA tmulPA $
+      lt (pretty ty1) <+> text "×" <+> rt (pretty ty2)
+  pretty (ty1 :+: ty2) =
+    withPA taddPA $
+      lt (pretty ty1) <+> text "+" <+> rt (pretty ty2)
+  pretty (TyCon c []) = pretty c
+  pretty (TyCon c tys) = do
     ds <- setPA initPA $ punctuate (text ",") (map pretty tys)
     pretty c <> parens (hsep ds)
 
 instance Subst Type Qualifier
 instance Subst Type Rational where
   subst _ _ = id
-  substs _  = id
+  substs _ = id
 instance Subst Type Void where
   subst _ _ = id
-  substs _  = id
+  substs _ = id
 instance Subst Type Con where
-  isCoerceVar (CContainer (AVar (U x)))
-    = Just (SubstCoerce x substCtrTy)
-    where
-      substCtrTy (TyAtom a) = Just (CContainer a)
-      substCtrTy _          = Nothing
-  isCoerceVar _                         = Nothing
+  isCoerceVar (CContainer (AVar (U x))) =
+    Just (SubstCoerce x substCtrTy)
+   where
+    substCtrTy (TyAtom a) = Just (CContainer a)
+    substCtrTy _ = Nothing
+  isCoerceVar _ = Nothing
 instance Subst Type Type where
   isvar (TyAtom (AVar (U x))) = Just (SubstName x)
-  isvar _                     = Nothing
+  isvar _ = Nothing
 
-pattern TyVar  :: Name Type -> Type
+pattern TyVar :: Name Type -> Type
 pattern TyVar v = TyAtom (AVar (U v))
 
 pattern TySkolem :: Name Type -> Type
@@ -470,7 +462,6 @@ pattern TyQ = TyAtom (ABase Q)
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
 
-
 -- pattern TyFin :: Integer -> Type
 -- pattern TyFin n = TyAtom (ABase (Fin n))
 
@@ -492,7 +483,7 @@ pattern (:+:) ty1 ty2 = TyCon CSum [ty1, ty2]
 pattern TyList :: Type -> Type
 pattern TyList elTy = TyCon CList [elTy]
 
-pattern TyBag  :: Type -> Type
+pattern TyBag :: Type -> Type
 pattern TyBag elTy = TyCon CBag [elTy]
 
 pattern TySet :: Type -> Type
@@ -515,21 +506,40 @@ pattern TyString :: Type
 pattern TyString = TyList TyC
 
 {-# COMPLETE
-      TyVar, TySkolem, TyVoid, TyUnit, TyBool, TyProp, TyN, TyZ, TyF, TyQ, TyC,
-      (:->:), (:*:), (:+:), TyList, TyBag, TySet, TyGraph, TyMap, TyUser #-}
+  TyVar
+  , TySkolem
+  , TyVoid
+  , TyUnit
+  , TyBool
+  , TyProp
+  , TyN
+  , TyZ
+  , TyF
+  , TyQ
+  , TyC
+  , (:->:)
+  , (:*:)
+  , (:+:)
+  , TyList
+  , TyBag
+  , TySet
+  , TyGraph
+  , TyMap
+  , TyUser
+  #-}
 
 -- | Is this a type variable?
 isTyVar :: Type -> Bool
 isTyVar (TyAtom (AVar _)) = True
-isTyVar _                 = False
+isTyVar _ = False
 
 -- orphans
 instance (Ord a, Subst t a) => Subst t (Set a) where
   subst x t = S.map (subst x t)
-  substs s  = S.map (substs s)
+  substs s = S.map (substs s)
 instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
-  substs s  = M.map (substs s)
+  substs s = M.map (substs s)
 
 -- | The definition of a user-defined type contains:
 --
@@ -555,14 +565,13 @@ type TyDefCtx = M.Map String TyDefBody
 
 -- | Pretty-print a type definition.
 instance Pretty (String, TyDefBody) where
-
-  pretty (tyName, TyDefBody ps body)
-    = "type" <+> (text tyName <> prettyArgs ps) <+> text "=" <+> pretty (body (map (TyVar . string2Name) ps))
-    where
-      prettyArgs [] = empty
-      prettyArgs _  = do
-          ds <- punctuate (text ",") (map text ps)
-          parens (hsep ds)
+  pretty (tyName, TyDefBody ps body) =
+    "type" <+> (text tyName <> prettyArgs ps) <+> text "=" <+> pretty (body (map (TyVar . string2Name) ps))
+   where
+    prettyArgs [] = empty
+    prettyArgs _ = do
+      ds <- punctuate (text ",") (map text ps)
+      parens (hsep ds)
 
 ---------------------------------
 --  Universally quantified types
@@ -597,52 +606,50 @@ closeType ty = Forall (bind (nub $ toListOf fv ty) ty)
 -- | Compute the number of inhabitants of a type.  @Nothing@ means the
 --   type is countably infinite.
 countType :: Type -> Maybe Integer
-countType TyVoid        = Just 0
-countType TyUnit        = Just 1
-countType TyBool        = Just 2
+countType TyVoid = Just 0
+countType TyUnit = Just 1
+countType TyBool = Just 2
 -- countType (TyFin n)     = Just n
-countType TyC           = Just (17 * 2^(16 :: Integer))
+countType TyC = Just (17 * 2 ^ (16 :: Integer))
 countType (ty1 :+: ty2) = (+) <$> countType ty1 <*> countType ty2
 countType (ty1 :*: ty2)
-  | isEmptyTy ty1       = Just 0
-  | isEmptyTy ty2       = Just 0
-  | otherwise           = (*) <$> countType ty1 <*> countType ty2
+  | isEmptyTy ty1 = Just 0
+  | isEmptyTy ty2 = Just 0
+  | otherwise = (*) <$> countType ty1 <*> countType ty2
 countType (ty1 :->: ty2) =
   case (countType ty1, countType ty2) of
     (Just 0, _) -> Just 1
     (_, Just 0) -> Just 0
     (_, Just 1) -> Just 1
-    (c1, c2)    -> (^) <$> c2 <*> c1
+    (c1, c2) -> (^) <$> c2 <*> c1
 countType (TyList ty)
-  | isEmptyTy ty        = Just 1
-  | otherwise           = Nothing
+  | isEmptyTy ty = Just 1
+  | otherwise = Nothing
 countType (TyBag ty)
-  | isEmptyTy ty        = Just 1
-  | otherwise           = Nothing
-countType (TySet ty)    = (2^) <$> countType ty
+  | isEmptyTy ty = Just 1
+  | otherwise = Nothing
+countType (TySet ty) = (2 ^) <$> countType ty
+-- t = number of elements in vertex type.
+-- n = number of vertices in the graph.
+-- For each n in [0..t], we can choose which n values to use for the
+--   vertices; then for each ordered pair of vertices (u,v)
+--   (including the possibility that u = v), we choose whether or
+--   not there is a directed edge u -> v.
+--
+-- https://oeis.org/A135748
 
-  -- t = number of elements in vertex type.
-  -- n = number of vertices in the graph.
-  -- For each n in [0..t], we can choose which n values to use for the
-  --   vertices; then for each ordered pair of vertices (u,v)
-  --   (including the possibility that u = v), we choose whether or
-  --   not there is a directed edge u -> v.
-  --
-  -- https://oeis.org/A135748
-
-countType (TyGraph ty)  =
-  (\t -> sum $ map (\n -> (t `choose` n) * 2^(n*n)) [0 .. t]) <$>
-  countType ty
-
+countType (TyGraph ty) =
+  (\t -> sum $ map (\n -> (t `choose` n) * 2 ^ (n * n)) [0 .. t])
+    <$> countType ty
 countType (TyMap tyKey tyValue)
-  | isEmptyTy tyKey     = Just 1     -- If we can't have any keys or values,
-  | isEmptyTy tyValue   = Just 1     -- only option is empty map
-  | otherwise           = (\k v -> (v+1) ^ k) <$> countType tyKey <*> countType tyValue
-      -- (v+1)^k since for each key, we can choose among v values to associate with it,
-      -- or we can choose to not have the key in the map.
+  | isEmptyTy tyKey = Just 1 -- If we can't have any keys or values,
+  | isEmptyTy tyValue = Just 1 -- only option is empty map
+  | otherwise = (\k v -> (v + 1) ^ k) <$> countType tyKey <*> countType tyValue
+-- (v+1)^k since for each key, we can choose among v values to associate with it,
+-- or we can choose to not have the key in the map.
 
 -- All other types are infinite. (TyN, TyZ, TyQ, TyF)
-countType _             = Nothing
+countType _ = Nothing
 
 --------------------------------------------------
 -- Type predicates
@@ -651,19 +658,19 @@ countType _             = Nothing
 -- | Check whether a type is a numeric type (@N@, @Z@, @F@, @Q@, or @Zn@).
 isNumTy :: Type -> Bool
 -- isNumTy (TyFin _) = True
-isNumTy ty        = ty `elem` [TyN, TyZ, TyF, TyQ]
+isNumTy ty = ty `elem` [TyN, TyZ, TyF, TyQ]
 
 -- | Decide whether a type is empty, /i.e./ uninhabited.
 isEmptyTy :: Type -> Bool
 isEmptyTy ty
   | Just 0 <- countType ty = True
-  | otherwise              = False
+  | otherwise = False
 
 -- | Decide whether a type is finite.
 isFiniteTy :: Type -> Bool
 isFiniteTy ty
   | Just _ <- countType ty = True
-  | otherwise              = False
+  | otherwise = False
 
 -- XXX coinductively check whether user-defined types are searchable
 --   e.g.  L = Unit + N * L  ought to be searchable.
@@ -671,16 +678,16 @@ isFiniteTy ty
 
 -- | Decide whether a type is searchable, i.e. effectively enumerable.
 isSearchable :: Type -> Bool
-isSearchable TyProp         = False
+isSearchable TyProp = False
 isSearchable ty
-  | isNumTy ty              = True
-  | isFiniteTy ty           = True
-isSearchable (TyList ty)    = isSearchable ty
-isSearchable (TySet ty)     = isSearchable ty
-isSearchable (ty1 :+: ty2)  = isSearchable ty1 && isSearchable ty2
-isSearchable (ty1 :*: ty2)  = isSearchable ty1 && isSearchable ty2
+  | isNumTy ty = True
+  | isFiniteTy ty = True
+isSearchable (TyList ty) = isSearchable ty
+isSearchable (TySet ty) = isSearchable ty
+isSearchable (ty1 :+: ty2) = isSearchable ty1 && isSearchable ty2
+isSearchable (ty1 :*: ty2) = isSearchable ty1 && isSearchable ty2
 isSearchable (ty1 :->: ty2) = isFiniteTy ty1 && isSearchable ty2
-isSearchable _              = False
+isSearchable _ = False
 
 --------------------------------------------------
 -- Strictness
@@ -695,7 +702,7 @@ data Strictness = Strict | Lazy
 strictness :: Type -> Strictness
 strictness ty
   | isNumTy ty = Strict
-  | otherwise  = Lazy
+  | otherwise = Lazy
 
 --------------------------------------------------
 -- Utilities
@@ -705,7 +712,7 @@ strictness ty
 --   types.
 unpair :: Type -> [Type]
 unpair (ty1 :*: ty2) = ty1 : unpair ty2
-unpair ty            = [ty]
+unpair ty = [ty]
 
 -- | Define @S@ as a substitution on types (the most common kind)
 --   for convenience.
@@ -722,8 +729,8 @@ uatomToTypeSubst = atomToTypeSubst . fmap uatomToAtom
 
 -- | Return a set of all the free container variables in a type.
 containerVars :: Type -> Set (Name Type)
-containerVars (TyCon (CContainer (AVar (U x))) tys)
-  = x `S.insert` foldMap containerVars tys
+containerVars (TyCon (CContainer (AVar (U x))) tys) =
+  x `S.insert` foldMap containerVars tys
 containerVars (TyCon _ tys) = foldMap containerVars tys
 containerVars _ = S.empty
 
@@ -733,7 +740,6 @@ containerVars _ = S.empty
 
 -- | A type class for things whose type can be extracted or set.
 class HasType t where
-
   -- | Get the type of a thing.
   getType :: t -> Type
 
@@ -741,40 +747,3 @@ class HasType t where
   --   implementation is for 'setType' to do nothing.
   setType :: Type -> t -> t
   setType _ = id
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

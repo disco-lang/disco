@@ -1,10 +1,9 @@
-{-# LANGUAGE DeriveAnyClass           #-}
-{-# LANGUAGE DeriveDataTypeable       #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE NondecreasingIndentation #-}
-{-# LANGUAGE OverloadedStrings        #-}
-{-# LANGUAGE UndecidableInstances     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE UndecidableInstances #-}
 
------------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Core
 -- Copyright   :  disco team and contributors
@@ -14,34 +13,35 @@
 --
 -- Abstract syntax trees representing the desugared, untyped core
 -- language for Disco.
------------------------------------------------------------------------------
+module Disco.AST.Core (
+  -- * Core AST
+  RationalDisplay (..),
+  Core (..),
+  Op (..),
+  opArity,
+  substQC,
+  substsQC,
+)
+where
 
-module Disco.AST.Core
-       ( -- * Core AST
-         RationalDisplay(..)
-       , Core(..)
-       , Op(..), opArity, substQC, substsQC
-       )
-       where
+import Control.Lens.Plated
+import Data.Data (Data)
+import Data.Data.Lens (uniplate)
+import qualified Data.Set as S
+import GHC.Generics
+import Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
+import Prelude hiding ((<>))
+import qualified Prelude as P
 
-import           Control.Lens.Plated
-import           Data.Data                        (Data)
-import           Data.Data.Lens                   (uniplate)
-import qualified Data.Set                         as S
-import           GHC.Generics
-import           Prelude                          hiding ((<>))
-import qualified Prelude                          as P
-import           Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
+import Disco.Effects.LFresh
+import Polysemy (Members, Sem)
+import Polysemy.Reader
 
-import           Disco.Effects.LFresh
-import           Polysemy                         (Members, Sem)
-import           Polysemy.Reader
-
-import           Data.Ratio
-import           Disco.AST.Generic                (Side, selectSide)
-import           Disco.Names                      (QName)
-import           Disco.Pretty
-import           Disco.Types
+import Data.Ratio
+import Disco.AST.Generic (Side, selectSide)
+import Disco.Names (QName)
+import Disco.Pretty
+import Disco.Types
 
 -- | A type of flags specifying whether to display a rational number
 --   as a fraction or a decimal.
@@ -51,7 +51,7 @@ data RationalDisplay = Fraction | Decimal
 instance Semigroup RationalDisplay where
   Decimal <> _ = Decimal
   _ <> Decimal = Decimal
-  _ <> _       = Fraction
+  _ <> _ = Fraction
 
 -- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
 --   idea that the result should be displayed as a decimal if any
@@ -232,8 +232,7 @@ data Op
     OShouldEq Type
   | -- Other primitives
     OShouldLt Type
-  |
-    -- | Error for non-exhaustive pattern match
+  | -- | Error for non-exhaustive pattern match
     OMatchErr
   | -- | Crash with a user-supplied message
     OCrash
@@ -252,7 +251,6 @@ data Op
   | -- | Not the Boolean `Impl`, but instead a propositional BOp
     -- | Should only be seen and used with Props.
     OImpl
-
   deriving (Show, Generic, Data, Alpha, Eq, Ord)
 
 -- | Get the arity (desired number of arguments) of a function
@@ -260,8 +258,8 @@ data Op
 --   uncurried and hence has arity 1.
 opArity :: Op -> Int
 opArity OEmptyGraph = 0
-opArity OMatchErr   = 0
-opArity _           = 1
+opArity OMatchErr = 0
+opArity _ = 1
 
 substQC :: QName Core -> Core -> Core -> Core
 substQC x s = transform $ \case
@@ -274,64 +272,68 @@ substsQC :: [(QName Core, Core)] -> Core -> Core
 substsQC xs = transform $ \case
   CVar y -> case P.lookup y xs of
     Just c -> c
-    _      -> CVar y
+    _ -> CVar y
   t -> t
 
 instance Pretty Core where
   pretty = \case
-    CVar qn         -> pretty qn
+    CVar qn -> pretty qn
     CNum _ r
       | denominator r == 1 -> text (show (numerator r))
-      | otherwise          -> text (show (numerator r)) <> "/" <> text (show (denominator r))
+      | otherwise -> text (show (numerator r)) <> "/" <> text (show (denominator r))
     CApp (CConst op) (CPair c1 c2)
       | isInfix op -> parens (pretty c1 <+> text (opToStr op) <+> pretty c2)
     CApp (CConst op) c
       | isPrefix op -> text (opToStr op) <> pretty c
       | isPostfix op -> pretty c <> text (opToStr op)
-    CConst op       -> pretty op
-    CInj s c        -> withPA funPA $ selectSide s "left" "right" <+> rt (pretty c)
-    CCase c l r     -> do
+    CConst op -> pretty op
+    CInj s c -> withPA funPA $ selectSide s "left" "right" <+> rt (pretty c)
+    CCase c l r -> do
       lunbind l $ \(x, lc) -> do
-      lunbind r $ \(y, rc) -> do
-        "case" <+> pretty c <+> "of {"
-          $+$ nest 2 (
-            vcat
-            [ withPA funPA $ "left" <+> rt (pretty x) <+> "->" <+> pretty lc
-            , withPA funPA $ "right" <+> rt (pretty y) <+> "->" <+> pretty rc
-            ])
-          $+$ "}"
-    CUnit           -> "unit"
-    CPair c1 c2     -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
-    CProj s c       -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
-    CAbs lam        -> withPA initPA $ do
+        lunbind r $ \(y, rc) -> do
+          "case"
+            <+> pretty c
+            <+> "of {"
+            $+$ nest
+              2
+              ( vcat
+                  [ withPA funPA $ "left" <+> rt (pretty x) <+> "->" <+> pretty lc
+                  , withPA funPA $ "right" <+> rt (pretty y) <+> "->" <+> pretty rc
+                  ]
+              )
+            $+$ "}"
+    CUnit -> "unit"
+    CPair c1 c2 -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
+    CProj s c -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
+    CAbs lam -> withPA initPA $ do
       lunbind lam $ \(xs, body) -> "λ" <> intercalate "," (map pretty xs) <> "." <+> lt (pretty body)
-    CApp c1 c2      -> withPA funPA $ lt (pretty c1) <+> rt (pretty c2)
-    CTest xs c      -> "test" <+> prettyTestVars xs <+> pretty c
-    CType ty        -> pretty ty
-    CDelay d        -> withPA initPA $ do
+    CApp c1 c2 -> withPA funPA $ lt (pretty c1) <+> rt (pretty c2)
+    CTest xs c -> "test" <+> prettyTestVars xs <+> pretty c
+    CType ty -> pretty ty
+    CDelay d -> withPA initPA $ do
       lunbind d $ \(xs, bodies) ->
         "delay" <+> intercalate "," (map pretty xs) <> "." <+> pretty (toTuple bodies)
-    CForce c        -> withPA funPA $ "force" <+> rt (pretty c)
+    CForce c -> withPA funPA $ "force" <+> rt (pretty c)
 
 toTuple :: [Core] -> Core
 toTuple = foldr CPair CUnit
 
 prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r Doc
 prettyTestVars = brackets . intercalate "," . map prettyTestVar
-  where
-    prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
+ where
+  prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
 
 isInfix, isPrefix, isPostfix :: Op -> Bool
-isInfix OShouldEq{} = True
-isInfix OShouldLt{} = True
-isInfix op = op `S.member` S.fromList
-  [ OAdd, OMul, ODiv, OExp, OMod, ODivides, OMultinom, OEq, OLt, OAnd, OOr, OImpl]
-
+isInfix OShouldEq {} = True
+isInfix OShouldLt {} = True
+isInfix op =
+  op
+    `S.member` S.fromList
+      [OAdd, OMul, ODiv, OExp, OMod, ODivides, OMultinom, OEq, OLt, OAnd, OOr, OImpl]
 isPrefix ONeg = True
-isPrefix _    = False
-
+isPrefix _ = False
 isPostfix OFact = True
-isPostfix _     = False
+isPostfix _ = False
 
 instance Pretty Op where
   pretty (OForall tys) = "∀" <> intercalate "," (map pretty tys) <> "."
@@ -340,67 +342,67 @@ instance Pretty Op where
     | isInfix op = "~" <> text (opToStr op) <> "~"
     | isPrefix op = text (opToStr op) <> "~"
     | isPostfix op = "~" <> text (opToStr op)
-    | otherwise  = text (opToStr op)
+    | otherwise = text (opToStr op)
 
 opToStr :: Op -> String
 opToStr = \case
-  OAdd               -> "+"
-  ONeg               -> "-"
-  OSqrt              -> "sqrt"
-  OFloor             -> "floor"
-  OCeil              -> "ceil"
-  OAbs               -> "abs"
-  OMul               -> "*"
-  ODiv               -> "/"
-  OExp               -> "^"
-  OMod               -> "mod"
-  ODivides           -> "divides"
-  OMultinom          -> "choose"
-  OFact              -> "!"
-  OEq                -> "=="
-  OLt                -> "<"
-  OEnum              -> "enumerate"
-  OCount             -> "count"
-  OPower             -> "power"
-  OBagElem           -> "elem_bag"
-  OListElem          -> "elem_list"
-  OEachBag           -> "each_bag"
-  OEachSet           -> "each_set"
-  OFilterBag         -> "filter_bag"
-  OMerge             -> "merge"
-  OBagUnions         -> "unions_bag"
-  OSummary           -> "summary"
-  OEmptyGraph        -> "emptyGraph"
-  OVertex            -> "vertex"
-  OOverlay           -> "overlay"
-  OConnect           -> "connect"
-  OInsert            -> "insert"
-  OLookup            -> "lookup"
-  OUntil             -> "until"
-  OSetToList         -> "set2list"
-  OBagToSet          -> "bag2set"
-  OBagToList         -> "bag2list"
-  OListToSet         -> "list2set"
-  OListToBag         -> "list2bag"
-  OBagToCounts       -> "bag2counts"
-  OCountsToBag       -> "counts2bag"
+  OAdd -> "+"
+  ONeg -> "-"
+  OSqrt -> "sqrt"
+  OFloor -> "floor"
+  OCeil -> "ceil"
+  OAbs -> "abs"
+  OMul -> "*"
+  ODiv -> "/"
+  OExp -> "^"
+  OMod -> "mod"
+  ODivides -> "divides"
+  OMultinom -> "choose"
+  OFact -> "!"
+  OEq -> "=="
+  OLt -> "<"
+  OEnum -> "enumerate"
+  OCount -> "count"
+  OPower -> "power"
+  OBagElem -> "elem_bag"
+  OListElem -> "elem_list"
+  OEachBag -> "each_bag"
+  OEachSet -> "each_set"
+  OFilterBag -> "filter_bag"
+  OMerge -> "merge"
+  OBagUnions -> "unions_bag"
+  OSummary -> "summary"
+  OEmptyGraph -> "emptyGraph"
+  OVertex -> "vertex"
+  OOverlay -> "overlay"
+  OConnect -> "connect"
+  OInsert -> "insert"
+  OLookup -> "lookup"
+  OUntil -> "until"
+  OSetToList -> "set2list"
+  OBagToSet -> "bag2set"
+  OBagToList -> "bag2list"
+  OListToSet -> "list2set"
+  OListToBag -> "list2bag"
+  OBagToCounts -> "bag2counts"
+  OCountsToBag -> "counts2bag"
   OUnsafeCountsToBag -> "ucounts2bag"
-  OMapToSet          -> "map2set"
-  OSetToMap          -> "set2map"
-  OIsPrime           -> "isPrime"
-  OFactor            -> "factor"
-  OFrac              -> "frac"
-  OHolds             -> "holds"
-  ONotProp           -> "not"
-  OShouldEq _        -> "=!="
-  OShouldLt _        -> "!<"
-  OMatchErr          -> "matchErr"
-  OCrash             -> "crash"
-  OId                -> "id"
-  OLookupSeq         -> "lookupSeq"
-  OExtendSeq         -> "extendSeq"
-  OForall{}          -> "∀"
-  OExists{}          -> "∃"
-  OAnd               -> "and"
-  OOr                -> "or"
-  OImpl              -> "implies"
+  OMapToSet -> "map2set"
+  OSetToMap -> "set2map"
+  OIsPrime -> "isPrime"
+  OFactor -> "factor"
+  OFrac -> "frac"
+  OHolds -> "holds"
+  ONotProp -> "not"
+  OShouldEq _ -> "=!="
+  OShouldLt _ -> "!<"
+  OMatchErr -> "matchErr"
+  OCrash -> "crash"
+  OId -> "id"
+  OLookupSeq -> "lookupSeq"
+  OExtendSeq -> "extendSeq"
+  OForall {} -> "∀"
+  OExists {} -> "∃"
+  OAnd -> "and"
+  OOr -> "or"
+  OImpl -> "implies"

@@ -1,3 +1,7 @@
+restylers_version: stable
 restylers:
-  - stylish-haskell
+  - fourmolu:
+      image: 'restyled/restyler-fourmolu:v0.13.0.0'
+      arguments:
+        []
   - hlint

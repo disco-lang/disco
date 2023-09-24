@@ -1,14 +1,5 @@
-
 -----------------------------------------------------------------------------
--- |
--- Module      :  Disco.Report
--- Copyright   :  disco team and contributors
--- Maintainer  :  byorgey@gmail.com
---
--- SPDX-License-Identifier: BSD-3-Clause
---
--- XXX
---
+
 -----------------------------------------------------------------------------
 
 -- The benefit of having our own deeply-embedded type for pretty
@@ -18,16 +9,24 @@
 -- interface of the pretty-printing library currently being used, so
 -- that a lot of code could just be kept unchanged.
 
+-- |
+-- Module      :  Disco.Report
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- XXX
 module Disco.Report where
 
-import           Data.List (intersperse)
+import Data.List (intersperse)
 
 data Report
-  = RTxt   String
-  | RSeq   [Report]
-  | RVSeq  [Report]
-  | RList  [Report]
-  | RNest  Report
+  = RTxt String
+  | RSeq [Report]
+  | RVSeq [Report]
+  | RList [Report]
+  | RNest Report
   deriving (Show)
 
 text :: String -> Report
@@ -52,4 +51,3 @@ nest :: Report -> Report
 nest = RNest
 
 ------------------------------------------------------------
-

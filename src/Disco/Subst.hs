@@ -1,6 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
+-- SPDX-License-Identifier: BSD-3-Clause
+
 -- |
 -- Module      :  Disco.Subst
 -- Copyright   :  disco team and contributors
@@ -8,41 +13,39 @@
 --
 -- The "Disco.Subst" module defines a generic type of substitutions
 -- that map variable names to values.
---
------------------------------------------------------------------------------
+module Disco.Subst (
+  -- * Substitutions
+  Substitution (..),
+  dom,
 
--- SPDX-License-Identifier: BSD-3-Clause
+  -- ** Constructing/destructing substitutions
+  idS,
+  (|->),
+  fromList,
+  toList,
 
-module Disco.Subst
-  ( -- * Substitutions
+  -- ** Substitution operations
+  (@@),
+  compose,
+  applySubst,
+  lookup,
+)
+where
 
-    Substitution(..), dom
+import Prelude hiding (lookup)
 
-    -- ** Constructing/destructing substitutions
+import Unbound.Generics.LocallyNameless (Name, Subst, substs)
 
-  , idS, (|->), fromList, toList
+import Data.Coerce
 
-    -- ** Substitution operations
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Set (Set)
 
-  , (@@), compose, applySubst, lookup
-
-  )
-  where
-
-import           Prelude                          hiding (lookup)
-
-import           Unbound.Generics.LocallyNameless (Name, Subst, substs)
-
-import           Data.Coerce
-
-import           Data.Map                         (Map)
-import qualified Data.Map                         as M
-import           Data.Set                         (Set)
-
-import           Disco.Effects.LFresh
-import           Disco.Pretty
-import           Polysemy
-import           Polysemy.Reader
+import Disco.Effects.LFresh
+import Disco.Pretty
+import Polysemy
+import Polysemy.Reader
 
 -- | A value of type @Substitution a@ is a substitution which maps some set of
 --   names (the /domain/, see 'dom') to values of type @a@.
@@ -57,7 +60,7 @@ import           Polysemy.Reader
 --   See also "Disco.Types", which defines 'S' as an alias for
 --   substitutions on types (the most common kind in the disco
 --   codebase).
-newtype Substitution a = Substitution { getSubst :: Map (Name a) a }
+newtype Substitution a = Substitution {getSubst :: Map (Name a) a}
   deriving (Eq, Ord, Show)
 
 instance Functor Substitution where

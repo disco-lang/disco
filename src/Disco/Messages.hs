@@ -1,7 +1,10 @@
-{-# LANGUAGE DeriveFunctor   #-}
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Messages
 -- Copyright   :  disco team and contributors
@@ -11,27 +14,24 @@
 --
 -- Message logging framework (e.g. for errors, warnings, etc.) for
 -- disco.
---
------------------------------------------------------------------------------
-
 module Disco.Messages where
 
-import           Control.Lens
-import           Control.Monad   (when)
-import           Polysemy
-import           Polysemy.Output
+import Control.Lens
+import Control.Monad (when)
+import Polysemy
+import Polysemy.Output
 
-import           Disco.Pretty    (Doc, Pretty, pretty', renderDoc')
+import Disco.Pretty (Doc, Pretty, pretty', renderDoc')
 
 data MessageType
-    = Info
-    | Warning
-    | ErrMsg
-    | Debug
-    deriving (Show, Read, Eq, Ord, Enum, Bounded)
+  = Info
+  | Warning
+  | ErrMsg
+  | Debug
+  deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 data Message = Message {_messageType :: MessageType, _message :: Doc}
-    deriving (Show)
+  deriving (Show)
 
 makeLenses ''Message
 

@@ -1,10 +1,13 @@
-{-# LANGUAGE DeriveAnyClass       #-}
-{-# LANGUAGE DeriveDataTypeable   #-}
-{-# LANGUAGE StandaloneDeriving   #-}
-{-# LANGUAGE TemplateHaskell      #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 -----------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------
+
 -- |
 -- Module      :  Disco.Module
 -- Copyright   :  (c) 2019 disco team (see LICENSE)
@@ -14,43 +17,52 @@
 --
 -- The 'ModuleInfo' record representing a disco module, and functions
 -- to resolve the location of a module on disk.
------------------------------------------------------------------------------
-
 module Disco.Module where
 
-import           Data.Data                               (Data)
-import           GHC.Generics                            (Generic)
+import Data.Data (Data)
+import GHC.Generics (Generic)
 
-import           Control.Lens                            (Getting, foldOf,
-                                                          makeLenses, view)
-import           Control.Monad                           (filterM)
-import           Control.Monad.IO.Class                  (MonadIO (..))
-import           Data.Bifunctor                          (first)
-import           Data.Map                                (Map)
-import qualified Data.Map                                as M
-import           Data.Maybe                              (listToMaybe)
-import qualified Data.Set                                as S
-import           System.Directory                        (doesFileExist)
-import           System.FilePath                         (replaceExtension,
-                                                          (</>))
+import Control.Lens (
+  Getting,
+  foldOf,
+  makeLenses,
+  view,
+ )
+import Control.Monad (filterM)
+import Control.Monad.IO.Class (MonadIO (..))
+import Data.Bifunctor (first)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Maybe (listToMaybe)
+import qualified Data.Set as S
+import System.Directory (doesFileExist)
+import System.FilePath (
+  replaceExtension,
+  (</>),
+ )
 
-import           Unbound.Generics.LocallyNameless        (Alpha, Bind, Name,
-                                                          Subst, bind)
-import           Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import Unbound.Generics.LocallyNameless (
+  Alpha,
+  Bind,
+  Name,
+  Subst,
+  bind,
+ )
+import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
-import           Polysemy
+import Polysemy
 
-import           Disco.AST.Surface
-import           Disco.AST.Typed
-import           Disco.Context
-import           Disco.Extensions
-import           Disco.Names
-import           Disco.Pretty                            hiding ((<>))
-import           Disco.Typecheck.Erase                   (erase, erasePattern)
-import           Disco.Typecheck.Util                    (TyCtx)
-import           Disco.Types
+import Disco.AST.Surface
+import Disco.AST.Typed
+import Disco.Context
+import Disco.Extensions
+import Disco.Names
+import Disco.Pretty hiding ((<>))
+import Disco.Typecheck.Erase (erase, erasePattern)
+import Disco.Typecheck.Util (TyCtx)
+import Disco.Types
 
-import           Paths_disco
+import Paths_disco
 
 ------------------------------------------------------------
 -- ModuleInfo and related types
@@ -76,10 +88,10 @@ data Defn = Defn (Name ATerm) [Type] Type [Clause]
   deriving (Show, Generic, Alpha, Data, Subst Type)
 
 instance Pretty Defn where
-  pretty (Defn x patTys ty clauses) = vcat $
-    prettyTyDecl x (foldr (:->:) ty patTys)
-    :
-    map (pretty . (x,) . eraseClause) clauses
+  pretty (Defn x patTys ty clauses) =
+    vcat $
+      prettyTyDecl x (foldr (:->:) ty patTys)
+        : map (pretty . (x,) . eraseClause) clauses
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete
@@ -89,31 +101,31 @@ type Clause = Bind [APattern] ATerm
 
 eraseClause :: Clause -> Bind [Pattern] Term
 eraseClause b = bind (map erasePattern ps) (erase t)
-  where (ps, t) = unsafeUnbind b
+ where
+  (ps, t) = unsafeUnbind b
 
 -- | Type checking a module yields a value of type ModuleInfo which contains
 --   mapping from terms to their relavent documenation, a mapping from terms to
 --   properties, and a mapping from terms to their types.
 data ModuleInfo = ModuleInfo
-  { _miName     :: ModuleName
-  , _miImports  :: Map ModuleName ModuleInfo
-
-  -- List of names declared by the module, in the order they occur
-  , _miNames    :: [QName Term]
-  , _miDocs     :: Ctx Term Docs
-  , _miProps    :: Ctx ATerm [AProperty]
-  , _miTys      :: TyCtx
-  , _miTydefs   :: TyDefCtx
+  { _miName :: ModuleName
+  , _miImports :: Map ModuleName ModuleInfo
+  , -- List of names declared by the module, in the order they occur
+    _miNames :: [QName Term]
+  , _miDocs :: Ctx Term Docs
+  , _miProps :: Ctx ATerm [AProperty]
+  , _miTys :: TyCtx
+  , _miTydefs :: TyDefCtx
   , _miTermdefs :: Ctx ATerm Defn
-  , _miTerms    :: [(ATerm, PolyType)]
-  , _miExts     :: ExtSet
+  , _miTerms :: [(ATerm, PolyType)]
+  , _miExts :: ExtSet
   }
   deriving (Show)
 
 makeLenses ''ModuleInfo
 
 instance Semigroup ModuleInfo where
-  -- | Two ModuleInfos
+  -- \| Two ModuleInfos
   --   are merged by joining their doc, type, type definition, and term
   --   contexts. The property context of the new module is the one
   --   obtained from the second module. The name of the new module is
@@ -121,8 +133,8 @@ instance Semigroup ModuleInfo where
   --   earlier ones.  Note that this function should really only be used
   --   for the special top-level REPL module.
   ModuleInfo n1 is1 ns1 d1 _ ty1 tyd1 tm1 tms1 es1
-    <> ModuleInfo _  is2 ns2 d2 p2 ty2 tyd2 tm2 tms2 es2
-    = ModuleInfo
+    <> ModuleInfo _ is2 ns2 d2 p2 ty2 tyd2 tm2 tms2 es2 =
+      ModuleInfo
         n1
         (is1 <> is2)
         (ns1 <> ns2)
@@ -178,7 +190,7 @@ data Resolver
 --   `:load`ed module).
 withStdlib :: Resolver -> Resolver
 withStdlib (FromDir fp) = FromDirOrStdlib fp
-withStdlib r            = r
+withStdlib r = r
 
 -- | Given a module resolution mode and a raw module name, relavent
 --   directories are searched for the file containing the provided
@@ -189,9 +201,9 @@ resolveModule resolver modname = do
   datadir <- liftIO getDataDir
   let searchPath =
         case resolver of
-          FromStdlib          -> [(datadir, Stdlib)]
-          FromDir dir         -> [(dir, Dir dir)]
-          FromCwdOrStdlib     -> [(datadir, Stdlib), (".", Dir ".")]
+          FromStdlib -> [(datadir, Stdlib)]
+          FromDir dir -> [(dir, Dir dir)]
+          FromCwdOrStdlib -> [(datadir, Stdlib), (".", Dir ".")]
           FromDirOrStdlib dir -> [(datadir, Stdlib), (dir, Dir dir)]
   let fps = map (first (</> replaceExtension modname "disco")) searchPath
   fexists <- liftIO $ filterM (doesFileExist . fst) fps

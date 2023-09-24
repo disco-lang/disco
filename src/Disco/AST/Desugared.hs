@@ -1,6 +1,5 @@
 {-# LANGUAGE PatternSynonyms #-}
 
------------------------------------------------------------------------------
 -- |
 -- Module      :  Disco.AST.Desugared
 -- Copyright   :  disco team and contributors
@@ -10,57 +9,51 @@
 --
 -- Typed abstract syntax trees representing the typechecked, desugared
 -- Disco language.
---
------------------------------------------------------------------------------
+module Disco.AST.Desugared (
+  -- * Desugared, type-annotated terms
+  DTerm,
+  pattern DTVar,
+  pattern DTPrim,
+  pattern DTUnit,
+  pattern DTBool,
+  pattern DTChar,
+  pattern DTNat,
+  pattern DTRat,
+  pattern DTAbs,
+  pattern DTApp,
+  pattern DTPair,
+  pattern DTCase,
+  pattern DTTyOp,
+  pattern DTNil,
+  pattern DTTest,
+  Container (..),
+  DBinding,
+  pattern DBinding,
 
-module Disco.AST.Desugared
-       ( -- * Desugared, type-annotated terms
-       DTerm
-       , pattern DTVar
-       , pattern DTPrim
-       , pattern DTUnit
-       , pattern DTBool
-       , pattern DTChar
-       , pattern DTNat
-       , pattern DTRat
-       , pattern DTAbs
-       , pattern DTApp
-       , pattern DTPair
-       , pattern DTCase
-       , pattern DTTyOp
-       , pattern DTNil
-       , pattern DTTest
+  -- * Branches and guards
+  DBranch,
+  DGuard,
+  pattern DGPat,
+  DPattern,
+  pattern DPVar,
+  pattern DPWild,
+  pattern DPUnit,
+  pattern DPPair,
+  pattern DPInj,
+  DProperty,
+)
+where
 
-       , Container(..)
-       , DBinding
-       , pattern DBinding
-         -- * Branches and guards
-       , DBranch
+import GHC.Generics
 
-       , DGuard
-       , pattern DGPat
+import Data.Void
+import Unbound.Generics.LocallyNameless
 
-       , DPattern
-       , pattern DPVar
-       , pattern DPWild
-       , pattern DPUnit
-       , pattern DPPair
-       , pattern DPInj
-
-       , DProperty
-       )
-       where
-
-import           GHC.Generics
-
-import           Data.Void
-import           Unbound.Generics.LocallyNameless
-
-import           Disco.AST.Generic
-import           Disco.Names                      (QName (..))
-import           Disco.Syntax.Operators
-import           Disco.Syntax.Prims
-import           Disco.Types
+import Disco.AST.Generic
+import Disco.Names (QName (..))
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims
+import Disco.Types
 
 data DS
 
@@ -69,36 +62,37 @@ type DProperty = Property_ DS
 -- | A @DTerm@ is a term which has been typechecked and desugared, so
 --   it has fewer constructors and complex features than 'ATerm', but
 --   still retains typing information.
-
 type DTerm = Term_ DS
 
-type instance X_Binder DS         = Name DTerm
+type instance X_Binder DS = Name DTerm
 
-type instance X_TVar DS           = Void -- names are qualified
-type instance X_TPrim DS          = Type
-type instance X_TLet DS           = Void -- Let gets translated to lambda
-type instance X_TUnit DS          = ()
-type instance X_TBool DS          = Type
-type instance X_TChar DS          = ()
-type instance X_TString DS        = Void
-type instance X_TNat DS           = Type
-type instance X_TRat DS           = ()
-type instance X_TAbs DS           = Type -- For lambas this is the function type but
-                                         -- for forall/exists it's the argument type
-type instance X_TApp DS           = Type
-type instance X_TCase DS          = Type
-type instance X_TChain DS         = Void -- Chains are translated into conjunctions of
-                                         -- binary comparisons
-type instance X_TTyOp DS          = Type
-type instance X_TContainer DS     = Void -- Literal containers are desugared into
-                                         -- conversion functions applied to list literals
+type instance X_TVar DS = Void -- names are qualified
+type instance X_TPrim DS = Type
+type instance X_TLet DS = Void -- Let gets translated to lambda
+type instance X_TUnit DS = ()
+type instance X_TBool DS = Type
+type instance X_TChar DS = ()
+type instance X_TString DS = Void
+type instance X_TNat DS = Type
+type instance X_TRat DS = ()
+type instance X_TAbs DS = Type -- For lambas this is the function type but
+-- for forall/exists it's the argument type
+
+type instance X_TApp DS = Type
+type instance X_TCase DS = Type
+type instance X_TChain DS = Void -- Chains are translated into conjunctions of
+-- binary comparisons
+
+type instance X_TTyOp DS = Type
+type instance X_TContainer DS = Void -- Literal containers are desugared into
+-- conversion functions applied to list literals
 
 type instance X_TContainerComp DS = Void -- Container comprehensions are translated
-                                         -- into monadic chains
+-- into monadic chains
 
-type instance X_TAscr DS          = Void -- No type ascriptions
-type instance X_TTup DS           = Void -- No tuples, only pairs
-type instance X_TParens DS        = Void -- No explicit parens
+type instance X_TAscr DS = Void -- No type ascriptions
+type instance X_TTup DS = Void -- No tuples, only pairs
+type instance X_TParens DS = Void -- No explicit parens
 
 -- Extra constructors
 type instance X_Term DS = X_DTerm
@@ -125,7 +119,7 @@ pattern DTUnit = TUnit_ ()
 pattern DTBool :: Type -> Bool -> DTerm
 pattern DTBool ty bool = TBool_ ty bool
 
-pattern DTNat  :: Type -> Integer -> DTerm
+pattern DTNat :: Type -> Integer -> DTerm
 pattern DTNat ty int = TNat_ ty int
 
 pattern DTRat :: Rational -> DTerm
@@ -137,7 +131,7 @@ pattern DTChar c = TChar_ () c
 pattern DTAbs :: Quantifier -> Type -> Bind (Name DTerm) DTerm -> DTerm
 pattern DTAbs q ty lam = TAbs_ q ty lam
 
-pattern DTApp  :: Type -> DTerm -> DTerm -> DTerm
+pattern DTApp :: Type -> DTerm -> DTerm -> DTerm
 pattern DTApp ty term1 term2 = TApp_ ty term1 term2
 
 pattern DTPair :: Type -> DTerm -> DTerm -> DTerm
@@ -158,9 +152,22 @@ pattern DTNil ty = XTerm_ (DTNil_ ty)
 pattern DTTest :: [(String, Type, Name DTerm)] -> DTerm -> DTerm
 pattern DTTest ns t = XTerm_ (DTTest_ ns t)
 
-{-# COMPLETE DTVar, DTPrim, DTUnit, DTBool, DTChar, DTNat, DTRat,
-             DTAbs, DTApp, DTPair, DTCase, DTTyOp,
-             DTNil, DTTest #-}
+{-# COMPLETE
+  DTVar
+  , DTPrim
+  , DTUnit
+  , DTBool
+  , DTChar
+  , DTNat
+  , DTRat
+  , DTAbs
+  , DTApp
+  , DTPair
+  , DTCase
+  , DTTyOp
+  , DTNil
+  , DTTest
+  #-}
 
 type instance X_TLink DS = Void
 
@@ -175,9 +182,9 @@ type DBranch = Bind (Telescope DGuard) DTerm
 
 type DGuard = Guard_ DS
 
-type instance X_GBool DS = Void   -- Boolean guards get desugared to pattern-matching
-type instance X_GPat  DS = ()
-type instance X_GLet  DS = Void   -- Let gets desugared to 'when' with a variable
+type instance X_GBool DS = Void -- Boolean guards get desugared to pattern-matching
+type instance X_GPat DS = ()
+type instance X_GLet DS = Void -- Let gets desugared to 'when' with a variable
 
 pattern DGPat :: Embed DTerm -> DPattern -> DGuard
 pattern DGPat embedt pat = GPat_ () embedt pat
@@ -186,23 +193,23 @@ pattern DGPat embedt pat = GPat_ () embedt pat
 
 type DPattern = Pattern_ DS
 
-type instance X_PVar     DS = Embed Type
-type instance X_PWild    DS = Embed Type
-type instance X_PAscr    DS = Void
-type instance X_PUnit    DS = ()
-type instance X_PBool    DS = Void
-type instance X_PChar    DS = Void
-type instance X_PString  DS = Void
-type instance X_PTup     DS = Void
-type instance X_PInj     DS = Void
-type instance X_PNat     DS = Void
-type instance X_PCons    DS = Void
-type instance X_PList    DS = Void
-type instance X_PAdd     DS = Void
-type instance X_PMul     DS = Void
-type instance X_PSub     DS = Void
-type instance X_PNeg     DS = Void
-type instance X_PFrac    DS = Void
+type instance X_PVar DS = Embed Type
+type instance X_PWild DS = Embed Type
+type instance X_PAscr DS = Void
+type instance X_PUnit DS = ()
+type instance X_PBool DS = Void
+type instance X_PChar DS = Void
+type instance X_PString DS = Void
+type instance X_PTup DS = Void
+type instance X_PInj DS = Void
+type instance X_PNat DS = Void
+type instance X_PCons DS = Void
+type instance X_PList DS = Void
+type instance X_PAdd DS = Void
+type instance X_PMul DS = Void
+type instance X_PSub DS = Void
+type instance X_PNeg DS = Void
+type instance X_PFrac DS = Void
 
 -- In the desugared language, constructor patterns (DPPair, DPInj) can
 -- only contain variables, not nested patterns.  This means that the
@@ -210,10 +217,11 @@ type instance X_PFrac    DS = Void
 -- exploding nested patterns into sequential guards, which makes the
 -- interpreter simpler.
 
-type instance X_Pattern  DS =
-  Either
-    (Embed Type, Name DTerm, Name DTerm)     -- DPPair
-    (Embed Type, Side, Name DTerm)           -- DPInj
+type instance
+  X_Pattern DS =
+    Either
+      (Embed Type, Name DTerm, Name DTerm) -- DPPair
+      (Embed Type, Side, Name DTerm) -- DPInj
 
 pattern DPVar :: Type -> Name DTerm -> DPattern
 pattern DPVar ty name <- PVar_ (unembed -> ty) name
@@ -228,19 +236,19 @@ pattern DPWild ty <- PWild_ (unembed -> ty)
 pattern DPUnit :: DPattern
 pattern DPUnit = PUnit_ ()
 
-pattern DPPair  :: Type -> Name DTerm -> Name DTerm -> DPattern
+pattern DPPair :: Type -> Name DTerm -> Name DTerm -> DPattern
 pattern DPPair ty x1 x2 <- XPattern_ (Left (unembed -> ty, x1, x2))
   where
     DPPair ty x1 x2 = XPattern_ (Left (embed ty, x1, x2))
 
-pattern DPInj  :: Type -> Side -> Name DTerm -> DPattern
+pattern DPInj :: Type -> Side -> Name DTerm -> DPattern
 pattern DPInj ty s x <- XPattern_ (Right (unembed -> ty, s, x))
   where
     DPInj ty s x = XPattern_ (Right (embed ty, s, x))
 
 {-# COMPLETE DPVar, DPWild, DPUnit, DPPair, DPInj #-}
 
-type instance X_QBind  DS = Void
+type instance X_QBind DS = Void
 type instance X_QGuard DS = Void
 
 ------------------------------------------------------------
@@ -248,25 +256,25 @@ type instance X_QGuard DS = Void
 ------------------------------------------------------------
 
 instance HasType DTerm where
-  getType (DTVar ty _)     = ty
-  getType (DTPrim ty _)    = ty
-  getType DTUnit           = TyUnit
-  getType (DTBool ty _)    = ty
-  getType (DTChar _)       = TyC
-  getType (DTNat ty _)     = ty
-  getType (DTRat _)        = TyF
+  getType (DTVar ty _) = ty
+  getType (DTPrim ty _) = ty
+  getType DTUnit = TyUnit
+  getType (DTBool ty _) = ty
+  getType (DTChar _) = TyC
+  getType (DTNat ty _) = ty
+  getType (DTRat _) = TyF
   getType (DTAbs Lam ty _) = ty
-  getType DTAbs{}          = TyProp
-  getType (DTApp ty _ _)   = ty
-  getType (DTPair ty _ _)  = ty
-  getType (DTCase ty _)    = ty
-  getType (DTTyOp ty _ _)  = ty
-  getType (DTNil ty)       = ty
-  getType (DTTest _ _)     = TyProp
+  getType DTAbs {} = TyProp
+  getType (DTApp ty _ _) = ty
+  getType (DTPair ty _ _) = ty
+  getType (DTCase ty _) = ty
+  getType (DTTyOp ty _ _) = ty
+  getType (DTNil ty) = ty
+  getType (DTTest _ _) = TyProp
 
 instance HasType DPattern where
-  getType (DPVar ty _)    = ty
-  getType (DPWild ty)     = ty
-  getType DPUnit          = TyUnit
+  getType (DPVar ty _) = ty
+  getType (DPWild ty) = ty
+  getType DPUnit = TyUnit
   getType (DPPair ty _ _) = ty
-  getType (DPInj ty _ _)  = ty
+  getType (DPInj ty _ _) = ty

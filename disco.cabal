@@ -458,7 +458,7 @@ library
                        filepath,
                        directory,
                        mtl >=2.2 && <2.4,
-                       megaparsec >= 6.1.1 && < 9.4,
+                       megaparsec >= 6.1.1 && < 9.6,
                        parser-combinators >= 1.0.0 && < 1.4,
                        pretty >=1.1 && <1.2,
                        split >= 0.2 && < 0.3,
@@ -473,7 +473,7 @@ library
                        polysemy-zoo >= 0.7 && < 0.9,
                        lens >= 4.14 && < 5.3,
                        exact-combinatorics >= 0.2 && < 0.3,
-                       arithmoi >= 0.10 && < 0.13,
+                       arithmoi >= 0.10 && < 0.14,
                        integer-logarithms >= 1.0 && < 1.1,
                        simple-enumeration >= 0.2 && < 0.3,
                        haskeline >=0.8 && <0.9,
@@ -481,8 +481,8 @@ library
                        QuickCheck >= 2.9 && < 2.15,
                        splitmix >= 0.1 && < 0.2,
                        fgl >= 5.5 && < 5.9,
-                       optparse-applicative >= 0.12 && < 0.18,
-                       oeis >= 0.3.10,
+                       optparse-applicative >= 0.12 && < 0.19,
+                       -- oeis2 < 1.1,
                        algebraic-graphs >= 0.5,
                        pretty-show >= 1.10
 
@@ -501,12 +501,12 @@ executable disco
                        haskeline >=0.8 && <0.9,
                        mtl >=2.2 && <2.4,
                        transformers >= 0.4 && < 0.7,
-                       megaparsec >= 6.1.1 && < 9.4,
+                       megaparsec >= 6.1.1 && < 9.6,
                        containers >= 0.5 && < 0.7,
                        unbound-generics >= 0.3 && < 0.4.3,
                        lens >= 4.14 && < 5.3,
-                       optparse-applicative >= 0.12 && < 0.18,
-                       oeis >= 0.3.10
+                       optparse-applicative >= 0.12 && < 0.19
+                       -- oeis2 < 1.1
 
   default-language:    Haskell2010
 
@@ -517,12 +517,12 @@ test-suite disco-tests
   hs-source-dirs: test
   ghc-options: -threaded
   build-depends:    base >= 4.7 && < 4.18,
-                    tasty >= 0.10 && < 1.5,
+                    tasty >= 0.10 && < 1.6,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7,
-                    bytestring >= 0.9 && < 0.12,
+                    bytestring >= 0.9 && < 0.13,
                     disco
   default-language: Haskell2010
 

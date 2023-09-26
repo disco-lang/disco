@@ -39,21 +39,40 @@ import Disco.Types
 import Disco.Types.Qualifiers
 
 -- | Top-level error type for Disco.
-data DiscoError where
-  -- | Module not found.
-  ModuleNotFound :: String -> DiscoError
-  -- | Cyclic import encountered.
-  CyclicImport :: [ModuleName] -> DiscoError
-  -- | Error encountered during typechecking.
-  TypeCheckErr :: LocTCError -> DiscoError
-  -- | Error encountered during parsing.
-  ParseErr :: ParseErrorBundle String DiscoParseError -> DiscoError
-  -- | Error encountered at runtime.
-  EvalErr :: EvalError -> DiscoError
-  -- | Something that shouldn't happen; indicates the presence of a
-  --   bug.
-  Panic :: String -> DiscoError
-  deriving (Show)
+--
+--   Got the basic idea for top-level error type from
+--
+--   <https://skillsmatter.com/skillscasts/9879-an-informal-guide-to-better-compiler-errors-jasper-van-der-jeugt>
+--
+--   The idea is that each subsystem uses a sum type to represent the
+--   kinds of errors that can occur; then at the top level instead of
+--   using an even bigger sum type, like we used to, just use a
+--   generic type with pretty-printed information.
+--
+--   Also took ideas from <https://elm-lang.org/news/the-syntax-cliff> in terms of
+--   what information we store here.
+data DiscoError = DiscoError
+  { errHeadline :: Doc
+  -- ^ The error "headline".
+  , errKind :: DiscoErrorKind
+  -- ^ What kind of error is it?
+  , errExplanation :: Doc
+  -- ^ A summary/explanation of the error. TODO: include source
+  -- location info?
+  , errHints :: [Doc]
+  -- ^ Things to try, examples, etc. that might help.
+  , errReading :: [Doc]
+  -- ^ References to further reading.
+  }
+
+-- | Enumeration of general categories of errors that can occur.
+data DiscoErrorKind
+  = ModuleNotFound
+  | CyclicImport
+  | TypeCheckErr
+  | ParseErr
+  | EvalErr
+  | Panic
 
 -- | Errors that can be generated at runtime.
 data EvalError where
@@ -75,41 +94,61 @@ data EvalError where
 
 deriving instance Show EvalError
 
-panic :: Member (Error DiscoError) r => String -> Sem r a
-panic = throw . Panic
+panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
+panic issueNum panicMsg = do
+  expl <- text panicMsg
+  reading <- case issueNum of
+    Nothing -> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
+    Just i -> "If you are curious to read more about this bug, visit" <+> issue i <> "."
+  throw
+    $ DiscoError
+      { errHeadline = "Disco bug!"
+      , errKind = Panic
+      , errExplanation = expl
+      , errHints = ["This error is not your fault!  It is a bug in Disco itself."]
+      , errReading = [reading]
+      }
 
 outputDiscoErrors :: Member (Output (Message ann)) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
   either (err . pretty') return e
 
+-- | Final formatting of a top-level Disco error.
 instance Pretty DiscoError where
-  pretty = \case
-    ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
-    CyclicImport ms -> cyclicImportError ms
-    TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
-    TypeCheckErr (LocTCError (Just n) te) ->
-      nest 2 $
-        vcat
-          [ "While checking " <> pretty' n <> ":"
-          , prettyTCError te
-          ]
-    ParseErr pe -> text (errorBundlePretty pe)
-    EvalErr ee -> prettyEvalError ee
-    Panic s ->
-      vcat
-        [ "Bug! " <> text s
-        , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
-        ]
+  pretty = return . errHeadline -- TODO: include more info!
+  -- pretty = \case
+  --   ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
+  --   CyclicImport ms -> cyclicImportError ms
+  --   TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
+  --   TypeCheckErr (LocTCError (Just n) te) ->
+  --     nest 2 $
+  --       vcat
+  --         [ "While checking " <> pretty' n <> ":"
+  --         , nest 2 $ prettyTCError te
+  --         ]
+  --   ParseErr pe -> text (errorBundlePretty pe)
+  --   EvalErr ee -> prettyEvalError ee
+  --   Panic s ->
+  --     vcat
+  --       [ "Bug! " <> text s
+  --       , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
+  --       ]
 
 rtd :: String -> Sem r (Doc ann)
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
 
 -- issue :: Int -> Sem r (Doc ann)
--- issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
+-- issue n = issueTracker <> "/" <> text (show n)
 
 squote :: String -> String
 squote x = "'" ++ x ++ "'"
+
+issueTracker :: Sem r Doc
+issueTracker = "https://github.com/disco-lang/disco/issues"
+
+newIssue :: Sem r Doc
+newIssue = issueTracker <> "/new/choose"
 
 cyclicImportError ::
   Members '[Reader PA, LFresh] r =>

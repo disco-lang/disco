@@ -10,7 +10,12 @@
 --
 -- Type for collecting all potential Disco errors at the top level,
 -- and a type for runtime errors.
-module Disco.Error (DiscoError (..), EvalError (..), panic, outputDiscoErrors) where
+module Disco.Error (
+  DiscoErrorKind (..),
+  DiscoError (..),
+  panic,
+  outputDiscoErrors,
+) where
 
 import Prelude hiding ((<>))
 
@@ -74,26 +79,6 @@ data DiscoErrorKind
   | EvalErr
   | Panic
 
--- | Errors that can be generated at runtime.
-data EvalError where
-  -- | An unbound name was encountered.
-  UnboundError :: QName core -> EvalError
-  -- | An unbound name that really shouldn't happen, coming from some
-  --   kind of internal name generation scheme.
-  UnboundPanic :: Name core -> EvalError
-  -- | Division by zero.
-  DivByZero :: EvalError
-  -- | Overflow, e.g. (2^66)!
-  Overflow :: EvalError
-  -- | Non-exhaustive case analysis.
-  NonExhaustive :: EvalError
-  -- | Infinite loop detected via black hole.
-  InfiniteLoop :: EvalError
-  -- | User-generated crash.
-  Crash :: String -> EvalError
-
-deriving instance Show EvalError
-
 panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do
   expl <- text panicMsg
@@ -155,18 +140,6 @@ cyclicImportError ms =
     [ "Error: module imports form a cycle:"
     , nest 2 $ intercalate " ->" (map pretty ms)
     ]
-
-prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
-prettyEvalError = \case
-  UnboundPanic x ->
-    ("Bug! No variable found named" <+> pretty' x <> ".")
-      $+$ "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
-  UnboundError x -> "Error: encountered undefined name" <+> pretty' x <> ". Maybe you haven't defined it yet?"
-  DivByZero -> "Error: division by zero."
-  Overflow -> "Error: that number would not even fit in the universe!"
-  NonExhaustive -> "Error: value did not match any of the branches in a case expression."
-  InfiniteLoop -> "Error: infinite loop detected!"
-  Crash s -> "User crash:" <+> text s
 
 -- [X] Step 1: nice error messages, make sure all are tested
 -- [ ] Step 2: link to wiki/website with more info on errors!

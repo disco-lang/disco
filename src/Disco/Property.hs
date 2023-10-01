@@ -21,24 +21,22 @@ module Disco.Property (
 )
 where
 
-import Prelude hiding ((<>))
-
 import Data.Char (toLower)
 import qualified Data.Enumeration.Invertible as E
-
-import Polysemy
-
 import Disco.AST.Typed
 import Disco.Effects.Input
 import Disco.Effects.LFresh
-import Disco.Error
+import Disco.Effects.Random
+import Disco.Eval.Error (prettyEvalError)
 import Disco.Pretty
 import Disco.Syntax.Prims
 import Disco.Typecheck.Erase (eraseProperty)
 import Disco.Types (TyDefCtx)
 import Disco.Value
 import Polysemy.Random
+import Polysemy
 import Polysemy.Reader
+import Prelude hiding ((<>))
 
 -- | Toggles which outcome (finding or not finding the thing being
 --   searched for) qualifies as success, without changing the thing
@@ -107,7 +105,7 @@ prettyTestReason _ _ (TestCmp _ t a1 a2) =
 prettyTestReason _ _ (TestRuntimeError ee) =
   nest 2 $
     "Test failed with an error:"
-      $+$ pretty (EvalErr ee)
+    $+$ prettyEvalError ee
 -- \$+$
 -- prettyTestEnv "Example inputs that caused the error:" env
 -- See #364

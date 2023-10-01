@@ -93,7 +93,7 @@ import Disco.AST.Core
 import Disco.AST.Generic (Side (..))
 import Disco.Context as Ctx
 import Disco.Effects.LFresh
-import Disco.Error
+import Disco.Eval.Error
 import Disco.Names
 import Disco.Pretty
 import Disco.Syntax.Operators (BOp (Add, Mul))

@@ -61,15 +61,11 @@ import Data.Bifunctor
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import System.FilePath ((-<.>))
-import Prelude
-
-import qualified System.Console.Haskeline as H
-
 import Disco.Effects.Fresh
 import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
+import Disco.Eval.Error (EvalError (..))
 import Polysemy
 import Polysemy.Embed
 import Polysemy.Error
@@ -77,6 +73,9 @@ import Polysemy.Fail
 import Polysemy.Output
 import Polysemy.Random
 import Polysemy.Reader
+import qualified System.Console.Haskeline as H
+import System.FilePath ((-<.>))
+import Prelude
 
 import Disco.AST.Core
 import Disco.AST.Surface

@@ -10,7 +10,12 @@
 --
 -- Type for collecting all potential Disco errors at the top level,
 -- and a type for runtime errors.
-module Disco.Error (DiscoError (..), EvalError (..), panic, outputDiscoErrors) where
+module Disco.Error (
+  DiscoErrorKind (..),
+  DiscoError (..),
+  panic,
+  outputDiscoErrors,
+) where
 
 import Prelude hiding ((<>))
 
@@ -73,26 +78,6 @@ data DiscoErrorKind
   | ParseErr
   | EvalErr
   | Panic
-
--- | Errors that can be generated at runtime.
-data EvalError where
-  -- | An unbound name was encountered.
-  UnboundError :: QName core -> EvalError
-  -- | An unbound name that really shouldn't happen, coming from some
-  --   kind of internal name generation scheme.
-  UnboundPanic :: Name core -> EvalError
-  -- | Division by zero.
-  DivByZero :: EvalError
-  -- | Overflow, e.g. (2^66)!
-  Overflow :: EvalError
-  -- | Non-exhaustive case analysis.
-  NonExhaustive :: EvalError
-  -- | Infinite loop detected via black hole.
-  InfiniteLoop :: EvalError
-  -- | User-generated crash.
-  Crash :: String -> EvalError
-
-deriving instance Show EvalError
 
 panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do

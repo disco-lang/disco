@@ -45,7 +45,7 @@ import Disco.Context as Ctx
 import Disco.Effects.Fresh
 import Disco.Effects.Input
 import Disco.Enumerate
-import Disco.Error
+import Disco.Eval.Error (EvalError (..))
 import Disco.Names
 import Disco.Property
 import Disco.Syntax.Operators (BOp (..))
@@ -375,11 +375,15 @@ appConst k = \case
       out . boolv . isJust . find (valEq x) . map fst
   OListElem -> arity2 $ \x -> out . boolv . isJust . find (valEq x) . vlist id
   OEachSet -> arity2 $ \f ->
-    withBag OEachSet $
-      outWithErr . fmap (VBag . countValues) . mapM (evalApp f . (: []) . fst)
+    withBag OEachSet
+      $ outWithErr
+      . fmap (VBag . countValues)
+      . mapM (evalApp f . (: []) . fst)
   OEachBag -> arity2 $ \f ->
-    withBag OEachBag $
-      outWithErr . fmap (VBag . sortNCount) . mapM (\(x, n) -> (,n) <$> evalApp f [x])
+    withBag OEachBag
+      $ outWithErr
+      . fmap (VBag . sortNCount)
+      . mapM (\(x, n) -> (,n) <$> evalApp f [x])
   OFilterBag -> arity2 $ \f -> withBag OFilterBag $ \xs ->
     outWithErr $ do
       bs <- mapM (evalApp f . (: []) . fst) xs
@@ -411,13 +415,18 @@ appConst k = \case
   --   (λx. bagFromCounts(bag(('a', 2 + x) :: ('b', 1) :: ('b', 1) :: [])))(3)
 
   OCountsToBag ->
-    withBag OCountsToBag $
-      out . VBag . sortNCount . map (second (uncurry (*)) . assoc . first (vpair id vint))
+    withBag OCountsToBag
+      $ out
+      . VBag
+      . sortNCount
+      . map (second (uncurry (*)) . assoc . first (vpair id vint))
    where
     assoc ((a, b), c) = (a, (b, c))
   OUnsafeCountsToBag ->
-    withBag OUnsafeCountsToBag $
-      out . VBag . map (second (uncurry (*)) . assoc . first (vpair id vint))
+    withBag OUnsafeCountsToBag
+      $ out
+      . VBag
+      . map (second (uncurry (*)) . assoc . first (vpair id vint))
    where
     assoc ((a, b), c) = (a, (b, c))
 
@@ -425,20 +434,30 @@ appConst k = \case
   -- Maps
 
   OMapToSet ->
-    withMap OMapToSet $
-      out . VBag . map (\(k', v) -> (VPair (fromSimpleValue k') v, 1)) . M.assocs
+    withMap OMapToSet
+      $ out
+      . VBag
+      . map (\(k', v) -> (VPair (fromSimpleValue k') v, 1))
+      . M.assocs
   OSetToMap ->
-    withBag OSetToMap $
-      out . VMap . M.fromList . map (convertAssoc . fst)
+    withBag OSetToMap
+      $ out
+      . VMap
+      . M.fromList
+      . map (convertAssoc . fst)
    where
     convertAssoc (VPair k' v) = (toSimpleValue k', v)
     convertAssoc v = error $ "Impossible! convertAssoc on non-VPair " ++ show v
   OInsert -> arity3 $ \k' v ->
-    withMap OInsert $
-      out . VMap . M.insert (toSimpleValue k') v
+    withMap OInsert
+      $ out
+      . VMap
+      . M.insert (toSimpleValue k') v
   OLookup -> arity2 $ \k' ->
-    withMap OLookup $
-      out . toMaybe . M.lookup (toSimpleValue k')
+    withMap OLookup
+      $ out
+      . toMaybe
+      . M.lookup (toSimpleValue k')
    where
     toMaybe = maybe (VInj L VUnit) (VInj R)
   --------------------------------------------------

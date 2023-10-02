@@ -65,7 +65,7 @@ import Disco.Effects.Fresh
 import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
-import Disco.Eval.Error (EvalError (..))
+import Disco.Eval.Error (EvalError (..), reportEvalError)
 import Polysemy
 import Polysemy.Embed
 import Polysemy.Error
@@ -197,8 +197,7 @@ runDisco cfg =
     . outputDiscoErrors -- Output any top-level errors
     . runLFresh -- Generate locally fresh names
     . runRandomIO -- Generate randomness via IO
-    . mapError EvalErr -- Embed runtime errors into top-level error type
-    . failToError Panic -- Turn pattern-match failures into a Panic error
+    . mapError reportEvalError -- Embed runtime errors into top-level error type
     . runReader emptyCtx -- Keep track of current Env
  where
   msgFilter
@@ -280,6 +279,10 @@ typecheckTop tcm = do
 
 --------------------------------------------------
 -- Loading
+
+data ResolverError
+  = ModuleNotFound FilePath
+  | CyclicImport [ModuleName]
 
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
@@ -384,7 +387,7 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
   -- Evaluate all the module definitions and add them to the topEnv.
-  mapError EvalErr $ loadDefsFrom m
+  mapError reportEvalError $ loadDefsFrom m
 
   -- Record the ModuleInfo record in the top-level map.
   modify (topModMap %~ M.insert name m)

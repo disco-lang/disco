@@ -72,8 +72,7 @@ data DiscoError = DiscoError
 
 -- | Enumeration of general categories of errors that can occur.
 data DiscoErrorKind
-  = ModuleNotFound
-  | CyclicImport
+  = ResolverErr
   | TypeCheckErr
   | ParseErr
   | EvalErr

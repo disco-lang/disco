@@ -65,7 +65,7 @@ import Disco.Effects.Fresh
 import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
-import Disco.Eval.Error (EvalError (..))
+import Disco.Eval.Error (EvalError (..), reportEvalError)
 import Polysemy
 import Polysemy.Embed
 import Polysemy.Error
@@ -197,8 +197,7 @@ runDisco cfg m =
     . outputDiscoErrors -- Output any top-level errors
     . runLFresh -- Generate locally fresh names
     . runRandomIO -- Generate randomness via IO
-    . mapError EvalErr -- Embed runtime errors into top-level error type
-    . failToError Panic -- Turn pattern-match failures into a Panic error
+    . mapError reportEvalError -- Embed runtime errors into top-level error type
     . runReader emptyCtx -- Keep track of current Env
     $ m
  where
@@ -282,6 +281,10 @@ typecheckTop tcm = do
 --------------------------------------------------
 -- Loading
 
+data ResolverError
+  = ModuleNotFound FilePath
+  | CyclicImport [ModuleName]
+
 -- | Recursively loads a given module by first recursively loading and
 --   typechecking its imported modules, adding the obtained
 --   'ModuleInfo' records to a map from module names to info records,
@@ -291,7 +294,7 @@ typecheckTop tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule ::
-  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error ResolverError, Embed IO] r =>
   Bool ->
   Resolver ->
   FilePath ->
@@ -305,7 +308,7 @@ loadDiscoModule quiet resolver =
 --   module loaded from disk).  Used for e.g. blocks/modules entered
 --   at the REPL prompt.
 loadParsedDiscoModule ::
-  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error ResolverError, Embed IO] r =>
   Bool ->
   Resolver ->
   ModuleName ->
@@ -319,7 +322,7 @@ loadParsedDiscoModule quiet resolver =
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule' ::
-  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error ResolverError, Embed IO] r =>
   Bool ->
   Resolver ->
   [ModuleName] ->
@@ -351,7 +354,7 @@ stdLib = ["list", "container"]
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule' ::
-  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error ResolverError, Embed IO] r =>
   Bool ->
   LoadingMode ->
   Resolver ->
@@ -385,7 +388,7 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
   -- Evaluate all the module definitions and add them to the topEnv.
-  mapError EvalErr $ loadDefsFrom m
+  mapError reportEvalError $ loadDefsFrom m
 
   -- Record the ModuleInfo record in the top-level map.
   modify (topModMap %~ M.insert name m)

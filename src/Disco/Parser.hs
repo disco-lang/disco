@@ -15,6 +15,7 @@
 module Disco.Parser (
   -- * Parser type and utilities
   DiscoParseError (..),
+  reportParseError,
   Parser,
   runParser,
   withExts,
@@ -106,6 +107,7 @@ import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as S
 import Disco.AST.Surface
+import Disco.Error
 import Disco.Extensions
 import Disco.Module
 import Disco.Pretty (prettyStr)
@@ -120,6 +122,7 @@ import Text.Megaparsec hiding (
 import qualified Text.Megaparsec as MP
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Text.PrettyPrint as PP
 import Unbound.Generics.LocallyNameless (
   Name,
   bind,
@@ -175,6 +178,9 @@ instance Eq OpaqueTerm where
 instance Ord OpaqueTerm where
   compare _ _ = EQ
 
+--------------------------------------------------
+-- Parse errors
+
 data DiscoParseError
   = ReservedVarName String
   | InvalidPattern OpaqueTerm
@@ -191,6 +197,18 @@ instance ShowErrorComponent DiscoParseError where
   errorComponentLen (InvalidPattern _) = 1
   errorComponentLen MissingAscr = 1
   errorComponentLen MultiArgLambda = 1
+
+reportParseError :: ParseErrorBundle String DiscoParseError -> DiscoError
+reportParseError e =
+  DiscoError
+    { errHeadline = PP.text "Syntax error"
+    , errKind = ParseErr
+    , errExplanation = PP.text (errorBundlePretty e)
+    , errHints = [] -- XXX
+    , errReading = [] -- XXX
+    }
+
+--------------------------------------------------
 
 -- | A parser is a megaparsec parser of strings, with an extra layer
 --   of state to keep track of the current indentation level and

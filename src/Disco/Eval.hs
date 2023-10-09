@@ -230,7 +230,7 @@ inputTopEnv m = do
 parseDiscoModule :: Members '[Error DiscoError, Embed IO] r => FilePath -> Sem r Module
 parseDiscoModule file = do
   str <- liftIO $ readFile file
-  fromEither . first ParseErr $ runParser (wholeModule Standalone) file str
+  fromEither . first reportParseError $ runParser (wholeModule Standalone) file str
 
 --------------------------------------------------
 -- Type checking

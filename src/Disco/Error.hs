@@ -19,10 +19,6 @@ module Disco.Error (
 
 import Prelude hiding ((<>))
 
-import Text.Megaparsec (
-  ParseErrorBundle,
-  errorBundlePretty,
- )
 import Unbound.Generics.LocallyNameless (Name)
 
 import Disco.Effects.LFresh
@@ -33,7 +29,6 @@ import Polysemy.Reader
 
 import Disco.Messages
 import Disco.Names (ModuleName, QName)
-import Disco.Parser (DiscoParseError)
 import Disco.Pretty
 import Disco.Typecheck.Solve
 import Disco.Typecheck.Util (

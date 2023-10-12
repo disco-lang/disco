@@ -19,8 +19,6 @@ module Disco.Error (
 
 import Prelude hiding ((<>))
 
-import Unbound.Generics.LocallyNameless (Name)
-
 import Disco.Effects.LFresh
 import Polysemy
 import Polysemy.Error
@@ -28,14 +26,9 @@ import Polysemy.Output
 import Polysemy.Reader
 
 import Disco.Messages
-import Disco.Names (ModuleName, QName)
+import Disco.Names (ModuleName)
 import Disco.Pretty
 import Disco.Typecheck.Solve
-import Disco.Typecheck.Util (
-  LocTCError (..),
-  TCError (..),
- )
-import Disco.Types
 import Disco.Types.Qualifiers
 
 -- | Top-level error type for Disco.
@@ -61,7 +54,7 @@ data DiscoError = DiscoError
   -- location info?
   , errHints :: [Doc]
   -- ^ Things to try, examples, etc. that might help.
-  , errReading :: [Doc]
+  , errReading :: [FurtherReading]
   -- ^ References to further reading.
   }
 
@@ -72,6 +65,15 @@ data DiscoErrorKind
   | ParseErr
   | EvalErr
   | Panic
+
+-- | Sources for further reading.
+data FurtherReading
+  = -- | Link to documentation page on readthedocs.
+    RTD String
+  | -- | Link to a GitHub issue.
+    Issue Int
+  | -- | Free-form.
+    OtherReading Doc
 
 panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do
@@ -299,7 +301,7 @@ conWord = \case
   CUser s -> text s
 
 prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r (Doc ann)
-prettySolveError = \case
+rettySolveError = \case
   -- XXX say which types!
   NoWeakUnifier ->
     vcat

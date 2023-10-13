@@ -245,7 +245,7 @@ runTCM ::
   Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error LocTCError ': r) a ->
   Sem r a
 runTCM tyCtx tyDefCtx =
-  mapError TypeCheckErr
+  mapError reportLocTCError
     . runFresh
     . runReader @TyDefCtx tyDefCtx
     . runReader @TyCtx tyCtx
@@ -259,7 +259,7 @@ runTCM' ::
   Sem (Reader TyCtx ': Reader TyDefCtx ': Fresh ': Error TCError ': r) a ->
   Sem r a
 runTCM' tyCtx tyDefCtx =
-  mapError (TypeCheckErr . noLoc)
+  mapError (reportLocTCError . noLoc)
     . runFresh
     . runReader @TyDefCtx tyDefCtx
     . runReader @TyCtx tyCtx

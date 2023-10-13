@@ -48,12 +48,12 @@ data EvalError where
 
 deriving instance Show EvalError
 
--- XXX update this
-reportEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r DiscoError
-reportEvalError e = do
+-- XXX update this.  Run reader, LFresh locally.
+reportEvalError :: EvalError -> Sem r DiscoError
+reportEvalError e = runPretty $ do
   explain <- prettyEvalError e
-  return
-    $ DiscoError
+  return $
+    DiscoError
       { errHeadline = "Runtime error"
       , errKind = EvalErr
       , errExplanation = explain

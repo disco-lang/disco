@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 -- |
 -- Module      :  Disco.Error
@@ -12,6 +11,7 @@
 -- and a type for runtime errors.
 module Disco.Error (
   DiscoErrorKind (..),
+  FurtherReading (..),
   DiscoError (..),
   panic,
   outputDiscoErrors,
@@ -28,7 +28,6 @@ import Polysemy.Reader
 import Disco.Messages
 import Disco.Names (ModuleName)
 import Disco.Pretty
-import Disco.Typecheck.Solve
 import Disco.Types.Qualifiers
 
 -- | Top-level error type for Disco.
@@ -62,6 +61,7 @@ data DiscoError = DiscoError
 data DiscoErrorKind
   = ResolverErr
   | TypeCheckErr
+  | TypeSolveErr
   | ParseErr
   | EvalErr
   | Panic
@@ -75,14 +75,19 @@ data FurtherReading
   | -- | Free-form.
     OtherReading Doc
 
+reportFurtherReading :: FurtherReading -> Sem r Doc
+reportFurtherReading (RTD _) = undefined
+reportFurtherReading (Issue i) = "If you are curious to read more about this bug, visit" <+> issue i <> "."
+reportFurtherReading (OtherReading r) = return r
+
 panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do
   expl <- text panicMsg
   reading <- case issueNum of
-    Nothing -> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
-    Just i -> "If you are curious to read more about this bug, visit" <+> issue i <> "."
-  throw
-    $ DiscoError
+    Nothing -> OtherReading <$> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
+    Just i -> return $ Issue i
+  throw $
+    DiscoError
       { errHeadline = "Disco bug!"
       , errKind = Panic
       , errExplanation = expl

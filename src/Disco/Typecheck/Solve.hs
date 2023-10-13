@@ -41,7 +41,9 @@ import Data.Set (Set)
 import Data.Set qualified as S
 import Data.Tuple
 import Disco.Effects.Fresh
+import Disco.Effects.LFresh
 import Disco.Effects.State
+import Disco.Error
 import Disco.Messages
 import Disco.Pretty hiding ((<>))
 import Disco.Subst
@@ -85,6 +87,68 @@ data SolveError where
 
 instance Semigroup SolveError where
   e <> _ = e
+
+reportSolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r DiscoError
+reportSolveError = \case
+  -- XXX say which types!
+  NoWeakUnifier ->
+    slvErrorRpt
+      "The shape of two types does not match."
+      []
+      [RTD "shape-mismatch"]
+  -- XXX say more!  XXX HIGHEST PRIORITY!
+  NoUnify ->
+    slvErrorRpt
+      "Typechecking failed."
+      []
+      [RTD "typecheck-fail"]
+  UnqualBase q b ->
+    slvErrorRpt
+      ("Values of type" <+> pretty' b <+> qualPhrase False q <> ".")
+      []
+      [RTD "not-qual"]
+  Unqual q ty ->
+    slvErrorRpt
+      ("Values of type" <+> pretty' ty <+> qualPhrase False q <> ".")
+      []
+      [RTD "not-qual"]
+  QualSkolem q a ->
+    slvErrorRpt
+      ( vcat
+          [ "Type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
+          , nest 2 (qualPhrase True q) <> "."
+          ]
+      )
+      []
+      [RTD "qual-skolem"]
+ where
+  slvErrorRpt expl hints rdg = do
+    expl' <- expl
+    hints' <- sequence hints
+    return $
+      DiscoError
+        { errHeadline = "Type error"
+        , errKind = TypeSolveErr
+        , errExplanation = expl'
+        , errHints = hints'
+        , errReading = rdg
+        }
+
+qualPhrase :: Bool -> Qualifier -> Sem r Doc
+qualPhrase b q
+  | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q
+  | otherwise = "can" <> (if b then empty else "not") <+> "be" <+> qualAction q
+
+qualAction :: Qualifier -> Sem r Doc
+qualAction = \case
+  QNum -> "added and multiplied"
+  QSub -> "subtracted"
+  QDiv -> "divided"
+  QCmp -> "compared"
+  QEnum -> "enumerated"
+  QBool -> "boolean"
+  QBasic -> "basic"
+  QSimple -> "simple"
 
 --------------------------------------------------
 -- Error utilities

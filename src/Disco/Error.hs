@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE StandaloneDeriving #-}
 
 -- |
 -- Module      :  Disco.Error
@@ -12,6 +11,7 @@
 -- and a type for runtime errors.
 module Disco.Error (
   DiscoErrorKind (..),
+  FurtherReading (..),
   DiscoError (..),
   panic,
   outputDiscoErrors,
@@ -28,7 +28,6 @@ import Polysemy.Reader
 import Disco.Messages
 import Disco.Names (ModuleName)
 import Disco.Pretty
-import Disco.Typecheck.Solve
 import Disco.Types.Qualifiers
 
 -- | Top-level error type for Disco.
@@ -62,6 +61,7 @@ data DiscoError = DiscoError
 data DiscoErrorKind
   = ResolverErr
   | TypeCheckErr
+  | TypeSolveErr
   | ParseErr
   | EvalErr
   | Panic
@@ -75,14 +75,19 @@ data FurtherReading
   | -- | Free-form.
     OtherReading Doc
 
+reportFurtherReading :: FurtherReading -> Sem r Doc
+reportFurtherReading (RTD _) = undefined
+reportFurtherReading (Issue i) = "If you are curious to read more about this bug, visit" <+> issue i <> "."
+reportFurtherReading (OtherReading r) = return r
+
 panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do
   expl <- text panicMsg
   reading <- case issueNum of
-    Nothing -> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
-    Just i -> "If you are curious to read more about this bug, visit" <+> issue i <> "."
-  throw
-    $ DiscoError
+    Nothing -> OtherReading <$> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
+    Just i -> return $ Issue i
+  throw $
+    DiscoError
       { errHeadline = "Disco bug!"
       , errKind = Panic
       , errExplanation = expl
@@ -136,50 +141,3 @@ cyclicImportError ms =
     [ "Error: module imports form a cycle:"
     , nest 2 $ intercalate " ->" (map pretty ms)
     ]
-
-prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
-prettySolveError = \case
-  -- XXX say which types!
-  NoWeakUnifier ->
-    vcat
-      [ "Error: the shape of two types does not match."
-      , rtd "shape-mismatch"
-      ]
-  -- XXX say more!  XXX HIGHEST PRIORITY!
-  NoUnify ->
-    vcat
-      [ "Error: typechecking failed."
-      , rtd "typecheck-fail"
-      ]
-  UnqualBase q b ->
-    vcat
-      [ "Error: values of type" <+> pretty' b <+> qualPhrase False q <> "."
-      , rtd "not-qual"
-      ]
-  Unqual q ty ->
-    vcat
-      [ "Error: values of type" <+> pretty' ty <+> qualPhrase False q <> "."
-      , rtd "not-qual"
-      ]
-  QualSkolem q a ->
-    vcat
-      [ "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
-      , nest 2 (qualPhrase True q) <> "."
-      , rtd "qual-skolem"
-      ]
-
-qualPhrase :: Bool -> Qualifier -> Sem r Doc
-qualPhrase b q
-  | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q
-  | otherwise = "can" <> (if b then empty else "not") <+> "be" <+> qualAction q
-
-qualAction :: Qualifier -> Sem r Doc
-qualAction = \case
-  QNum -> "added and multiplied"
-  QSub -> "subtracted"
-  QDiv -> "divided"
-  QCmp -> "compared"
-  QEnum -> "enumerated"
-  QBool -> "boolean"
-  QBasic -> "basic"
-  QSimple -> "simple"

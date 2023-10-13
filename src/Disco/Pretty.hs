@@ -89,11 +89,14 @@ mparens pa doc = do
 class Pretty t where
   pretty :: Members '[Reader PA, LFresh] r => t -> Sem r Doc
 
+runPretty :: Sem (Reader PA ': LFresh ': r) a -> Sem r a
+runPretty = runLFresh . runReader initPA
+
 prettyStr :: Pretty t => t -> Sem r String
 prettyStr = renderDoc . runLFresh . pretty
 
 pretty' :: Pretty t => t -> Sem r Doc
-pretty' = runReader initPA . runLFresh . pretty
+pretty' = runPretty . pretty
 
 ------------------------------------------------------------
 -- Some standard instances

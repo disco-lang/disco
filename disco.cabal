@@ -485,7 +485,8 @@ library
                        optparse-applicative >= 0.12 && < 0.19,
                        -- oeis2 < 1.1,
                        algebraic-graphs >= 0.5,
-                       pretty-show >= 1.10
+                       pretty-show >= 1.10,
+                       diagnose >= 2.5.1 && < 2.6
 
   hs-source-dirs:      src
   default-language:    Haskell2010

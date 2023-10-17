@@ -7,14 +7,13 @@
 --
 -- SPDX-License-Identifier: BSD-3-Clause
 --
--- Type for collecting all potential Disco errors at the top level,
--- and a type for runtime errors.
+-- Top-level utilities for dealing with Disco errors and warnings.
 module Disco.Error (
-  DiscoErrorKind (..),
-  FurtherReading (..),
-  DiscoError (..),
-  panic,
-  outputDiscoErrors,
+    DiscoErrorKind (..),
+    FurtherReading (..),
+    DiscoError (..),
+    panic,
+    outputDiscoErrors,
 ) where
 
 import Prelude hiding ((<>))
@@ -28,52 +27,18 @@ import Polysemy.Reader
 import Disco.Messages
 import Disco.Names (ModuleName)
 import Disco.Pretty
-import Disco.Types.Qualifiers
+import Error.Diagnose (Report)
 
--- | Top-level error type for Disco.
---
---   Got the basic idea for top-level error type from
---
---   <https://skillsmatter.com/skillscasts/9879-an-informal-guide-to-better-compiler-errors-jasper-van-der-jeugt>
---
---   The idea is that each subsystem uses a sum type to represent the
---   kinds of errors that can occur; then at the top level instead of
---   using an even bigger sum type, like we used to, just use a
---   generic type with pretty-printed information.
---
---   Also took ideas from <https://elm-lang.org/news/the-syntax-cliff> in terms of
---   what information we store here.
-data DiscoError = DiscoError
-  { errHeadline :: Doc
-  -- ^ The error "headline".
-  , errKind :: DiscoErrorKind
-  -- ^ What kind of error is it?
-  , errExplanation :: Doc
-  -- ^ A summary/explanation of the error. TODO: include source
-  -- location info?
-  , errHints :: [Doc]
-  -- ^ Things to try, examples, etc. that might help.
-  , errReading :: [FurtherReading]
-  -- ^ References to further reading.
-  }
-
--- | Enumeration of general categories of errors that can occur.
-data DiscoErrorKind
-  = ResolverErr
-  | TypeCheckErr
-  | TypeSolveErr
-  | ParseErr
-  | EvalErr
-  | Panic
+type DiscoError = Report Text
 
 -- | Sources for further reading.
 data FurtherReading
-  = -- | Link to documentation page on readthedocs.
-    RTD String
-  | -- | Link to a GitHub issue.
-    Issue Int
-  | -- | Free-form.
-    OtherReading Doc
+    = -- | Link to documentation page on readthedocs.
+      RTD String
+    | -- | Link to a GitHub issue.
+      Issue Int
+    | -- | Free-form.
+      OtherReading Doc
 
 reportFurtherReading :: FurtherReading -> Sem r Doc
 reportFurtherReading (RTD _) = undefined

@@ -16,20 +16,19 @@ module Disco.Error (
     outputDiscoErrors,
 ) where
 
-import Prelude hiding ((<>))
-
 import Disco.Effects.LFresh
+import Disco.Messages
+import Disco.Names (ModuleName)
+import Disco.Pretty
+import Error.Diagnose (Diagnostic, Note (..), Report (..))
 import Polysemy
 import Polysemy.Error
 import Polysemy.Output
 import Polysemy.Reader
+import Prelude hiding ((<>))
 
-import Disco.Messages
-import Disco.Names (ModuleName)
-import Disco.Pretty
-import Error.Diagnose (Report)
-
-type DiscoError = Report Text
+type DiscoDiagnostic = Diagnostic Doc
+type DiscoReport = Report Doc
 
 -- | Sources for further reading.
 data FurtherReading
@@ -45,45 +44,45 @@ reportFurtherReading (RTD _) = undefined
 reportFurtherReading (Issue i) = "If you are curious to read more about this bug, visit" <+> issue i <> "."
 reportFurtherReading (OtherReading r) = return r
 
-panic :: Member (Error DiscoError) r => Maybe Int -> String -> Sem r a
+panic :: Member (Error DiscoReport) r => Maybe Int -> String -> Sem r a
 panic issueNum panicMsg = do
-  expl <- text panicMsg
-  reading <- case issueNum of
-    Nothing -> OtherReading <$> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
-    Just i -> return $ Issue i
-  throw $
-    DiscoError
-      { errHeadline = "Disco bug!"
-      , errKind = Panic
-      , errExplanation = expl
-      , errHints = ["This error is not your fault!  It is a bug in Disco itself."]
-      , errReading = [reading]
-      }
+    expl <- text panicMsg
+    reading <- case issueNum of
+        Nothing -> OtherReading <$> "It would be a huge help to Disco development if you visit" <+> newIssue <> ", create a new issue, paste this error message, and explain what you were doing when you got this message."
+        Just i -> return $ Issue i
+    throw
+        $ Err
+            Nothing
+            expl
+            []
+            [ Note "This error is not your fault!  It is a bug in Disco itself."
+            , Note (reportFurtherReading reading)
+            ]
 
-outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoReport ': r) () -> Sem r ()
 outputDiscoErrors m = do
-  e <- runError m
-  either (err . pretty') return e
+    e <- runError m
+    either (err . pretty') return e
 
--- | Final formatting of a top-level Disco error.
-instance Pretty DiscoError where
-  pretty = return . errHeadline -- TODO: include more info!
-  -- pretty = \case
-  --   ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
-  --   CyclicImport ms -> cyclicImportError ms
-  --   TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
-  --   TypeCheckErr (LocTCError (Just n) te) ->
-  --     vcat
-  --       [ "While checking " <> pretty' n <> ":"
-  --       , nest 2 $ prettyTCError te
-  --       ]
-  --   ParseErr pe -> text (errorBundlePretty pe)
-  --   EvalErr ee -> prettyEvalError ee
-  --   Panic s ->
-  --     vcat
-  --       [ "Bug! " <> text s
-  --       , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
-  --       ]
+-- | Final formatting of a top-level Disco report.
+instance Pretty DiscoReport where
+    pretty = return . errHeadline -- TODO: include more info!
+    -- pretty = \case
+    --   ModuleNotFound m -> "Error: couldn't find a module named '" <> text m <> "'."
+    --   CyclicImport ms -> cyclicImportError ms
+    --   TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
+    --   TypeCheckErr (LocTCError (Just n) te) ->
+    --     vcat
+    --       [ "While checking " <> pretty' n <> ":"
+    --       , nest 2 $ prettyTCError te
+    --       ]
+    --   ParseErr pe -> text (errorBundlePretty pe)
+    --   EvalErr ee -> prettyEvalError ee
+    --   Panic s ->
+    --     vcat
+    --       [ "Bug! " <> text s
+    --       , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
+    --       ]
 
 rtd :: String -> Sem r Doc
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
@@ -98,11 +97,11 @@ newIssue :: Sem r Doc
 newIssue = issueTracker <> "/new/choose"
 
 cyclicImportError ::
-  Members '[Reader PA, LFresh] r =>
-  [ModuleName] ->
-  Sem r Doc
+    Members '[Reader PA, LFresh] r =>
+    [ModuleName] ->
+    Sem r Doc
 cyclicImportError ms =
-  vcat
-    [ "Error: module imports form a cycle:"
-    , nest 2 $ intercalate " ->" (map pretty ms)
-    ]
+    vcat
+        [ "Error: module imports form a cycle:"
+        , nest 2 $ intercalate " ->" (map pretty ms)
+        ]

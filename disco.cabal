@@ -460,7 +460,7 @@ library
                        mtl >=2.2 && <2.4,
                        megaparsec >= 6.1.1 && < 9.6,
                        parser-combinators >= 1.0.0 && < 1.4,
-                       pretty >=1.1 && <1.2,
+                       prettyprinter >=1.7 && < 1.8,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.7,
                        containers >=0.5 && <0.7,

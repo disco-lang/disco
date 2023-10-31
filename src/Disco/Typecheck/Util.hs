@@ -1,6 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
 
 -- |
 -- Module      :  Disco.Typecheck.Util
@@ -148,7 +145,7 @@ withConstraint = fmap swap . runWriter
 --   the resulting substitution (or failing with an error).  Note that
 --   this locally dispatches the constraint writer effect.
 solve ::
-  Members '[Reader TyDefCtx, Error TCError, Output Message] r =>
+  Members '[Reader TyDefCtx, Error TCError, Output (Message ann)] r =>
   Sem (Writer Constraint ': r) a ->
   Sem r (a, S)
 solve m = do

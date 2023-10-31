@@ -318,7 +318,7 @@ instance Pretty Core where
 toTuple :: [Core] -> Core
 toTuple = foldr CPair CUnit
 
-prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r Doc
+prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r (Doc ann)
 prettyTestVars = brackets . intercalate "," . map prettyTestVar
  where
   prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])

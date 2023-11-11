@@ -12,13 +12,14 @@ module Disco.Pretty.DSL where
 
 import Control.Applicative hiding (empty)
 import Data.String (IsString (..))
-import Prelude hiding ((<>))
+import Disco.Pretty.Prec
 import Polysemy
 import Polysemy.Reader
 import Prettyprinter (Doc)
-import Prettyprinter.Render.String (renderString)
 import qualified Prettyprinter as PP
-import Disco.Pretty.Prec
+import Prettyprinter.Internal (Doc (Empty)) -- XXX comment me
+import Prettyprinter.Render.String (renderString)
+import Prelude hiding ((<>))
 
 instance IsString (Sem r (Doc ann)) where
   fromString = text
@@ -65,6 +66,9 @@ integer = pure . PP.pretty
 nest :: Functor f => Int -> f (Doc ann) -> f (Doc ann)
 nest n d = PP.nest n <$> d
 
+indent :: Functor f => Int -> f (Doc ann) -> f (Doc ann)
+indent n d = PP.indent n <$> d
+
 hang :: Applicative f => f (Doc ann) -> Int -> f (Doc ann) -> f (Doc ann)
 hang d1 n d2 = d1 <+> nest n d2
 
@@ -78,7 +82,10 @@ empty = pure PP.emptyDoc
 (<>) = liftA2 (PP.<>)
 
 ($+$) :: Applicative f => f (Doc ann) -> f (Doc ann) -> f (Doc ann)
-d1 $+$ d2 = PP.vcat <$> sequenceA [d1,d2]
+d1 $+$ d2 = f <$> d1 <*> d2
+ where
+  f x1 Empty = x1
+  f x1 x2 = PP.vcat [x1, x2]
 
 punctuate :: Applicative f => f (Doc ann) -> [f (Doc ann)] -> f [f (Doc ann)]
 punctuate p ds = map pure <$> (PP.punctuate <$> p <*> sequenceA ds)

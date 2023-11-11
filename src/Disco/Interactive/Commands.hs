@@ -474,7 +474,7 @@ handleDocPrim prim = do
     (Nothing, Nothing) -> return ()
     (Nothing, Just p) -> info $ mkReference p
     (Just d, mp) ->
-      info $ "" $+$ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
+      info $ Pretty.empty $+$ text d $+$ Pretty.empty $+$ maybe Pretty.empty (\p -> mkReference p $+$ Pretty.empty) mp
  where
   describePrec p = "precedence level" <+> text (show p)
   describeFixity In = Pretty.empty
@@ -504,7 +504,7 @@ handleDocOther s =
     (Nothing, Nothing) -> info $ "No documentation found for '" <> text s <> "'."
     (Nothing, Just p) -> info $ mkReference p
     (Just d, mp) ->
-      info $ text d $+$ "" $+$ maybe Pretty.empty (\p -> mkReference p $+$ "") mp
+      info $ text d $+$ Pretty.empty $+$ maybe Pretty.empty (\p -> mkReference p $+$ Pretty.empty) mp
 
 ------------------------------------------------------------
 -- eval
@@ -653,14 +653,16 @@ runAllTests declNames aprops
         hdr = pretty' n <> ":"
 
     case P.null failures of
-      True -> info $ nest 2 $ hdr <+> "OK"
+      True -> info $ indent 2 $ hdr <+> "OK"
       False -> do
         tydefs <- inputs @TopInfo (view (replModInfo . to allTydefs))
         let prettyFailures =
-              runInputConst tydefs . runReader initPA . runLFresh $
-                bulletList "-" $
-                  map (uncurry prettyTestResult) failures
-        info $ nest 2 $ hdr $+$ prettyFailures
+              runInputConst tydefs
+                . runReader initPA
+                . runLFresh
+                $ bulletList "-"
+                $ map (uncurry prettyTestResult) failures
+        info $ indent 2 $ hdr $+$ prettyFailures
     return (P.null failures)
 
 ------------------------------------------------------------
@@ -849,7 +851,7 @@ handleTest (TestProp t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   inputToState . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
-    info $ runInputConst tydefs . runReader initPA $ nest 2 $ "-" <+> prettyTestResult at r
+    info $ runInputConst tydefs . runReader initPA $ indent 2 . nest 2 $ "-" <+> prettyTestResult at r
 
 ------------------------------------------------------------
 -- :type

@@ -2,10 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- TODO: the calls to 'error' should be replaced with logging/error capabilities.
 
 -- |
@@ -34,13 +30,13 @@ import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as S
 import Disco.Effects.LFresh
-import Polysemy
-import Polysemy.Reader
-import Unbound.Generics.LocallyNameless (Name)
-import Prettyprinter (Doc)
 import Disco.Pretty.DSL
 import Disco.Pretty.Prec
 import Disco.Syntax.Operators
+import Polysemy
+import Polysemy.Reader
+import Prettyprinter (Doc)
+import Unbound.Generics.LocallyNameless (Name)
 
 ------------------------------------------------------------
 -- Utilities for handling precedence and associativity

@@ -80,7 +80,7 @@ import Disco.Parser (
   withExts,
  )
 import Disco.Pretty hiding (empty, (<>))
-import qualified Disco.Pretty as Pretty
+import qualified Disco.Pretty as PP
 import Disco.Property (prettyTestResult)
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims (
@@ -443,13 +443,13 @@ handleDocVar x = do
       hsep [pretty' x, ":", pretty' ty]
         $+$ case Ctx.lookup' qn docMap of
           Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
-          _ -> Pretty.empty
+          _ -> PP.empty
   showDoc docMap (Right tdBody) =
     info $
       pretty' (name2String x, tdBody)
         $+$ case Ctx.lookupAll' x docMap of
           ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
-          _ -> Pretty.empty
+          _ -> PP.empty
 
 handleDocPrim ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
@@ -457,38 +457,45 @@ handleDocPrim ::
   Sem r ()
 handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  info $
-    vcat
-      [ case prim of
+  info
+    . vcat
+    $ ( case prim of
           PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
            where
             OpInfo (UOpF f _) syns _ = uopMap ! u
           PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
-          _ -> Pretty.empty
-      , case prim of
-          PrimUOp u -> describePrec (uPrec u)
-          PrimBOp b -> describePrec (bPrec b) <> describeFixity (assoc b)
-          _ -> Pretty.empty
-      ]
+          _ -> []
+      )
+      ++ ( case prim of
+            PrimUOp u -> [describePrec (uPrec u)]
+            PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+            _ -> []
+         )
   case (M.lookup prim primDoc, M.lookup prim primReference) of
     (Nothing, Nothing) -> return ()
     (Nothing, Just p) -> info $ mkReference p
     (Just d, mp) ->
-      info $ Pretty.empty $+$ text d $+$ Pretty.empty $+$ maybe Pretty.empty (\p -> mkReference p $+$ Pretty.empty) mp
+      info $
+        vcat
+          [ PP.empty
+          , text d
+          , PP.empty
+          , maybe PP.empty (\p -> vcat [mkReference p, PP.empty]) mp
+          ]
  where
   describePrec p = "precedence level" <+> text (show p)
-  describeFixity In = Pretty.empty
+  describeFixity In = PP.empty
   describeFixity InL = ", left associative"
   describeFixity InR = ", right associative"
-  describeAlts _ _ [] = Pretty.empty
-  describeAlts _ _ [_] = Pretty.empty
-  describeAlts pre post (_ : alts) = "Alternative syntax:" <+> intercalate "," (map showOp alts)
+  describeAlts _ _ [] = []
+  describeAlts _ _ [_] = []
+  describeAlts pre post (_ : alts) = ["Alternative syntax:" <+> intercalate "," (map showOp alts)]
    where
     showOp op =
       hcat
-        [ if pre then "~" else Pretty.empty
+        [ if pre then "~" else PP.empty
         , text op
-        , if post then "~" else Pretty.empty
+        , if post then "~" else PP.empty
         ]
 
 mkReference :: String -> Sem r (Doc ann)
@@ -504,7 +511,12 @@ handleDocOther s =
     (Nothing, Nothing) -> info $ "No documentation found for '" <> text s <> "'."
     (Nothing, Just p) -> info $ mkReference p
     (Just d, mp) ->
-      info $ text d $+$ Pretty.empty $+$ maybe Pretty.empty (\p -> mkReference p $+$ Pretty.empty) mp
+      info $
+        vcat
+          [ text d
+          , PP.empty
+          , maybe PP.empty (\p -> vcat [mkReference p, PP.empty]) mp
+          ]
 
 ------------------------------------------------------------
 -- eval

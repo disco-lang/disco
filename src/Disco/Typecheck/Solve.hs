@@ -249,7 +249,7 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 -- Top-level solver algorithm
 
 solveConstraint ::
-  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
   Constraint ->
   Sem r S
 solveConstraint c = do
@@ -271,7 +271,7 @@ solveConstraint c = do
   asum' (map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice ::
-  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
   Sem r S
@@ -487,7 +487,7 @@ checkQual q (ABase bty) =
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
 simplify ::
-  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+  Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
   Sem r (TyVarInfoMap, [(Atom, Atom)], S)
@@ -517,7 +517,7 @@ simplify origVM cs =
   -- Iterate picking one simplifiable constraint and simplifying it
   -- until none are left.
   simplify' ::
-    Members '[State SimplifyState, Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
+    Members '[State SimplifyState, Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
     Sem r ()
   simplify' = do
     -- q <- gets fst
@@ -751,7 +751,7 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
 checkSkolems ::
-  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+  Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
   TyVarInfoMap ->
   Graph Atom ->
   Sem r (Graph UAtom, S)
@@ -784,7 +784,7 @@ checkSkolems vm graph = do
   noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
 
   unifyWCCs ::
-    Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
+    Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
     Graph Atom ->
     S ->
     [Set Atom] ->
@@ -964,7 +964,7 @@ glbBySort vm rm = limBySort vm rm SubTy
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
 solveGraph ::
-  Members '[Fresh, Error SolveError, Output Message] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann)] r =>
   TyVarInfoMap ->
   Graph UAtom ->
   Sem r S
@@ -1030,7 +1030,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
     fromVar _ = error "Impossible! UB but uisVar."
 
   go ::
-    Members '[Fresh, Error SolveError, Output Message] r =>
+    Members '[Fresh, Error SolveError, Output (Message ann)] r =>
     RelMap ->
     Sem r (Substitution BaseTy)
   go relMap@(RelMap rm) =

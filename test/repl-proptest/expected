@@ -7,8 +7,6 @@
       a = false
       b = false
   - Certainly false: ∀a, b. (a /\ b) =!= (a \/ b)
-    - Left side:  false
-    - Right side: true
     Found counterexample:
       a = false
       b = true

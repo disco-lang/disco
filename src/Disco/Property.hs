@@ -79,7 +79,7 @@ generateSamples (Randomized n m) e
 -- Pretty-printing for test results
 ------------------------------------------------------------
 
-prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r Doc
+prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r (Doc ann)
 prettyResultCertainty r prop res =
   (if resultIsCertain r then "Certainly" else "Possibly") <+> text res <> ":" <+> pretty (eraseProperty prop)
 
@@ -88,11 +88,11 @@ prettyTestReason ::
   Bool ->
   AProperty ->
   TestReason ->
-  Sem r Doc
+  Sem r (Doc ann)
 prettyTestReason _ _ TestBool = empty
-prettyTestReason b prop (TestFound (TestResult _ tr env))
+prettyTestReason b _ (TestFound (TestResult _ _ env))
   | b = prettyTestEnv "Found example:" env
-  | not b = prettyTestReason b prop tr $+$ prettyTestEnv "Found counterexample:" env
+  | not b = prettyTestEnv "Found counterexample:" env
 prettyTestReason b _ (TestNotFound Exhaustive)
   | b = "No counterexamples exist; all possible values were checked."
   | not b = "No example exists; all possible values were checked."
@@ -112,16 +112,17 @@ prettyTestReason _ _ (TestLt t a1 a2) =
     , "Right side: " <> prettyValue t a2
     ]
 prettyTestReason _ _ (TestRuntimeError ee) =
-  "Test failed with an error:"
-    $+$ nest 2 (pretty (EvalErr ee))
+  nest 2 $
+    "Test failed with an error:"
+      $+$ pretty (EvalErr ee)
 -- \$+$
 -- prettyTestEnv "Example inputs that caused the error:" env
 -- See #364
 prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
   bulletList
     "-"
-    [ "Left side:" $+$ nest 2 (prettyTestResult' b p1 tr1)
-    , "Right side:" $+$ nest 2 (prettyTestResult' b p2 tr2)
+    [ nest 2 $ "Left side:" $+$ prettyTestResult' b p1 tr1
+    , nest 2 $ "Right side:" $+$ prettyTestResult' b p2 tr2
     ]
 -- See Note [prettyTestReason fallback]
 prettyTestReason _ _ _ = empty
@@ -151,7 +152,7 @@ prettyTestResult' ::
   Bool ->
   AProperty ->
   TestResult ->
-  Sem r Doc
+  Sem r (Doc ann)
 prettyTestResult' _ prop (TestResult bool tr _) =
   prettyResultCertainty tr prop (map toLower (show bool))
     $+$ prettyTestReason bool prop tr
@@ -160,16 +161,16 @@ prettyTestResult ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>
   AProperty ->
   TestResult ->
-  Sem r Doc
+  Sem r (Doc ann)
 prettyTestResult prop (TestResult b r env) = prettyTestResult' b prop (TestResult b r env)
 
 prettyTestEnv ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>
   String ->
   TestEnv ->
-  Sem r Doc
+  Sem r (Doc ann)
 prettyTestEnv _ (TestEnv []) = empty
-prettyTestEnv s (TestEnv vs) = text s $+$ nest 2 (vcat (map prettyBind vs))
+prettyTestEnv s (TestEnv vs) = nest 2 $ text s $+$ vcat (map prettyBind vs)
  where
   maxNameLen = maximum . map (\(n, _, _) -> length n) $ vs
   prettyBind (x, ty, v) =

@@ -82,7 +82,7 @@ deriving instance Show EvalError
 panic :: Member (Error DiscoError) r => String -> Sem r a
 panic = throw . Panic
 
-outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors :: Member (Output (Message ann)) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
   either (err . pretty') return e
@@ -93,9 +93,9 @@ instance Pretty DiscoError where
     CyclicImport ms -> cyclicImportError ms
     TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
     TypeCheckErr (LocTCError (Just n) te) ->
-      vcat
+      nest 2 $ vcat
         [ "While checking " <> pretty' n <> ":"
-        , nest 2 $ prettyTCError te
+        , prettyTCError te
         ]
     ParseErr pe -> text (errorBundlePretty pe)
     EvalErr ee -> prettyEvalError ee
@@ -105,23 +105,23 @@ instance Pretty DiscoError where
         , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
         ]
 
-rtd :: String -> Sem r Doc
+rtd :: String -> Sem r (Doc ann)
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
 
-issue :: Int -> Sem r Doc
+issue :: Int -> Sem r (Doc ann)
 issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
 
 cyclicImportError ::
   Members '[Reader PA, LFresh] r =>
   [ModuleName] ->
-  Sem r Doc
+  Sem r (Doc ann)
 cyclicImportError ms =
-  vcat
+  nest 2 $ vcat
     [ "Error: module imports form a cycle:"
-    , nest 2 $ intercalate " ->" (map pretty ms)
+    , intercalate " ->" (map pretty ms)
     ]
 
-prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
+prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r (Doc ann)
 prettyEvalError = \case
   UnboundPanic x ->
     ("Bug! No variable found named" <+> pretty' x <> ".")
@@ -138,7 +138,7 @@ prettyEvalError = \case
 -- [ ] Step 3: improve error messages according to notes below
 -- [ ] Step 4: get it to return multiple error messages
 -- [ ] Step 5: save parse locations, display with errors
-prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
+prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r (Doc ann)
 prettyTCError = \case
   -- XXX include some potential misspellings along with Unbound
   --   see https://github.com/disco-lang/disco/issues/180
@@ -150,7 +150,7 @@ prettyTCError = \case
   Ambiguous x ms ->
     vcat
       [ "Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:"
-      , nest 2 (vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms)
+      , indent 2 . vcat . map (\m -> pretty' m <> "." <> pretty' x) $ ms
       , rtd "ambiguous"
       ]
   NoType x ->
@@ -166,9 +166,9 @@ prettyTCError = \case
   NotCon c t ty ->
     vcat
       [ "Error: the expression"
-      , nest 2 $ pretty' t
+      , indent 2 $ pretty' t
       , "must have both a" <+> conWord c <+> "type and also the incompatible type"
-      , nest 2 $ pretty' ty <> "."
+      , indent 2 $ pretty' ty <> "."
       , rtd "notcon"
       ]
   EmptyCase ->
@@ -179,9 +179,9 @@ prettyTCError = \case
   PatternType c pat ty ->
     vcat
       [ "Error: the pattern"
-      , nest 2 $ pretty' pat
+      , indent 2 $ pretty' pat
       , "is supposed to have type"
-      , nest 2 $ pretty' ty <> ","
+      , indent 2 $ pretty' ty <> ","
       , "but instead it has a" <+> conWord c <+> "type."
       , rtd "pattern-type"
       ]
@@ -220,7 +220,7 @@ prettyTCError = \case
   NoSearch ty ->
     vcat
       [ "Error: the type"
-      , nest 2 $ pretty' ty
+      , indent 2 $ pretty' ty
       , "is not searchable (i.e. it cannot be used in a forall)."
       , rtd "no-search"
       ]
@@ -259,7 +259,7 @@ prettyTCError = \case
   NoPolyRec s ss tys ->
     vcat
       [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
-      , nest
+      , indent
           2
           ( text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
           )
@@ -267,7 +267,7 @@ prettyTCError = \case
       ]
   NoError -> empty
 
-conWord :: Con -> Sem r Doc
+conWord :: Con -> Sem r (Doc ann)
 conWord = \case
   CArr -> "function"
   CProd -> "pair"
@@ -280,7 +280,7 @@ conWord = \case
   CGraph -> "graph"
   CUser s -> text s
 
-prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
+prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r (Doc ann)
 prettySolveError = \case
   -- XXX say which types!
   NoWeakUnifier ->
@@ -307,16 +307,16 @@ prettySolveError = \case
   QualSkolem q a ->
     vcat
       [ "Error: type variable" <+> pretty' a <+> "represents any type, so we cannot assume values of that type"
-      , nest 2 (qualPhrase True q) <> "."
+      , indent 2 (qualPhrase True q) <> "."
       , rtd "qual-skolem"
       ]
 
-qualPhrase :: Bool -> Qualifier -> Sem r Doc
+qualPhrase :: Bool -> Qualifier -> Sem r (Doc ann)
 qualPhrase b q
   | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q
   | otherwise = "can" <> (if b then empty else "not") <+> "be" <+> qualAction q
 
-qualAction :: Qualifier -> Sem r Doc
+qualAction :: Qualifier -> Sem r (Doc ann)
 qualAction = \case
   QNum -> "added and multiplied"
   QSub -> "subtracted"

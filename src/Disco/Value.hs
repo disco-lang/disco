@@ -460,10 +460,10 @@ set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
 -- Pretty-printing values
 ------------------------------------------------------------
 
-prettyValue' :: Member (Input TyDefCtx) r => Type -> Value -> Sem r Doc
+prettyValue' :: Member (Input TyDefCtx) r => Type -> Value -> Sem r (Doc ann)
 prettyValue' ty v = runLFresh . runReader initPA $ prettyValue ty v
 
-prettyValue :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+prettyValue :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r (Doc ann)
 -- Lazily expand any user-defined types
 prettyValue (TyUser x args) v = do
   tydefs <- input
@@ -520,23 +520,23 @@ prettyValue ty@TyCon {} v =
 
 -- | Pretty-print a value with guaranteed parentheses.  Do nothing for
 --   tuples; add an extra set of parens for other values.
-prettyVP :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+prettyVP :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r (Doc ann)
 prettyVP ty@(_ :*: _) = prettyValue ty
 prettyVP ty = parens . prettyValue ty
 
-prettyPlaceholder :: Members '[Reader PA, LFresh] r => Type -> Sem r Doc
+prettyPlaceholder :: Members '[Reader PA, LFresh] r => Type -> Sem r (Doc ann)
 prettyPlaceholder ty = "<" <> pretty ty <> ">"
 
-prettyTuple :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r Doc
+prettyTuple :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Value -> Sem r (Doc ann)
 prettyTuple (ty1 :*: ty2) (VPair v1 v2) = prettyValue ty1 v1 <> "," <+> prettyTuple ty2 v2
 prettyTuple ty v = prettyValue ty v
 
 -- | 'prettySequence' pretty-prints a lists of values separated by a delimiter.
-prettySequence :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Doc -> [Value] -> Sem r Doc
+prettySequence :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> Doc ann -> [Value] -> Sem r (Doc ann)
 prettySequence ty del vs = hsep =<< punctuate (return del) (map (prettyValue ty) vs)
 
 -- | Pretty-print a literal bag value.
-prettyBag :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> [(Value, Integer)] -> Sem r Doc
+prettyBag :: Members '[Input TyDefCtx, LFresh, Reader PA] r => Type -> [(Value, Integer)] -> Sem r (Doc ann)
 prettyBag _ [] = bag empty
 prettyBag ty vs
   | all ((== 1) . snd) vs = bag $ prettySequence ty "," (map fst vs)

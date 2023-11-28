@@ -72,7 +72,7 @@ instance Pretty a => Pretty (Substitution a) where
     ds <- punctuate "," es
     braces (hsep ds)
 
-prettyMapping :: (Pretty a, Members '[Reader PA, LFresh] r) => Name a -> a -> Sem r Doc
+prettyMapping :: (Pretty a, Members '[Reader PA, LFresh] r) => Name a -> a -> Sem r (Doc ann)
 prettyMapping x a = pretty x <+> "->" <+> pretty a
 
 -- | The domain of a substitution is the set of names for which the

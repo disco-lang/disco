@@ -291,17 +291,15 @@ instance Pretty Core where
     CCase c l r -> do
       lunbind l $ \(x, lc) -> do
         lunbind r $ \(y, rc) -> do
-          "case"
-            <+> pretty c
-            <+> "of {"
-            $+$ nest
-              2
-              ( vcat
-                  [ withPA funPA $ "left" <+> rt (pretty x) <+> "->" <+> pretty lc
-                  , withPA funPA $ "right" <+> rt (pretty y) <+> "->" <+> pretty rc
-                  ]
-              )
-            $+$ "}"
+          nest 2 $
+            "case"
+              <+> pretty c
+              <+> "of {"
+              $+$ vcat
+                [ withPA funPA $ "left" <+> rt (pretty x) <+> "->" <+> pretty lc
+                , withPA funPA $ "right" <+> rt (pretty y) <+> "->" <+> pretty rc
+                ]
+              $+$ "}"
     CUnit -> "unit"
     CPair c1 c2 -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
     CProj s c -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
@@ -318,7 +316,7 @@ instance Pretty Core where
 toTuple :: [Core] -> Core
 toTuple = foldr CPair CUnit
 
-prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r Doc
+prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r (Doc ann)
 prettyTestVars = brackets . intercalate "," . map prettyTestVar
  where
   prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])

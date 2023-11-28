@@ -114,7 +114,7 @@ inferTelescope inferOne tel = do
 --   imports should already be checked and passed in as the second
 --   argument.
 checkModule ::
-  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r =>
+  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r =>
   ModuleName ->
   Map ModuleName ModuleInfo ->
   Module ->
@@ -268,7 +268,7 @@ checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 -- | Type check a top-level definition in the given module.
 checkDefn ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output Message] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output (Message ann)] r =>
   ModuleName ->
   TermDefn ->
   Sem r Defn
@@ -336,7 +336,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output (Message ann)] r =>
   Ctx Term Docs ->
   Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
@@ -348,7 +348,7 @@ checkProperties docs =
 
 -- | Check the types of the terms embedded in a property.
 checkProperty ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output (Message ann)] r =>
   Property ->
   Sem r AProperty
 checkProperty prop = do
@@ -445,7 +445,7 @@ infer = typecheck Infer
 --   for a term by running type inference, solving the resulting
 --   constraints, and quantifying over any remaining type variables.
 inferTop ::
-  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   Sem r (ATerm, PolyType)
 inferTop t = do
@@ -473,7 +473,7 @@ inferTop t = do
 --   polymorphic type by running type checking and solving the
 --   resulting constraints.
 checkTop ::
-  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   PolyType ->
   Sem r ATerm

@@ -1,3 +1,16 @@
+* 0.1.6 (16 December 2023)
+
+  - A bunch more documentation
+  - Allow `!=` as a synonym for `/=`
+  - Allow `=<` and `=>` as aliases for `<=` and `>=`, respectively
+  - Better reporting of test results
+  - Load standard library modules immediately on startup
+  - `:doc` now works for case expressions, wildcard patterns, `unit`
+    and `Unit`
+  - Allow optional commas on either side of an ellipsis (#361)
+  - Propositions can be combined with binary operators (thanks to
+    @cally-cmd)
+
 * 0.1.5 (12 March 2022)
 
   - Syntax errors in function definitions now result in much more

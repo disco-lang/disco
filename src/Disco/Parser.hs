@@ -304,8 +304,8 @@ ellipsis = label "ellipsis (..)" $ concat <$> ((:) <$> dot <*> some dot)
 lambda :: Parser String
 lambda = symbol "\\" <|> symbol "λ"
 
-forall :: Parser ()
-forall = void (symbol "∀") <|> reserved "forall"
+forAll :: Parser ()
+forAll = void (symbol "∀") <|> reserved "forall"
 
 exists :: Parser ()
 exists = void (symbol "∃") <|> reserved "exists"
@@ -888,7 +888,7 @@ parseQuantified = do
 parseQuantifier :: Parser Quantifier
 parseQuantifier =
   Lam <$ lambda
-    <|> All <$ forall
+    <|> All <$ forAll
     <|> Ex <$ exists
 
 -- | Parse a let expression (@let x1 = t1, x2 = t2, ... in t@).
@@ -1241,6 +1241,7 @@ parseType = makeExprParser parseAtomicType table
     [
       [ infixR "*" (:*:)
       , infixR "×" (:*:)
+      , infixR "><" (:*:)
       ]
     ,
       [ infixR "+" (:+:)

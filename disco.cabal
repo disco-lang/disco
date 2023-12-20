@@ -177,6 +177,8 @@ extra-source-files:  stack.yaml, repl/*.hs
                      test/parse-top-term/expected
                      test/parse-top-term/input
                      test/parse-top-term/parse-top-term.disco
+                     test/parse-try/expected
+                     test/parse-try/input
                      test/poly-bad/expected
                      test/poly-bad/input
                      test/poly-infer-sort/expected
@@ -347,6 +349,8 @@ extra-source-files:  stack.yaml, repl/*.hs
                      test/types-squash/input
                      test/types-standalone-ops/expected
                      test/types-standalone-ops/input
+                     test/types-syntax/expected
+                     test/types-syntax/input
                      test/types-toomanypats/expected
                      test/types-toomanypats/input
                      test/types-toomanypats/toomanypats.disco

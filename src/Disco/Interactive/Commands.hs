@@ -89,7 +89,7 @@ import Disco.Syntax.Prims (
  )
 import Disco.Typecheck
 import Disco.Typecheck.Erase
-import Disco.Types (toPolyType, pattern TyString)
+import Disco.Types (toPolyType, PolyType(..), pattern TyString, pattern TyList)
 import Disco.Value
 
 ------------------------------------------------------------
@@ -106,6 +106,7 @@ data REPLExpr :: CmdTag -> * where
   Parse :: Term -> REPLExpr 'CParse -- Show the parsed AST
   Pretty :: Term -> REPLExpr 'CPretty -- Pretty-print a term
   Print :: Term -> REPLExpr 'CPrint -- Print a string
+  Table :: Term -> REPLExpr 'CTable -- Print a table
   Ann :: Term -> REPLExpr 'CAnn -- Show type-annotated term
   Desugar :: Term -> REPLExpr 'CDesugar -- Show a desugared term
   Compile :: Term -> REPLExpr 'CCompile -- Show a compiled term
@@ -150,6 +151,7 @@ data CmdTag
   | CParse
   | CPretty
   | CPrint
+  | CTable
   | CAnn
   | CDesugar
   | CCompile
@@ -229,6 +231,7 @@ discoCommands =
   , SomeCmd parseCmd
   , SomeCmd prettyCmd
   , SomeCmd printCmd
+  , SomeCmd tableCmd
   , SomeCmd reloadCmd
   , SomeCmd showDefnCmd
   , SomeCmd typeCheckCmd
@@ -780,6 +783,34 @@ handlePrint (Print t) = do
   at <- inputToState . typecheckTop $ checkTop t (toPolyType TyString)
   v <- mapError EvalErr . evalTerm False $ at
   info $ text (vlist vchar v)
+
+------------------------------------------------------------
+-- :table
+
+tableCmd :: REPLCommand 'CTable
+tableCmd =
+  REPLCommand
+    { name = "table"
+    , helpcmd = ":table <expr>"
+    , shortHelp = "Print a formatted table for a list or function"
+    , category = User
+    , cmdtype = ColonCmd
+    , action = handleTable
+    , parser = Table <$> term
+    }
+
+handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
+handleTable (Table t) = do
+  (at, ty) <- inputToState . typecheckTop $ inferTop t
+  v <- mapError EvalErr . evalTerm False $ at
+  info $ formatTable ty v
+
+formatTable :: Member LFresh r => PolyType -> Value -> Sem r (Doc ann)
+formatTable pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
+  case ty of
+    TyList ety -> undefined
+    -- TyFun tyA tyB -> undefined
+    _ -> "Don't know how to make a table for type" <+> pretty' pty
 
 ------------------------------------------------------------
 -- :reload

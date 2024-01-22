@@ -31,13 +31,12 @@ import Control.Lens (
 import Control.Monad.Except
 import Data.Char (isSpace)
 import Data.Coerce
-import Data.List (find, isPrefixOf, sortBy)
+import Data.List (find, isPrefixOf, sortBy, transpose)
 import Data.Map ((!))
 import qualified Data.Map as M
 import Data.Typeable
 import System.FilePath (splitFileName)
 import Prelude as P
-
 import Text.Megaparsec hiding (State, runParser)
 import qualified Text.Megaparsec.Char as C
 import Unbound.Generics.LocallyNameless (
@@ -45,7 +44,6 @@ import Unbound.Generics.LocallyNameless (
   name2String,
   string2Name,
  )
-
 import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
@@ -53,7 +51,6 @@ import Polysemy
 import Polysemy.Error hiding (try)
 import Polysemy.Output
 import Polysemy.Reader
-
 import Data.Maybe (mapMaybe, maybeToList)
 import Disco.AST.Surface
 import Disco.AST.Typed
@@ -89,8 +86,10 @@ import Disco.Syntax.Prims (
  )
 import Disco.Typecheck
 import Disco.Typecheck.Erase
-import Disco.Types (toPolyType, PolyType(..), pattern TyString, pattern TyList)
+import Disco.Types (toPolyType, PolyType(..), Type, pattern TyString, pattern TyList)
 import Disco.Value
+import Text.PrettyPrint.Boxes (Box)
+import qualified Text.PrettyPrint.Boxes as Boxes
 
 ------------------------------------------------------------
 -- REPL expression type
@@ -803,14 +802,21 @@ handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ())
 handleTable (Table t) = do
   (at, ty) <- inputToState . typecheckTop $ inferTop t
   v <- mapError EvalErr . evalTerm False $ at
-  info $ formatTable ty v
+  info $ (formatTable ty v >>= text)
 
-formatTable :: Member LFresh r => PolyType -> Value -> Sem r (Doc ann)
+formatTable :: Member LFresh r => PolyType -> Value -> Sem r String
 formatTable pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
   case ty of
-    TyList ety -> undefined
+    TyList ety -> do
+      byRows <- mapM (formatCols ety) . vlist id $ v
+      return . Boxes.render . Boxes.hsep 2 Boxes.top . map (Boxes.vcat Boxes.left) . transpose $ byRows
     -- TyFun tyA tyB -> undefined
-    _ -> "Don't know how to make a table for type" <+> pretty' pty
+    _ -> do
+      tyStr <- prettyStr pty
+      return $ "Don't know how to make a table for type " ++ tyStr
+
+formatCols :: Type -> Value -> Sem r [Box]
+formatCols ety vs = undefined
 
 ------------------------------------------------------------
 -- :reload

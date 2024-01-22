@@ -8,6 +8,7 @@ Commands available from the prompt:
 :names            Show all names in current scope
 :print <expr>     Print a string without the double quotes, interpreting special characters
 :reload           Reloads the most recently loaded file
+:table <expr>     Print a formatted table for a list or function
 :test <property>  Test a property using random examples
 
 2

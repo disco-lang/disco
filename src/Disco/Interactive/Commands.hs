@@ -34,30 +34,17 @@ import Data.Coerce
 import Data.List (find, isPrefixOf, sortBy, transpose)
 import Data.Map ((!))
 import qualified Data.Map as M
-import Data.Typeable
-import System.FilePath (splitFileName)
-import Prelude as P
-import Text.Megaparsec hiding (State, runParser)
-import qualified Text.Megaparsec.Char as C
-import Unbound.Generics.LocallyNameless (
-  Name,
-  name2String,
-  string2Name,
- )
-import Disco.Effects.Input
-import Disco.Effects.LFresh
-import Disco.Effects.State
-import Polysemy
-import Polysemy.Error hiding (try)
-import Polysemy.Output
-import Polysemy.Reader
 import Data.Maybe (mapMaybe, maybeToList)
+import Data.Typeable
 import Disco.AST.Surface
 import Disco.AST.Typed
 import Disco.Compile
 import Disco.Context as Ctx
 import Disco.Desugar
 import Disco.Doc
+import Disco.Effects.Input
+import Disco.Effects.LFresh
+import Disco.Effects.State
 import Disco.Error
 import Disco.Eval
 import Disco.Extensions
@@ -86,10 +73,23 @@ import Disco.Syntax.Prims (
  )
 import Disco.Typecheck
 import Disco.Typecheck.Erase
-import Disco.Types (toPolyType, PolyType(..), Type, pattern TyString, pattern TyList)
+import Disco.Types (PolyType (..), Type, toPolyType, pattern TyList, pattern TyString)
 import Disco.Value
+import Polysemy
+import Polysemy.Error hiding (try)
+import Polysemy.Output
+import Polysemy.Reader
+import System.FilePath (splitFileName)
+import Text.Megaparsec hiding (State, runParser)
+import qualified Text.Megaparsec.Char as C
 import Text.PrettyPrint.Boxes (Box)
 import qualified Text.PrettyPrint.Boxes as Boxes
+import Unbound.Generics.LocallyNameless (
+  Name,
+  name2String,
+  string2Name,
+ )
+import Prelude as P
 
 ------------------------------------------------------------
 -- REPL expression type

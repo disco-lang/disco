@@ -73,7 +73,7 @@ import Disco.Syntax.Prims (
  )
 import Disco.Typecheck
 import Disco.Typecheck.Erase
-import Disco.Types (PolyType (..), Type, toPolyType, pattern TyList, pattern TyString)
+import Disco.Types
 import Disco.Value
 import Polysemy
 import Polysemy.Error hiding (try)
@@ -809,14 +809,15 @@ formatTable pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols ety) . vlist id $ v
-      return . Boxes.render . Boxes.hsep 2 Boxes.top . map (Boxes.vcat Boxes.left) . transpose $ byRows
+      return . Boxes.render . Boxes.hsep 2 Boxes.top . map (Boxes.vcat Boxes.right) . transpose $ byRows
     -- TyFun tyA tyB -> undefined
     _ -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
 formatCols :: Type -> Value -> Sem r [Box]
-formatCols ety vs = undefined
+formatCols TyN (vint -> n) = return [Boxes.text (show n)]
+formatCols (t1 :*: t2) (vpair id id -> (v1,v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
 
 ------------------------------------------------------------
 -- :reload

@@ -816,12 +816,12 @@ formatTable pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
       return $ "Don't know how to make a table for type " ++ tyStr
 
 formatCols :: Type -> Value -> Sem r [Box]
-formatCols TyN (vint -> n) = return [Boxes.text (show n)]
-formatCols TyZ (vint -> n) = return [Boxes.text (show n)]
-formatCols TyF v = do
-  v' <- prettyValue' TyF v  -- XXX factor out pretty-printing of rationals, so we don't have to call prettyValue which introduces Input TyDefCtx effect
-  return [Boxes.text (renderDoc' v')]
--- formatCols TyQ v = return [Boxes.text (renderDoc' (prettyValue TyQ v))]
+formatCols TyUnit _ = return [Boxes.text "unit"]
+formatCols TyBool (vbool -> b) = return [Boxes.text (take 1 $ show b)]
+formatCols TyC (vchar -> c) = return [Boxes.text (show c)]
+formatCols ty v
+  | ty `elem` [TyN, TyZ] = return [Boxes.text (show (vint v))]
+  | ty `elem` [TyF, TyQ] = return [Boxes.text (prettyRational (vrat v))]
 formatCols (t1 :*: t2) (vpair id id -> (v1,v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
 
 ------------------------------------------------------------

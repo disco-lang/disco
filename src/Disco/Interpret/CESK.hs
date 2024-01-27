@@ -275,7 +275,7 @@ appConst k = \case
     modOp m n
       | n == 0 = throw DivByZero
       | otherwise = return $ intv (numerator m `mod` numerator n)
-  ODivides -> numOp2' (\m n -> return (enumv $ divides m n)) >=> out
+  ODivides -> numOp2' (\m n -> return (boolv $ divides m n)) >=> out
    where
     divides 0 0 = True
     divides 0 _ = False
@@ -284,7 +284,7 @@ appConst k = \case
   --------------------------------------------------
   -- Number theory
 
-  OIsPrime -> intOp1 (enumv . isPrime) >=> out
+  OIsPrime -> intOp1 (boolv . isPrime) >=> out
   OFactor -> intOp1' primFactor >>> outWithErr
    where
     -- Semantics of the @$factor@ prim: turn a natural number into its
@@ -341,8 +341,8 @@ appConst k = \case
   --------------------------------------------------
   -- Comparison
 
-  OEq -> arity2 $ \v1 v2 -> out $ enumv (valEq v1 v2)
-  OLt -> arity2 $ \v1 v2 -> out $ enumv (valLt v1 v2)
+  OEq -> arity2 $ \v1 v2 -> out $ boolv (valEq v1 v2)
+  OLt -> arity2 $ \v1 v2 -> out $ boolv (valLt v1 v2)
   --------------------------------------------------
   -- Container operations
 
@@ -356,8 +356,8 @@ appConst k = \case
     cons n (x, k') (zs, m) = ((x, k') : zs, choose n k' * m)
   OBagElem -> arity2 $ \x ->
     withBag OBagElem $
-      out . enumv . isJust . find (valEq x) . map fst
-  OListElem -> arity2 $ \x -> out . enumv . isJust . find (valEq x) . vlist id
+      out . boolv . isJust . find (valEq x) . map fst
+  OListElem -> arity2 $ \x -> out . boolv . isJust . find (valEq x) . vlist id
   OEachSet -> arity2 $ \f ->
     withBag OEachSet $
       outWithErr . fmap (VBag . countValues) . mapM (evalApp f . (: []) . fst)
@@ -727,7 +727,7 @@ graphSummary = toDiscoAdjMap . reifyGraph
 
 resultToBool :: Member (Error EvalError) r => TestResult -> Sem r Value
 resultToBool (TestResult _ (TestRuntimeError e) _) = throw e
-resultToBool (TestResult b _ _) = return $ enumv b
+resultToBool (TestResult b _ _) = return $ boolv b
 
 notProp :: ValProp -> ValProp
 notProp (VPDone r) = VPDone (invertPropResult r)

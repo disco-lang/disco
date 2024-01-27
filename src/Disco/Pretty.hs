@@ -129,7 +129,13 @@ instance Pretty BOp where
     _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 --------------------------------------------------
--- Pretty-printing decimals
+-- Pretty-printing rationals + decimals
+
+-- | Pretty-print a rational number as a fraction.
+prettyRational :: Rational -> String
+prettyRational r
+  | denominator r == 1 = show (numerator r)
+  | otherwise = show (numerator r) ++ "/" ++ show (denominator r)
 
 -- | Pretty-print a rational number using its decimal expansion, in
 --   the format @nnn.prefix[rep]...@, with any repeating digits enclosed

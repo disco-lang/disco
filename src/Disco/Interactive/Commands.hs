@@ -83,7 +83,7 @@ import System.FilePath (splitFileName)
 import Text.Megaparsec hiding (State, runParser)
 import qualified Text.Megaparsec.Char as C
 import Text.PrettyPrint.Boxes (Box)
-import qualified Text.PrettyPrint.Boxes as Boxes
+import qualified Text.PrettyPrint.Boxes as B
 import Unbound.Generics.LocallyNameless (
   Name,
   name2String,
@@ -802,27 +802,38 @@ handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ())
 handleTable (Table t) = do
   (at, ty) <- inputToState . typecheckTop $ inferTop t
   v <- mapError EvalErr . evalTerm False $ at
-  info $ (formatTable ty v >>= text)
+  info $ formatTableFor ty v >>= text
 
-formatTable :: Member LFresh r => PolyType -> Value -> Sem r String
-formatTable pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
+-- XXX Create a type ValueTable which stores a list of column headers
+-- + a table of values, maybe with some smart constructors
+
+-- Refactor formatCols to return [String] instead of [Box]
+
+-- Change renderTable function to create all Boxes etc.
+
+formatTableFor :: Member LFresh r => PolyType -> Value -> Sem r String
+formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols ety) . vlist id $ v
-      return . Boxes.render . Boxes.hsep 2 Boxes.top . map (Boxes.vcat Boxes.right) . transpose $ byRows
-    -- TyFun tyA tyB -> undefined
+      renderTable byRows
+    TyFun tyA tyB -> do
+      let vs = take 31 $ enumerateType tyA
+    -- byRows <- mapM (formatCols (tyA :*: tyB)
     _ -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
 formatCols :: Type -> Value -> Sem r [Box]
-formatCols TyUnit _ = return [Boxes.text "unit"]
-formatCols TyBool (vbool -> b) = return [Boxes.text (take 1 $ show b)]
-formatCols TyC (vchar -> c) = return [Boxes.text (show c)]
+formatCols TyUnit _ = return [B.text "unit"]
+formatCols TyBool (vbool -> b) = return [B.text (take 1 $ show b)]
+formatCols TyC (vchar -> c) = return [B.text (show c)]
 formatCols ty v
-  | ty `elem` [TyN, TyZ] = return [Boxes.text (show (vint v))]
-  | ty `elem` [TyF, TyQ] = return [Boxes.text (prettyRational (vrat v))]
-formatCols (t1 :*: t2) (vpair id id -> (v1,v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
+  | ty `elem` [TyN, TyZ] = return [B.text (show (vint v))]
+  | ty `elem` [TyF, TyQ] = return [B.text (prettyRational (vrat v))]
+formatCols (t1 :*: t2) (vpair id id -> (v1, v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
+
+renderTable = return . B.render . B.hsep 2 B.top . map (B.vcat B.right) . transpose
 
 ------------------------------------------------------------
 -- :reload

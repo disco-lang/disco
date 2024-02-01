@@ -807,33 +807,30 @@ handleTable (Table t) = do
 -- XXX Create a type ValueTable which stores a list of column headers
 -- + a table of values, maybe with some smart constructors
 
--- Refactor formatCols to return [String] instead of [Box]
-
--- Change renderTable function to create all Boxes etc.
-
 formatTableFor :: Member LFresh r => PolyType -> Value -> Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols ety) . vlist id $ v
-      renderTable byRows
-    TyFun tyA tyB -> do
-      let vs = take 31 $ enumerateType tyA
+      return $ renderTable byRows
+    tyA :->: tyB -> undefined
+    -- let vs = take 31 $ enumerateType tyA
     -- byRows <- mapM (formatCols (tyA :*: tyB)
     _ -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
-formatCols :: Type -> Value -> Sem r [Box]
-formatCols TyUnit _ = return [B.text "unit"]
-formatCols TyBool (vbool -> b) = return [B.text (take 1 $ show b)]
-formatCols TyC (vchar -> c) = return [B.text (show c)]
+formatCols :: Type -> Value -> Sem r [String]
+formatCols TyUnit _ = return ["unit"]
+formatCols TyBool (vbool -> b) = return [take 1 $ show b]
+formatCols TyC (vchar -> c) = return [show c]
 formatCols ty v
-  | ty `elem` [TyN, TyZ] = return [B.text (show (vint v))]
-  | ty `elem` [TyF, TyQ] = return [B.text (prettyRational (vrat v))]
+  | ty `elem` [TyN, TyZ] = return [show (vint v)]
+  | ty `elem` [TyF, TyQ] = return [prettyRational (vrat v)]
 formatCols (t1 :*: t2) (vpair id id -> (v1, v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
 
-renderTable = return . B.render . B.hsep 2 B.top . map (B.vcat B.right) . transpose
+renderTable :: [[String]] -> String
+renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose
 
 ------------------------------------------------------------
 -- :reload

@@ -82,7 +82,6 @@ import Polysemy.Reader
 import System.FilePath (splitFileName)
 import Text.Megaparsec hiding (State, runParser)
 import qualified Text.Megaparsec.Char as C
-import Text.PrettyPrint.Boxes (Box)
 import qualified Text.PrettyPrint.Boxes as B
 import Unbound.Generics.LocallyNameless (
   Name,
@@ -802,13 +801,15 @@ handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ())
 handleTable (Table t) = do
   (at, ty) <- inputToState . typecheckTop $ inferTop t
   v <- mapError EvalErr . evalTerm False $ at
-  info $ formatTableFor ty v >>= text
+
+  tydefs <- use @TopInfo (replModInfo . to allTydefs)
+  info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
 -- XXX Create a type ValueTable which stores a list of column headers
 -- + a table of values, maybe with some smart constructors
 
-formatTableFor :: Member LFresh r => PolyType -> Value -> Sem r String
-formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
+formatTableFor :: (Member LFresh r, Member (Input TyDefCtx) r) => PolyType -> Value -> Sem r String
+formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols ety) . vlist id $ v
@@ -820,15 +821,13 @@ formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(vars, ty) ->
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
-formatCols :: Type -> Value -> Sem r [String]
-formatCols TyUnit _ = return ["unit"]
-formatCols TyBool (vbool -> b) = return [take 1 $ show b]
-formatCols TyC (vchar -> c) = return [show c]
-formatCols ty v
-  | ty `elem` [TyN, TyZ] = return [show (vint v)]
-  | ty `elem` [TyF, TyQ] = return [prettyRational (vrat v)]
+formatCols :: (Member LFresh r, Member (Input TyDefCtx) r) => Type -> Value -> Sem r [String]
 formatCols (t1 :*: t2) (vpair id id -> (v1, v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
+formatCols (TyList ety) (vlist id -> vs) = concat <$> mapM (formatCols ety) vs
+formatCols ty v = (: []) <$> renderDoc (prettyValue ty v)
 
+-- XXX correctly handle rows of different lengths by padding before transpose
+-- different-length rows could result from using :table on a list of lists.
 renderTable :: [[String]] -> String
 renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose
 

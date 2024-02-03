@@ -45,6 +45,7 @@ import Disco.Doc
 import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
+import Disco.Enumerate (enumerateType)
 import Disco.Error
 import Disco.Eval
 import Disco.Extensions
@@ -805,18 +806,17 @@ handleTable (Table t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
--- XXX Create a type ValueTable which stores a list of column headers
--- + a table of values, maybe with some smart constructors
-
-formatTableFor :: (Member LFresh r, Member (Input TyDefCtx) r) => PolyType -> Value -> Sem r String
+formatTableFor :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r => PolyType -> Value -> Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols ety) . vlist id $ v
       return $ renderTable byRows
-    tyA :->: tyB -> undefined
-    -- let vs = take 31 $ enumerateType tyA
-    -- byRows <- mapM (formatCols (tyA :*: tyB)
+    tyA :->: tyB -> do
+      let vs = take 31 $ enumerateType tyA
+      results <- mapM (evalApp v . (: [])) vs
+      byRows <- mapM (formatCols (tyA :*: tyB)) (zipWith (curry (pairv id id)) vs results)
+      return $ renderTable byRows
     _ -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
@@ -826,10 +826,11 @@ formatCols (t1 :*: t2) (vpair id id -> (v1, v2)) = (++) <$> formatCols t1 v1 <*>
 formatCols (TyList ety) (vlist id -> vs) = concat <$> mapM (formatCols ety) vs
 formatCols ty v = (: []) <$> renderDoc (prettyValue ty v)
 
--- XXX correctly handle rows of different lengths by padding before transpose
--- different-length rows could result from using :table on a list of lists.
 renderTable :: [[String]] -> String
-renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose
+renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose . pad
+ where
+  pad rows = map (padTo (maximum . map length $ rows)) rows
+  padTo n = take n . (++ repeat "")
 
 ------------------------------------------------------------
 -- :reload

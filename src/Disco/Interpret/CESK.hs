@@ -18,6 +18,7 @@ module Disco.Interpret.CESK (
   runCESK,
   step,
   eval,
+  evalApp,
   runTest,
 )
 where

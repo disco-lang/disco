@@ -2,11 +2,11 @@ Loading prop-basic.disco...
 Loaded.
   - Possibly true: injective(λx. x * 2)
     Checked 100 possibilities without finding a counterexample.
-  - Possibly true: idempotent(λx. x max 10)
+  - Possibly true: idempotent(λx. max(x, 10))
     Checked 100 possibilities without finding a counterexample.
   - Possibly true: commutative(λ(a, b). a * b)
     Checked 100 possibilities without finding a counterexample.
   - Possibly true: associative(λ(a, b). a + b)
     Checked 100 possibilities without finding a counterexample.
-  - Possibly true: identityFor(0, λ(a, b). a max b)
+  - Possibly true: identityFor(0, λ(a, b). max(a, b))
     Checked 100 possibilities without finding a counterexample.

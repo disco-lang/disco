@@ -188,6 +188,8 @@ primTable =
   [ PrimInfo PrimLeft "left" True
   , PrimInfo PrimRight "right" True
   , PrimInfo (PrimUOp Not) "not" True
+  , PrimInfo (PrimBOp Min) "min" True
+  , PrimInfo (PrimBOp Max) "max" True
   , PrimInfo PrimSqrt "sqrt" True
   , PrimInfo PrimFloor "floor" True
   , PrimInfo PrimCeil "ceiling" True

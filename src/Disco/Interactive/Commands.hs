@@ -806,6 +806,9 @@ handleTable (Table t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
+-- XXX need to handle curried functions
+-- XXX add library function to make a table of a function for given inputs?
+
 formatTableFor :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r => PolyType -> Value -> Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
@@ -843,6 +846,12 @@ formatCols l (t1 :*: t2) (vpair id id -> (v1, v2))
 formatCols TopLevel (TyList ety) (vlist id -> vs)
   = concat <$> mapM (formatCols InnerLevel ety) vs
 formatCols _ ty v = (: []) <$> renderDoc (prettyValue ty v)
+
+-- XXX numbers should be right-aligned but other values (e.g. lists)
+-- should be left-aligned?  Save types, or alignment, as output of formatCols?
+
+-- | Render a table, given as a list of rows, formatting it so that
+-- each column is aligned.
 renderTable :: [[String]] -> String
 renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose . pad
  where

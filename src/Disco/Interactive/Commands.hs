@@ -810,22 +810,39 @@ formatTableFor :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r => PolyTyp
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
     TyList ety -> do
-      byRows <- mapM (formatCols ety) . vlist id $ v
+      byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
       return $ renderTable byRows
     tyA :->: tyB -> do
       let vs = take 31 $ enumerateType tyA
       results <- mapM (evalApp v . (: [])) vs
-      byRows <- mapM (formatCols (tyA :*: tyB)) (zipWith (curry (pairv id id)) vs results)
+      byRows <- mapM (formatCols TopLevel (tyA :*: tyB)) (zipWith (curry (pairv id id)) vs results)
       return $ renderTable byRows
     _ -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
-formatCols :: (Member LFresh r, Member (Input TyDefCtx) r) => Type -> Value -> Sem r [String]
-formatCols (t1 :*: t2) (vpair id id -> (v1, v2)) = (++) <$> formatCols t1 v1 <*> formatCols t2 v2
-formatCols (TyList ety) (vlist id -> vs) = concat <$> mapM (formatCols ety) vs
-formatCols ty v = (: []) <$> renderDoc (prettyValue ty v)
+data Level = TopLevel | NestedPair | InnerLevel
+  deriving (Eq, Ord, Show)
 
+-- | Turn a value into a list of formatted columns in a type-directed
+--   way.  Lists and tuples are only split out into columns if they
+--   occur at the top level; lists or tuples nested inside of other
+--   data structures are simply pretty-printed.  However, note we have
+--   to make a special case for nested tuples: if a pair type occurs
+--   at the top level we keep recursively splitting out its children
+--   into columns as long as they are also pair types.
+--
+--   Any value of a type other than a list or tuple is simply
+--   pretty-printed.
+formatCols
+  :: (Member LFresh r, Member (Input TyDefCtx) r)
+  => Level -> Type -> Value -> Sem r [String]
+formatCols l (t1 :*: t2) (vpair id id -> (v1, v2))
+  | l `elem` [TopLevel, NestedPair]
+  = (++) <$> formatCols NestedPair t1 v1 <*> formatCols NestedPair t2 v2
+formatCols TopLevel (TyList ety) (vlist id -> vs)
+  = concat <$> mapM (formatCols InnerLevel ety) vs
+formatCols _ ty v = (: []) <$> renderDoc (prettyValue ty v)
 renderTable :: [[String]] -> String
 renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose . pad
  where

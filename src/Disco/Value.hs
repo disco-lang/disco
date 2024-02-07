@@ -79,7 +79,7 @@ import qualified Prelude as P
 
 import Control.Monad (forM)
 import Data.Bifunctor (first)
-import Data.Char (chr, ord, toLower)
+import Data.Char (chr, ord)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.List (foldl')
@@ -471,7 +471,7 @@ prettyValue (TyUser x args) v = do
   prettyValue (body args) v
 prettyValue _ VUnit = "■"
 prettyValue TyProp _ = prettyPlaceholder TyProp
-prettyValue TyBool (VInj s _) = text $ map toLower (show (s == R))
+prettyValue TyBool (VInj s _) = text $ take 1 (show (s == R))
 prettyValue TyBool v =
   error $ "Non-VInj passed with Bool type to prettyValue: " ++ show v
 prettyValue TyC (vchar -> c) = text (show c)

@@ -8,8 +8,8 @@ reduce : (a × a → a) × a × List(a) → a
 reduce(~+~, 0, [1 .. 10]) : ℕ
 55
 60
-true
+T
 2351
 6
 7
-true
+T

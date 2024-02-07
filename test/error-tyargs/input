@@ -1,7 +1,7 @@
 :load test/error-tyargs/error-tyargs.disco
-x : T
-y : T(Int)
-z : T(Int,Char)
-w : T(Int,Char,Bool)
+x : X
+y : X(Int)
+z : X(Int,Char)
+w : X(Int,Char,Bool)
 q : List
 p : List(Int,Char)

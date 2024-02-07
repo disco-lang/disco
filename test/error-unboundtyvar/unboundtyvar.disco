@@ -1,1 +1,1 @@
-type T(a) = a + b
+type Ty(a) = a + b

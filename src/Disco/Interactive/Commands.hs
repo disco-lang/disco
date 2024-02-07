@@ -806,8 +806,15 @@ handleTable (Table t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
--- XXX need to handle curried functions
--- XXX add library function to make a table of a function for given inputs?
+-- XXX need to handle curried functions ---> make into a new issue
+-- XXX add library function to make a table of a function for given inputs? --> new issue
+
+-- XXX add tests
+
+-- XXX merge T/F thing first so we can format tests properly
+
+maxFunTableRows :: Int
+maxFunTableRows = 25
 
 formatTableFor :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r => PolyType -> Value -> Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
@@ -816,11 +823,14 @@ formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
       byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
       return $ renderTable byRows
     tyA :->: tyB -> do
-      let vs = take 31 $ enumerateType tyA
+      let vs = take (maxFunTableRows + 1) $ enumerateType tyA
       results <- mapM (evalApp v . (: [])) vs
-      byRows <- mapM (formatCols TopLevel (tyA :*: tyB)) (zipWith (curry (pairv id id)) vs results)
-      return $ renderTable byRows
-    _ -> do
+      byRows <-
+        mapM
+          (formatCols TopLevel (tyA :*: tyB))
+          (zipWith (curry (pairv id id)) (take maxFunTableRows vs) results)
+      return $ renderTable (byRows ++ [[(B.left, "...")] | length vs == maxFunTableRows + 1])
+    _otherTy -> do
       tyStr <- prettyStr pty
       return $ "Don't know how to make a table for type " ++ tyStr
 
@@ -837,26 +847,35 @@ data Level = TopLevel | NestedPair | InnerLevel
 --
 --   Any value of a type other than a list or tuple is simply
 --   pretty-printed.
-formatCols
-  :: (Member LFresh r, Member (Input TyDefCtx) r)
-  => Level -> Type -> Value -> Sem r [String]
+formatCols ::
+  (Member LFresh r, Member (Input TyDefCtx) r) =>
+  Level ->
+  Type ->
+  Value ->
+  Sem r [(B.Alignment, String)]
 formatCols l (t1 :*: t2) (vpair id id -> (v1, v2))
-  | l `elem` [TopLevel, NestedPair]
-  = (++) <$> formatCols NestedPair t1 v1 <*> formatCols NestedPair t2 v2
-formatCols TopLevel (TyList ety) (vlist id -> vs)
-  = concat <$> mapM (formatCols InnerLevel ety) vs
-formatCols _ ty v = (: []) <$> renderDoc (prettyValue ty v)
+  | l `elem` [TopLevel, NestedPair] =
+      (++) <$> formatCols NestedPair t1 v1 <*> formatCols NestedPair t2 v2
+formatCols TopLevel (TyList ety) (vlist id -> vs) =
+  concat <$> mapM (formatCols InnerLevel ety) vs
+formatCols _ ty v = (: []) . (alignmentForType ty,) <$> renderDoc (prettyValue ty v)
 
--- XXX numbers should be right-aligned but other values (e.g. lists)
--- should be left-aligned?  Save types, or alignment, as output of formatCols?
+alignmentForType :: Type -> B.Alignment
+alignmentForType ty | ty `elem` [TyN, TyZ, TyF, TyQ] = B.right
+alignmentForType _ = B.left
 
 -- | Render a table, given as a list of rows, formatting it so that
 -- each column is aligned.
-renderTable :: [[String]] -> String
-renderTable = B.render . B.hsep 2 B.top . map (B.vcat B.right . map B.text) . transpose . pad
+renderTable :: [[(B.Alignment, String)]] -> String
+renderTable = B.render . B.hsep 2 B.top . map renderCol . transpose . pad
  where
+  pad :: [[(B.Alignment, String)]] -> [[(B.Alignment, String)]]
   pad rows = map (padTo (maximum . map length $ rows)) rows
-  padTo n = take n . (++ repeat "")
+  padTo n = take n . (++ repeat (B.left, ""))
+
+  renderCol :: [(B.Alignment, String)] -> B.Box
+  renderCol [] = B.nullBox
+  renderCol ((align, x) : xs) = B.vcat align . map B.text $ x : map snd xs
 
 ------------------------------------------------------------
 -- :reload

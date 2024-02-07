@@ -1,1 +1,1 @@
-type T(a,b) = Unit + a*b
+type X(a,b) = Unit + a*b

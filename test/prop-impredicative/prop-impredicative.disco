@@ -1,1 +1,1 @@
-type T(a) = Unit + a * T(a) * T(a)
+type Tree(a) = Unit + a * Tree(a) * Tree(a)

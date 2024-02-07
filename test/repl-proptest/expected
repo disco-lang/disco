@@ -1,12 +1,12 @@
-  - Certainly true: not false
+  - Certainly true: not F
   - Certainly true: {1, 2} =!= {2, 1}
     - Left side:  {1, 2}
     - Right side: {1, 2}
   - Certainly true: ∃a, b. (a /\ b) =!= (a \/ b)
     Found example:
-      a = false
-      b = false
+      a = F
+      b = F
   - Certainly false: ∀a, b. (a /\ b) =!= (a \/ b)
     Found counterexample:
-      a = false
-      b = true
+      a = F
+      b = T

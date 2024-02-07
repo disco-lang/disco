@@ -399,6 +399,8 @@ reservedWords =
   , "false"
   , "True"
   , "False"
+  , "T"
+  , "F"
   , "let"
   , "in"
   , "is"
@@ -695,8 +697,8 @@ parseAtom :: Parser Term
 parseAtom =
   label "expression" $
     parseUnit
-      <|> TBool True <$ (reserved "true" <|> reserved "True")
-      <|> TBool False <$ (reserved "false" <|> reserved "False")
+      <|> TBool True <$ (reserved "true" <|> reserved "True" <|> reserved "T")
+      <|> TBool False <$ (reserved "false" <|> reserved "False" <|> reserved "F")
       <|> TChar <$> lexeme (between (char '\'') (char '\'') L.charLiteral)
       <|> TString <$> lexeme (char '"' >> manyTill L.charLiteral (char '"'))
       <|> TWild <$ try parseWild

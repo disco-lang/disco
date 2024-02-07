@@ -543,7 +543,7 @@ instance Pretty Term where
         Nothing -> error $ "pretty @Term: Prim " ++ show p ++ " is not in the primMap!"
     TParens t -> pretty t
     TUnit -> text "■"
-    (TBool b) -> text (map toLower $ show b)
+    (TBool b) -> text (take 1 $ show b)
     TChar c -> text (show c)
     TString cs -> doubleQuotes $ text cs
     TAbs q bnd -> withPA initPA $

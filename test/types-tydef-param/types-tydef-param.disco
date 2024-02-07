@@ -27,7 +27,7 @@ t = right (5, right (2, left(■), left(■)), right (7, right (1, left(■), le
 type AltList(a,b) = Unit + a * AltList(b,a)
 
 alt1 : AltList(N, Bool)
-alt1 = right (3, right (true, right (5, right (false, right (7, left(■))))))
+alt1 = right (3, right (T, right (5, right (F, right (7, left(■))))))
 
 foldAltList : r -> (a * r -> r) -> (b * r -> r) -> AltList(a, b) -> r
 foldAltList z _ _ (left(■)) = z

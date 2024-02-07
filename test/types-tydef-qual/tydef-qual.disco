@@ -4,15 +4,15 @@ type S = List(Char)
 x : S
 x = "hi"
 
-type T(a) = Unit + a * T(a) * T(a)
+type Tree(a) = Unit + a * Tree(a) * Tree(a)
 
-leaf : T(a)
+leaf : Tree(a)
 leaf = left(unit)
 
-testT : T(N)
+testT : Tree(N)
 testT = right(3, right(4, right(1, leaf, leaf), right(6, leaf, leaf)), right(9, leaf, leaf))
 
 !!!  mirror(mirror(testT)) == testT
-mirror : T(a) -> T(a)
+mirror : Tree(a) -> Tree(a)
 mirror(left(unit)) = left(unit)
 mirror(right(a,l,r)) = right(a, mirror(r), mirror(l))

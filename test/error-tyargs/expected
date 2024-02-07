@@ -1,10 +1,10 @@
 Loading error-tyargs.disco...
 Loaded.
-Error: not enough arguments for the type 'T'.
+Error: not enough arguments for the type 'X'.
 https://disco-lang.readthedocs.io/en/latest/reference/num-args-type.html
-Error: not enough arguments for the type 'T'.
+Error: not enough arguments for the type 'X'.
 https://disco-lang.readthedocs.io/en/latest/reference/num-args-type.html
-Error: too many arguments for the type 'T'.
+Error: too many arguments for the type 'X'.
 https://disco-lang.readthedocs.io/en/latest/reference/num-args-type.html
 Error: not enough arguments for the type 'List'.
 https://disco-lang.readthedocs.io/en/latest/reference/num-args-type.html

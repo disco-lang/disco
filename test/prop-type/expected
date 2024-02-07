@@ -4,6 +4,6 @@
 ∃x : ℕ. ∃y : ℕ. x > y : Prop
 ∀x : ℕ, y : ℕ, z : ℕ. x + y + z == x + (y + z) : Prop
 ∃x : ℕ. ∀y : ℕ. x <= y : Prop
-not(∀x : Bool. true \/ x) : Prop
-(∀x : Void. false) /\ true : Prop
-(∀x : Void. false) \/ true : Prop
+not(∀x : Bool. T \/ x) : Prop
+(∀x : Void. F) /\ T : Prop
+(∀x : Void. F) \/ T : Prop

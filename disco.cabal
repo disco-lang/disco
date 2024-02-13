@@ -317,6 +317,12 @@ extra-source-files:  stack.yaml, repl/*.hs
                      test/syntax-tuples/input
                      test/syntax-types/expected
                      test/syntax-types/input
+                     test/table-error/expected
+                     test/table-error/input
+                     test/table-function/expected
+                     test/table-function/input
+                     test/table-list/expected
+                     test/table-list/input
                      test/types-192/expected
                      test/types-192/input
                      test/types-306/expected

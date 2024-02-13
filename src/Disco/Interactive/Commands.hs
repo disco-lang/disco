@@ -811,8 +811,6 @@ handleTable (Table t) = do
 
 -- XXX add tests
 
--- XXX merge T/F thing first so we can format tests properly
-
 maxFunTableRows :: Int
 maxFunTableRows = 25
 
@@ -856,9 +854,15 @@ formatCols ::
 formatCols l (t1 :*: t2) (vpair id id -> (v1, v2))
   | l `elem` [TopLevel, NestedPair] =
       (++) <$> formatCols NestedPair t1 v1 <*> formatCols NestedPair t2 v2
+-- Special case for String (= List Char), just print as string value
+formatCols TopLevel TyString v = formatColDefault TyString v
+-- For any other lists @ top level, print each element in a separate column
 formatCols TopLevel (TyList ety) (vlist id -> vs) =
   concat <$> mapM (formatCols InnerLevel ety) vs
-formatCols _ ty v = (: []) . (alignmentForType ty,) <$> renderDoc (prettyValue ty v)
+formatCols _ ty v = formatColDefault ty v
+
+-- XXX type signature + comment
+formatColDefault ty v = (: []) . (alignmentForType ty,) <$> renderDoc (prettyValue ty v)
 
 alignmentForType :: Type -> B.Alignment
 alignmentForType ty | ty `elem` [TyN, TyZ, TyF, TyQ] = B.right
@@ -867,7 +871,7 @@ alignmentForType _ = B.left
 -- | Render a table, given as a list of rows, formatting it so that
 -- each column is aligned.
 renderTable :: [[(B.Alignment, String)]] -> String
-renderTable = B.render . B.hsep 2 B.top . map renderCol . transpose . pad
+renderTable = stripTrailingWS . B.render . B.hsep 2 B.top . map renderCol . transpose . pad
  where
   pad :: [[(B.Alignment, String)]] -> [[(B.Alignment, String)]]
   pad rows = map (padTo (maximum . map length $ rows)) rows
@@ -876,6 +880,9 @@ renderTable = B.render . B.hsep 2 B.top . map renderCol . transpose . pad
   renderCol :: [(B.Alignment, String)] -> B.Box
   renderCol [] = B.nullBox
   renderCol ((align, x) : xs) = B.vcat align . map B.text $ x : map snd xs
+
+  stripTrailingWS = unlines . map stripEnd . lines
+  stripEnd = reverse . dropWhile isSpace . reverse
 
 ------------------------------------------------------------
 -- :reload

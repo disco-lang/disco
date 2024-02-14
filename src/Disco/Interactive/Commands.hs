@@ -806,26 +806,43 @@ handleTable (Table t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
--- XXX need to handle curried functions ---> make into a new issue
--- XXX add library function to make a table of a function for given inputs? --> new issue
-
--- XXX add tests
+-- XXX need to handle curried functions ---> make into a new issue?
+-- XXX add library function to make a table of a function for given inputs? --> new issue?
 
 maxFunTableRows :: Int
 maxFunTableRows = 25
 
-formatTableFor :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r => PolyType -> Value -> Sem r String
+pairTy :: Type -> Type -> Type
+pairTy tyA TyUnit = tyA
+pairTy tyA tyB = tyA :*: tyB
+
+uncurryTy :: Type -> (Type, Type)
+uncurryTy (tyA :->: tyB) = (pairTy tyA tyAs, tyRes)
+  where
+    (tyAs, tyRes) = uncurryTy tyB
+uncurryTy ty = (TyUnit, ty)
+
+-- Evaluate the application of a curried function to an uncurried
+-- input
+evalCurried :: Members EvalEffects r => Type -> Value -> Value -> Sem r Value
+evalCurried _ f v = evalApp f [v]
+
+formatTableFor
+  :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r
+  => PolyType
+  -> Value
+  -> Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
     TyList ety -> do
       byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
       return $ renderTable byRows
-    tyA :->: tyB -> do
-      let vs = take (maxFunTableRows + 1) $ enumerateType tyA
-      results <- mapM (evalApp v . (: [])) vs
+    (uncurryTy -> (tyInputs, tyRes)) | tyInputs /= TyUnit -> do
+      let vs = take (maxFunTableRows + 1) $ enumerateType tyInputs
+      results <- mapM (evalCurried ty v) vs
       byRows <-
         mapM
-          (formatCols TopLevel (tyA :*: tyB))
+          (formatCols TopLevel (tyInputs :*: tyRes))
           (zipWith (curry (pairv id id)) (take maxFunTableRows vs) results)
       return $ renderTable (byRows ++ [[(B.left, "...")] | length vs == maxFunTableRows + 1])
     _otherTy -> do

@@ -836,6 +836,10 @@ evalCurried _ f _ v = evalApp f [v]
 -- XXX yield error when trying to do :table on something polymorphic
 -- XXX properly handle function types that actually use unit.
 -- XXX fix "Bad CESK machine state" error.
+--
+-- Note formatCols ... (tyInputs :*: ...) will be bad if tyInputs
+-- still has unit value in it...  Perhaps we should just never show a
+-- unit value column at all...?
 formatTableFor ::
   Members (LFresh ': Input TyDefCtx ': EvalEffects) r =>
   PolyType ->

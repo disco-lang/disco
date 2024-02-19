@@ -807,16 +807,19 @@ handleTable (Table t) = do
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
 -- XXX add library function to make a table of a function for given inputs? --> new issue?
+-- XXX more tests, e.g. for curried functions etc.
 
+-- | The max number of rows to show in the output of :table.
 maxFunTableRows :: Int
 maxFunTableRows = 25
 
-pairTy :: Type -> Type -> Type
-pairTy tyA TyUnit = tyA
-pairTy tyA tyB = tyA :*: tyB
-
+-- | Uncurry a type, turning a type of the form A -> B -> ... -> Y ->
+--   Z into the pair of types (A * B * ... * Y * Unit, Z).  Note we do
+--   not optimize away the Unit at the end of the chain, since this
+--   needs to be an isomorphism.  Otherwise we would not be able to
+--   distinguish between e.g.  Z and Unit -> Z.
 uncurryTy :: Type -> (Type, Type)
-uncurryTy (tyA :->: tyB) = (pairTy tyA tyAs, tyRes)
+uncurryTy (tyA :->: tyB) = (tyA :*: tyAs, tyRes)
  where
   (tyAs, tyRes) = uncurryTy tyB
 uncurryTy ty = (TyUnit, ty)
@@ -824,17 +827,15 @@ uncurryTy ty = (TyUnit, ty)
 -- | Evaluate the application of a curried function to an uncurried
 --   input.
 evalCurried :: Members EvalEffects r => Type -> Value -> Type -> Value -> Sem r Value
-evalCurried (tyA :->: tyB) f tyArg v
-  | (tyX :*: tyY) <- tyArg
-  , tyX == tyA = do
-      let (v1, v2) = vpair id id v
-      f' <- evalApp f [v1]
-      evalCurried tyB f' tyY v2
+evalCurried (_ :->: tyB) f (_ :*: tyY) v = do
+  let (v1, v2) = vpair id id v
+  f' <- evalApp f [v1]
+  evalCurried tyB f' tyY v2
 evalCurried _ f _ v = evalApp f [v]
 
 -- XXX yield error when trying to do :table on something polymorphic
--- XXX properly handle function types that actually use unit.  Maybe
--- get rid of special case for unit at end of uncurrying?
+-- XXX properly handle function types that actually use unit.
+-- XXX fix "Bad CESK machine state" error.
 formatTableFor ::
   Members (LFresh ': Input TyDefCtx ': EvalEffects) r =>
   PolyType ->
@@ -845,7 +846,7 @@ formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
     TyList ety -> do
       byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
       return $ renderTable byRows
-    (uncurryTy -> (tyInputs, tyRes)) | tyInputs /= TyUnit -> do
+    (uncurryTy -> (tyInputs, tyRes)) -> do
       let vs = take (maxFunTableRows + 1) $ enumerateType tyInputs
       results <- mapM (evalCurried ty v tyInputs) vs
       byRows <-

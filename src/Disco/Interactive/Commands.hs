@@ -806,7 +806,6 @@ handleTable (Table t) = do
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
 
--- XXX need to handle curried functions ---> make into a new issue?
 -- XXX add library function to make a table of a function for given inputs? --> new issue?
 
 maxFunTableRows :: Int
@@ -818,20 +817,29 @@ pairTy tyA tyB = tyA :*: tyB
 
 uncurryTy :: Type -> (Type, Type)
 uncurryTy (tyA :->: tyB) = (pairTy tyA tyAs, tyRes)
-  where
-    (tyAs, tyRes) = uncurryTy tyB
+ where
+  (tyAs, tyRes) = uncurryTy tyB
 uncurryTy ty = (TyUnit, ty)
 
--- Evaluate the application of a curried function to an uncurried
--- input
-evalCurried :: Members EvalEffects r => Type -> Value -> Value -> Sem r Value
-evalCurried _ f v = evalApp f [v]
+-- | Evaluate the application of a curried function to an uncurried
+--   input.
+evalCurried :: Members EvalEffects r => Type -> Value -> Type -> Value -> Sem r Value
+evalCurried (tyA :->: tyB) f tyArg v
+  | (tyX :*: tyY) <- tyArg
+  , tyX == tyA = do
+      let (v1, v2) = vpair id id v
+      f' <- evalApp f [v1]
+      evalCurried tyB f' tyY v2
+evalCurried _ f _ v = evalApp f [v]
 
-formatTableFor
-  :: Members (LFresh ': Input TyDefCtx ': EvalEffects) r
-  => PolyType
-  -> Value
-  -> Sem r String
+-- XXX yield error when trying to do :table on something polymorphic
+-- XXX properly handle function types that actually use unit.  Maybe
+-- get rid of special case for unit at end of uncurrying?
+formatTableFor ::
+  Members (LFresh ': Input TyDefCtx ': EvalEffects) r =>
+  PolyType ->
+  Value ->
+  Sem r String
 formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
   case ty of
     TyList ety -> do
@@ -839,7 +847,7 @@ formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
       return $ renderTable byRows
     (uncurryTy -> (tyInputs, tyRes)) | tyInputs /= TyUnit -> do
       let vs = take (maxFunTableRows + 1) $ enumerateType tyInputs
-      results <- mapM (evalCurried ty v) vs
+      results <- mapM (evalCurried ty v tyInputs) vs
       byRows <-
         mapM
           (formatCols TopLevel (tyInputs :*: tyRes))
@@ -878,7 +886,14 @@ formatCols TopLevel (TyList ety) (vlist id -> vs) =
   concat <$> mapM (formatCols InnerLevel ety) vs
 formatCols _ ty v = formatColDefault ty v
 
--- XXX type signature + comment
+-- | Default formatting of a typed column value by simply
+--   pretty-printing it, and using the alignment appropriate for its
+--   type.
+formatColDefault ::
+  (Member (Input TyDefCtx) r, Member LFresh r) =>
+  Type ->
+  Value ->
+  Sem r [(B.Alignment, String)]
 formatColDefault ty v = (: []) . (alignmentForType ty,) <$> renderDoc (prettyValue ty v)
 
 alignmentForType :: Type -> B.Alignment

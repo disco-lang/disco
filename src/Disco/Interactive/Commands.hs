@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
 -- |
@@ -75,6 +74,7 @@ import Disco.Syntax.Prims (
 import Disco.Typecheck
 import Disco.Typecheck.Erase
 import Disco.Types
+import Disco.Util (maximum0)
 import Disco.Value
 import Polysemy
 import Polysemy.Error hiding (try)
@@ -591,7 +591,7 @@ handleHelp Help =
   sortedList cmds =
     sortBy (\(SomeCmd x) (SomeCmd y) -> compare (name x) (name y)) $ filteredCommands cmds
   showCmd c = text (padRight (helpcmd c) maxlen ++ "  " ++ shortHelp c)
-  longestCmd cmds = maximum $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
+  longestCmd cmds = maximum0 $ map (\(SomeCmd c) -> length $ helpcmd c) cmds
   padRight s maxsize = take maxsize (s ++ repeat ' ')
   --  don't show dev-only commands by default
   filteredCommands = P.filter (\(SomeCmd c) -> category c == User)
@@ -891,7 +891,7 @@ renderTable :: [[(B.Alignment, String)]] -> String
 renderTable = stripTrailingWS . B.render . B.hsep 2 B.top . map renderCol . transpose . pad
  where
   pad :: [[(B.Alignment, String)]] -> [[(B.Alignment, String)]]
-  pad rows = map (padTo (maximum . map length $ rows)) rows
+  pad rows = map (padTo (maximum0 . map length $ rows)) rows
   padTo n = take n . (++ repeat (B.left, ""))
 
   renderCol :: [(B.Alignment, String)] -> B.Box
@@ -957,7 +957,7 @@ handleShowDefn (ShowDefn x) = do
     let ds = map (pretty' . snd) xdefs ++ maybe [] (pure . pretty' . (name2s,)) mtydef
     case ds of
       [] -> text "No definition for" <+> pretty' x
-      _ -> vcat ds
+      _nonEmptyList -> vcat ds
 
 ------------------------------------------------------------
 -- :test

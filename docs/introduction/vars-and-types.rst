@@ -35,3 +35,12 @@ Let's begin by looking at a few standard built-in types.
 Natural numbers
 ---------------
 
+The type of *natural numbers* includes the counting numbers 0, 1, 2,
+3, 4, 5, ... (*including* zero).
+
+  - Natural numbers can be *added*; adding two natural numbers
+    always results in another natural number.
+
+  - Natural numbers can also be *multiplied*; again, multiplying two
+    natural numbers always results in another natural number.
+

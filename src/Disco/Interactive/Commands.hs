@@ -831,11 +831,11 @@ evalCurried (_ :->: tyB) f (_ :*: tyY) v = do
   let (v1, v2) = vpair id id v
   f' <- evalApp f [v1]
   evalCurried tyB f' tyY v2
-evalCurried _ f _ v = evalApp f [v]
+evalCurried _ v _ _ = return v
 
 -- XXX yield error when trying to do :table on something polymorphic
 -- XXX properly handle function types that actually use unit.
--- XXX fix "Bad CESK machine state" error.
+-- XXX get rid of Unit column in table...
 --
 -- Note formatCols ... (tyInputs :*: ...) will be bad if tyInputs
 -- still has unit value in it...  Perhaps we should just never show a

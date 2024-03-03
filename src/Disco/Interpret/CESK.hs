@@ -1,10 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -fmax-pmcheck-models=200 #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Interpret.CESK
 -- Copyright   :  disco team and contributors

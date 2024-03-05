@@ -28,6 +28,7 @@ import Control.Lens (
   (^.),
  )
 import Control.Monad.Except
+import Data.Bifunctor (second)
 import Data.Char (isSpace)
 import Data.Coerce
 import Data.List (find, isPrefixOf, sortBy, transpose)
@@ -833,34 +834,41 @@ evalCurried (_ :->: tyB) f (_ :*: tyY) v = do
   evalCurried tyB f' tyY v2
 evalCurried _ v _ _ = return v
 
--- XXX yield error when trying to do :table on something polymorphic
--- XXX properly handle function types that actually use unit.
--- XXX get rid of Unit column in table...
---
--- Note formatCols ... (tyInputs :*: ...) will be bad if tyInputs
--- still has unit value in it...  Perhaps we should just never show a
--- unit value column at all...?
 formatTableFor ::
   Members (LFresh ': Input TyDefCtx ': EvalEffects) r =>
   PolyType ->
   Value ->
   Sem r String
-formatTableFor pty@(Forall bnd) v = lunbind bnd $ \(_vars, ty) ->
-  case ty of
-    TyList ety -> do
-      byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
-      return $ renderTable byRows
-    (uncurryTy -> (tyInputs, tyRes)) -> do
-      let vs = take (maxFunTableRows + 1) $ enumerateType tyInputs
-      results <- mapM (evalCurried ty v tyInputs) vs
-      byRows <-
-        mapM
-          (formatCols TopLevel (tyInputs :*: tyRes))
-          (zipWith (curry (pairv id id)) (take maxFunTableRows vs) results)
-      return $ renderTable (byRows ++ [[(B.left, "...")] | length vs == maxFunTableRows + 1])
-    _otherTy -> do
-      tyStr <- prettyStr pty
-      return $ "Don't know how to make a table for type " ++ tyStr
+formatTableFor (Forall bnd) v = lunbind bnd $ \(vars, ty) ->
+  case vars of
+    [] -> case ty of
+      TyList ety -> do
+        byRows <- mapM (formatCols TopLevel ety) . vlist id $ v
+        return $ renderTable byRows
+      (_ :->: _) -> do
+        let (tyInputs, tyRes) = uncurryTy ty
+            vs = take (maxFunTableRows + 1) $ enumerateType tyInputs
+            (tyInputs', stripV) = stripFinalUnit tyInputs
+        results <- mapM (evalCurried ty v tyInputs) vs
+        byRows <-
+          mapM
+            (formatCols TopLevel (tyInputs' :*: tyRes))
+            (zipWith (curry (pairv id id)) (take maxFunTableRows (map stripV vs)) results)
+        return $ renderTable (byRows ++ [[(B.left, "...")] | length vs == maxFunTableRows + 1])
+      _otherTy -> do
+        tyStr <- prettyStr ty
+        return $ "Don't know how to make a table for " ++ tyStr
+    _vars -> return $ "Can't make a table for a polymorphic type"
+
+-- | Strip the unit type from the end of a chain like (tA :*: (tB :*: (tC :*: Unit))),
+--   which is an output of 'uncurryTy', and return a function to make the corresponding
+--   change to a value of that type.
+stripFinalUnit :: Type -> (Type, Value -> Value)
+stripFinalUnit (tA :*: TyUnit) = (tA, fst . vpair id id)
+stripFinalUnit (tA :*: tB) = (tA :*: tB', pairv id id . second v' . vpair id id)
+ where
+  (tB', v') = stripFinalUnit tB
+stripFinalUnit ty = (ty, id)
 
 data Level = TopLevel | NestedPair | InnerLevel
   deriving (Eq, Ord, Show)

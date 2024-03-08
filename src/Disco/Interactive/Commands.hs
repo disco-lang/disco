@@ -854,7 +854,7 @@ formatTableFor (Forall bnd) v = lunbind bnd $ \(vars, ty) ->
         return $ renderTable (byRows ++ [[(B.left, "...")] | length vs == maxFunTableRows + 1])
       _otherTy -> do
         tyStr <- prettyStr ty
-        return $ "Don't know how to make a table for " ++ tyStr
+        return $ "Don't know how to make a table for type " ++ tyStr
     _vars -> return $ "Can't make a table for a polymorphic type"
 
 -- | Strip the unit type from the end of a chain like (tA :*: (tB :*: (tC :*: Unit))),

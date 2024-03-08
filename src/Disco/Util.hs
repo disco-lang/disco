@@ -28,3 +28,7 @@ for = flip map
 m ! k = case M.lookup k m of
   Nothing -> error $ "key " ++ show k ++ " is not an element in the map"
   Just v -> v
+
+maximum0 :: (Num a, Ord a) => [a] -> a
+maximum0 [] = 0
+maximum0 xs = maximum xs

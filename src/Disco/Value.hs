@@ -30,7 +30,8 @@ module Disco.Value (
   vint,
   charv,
   vchar,
-  enumv,
+  boolv,
+  vbool,
   pairv,
   vpair,
   listv,
@@ -245,10 +246,12 @@ vchar = chr . fromIntegral . vint
 charv :: Char -> Value
 charv = intv . fromIntegral . ord
 
--- | Turn any instance of @Enum@ into a @Value@, by creating a
---   constructor with an index corresponding to the enum value.
-enumv :: Enum e => e -> Value
-enumv e = VInj (toEnum $ fromEnum e) VUnit
+boolv :: Bool -> Value
+boolv e = VInj (toEnum $ fromEnum e) VUnit
+
+vbool :: Value -> Bool
+vbool (VInj s VUnit) = toEnum $ fromEnum s
+vbool v = error $ "vbool " ++ show v
 
 pairv :: (a -> Value) -> (b -> Value) -> (a, b) -> Value
 pairv av bv (a, b) = VPair (av a) (bv b)
@@ -486,11 +489,9 @@ prettyValue (ty1 :+: _) (VInj L v) = "left" <> prettyVP ty1 v
 prettyValue (_ :+: ty2) (VInj R v) = "right" <> prettyVP ty2 v
 prettyValue (_ :+: _) v =
   error $ "Non-VInj passed with sum type to prettyValue: " ++ show v
-prettyValue _ (VNum d r)
-  | denominator r == 1 = text $ show (numerator r)
-  | otherwise = text $ case d of
-      Fraction -> show (numerator r) ++ "/" ++ show (denominator r)
-      Decimal -> prettyDecimal r
+prettyValue _ (VNum d r) = text $ case (d, denominator r == 1) of
+  (Decimal, False) -> prettyDecimal r
+  _ -> prettyRational r
 prettyValue ty@(_ :->: _) _ = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs) = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TySet _) v =

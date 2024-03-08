@@ -796,7 +796,7 @@ tableCmd =
     , category = User
     , cmdtype = ColonCmd
     , action = handleTable
-    , parser = Table <$> term
+    , parser = Table <$> parseTermOrOp
     }
 
 handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
@@ -806,9 +806,6 @@ handleTable (Table t) = do
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
   info $ runInputConst tydefs $ formatTableFor ty v >>= text
-
--- XXX add library function to make a table of a function for given inputs? --> new issue?
--- XXX more tests, e.g. for curried functions etc.
 
 -- | The max number of rows to show in the output of :table.
 maxFunTableRows :: Int
@@ -1025,7 +1022,7 @@ typeCheckCmd =
     , category = Dev
     , cmdtype = ColonCmd
     , action = inputToState @TopInfo . handleTypeCheck
-    , parser = parseTypeCheck
+    , parser = TypeCheck <$> parseTermOrOp
     }
 
 handleTypeCheck ::
@@ -1036,17 +1033,17 @@ handleTypeCheck (TypeCheck t) = do
   (_, sig) <- typecheckTop $ inferTop t
   info $ pretty' t <+> text ":" <+> pretty' sig
 
-parseTypeCheck :: Parser (REPLExpr 'CTypeCheck)
-parseTypeCheck =
-  TypeCheck
-    <$> ( (try term <?> "expression")
-            <|> (parseNakedOp <?> "operator")
-        )
+------------------------------------------------------------
 
--- In a :type or :doc command, allow naked operators, as in :type + ,
+-- In :type, :doc, or :table commands, allow naked operators, as in :type + ,
 -- even though + by itself is not a syntactically valid term.
 -- However, this seems like it may be a common thing for a student to
 -- ask and there is no reason we can't have this as a special case.
+parseTermOrOp :: Parser Term
+parseTermOrOp =
+  (try term <?> "expression")
+    <|> (parseNakedOp <?> "operator")
+
 parseNakedOp :: Parser Term
 parseNakedOp = TPrim <$> parseNakedOpPrim
 

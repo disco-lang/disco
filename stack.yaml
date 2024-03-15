@@ -2,7 +2,7 @@
 # For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration/
 
 # Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
-resolver: lts-21.25
+resolver: lts-22.13
 
 # Local packages, usually specified by relative directory name
 packages:
@@ -10,8 +10,8 @@ packages:
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:
-  - unbound-generics-0.4.2
-    # unbound-generics-0.4.3 contains breaking changes (adding methods to Subst class)
+  - unbound-generics-0.4.3
+  - ansi-wl-pprint-0.6.9
   - simple-enumeration-0.2.1@sha256:8625b269c1650d3dd0e3887351c153049f4369853e0d525219e07480ea004b9f,1178
     # - HTTP-4000.3.16@sha256:6042643c15a0b43e522a6693f1e322f05000d519543a84149cb80aeffee34f71,5947
     # HTTP-4000.3 needed for oeis-0.3.10

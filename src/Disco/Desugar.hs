@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Desugar
 -- Copyright   :  disco team and contributors
@@ -26,11 +22,10 @@ module Disco.Desugar (
 )
 where
 
-import Control.Monad.Cont
+import Control.Monad (zipWithM)
 import Data.Bool (bool)
 import Data.Coerce
 import Data.Maybe (fromMaybe, isJust)
-
 import Disco.AST.Desugared
 import Disco.AST.Surface
 import Disco.AST.Typed
@@ -40,7 +35,6 @@ import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck (containerTy)
 import Disco.Types
-
 import Disco.Effects.Fresh
 import Polysemy (Member, Sem, run)
 import Unbound.Generics.LocallyNameless (

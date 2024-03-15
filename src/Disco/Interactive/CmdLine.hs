@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Interactive.CmdLine
 -- Copyright   :  disco team and contributors
@@ -27,20 +23,14 @@ import Paths_disco (version)
 
 import Control.Lens hiding (use)
 import Control.Monad (unless, when)
+import Control.Monad.Catch (SomeException)
 import qualified Control.Monad.Catch as CMC
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Foldable (forM_)
 import Data.List (isPrefixOf)
 import Data.Maybe (isJust)
-import System.Exit (
-  exitFailure,
-  exitSuccess,
- )
-
-import qualified Options.Applicative as O
-import System.Console.Haskeline as H
-
 import Disco.AST.Surface (emptyModule)
+import Disco.Effects.State
 import Disco.Error
 import Disco.Eval
 import Disco.Interactive.Commands
@@ -51,11 +41,15 @@ import Disco.Module (
  )
 import Disco.Names (ModuleName (REPLModule))
 import Disco.Pretty
-
-import Disco.Effects.State
+import qualified Options.Applicative as O
 import Polysemy
 import Polysemy.ConstraintAbsorber.MonadCatch
 import Polysemy.Error
+import System.Console.Haskeline as H
+import System.Exit (
+  exitFailure,
+  exitSuccess,
+ )
 
 ------------------------------------------------------------
 -- Command-line options parser

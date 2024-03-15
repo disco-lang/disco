@@ -15,7 +15,8 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad.Except
+import Control.Monad.Except ()
+import Control.Monad (when, zipWithM, forM_, unless, guard, void)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce

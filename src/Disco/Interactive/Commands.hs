@@ -27,7 +27,8 @@ import Control.Lens (
   (?~),
   (^.),
  )
-import Control.Monad.Except
+import Control.Monad (forM_, when, void)
+import Control.Monad.Except ()
 import Data.Bifunctor (second)
 import Data.Char (isSpace)
 import Data.Coerce

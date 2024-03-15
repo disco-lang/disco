@@ -5,10 +5,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- SPDX-License-Identifier: BSD-3-Clause
 
 -- |
@@ -415,6 +411,7 @@ instance Subst Type Qualifier
 instance Subst Type Rational where
   subst _ _ = id
   substs _ = id
+  substBvs _ _ = id
 instance Subst Type Void where
   subst _ _ = id
   substs _ = id
@@ -537,9 +534,11 @@ isTyVar _ = False
 instance (Ord a, Subst t a) => Subst t (Set a) where
   subst x t = S.map (subst x t)
   substs s = S.map (substs s)
+  substBvs c bs = S.map (substBvs c bs)
 instance (Ord k, Subst t a) => Subst t (Map k a) where
   subst x t = M.map (subst x t)
   substs s = M.map (substs s)
+  substBvs c bs = M.map (substBvs c bs)
 
 -- | The definition of a user-defined type contains:
 --

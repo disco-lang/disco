@@ -15,13 +15,13 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad.Except ()
-import Control.Monad (when, zipWithM, forM_, unless, guard, void)
+import Control.Monad (when, zipWithM, forM_, unless)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
 import qualified Data.Foldable as F
-import Data.List (group, sort)
+import Data.List (sort)
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (isJust)
@@ -244,7 +244,7 @@ checkPolyRec (TypeDefn name args body) = go body
 --   >>> filterDups [1,3,2,1,1,4,2]
 --   [1,2]
 filterDups :: Ord a => [a] -> [a]
-filterDups = map head . filter ((> 1) . length) . group . sort
+filterDups = map NE.head . filter ((> 1) . NE.length) . NE.group . sort
 
 --------------------------------------------------
 -- Type declarations

@@ -502,6 +502,7 @@ library
                        pretty-show >= 1.10 && < 1.11,
                        boxes >= 0.1.5 && < 0.2,
                        edit-distance >= 0.2 && < 0.3,
+                       infinite-list >= 0.1 && < 0.2,
 
   hs-source-dirs:      src
   default-language:    Haskell2010

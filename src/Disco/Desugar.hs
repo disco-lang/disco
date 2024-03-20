@@ -25,6 +25,8 @@ where
 import Control.Monad (zipWithM)
 import Data.Bool (bool)
 import Data.Coerce
+import Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe, isJust)
 import Disco.AST.Desugared
 import Disco.AST.Surface
@@ -185,9 +187,9 @@ desugarDefn (Defn _ patTys bodyTy def) =
 --   with their corresponding patterns. Definitions are abstractions
 --   (which happen to be named), and source-level lambdas are also
 --   abstractions (which happen to have only one clause).
-desugarAbs :: Member Fresh r => Quantifier -> Type -> [Clause] -> Sem r DTerm
+desugarAbs :: Member Fresh r => Quantifier -> Type -> NonEmpty Clause -> Sem r DTerm
 -- Special case for compiling a single lambda with no pattern matching directly to a lambda
-desugarAbs Lam ty [cl@(unsafeUnbind -> ([APVar _ _], _))] = do
+desugarAbs Lam ty (cl@(unsafeUnbind -> ([APVar _ _], _)) :| []) = do
   (ps, at) <- unbind cl
   d <- desugarTerm at
   return $ DTAbs Lam ty (bind (getVar (head ps)) d)
@@ -219,11 +221,11 @@ desugarAbs quant overallTy body = do
   -- with the same quantifier when there's only a single clause. That
   -- way, we generate a chain of abstractions followed by a case, instead
   -- of a bunch of alternating abstractions and cases.
-  unbindClauses :: Member Fresh r => [Clause] -> Sem r [([APattern], ATerm)]
-  unbindClauses [c] | quant `elem` [All, Ex] = do
+  unbindClauses :: Member Fresh r => NonEmpty Clause -> Sem r [([APattern], ATerm)]
+  unbindClauses (c :| []) | quant `elem` [All, Ex] = do
     (ps, t) <- liftClause c
     return [(ps, addDbgInfo ps t)]
-  unbindClauses cs = mapM unbind cs
+  unbindClauses cs = mapM unbind (NE.toList cs)
 
   liftClause :: Member Fresh r => Bind [APattern] ATerm -> Sem r ([APattern], ATerm)
   liftClause c =
@@ -274,7 +276,7 @@ desugarTerm (ATBool ty b) = return $ DTBool ty b
 desugarTerm (ATChar c) = return $ DTChar c
 desugarTerm (ATString cs) =
   desugarContainer (TyList TyC) ListContainer (map (\c -> (ATChar c, Nothing)) cs) Nothing
-desugarTerm (ATAbs q ty lam) = desugarAbs q ty [lam]
+desugarTerm (ATAbs q ty lam) = desugarAbs q ty (NE.singleton lam)
 -- Special cases for fully applied operators
 desugarTerm (ATApp resTy (ATPrim _ (PrimUOp uop)) t)
   | uopDesugars (getType t) resTy uop = desugarUnApp resTy uop t

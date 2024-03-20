@@ -21,6 +21,7 @@ import Data.Bifunctor (first)
 import Data.Coerce
 import qualified Data.Foldable as F
 import Data.List (sort)
+import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -290,7 +291,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
   -- Try to decompose the type into a chain of arrows like pty1 ->
   -- pty2 -> pty3 -> ... -> bodyTy, according to the number of
   -- patterns, and lazily unrolling type definitions along the way.
-  (patTys, bodyTy) <- decomposeDefnTy (numPats (head clauses)) ty
+  (patTys, bodyTy) <- decomposeDefnTy (numPats (NE.head clauses)) ty
 
   ((acs, _), theta) <- solve $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
@@ -300,16 +301,15 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
  where
   numPats = length . fst . unsafeUnbind
 
-  checkNumPats [] = return () -- This can't happen, but meh
-  checkNumPats [_] = return ()
-  checkNumPats (c : cs)
+  checkNumPats (_ :| []) = return ()
+  checkNumPats (c :| cs)
     | all ((== 0) . numPats) (c : cs) = throw (DuplicateDefns x)
     | not (all ((== numPats c) . numPats) cs) = throw NumPatterns
     -- XXX more info, this error actually means # of
     -- patterns don't match across different clauses
     | otherwise = return ()
 
-  -- \| Check a clause of a definition against a list of pattern types and a body type.
+  -- | Check a clause of a definition against a list of pattern types and a body type.
   checkClause ::
     Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r =>
     [Type] ->

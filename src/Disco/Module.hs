@@ -4,10 +4,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Module
 -- Copyright   :  (c) 2019 disco team (see LICENSE)
@@ -19,9 +15,10 @@
 -- to resolve the location of a module on disk.
 module Disco.Module where
 
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Data (Data)
 import GHC.Generics (Generic)
-
 import Control.Lens (
   Getting,
   foldOf,
@@ -84,14 +81,14 @@ data LoadingMode = REPL | Standalone
 --   @
 --
 --   might look like @Defn f [Z, Z*Z] B [clause 1 ..., clause 2 ...]@
-data Defn = Defn (Name ATerm) [Type] Type [Clause]
+data Defn = Defn (Name ATerm) [Type] Type (NonEmpty Clause)
   deriving (Show, Generic, Alpha, Data, Subst Type)
 
 instance Pretty Defn where
   pretty (Defn x patTys ty clauses) =
     vcat $
       prettyTyDecl x (foldr (:->:) ty patTys)
-        : map (pretty . (x,) . eraseClause) clauses
+        : map (pretty . (x,) . eraseClause) (NE.toList clauses)
 
 -- | A clause in a definition consists of a list of patterns (the LHS
 --   of the =) and a term (the RHS).  For example, given the concrete

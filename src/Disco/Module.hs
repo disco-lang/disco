@@ -84,9 +84,6 @@ data LoadingMode = REPL | Standalone
 data Defn = Defn (Name ATerm) [Type] Type (NonEmpty Clause)
   deriving (Show, Generic, Alpha, Data, Subst Type)
 
-instance Alpha a => Alpha (NonEmpty a)
-instance (Subst t a) => Subst t (NonEmpty a)
-
 instance Pretty Defn where
   pretty (Defn x patTys ty clauses) =
     vcat $

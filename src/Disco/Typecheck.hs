@@ -30,8 +30,28 @@ import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Set (Set)
 import qualified Data.Set as S
-import Prelude as P hiding (lookup)
-
+import Disco.AST.Surface
+import Disco.AST.Typed
+import Disco.Context hiding (filter)
+import qualified Disco.Context as Ctx
+import Disco.Effects.Fresh
+import Disco.Messages
+import Disco.Module
+import Disco.Names
+import Disco.Subst (applySubst)
+import qualified Disco.Subst as Subst
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims
+import Disco.Typecheck.Constraints
+import Disco.Typecheck.Util
+import Disco.Types
+import Disco.Types.Rules
+import Polysemy hiding (embed)
+import Polysemy.Error
+import Polysemy.Output
+import Polysemy.Reader
+import Polysemy.Writer
+import Text.EditDistance (defaultEditCosts, restrictedDamerauLevenshteinDistance)
 import Unbound.Generics.LocallyNameless (
   Alpha,
   Bind,
@@ -44,29 +64,7 @@ import Unbound.Generics.LocallyNameless (
   unembed,
  )
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-
-import Disco.Effects.Fresh
-import Polysemy hiding (embed)
-import Polysemy.Error
-import Polysemy.Output
-import Polysemy.Reader
-import Polysemy.Writer
-
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.Context hiding (filter)
-import qualified Disco.Context as Ctx
-import Disco.Messages
-import Disco.Module
-import Disco.Names
-import Disco.Subst (applySubst)
-import qualified Disco.Subst as Subst
-import Disco.Syntax.Operators
-import Disco.Syntax.Prims
-import Disco.Typecheck.Constraints
-import Disco.Typecheck.Util
-import Disco.Types
-import Disco.Types.Rules
+import Prelude as P hiding (lookup)
 
 ------------------------------------------------------------
 -- Container utilities
@@ -214,8 +212,11 @@ checkUnboundVars :: Members '[Reader TyDefCtx, Error TCError] r => TypeDefn -> S
 checkUnboundVars (TypeDefn _ args body) = go body
  where
   go (TyAtom (AVar (U x)))
-    | name2String x `elem` args = return ()
-    | otherwise = throw $ UnboundTyVar x
+    | xn `elem` args = return ()
+    | otherwise = throw $ UnboundTyVar x suggestions
+   where
+    xn = name2String x
+    suggestions = filter ((<= 2) . restrictedDamerauLevenshteinDistance defaultEditCosts xn) args
   go (TyAtom _) = return ()
   go (TyUser name tys) = lookupTyDefn name tys >> mapM_ go tys
   go (TyCon _ tys) = mapM_ go tys

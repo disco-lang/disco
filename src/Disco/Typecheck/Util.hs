@@ -1,4 +1,3 @@
-
 -- |
 -- Module      :  Disco.Typecheck.Util
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
@@ -91,8 +90,8 @@ data TCError
     NotEnoughArgs Con
   | -- | Too many arguments provided to type constructor.
     TooManyArgs Con
-  | -- | Unbound type variable
-    UnboundTyVar (Name Type)
+  | -- | Unbound type variable, together with suggested edits
+    UnboundTyVar (Name Type) [String]
   | -- | Polymorphic recursion is not allowed
     NoPolyRec String [String] [Type]
   | -- | Not an error.  The identity of the

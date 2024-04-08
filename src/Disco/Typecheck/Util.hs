@@ -1,4 +1,3 @@
-
 -- |
 -- Module      :  Disco.Typecheck.Util
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
@@ -52,8 +51,10 @@ noLoc = LocTCError Nothing
 
 -- | Potential typechecking errors.
 data TCError
-  = -- | Encountered an unbound variable
-    Unbound (Name Term)
+  = -- | Encountered an unbound variable.  The offending variable
+    --   together with some suggested in-scope names with small edit
+    --   distance.
+    Unbound (Name Term) [String]
   | -- | Encountered an ambiguous name.
     Ambiguous (Name Term) [ModuleName]
   | -- | No type is specified for a definition
@@ -91,8 +92,8 @@ data TCError
     NotEnoughArgs Con
   | -- | Too many arguments provided to type constructor.
     TooManyArgs Con
-  | -- | Unbound type variable
-    UnboundTyVar (Name Type)
+  | -- | Unbound type variable, together with suggested edits
+    UnboundTyVar (Name Type) [String]
   | -- | Polymorphic recursion is not allowed
     NoPolyRec String [String] [Type]
   | -- | Not an error.  The identity of the

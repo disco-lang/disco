@@ -93,10 +93,11 @@ instance Pretty DiscoError where
     CyclicImport ms -> cyclicImportError ms
     TypeCheckErr (LocTCError Nothing te) -> prettyTCError te
     TypeCheckErr (LocTCError (Just n) te) ->
-      nest 2 $ vcat
-        [ "While checking " <> pretty' n <> ":"
-        , prettyTCError te
-        ]
+      nest 2 $
+        vcat
+          [ "While checking " <> pretty' n <> ":"
+          , prettyTCError te
+          ]
     ParseErr pe -> text (errorBundlePretty pe)
     EvalErr ee -> prettyEvalError ee
     Panic s ->
@@ -111,15 +112,19 @@ rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page
 issue :: Int -> Sem r (Doc ann)
 issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
 
+squote :: String -> String
+squote x = "'" ++ x ++ "'"
+
 cyclicImportError ::
   Members '[Reader PA, LFresh] r =>
   [ModuleName] ->
   Sem r (Doc ann)
 cyclicImportError ms =
-  nest 2 $ vcat
-    [ "Error: module imports form a cycle:"
-    , intercalate " ->" (map pretty ms)
-    ]
+  nest 2 $
+    vcat
+      [ "Error: module imports form a cycle:"
+      , intercalate " ->" (map pretty ms)
+      ]
 
 prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r (Doc ann)
 prettyEvalError = \case
@@ -142,11 +147,11 @@ prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r (Doc ann)
 prettyTCError = \case
   -- XXX include some potential misspellings along with Unbound
   --   see https://github.com/disco-lang/disco/issues/180
-  Unbound x ->
-    vcat
-      [ "Error: there is nothing named" <+> pretty' x <> "."
-      , rtd "unbound"
-      ]
+  Unbound x suggestions ->
+    vcat $
+      ["Error: there is nothing named" <+> pretty' x <> "."]
+        ++ ["Perhaps you meant" <+> intercalate " or" (map (text . squote) suggestions) <> "?" | not (null suggestions)]
+        ++ [rtd "unbound"]
   Ambiguous x ms ->
     vcat
       [ "Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:"
@@ -249,13 +254,12 @@ prettyTCError = \case
       [ "Error: too many arguments for the type '" <> pretty' con <> "'."
       , rtd "num-args-type"
       ]
-  -- XXX Mention the definition in which it was found, suggest adding the variable
-  --     as a parameter
-  UnboundTyVar v ->
-    vcat
-      [ "Error: Unknown type variable '" <> pretty' v <> "'."
-      , rtd "unbound-tyvar"
-      ]
+  -- XXX Mention the definition in which it was found
+  UnboundTyVar v suggestions ->
+    vcat $
+      ["Error: Unknown type variable '" <> pretty' v <> "'."]
+        ++ ["Perhaps you meant" <+> intercalate " or" (map (text . squote) suggestions) <> "?" | not (null suggestions)]
+        ++ [rtd "unbound-tyvar"]
   NoPolyRec s ss tys ->
     vcat
       [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."

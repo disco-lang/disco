@@ -2,10 +2,6 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Typecheck
 -- Copyright   :  disco team and contributors
@@ -30,8 +26,28 @@ import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Set (Set)
 import qualified Data.Set as S
-import Prelude as P hiding (lookup)
-
+import Disco.AST.Surface
+import Disco.AST.Typed
+import Disco.Context hiding (filter)
+import qualified Disco.Context as Ctx
+import Disco.Effects.Fresh
+import Disco.Messages
+import Disco.Module
+import Disco.Names
+import Disco.Subst (applySubst)
+import qualified Disco.Subst as Subst
+import Disco.Syntax.Operators
+import Disco.Syntax.Prims
+import Disco.Typecheck.Constraints
+import Disco.Typecheck.Util
+import Disco.Types
+import Disco.Types.Rules
+import Polysemy hiding (embed)
+import Polysemy.Error
+import Polysemy.Output
+import Polysemy.Reader
+import Polysemy.Writer
+import Text.EditDistance (defaultEditCosts, restrictedDamerauLevenshteinDistance)
 import Unbound.Generics.LocallyNameless (
   Alpha,
   Bind,
@@ -44,29 +60,7 @@ import Unbound.Generics.LocallyNameless (
   unembed,
  )
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-
-import Disco.Effects.Fresh
-import Polysemy hiding (embed)
-import Polysemy.Error
-import Polysemy.Output
-import Polysemy.Reader
-import Polysemy.Writer
-
-import Disco.AST.Surface
-import Disco.AST.Typed
-import Disco.Context hiding (filter)
-import qualified Disco.Context as Ctx
-import Disco.Messages
-import Disco.Module
-import Disco.Names
-import Disco.Subst (applySubst)
-import qualified Disco.Subst as Subst
-import Disco.Syntax.Operators
-import Disco.Syntax.Prims
-import Disco.Typecheck.Constraints
-import Disco.Typecheck.Util
-import Disco.Types
-import Disco.Types.Rules
+import Prelude as P hiding (lookup)
 
 ------------------------------------------------------------
 -- Container utilities
@@ -103,6 +97,13 @@ inferTelescope inferOne tel = do
     extends ctx $ do
       (tybs, ctx') <- go bs
       return (tyb : tybs, ctx <> ctx')
+
+------------------------------------------------------------
+-- Variable name utilities
+------------------------------------------------------------
+
+suggestionsFrom :: String -> [String] -> [String]
+suggestionsFrom x = filter ((<= 1) . restrictedDamerauLevenshteinDistance defaultEditCosts x)
 
 ------------------------------------------------------------
 -- Modules
@@ -214,8 +215,11 @@ checkUnboundVars :: Members '[Reader TyDefCtx, Error TCError] r => TypeDefn -> S
 checkUnboundVars (TypeDefn _ args body) = go body
  where
   go (TyAtom (AVar (U x)))
-    | name2String x `elem` args = return ()
-    | otherwise = throw $ UnboundTyVar x
+    | xn `elem` args = return ()
+    | otherwise = throw $ UnboundTyVar x suggestions
+   where
+    xn = name2String x
+    suggestions = suggestionsFrom xn args
   go (TyAtom _) = return ()
   go (TyUser name tys) = lookupTyDefn name tys >> mapM_ go tys
   go (TyCon _ tys) = mapM_ go tys
@@ -539,7 +543,10 @@ typecheck Infer (TVar x) = do
   -- Pick the first method that succeeds; if none do, throw an unbound
   -- variable error.
   mt <- runMaybeT . F.asum . map MaybeT $ [tryLocal, tryModule, tryPrim]
-  maybe (throw (Unbound x)) return mt
+  ctx <- ask @TyCtx
+  let inScope = map name2String (Ctx.names ctx) ++ opNames ++ [syn | PrimInfo _ syn _ <- M.elems primMap]
+      suggestions = suggestionsFrom (name2String x) inScope
+  maybe (throw $ Unbound x suggestions) return mt
  where
   -- 1. See if the variable name is bound locally.
   tryLocal = do
@@ -559,13 +566,13 @@ typecheck Infer (TVar x) = do
         (_, ty) <- unbind sig
         return . Just $ ATVar ty (m .- coerce x)
       [] -> return Nothing
-      _ -> throw $ Ambiguous x (map fst bs)
+      _nonEmpty -> throw $ Ambiguous x (map fst bs)
 
   -- 3. See if we should convert it to a primitive.
   tryPrim =
     case toPrim (name2String x) of
       (prim : _) -> Just <$> typecheck Infer (TPrim prim)
-      _ -> return Nothing
+      [] -> return Nothing
 
 --------------------------------------------------
 -- Primitives

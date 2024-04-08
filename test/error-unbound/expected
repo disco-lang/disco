@@ -1,1 +1,15 @@
 Error: encountered undefined name REPL.even. Maybe you haven't defined it yet?
+Error: there is nothing named fo.
+Perhaps you meant 'foo'?
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
+Error: there is nothing named ofo.
+Perhaps you meant 'foo'?
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
+Error: there is nothing named for.
+Perhaps you meant 'foo' or 'or'?
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
+Error: there is nothing named oof.
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html
+Error: there is nothing named Foo.
+Perhaps you meant 'foo'?
+https://disco-lang.readthedocs.io/en/latest/reference/unbound.html

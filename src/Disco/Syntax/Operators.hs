@@ -26,6 +26,7 @@ module Disco.Syntax.Operators (
   opTable,
   uopMap,
   bopMap,
+  opNames,
   uPrec,
   bPrec,
   assoc,
@@ -36,6 +37,7 @@ import Data.Data (Data)
 import GHC.Generics (Generic)
 import Unbound.Generics.LocallyNameless
 
+import Data.Char (isAlpha)
 import Data.Map (Map, (!))
 import qualified Data.Map as M
 
@@ -263,6 +265,9 @@ bopMap :: Map BOp OpInfo
 bopMap =
   M.fromList $
     [(op, info) | opLevel <- opTable, info@(OpInfo (BOpF _ op) _ _) <- opLevel]
+
+opNames :: [String]
+opNames = [syn | OpInfo _ syns _ <- concat opTable, syn <- filter (all isAlpha) syns]
 
 -- | A convenient function for looking up the precedence of a unary operator.
 uPrec :: UOp -> Int

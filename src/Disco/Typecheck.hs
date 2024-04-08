@@ -2,10 +2,6 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE OverloadedStrings #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Typecheck
 -- Copyright   :  disco team and contributors
@@ -101,6 +97,13 @@ inferTelescope inferOne tel = do
     extends ctx $ do
       (tybs, ctx') <- go bs
       return (tyb : tybs, ctx <> ctx')
+
+------------------------------------------------------------
+-- Variable name utilities
+------------------------------------------------------------
+
+suggestionsFrom :: String -> [String] -> [String]
+suggestionsFrom x = filter ((<= 1) . restrictedDamerauLevenshteinDistance defaultEditCosts x)
 
 ------------------------------------------------------------
 -- Modules
@@ -216,7 +219,7 @@ checkUnboundVars (TypeDefn _ args body) = go body
     | otherwise = throw $ UnboundTyVar x suggestions
    where
     xn = name2String x
-    suggestions = filter ((<= 2) . restrictedDamerauLevenshteinDistance defaultEditCosts xn) args
+    suggestions = suggestionsFrom xn args
   go (TyAtom _) = return ()
   go (TyUser name tys) = lookupTyDefn name tys >> mapM_ go tys
   go (TyCon _ tys) = mapM_ go tys
@@ -540,7 +543,10 @@ typecheck Infer (TVar x) = do
   -- Pick the first method that succeeds; if none do, throw an unbound
   -- variable error.
   mt <- runMaybeT . F.asum . map MaybeT $ [tryLocal, tryModule, tryPrim]
-  maybe (throw (Unbound x)) return mt
+  ctx <- ask @TyCtx
+  let inScope = map name2String (Ctx.names ctx) ++ opNames ++ [syn | PrimInfo _ syn _ <- M.elems primMap]
+      suggestions = suggestionsFrom (name2String x) inScope
+  maybe (throw $ Unbound x suggestions) return mt
  where
   -- 1. See if the variable name is bound locally.
   tryLocal = do
@@ -560,13 +566,13 @@ typecheck Infer (TVar x) = do
         (_, ty) <- unbind sig
         return . Just $ ATVar ty (m .- coerce x)
       [] -> return Nothing
-      _ -> throw $ Ambiguous x (map fst bs)
+      _nonEmpty -> throw $ Ambiguous x (map fst bs)
 
   -- 3. See if we should convert it to a primitive.
   tryPrim =
     case toPrim (name2String x) of
       (prim : _) -> Just <$> typecheck Infer (TPrim prim)
-      _ -> return Nothing
+      [] -> return Nothing
 
 --------------------------------------------------
 -- Primitives

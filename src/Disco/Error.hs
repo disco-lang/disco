@@ -112,6 +112,9 @@ rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page
 issue :: Int -> Sem r (Doc ann)
 issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
 
+squote :: String -> String
+squote x = "'" ++ x ++ "'"
+
 cyclicImportError ::
   Members '[Reader PA, LFresh] r =>
   [ModuleName] ->
@@ -144,11 +147,11 @@ prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r (Doc ann)
 prettyTCError = \case
   -- XXX include some potential misspellings along with Unbound
   --   see https://github.com/disco-lang/disco/issues/180
-  Unbound x ->
-    vcat
-      [ "Error: there is nothing named" <+> pretty' x <> "."
-      , rtd "unbound"
-      ]
+  Unbound x suggestions ->
+    vcat $
+      ["Error: there is nothing named" <+> pretty' x <> "."]
+        ++ ["Perhaps you meant" <+> intercalate " or" (map (text . squote) suggestions) <> "?" | not (null suggestions)]
+        ++ [rtd "unbound"]
   Ambiguous x ms ->
     vcat
       [ "Error: the name" <+> pretty' x <+> "is ambiguous. It could refer to:"
@@ -253,11 +256,10 @@ prettyTCError = \case
       ]
   -- XXX Mention the definition in which it was found
   UnboundTyVar v suggestions ->
-    let squote x = "'" ++ x ++ "'"
-     in vcat $
-          ["Error: Unknown type variable '" <> pretty' v <> "'."]
-            ++ ["Perhaps you meant" <+> intercalate " or" (map (text . squote) suggestions) <> "?" | not (null suggestions)]
-            ++ [rtd "unbound-tyvar"]
+    vcat $
+      ["Error: Unknown type variable '" <> pretty' v <> "'."]
+        ++ ["Perhaps you meant" <+> intercalate " or" (map (text . squote) suggestions) <> "?" | not (null suggestions)]
+        ++ [rtd "unbound-tyvar"]
   NoPolyRec s ss tys ->
     vcat
       [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."

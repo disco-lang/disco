@@ -51,8 +51,10 @@ noLoc = LocTCError Nothing
 
 -- | Potential typechecking errors.
 data TCError
-  = -- | Encountered an unbound variable
-    Unbound (Name Term)
+  = -- | Encountered an unbound variable.  The offending variable
+    --   together with some suggested in-scope names with small edit
+    --   distance.
+    Unbound (Name Term) [String]
   | -- | Encountered an ambiguous name.
     Ambiguous (Name Term) [ModuleName]
   | -- | No type is specified for a definition

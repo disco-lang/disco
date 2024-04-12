@@ -185,5 +185,5 @@ digitalExpansion :: Integer -> Integer -> Integer -> ([Integer], Int)
 digitalExpansion b n d = digits
  where
   longDivStep (_, r) = (b * r) `divMod` d
-  res = tail $ iterate longDivStep (0, n)
+  res = drop 1 $ iterate longDivStep (0, n)
   digits = first (map fst) (findRep res)

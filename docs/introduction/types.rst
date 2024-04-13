@@ -1,5 +1,5 @@
-Variables and types
-===================
+Types
+=====
 
 Every :doc:`expression </reference/expression>` in disco has a
 :doc:`type </reference/types>`. A *type* is a collection of values

@@ -20,4 +20,5 @@ more detail on some particular topic.
    :maxdepth: 1
 
    getting-started
-   vars-and-types
+   types
+   variables

@@ -29,6 +29,9 @@ Types have several benefits:
   is evaluated, it will result in a value of that type.
 * Types help make sure that we don't do nonsensical things, like ask
   for the length of a number, or add a number and a string.
+* Types aid us in keeping things straight in our own heads, especially
+  once we start dealing with more complex things such as functions and
+  sets.
 
 Let's begin by looking at a few standard built-in types.
 
@@ -85,7 +88,7 @@ or ``Integer``.
 
   - Even if we subtract two natural numbers, we get an integer:
 
-    ::
+     ::
 
        Disco> 1 - 3
        -2
@@ -107,3 +110,50 @@ or ``Integer``.
        3
        Disco> :type 5 - 2
        5 - 2 : ℤ
+
+Exercises
+---------
+
+What type will Disco give to each of the following expressions?
+Make a prediction, then use the ``:type`` command to see if you were
+right.
+
+- ``1``
+- ``777``
+- ``-2``
+- ``0``
+- ``1 + 99``
+- ``(-1) + 99``
+- ``1 + (-99)``
+- ``19 - 6``
+
+Fractional and Rational numbers
+-------------------------------
+
+Just as subtracting two natural numbers may not give us another
+natural number, we also cannot *divide* two natural numbers.
+
+- The natural numbers plus fractions such as ``2/3`` make up the type
+  of *fractional numbers*, written ``F``, ``𝔽``, ``Frac`` or ``Fractional``.
+  This type supports addition, multiplication, and division.
+
+- The integers plus all positive or negative fractions make up the
+  type of *rational numbers*, written ``Q``, ``ℚ``, or ``Rational``.
+  This type supports all four standard arithmetic operations:
+  addition, multiplication, subtraction, and division.
+
+You will learn more about these types, how to convert between them,
+*etc.*; for now it's important just to know that they exist and to
+understand the basic distinctions between them.
+
+Exercises
+---------
+
+What type will Disco give to each of the following expressions?
+Make a prediction, then use the ``:type`` command to see if you were
+right.
+
+- ``2 / 3``
+- ``5 / (-6)``
+- ``(-5)``
+- ``(2 / 3) + (-5)``

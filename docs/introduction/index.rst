@@ -22,3 +22,4 @@ more detail on some particular topic.
    getting-started
    types
    variables
+   arithmetic

@@ -111,12 +111,18 @@ or ``Integer``.
        Disco> :type 5 - 2
        5 - 2 : ℤ
 
+Subtyping
+---------
+
+XXX need to say (+ show with example) that Disco can automatically
+convert from N to Z.
+
 Exercises
 ---------
 
-What type will Disco give to each of the following expressions?
-Make a prediction, then use the ``:type`` command to see if you were
-right.
+What **type** will Disco give to each of the following expressions?
+(You do not have to predict their value.)  Make a prediction, then
+use the ``:type`` command to see if you were right.
 
 - ``1``
 - ``777``
@@ -149,9 +155,9 @@ understand the basic distinctions between them.
 Exercises
 ---------
 
-What type will Disco give to each of the following expressions?
-Make a prediction, then use the ``:type`` command to see if you were
-right.
+What **type** will Disco give to each of the following expressions?
+(You do not have to predict their value.)  Make a prediction, then use
+the ``:type`` command to see if you were right.
 
 - ``2 / 3``
 - ``5 / (-6)``

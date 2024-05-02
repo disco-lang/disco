@@ -18,4 +18,4 @@ grammar", that is, the various ways to write valid Disco programs.
    case
    comment
    docs
-   tydef
+   typedef

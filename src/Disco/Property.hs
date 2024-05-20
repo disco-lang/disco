@@ -28,7 +28,6 @@ import Prelude hiding ((<>))
 import Data.Char (toLower)
 import qualified Data.Enumeration.Invertible as E
 
-import Disco.Effects.Random
 import Polysemy
 
 import Disco.AST.Typed
@@ -41,6 +40,7 @@ import Disco.Typecheck.Erase (eraseProperty)
 import Disco.Types (TyDefCtx)
 import Disco.Value
 import Polysemy.Reader
+import Polysemy.Random
 
 -- | Toggles which outcome (finding or not finding the thing being
 --   searched for) qualifies as success, without changing the thing

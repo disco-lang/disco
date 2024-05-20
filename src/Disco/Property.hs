@@ -39,8 +39,8 @@ import Disco.Syntax.Prims
 import Disco.Typecheck.Erase (eraseProperty)
 import Disco.Types (TyDefCtx)
 import Disco.Value
-import Polysemy.Reader
 import Polysemy.Random
+import Polysemy.Reader
 
 -- | Toggles which outcome (finding or not finding the thing being
 --   searched for) qualifies as success, without changing the thing

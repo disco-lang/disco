@@ -60,8 +60,8 @@ import Disco.Effects.Fresh
 import Disco.Effects.Input
 import Polysemy
 import Polysemy.Error
-import Polysemy.State
 import Polysemy.Random
+import Polysemy.State
 
 ------------------------------------------------------------
 -- Utilities

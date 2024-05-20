@@ -48,6 +48,6 @@ absorbWithSem ::
 absorbWithSem d i m = R.reify d $ \(_ :: Proxy (s :: Type)) ->
   m
     \\ C.trans
-      (C.unsafeCoerceConstraint :: ((p (x m s) :- p m)))
+      (C.unsafeCoerceConstraint :: (p (x m s) :- p m))
       i
 {-# INLINEABLE absorbWithSem #-}

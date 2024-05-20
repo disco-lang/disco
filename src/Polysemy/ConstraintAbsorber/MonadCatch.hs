@@ -77,7 +77,7 @@ absorbMonadThrow ::
   -- 'Sem'. This might be something with type @'C.MonadCatch' e m => m a@.
   (C.MonadThrow (Sem r) => Sem r a) ->
   Sem r a
-absorbMonadThrow main = absorbMonadCatch main
+absorbMonadThrow = absorbMonadCatch
 {-# INLINEABLE absorbMonadThrow #-}
 
 ------------------------------------------------------------------------------
@@ -122,7 +122,7 @@ instance
   catch x f =
     let catchF = catch_ (reflect $ Proxy @s')
      in Action $
-          (action x) `catchF` \e -> case C.fromException e of
+          action x `catchF` \e -> case C.fromException e of
             Just e' -> action $ f e'
             _ -> throwM_ (reflect $ Proxy @s') (C.toException e)
   {-# INLINEABLE catch #-}

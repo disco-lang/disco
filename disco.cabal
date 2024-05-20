@@ -419,7 +419,6 @@ library
                        Disco.Effects.Fresh
                        Disco.Effects.Input
                        Disco.Effects.LFresh
-                       Disco.Effects.Random
                        Disco.Effects.State
                        Disco.Effects.Store
                        Disco.AST.Core
@@ -462,6 +461,10 @@ library
                        Disco.Doc
 
   other-modules:       Paths_disco
+                       Polysemy.ConstraintAbsorber
+                       Polysemy.ConstraintAbsorber.MonadCatch
+                       Polysemy.Random
+
   autogen-modules:     Paths_disco
 
   build-depends:       base >=4.8 && <4.18,
@@ -480,7 +483,10 @@ library
                        -- constraint, hence a breaking change
                        polysemy >= 1.6.0.0 && < 1.10,
                        polysemy-plugin >= 0.4 && < 0.5,
-                       polysemy-zoo >= 0.7 && < 0.9,
+                       reflection >= 2.1.7 && < 2.2,
+                       random >= 1.2.1.1 && < 1.3,
+                       constraints >= 0.13.4 && < 0.14,
+                       text >= 2.0.2 && < 2.1,
                        lens >= 4.14 && < 5.3,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.14,

@@ -58,9 +58,9 @@ import Math.NumberTheory.Primes.Testing (isPrime)
 
 import Disco.Effects.Fresh
 import Disco.Effects.Input
-import Disco.Effects.Random
 import Polysemy
 import Polysemy.Error
+import Polysemy.Random
 import Polysemy.State
 
 ------------------------------------------------------------

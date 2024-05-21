@@ -3,6 +3,9 @@ module Main (main, pFn) where
 import qualified Data.Text.IO as TIO
 import Text.Megaparsec (eof, many, runParser, errorBundlePretty)
 import Parse
+import GuardTree
+import Data.List.NonEmpty (fromList)
+import Data.Text (Text)
 
 parseFile :: String -> IO [FunctionDef]
 parseFile file = do
@@ -12,8 +15,10 @@ parseFile file = do
     Left e -> error $ errorBundlePretty e
     Right defs -> return defs
 
-p :: String -> IO ()
-p x = parseFile x >>= print
-
 main :: IO ()
-main = p "test/test.disc"
+main = pfg "test/test.disc" >>= print
+
+pfg :: String -> IO [(Text, Gdt)]
+pfg file = do
+  defs <- parseFile file
+  return $ map (\(FunctionDef (FunctionDecl name _ _) clauses) -> (name, desugarClauses $ fromList clauses)) defs

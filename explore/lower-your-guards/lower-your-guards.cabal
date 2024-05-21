@@ -13,7 +13,6 @@ build-type:          Simple
 executable lower-your-guards
   hs-source-dirs:      src
   main-is:             Main.hs
-  other-modules:       Parse
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5,
                        megaparsec >= 6.1.1 && < 9.7,
@@ -29,3 +28,5 @@ executable lower-your-guards
                        -Wredundant-constraints
   default-extensions:  GADTs
                        OverloadedStrings
+  other-modules:       Parse,
+                       GuardTree

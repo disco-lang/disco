@@ -1,0 +1,26 @@
+cabal-version:       2.2
+
+name:                lower-your-guards
+version:             0.1.0.0
+license:             BSD-3-Clause
+license-file:        LICENSE
+author:              Colin Phillips
+maintainer:          col.phillips2004@gmail.com
+copyright:           2024 Colin Phillips
+category:            Language
+build-type:          Simple
+
+executable lower-your-guards
+  hs-source-dirs:      src
+  main-is:             Main.hs
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+  ghc-options:         -Wall
+                       -Wcompat
+                       -Widentities
+                       -Wincomplete-record-updates
+                       -Wincomplete-uni-patterns
+                       -Wmissing-export-lists
+                       -Wmissing-home-modules
+                       -Wpartial-fields
+                       -Wredundant-constraints

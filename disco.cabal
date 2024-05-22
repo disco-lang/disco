@@ -12,7 +12,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC ==8.10.7 || ==9.2.5 || ==9.4.3
+tested-with:         GHC ==9.4.8 || ==9.6.5 || ==9.8.2
 
 data-dir:            lib
 
@@ -467,7 +467,7 @@ library
 
   autogen-modules:     Paths_disco
 
-  build-depends:       base >=4.8 && <4.18,
+  build-depends:       base >=4.8 && <4.20,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.4,
@@ -476,25 +476,24 @@ library
                        prettyprinter >=1.7 && < 1.8,
                        split >= 0.2 && < 0.3,
                        transformers >= 0.4 && < 0.7,
-                       containers >=0.5 && <0.7,
-                       unbound-generics >= 0.3 && < 0.4.3,
-                       -- unbound-generics 0.4.3 added substBvs to
-                       -- Subst class which adds a new Generic
-                       -- constraint, hence a breaking change
+                       containers >=0.5 && <0.8,
+                       unbound-generics >= 0.4.4 && < 0.5,
+                       -- Need the Alpha and Subst instances for
+                       -- NonEmpty from unbound-generics 0.4.4
                        polysemy >= 1.6.0.0 && < 1.10,
                        polysemy-plugin >= 0.4 && < 0.5,
                        reflection >= 2.1.7 && < 2.2,
                        random >= 1.2.1.1 && < 1.3,
-                       constraints >= 0.13.4 && < 0.14,
-                       text >= 2.0.2 && < 2.1,
-                       lens >= 4.14 && < 5.3,
+                       constraints >= 0.13.4 && < 0.15,
+                       text >= 2.0.2 && < 2.2,
+                       lens >= 4.14 && < 5.4,
                        exact-combinatorics >= 0.2 && < 0.3,
                        arithmoi >= 0.10 && < 0.14,
                        integer-logarithms >= 1.0 && < 1.1,
                        simple-enumeration >= 0.2 && < 0.3,
                        haskeline >=0.8 && <0.9,
                        exceptions >= 0.10 && < 0.11,
-                       QuickCheck >= 2.9 && < 2.15,
+                       QuickCheck >= 2.9 && < 2.16,
                        splitmix >= 0.1 && < 0.2,
                        fgl >= 5.5 && < 5.9,
                        optparse-applicative >= 0.12 && < 0.19,
@@ -503,6 +502,7 @@ library
                        pretty-show >= 1.10 && < 1.11,
                        boxes >= 0.1.5 && < 0.2,
                        edit-distance >= 0.2 && < 0.3,
+                       infinite-list >= 0.1 && < 0.2,
 
   hs-source-dirs:      src
   default-language:    Haskell2010
@@ -520,9 +520,9 @@ executable disco
                        mtl >=2.2 && <2.4,
                        transformers >= 0.4 && < 0.7,
                        megaparsec >= 6.1.1 && < 9.7,
-                       containers >= 0.5 && < 0.7,
-                       unbound-generics >= 0.3 && < 0.4.3,
-                       lens >= 4.14 && < 5.3,
+                       containers >= 0.5 && < 0.8,
+                       unbound-generics >= 0.3 && < 0.5,
+                       lens >= 4.14 && < 5.4,
                        optparse-applicative >= 0.12 && < 0.19
                        -- oeis2 < 1.1
 
@@ -534,7 +534,8 @@ test-suite disco-tests
   main-is: Tests.hs
   hs-source-dirs: test
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.18,
+  build-tool-depends: disco:disco
+  build-depends:    base >= 4.7 && < 4.20,
                     tasty >= 0.10 && < 1.6,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
@@ -550,7 +551,8 @@ test-suite disco-examples
   main-is: TestExamples.hs
   hs-source-dirs: example
   ghc-options: -threaded
-  build-depends:    base >= 4.7 && < 4.18,
+  build-tool-depends: disco:disco
+  build-depends:    base >= 4.7 && < 4.20,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.5,
                     process >= 1.4 && < 1.7

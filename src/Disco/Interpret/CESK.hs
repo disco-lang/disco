@@ -27,6 +27,7 @@ import Control.Arrow ((***), (>>>))
 import Control.Monad ((>=>))
 import Data.Bifunctor (first, second)
 import Data.List (find)
+import qualified Data.List.Infinite as InfList
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Ratio
@@ -522,9 +523,9 @@ integerSqrt' n =
       (lowerRoot, lowerN) =
         last $ takeWhile ((n >=) . snd) $ zip (1 : twopows) twopows
       newtonStep x = div (x + div n x) 2
-      iters = iterate newtonStep (integerSqrt' (div n lowerN) * lowerRoot)
+      iters = InfList.iterate' newtonStep (integerSqrt' (div n lowerN) * lowerRoot)
       isRoot r = r ^! 2 <= n && n < (r + 1) ^! 2
-   in head $ dropWhile (not . isRoot) iters
+   in InfList.head $ InfList.dropWhile (not . isRoot) iters
 
 -- this operator is used for `integerSqrt'`
 (^!) :: Num a => a -> Int -> a
@@ -599,7 +600,7 @@ babbage (x : xs) = scanl (+) x (babbage (diff (x : xs)))
 -- | Compute the forward difference of the given sequence, that is,
 --   differences of consecutive pairs of elements.
 diff :: Num a => [a] -> [a]
-diff xs = zipWith (-) (tail xs) xs
+diff xs = zipWith (-) (drop 1 xs) xs
 
 -- | Take forward differences until the result is constant, and return
 --   the constant.  The sign of the constant difference tells us the

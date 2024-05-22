@@ -73,7 +73,7 @@ rt = local (\(PA p _) -> PA p InR)
 mparens :: Member (Reader PA) r => PA -> Sem r (Doc ann) -> Sem r (Doc ann)
 mparens pa doc = do
   parentPA <- ask
-  (if pa < parentPA then parens else id) doc
+  (if pa `lowerPrec` parentPA then parens else id) doc
 
 ------------------------------------------------------------
 -- Pretty type class
@@ -185,5 +185,5 @@ digitalExpansion :: Integer -> Integer -> Integer -> ([Integer], Int)
 digitalExpansion b n d = digits
  where
   longDivStep (_, r) = (b * r) `divMod` d
-  res = tail $ iterate longDivStep (0, n)
+  res = drop 1 $ iterate longDivStep (0, n)
   digits = first (map fst) (findRep res)

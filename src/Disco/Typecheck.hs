@@ -15,12 +15,14 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad.Except
+import Control.Monad (forM_, unless, when, zipWithM)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
 import qualified Data.Foldable as F
-import Data.List (group, sort)
+import Data.List (sort)
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (isJust)
@@ -243,7 +245,7 @@ checkPolyRec (TypeDefn name args body) = go body
 --   >>> filterDups [1,3,2,1,1,4,2]
 --   [1,2]
 filterDups :: Ord a => [a] -> [a]
-filterDups = map head . filter ((> 1) . length) . group . sort
+filterDups = map NE.head . filter ((> 1) . NE.length) . NE.group . sort
 
 --------------------------------------------------
 -- Type declarations
@@ -289,7 +291,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
   -- Try to decompose the type into a chain of arrows like pty1 ->
   -- pty2 -> pty3 -> ... -> bodyTy, according to the number of
   -- patterns, and lazily unrolling type definitions along the way.
-  (patTys, bodyTy) <- decomposeDefnTy (numPats (head clauses)) ty
+  (patTys, bodyTy) <- decomposeDefnTy (numPats (NE.head clauses)) ty
 
   ((acs, _), theta) <- solve $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
@@ -299,9 +301,8 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
  where
   numPats = length . fst . unsafeUnbind
 
-  checkNumPats [] = return () -- This can't happen, but meh
-  checkNumPats [_] = return ()
-  checkNumPats (c : cs)
+  checkNumPats (_ :| []) = return ()
+  checkNumPats (c :| cs)
     | all ((== 0) . numPats) (c : cs) = throw (DuplicateDefns x)
     | not (all ((== numPats c) . numPats) cs) = throw NumPatterns
     -- XXX more info, this error actually means # of
@@ -467,7 +468,7 @@ inferTop t = do
       cvs = containerVars (getType at')
 
       -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+      at'' = applySubst (Subst.fromList $ map (,TyAtom (ABase CtrList)) (S.toList cvs)) at'
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
@@ -980,7 +981,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
   extends ctx $
-    ATAbs Lam checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
+    ATAbs Lam checkTy . bind (coerce typedArgs) <$> check t resTy
  where
   -- Given the patterns and their optional type annotations in the
   -- head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the

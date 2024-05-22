@@ -1,4 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Functor law" #-}
 
 -- |
 -- Module      :  Disco.Parser
@@ -109,16 +112,17 @@ import Control.Lens (
   (&),
   (.=),
  )
+import Control.Monad (guard, void)
 import Control.Monad.State
 import Data.Char (isAlpha, isDigit)
 import Data.Foldable (asum)
 import Data.List (find, intercalate)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
 import Data.Ratio
 import Data.Set (Set)
 import qualified Data.Set as S
-
 import Disco.AST.Surface
 import Disco.Extensions
 import Disco.Module
@@ -345,7 +349,7 @@ decimal =
     -- either some digits optionally followed by bracketed digits...
     (,) <$> some digit <*> optional (brackets (some digit))
       -- ...or just bracketed digits.
-      <|> ([],) <$> (Just <$> brackets (some digit))
+      <|> (([],) . Just <$> brackets (some digit))
 
   readDecimal a (b, mrep) =
     read a % 1 -- integer part
@@ -542,7 +546,9 @@ parseModule mode = do
   defnGroups [] = []
   defnGroups (d@DType {} : ds) = d : defnGroups ds
   defnGroups (d@DTyDef {} : ds) = d : defnGroups ds
-  defnGroups (DDefn (TermDefn x bs) : ds) = DDefn (TermDefn x (bs ++ concatMap (\(TermDefn _ cs) -> cs) grp)) : defnGroups rest
+  defnGroups (DDefn (TermDefn x bs) : ds) =
+    DDefn (TermDefn x (bs `NE.appendList` concatMap (\(TermDefn _ cs) -> NE.toList cs) grp))
+      : defnGroups rest
    where
     (grp, rest) = matchDefn ds
     matchDefn :: [Decl] -> ([TermDefn], [Decl])
@@ -650,7 +656,7 @@ parseTyDecl =
 parseDefn :: Parser TermDefn
 parseDefn =
   label "definition" $
-    (\(x, ps) body -> TermDefn x [bind ps body])
+    (\(x, ps) body -> TermDefn x (NE.singleton (bind ps body)))
       -- Only backtrack if we don't get a complete 'LHS ='.  Once we see
       -- an = sign, commit to parsing a definition, because it can't be a
       -- valid standalone expression anymore.  If the RHS fails, we don't

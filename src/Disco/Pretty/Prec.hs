@@ -19,10 +19,26 @@ import Disco.Syntax.Operators
 type Prec = Int
 
 data PA = PA Prec BFixity
-  deriving (Show, Eq)
+  deriving (Show, Eq) -- Do NOT derive Ord, see note below.
 
-instance Ord PA where
-  compare (PA p1 a1) (PA p2 a2) = compare p1 p2 `mappend` (if a1 == a2 then EQ else LT)
+lowerPrec :: PA -> PA -> Bool
+lowerPrec (PA p1 a1) (PA p2 a2) = p1 < p2 || (p1 == p2 && a1 /= a2)
+
+-- Note re: lowerPrec: we used to have an unlawful Ord instance defined by
+--
+--   compare (PA p1 a1) (PA p2 a2) = compare p1 p2 `mappend` (if a1 == a2 then EQ else LT)
+--
+-- with the idea that we could test whether one precedence was lower
+-- than another simply using (<).
+--
+-- However, this was unlawful since e.g. it does not satisfy x < y ==
+-- y > x: If x and y have the same Prec value but different BFixity
+-- values, we would have both x < y and y < x.
+--
+-- In base-4.18 apparently something in the default implementations of
+-- Ord methods changed so that e.g. not (PA 2 InR < PA 2 InL).  Hence
+-- the 'mparens' method in such cases of nested same-precedence
+-- operators was not emitting parentheses in cases where it should.
 
 -- Standard precedence levels
 

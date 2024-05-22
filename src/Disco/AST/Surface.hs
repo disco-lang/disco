@@ -108,26 +108,25 @@ module Disco.AST.Surface (
 )
 where
 
-import Prelude hiding ((<>))
-
 import Control.Lens ((%~), _1, _2, _3)
 import Data.Char (toLower)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Void
-
-import Disco.Effects.LFresh
-import Polysemy hiding (Embed, embed)
-import Polysemy.Reader
-
 import Disco.AST.Generic
+import Disco.Effects.LFresh
 import Disco.Extensions
 import Disco.Pretty
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Types
+import Polysemy hiding (Embed, embed)
+import Polysemy.Reader
 import Unbound.Generics.LocallyNameless hiding (LFresh (..), lunbind)
+import Prelude hiding ((<>))
 
 -- | The extension descriptor for Surface specific AST types.
 data UD
@@ -188,7 +187,7 @@ data TypeDecl = TypeDecl (Name Term) PolyType
 -- | A group of definition clauses of the form @name pat1 .. patn = term@. The
 --   patterns bind variables in the term. For example, @f n (x,y) =
 --   n*x + y@.
-data TermDefn = TermDefn (Name Term) [Bind [Pattern] Term]
+data TermDefn = TermDefn (Name Term) (NonEmpty (Bind [Pattern] Term))
 
 -- | A user-defined type (potentially recursive).
 --
@@ -224,7 +223,7 @@ instance Pretty Decl where
     DType (TypeDecl x ty) -> pretty x <+> text ":" <+> pretty ty
     DTyDef (TypeDefn x args body) ->
       text "type" <+> text x <+> hsep (map text args) <+> text "=" <+> pretty body
-    DDefn (TermDefn x bs) -> vcat $ map (pretty . (x,)) bs
+    DDefn (TermDefn x bs) -> vcat $ map (pretty . (x,)) (NE.toList bs)
 
 -- | Pretty-print a single clause in a definition.
 instance Pretty (Name a, Bind [Pattern] Term) where

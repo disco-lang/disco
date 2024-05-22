@@ -15,10 +15,6 @@
 -- to resolve the location of a module on disk.
 module Disco.Module where
 
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-import Data.Data (Data)
-import GHC.Generics (Generic)
 import Control.Lens (
   Getting,
   foldOf,
@@ -28,10 +24,14 @@ import Control.Lens (
 import Control.Monad (filterM)
 import Control.Monad.IO.Class (MonadIO (..))
 import Data.Bifunctor (first)
+import Data.Data (Data)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Maybe (listToMaybe)
 import qualified Data.Set as S
+import GHC.Generics (Generic)
 import System.Directory (doesFileExist)
 import System.FilePath (
   replaceExtension,

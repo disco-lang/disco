@@ -543,8 +543,8 @@ parseModule mode = do
   defnGroups [] = []
   defnGroups (d@DType {} : ds) = d : defnGroups ds
   defnGroups (d@DTyDef {} : ds) = d : defnGroups ds
-  defnGroups (DDefn (TermDefn x bs) : ds)
-    = DDefn (TermDefn x (bs `NE.appendList` concatMap (\(TermDefn _ cs) -> NE.toList cs) grp))
+  defnGroups (DDefn (TermDefn x bs) : ds) =
+    DDefn (TermDefn x (bs `NE.appendList` concatMap (\(TermDefn _ cs) -> NE.toList cs) grp))
       : defnGroups rest
    where
     (grp, rest) = matchDefn ds

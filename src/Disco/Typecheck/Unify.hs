@@ -14,8 +14,8 @@ module Disco.Typecheck.Unify where
 
 import Unbound.Generics.LocallyNameless (Name, fv)
 
-import Control.Monad (mzero)
 import Control.Lens (anyOf)
+import Control.Monad (mzero)
 import Control.Monad.State
 import qualified Data.Map as M
 import Data.Set (Set)

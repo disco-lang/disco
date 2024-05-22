@@ -1127,6 +1127,7 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
           if getSort vm v == S.fromList [QBool]
             then Just (coerce v |-> B)
             else -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
+
               (coerce v |->)
                 <$> lubBySort
                   vm

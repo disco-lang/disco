@@ -8,6 +8,8 @@ import Parse
 import Text.Megaparsec (eof, errorBundlePretty, many, runParser)
 import qualified Uncovered as U
 import Text.Pretty.Simple (pPrint)
+import qualified Inhabitants as I
+import qualified Data.Set as S
 
 parseFile :: String -> IO [FunctionDef]
 parseFile file = do
@@ -32,5 +34,15 @@ pdu file = do
     map
       ( \(FunctionDef (FunctionDecl name tIn _) clauses) ->
           (name, U.uncovered ([("x_1", tIn)], U.T) $ G.desugarClauses $ fromList clauses)
+      )
+      defs
+
+pdui :: String -> IO [(Text, S.Set I.NormRefType)]
+pdui file = do
+  defs <- parseFile file
+  return $
+    map
+      ( \(FunctionDef (FunctionDecl name tIn _) clauses) ->
+          (name, I.genInhabitants $ U.uncovered ([("x_1", tIn)], U.T) $ G.desugarClauses $ fromList clauses)
       )
       defs

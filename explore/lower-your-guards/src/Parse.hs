@@ -28,7 +28,8 @@ data Type where
   TBool :: Type
   TPair :: Type -> Type -> Type
   TFn :: Type -> Type -> Type
-  deriving (Show, Eq)
+  ColinMistake :: Type
+  deriving (Show, Eq, Ord)
 
 data Clause where
   Clause :: Pattern -> Expr -> Clause

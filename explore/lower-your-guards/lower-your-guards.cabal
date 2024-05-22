@@ -18,6 +18,7 @@ executable lower-your-guards
                        megaparsec >= 6.1.1 && < 9.7,
                        text >= 2.0.2 && < 2.1,
                        pretty-simple,
+                       containers,
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities
@@ -27,8 +28,11 @@ executable lower-your-guards
                        -Wmissing-home-modules
                        -Wpartial-fields
                        -Wredundant-constraints
-  default-extensions:  GADTs
-                       OverloadedStrings
+  default-extensions:  GADTs,
+                       OverloadedStrings,
+                       LambdaCase,
+                       TupleSections
   other-modules:       Parse,
                        GuardTree,
                        Uncovered
+                       Inhabitants

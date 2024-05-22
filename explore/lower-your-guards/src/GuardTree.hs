@@ -7,6 +7,7 @@ import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Parse as P
+import qualified Types as Ty
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -15,12 +16,10 @@ data Gdt where
   deriving (Show, Eq)
 
 data Guard where
-  Match :: DataCon -> [Var] -> Var -> Guard
+  Match :: Ty.DataConstructor -> [Var] -> Var -> Guard
   MatchLit :: Int -> Var -> Guard
-  Let :: Var -> Var -> Guard
+  Let :: Var -> Ty.Type -> Var -> Guard
   deriving (Show, Eq)
-
-type DataCon = Text
 
 type Var = Text
 
@@ -31,16 +30,16 @@ desugarClauses :: NonEmpty P.Clause -> Gdt
 desugarClauses clauses = foldr1 Branch $ NE.map desugarClause $ enumerate clauses
 
 desugarClause :: (Int, P.Clause) -> Gdt
-desugarClause (i, P.Clause pat _) = foldr Guarded (Grhs i) guards
+desugarClause (i, P.Clause pat typeIn _) = foldr Guarded (Grhs i) guards
   where
-    guards = desugarMatch "x_1" pat
+    guards = desugarMatch "x_1" typeIn pat
 
-desugarMatch :: Text -> P.Pattern -> [Guard]
-desugarMatch var pat = case pat of
+desugarMatch :: Var -> Ty.Type -> P.Pattern -> [Guard]
+desugarMatch var varType pat = case pat of
   P.PWild -> []
   P.PLit i -> [MatchLit i var]
-  P.PVar (P.Var a) -> [Let a var]
-  P.PMatch dataCon subPats -> Match dataCon ys var : concat (zipWith desugarMatch ys subPats)
+  P.PVar (P.Var a) -> [Let a varType var]
+  P.PMatch dataCon subPats -> Match dataCon ys var : concat (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
     where
       ys = getYs (length subPats)
 

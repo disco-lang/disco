@@ -35,4 +35,5 @@ executable lower-your-guards
   other-modules:       Parse,
                        GuardTree,
                        Uncovered
-                       Inhabitants
+                       Inhabitants,
+                       Types

@@ -11,35 +11,37 @@ import Data.Functor (($>), (<&>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Void (Void)
-import Text.Megaparsec (Parsec, choice, satisfy)
+import Text.Megaparsec (Parsec, choice, satisfy, lookAhead)
 import Text.Megaparsec.Char as C (alphaNumChar, space1, string)
 import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Types as Ty
+import Data.Char (isUpper, isSymbol)
 
 data FunctionDecl where
-  FunctionDecl :: Text -> Type -> Type -> FunctionDecl
+  FunctionDecl :: Text -> Ty.Type -> Ty.Type -> FunctionDecl
   deriving (Show, Eq)
 
 data FunctionDef where
   FunctionDef :: FunctionDecl -> [Clause] -> FunctionDef
   deriving (Show, Eq)
 
-data Type where
-  TInt :: Type
-  TBool :: Type
-  TPair :: Type -> Type -> Type
-  TFn :: Type -> Type -> Type
-  ColinMistake :: Type
-  deriving (Show, Eq, Ord)
+-- data Type where
+--   TInt :: Type
+--   TBool :: Type
+--   TPair :: Type -> Type -> Type
+--   TFn :: Type -> Type -> Type
+--   ColinMistake :: Type
+--   deriving (Show, Eq, Ord)
 
 data Clause where
-  Clause :: Pattern -> Expr -> Clause
+  Clause :: Pattern -> Ty.Type -> Expr -> Clause
   deriving (Show, Eq)
 
 data Pattern where
   PLit :: Int -> Pattern
   PWild :: Pattern
   PVar :: Var -> Pattern
-  PMatch :: Text -> [Pattern] -> Pattern
+  PMatch :: Ty.DataConstructor -> [Pattern] -> Pattern
   deriving (Show, Eq)
 
 newtype Var = Var Text
@@ -83,53 +85,64 @@ pFnDecl = do
 
   return $ FunctionDecl name tFrom tTo
 
--- pDataCons :: Parser Text
--- pDataCons = choice . map symbol $ [","]
+pDataCons :: [Ty.DataConstructor] -> Parser Ty.DataConstructor
+pDataCons possible = choice $ map (\x -> x <$ symbol (Ty.dcName x)) possible
 
-pDataConsMatch :: Parser Pattern
-pDataConsMatch =
+pDataConsMatch :: Ty.Type -> Parser Pattern
+pDataConsMatch typeIn =
   do
-    dataCon <- symbol ","
-    terms <- replicateM 2 pPattern
-    return $ PMatch dataCon terms
+    _ <- lookAhead $ satisfy (\x -> isUpper x || x == ',')
+    let eCons = Ty.dataCons typeIn
+    case eCons of
+      Right () -> error "TODO (colin): int type"
+      Left cons -> do
+          dataCon <- pDataCons cons
+          terms <- mapM pPattern (Ty.dcTypes dataCon) 
+          return $ PMatch dataCon terms
 
-pPattern :: Parser Pattern
-pPattern =
+pPattern :: Ty.Type -> Parser Pattern
+pPattern typeIn =
   choice
-    [ pDataConsMatch,
+    [ 
       pInteger <&> PLit,
       symbol "_" $> PWild,
+      pDataConsMatch typeIn,
       pName <&> PVar . Var
     ]
 
-pClause :: Text -> Parser Clause
-pClause name = do
+pClause :: Text -> Ty.Type -> Parser Clause
+pClause name typeIn = do
   _ <- lexeme (string name)
 
-  pat <- pPattern
+  pat <- pPattern typeIn
 
   _ <- symbol "="
 
   expr <- Expr . T.pack <$> some (satisfy (/= '\n')) <* sc
 
-  return $ Clause pat expr
+  return $ Clause pat typeIn expr
 
 pFn :: Parser FunctionDef
 pFn = do
   fnDecl <- pFnDecl
-  let FunctionDecl name _ _ = fnDecl
-  clauses <- some (pClause name)
+  let FunctionDecl name typeIn _ = fnDecl
+  clauses <- some (pClause name typeIn)
 
   return $ FunctionDef fnDecl clauses
 
-pType :: Parser Type
+pType :: Parser Ty.Type
 pType =
   choice
-    [ TInt <$ lexeme (string "Int"),
-      TBool <$ lexeme (string "Bool"),
+    [ Ty.int <$ lexeme (string "Int"),
+      Ty.bool <$ lexeme (string "Bool"),
       do
         _ <- symbol ","
         l <- pType
         r <- pType
-        return $ TPair l r
+        return $ Ty.pair l r,
+      do
+        _ <- lexeme (string "Either")
+        l <- pType
+        r <- pType
+        return $ Ty.either l r
     ]

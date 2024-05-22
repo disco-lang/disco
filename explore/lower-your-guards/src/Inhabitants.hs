@@ -5,17 +5,17 @@ module Inhabitants where
 
 import qualified Data.Set as S
 import Data.Text (Text)
-import qualified Parse as P
 import qualified Uncovered as U
+import qualified Types as Ty
 
 type NormRefType = (U.Context, [Constraint])
 
 data Constraint where
-  MatchDataCon :: Text -> [Text] -> Text -> Constraint
-  NotDataCon :: Text -> Text -> Constraint
+  MatchDataCon :: Ty.DataConstructor -> [Text] -> Text -> Constraint
+  NotDataCon :: Ty.DataConstructor -> Text -> Constraint
   MatchIntLit :: Int -> Text -> Constraint
   NotIntLit :: Int -> Text -> Constraint
-  TypeEquality :: Text -> Text -> Constraint
+  TermEquality :: Text -> Text -> Constraint
   deriving (Show, Eq, Ord)
 
 genInhabitants :: U.RefinementType -> S.Set NormRefType
@@ -30,9 +30,9 @@ normalize (Just nref) fl = maybe S.empty S.singleton (nref <+> fl)
 (<+>) :: NormRefType -> U.Formula -> Maybe NormRefType
 _ <+> U.F = Nothing
 n <+> U.T = Just n
-(context, constraints) <+> U.MatchDataCon dc vars x = Just (context ++ map (,P.ColinMistake) vars, constraints) <+| MatchDataCon dc vars x
+(context, constraints) <+> U.MatchDataCon k ys x = Just (context ++ zip ys (Ty.dcTypes k), constraints) <+| MatchDataCon k ys x
 n <+> U.NotDataCon k x = Just n <+| NotDataCon k x
-(context, constraints) <+> U.Let x y = Just (context ++ [(x,P.ColinMistake)], constraints) <+| TypeEquality x y
+(context, constraints) <+> U.Let x xType y = Just (context ++ [(x,xType)], constraints) <+| TermEquality x y
 (context, constraints) <+> U.MatchIntLit i x = Just (context, constraints) <+| MatchIntLit i x
 n <+> U.NotIntLit i x = Just n <+| NotIntLit i x
 
@@ -50,9 +50,9 @@ Just (ctx, cns) <+| NotDataCon k x
   | otherwise = Just (ctx, cns ++ [NotDataCon k origX])
   where
     origX = lookupVar x cns
-Just (ctx, cns) <+| TypeEquality x y
+Just (ctx, cns) <+| TermEquality x y
   | x' == y' = Just (ctx, cns)
-  | otherwise = Just (ctx, cns ++ [TypeEquality x y])
+  | otherwise = Just (ctx, cns ++ [TermEquality x y])
   -- error "TODO(colin)"
   where
     x' = lookupVar x cns
@@ -71,12 +71,12 @@ Just (ctx, cns) <+| NotIntLit i x
     origX = lookupVar x cns
 
 
-isNotType :: Text -> Text -> (Constraint -> Bool)
+isNotType :: Text -> Ty.DataConstructor -> (Constraint -> Bool)
 isNotType origX k = \case
   NotDataCon k' x' | x' == origX && k' == k -> True
   _ -> False
 
-isType :: Text -> Text -> (Constraint -> Bool)
+isType :: Text -> Ty.DataConstructor -> (Constraint -> Bool)
 isType origX k = \case
   MatchDataCon k' _ x' | x' == origX && k' == k -> True
   _ -> False
@@ -93,5 +93,5 @@ isNotTheInt origX i = \case
 
 lookupVar :: Text -> [Constraint] -> Text
 lookupVar x [] = x
-lookupVar x (TypeEquality x' y : cs) | x' == x = lookupVar y cs
+lookupVar x (TermEquality x' y : cs) | x' == x = lookupVar y cs
 lookupVar x (_ : cs) = lookupVar x cs

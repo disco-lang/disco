@@ -4,22 +4,22 @@ module Uncovered where
 
 import Data.Text (Text)
 import qualified GuardTree as G
-import qualified Parse as P
+import qualified Types as Ty
 
 type RefinementType = (Context, Formula)
 
-type Context = [(G.Var, P.Type)]
+type Context = [(G.Var, Ty.Type)]
 
 data Formula where
   And :: Formula -> Formula -> Formula
   Or :: Formula -> Formula -> Formula
   T :: Formula
   F :: Formula
-  NotDataCon :: G.DataCon -> G.Var -> Formula
-  MatchDataCon :: G.DataCon -> [G.Var] -> G.Var -> Formula
+  NotDataCon :: Ty.DataConstructor -> G.Var -> Formula
+  MatchDataCon :: Ty.DataConstructor -> [G.Var] -> G.Var -> Formula
   NotIntLit :: Int -> G.Var -> Formula
   MatchIntLit :: Int -> G.Var -> Formula
-  Let :: G.Var -> Text -> Formula
+  Let :: G.Var -> Ty.Type -> G.Var -> Formula
   deriving (Show, Eq)
 
 uncovered :: RefinementType -> G.Gdt -> RefinementType
@@ -28,7 +28,7 @@ uncovered r g = case g of
   G.Branch t1 t2 -> uncovered (uncovered r t1) t2
   (G.Guarded (G.Match dataCon terms var) t) ->  (r `liftAnd` NotDataCon dataCon var) `union` uncovered (r `liftAnd` MatchDataCon dataCon terms var) t
   (G.Guarded (G.MatchLit i v) t) -> (r `liftAnd` NotIntLit i v) `union` uncovered (r `liftAnd` MatchIntLit i v) t
-  (G.Guarded (G.Let lhs rhs) t) -> uncovered (r `liftAnd` Let lhs rhs) t
+  (G.Guarded (G.Let lhs lType rhs) t) -> uncovered (r `liftAnd` Let lhs lType rhs) t
 
 liftAnd :: RefinementType -> Formula -> RefinementType
 liftAnd (cont, form) f = (cont, form `And` f)

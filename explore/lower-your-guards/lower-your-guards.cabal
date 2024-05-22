@@ -29,4 +29,5 @@ executable lower-your-guards
   default-extensions:  GADTs
                        OverloadedStrings
   other-modules:       Parse,
-                       GuardTree
+                       GuardTree,
+                       Uncovered

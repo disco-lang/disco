@@ -1,11 +1,12 @@
-module Main (main, pFn) where
+module Main (main, pfg, pdu) where
 
-import qualified Data.Text.IO as TIO
-import Text.Megaparsec (eof, many, runParser, errorBundlePretty)
-import Parse
-import GuardTree
 import Data.List.NonEmpty (fromList)
 import Data.Text (Text)
+import qualified Data.Text.IO as TIO
+import qualified GuardTree as G
+import Parse
+import Text.Megaparsec (eof, errorBundlePretty, many, runParser)
+import qualified Uncovered as U
 
 parseFile :: String -> IO [FunctionDef]
 parseFile file = do
@@ -16,9 +17,19 @@ parseFile file = do
     Right defs -> return defs
 
 main :: IO ()
-main = pfg "test/test.disc" >>= print
+main = pdu "test/test.disc" >>= print
 
-pfg :: String -> IO [(Text, Gdt)]
+pfg :: String -> IO [(Text, G.Gdt)]
 pfg file = do
   defs <- parseFile file
-  return $ map (\(FunctionDef (FunctionDecl name _ _) clauses) -> (name, desugarClauses $ fromList clauses)) defs
+  return $ map (\(FunctionDef (FunctionDecl name _ _) clauses) -> (name, G.desugarClauses $ fromList clauses)) defs
+
+pdu :: String -> IO [(Text, U.RefinementType)]
+pdu file = do
+  defs <- parseFile file
+  return $
+    map
+      ( \(FunctionDef (FunctionDecl name tIn _) clauses) ->
+          (name, U.uncovered ([("x_1", tIn)], U.Lit U.T) $ G.desugarClauses $ fromList clauses)
+      )
+      defs

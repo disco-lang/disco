@@ -25,19 +25,19 @@ where
 import Control.Monad (zipWithM)
 import Data.Bool (bool)
 import Data.Coerce
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe, isJust)
 import Disco.AST.Desugared
 import Disco.AST.Surface
 import Disco.AST.Typed
+import Disco.Effects.Fresh
 import Disco.Module
 import Disco.Names
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck (containerTy)
 import Disco.Types
-import Disco.Effects.Fresh
 import Polysemy (Member, Sem, run)
 import Unbound.Generics.LocallyNameless (
   Bind,

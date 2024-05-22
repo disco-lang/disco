@@ -15,13 +15,13 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad (when, zipWithM, forM_, unless)
+import Control.Monad (forM_, unless, when, zipWithM)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
 import qualified Data.Foldable as F
 import Data.List (sort)
-import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -309,7 +309,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
     -- patterns don't match across different clauses
     | otherwise = return ()
 
-  -- | Check a clause of a definition against a list of pattern types and a body type.
+  -- \| Check a clause of a definition against a list of pattern types and a body type.
   checkClause ::
     Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r =>
     [Type] ->

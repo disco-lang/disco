@@ -108,25 +108,25 @@ module Disco.AST.Surface (
 )
 where
 
-import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
-import Prelude hiding ((<>))
 import Control.Lens ((%~), _1, _2, _3)
 import Data.Char (toLower)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Void
-import Disco.Effects.LFresh
-import Polysemy hiding (Embed, embed)
-import Polysemy.Reader
 import Disco.AST.Generic
+import Disco.Effects.LFresh
 import Disco.Extensions
 import Disco.Pretty
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Types
+import Polysemy hiding (Embed, embed)
+import Polysemy.Reader
 import Unbound.Generics.LocallyNameless hiding (LFresh (..), lunbind)
+import Prelude hiding ((<>))
 
 -- | The extension descriptor for Surface specific AST types.
 data UD

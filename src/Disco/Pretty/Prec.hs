@@ -19,7 +19,7 @@ import Disco.Syntax.Operators
 type Prec = Int
 
 data PA = PA Prec BFixity
-  deriving (Show, Eq)   -- Do NOT derive Ord, see note below.
+  deriving (Show, Eq) -- Do NOT derive Ord, see note below.
 
 lowerPrec :: PA -> PA -> Bool
 lowerPrec (PA p1 a1) (PA p2 a2) = p1 < p2 || (p1 == p2 && a1 /= a2)

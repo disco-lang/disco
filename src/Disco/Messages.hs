@@ -1,10 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Messages
 -- Copyright   :  disco team and contributors
@@ -30,7 +26,7 @@ data MessageType
   | Debug
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
-data Message ann = Message {_messageType :: MessageType, _message :: (Doc ann)}
+data Message ann = Message {_messageType :: MessageType, _message :: Doc ann}
   deriving (Show)
 
 makeLenses ''Message

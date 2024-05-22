@@ -1,3 +1,7 @@
+{-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Functor law" #-}
+
 -- |
 -- Module      :  Disco.Desugar
 -- Copyright   :  disco team and contributors
@@ -238,7 +242,7 @@ desugarAbs quant overallTy body = do
   -- Wrap a term in a test frame to report the values of all variables
   -- bound in the patterns.
   addDbgInfo :: [APattern] -> ATerm -> ATerm
-  addDbgInfo ps t = ATTest (map withName $ concatMap varsBound ps) t
+  addDbgInfo ps = ATTest (map withName $ concatMap varsBound ps)
    where
     withName (n, ty) = (name2String n, ty, n)
 

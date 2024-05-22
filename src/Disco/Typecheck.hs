@@ -468,7 +468,7 @@ inferTop t = do
       cvs = containerVars (getType at')
 
       -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ zip (S.toList cvs) (repeat (TyAtom (ABase CtrList)))) at'
+      at'' = applySubst (Subst.fromList $ map (, TyAtom (ABase CtrList)) (S.toList cvs)) at'
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
@@ -981,7 +981,7 @@ typecheck (Check checkTy) tm@(TAbs Lam body) = do
   -- Then check the type of the body under a context extended with
   -- types for all the arguments.
   extends ctx $
-    ATAbs Lam checkTy <$> (bind (coerce typedArgs) <$> check t resTy)
+    ATAbs Lam checkTy . bind (coerce typedArgs) <$> check t resTy
  where
   -- Given the patterns and their optional type annotations in the
   -- head of a lambda (e.g.  @x (y:Z) (f : N -> N) -> ...@), and the

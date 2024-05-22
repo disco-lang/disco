@@ -83,10 +83,6 @@ data BOp
     Leq
   | -- | Greater than or equal (@>=@)
     Geq
-  | -- | Minimum (@min@)
-    Min
-  | -- | Maximum (@max@)
-    Max
   | -- | Logical and (@&&@ / @and@)
     And
   | -- | Logical or (@||@ / @or@)
@@ -201,10 +197,6 @@ opTable =
       [ bopInfo InL Union ["union", "∪"]
       , bopInfo InL Inter ["intersect", "∩"]
       , bopInfo InL Diff ["\\"]
-      ]
-    ,
-      [ bopInfo InL Min ["min"]
-      , bopInfo InL Max ["max"]
       ]
     ,
       [ bopInfo InL Mul ["*"]

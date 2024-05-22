@@ -417,8 +417,6 @@ reservedWords =
   , "choose"
   , "implies"
   , "iff"
-  , "min"
-  , "max"
   , "union"
   , "∪"
   , "intersect"

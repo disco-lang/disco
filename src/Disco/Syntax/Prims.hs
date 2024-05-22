@@ -53,6 +53,10 @@ data Prim where
   PrimCeil :: Prim
   -- | Absolute value (@abs@)
   PrimAbs :: Prim
+  -- | Min
+  PrimMin :: Prim
+  -- | Max
+  PrimMax :: Prim
   -- | Power set (XXX or bag?)
   PrimPower :: Prim
   -- | Container -> list conversion
@@ -149,12 +153,12 @@ primTable =
   [ PrimInfo PrimLeft "left" True
   , PrimInfo PrimRight "right" True
   , PrimInfo (PrimUOp Not) "not" True
-  , PrimInfo (PrimBOp Min) "min" True
-  , PrimInfo (PrimBOp Max) "max" True
   , PrimInfo PrimSqrt "sqrt" True
   , PrimInfo PrimFloor "floor" True
   , PrimInfo PrimCeil "ceiling" True
   , PrimInfo PrimAbs "abs" True
+  , PrimInfo PrimMin "min" True
+  , PrimInfo PrimMax "max" True
   , PrimInfo PrimPower "power" True
   , PrimInfo PrimList "list" True
   , PrimInfo PrimBag "bag" True

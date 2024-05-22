@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+{-# HLINT ignore "Functor law" #-}
 
 -- |
 -- Module      :  Disco.Parser
@@ -346,7 +348,7 @@ decimal =
     -- either some digits optionally followed by bracketed digits...
     (,) <$> some digit <*> optional (brackets (some digit))
       -- ...or just bracketed digits.
-      <|> ([],) <$> (Just <$> brackets (some digit))
+      <|> (([],) . Just <$> brackets (some digit))
 
   readDecimal a (b, mrep) =
     read a % 1 -- integer part

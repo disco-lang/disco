@@ -1,9 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- SPDX-License-Identifier: BSD-3-Clause
 
 -- |
@@ -98,7 +94,7 @@ x |-> t = Substitution (M.singleton x t)
 --   As one would expect, composition is associative and has 'idS' as
 --   its identity.
 (@@) :: Subst a a => Substitution a -> Substitution a -> Substitution a
-(Substitution s1) @@ (Substitution s2) = Substitution ((M.map (applySubst (Substitution s1))) s2 `M.union` s1)
+(Substitution s1) @@ (Substitution s2) = Substitution $ M.map (applySubst (Substitution s1)) s2 `M.union` s1
 
 -- | Compose a whole container of substitutions.  For example,
 --   @compose [s1, s2, s3] = s1 \@\@ s2 \@\@ s3@.

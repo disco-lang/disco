@@ -468,7 +468,7 @@ inferTop t = do
       cvs = containerVars (getType at')
 
       -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ map (, TyAtom (ABase CtrList)) (S.toList cvs)) at'
+      at'' = applySubst (Subst.fromList $ map (,TyAtom (ABase CtrList)) (S.toList cvs)) at'
 
   -- Finally, quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.

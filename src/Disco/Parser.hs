@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+
 {-# HLINT ignore "Functor law" #-}
 
 -- |

@@ -17,6 +17,7 @@ executable lower-your-guards
   build-depends:       base >= 4.7 && < 5,
                        megaparsec >= 6.1.1 && < 9.7,
                        text >= 2.0.2 && < 2.1,
+                       pretty-simple,
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities

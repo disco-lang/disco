@@ -7,6 +7,7 @@ import qualified GuardTree as G
 import Parse
 import Text.Megaparsec (eof, errorBundlePretty, many, runParser)
 import qualified Uncovered as U
+import Text.Pretty.Simple (pPrint)
 
 parseFile :: String -> IO [FunctionDef]
 parseFile file = do
@@ -17,7 +18,7 @@ parseFile file = do
     Right defs -> return defs
 
 main :: IO ()
-main = pdu "test/test.disc" >>= print
+main = pdu "test/test.disc" >>= pPrint
 
 pfg :: String -> IO [(Text, G.Gdt)]
 pfg file = do
@@ -30,6 +31,6 @@ pdu file = do
   return $
     map
       ( \(FunctionDef (FunctionDecl name tIn _) clauses) ->
-          (name, U.uncovered ([("x_1", tIn)], U.Lit U.T) $ G.desugarClauses $ fromList clauses)
+          (name, U.uncovered ([("x_1", tIn)], U.T) $ G.desugarClauses $ fromList clauses)
       )
       defs

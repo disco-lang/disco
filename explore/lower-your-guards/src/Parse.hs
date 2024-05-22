@@ -6,6 +6,7 @@
 module Parse where
 
 import Control.Applicative (some)
+import Control.Monad (replicateM)
 import Data.Functor (($>), (<&>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,6 +26,7 @@ data FunctionDef where
 data Type where
   TInt :: Type
   TBool :: Type
+  TPair :: Type -> Type -> Type
   TFn :: Type -> Type -> Type
   deriving (Show, Eq)
 
@@ -36,6 +38,7 @@ data Pattern where
   PLit :: Int -> Pattern
   PWild :: Pattern
   PVar :: Var -> Pattern
+  PMatch :: Text -> [Pattern] -> Pattern
   deriving (Show, Eq)
 
 newtype Var = Var Text
@@ -79,17 +82,30 @@ pFnDecl = do
 
   return $ FunctionDecl name tFrom tTo
 
+-- pDataCons :: Parser Text
+-- pDataCons = choice . map symbol $ [","]
+
+pDataConsMatch :: Parser Pattern
+pDataConsMatch =
+  do
+    dataCon <- symbol ","
+    terms <- replicateM 2 pPattern
+    return $ PMatch dataCon terms
+
+pPattern :: Parser Pattern
+pPattern =
+  choice
+    [ pDataConsMatch,
+      pInteger <&> PLit,
+      symbol "_" $> PWild,
+      pName <&> PVar . Var
+    ]
+
 pClause :: Text -> Parser Clause
 pClause name = do
   _ <- lexeme (string name)
 
-  pat <-
-    choice
-      [ -- pInteger >>= return . PLit
-        pInteger <&> PLit,
-        symbol "_" $> PWild,
-        pName <&> PVar . Var
-      ]
+  pat <- pPattern
 
   _ <- symbol "="
 
@@ -109,5 +125,10 @@ pType :: Parser Type
 pType =
   choice
     [ TInt <$ lexeme (string "Int"),
-      TBool <$ lexeme (string "Bool")
+      TBool <$ lexeme (string "Bool"),
+      do
+        _ <- symbol ","
+        l <- pType
+        r <- pType
+        return $ TPair l r
     ]

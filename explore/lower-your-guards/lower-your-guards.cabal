@@ -19,6 +19,7 @@ executable lower-your-guards
                        text >= 2.0.2 && < 2.1,
                        pretty-simple,
                        containers,
+                       mtl,
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities
@@ -36,4 +37,5 @@ executable lower-your-guards
                        GuardTree,
                        Uncovered
                        Inhabitants,
-                       Types
+                       Types,
+                       Fresh

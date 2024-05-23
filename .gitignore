@@ -74,6 +74,8 @@ pubs/WG2.1/*.pdf
 pubs/TFPIE23/*.pdf
 pubs/TFPIE23/talk/*.pdf
 
+pubs/arith-pats/*.pdf
+
 tmp/
 
 .ipynb_checkpoints

@@ -266,7 +266,12 @@ appConst k = \case
     divOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
     divOp _ 0 = throw DivByZero
     divOp m n = return $ ratv (m / n)
-  OExp -> numOp2 (\m n -> m ^^ numerator n) >=> out
+  OExp -> numOp2' expOp >>> outWithErr
+   where
+    expOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value
+    expOp m n 
+      | m == 0 && n < 0    = throw DivByZero 
+      | otherwise          = return $ ratv (m ^^ numerator n)
   OMod -> numOp2' modOp >>> outWithErr
    where
     modOp :: Member (Error EvalError) r => Rational -> Rational -> Sem r Value

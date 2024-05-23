@@ -52,6 +52,9 @@ module Disco.Types (
   pattern TyF,
   pattern TyQ,
   pattern TyC,
+
+  pattern TyGen,
+
   -- , pattern TyFin
   pattern (:->:),
   pattern (:*:),
@@ -162,6 +165,8 @@ data BaseTy where
   CtrBag :: BaseTy
   -- | List container type.
   CtrList :: BaseTy
+  -- [Helpful comment]
+  Gen :: BaseTy
   deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst BaseTy, Subst Atom, Subst UAtom, Subst Type)
 
 instance Pretty BaseTy where
@@ -178,6 +183,8 @@ instance Pretty BaseTy where
     CtrList -> text "List"
     CtrBag -> text "Bag"
     CtrSet -> text "Set"
+
+    Gen -> text "gen"
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool
@@ -458,6 +465,9 @@ pattern TyQ = TyAtom (ABase Q)
 
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
+
+pattern TyGen :: Type 
+pattern TyGen = TyAtom (ABase Gen)
 
 -- pattern TyFin :: Integer -> Type
 -- pattern TyFin n = TyAtom (ABase (Fin n))

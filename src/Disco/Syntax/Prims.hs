@@ -151,6 +151,10 @@ data Prim where
   PrimExtendSeq ::
     -- | Extend OEIS sequence
     Prim
+  PrimSeed ::
+    Prim 
+  PrimRandom :: 
+    Prim
   deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
@@ -221,6 +225,8 @@ primTable =
   , PrimInfo PrimHolds "holds" True
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False
+  , PrimInfo PrimSeed "seed" True 
+  , PrimInfo PrimRandom "random" True
   ]
 
 -- | Find any exposed prims with the given name.

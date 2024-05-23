@@ -31,14 +31,14 @@ The sum of two numbers, types, or graphs.
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 ~! : ℕ → ℕ
-precedence level 15
+precedence level 14
 
 n! computes the factorial of n, that is, 1 * 2 * ... * n.
 
 https://disco-lang.readthedocs.io/en/latest/reference/factorial.html
 
 ~! : ℕ → ℕ
-precedence level 15
+precedence level 14
 
 n! computes the factorial of n, that is, 1 * 2 * ... * n.
 
@@ -46,7 +46,7 @@ https://disco-lang.readthedocs.io/en/latest/reference/factorial.html
 
 not~ : Bool → Bool
 Alternative syntax: ¬~
-precedence level 16
+precedence level 15
 
 Logical negation: not(true) = false and not(false) = true.
 

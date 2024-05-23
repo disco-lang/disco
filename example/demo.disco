@@ -26,4 +26,4 @@ type P(a) = a + P(a) * P(a)
 
 height : P(a) -> N
 height (left(_)) = 0
-height (right(l, r)) = 1 + (height l) max (height r)
+height (right(l, r)) = 1 + max(height l, height r)

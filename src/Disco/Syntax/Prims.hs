@@ -37,120 +37,85 @@ import Disco.Syntax.Operators
 
 -- | Primitives, /i.e./ built-in constants.
 data Prim where
-  PrimUOp ::
-    UOp ->
-    -- | Unary operator
-    Prim
-  PrimBOp ::
-    BOp ->
-    -- | Binary operator
-    Prim
-  PrimLeft ::
-    -- | Left injection into a sum type.
-    Prim
-  PrimRight ::
-    -- | Right injection into a sum type.
-    Prim
-  PrimSqrt ::
-    -- | Integer square root (@sqrt@)
-    Prim
-  PrimFloor ::
-    -- | Floor of fractional type (@floor@)
-    Prim
-  PrimCeil ::
-    -- | Ceiling of fractional type (@ceiling@)
-    Prim
-  PrimAbs ::
-    -- | Absolute value (@abs@)
-    Prim
-  PrimPower ::
-    -- | Power set (XXX or bag?)
-    Prim
-  PrimList ::
-    -- | Container -> list conversion
-    Prim
-  PrimBag ::
-    -- | Container -> bag conversion
-    Prim
-  PrimSet ::
-    -- | Container -> set conversion
-    Prim
-  PrimB2C ::
-    -- | bag -> set of counts conversion
-    Prim
-  PrimC2B ::
-    -- | set of counts -> bag conversion
-    Prim
-  PrimUC2B ::
-    -- | unsafe set of counts -> bag conversion
-    --   that assumes all distinct
-    Prim
-  PrimMapToSet ::
-    -- | Map k v -> Set (k × v)
-    Prim
-  PrimSetToMap ::
-    -- | Set (k × v) -> Map k v
-    Prim
-  PrimSummary ::
-    -- | Get Adjacency list of Graph
-    Prim
-  PrimVertex ::
-    -- | Construct a graph Vertex
-    Prim
-  PrimEmptyGraph ::
-    -- | Empty graph
-    Prim
-  PrimOverlay ::
-    -- | Overlay two Graphs
-    Prim
-  PrimConnect ::
-    -- | Connect Graph to another with directed edges
-    Prim
-  PrimInsert ::
-    -- | Insert into map
-    Prim
-  PrimLookup ::
-    -- | Get value associated with key in map
-    Prim
-  PrimEach ::
-    -- | Each operation for containers
-    Prim
-  PrimReduce ::
-    -- | Reduce operation for containers
-    Prim
-  PrimFilter ::
-    -- | Filter operation for containers
-    Prim
-  PrimJoin ::
-    -- | Monadic join for containers
-    Prim
-  PrimMerge ::
-    -- | Generic merge operation for bags/sets
-    Prim
-  PrimIsPrime ::
-    -- | Efficient primality test
-    Prim
-  PrimFactor ::
-    -- | Factorization
-    Prim
-  PrimFrac ::
-    -- | Turn a rational into a pair (num, denom)
-    Prim
-  PrimCrash ::
-    -- | Crash
-    Prim
-  PrimUntil ::
-    -- | @[x, y, z .. e]@
-    Prim
-  PrimHolds ::
-    -- | Test whether a proposition holds
-    Prim
-  PrimLookupSeq ::
-    -- | Lookup OEIS sequence
-    Prim
-  PrimExtendSeq ::
-    -- | Extend OEIS sequence
-    Prim
+  -- | Unary operator
+  PrimUOp :: UOp -> Prim
+  -- | Binary operator
+  PrimBOp :: BOp -> Prim
+  -- | Left injection into a sum type.
+  PrimLeft :: Prim
+  -- | Right injection into a sum type.
+  PrimRight :: Prim
+  -- | Integer square root (@sqrt@)
+  PrimSqrt :: Prim
+  -- | Floor of fractional type (@floor@)
+  PrimFloor :: Prim
+  -- | Ceiling of fractional type (@ceiling@)
+  PrimCeil :: Prim
+  -- | Absolute value (@abs@)
+  PrimAbs :: Prim
+  -- | Min
+  PrimMin :: Prim
+  -- | Max
+  PrimMax :: Prim
+  -- | Power set (XXX or bag?)
+  PrimPower :: Prim
+  -- | Container -> list conversion
+  PrimList :: Prim
+  -- | Container -> bag conversion
+  PrimBag :: Prim
+  -- | Container -> set conversion
+  PrimSet :: Prim
+  -- | bag -> set of counts conversion
+  PrimB2C :: Prim
+  -- | set of counts -> bag conversion
+  PrimC2B :: Prim
+  -- | unsafe set of counts -> bag conversion
+  --   that assumes all distinct
+  PrimUC2B :: Prim
+  -- | Map k v -> Set (k × v)
+  PrimMapToSet :: Prim
+  -- | Set (k × v) -> Map k v
+  PrimSetToMap :: Prim
+  -- | Get Adjacency list of Graph
+  PrimSummary :: Prim
+  -- | Construct a graph Vertex
+  PrimVertex :: Prim
+  -- | Empty graph
+  PrimEmptyGraph :: Prim
+  -- | Overlay two Graphs
+  PrimOverlay :: Prim
+  -- | Connect Graph to another with directed edges
+  PrimConnect :: Prim
+  -- | Insert into map
+  PrimInsert :: Prim
+  -- | Get value associated with key in map
+  PrimLookup :: Prim
+  -- | Each operation for containers
+  PrimEach :: Prim
+  -- | Reduce operation for containers
+  PrimReduce :: Prim
+  -- | Filter operation for containers
+  PrimFilter :: Prim
+  -- | Monadic join for containers
+  PrimJoin :: Prim
+  -- | Generic merge operation for bags/sets
+  PrimMerge :: Prim
+  -- | Efficient primality test
+  PrimIsPrime :: Prim
+  -- | Factorization
+  PrimFactor :: Prim
+  -- | Turn a rational into a pair (num, denom)
+  PrimFrac :: Prim
+  -- | Crash
+  PrimCrash :: Prim
+  -- | @[x, y, z .. e]@
+  PrimUntil :: Prim
+  -- | Test whether a proposition holds
+  PrimHolds :: Prim
+  -- | Lookup OEIS sequence
+  PrimLookupSeq :: Prim
+  -- | Extend OEIS sequence
+  PrimExtendSeq :: Prim
   deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
@@ -192,6 +157,8 @@ primTable =
   , PrimInfo PrimFloor "floor" True
   , PrimInfo PrimCeil "ceiling" True
   , PrimInfo PrimAbs "abs" True
+  , PrimInfo PrimMin "min" True
+  , PrimInfo PrimMax "max" True
   , PrimInfo PrimPower "power" True
   , PrimInfo PrimList "list" True
   , PrimInfo PrimBag "bag" True

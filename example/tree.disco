@@ -20,4 +20,4 @@ treeSize : Tree -> N
 treeSize(t) = treeFold(0, \(x,l,r). 1 + l + r, t)
 
 treeHeight : Tree -> N
-treeHeight(t) = treeFold(0, \(x,l,r). 1 + l max r, t)
+treeHeight(t) = treeFold(0, \(x,l,r). 1 + max(l,r), t)

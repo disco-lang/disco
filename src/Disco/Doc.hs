@@ -42,6 +42,8 @@ primDoc =
     , PrimFloor ==> "floor(x) is the largest integer which is <= x."
     , PrimCeil ==> "ceiling(x) is the smallest integer which is >= x."
     , PrimAbs ==> "abs(x) is the absolute value of x.  Also written |x|."
+    , PrimMin ==> "min(x,y) is the minimum of x and y, i.e. whichever is smaller."
+    , PrimMax ==> "max(x,y) is the maximum of x and y, i.e. whichever is larger."
     , PrimUOp Not ==> "Logical negation: not(true) = false and not(false) = true."
     , PrimBOp And ==> "Logical conjunction (and): true /\\ true = true; otherwise x /\\ y = false."
     , PrimBOp Or ==> "Logical disjunction (or): false \\/ false = false; otherwise x \\/ y = true."

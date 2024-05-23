@@ -24,14 +24,14 @@ data Guard where
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
 enumerate = NE.zip (1 :| [2 ..])
 
-desugarClauses :: NonEmpty P.Clause -> F.Fresh Gdt
-desugarClauses clauses = do
-  cl <- mapM desugarClause (enumerate clauses)
+desugarClauses :: [F.VarID] -> NonEmpty P.Clause -> F.Fresh Gdt
+desugarClauses args clauses = do
+  cl <- mapM (desugarClause args) (enumerate clauses)
   return $ foldr1 Branch cl
 
-desugarClause :: (Int, P.Clause) -> F.Fresh Gdt
-desugarClause (i, P.Clause pat typeIn _) = do
-  x1 <- F.fresh (Just "x_1")
+desugarClause :: [F.VarID] -> (Int, P.Clause) -> F.Fresh Gdt
+desugarClause args (i, P.Clause pat typeIn _) = do
+  let x1 = head args -- we only suport 1 arg for this toy lyg
   guards <- desugarMatch x1 typeIn pat
   return $ foldr Guarded (Grhs i) guards
 

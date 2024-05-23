@@ -28,15 +28,23 @@ parseFile file = do
 main :: IO ()
 main = pdu "test/test.disc" >>= pPrint
 
+desGdt :: [P.Clause] -> F.Fresh G.Gdt
+desGdt clauses = do
+  x1 <- F.fresh (Just "x_1")
+  G.desugarClauses [x1] . fromList $ clauses
+
 evalGdt :: [P.Clause] -> G.Gdt
-evalGdt clauses = evalState (G.desugarClauses . fromList $ clauses) F.blank
+evalGdt clauses = evalState (desGdt clauses) F.blank
+
+runGdt :: [P.Clause] -> (G.Gdt, NE.NonEmpty F.Frame)
+runGdt clauses = runState (desGdt clauses) F.blank
 
 uncov :: [P.Clause] -> Ty.Type -> F.Fresh U.RefinementType
 uncov clauses tIn = do
-  gdt <- G.desugarClauses . fromList $ clauses
-  binds <- gets (M.toList . F.fBound . NE.head)
-  let varId = fst . head . filter (\(_,y) -> case y of Just "x_1" -> True; _ -> False) $ binds
-  return $ U.uncovered ([(varId, tIn)], U.T) gdt
+  x1 <- F.fresh (Just "x_1")
+  gdt <- G.desugarClauses [x1] . fromList $ clauses
+  let argsCtx = [(x1, tIn)]
+  return $ U.uncovered (argsCtx, U.T) gdt
 
 evalUncov :: [P.Clause] -> Ty.Type -> U.RefinementType
 evalUncov clauses tIn = evalState (uncov clauses tIn) F.blank
@@ -57,10 +65,10 @@ norm clauses tIn = do
 evalNorm :: [P.Clause] -> Ty.Type -> S.Set I.NormRefType
 evalNorm clauses tIn = evalState (norm clauses tIn) F.blank
 
-pfg :: String -> IO [(Text, G.Gdt)]
+pfg :: String -> IO [(Text, (G.Gdt, NE.NonEmpty F.Frame))]
 pfg file = do
   defs <- parseFile file
-  return $ map (\(P.FunctionDef (P.FunctionDecl name _ _) clauses) -> (name, evalGdt clauses)) defs
+  return $ map (\(P.FunctionDef (P.FunctionDecl name _ _) clauses) -> (name, runGdt clauses)) defs
 
 pdu :: String -> IO [(Text, U.RefinementType)]
 pdu file = do
@@ -82,10 +90,10 @@ pdui file = do
       )
       defs
 
-inhabNice :: String -> IO [(Text, [[String]])]
+inhabNice :: String -> IO ()
 inhabNice file = do
   defs <- parseFile file
-  return $
+  pPrint $
     map
       ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
           (name, map (map nicePattern) $ evalInhab clauses tIn)

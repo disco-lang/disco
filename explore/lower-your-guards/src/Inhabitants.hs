@@ -127,7 +127,7 @@ lookupVar x (TermEquality x' y : cs) | x' == x = lookupVar y cs
 lookupVar x (_ : cs) = lookupVar x cs
 
 lookupType :: F.VarID -> U.Context -> Ty.Type
-lookupType _ [] = error "var not found in context"
+lookupType var ctx@[] = error ("var not found in context: " ++ show var ++ " " ++ show ctx)
 lookupType x ((x', tau) : cs)
   | x' == x = tau
   | otherwise = lookupType x cs

@@ -89,6 +89,8 @@ extra-source-files:  stack.yaml, repl/*.hs
                      test/error-duplicatetydefns/input
                      test/error-emptycase/expected
                      test/error-emptycase/input
+                     test/error-expdivbyzero/expected
+                     test/error-expdivbyzero/input
                      test/error-names/expected
                      test/error-names/input
                      test/error-nonlinear/expected

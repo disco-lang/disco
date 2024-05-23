@@ -7,6 +7,8 @@ import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Uncovered as U
 import qualified Types as Ty
+import Data.Maybe (isJust)
+import qualified Parse as P
 
 type NormRefType = (U.Context, [Constraint])
 
@@ -18,8 +20,19 @@ data Constraint where
   TermEquality :: Text -> Text -> Constraint
   deriving (Show, Eq, Ord)
 
-genInhabitants :: U.RefinementType -> S.Set NormRefType
-genInhabitants (context, formula) = normalize (Just (context, [])) formula
+genInhabitants :: U.RefinementType -> S.Set [P.Pattern]
+genInhabitants (context, formula) = S.map (`expandVars` context) $ normalize (Just (context, [])) formula
+
+expandVars :: NormRefType -> U.Context -> [P.Pattern]
+expandVars nset = map (expandVar nset)
+
+expandVar :: NormRefType -> (Text, Ty.Type) -> P.Pattern
+expandVar (ctx, cns) (x, xType) = case matchingCons of
+  [] -> P.PWild
+  (k : ks) -> P.PMatch k []
+  where
+    origX = lookupVar x cns
+    matchingCons = [k | k <- Ty.dataCons xType, any (origX `isType` k) cns]
 
 normalize :: Maybe NormRefType -> U.Formula -> S.Set NormRefType
 normalize nref (f1 `U.And` f2) = S.unions $ S.map (\r -> normalize (Just r) f2) (normalize nref f1)
@@ -40,13 +53,13 @@ n <+> U.NotIntLit i x = Just n <+| NotIntLit i x
 Nothing <+| _ = Nothing
 -- TODO(colin): 10a,10c:
 Just (ctx, cns) <+| MatchDataCon k vars x
-  | not $ any (origX `isNotType` k) cns = Nothing
+  | any (origX `isNotType` k) cns = Nothing
   | otherwise = Just (ctx, cns ++ [MatchDataCon k vars origX])
   where
     origX = lookupVar x cns
--- TODO(colin): 11b:
 Just (ctx, cns) <+| NotDataCon k x
   | any (origX `isType` k) cns = Nothing
+  | not $ inh (ctx, cns ++ [NotDataCon k origX]) x (lookupType x ctx) = Nothing
   | otherwise = Just (ctx, cns ++ [NotDataCon k origX])
   where
     origX = lookupVar x cns
@@ -63,7 +76,6 @@ Just (ctx, cns) <+| MatchIntLit i x
   | otherwise = Just (ctx, cns ++ [MatchIntLit i origX])
   where
     origX = lookupVar x cns
--- TODO(colin): 11b:
 Just (ctx, cns) <+| NotIntLit i x
   | any (origX `isTheInt` i) cns = Nothing
   | otherwise = Just (ctx, cns ++ [NotIntLit i origX])
@@ -95,3 +107,23 @@ lookupVar :: Text -> [Constraint] -> Text
 lookupVar x [] = x
 lookupVar x (TermEquality x' y : cs) | x' == x = lookupVar y cs
 lookupVar x (_ : cs) = lookupVar x cs
+
+lookupType :: Text -> U.Context -> Ty.Type
+lookupType _ [] = error "var not found in context"
+lookupType x ((x',tau):cs)
+  | x' == x = tau
+  | otherwise = lookupType x cs
+
+--
+--
+--
+
+inh :: NormRefType -> Text -> Ty.Type -> Bool
+inh n x tau = any (isJust . inst n x) (cons n tau)
+
+cons :: NormRefType -> Ty.Type -> [Ty.DataConstructor]
+cons _ Ty.Type { Ty.dataCons = ks } = ks
+-- cons _ _ = error "TODO(colin) no match on Cons"
+
+inst :: NormRefType -> Text -> Ty.DataConstructor -> Maybe NormRefType
+inst (ctx, cns) x k = Just (ctx ++ map ("FRESH",) (Ty.dcTypes k), cns) <+| MatchDataCon k (map (const "FRESH") (Ty.dcTypes k)) x

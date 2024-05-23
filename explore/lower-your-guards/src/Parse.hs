@@ -42,10 +42,10 @@ data Pattern where
   PWild :: Pattern
   PVar :: Var -> Pattern
   PMatch :: Ty.DataConstructor -> [Pattern] -> Pattern
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 newtype Var = Var Text
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 newtype Expr = Expr Text
   deriving (Show, Eq)
@@ -92,13 +92,10 @@ pDataConsMatch :: Ty.Type -> Parser Pattern
 pDataConsMatch typeIn =
   do
     _ <- lookAhead $ satisfy (\x -> isUpper x || x == ',')
-    let eCons = Ty.dataCons typeIn
-    case eCons of
-      Right () -> error "TODO (colin): int type"
-      Left cons -> do
-          dataCon <- pDataCons cons
-          terms <- mapM pPattern (Ty.dcTypes dataCon) 
-          return $ PMatch dataCon terms
+    let cons = Ty.dataCons typeIn
+    dataCon <- pDataCons cons
+    terms <- mapM pPattern (Ty.dcTypes dataCon) 
+    return $ PMatch dataCon terms
 
 pPattern :: Ty.Type -> Parser Pattern
 pPattern typeIn =

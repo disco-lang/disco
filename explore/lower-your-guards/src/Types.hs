@@ -1,14 +1,14 @@
+{-# OPTIONS_GHC -Wno-missing-export-lists #-}
 module Types where
 
-import Data.Maybe (isJust)
 import Data.Text (Text)
-import qualified Data.Text as T
-import Text.Read (readMaybe)
+
+data TypeConstructor = TBool | TPair | TEither | TInt
+  deriving (Show, Eq, Ord)
 
 data Type = Type
-  { typeName :: Text,
-    dataCons :: Either [DataConstructor] ()
-    -- ,member :: Text -> Maybe [Type]
+  { typeCons :: TypeConstructor,
+    dataCons :: [DataConstructor]
   }
   deriving (Show, Eq, Ord)
 
@@ -21,9 +21,8 @@ data DataConstructor = DataConstructor
 bool :: Type
 bool =
   Type
-    { typeName = "Bool",
+    { typeCons = TBool,
       dataCons =
-        Left
           [ DataConstructor {dcName = "True", dcTypes = []},
             DataConstructor {dcName = "False", dcTypes = []}
           ]
@@ -32,9 +31,8 @@ bool =
 pair :: Type -> Type -> Type
 pair a b =
   Type
-    { typeName = ",",
+    { typeCons = TPair,
       dataCons =
-        Left
           [ DataConstructor {dcName = ",", dcTypes = [a, b]}
           ]
     }
@@ -42,9 +40,8 @@ pair a b =
 either :: Type -> Type -> Type
 either a b =
   Type
-    { typeName = "Either",
+    { typeCons = TEither,
       dataCons =
-        Left
           [ DataConstructor {dcName = "Left", dcTypes = [a]},
             DataConstructor {dcName = "Right", dcTypes = [b]}
           ]
@@ -53,11 +50,6 @@ either a b =
 int :: Type
 int =
   Type
-    { typeName = "Int",
-      dataCons =
-        Right ()
-          -- ( \case
-          --     DataConstructor {dcName = name, dcTypes = types} ->
-          --       null types && isJust (readMaybe (T.unpack name) :: Maybe Int)
-          -- )
+    { typeCons = TInt,
+      dataCons = []
     }

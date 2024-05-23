@@ -9,6 +9,7 @@ import qualified Uncovered as U
 import qualified Types as Ty
 import Data.Maybe (isJust)
 import qualified Parse as P
+import qualified GuardTree as G
 
 type NormRefType = (U.Context, [Constraint])
 
@@ -29,7 +30,7 @@ expandVars nset = map (expandVar nset)
 expandVar :: NormRefType -> (Text, Ty.Type) -> P.Pattern
 expandVar (ctx, cns) (x, xType) = case matchingCons of
   [] -> P.PWild
-  (k : ks) -> P.PMatch k []
+  (k : _) -> P.PMatch k (expandVars (ctx, cns) (zip (G.getYs 100) (Ty.dcTypes k)))
   where
     origX = lookupVar x cns
     matchingCons = [k | k <- Ty.dataCons xType, any (origX `isType` k) cns]

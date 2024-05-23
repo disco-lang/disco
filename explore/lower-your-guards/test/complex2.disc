@@ -1,0 +1,18 @@
+foo : , Either Int Bool Int -> Bool
+foo , Left  1     2 = True
+foo , Right False n = True
+foo , Right True  n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+
+/*
+Note
+
+The number of ", _ _" non-exhaustive warnings
+from  inhabNice seems to always be
+2 ** (number of clasues)
+
+Should it be this way?
+TODO(colin): investigate
+
+*/

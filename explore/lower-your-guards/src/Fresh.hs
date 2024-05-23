@@ -43,9 +43,9 @@ performInNewScope m = do
   exitScope
   return a
 
-test :: Fresh [VarID]
-test = do
-  vars <- replicateM 10 (fresh Nothing)
-  -- thing <- performInNewScope (fresh (Just "MY NAME!"))
-  -- return [thing]
-  return vars
+-- test :: Fresh [VarID]
+-- test = do
+--   vars <- replicateM 10 (fresh Nothing)
+--   -- thing <- performInNewScope (fresh (Just "MY NAME!"))
+--   -- return [thing]
+--   return vars

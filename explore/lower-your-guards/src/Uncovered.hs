@@ -5,21 +5,22 @@ module Uncovered where
 import Data.Text (Text)
 import qualified GuardTree as G
 import qualified Types as Ty
+import qualified Fresh as F
 
 type RefinementType = (Context, Formula)
 
-type Context = [(G.Var, Ty.Type)]
+type Context = [(F.VarID, Ty.Type)]
 
 data Formula where
   And :: Formula -> Formula -> Formula
   Or :: Formula -> Formula -> Formula
   T :: Formula
   F :: Formula
-  NotDataCon :: Ty.DataConstructor -> G.Var -> Formula
-  MatchDataCon :: Ty.DataConstructor -> [G.Var] -> G.Var -> Formula
-  NotIntLit :: Int -> G.Var -> Formula
-  MatchIntLit :: Int -> G.Var -> Formula
-  Let :: G.Var -> Ty.Type -> G.Var -> Formula
+  NotDataCon :: Ty.DataConstructor -> F.VarID -> Formula
+  MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Formula
+  NotIntLit :: Int -> F.VarID -> Formula
+  MatchIntLit :: Int -> F.VarID -> Formula
+  Let :: F.VarID -> Ty.Type -> F.VarID -> Formula
   deriving (Show, Eq)
 
 uncovered :: RefinementType -> G.Gdt -> RefinementType

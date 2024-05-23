@@ -4,10 +4,10 @@ module GuardTree where
 
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
-import Data.Text (Text)
-import qualified Data.Text as T
 import qualified Parse as P
 import qualified Types as Ty
+import qualified Fresh as F
+import Control.Monad (replicateM)
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -16,32 +16,37 @@ data Gdt where
   deriving (Show, Eq)
 
 data Guard where
-  Match :: Ty.DataConstructor -> [Var] -> Var -> Guard
-  MatchLit :: Int -> Var -> Guard
-  Let :: Var -> Ty.Type -> Var -> Guard
+  Match :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Guard
+  MatchLit :: Int -> F.VarID -> Guard
+  Let :: F.VarID -> Ty.Type -> F.VarID -> Guard
   deriving (Show, Eq)
-
-type Var = Text
 
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
 enumerate = NE.zip (1 :| [2 ..])
 
-desugarClauses :: NonEmpty P.Clause -> Gdt
-desugarClauses clauses = foldr1 Branch $ NE.map desugarClause $ enumerate clauses
+desugarClauses :: NonEmpty P.Clause -> F.Fresh Gdt
+desugarClauses clauses = do
+  cl <- mapM desugarClause (enumerate clauses)
+  return $ foldr1 Branch cl
 
-desugarClause :: (Int, P.Clause) -> Gdt
-desugarClause (i, P.Clause pat typeIn _) = foldr Guarded (Grhs i) guards
-  where
-    guards = desugarMatch "x_1" typeIn pat
+desugarClause :: (Int, P.Clause) -> F.Fresh Gdt
+desugarClause (i, P.Clause pat typeIn _) = do
+  x1 <- F.fresh (Just "x_1")
+  guards <- desugarMatch x1 typeIn pat
+  return $ foldr Guarded (Grhs i) guards
 
-desugarMatch :: Var -> Ty.Type -> P.Pattern -> [Guard]
-desugarMatch var varType pat = case pat of
-  P.PWild -> []
-  P.PLit i -> [MatchLit i var]
-  P.PVar (P.Var a) -> [Let a varType var]
-  P.PMatch dataCon subPats -> Match dataCon ys var : concat (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
-    where
-      ys = getYs (length subPats)
+desugarMatch :: F.VarID -> Ty.Type -> P.Pattern -> F.Fresh [Guard]
+desugarMatch var varType pat = do
+  case pat of
+    P.PWild -> return []
+    P.PLit i -> return [MatchLit i var]
+    P.PVar name -> do
+      x <- F.fresh (Just name)
+      return [Let x varType var]
+    P.PMatch dataCon subPats -> do
+      ys <- replicateM (length subPats) (F.fresh Nothing)
+      guards <- sequence (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
+      return $ Match dataCon ys var : concat guards
 
-getYs :: Int -> [Text]
-getYs n = map (T.pack . ("y" ++) . show) [1 .. n]
+-- getYs :: Int -> [Text]
+-- getYs n = map (T.pack . ("y" ++) . show) [1 .. n]

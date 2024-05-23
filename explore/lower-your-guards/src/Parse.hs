@@ -40,11 +40,8 @@ data Clause where
 data Pattern where
   PLit :: Int -> Pattern
   PWild :: Pattern
-  PVar :: Var -> Pattern
+  PVar :: Text -> Pattern
   PMatch :: Ty.DataConstructor -> [Pattern] -> Pattern
-  deriving (Show, Eq, Ord)
-
-newtype Var = Var Text
   deriving (Show, Eq, Ord)
 
 newtype Expr = Expr Text
@@ -104,7 +101,7 @@ pPattern typeIn =
       pInteger <&> PLit,
       symbol "_" $> PWild,
       pDataConsMatch typeIn,
-      pName <&> PVar . Var
+      pName <&> PVar 
     ]
 
 pClause :: Text -> Ty.Type -> Parser Clause

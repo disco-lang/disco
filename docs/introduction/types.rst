@@ -114,8 +114,16 @@ or ``Integer``.
 Subtyping
 ---------
 
-XXX need to say (+ show with example) that Disco can automatically
-convert from N to Z.
+In some cases, Disco can automatically convert between types if no
+information would be lost.  For example, Disco can automatically
+convert natural numbers to integers, because every natural number is
+an integer.  On the other hand, not every integer is a natural number
+(for example, ``-5`` is an integer but not a natural number), so Disco
+cannot automatically convert the other way.
+
+This automatic conversion is called :doc:`subtyping
+</reference/subtypes>`.  We will discuss it in more depth later; for
+now it mostly won't make much difference.
 
 Exercises
 ---------

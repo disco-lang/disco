@@ -44,7 +44,8 @@ numbers using the special symbol ``ℕ``; however, it can also be
 written ``Natural``, ``Nat``, or just ``N``.
 
   - Natural numbers can be *added*; adding two natural numbers
-    always results in another natural number.
+    always results in another natural number (that is, the natural
+    numbers are "closed under addition").
 
     ::
 
@@ -54,7 +55,8 @@ written ``Natural``, ``Nat``, or just ``N``.
        1 + 1 : ℕ
 
   - Natural numbers can also be *multiplied*; again, multiplying two
-    natural numbers always results in another natural number.
+    natural numbers always results in another natural number (that is,
+    the natural numbers are "closed under multiplication").
 
     ::
 
@@ -67,7 +69,8 @@ Integers
 --------
 
 Although we can add and multiply natural numbers, subtracting two
-natural numbers will not necessarily yield another natural number.
+natural numbers will not necessarily yield another natural
+number---the natural numbers are not closed under subtraction.
 The type of numbers that support addition, multiplication, and
 subtraction is called the *integers*, and includes values like ...,
 -3, -2, -1, 0, 1, 2, 3, ...  Disco displays the type of integers using
@@ -115,11 +118,24 @@ Subtyping
 ---------
 
 In some cases, Disco can automatically convert between types if no
-information would be lost.  For example, Disco can automatically
-convert natural numbers to integers, because every natural number is
-an integer.  On the other hand, not every integer is a natural number
-(for example, ``-5`` is an integer but not a natural number), so Disco
-cannot automatically convert the other way.
+information would be lost.  For example, we saw in an example above
+that Disco can automatically convert natural numbers to integers,
+because every natural number is an integer.  Even though ``5`` and
+``2`` individually have type ``N``, if we subtract them Disco converts
+them to type ``Z`` in order to be able to do the subtraction:
+
+::
+
+   Disco> :type 5
+   5 : ℕ
+   Disco> :type 2
+   2 : ℕ
+   Disco> :type 5 - 2
+   5 - 2 : ℤ
+
+On the other hand, not every integer is a natural number (for example,
+``-5`` is an integer but not a natural number), so Disco cannot
+automatically convert the other way.
 
 This automatic conversion is called :doc:`subtyping
 </reference/subtypes>`.  We will discuss it in more depth later; for

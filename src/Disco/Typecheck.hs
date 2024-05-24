@@ -15,7 +15,7 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad (forM_, unless, when, zipWithM, replicateM, filterM)
+import Control.Monad (filterM, forM_, replicateM, unless, when, zipWithM)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
@@ -311,7 +311,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
     -- patterns don't match across different clauses
     | otherwise = return ()
 
-  -- | Check a clause of a definition against a list of pattern types and a body type.
+  -- \| Check a clause of a definition against a list of pattern types and a body type.
   checkClause ::
     Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r =>
     [Type] ->
@@ -474,7 +474,8 @@ inferTop t = do
 
   -- Quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return $ do  -- Monad NonEmpty
+  return $ do
+    -- Monad NonEmpty
 
     -- Iterate over all possible solutions...
     theta <- thetas
@@ -750,7 +751,7 @@ typecheck Infer (TPrim prim) = do
     c <- freshAtom
     a <- freshTy
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         ]
@@ -765,7 +766,7 @@ typecheck Infer (TPrim prim) = do
     a <- freshTy
     c <- freshAtom
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         ]
@@ -844,7 +845,7 @@ typecheck Infer (TPrim prim) = do
 
     -- b can be either Nat (a binomial coefficient)
     -- or a list of Nat (a multinomial coefficient).
-    constraint $ COr [CEq b TyN, CEq b (TyList TyN)]
+    constraint $ cOr [CEq b TyN, CEq b (TyList TyN)]
     return $ TyN :*: b :->: TyN
 
   ----------------------------------------
@@ -923,7 +924,7 @@ typecheck Infer (TPrim prim) = do
   inferPrim PrimAbs = do
     argTy <- freshTy
     resTy <- freshTy
-    cAbs argTy resTy `cOr` cSize argTy resTy
+    cAbs argTy resTy `orElse` cSize argTy resTy
     return $ argTy :->: resTy
 
   ----------------------------------------
@@ -947,7 +948,7 @@ typecheck Infer (TPrim prim) = do
 
     constraint $ CQual QCmp a
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         , CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         ]
@@ -1498,7 +1499,7 @@ cPos ty = do
       -- Valid types for absolute value are Z -> N, Q -> F, or T -> T
       -- (e.g. Z5 -> Z5).
       constraint $
-        COr
+        cOr
           [ cAnd [CSub ty TyZ, CSub TyN res]
           , cAnd [CSub ty TyQ, CSub TyF res]
           , CEq ty res
@@ -1527,7 +1528,7 @@ cInt ty = do
       -- Valid types for absolute value are F -> N, Q -> Z, or T -> T
       -- (e.g. Z5 -> Z5).
       constraint $
-        COr
+        cOr
           [ cAnd [CSub ty TyF, CSub TyN res]
           , cAnd [CSub ty TyQ, CSub TyZ res]
           , CEq ty res
@@ -1559,7 +1560,7 @@ cExp ty1 ty2 = do
   -- to support multiplication, or else the exponent is Z, in which
   -- case the result type also has to support division.
   constraint $
-    COr
+    cOr
       [ cAnd [CQual QNum resTy, CEq ty2 TyN]
       , cAnd [CQual QDiv resTy, CEq ty2 TyZ]
       ]
@@ -1736,9 +1737,11 @@ ensureEq ty1 ty2
 -- Subtyping
 ------------------------------------------------------------
 
-isSubPolyType
-  :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r
-  => PolyType -> PolyType -> Sem r Bool
+isSubPolyType ::
+  Members '[Input TyDefCtx, Output (Message ann), Fresh] r =>
+  PolyType ->
+  PolyType ->
+  Sem r Bool
 isSubPolyType (Forall b1) (Forall b2) = do
   (as1, ty1) <- unbind b1
   (as2, ty2) <- unbind b2
@@ -1753,8 +1756,8 @@ thin = fmap NE.fromList . thin' . NE.toList
 -- we could probably rewrite it in terms of NonEmpty combinators but it's more effort than
 -- I cared to spend at the moment.
 thin' :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => [PolyType] -> Sem r [PolyType]
-thin' []       = return []
-thin' (ty:tys) = do
+thin' [] = return []
+thin' (ty : tys) = do
   ss <- or <$> mapM (`isSubPolyType` ty) tys
   if ss
     then thin' tys

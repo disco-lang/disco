@@ -1,6 +1,6 @@
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 
 -- |
 -- Module      :  Disco.Interactive.Commands
@@ -36,7 +36,7 @@ import Data.Coerce
 import Data.List (find, isPrefixOf, sortBy, transpose)
 import Data.List.NonEmpty qualified as NE
 import Data.Map ((!))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (mapMaybe, maybeToList)
 import Data.Typeable
 import Disco.AST.Surface
@@ -45,8 +45,8 @@ import Disco.Compile
 import Disco.Context as Ctx
 import Disco.Desugar
 import Disco.Doc
-import Disco.Effects.Input
 import Disco.Effects.Fresh (runFresh)
+import Disco.Effects.Input
 import Disco.Effects.LFresh
 import Disco.Effects.State
 import Disco.Enumerate (enumerateType)
@@ -69,7 +69,7 @@ import Disco.Parser (
   withExts,
  )
 import Disco.Pretty hiding (empty, (<>))
-import qualified Disco.Pretty as PP
+import Disco.Pretty qualified as PP
 import Disco.Property (prettyTestResult)
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims (
@@ -87,8 +87,8 @@ import Polysemy.Output
 import Polysemy.Reader
 import System.FilePath (splitFileName)
 import Text.Megaparsec hiding (State, runParser)
-import qualified Text.Megaparsec.Char as C
-import qualified Text.PrettyPrint.Boxes as B
+import Text.Megaparsec.Char qualified as C
+import Text.PrettyPrint.Boxes qualified as B
 import Unbound.Generics.LocallyNameless (
   Name,
   name2String,
@@ -1038,9 +1038,10 @@ handleTypeCheck (TypeCheck t) = do
   sigs <- runFresh . mapInput (view (replModInfo . miTydefs)) $ thin $ NE.map snd asigs
   let (toShow, extra) = NE.splitAt 8 sigs
   when (length sigs > 1) $ info "This expression has multiple possible types.  Some examples:"
-  info $ vcat $
-    map (\sig -> pretty' t <+> text ":" <+> pretty' sig) toShow
-    ++ ["..." | not (P.null extra)]
+  info $
+    vcat $
+      map (\sig -> pretty' t <+> text ":" <+> pretty' sig) toShow
+        ++ ["..." | not (P.null extra)]
 
 ------------------------------------------------------------
 

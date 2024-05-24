@@ -8,24 +8,24 @@
 -- used during type checking.
 module Disco.Typecheck.Util where
 
+import Data.List.NonEmpty (NonEmpty (..))
+import qualified Data.Map as M
+import Data.Tuple (swap)
+import Disco.AST.Surface
+import Disco.Context
 import Disco.Effects.Fresh
+import Disco.Messages
+import Disco.Names (ModuleName, QName)
+import Disco.Typecheck.Constraints
+import Disco.Typecheck.Solve
+import Disco.Types
 import Polysemy
 import Polysemy.Error
 import Polysemy.Output
 import Polysemy.Reader
 import Polysemy.Writer
 import Unbound.Generics.LocallyNameless (Name, bind, string2Name)
-import qualified Data.Map as M
-import Data.Tuple (swap)
 import Prelude hiding (lookup)
-import Data.List.NonEmpty (NonEmpty)
-import Disco.AST.Surface
-import Disco.Context
-import Disco.Messages
-import Disco.Names (ModuleName, QName)
-import Disco.Typecheck.Constraints
-import Disco.Typecheck.Solve
-import Disco.Types
 
 ------------------------------------------------------------
 -- Contexts
@@ -126,11 +126,11 @@ forAll nms = censor (CAll . bind nms)
 
 -- | Run two constraint-generating actions and combine the constraints
 --   via disjunction.
-cOr :: Members '[Writer Constraint] r => Sem r () -> Sem r () -> Sem r ()
-cOr m1 m2 = do
+orElse :: Members '[Writer Constraint] r => Sem r () -> Sem r () -> Sem r ()
+orElse m1 m2 = do
   (c1, _) <- censor (const CTrue) (listen m1)
   (c2, _) <- censor (const CTrue) (listen m2)
-  constraint $ COr [c1, c2]
+  constraint $ COr (c1 :| [c2])
 
 -- | Run a computation that generates constraints, returning the
 --   generated 'Constraint' along with the output. Note that this

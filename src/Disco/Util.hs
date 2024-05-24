@@ -11,9 +11,9 @@
 module Disco.Util where
 
 import Data.Bifunctor (bimap)
-import Data.Map qualified as M
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
+import Data.Map qualified as M
 
 infixr 1 ==>
 
@@ -56,9 +56,9 @@ partitionNE p as = (filterNE p as, filterNE (not . p) as)
 --   list must be nonempty.
 partitionEithersNE :: NonEmpty (Either a b) -> Either (NonEmpty a) ([a], NonEmpty b)
 partitionEithersNE = foldr1 combine . NE.map (bimap NE.singleton (([],) . NE.singleton))
-  where
-    combine :: Either (NonEmpty a) ([a], NonEmpty b) -> Either (NonEmpty a) ([a], NonEmpty b) -> Either (NonEmpty a) ([a], NonEmpty b)
-    combine (Left as1) (Left as2) = Left (NE.append as1 as2)
-    combine (Left as1) (Right (as2,bs)) = Right (NE.toList as1 ++ as2, bs)
-    combine (Right (as1,bs)) (Left as2) = Right (as1 ++ NE.toList as2, bs)
-    combine (Right (as1, bs1)) (Right (as2, bs2)) = Right (as1 ++ as2, NE.append bs1 bs2)
+ where
+  combine :: Either (NonEmpty a) ([a], NonEmpty b) -> Either (NonEmpty a) ([a], NonEmpty b) -> Either (NonEmpty a) ([a], NonEmpty b)
+  combine (Left as1) (Left as2) = Left (NE.append as1 as2)
+  combine (Left as1) (Right (as2, bs)) = Right (NE.toList as1 ++ as2, bs)
+  combine (Right (as1, bs)) (Left as2) = Right (as1 ++ NE.toList as2, bs)
+  combine (Right (as1, bs1)) (Right (as2, bs2)) = Right (as1 ++ as2, NE.append bs1 bs2)

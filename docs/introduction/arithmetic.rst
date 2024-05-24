@@ -76,7 +76,7 @@ some parentheses.
    67
 
 Of course, Disco has many more operators than we have seen so far
-(almost 30 in total).  But you do not need to memorize the precedence
+(almost 30 in total), but you do not need to memorize the precedence
 (*i.e.* order of operations) for all the operators!  You can use the
 ``:doc`` command to see information about an operator, including its
 precedence level.  For example, let's check out the documentation for
@@ -109,15 +109,44 @@ will be done from left to right (like ``((1 + 2) + 3) + 4``).
 Finally, there is a description of what the operator does, and a link
 we can click if we want to read more about it.
 
+If we look at the documentation for multiplication, we can see that it
+has a *higher* precedence (8) than addition:
+
+::
+
+   Disco> :doc *
+   ~*~ : ℕ × ℕ → ℕ
+   precedence level 8, left associative
+
+   The product of two numbers, types, or graphs.
+
+   https://disco-lang.readthedocs.io/en/latest/reference/multiplication.html
+
+The higher precedence level of ``*`` is how Disco knows that it should
+be done before (*i.e.* have parentheses put around it) before addition.
+
 Exercises
 ---------
 
-Rewrite each of the following expressions in an equivalent way using
-as few parentheses as possible.  Use the :doc command if you need to
-know the precedence of an operator.  Use Disco to make sure that the
-original expression and your new version still yield the same result.
+* What is the precedence level of subtraction, and how does it compare
+  to the precedence levels of addition and multiplication?  Does this
+  make sense given what you know about the order of operations?
 
-* ``XXX``
+* What is the precedence level of the "less than" operator ``<``?
+  Does it have higher or lower precedence than addition?  Does this
+  make sense?  (*Hint*: think about expressions such as ``y < x + 3``.)
+
+* Rewrite each of the following expressions in an equivalent way using
+  as few parentheses as possible.  Use the ``:doc`` command if you
+  need to look up the precedence of an operator.  Use Disco to make
+  sure that the original expression and your new version still yield
+  the same result.
+
+    * ``((1 + 2) + 3) + 4``
+    * ``(1 + 2) + (3 + 4)``
+    * ``1 + (5 * (x^2))``
+    * ``((((2 + 3) * 5) + 2) * 10) * 2``
+    * ``x^(2^(3^1))``
 
 Subtraction
 -----------

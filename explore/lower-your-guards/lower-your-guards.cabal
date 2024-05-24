@@ -20,6 +20,7 @@ executable lower-your-guards
                        pretty-simple,
                        containers,
                        mtl,
+                       transformers,
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities

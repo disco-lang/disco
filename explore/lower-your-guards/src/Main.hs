@@ -1,4 +1,4 @@
-module Main (main, pfg, pdu) where
+module Main (main, evalGdt, pfg, pdu, pdun, pdui, inhabNice) where
 
 import Control.Monad.State
 import Data.List.NonEmpty (fromList)
@@ -15,7 +15,6 @@ import Text.Pretty.Simple (pPrint)
 import qualified Types as Ty
 import qualified Uncovered as U
 import qualified Data.List.NonEmpty as NE
-import qualified Data.Map as M
 
 parseFile :: String -> IO [P.FunctionDef]
 parseFile file = do
@@ -26,7 +25,7 @@ parseFile file = do
     Right defs -> return defs
 
 main :: IO ()
-main = pdu "test/test.disc" >>= pPrint
+main = pdui "test/test.disc" >>= pPrint
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
 desGdt clauses = do
@@ -60,7 +59,7 @@ evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
 norm :: [P.Clause] -> Ty.Type -> F.Fresh (S.Set I.NormRefType)
 norm clauses tIn = do
   (context, formula) <- uncov clauses tIn
-  I.normalize (Just (context, [])) formula
+  I.normalize (context, []) formula
 
 evalNorm :: [P.Clause] -> Ty.Type -> S.Set I.NormRefType
 evalNorm clauses tIn = evalState (norm clauses tIn) F.blank
@@ -101,7 +100,7 @@ inhabNice file = do
       defs
 
 nicePattern :: P.Pattern -> String
-nicePattern (P.PMatch k ps) = (T.unpack $ Ty.dcName k) ++ (concatMap (" " ++) (map nicePattern ps))
+nicePattern (P.PMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . nicePattern) ps
 nicePattern P.PWild = "_"
 nicePattern (P.PLit i) = show i
 nicePattern (P.PVar x) = T.unpack x

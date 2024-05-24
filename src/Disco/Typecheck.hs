@@ -771,17 +771,8 @@ typecheck Infer (TPrim prim) = do
   ----------------------------------------
   -- Randomness
 
---   inferPrim PrimRandom = return $ TyGen :*: (TyN :*: TyN) :->: (TyGen :*: TyN)
---   inferPrim PrimSeed = return $ TyN :->: TyGen
-
-  inferPrim PrimRandom = do 
-   a <- freshTy 
-   constraint $ CQual QNum a 
-   return $ TyGen :*: (a :*: a) :->: (TyGen :*: a)
-  inferPrim PrimSeed = do 
-   a <- freshTy 
-   constraint $ CQual QNum a 
-   return $ a :->: TyGen
+  inferPrim PrimRandom = return $ TyGen :*: (TyN :*: TyN) :->: (TyGen :*: TyN)
+  inferPrim PrimSeed = return $ TyN :->: TyGen
 
   ----------------------------------------
   -- Arithmetic

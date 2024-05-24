@@ -184,7 +184,7 @@ instance Pretty BaseTy where
     CtrBag -> text "Bag"
     CtrSet -> text "Set"
 
-    Gen -> text "gen"
+    Gen -> text "Gen"
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool

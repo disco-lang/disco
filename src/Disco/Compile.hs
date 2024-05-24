@@ -289,8 +289,8 @@ compilePrim ty PrimConnect = compilePrimErr PrimConnect ty
 compilePrim _ PrimInsert = return $ CConst OInsert
 compilePrim _ PrimLookup = return $ CConst OLookup
 
--- compilePrim _ PrimRandom = return $ CConst ORandom 
--- compilePrim _ PrimSeed = return $ CConst OSeed
+compilePrim _ PrimRandom = return $ CConst ORandom 
+compilePrim _ PrimSeed = return $ CConst OSeed
 
 compilePrim (_ :*: TyList _ :->: _) PrimEach =
   return $

@@ -251,6 +251,10 @@ data Op
   | -- | Not the Boolean `Impl`, but instead a propositional BOp
     -- | Should only be seen and used with Props.
     OImpl
+  | -- | Cool
+    OSeed 
+  | -- | Cool 
+    ORandom
   deriving (Show, Generic, Data, Alpha, Eq, Ord)
 
 -- | Get the arity (desired number of arguments) of a function
@@ -404,3 +408,6 @@ opToStr = \case
   OAnd -> "and"
   OOr -> "or"
   OImpl -> "implies"
+
+  ORandom -> "random"
+  OSeed -> "seed"

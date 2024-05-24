@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 
 -- |
 -- Module      :  Disco.Interactive.Commands
@@ -33,6 +34,7 @@ import Data.Bifunctor (second)
 import Data.Char (isSpace)
 import Data.Coerce
 import Data.List (find, isPrefixOf, sortBy, transpose)
+import Data.List.NonEmpty qualified as NE
 import Data.Map ((!))
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe, maybeToList)
@@ -44,6 +46,7 @@ import Disco.Context as Ctx
 import Disco.Desugar
 import Disco.Doc
 import Disco.Effects.Input
+import Disco.Effects.Fresh (runFresh)
 import Disco.Effects.LFresh
 import Disco.Effects.State
 import Disco.Enumerate (enumerateType)
@@ -307,7 +310,7 @@ handleAnn ::
   REPLExpr 'CAnn ->
   Sem r ()
 handleAnn (Ann t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   infoPretty at
 
 ------------------------------------------------------------
@@ -330,7 +333,7 @@ handleCompile ::
   REPLExpr 'CCompile ->
   Sem r ()
 handleCompile (Compile t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   infoPretty . compileTerm $ at
 
 ------------------------------------------------------------
@@ -353,7 +356,7 @@ handleDesugar ::
   REPLExpr 'CDesugar ->
   Sem r ()
 handleDesugar (Desugar t) = do
-  (at, _) <- typecheckTop $ inferTop t
+  (at, _) <- typecheckTop $ inferTop' t
   info $ pretty' . eraseDTerm . runDesugar . desugarTerm $ at
 
 ------------------------------------------------------------
@@ -802,7 +805,7 @@ tableCmd =
 
 handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
 handleTable (Table t) = do
-  (at, ty) <- inputToState . typecheckTop $ inferTop t
+  (at, ty) <- inputToState . typecheckTop $ inferTop' t
   v <- mapError EvalErr . evalTerm False $ at
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
@@ -1031,8 +1034,13 @@ handleTypeCheck ::
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  (_, sig) <- typecheckTop $ inferTop t
-  info $ pretty' t <+> text ":" <+> pretty' sig
+  asigs <- typecheckTop $ inferTop t
+  sigs <- runFresh . mapInput (view (replModInfo . miTydefs)) $ thin $ NE.map snd asigs
+  let (toShow, extra) = NE.splitAt 8 sigs
+  when (length sigs > 1) $ info "This expression has multiple possible types.  Some examples:"
+  info $ vcat $
+    map (\sig -> pretty' t <+> text ":" <+> pretty' sig) toShow
+    ++ ["..." | not (P.null extra)]
 
 ------------------------------------------------------------
 

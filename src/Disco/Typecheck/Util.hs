@@ -15,11 +15,10 @@ import Polysemy.Output
 import Polysemy.Reader
 import Polysemy.Writer
 import Unbound.Generics.LocallyNameless (Name, bind, string2Name)
-
 import qualified Data.Map as M
 import Data.Tuple (swap)
 import Prelude hiding (lookup)
-
+import Data.List.NonEmpty (NonEmpty)
 import Disco.AST.Surface
 import Disco.Context
 import Disco.Messages
@@ -143,18 +142,19 @@ withConstraint :: Sem (Writer Constraint ': r) a -> Sem r (a, Constraint)
 withConstraint = fmap swap . runWriter
 
 -- | Run a computation and solve its generated constraint, returning
---   the resulting substitution (or failing with an error).  Note that
---   this locally dispatches the constraint writer effect.
+--   all the possible resulting substitutions (or failing with an
+--   error).  Note that this locally dispatches the constraint writer
+--   effect.
 solve ::
   Members '[Reader TyDefCtx, Error TCError, Output (Message ann)] r =>
   Sem (Writer Constraint ': r) a ->
-  Sem r (a, S)
+  Sem r (a, NonEmpty S)
 solve m = do
   (a, c) <- withConstraint m
   res <- runSolve . inputToReader . solveConstraint $ c
   case res of
     Left e -> throw (Unsolvable e)
-    Right s -> return (a, s)
+    Right ss -> return (a, ss)
 
 ------------------------------------------------------------
 -- Contexts

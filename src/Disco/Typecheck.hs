@@ -15,7 +15,7 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad (forM_, unless, when, zipWithM)
+import Control.Monad (forM_, unless, when, zipWithM, replicateM, filterM)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
@@ -41,11 +41,13 @@ import qualified Disco.Subst as Subst
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck.Constraints
+import Disco.Typecheck.Solve (solveConstraint)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Types.Rules
 import Polysemy hiding (embed)
 import Polysemy.Error
+import Polysemy.Input
 import Polysemy.Output
 import Polysemy.Reader
 import Polysemy.Writer
@@ -141,7 +143,7 @@ checkModule name imports (Module es _ m docs terms) = do
         (x : _) -> throw $ noLoc $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- mapError noLoc $ checkProperties docCtx -- XXX location?
-          aterms <- mapError noLoc $ mapM inferTop terms -- XXX location?
+          aterms <- mapError noLoc $ mapM inferTop' terms -- XXX location?
           return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
  where
   getDefnName :: Defn -> Name ATerm
@@ -293,11 +295,11 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
   -- patterns, and lazily unrolling type definitions along the way.
   (patTys, bodyTy) <- decomposeDefnTy (numPats (NE.head clauses)) ty
 
-  ((acs, _), theta) <- solve $ do
+  ((acs, _), thetas) <- solve $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
     return (aclauses, ty)
 
-  return $ applySubst theta (Defn (coerce x) patTys bodyTy acs)
+  return $ applySubst (NE.head thetas) (Defn (coerce x) patTys bodyTy acs)
  where
   numPats = length . fst . unsafeUnbind
 
@@ -309,7 +311,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
     -- patterns don't match across different clauses
     | otherwise = return ()
 
-  -- \| Check a clause of a definition against a list of pattern types and a body type.
+  -- | Check a clause of a definition against a list of pattern types and a body type.
   checkClause ::
     Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r =>
     [Type] ->
@@ -357,9 +359,9 @@ checkProperty ::
   Property ->
   Sem r AProperty
 checkProperty prop = do
-  (at, theta) <- solve $ check prop TyProp
+  (at, thetas) <- solve $ check prop TyProp
   -- XXX do we need to default container variables here?
-  return $ applySubst theta at
+  return $ applySubst (NE.head thetas) at
 
 ------------------------------------------------------------
 -- Type checking/inference
@@ -446,33 +448,51 @@ infer ::
   Sem r ATerm
 infer = typecheck Infer
 
--- | Top-level type inference algorithm: infer a (polymorphic) type
---   for a term by running type inference, solving the resulting
---   constraints, and quantifying over any remaining type variables.
-inferTop ::
+-- | Top-level type inference algorithm, returning only the first
+--   possible result.
+inferTop' ::
   Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   Sem r (ATerm, PolyType)
+inferTop' = fmap NE.head . inferTop
+
+-- | Top-level type inference algorithm: infer some possible
+--   (polymorphic) types for a term by running type inference, solving
+--   the resulting constraints, and quantifying over any remaining
+--   type variables.
+inferTop ::
+  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Term ->
+  Sem r (NonEmpty (ATerm, PolyType))
 inferTop t = do
   -- Run inference on the term and try to solve the resulting
   -- constraints.
-  (at, theta) <- solve $ infer t
+  (at, thetas) <- solve $ infer t
 
   debug "Final annotated term (before substitution and container monomorphizing):"
   debugPretty at
 
-  -- Apply the resulting substitution.
-  let at' = applySubst theta at
-
-      -- Find any remaining container variables.
-      cvs = containerVars (getType at')
-
-      -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ map (,TyAtom (ABase CtrList)) (S.toList cvs)) at'
-
-  -- Finally, quantify over any remaining type variables and return
+  -- Quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return (at'', closeType (getType at''))
+  return $ do  -- Monad NonEmpty
+
+    -- Iterate over all possible solutions...
+    theta <- thetas
+
+    let -- Apply each one...
+        at' = applySubst theta at
+
+        -- Find any remaining container variables...
+        cvs = containerVars (getType at')
+
+    -- Build all possible substitutions for those container variables...
+    ctrs <- replicateM (S.size cvs) (NE.map (TyAtom . ABase) (CtrList :| [CtrBag, CtrSet]))
+
+    -- Substitute for the container variables...
+    let at'' = applySubst (Subst.fromList $ zip (S.toList cvs) ctrs) at'
+
+    -- Return the term along with its type, with all substitutions applied.
+    return (at'', closeType (getType at''))
 
 -- | Top-level type checking algorithm: check that a term has a given
 --   polymorphic type by running type checking and solving the
@@ -484,7 +504,7 @@ checkTop ::
   Sem r ATerm
 checkTop t ty = do
   (at, theta) <- solve $ checkPolyTy t ty
-  return $ applySubst theta at
+  return $ applySubst (NE.head theta) at
 
 --------------------------------------------------
 -- The typecheck function
@@ -1711,3 +1731,33 @@ ensureEq :: Member (Writer Constraint) r => Type -> Type -> Sem r ()
 ensureEq ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise = constraint $ CEq ty1 ty2
+
+------------------------------------------------------------
+-- Subtyping
+------------------------------------------------------------
+
+isSubPolyType
+  :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r
+  => PolyType -> PolyType -> Sem r Bool
+isSubPolyType (Forall b1) (Forall b2) = do
+  (as1, ty1) <- unbind b1
+  (as2, ty2) <- unbind b2
+  let c = CAll (bind as1 (CSub ty1 (substs (zip as2 (map TyVar as1)) ty2)))
+  ss <- runError (solveConstraint c)
+  return (either (const False) (not . P.null) ss)
+
+thin :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => NonEmpty PolyType -> Sem r (NonEmpty PolyType)
+thin = fmap NE.fromList . thin' . NE.toList
+
+-- Intuitively, this will always return a nonempty list given a nonempty list as input;
+-- we could probably rewrite it in terms of NonEmpty combinators but it's more effort than
+-- I cared to spend at the moment.
+thin' :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => [PolyType] -> Sem r [PolyType]
+thin' []       = return []
+thin' (ty:tys) = do
+  ss <- or <$> mapM (`isSubPolyType` ty) tys
+  if ss
+    then thin' tys
+    else do
+      tys' <- filterM (fmap not . (ty `isSubPolyType`)) tys
+      (ty :) <$> thin' tys'

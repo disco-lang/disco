@@ -7,6 +7,15 @@
 [3] : List(ℕ)
 {3} : Set(ℕ)
 ⟅3⟆ : Bag(ℕ)
+This expression has multiple possible types.  Some examples:
 list : List(a) → List(a)
+list : Bag(a) → List(a)
+list : Set(a) → List(a)
+This expression has multiple possible types.  Some examples:
 bag : List(ℕ) → Bag(ℕ)
+bag : Bag(ℕ) → Bag(ℕ)
+bag : Set(ℕ) → Bag(ℕ)
+This expression has multiple possible types.  Some examples:
 set : List(ℕ) → Set(ℕ)
+set : Bag(ℕ) → Set(ℕ)
+set : Set(ℕ) → Set(ℕ)

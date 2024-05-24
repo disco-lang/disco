@@ -1,10 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
+{-# LANGUAGE ImportQualifiedPost #-}
 
 -- |
 -- Module      :  Disco.Typecheck.Solve
@@ -29,7 +26,6 @@ import Unbound.Generics.LocallyNameless (
 
 import Data.Coerce
 import GHC.Generics (Generic)
-
 import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (use, (%=), (.=))
 import Control.Monad (unless, zipWithM)
@@ -52,14 +48,12 @@ import Data.Monoid (First (..))
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Tuple
-
 import Disco.Effects.Fresh
 import Disco.Effects.State
 import Polysemy
 import Polysemy.Error
 import Polysemy.Input
 import Polysemy.Output
-
 import Disco.Messages
 import Disco.Pretty hiding ((<>))
 import Disco.Subst
@@ -71,6 +65,8 @@ import Disco.Typecheck.Unify
 import Disco.Types
 import Disco.Types.Qualifiers
 import Disco.Types.Rules
+import Data.List.NonEmpty (NonEmpty)
+import Data.List.NonEmpty qualified as NE
 
 --------------------------------------------------
 -- Solver errors
@@ -251,7 +247,7 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 solveConstraint ::
   Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
   Constraint ->
-  Sem r S
+  Sem r (NonEmpty S)
 solveConstraint c = do
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers; also expand disjunctions.  Result in a
@@ -268,7 +264,7 @@ solveConstraint c = do
 
   -- Now try continuing with each set and pick the first one that has
   -- a solution.
-  asum' (map (uncurry solveConstraintChoice) qcList)
+  NE.singleton <$> asum' (map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice ::
   Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>

@@ -4,7 +4,10 @@ Running tests...
   dummy: OK
   setSize2: OK
 Loaded.
+This expression has multiple possible types.  Some examples:
 reduce : (a × a → a) × a × List(a) → a
+reduce : (a × a → a) × a × Bag(a) → a
+reduce : (a × a → a) × a × Set(a) → a
 reduce(~+~, 0, [1 .. 10]) : ℕ
 55
 60

@@ -142,16 +142,17 @@ withConstraint :: Sem (Writer Constraint ': r) a -> Sem r (a, Constraint)
 withConstraint = fmap swap . runWriter
 
 -- | Run a computation and solve its generated constraint, returning
---   all the possible resulting substitutions (or failing with an
---   error).  Note that this locally dispatches the constraint writer
---   effect.
+--   up to the requested number of possible resulting substitutions
+--   (or failing with an error).  Note that this locally dispatches
+--   the constraint writer and solution limit effects.
 solve ::
   Members '[Reader TyDefCtx, Error TCError, Output (Message ann)] r =>
+  Int ->
   Sem (Writer Constraint ': r) a ->
   Sem r (a, NonEmpty S)
-solve m = do
+solve lim m = do
   (a, c) <- withConstraint m
-  res <- runSolve . inputToReader . solveConstraint $ c
+  res <- runSolve (SolutionLimit lim) . inputToReader . solveConstraint $ c
   case res of
     Left e -> throw (Unsolvable e)
     Right ss -> return (a, ss)

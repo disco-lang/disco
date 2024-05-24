@@ -26,7 +26,7 @@ import Unbound.Generics.LocallyNameless (
 
 import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (use, (%=), (.=))
-import Control.Monad (forM, unless, zipWithM)
+import Control.Monad (forM, join, unless, zipWithM)
 import Data.Bifunctor (first, second)
 import Data.Coerce
 import Data.Either (partitionEithers)
@@ -89,8 +89,8 @@ instance Semigroup SolveError where
 --------------------------------------------------
 -- Error utilities
 
-runSolve :: Sem (Fresh ': Error SolveError ': r) a -> Sem r (Either SolveError a)
-runSolve = runError . runFresh
+runSolve :: SolutionLimit -> Sem (State SolutionLimit ': Fresh ': Error SolveError ': r) a -> Sem r (Either SolveError a)
+runSolve lim = runError . runFresh . evalState lim
 
 -- | Run a list of actions, and return the results from those which do
 --   not throw an error.  If all of them throw an error, rethrow the
@@ -101,6 +101,32 @@ filterErrors ms = do
   case partitionEithersNE es of
     Left (e :| _) -> throw e
     Right (_, as) -> return as
+
+--------------------------------------------------
+-- Solution limits
+
+-- | Max number of solutions to generate.
+newtype SolutionLimit = SolutionLimit {getSolutionLimit :: Int}
+
+-- | Register the fact that we found one solution, by decrementing the
+--   solution limit.
+countSolution :: Member (State SolutionLimit) r => Sem r ()
+countSolution = modify (SolutionLimit . subtract 1 . getSolutionLimit)
+
+-- | Run a subcomputation conditional on the solution limit still
+--   being positive.  If the solution limit has reached zero, stop
+--   early.
+withSolutionLimit ::
+  (Member (State SolutionLimit) r, Member (Output (Message ann)) r, Monoid a) =>
+  Sem r a ->
+  Sem r a
+withSolutionLimit m = do
+  SolutionLimit lim <- get
+  case lim of
+    0 -> do
+      debug "Reached solution limit, stopping early..."
+      return mempty
+    _ -> m
 
 --------------------------------------------------
 -- Simple constraints
@@ -239,7 +265,7 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 -- Top-level solver algorithm
 
 solveConstraint ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
   Constraint ->
   Sem r (NonEmpty S)
 solveConstraint c = do
@@ -248,6 +274,7 @@ solveConstraint c = do
   -- list of possible constraint sets; each one consists of equational
   -- and subtyping constraints in addition to qualifiers.
 
+  debug "============================================================"
   debug "Solving:"
   debugPretty c
 
@@ -260,11 +287,13 @@ solveConstraint c = do
   sconcat <$> filterErrors (NE.map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
   Sem r (NonEmpty S)
 solveConstraintChoice quals cs = do
+  debug "solveConstraintChoice"
+
   debugPretty quals
   debug $ vcat (map pretty' cs)
 
@@ -955,6 +984,9 @@ ubsBySort, lbsBySort :: TyVarInfoMap -> RelMap -> [BaseTy] -> Sort -> Set (Name 
 ubsBySort vm rm = allBySort vm rm SuperTy
 lbsBySort vm rm = allBySort vm rm SubTy
 
+maxSolutions :: Int
+maxSolutions = 16
+
 -- | From the constraint graph, build the sets of sub- and super- base
 --   types of each type variable, as well as the sets of sub- and
 --   supertype variables.  For each type variable x in turn, try to
@@ -969,11 +1001,14 @@ lbsBySort vm rm = allBySort vm rm SubTy
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
 solveGraph ::
-  Members '[Fresh, Error SolveError, Output (Message ann)] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), State SolutionLimit] r =>
   TyVarInfoMap ->
   Graph UAtom ->
   Sem r [S]
-solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
+solveGraph vm g = do
+  debug "Solving graph..."
+  debugPretty g
+  map (atomToTypeSubst . unifyWCC) <$> go topRelMap
  where
   unifyWCC :: Substitution BaseTy -> Substitution Atom
   unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
@@ -1035,13 +1070,17 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
     fromVar _ = error "Impossible! UB but uisVar."
 
   go ::
-    Members '[Fresh, Output (Message ann)] r =>
+    Members '[Fresh, Output (Message ann), State SolutionLimit] r =>
     RelMap ->
-    Sem r (Set (Substitution BaseTy))
-  go relMap@(RelMap rm) =
-    debugPretty relMap >> case as of
+    Sem r [Substitution BaseTy]
+  go relMap@(RelMap rm) = withSolutionLimit $ do
+    debugPretty relMap
+    case as of
       -- No variables left that have base type constraints.
-      [] -> return $ S.singleton idS
+      [] -> do
+        -- Found a solution, decrement the counter.
+        countSolution
+        return [idS]
       -- Solve one variable at a time.  See below.
       (a : _) -> do
         debug $ "Solving for" <+> pretty' a
@@ -1059,9 +1098,9 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
         -- anything (indeed, some variables might not be keys if
         -- they have an empty sort), so it doesn't matter if old
         -- variables hang around in it.
-        ss' <- forM (S.toList ss) $ \s ->
-          S.map (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
-        return (S.unions ss')
+        ss' <- forM ss $ \s ->
+          map (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
+        return (join ss')
    where
     -- NOTE we can't solve a bunch in parallel!  Might end up
     -- assigning them conflicting solutions if some depend on
@@ -1109,7 +1148,7 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
     -- them.
 
     -- Solve for a variable, returning all possible substitutions.
-    solveVar :: Name Type -> Set (Substitution BaseTy)
+    solveVar :: Name Type -> [Substitution BaseTy]
     solveVar v =
       case ((v, SuperTy), (v, SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" rm) of
         -- No sub- or supertypes; the only way this can happen is
@@ -1140,11 +1179,11 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
         ([], []) ->
           -- Debug.trace (show v ++ " has no sub- or supertypes.")
           -- Pick some base type with an appropriate sort.
-          S.map (coerce v |->) $ S.fromList (filter (`hasSort` getSort vm v) [N, Z, F, Q, B, C])
+          map (coerce v |->) $ filter (`hasSort` getSort vm v) [N, Z, F, Q, B, C]
         -- Only supertypes.  Just assign a to their inf, if one exists.
         (bsupers, []) ->
           -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
-          S.map (coerce v |->) $
+          map (coerce v |->) . S.toList $
             lbsBySort
               vm
               relMap
@@ -1158,7 +1197,7 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
           -- Debug.trace ("relmap: " ++ show relMap) $
           -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
           -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
-          S.map (coerce v |->) $
+          map (coerce v |->) . S.toList $
             ubsBySort
               vm
               relMap
@@ -1171,5 +1210,6 @@ solveGraph vm g = map (atomToTypeSubst . unifyWCC) . S.toList <$> go topRelMap
           let mub = glbBySort vm relMap bsupers (getSort vm v) (varRels (rm ! (v, SuperTy)))
               mlb = lubBySort vm relMap bsubs (getSort vm v) (varRels (rm ! (v, SubTy)))
            in case (mlb, mub) of
-                (Just lb, Just ub) -> S.map (coerce v |->) (S.fromList (filter (`isSubB` ub) (supertypes lb)))
-                _ -> S.empty
+                (Just lb, Just ub) ->
+                  map (coerce v |->) (filter (`isSubB` ub) (supertypes lb))
+                _ -> []

@@ -1029,12 +1029,15 @@ typeCheckCmd =
     , parser = TypeCheck <$> parseTermOrOp
     }
 
+maxInferredTypes :: Int
+maxInferredTypes = 16
+
 handleTypeCheck ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do
-  asigs <- typecheckTop $ inferTop t
+  asigs <- typecheckTop $ inferTop maxInferredTypes t
   sigs <- runFresh . mapInput (view (replModInfo . miTydefs)) $ thin $ NE.map snd asigs
   let (toShow, extra) = NE.splitAt 8 sigs
   when (length sigs > 1) $ info "This expression has multiple possible types.  Some examples:"

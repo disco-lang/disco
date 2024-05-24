@@ -1,2 +1,2 @@
 #!/bin/sh
-stack test --fast --file-watch --test-arguments '--hide-successes +RTS -N8 -RTS'
+cabal test -j -O0

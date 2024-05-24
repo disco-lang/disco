@@ -1,0 +1,4 @@
+foo : , Either Int Bool Int -> Bool
+foo , Right _        _ = True
+foo , Left  0         _ = True
+foo , Left  0         _ = True

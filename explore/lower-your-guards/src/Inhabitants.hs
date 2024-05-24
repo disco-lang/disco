@@ -3,6 +3,7 @@
 
 module Inhabitants where
 
+import Control.Applicative
 import Control.Monad (foldM, guard, replicateM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
@@ -12,7 +13,6 @@ import qualified Fresh as F
 import qualified Parse as P
 import qualified Types as Ty
 import qualified Uncovered as U
-import Control.Applicative
 
 type NormRefType = (U.Context, [Constraint])
 
@@ -40,7 +40,7 @@ expandVar (ctx, cns) (x, xType) = case matchingCons of
     P.PMatch k <$> expandVars (ctx, cns) (zip freshVars (Ty.dcTypes k))
   where
     origX = lookupVar x cns
-    matchingCons = [k | k <- Ty.dataCons xType, any (origX `isType` k) cns]
+    matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
@@ -60,7 +60,7 @@ n <+> U.NotDataCon k x = n <+| NotDataCon k x
 (context, constraints) <+> U.MatchIntLit i x = (context, constraints) <+| MatchIntLit i x
 n <+> U.NotIntLit i x = n <+| NotIntLit i x
 
-breakIf :: Alternative f => Bool -> f ()
+breakIf :: (Alternative f) => Bool -> f ()
 breakIf = guard . not
 
 splitConstraintsOn :: F.VarID -> [Constraint] -> ([Constraint], [Constraint])
@@ -85,19 +85,31 @@ substituteVarID y x (MatchIntLit i x') | x' == x = MatchIntLit i y
 substituteVarID y x (NotIntLit i x') | x' == x = NotIntLit i y
 substituteVarID _ _ cn = cn
 
+addConstraints :: NormRefType -> [Constraint] -> MaybeT F.Fresh NormRefType
+addConstraints = foldM (<+|)
+
 (<+|) :: NormRefType -> Constraint -> MaybeT F.Fresh NormRefType
 ----- Equation (10) -----
 (ctx, cns) <+| MatchDataCon k vars x = do
   let origX = lookupVar x cns
-  -- TODO(colin): 10a
-  breakIf $ any (origX `isNotType` k) cns
-  -- TODO(colin): 10c
-  return (ctx, cns ++ [MatchDataCon k vars origX])
+  let matchingX = allMatchesOnVar origX cns
+  -- 10a
+  breakIf $ any (\(k', _, _) -> k' /= k) matchingX
+  -- 10b
+  breakIf $ any (origX `isNotDataCon` k) cns
+
+  -- length of kMatchingX should only ever be 0 or 1, see I4 in section 3.4
+  let kMatchingX = filter (\(k', _, _) -> k' == k) matchingX
+  case kMatchingX of
+    -- 10c -- TODO(colin): Still need to add type constraints!
+    ((_, vars', _) : _) -> addConstraints (ctx, cns) (zipWith TermEquality vars vars')
+    -- 10d
+    [] -> return (ctx, cns ++ [MatchDataCon k vars origX])
 
 ----- Equation (11) -----
 (ctx, cns) <+| NotDataCon k x = do
   let origX = lookupVar x cns
-  breakIf $ any (origX `isType` k) cns
+  breakIf $ any (origX `isMatchDataCon` k) cns
 
   -- redundancy of NotDataCon constraint?
   inhabited <- lift (inh (ctx, cns ++ [NotDataCon k origX]) x (lookupType x ctx))
@@ -113,7 +125,7 @@ substituteVarID _ _ cn = cn
     then return (ctx, cns)
     else do
       let (noX', withX') = splitConstraintsOn x' cns
-      foldM (<+|) (ctx, noX' ++ [TermEquality x' y']) (substituteVarIDs y' x' withX')
+      addConstraints (ctx, noX' ++ [TermEquality x' y']) (substituteVarIDs y' x' withX')
 
 ----- Modified Equation (10) -----
 (ctx, cns) <+| MatchIntLit i x = do
@@ -127,24 +139,29 @@ substituteVarID _ _ cn = cn
   breakIf $ any (origX `isTheInt` i) cns
   return (ctx, cns ++ [NotIntLit i origX])
 
-isNotType :: F.VarID -> Ty.DataConstructor -> (Constraint -> Bool)
-isNotType origX k = \case
+isNotDataCon :: F.VarID -> Ty.DataConstructor -> (Constraint -> Bool)
+isNotDataCon origX k = \case
   NotDataCon k' x' | x' == origX && k' == k -> True
   _ -> False
 
-isType :: F.VarID -> Ty.DataConstructor -> (Constraint -> Bool)
-isType origX k = \case
+isMatchDataCon :: F.VarID -> Ty.DataConstructor -> (Constraint -> Bool)
+isMatchDataCon origX k = \case
   MatchDataCon k' _ x' | x' == origX && k' == k -> True
+  _ -> False
+
+testMatchDataCon :: (Ty.DataConstructor -> Bool) -> (Constraint -> Bool)
+testMatchDataCon kf = \case
+  MatchDataCon k' _ _ -> kf k'
   _ -> False
 
 isTheInt :: F.VarID -> Int -> (Constraint -> Bool)
 isTheInt origX i = \case
-  NotIntLit i' x' | x' == origX && i' == i -> True
+  MatchIntLit i' x' | x' == origX && i' == i -> True
   _ -> False
 
 isNotTheInt :: F.VarID -> Int -> (Constraint -> Bool)
 isNotTheInt origX i = \case
-  MatchIntLit i' x' | x' == origX && i' == i -> True
+  NotIntLit i' x' | x' == origX && i' == i -> True
   _ -> False
 
 lookupVar :: F.VarID -> [Constraint] -> F.VarID
@@ -158,15 +175,23 @@ lookupType x ((x', tau) : cs)
   | x' == x = tau
   | otherwise = lookupType x cs
 
+allMatchesOnVar :: F.VarID -> [Constraint] -> [(Ty.DataConstructor, [F.VarID], F.VarID)]
+allMatchesOnVar _ [] = []
+allMatchesOnVar x (MatchDataCon k ys x' : cns) | x' == x = (k, ys, x) : allMatchesOnVar x cns
+allMatchesOnVar x (_ : cns) = allMatchesOnVar x cns
+
 --
 --
 --
 
 inh :: NormRefType -> F.VarID -> Ty.Type -> F.Fresh Bool
 inh n x tau = any isJust <$> mapM (runMaybeT . inst n x) (cons n tau)
+-- we may need to add a special case for integers eventually?
+-- inh _ _ tau | tau == Ty.int = pure True 
 
 cons :: NormRefType -> Ty.Type -> [Ty.DataConstructor]
 cons _ Ty.Type {Ty.dataCons = ks} = ks
+
 -- the NormRefType is taken in because we may eventually have type constraints
 -- and we would need to worry about that here
 

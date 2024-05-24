@@ -8,11 +8,6 @@ foo , Left  3     n = True
 /*
 Note
 
-The number of ", _ _" non-exhaustive warnings
-from  inhabNice seems to always be
-2 ** (number of clasues)
-
-Should it be this way?
-TODO(colin): investigate
+Shows covered when not
 
 */

@@ -16,14 +16,22 @@ f is a function.
 Some more documentation.
 
 No documentation found for 'x'.
+This expression has multiple possible types.  Some examples:
 ~+~ : ℕ × ℕ → ℕ
+~+~ : ℤ × ℤ → ℤ
+~+~ : 𝔽 × 𝔽 → 𝔽
+~+~ : ℚ × ℚ → ℚ
 precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.
 
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
+This expression has multiple possible types.  Some examples:
 ~+~ : ℕ × ℕ → ℕ
+~+~ : ℤ × ℤ → ℤ
+~+~ : 𝔽 × 𝔽 → 𝔽
+~+~ : ℚ × ℚ → ℚ
 precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.

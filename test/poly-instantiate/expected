@@ -3,10 +3,22 @@ Loaded.
 foldr : (a → r → r) → r → List(a) → r
 foldr(λx. λy. x) : a → List(a) → a
 foldr(λx. λy. y) : r → List(a) → r
+This expression has multiple possible types.  Some examples:
 foldr(λx. λy. x + 1) : ℕ → List(ℕ) → ℕ
+foldr(λx. λy. x + 1) : ℤ → List(ℤ) → ℤ
+foldr(λx. λy. x + 1) : 𝔽 → List(𝔽) → 𝔽
+foldr(λx. λy. x + 1) : ℚ → List(ℚ) → ℚ
+This expression has multiple possible types.  Some examples:
 foldr(λx. λy. y + 1) : ℕ → List(a) → ℕ
+foldr(λx. λy. y + 1) : ℤ → List(a) → ℤ
+foldr(λx. λy. y + 1) : 𝔽 → List(a) → 𝔽
+foldr(λx. λy. y + 1) : ℚ → List(a) → ℚ
 foldr(λx. λy. y + 1)(1) : List(a) → ℕ
 foldr(λx. λy. y + 1)(-1) : List(a) → ℤ
+This expression has multiple possible types.  Some examples:
 foldr(λx. λy. x)(F) : List(Bool) → Bool
-foldr(λx. λy. x + 1)(1 / 2) : List(ℕ) → 𝔽
-foldr(λx. λy. x - 1)(1 / 2) : List(ℤ) → ℚ
+foldr(λx. λy. x)(F) : List(Prop) → Prop
+This expression has multiple possible types.  Some examples:
+foldr(λx. λy. x + 1)(1 / 2) : List(𝔽) → 𝔽
+foldr(λx. λy. x + 1)(1 / 2) : List(ℤ) → ℚ
+foldr(λx. λy. x - 1)(1 / 2) : List(ℚ) → ℚ

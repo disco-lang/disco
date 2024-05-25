@@ -1,11 +1,27 @@
+This expression has multiple possible types.  Some examples:
 let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x + x) : ℕ → ℕ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x + x) : ℤ → ℤ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x + x) : 𝔽 → 𝔽
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x + x) : ℚ → ℚ
+This expression has multiple possible types.  Some examples:
 let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x - x) : ℤ → ℤ
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x - x) : ℚ → ℚ
+This expression has multiple possible types.  Some examples:
 let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x / x) : 𝔽 → 𝔽
+let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. x / x) : ℚ → ℚ
 let f : (a → a) → a → a = λg. λx. g(g(x)) in f(λx. -x / x) : ℚ → ℚ
 λx. x : a → a
 λx. λy. x : a1 → a → a1
+This expression has multiple possible types.  Some examples:
 λx. λy. λz. x + y + z : ℕ → ℕ → ℕ → ℕ
+λx. λy. λz. x + y + z : ℤ → ℤ → ℤ → ℤ
+λx. λy. λz. x + y + z : ℕ → ℕ → 𝔽 → 𝔽
+λx. λy. λz. x + y + z : ℕ → 𝔽 → ℕ → 𝔽
+This expression has multiple possible types.  Some examples:
 λx. λy : ℕ. x - y : ℤ → ℕ → ℤ
-λw. λx : ℕ. λy. λz : 𝔽. w - x + y + z : ℚ → ℕ → ℚ → 𝔽 → ℚ
+λx. λy : ℕ. x - y : ℚ → ℕ → ℚ
+This expression has multiple possible types.  Some examples:
+λw. λx : ℕ. λy. λz : 𝔽. w - x + y + z : ℕ → ℕ → ℚ → 𝔽 → ℚ
+λw. λx : ℕ. λy. λz : 𝔽. w - x + y + z : ℤ → ℕ → ℤ → 𝔽 → ℚ
 Error: typechecking failed.
 https://disco-lang.readthedocs.io/en/latest/reference/typecheck-fail.html

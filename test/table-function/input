@@ -5,6 +5,7 @@
 :table /\
 :table \x. x^2 + 1
 :table \x. x^2 - 1
-:table \x. x + 1/2
+:table \x:Z. x^2 - 1
+:table \x:F. x + 1/2
 :table \x. reduce(~+~, 0, x)
 :table \x:Unit. unit

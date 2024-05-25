@@ -1,4 +1,6 @@
 ~/\~ : Bool × Bool → Bool
 F /\ T : Bool
+This expression has multiple possible types.  Some examples:
 λx. x /\ T : Bool → Bool
+λx. x /\ T : Prop → Prop
 let f : (Bool × Bool → Bool) → Bool = λg. g(T, F) in f(~/\~) : Bool

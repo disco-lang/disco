@@ -144,7 +144,7 @@ checkModule name imports (Module es _ m docs terms) = do
         (x : _) -> throw $ noLoc $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- mapError noLoc $ checkProperties docCtx -- XXX location?
-          aterms <- mapError noLoc $ mapM inferTop' terms -- XXX location?
+          aterms <- mapError noLoc $ mapM inferTop1 terms -- XXX location?
           return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
  where
   getDefnName :: Defn -> Name ATerm
@@ -456,11 +456,11 @@ infer = typecheck Infer
 
 -- | Top-level type inference algorithm, returning only the first
 --   possible result.
-inferTop' ::
+inferTop1 ::
   Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   Sem r (ATerm, PolyType)
-inferTop' t = NE.head <$> inferTop 1 t
+inferTop1 t = NE.head <$> inferTop 1 t
 
 -- | Top-level type inference algorithm: infer up to the requested max
 --   number of possible (polymorphic) types for a term by running type

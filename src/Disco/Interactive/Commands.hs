@@ -310,7 +310,7 @@ handleAnn ::
   REPLExpr 'CAnn ->
   Sem r ()
 handleAnn (Ann t) = do
-  (at, _) <- typecheckTop $ inferTop' t
+  (at, _) <- typecheckTop $ inferTop1 t
   infoPretty at
 
 ------------------------------------------------------------
@@ -333,7 +333,7 @@ handleCompile ::
   REPLExpr 'CCompile ->
   Sem r ()
 handleCompile (Compile t) = do
-  (at, _) <- typecheckTop $ inferTop' t
+  (at, _) <- typecheckTop $ inferTop1 t
   infoPretty . compileTerm $ at
 
 ------------------------------------------------------------
@@ -356,7 +356,7 @@ handleDesugar ::
   REPLExpr 'CDesugar ->
   Sem r ()
 handleDesugar (Desugar t) = do
-  (at, _) <- typecheckTop $ inferTop' t
+  (at, _) <- typecheckTop $ inferTop1 t
   info $ pretty' . eraseDTerm . runDesugar . desugarTerm $ at
 
 ------------------------------------------------------------
@@ -805,7 +805,7 @@ tableCmd =
 
 handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
 handleTable (Table t) = do
-  (at, ty) <- inputToState . typecheckTop $ inferTop' t
+  (at, ty) <- inputToState . typecheckTop $ inferTop1 t
   v <- mapError EvalErr . evalTerm False $ at
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)

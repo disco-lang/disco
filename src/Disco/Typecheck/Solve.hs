@@ -984,9 +984,6 @@ ubsBySort, lbsBySort :: TyVarInfoMap -> RelMap -> [BaseTy] -> Sort -> Set (Name 
 ubsBySort vm rm = allBySort vm rm SuperTy
 lbsBySort vm rm = allBySort vm rm SubTy
 
-maxSolutions :: Int
-maxSolutions = 16
-
 -- | From the constraint graph, build the sets of sub- and super- base
 --   types of each type variable, as well as the sets of sub- and
 --   supertype variables.  For each type variable x in turn, try to

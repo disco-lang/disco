@@ -176,6 +176,29 @@ You will learn more about these types, how to convert between them,
 *etc.*; for now it's important just to know that they exist and to
 understand the basic distinctions between them.
 
+Note that Disco does not have floating-point numbers: all rational
+numbers are stored exactly as a ratio, not as a decimal
+approximation.  For example,
+
+::
+
+   Disco> (1+1)/(3+4)
+   2/7
+
+The result of ``(1+1)/(3+4)`` is simply displayed as the fraction
+``2/7``, instead of as a decimal approximation like
+``0.2857142857142857``.  However, we can still use decimal notation to
+write rational numbers:
+
+::
+
+   Disco> 1.2 + 3.5
+   4.7
+
+In this case Disco displays the answer in decimal form, since we also
+used decimal form in the input; internally, however, ``4.7`` is still
+represented as the exact fraction ``47/10``.
+
 Exercises
 ---------
 

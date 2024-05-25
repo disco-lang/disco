@@ -482,7 +482,35 @@ inferTop lim t = do
   debug "Final annotated term (before substitution and container monomorphizing):"
   debugPretty at
 
-  -- XXX include this container variable stuff in solution limits...?
+  -- Currently the following code generates *every possible*
+  -- combination of substitutions for container variables, which can
+  -- lead to exponential blowup in some cases.  For example, inferring
+  -- the type of
+  --
+  --   \x. \y. \z. (set(x), set(y), set(z))
+  --
+  -- takes a Very Long Time.  Potential solutions include:
+  --
+  --   1. Do something similar as in the 'solve' function, using a State SolutionLimit
+  --      effect to stop early once we've generated enough variety.
+  --
+  --   2. Use a proper backtracking search monad like LogicT to scope
+  --      over both the generation of solution substitutions *and*
+  --      choosing container variable monomorphizations, then just
+  --      take a limited number of solutions.  Unfortunately,
+  --      polysemy's NonDet effect seems to be somewhat broken
+  --      (https://stackoverflow.com/questions/62627695/running-the-nondet-effect-once-in-polysemy
+  --      ; https://github.com/polysemy-research/polysemy/issues/246 )
+  --      and using LogicT on top of Sem is going to be tedious since
+  --      it would require calling 'lift' on almost everything.
+  --
+  --   3. Also, it is probably (?) the case that no matter which of
+  --      the generated substitutions is used, the exact same
+  --      container variables are still unconstrained in all of them.
+  --      So we should be able to pick container variable
+  --      monomorphizations independently of the substitutions from
+  --      the solver.  Doing this would help though it would not
+  --      address the fundamental issue.
 
   -- Quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.

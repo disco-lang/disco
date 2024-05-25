@@ -85,7 +85,11 @@ precedence level.  For example, let's check out the documentation for
 ::
 
    Disco> :doc +
+   This expression has multiple possible types.  Some examples:
    ~+~ : ℕ × ℕ → ℕ
+   ~+~ : ℤ × ℤ → ℤ
+   ~+~ : 𝔽 × 𝔽 → 𝔽
+   ~+~ : ℚ × ℚ → ℚ
    precedence level 7, left associative
 
    The sum of two numbers, types, or graphs.
@@ -93,18 +97,19 @@ precedence level.  For example, let's check out the documentation for
    https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 There is a lot of information here, so let's go through it slowly.
-The first line, ``~+~ : ℕ × ℕ → ℕ``, tells us the :doc:`type <types>`
-of the addition operator.  Don't worry for now about what the various
+The first few lines tell us some of the :doc:`type <types>`
+the addition operator can have.  Don't worry for now about what the various
 symbols like ``~``, ``×``, and ``→`` mean; essentially this is telling
 us that ``+`` takes a pair of natural numbers and returns a natural
-number (XXX why this type is wrong --- ``+`` is more general).
+number; or a pair of integers and returns an integer; and so on.  This
+fits with the claim made before that all four of the numeric types
+support addition.
 
-The second line tells us the *precedence level* of ``+`` is ``7``.
-Operators with a *higher* precedence level come before ones with a
-lower precedence (for example, ``*`` has precedence level ``8``).  It
-also tells us that ``+`` is *left associative*, which means that if we
-use multiple ``+`` operations in a row (like ``1 + 2 + 3 + 4``), they
-will be done from left to right (like ``((1 + 2) + 3) + 4``).
+The next line tells us that the *precedence level* of ``+`` is ``7``.
+It also tells us that ``+`` is *left associative*, which means
+that if we use multiple ``+`` operations in a row (like ``1 + 2 + 3 +
+4``), they will be done from left to right (like ``((1 + 2) + 3) +
+4``).
 
 Finally, there is a description of what the operator does, and a link
 we can click if we want to read more about it.
@@ -123,7 +128,7 @@ has a *higher* precedence (8) than addition:
    https://disco-lang.readthedocs.io/en/latest/reference/multiplication.html
 
 The higher precedence level of ``*`` is how Disco knows that it should
-be done before (*i.e.* have parentheses put around it) before addition.
+come before (*i.e.* have parentheses put around it before) addition.
 
 Exercises
 ---------
@@ -148,24 +153,30 @@ Exercises
     * ``((((2 + 3) * 5) + 2) * 10) * 2``
     * ``x^(2^(3^1))``
 
-Subtraction
------------
+Subtraction and absolute value
+------------------------------
 
-Subtraction is written using ``-``.  Also ``.-`` for saturating subtraction.
+We can also perform subtraction in Disco, using the usual ``-``
+operator.  As mentioned before, we can only do subtraction on integers
+(``Z``) and rational numbers (``Q``); however, remember that other
+numeric types can be automatically converted into one of these.
 
-Only Z, Q support subtraction.
+The absolute value function is written ``|x|`` or ``abs(x)``.  It's
+worth noting that absolte value turns integers into natural numbers,
+and rational numbers into fractional numbers.  For example:
 
-Absolute value
---------------
+::
 
-Written ``|x|`` or ``abs(x)``.
-
-Types: turns Z into N, Q into F.  Show examples.
+   Disco> :type -3
+   -3 : ℤ
+   Disco> :type |-3|
+   abs(-3) : ℕ
 
 Division
 --------
 
-Written using ``/``.  Only F, Q support division.  Show examples.
+Division is written using ``/``.  Only fractional numbers (``F``) and
+rational numbers (``Q``) support division.
 
 Integer division
 ----------------

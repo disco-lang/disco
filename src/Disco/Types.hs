@@ -155,6 +155,8 @@ data BaseTy where
   -- the exact number of inhabitants.
   -- Fin  :: Integer -> BaseTy
 
+  Gen :: BaseTy
+
   -- | Set container type.  It's a bit odd putting these here since
   --   they have kind * -> * and all the other base types have kind *;
   --   but there's nothing fundamentally wrong with it and in
@@ -165,8 +167,6 @@ data BaseTy where
   CtrBag :: BaseTy
   -- | List container type.
   CtrList :: BaseTy
-  -- [Helpful comment]
-  Gen :: BaseTy
   deriving (Show, Eq, Ord, Generic, Data, Alpha, Subst BaseTy, Subst Atom, Subst UAtom, Subst Type)
 
 instance Pretty BaseTy where

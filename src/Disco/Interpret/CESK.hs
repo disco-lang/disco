@@ -63,6 +63,7 @@ import Polysemy
 import Polysemy.Error
 import Polysemy.Random
 import Polysemy.State
+import qualified System.Random as R
 
 ------------------------------------------------------------
 -- Utilities
@@ -428,7 +429,13 @@ appConst k = \case
       out . toMaybe . M.lookup (toSimpleValue k')
    where
     toMaybe = maybe (VInj L VUnit) (VInj R)
-
+  --------------------------------------------------
+  -- Randomness
+  
+  ORandom ->  arity3 $ \v1 v2 v3 -> 
+    let (a,g') = R.randomR (vint v2,vint v3) (vgen v1) 
+    in out $ VPair (intv a) (genv g')
+  OSeed -> out . VGen . (R.mkStdGen . fromIntegral . vint) 
   --------------------------------------------------
   -- Graph operations
 

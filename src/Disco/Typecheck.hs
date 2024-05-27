@@ -771,9 +771,9 @@ typecheck Infer (TPrim prim) = do
   ----------------------------------------
   -- Randomness
 
-  inferPrim PrimRandom = return $ TyGen :*: (TyN :*: TyN) :->: (TyGen :*: TyN)
+  inferPrim PrimRandom = return $ TyGen :*: (TyN :*: TyN) :->: (TyN :*: TyGen)
   inferPrim PrimSeed = return $ TyN :->: TyGen
-
+  
   ----------------------------------------
   -- Arithmetic
 

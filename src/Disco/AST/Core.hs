@@ -251,9 +251,9 @@ data Op
   | -- | Not the Boolean `Impl`, but instead a propositional BOp
     -- | Should only be seen and used with Props.
     OImpl
-  | -- | Cool
+  | 
     OSeed 
-  | -- | Cool 
+  | 
     ORandom
   deriving (Show, Generic, Data, Alpha, Eq, Ord)
 

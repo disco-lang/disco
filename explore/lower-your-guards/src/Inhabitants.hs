@@ -4,10 +4,12 @@
 module Inhabitants where
 
 import Control.Applicative
-import Control.Monad (foldM, guard, replicateM)
+import Control.Monad (foldM, forM, guard, join, replicateM)
+import Control.Monad.State (runState)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
-import Data.Maybe (isJust)
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
 import qualified Fresh as F
 import qualified Parse as P
@@ -23,6 +25,55 @@ data Constraint where
   NotIntLit :: Int -> F.VarID -> Constraint
   TermEquality :: F.VarID -> F.VarID -> Constraint
   deriving (Show, Eq, Ord)
+
+data InhabPat where
+  IPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
+  IPWild :: InhabPat
+  IPPlaceholderInt :: InhabPat
+  deriving (Show, Eq, Ord)
+
+genInhabPos :: NE.NonEmpty F.Frame -> U.RefinementType -> [InhabPat]
+genInhabPos frames (context, formula) = do
+  let mNrefs = S.toList <$> normalize (context, []) formula
+  let (nrefs, frames') = runState mNrefs frames
+  nref <- nrefs
+  join $ expandVarsPos frames' nref context
+
+expandVarsPos :: NE.NonEmpty F.Frame -> NormRefType -> U.Context -> [[InhabPat]]
+expandVarsPos frame nset vars = do
+  traverse (expandVarPos frame nset) vars
+
+expandVarPos :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
+expandVarPos frames nref@(_, cns) (x, xType) = case matchingX of
+  [] | xType == Ty.int -> return IPPlaceholderInt
+  [] -> do
+    let (matchers, frames') =
+          runState
+            ( catMaybes
+                <$> forM
+                  (Ty.dataCons xType)
+                  ( \dc -> do
+                      frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
+                      runMaybeT (nref <+| MatchDataCon dc frs x)
+                  )
+            )
+            frames
+    if null matchers
+      then return IPWild
+      else do
+        m <- matchers
+        expandVarPos frames' m (x, xType)
+  ((k, ys, _) : _) -> do
+    -- freshVars <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
+    l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
+    return $ IPMatch k l
+  where
+    origX = lookupVar x cns
+    -- matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
+    -- ms = allMatchesOnVar origX cns
+    matchingX = allMatchesOnVar origX cns
+
+-- kMatchingX = filter (\(k', _, _) -> k' == k) matchingX
 
 genInhabitants :: U.RefinementType -> F.Fresh [[P.Pattern]]
 genInhabitants (context, formula) = do
@@ -186,8 +237,9 @@ allMatchesOnVar x (_ : cns) = allMatchesOnVar x cns
 
 inh :: NormRefType -> F.VarID -> Ty.Type -> F.Fresh Bool
 inh n x tau = any isJust <$> mapM (runMaybeT . inst n x) (cons n tau)
+
 -- we may need to add a special case for integers eventually?
--- inh _ _ tau | tau == Ty.int = pure True 
+-- inh _ _ tau | tau == Ty.int = pure True
 
 cons :: NormRefType -> Ty.Type -> [Ty.DataConstructor]
 cons _ Ty.Type {Ty.dataCons = ks} = ks

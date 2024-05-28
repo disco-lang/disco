@@ -39,4 +39,5 @@ executable lower-your-guards
                        Uncovered
                        Inhabitants,
                        Types,
-                       Fresh
+                       Fresh,
+                       Play

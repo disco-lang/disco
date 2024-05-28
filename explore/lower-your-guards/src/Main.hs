@@ -1,4 +1,4 @@
-module Main (main, evalGdt, pfg, pdu, pdun, pdui, inhabNice) where
+module Main (main, evalGdt, pfg, pdu, pdun, pdui, inhabNice, pduip, inhabNicePos) where
 
 import Control.Monad.State
 import Data.List.NonEmpty (fromList)
@@ -53,8 +53,17 @@ inhab clauses tIn = do
   u <- uncov clauses tIn
   I.genInhabitants u
 
+inhabPos :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
+inhabPos clauses tIn = do
+  u <- uncov clauses tIn
+  s <- get
+  return $ I.genInhabPos s u
+
 evalInhab :: [P.Clause] -> Ty.Type -> [[P.Pattern]]
 evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
+
+evalInhabPos :: [P.Clause] -> Ty.Type -> [I.InhabPat]
+evalInhabPos clauses tIn = evalState (inhabPos clauses tIn) F.blank
 
 norm :: [P.Clause] -> Ty.Type -> F.Fresh (S.Set I.NormRefType)
 norm clauses tIn = do
@@ -89,6 +98,16 @@ pdui file = do
       )
       defs
 
+pduip :: String -> IO [(Text, [I.InhabPat])]
+pduip file = do
+  defs <- parseFile file
+  return $
+    map
+      ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
+          (name, evalInhabPos clauses tIn)
+      )
+      defs
+
 inhabNice :: String -> IO ()
 inhabNice file = do
   defs <- parseFile file
@@ -99,11 +118,26 @@ inhabNice file = do
       )
       defs
 
+inhabNicePos :: String -> IO ()
+inhabNicePos file = do
+  defs <- parseFile file
+  pPrint $
+    map
+      ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
+          (name, map niceInhabPattern $ evalInhabPos clauses tIn)
+      )
+      defs
+
 nicePattern :: P.Pattern -> String
 nicePattern (P.PMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . nicePattern) ps
 nicePattern P.PWild = "_"
 nicePattern (P.PLit i) = show i
 nicePattern (P.PVar x) = T.unpack x
+
+niceInhabPattern :: I.InhabPat -> String
+niceInhabPattern (I.IPMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
+niceInhabPattern I.IPWild = "_"
+niceInhabPattern I.IPPlaceholderInt = "placehold"
 
 pdun :: String -> IO [(Text, S.Set I.NormRefType)]
 pdun file = do

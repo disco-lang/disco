@@ -1,0 +1,5 @@
+foo : , Either Bool Bool Bool -> Bool
+foo , Left  True    b = True
+foo , Right False   b = True
+
+// TODO(colin): too specific on b

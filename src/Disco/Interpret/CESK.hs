@@ -431,7 +431,7 @@ appConst k = \case
     toMaybe = maybe (VInj L VUnit) (VInj R)
   --------------------------------------------------
   -- Randomness
-  
+
   ORandom ->  arity3 $ \v1 v2 v3 -> 
     let (a,g') = R.randomR (vint v2,vint v3) (vgen v1) 
     in out $ VPair (intv a) (genv g')

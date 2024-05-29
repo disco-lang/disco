@@ -505,10 +505,7 @@ prettyValue (_ :+: _) v =
 prettyValue _ (VNum d r) = text $ case (d, denominator r == 1) of
   (Decimal, False) -> prettyDecimal r
   _ -> prettyRational r
-
--- Temporary placement:
-prettyValue _ (VGen g) = text (show g)
-
+prettyValue _ (VGen _) = prettyPlaceholder TyGen
 prettyValue ty@(_ :->: _) _ = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs) = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TySet _) v =

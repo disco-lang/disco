@@ -15,6 +15,10 @@ foo3 :: (Either Bool Bool, Bool) -> Bool
 foo3 (Left  True    , b) = True
 foo3 (Right False   , b) = True
 
+foo4 :: (Int, Int) -> Bool
+foo4 (1, n) = True
+foo4 (n, 2) = False
+
 data Pat where
     Base :: Pat
     Kon :: Pat -> Pat

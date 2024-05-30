@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -Wno-incomplete-patterns #-}
+-- {-# OPTIONS_GHC -Wno-incomplete-patterns #-}
 {-# OPTIONS_GHC -Wno-missing-export-lists #-}
 
 module Inhabitants where
@@ -15,6 +15,7 @@ import qualified Fresh as F
 import qualified Parse as P
 import qualified Types as Ty
 import qualified Uncovered as U
+import Data.List (nub)
 
 type NormRefType = (U.Context, [Constraint])
 
@@ -29,6 +30,9 @@ data Constraint where
 data InhabPat where
   IPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
   IPWild :: InhabPat
+  IPIntLit :: Int -> InhabPat
+  IPNotIntLit :: Int -> InhabPat
+  IPNotIntLits :: [Int] -> InhabPat
   IPPlaceholderInt :: InhabPat
   deriving (Show, Eq, Ord)
 
@@ -44,9 +48,14 @@ expandVarsPos frame nset vars = do
   traverse (expandVarPos frame nset) vars
 
 expandVarPos :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
-expandVarPos frames nref@(_, cns) (x, xType) = case matchingX of
-  [] | xType == Ty.int -> return IPPlaceholderInt
-  [] -> do
+expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
+  Nothing | xType == Ty.int -> case isIntX of
+                Nothing -> case isNotIntX of
+                                [] -> return IPWild
+                                -- is -> map IPNotIntLit is
+                                is -> return $ IPNotIntLits (nub is)
+                Just i -> return $ IPIntLit i
+  Nothing -> do
     let (matchers, frames') =
           runState
             ( catMaybes
@@ -63,7 +72,7 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchingX of
       else do
         m <- matchers
         expandVarPos frames' m (x, xType)
-  ((k, ys, _) : _) -> do
+  Just (k, ys) -> do
     -- freshVars <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
     l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
     return $ IPMatch k l
@@ -71,7 +80,9 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchingX of
     origX = lookupVar x cns
     -- matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
     -- ms = allMatchesOnVar origX cns
-    matchingX = allMatchesOnVar origX cns
+    matchOnX = getMatchOnVar origX cns
+    isIntX = getIsInt origX cns
+    isNotIntX = getIsNotInt origX cns
 
 -- kMatchingX = filter (\(k', _, _) -> k' == k) matchingX
 
@@ -108,7 +119,7 @@ n <+> U.T = return n
 (context, constraints) <+> U.MatchDataCon k ys x = (context ++ zip ys (Ty.dcTypes k), constraints) <+| MatchDataCon k ys x
 n <+> U.NotDataCon k x = n <+| NotDataCon k x
 (context, constraints) <+> U.Let x xType y = (context ++ [(x, xType)], constraints) <+| TermEquality x y
-(context, constraints) <+> U.MatchIntLit i x = (context, constraints) <+| MatchIntLit i x
+n <+> U.MatchIntLit i x = n <+| MatchIntLit i x
 n <+> U.NotIntLit i x = n <+| NotIntLit i x
 
 breakIf :: (Alternative f) => Bool -> f ()
@@ -188,6 +199,7 @@ addConstraints = foldM (<+|)
 (ctx, cns) <+| NotIntLit i x = do
   let origX = lookupVar x cns
   breakIf $ any (origX `isTheInt` i) cns
+  -- breakIf $ any (origX `isNotTheInt` i) cns
   return (ctx, cns ++ [NotIntLit i origX])
 
 isNotDataCon :: F.VarID -> Ty.DataConstructor -> (Constraint -> Bool)
@@ -230,6 +242,21 @@ allMatchesOnVar :: F.VarID -> [Constraint] -> [(Ty.DataConstructor, [F.VarID], F
 allMatchesOnVar _ [] = []
 allMatchesOnVar x (MatchDataCon k ys x' : cns) | x' == x = (k, ys, x) : allMatchesOnVar x cns
 allMatchesOnVar x (_ : cns) = allMatchesOnVar x cns
+
+getMatchOnVar :: F.VarID -> [Constraint] -> Maybe (Ty.DataConstructor, [F.VarID])
+getMatchOnVar _ [] = Nothing
+getMatchOnVar x (MatchDataCon k ys x' : _) | x' == x = Just (k, ys)
+getMatchOnVar x (_ : cns) = getMatchOnVar x cns
+
+getIsInt :: F.VarID -> [Constraint] -> Maybe Int
+getIsInt _ [] = Nothing
+getIsInt x (MatchIntLit i x' : _) | x' == x = Just i
+getIsInt x (_ : cns) = getIsInt x cns
+
+getIsNotInt :: F.VarID -> [Constraint] -> [Int]
+getIsNotInt _ [] = []
+getIsNotInt x (NotIntLit i x' : cns) | x' == x = i : getIsNotInt x cns
+getIsNotInt x (_ : cns) = getIsNotInt x cns
 
 --
 --

@@ -13,7 +13,6 @@ import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
 import qualified Fresh as F
-import qualified Parse as P
 import qualified Types as Ty
 import qualified Uncovered as U
 
@@ -75,26 +74,20 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
             m <- matchers
             expandVarPos frames' m (x, xType)
   Just (k, ys) -> do
-    -- freshVars <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
     l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
     return $ IPMatch k l
   where
     origX = lookupVar x cns
-    -- matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
-    -- ms = allMatchesOnVar origX cns
     matchOnX = getMatchOnVar origX cns
     cantMatchOnX = getNotMatchOnVar origX cns
     isIntX = getIsInt origX cns
     isNotIntX = getIsNotInt origX cns
-
--- kMatchingX = filter (\(k', _, _) -> k' == k) matchingX
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
   n1 <- S.toList <$> normalize nref f1
   rest <- traverse (`normalize` f2) n1
   return $ S.unions rest
--- S.unions $ S.map (\r -> normalize (Just r) f2) (normalize nref f1)
 normalize nref (f1 `U.Or` f2) = S.union <$> normalize nref f1 <*> normalize nref f2
 normalize nref fl = maybe S.empty S.singleton <$> runMaybeT (nref <+> fl)
 

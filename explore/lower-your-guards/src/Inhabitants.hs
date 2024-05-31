@@ -8,6 +8,7 @@ import Control.Monad (foldM, forM, guard, join, replicateM)
 import Control.Monad.State (runState)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
+import Data.List (nub)
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes, isJust)
 import qualified Data.Set as S
@@ -15,7 +16,6 @@ import qualified Fresh as F
 import qualified Parse as P
 import qualified Types as Ty
 import qualified Uncovered as U
-import Data.List (nub)
 
 type NormRefType = (U.Context, [Constraint])
 
@@ -50,28 +50,30 @@ expandVarsPos frame nset vars = do
 expandVarPos :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
 expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
   Nothing | xType == Ty.int -> case isIntX of
-                Nothing -> case isNotIntX of
-                                [] -> return IPWild
-                                -- is -> map IPNotIntLit is
-                                is -> return $ IPNotIntLits (nub is)
-                Just i -> return $ IPIntLit i
-  Nothing -> do
-    let (matchers, frames') =
-          runState
-            ( catMaybes
-                <$> forM
-                  (Ty.dataCons xType)
-                  ( \dc -> do
-                      frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
-                      runMaybeT (nref <+| MatchDataCon dc frs x)
-                  )
-            )
-            frames
-    if null matchers
-      then return IPWild
-      else do
-        m <- matchers
-        expandVarPos frames' m (x, xType)
+    Nothing -> case isNotIntX of
+      [] -> return IPWild
+      is -> return $ IPNotIntLits (nub is)
+    Just i -> return $ IPIntLit i
+  Nothing -> case cantMatchOnX of
+    [] -> return IPWild
+    _ ->
+      do
+        let (matchers, frames') =
+              runState
+                ( catMaybes
+                    <$> forM
+                      (Ty.dataCons xType)
+                      ( \dc -> do
+                          frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
+                          runMaybeT (nref <+| MatchDataCon dc frs x)
+                      )
+                )
+                frames
+        if null matchers
+          then return IPWild
+          else do
+            m <- matchers
+            expandVarPos frames' m (x, xType)
   Just (k, ys) -> do
     -- freshVars <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
     l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
@@ -81,6 +83,7 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
     -- matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
     -- ms = allMatchesOnVar origX cns
     matchOnX = getMatchOnVar origX cns
+    cantMatchOnX = getNotMatchOnVar origX cns
     isIntX = getIsInt origX cns
     isNotIntX = getIsNotInt origX cns
 
@@ -247,6 +250,11 @@ getMatchOnVar :: F.VarID -> [Constraint] -> Maybe (Ty.DataConstructor, [F.VarID]
 getMatchOnVar _ [] = Nothing
 getMatchOnVar x (MatchDataCon k ys x' : _) | x' == x = Just (k, ys)
 getMatchOnVar x (_ : cns) = getMatchOnVar x cns
+
+getNotMatchOnVar :: F.VarID -> [Constraint] -> [Ty.DataConstructor]
+getNotMatchOnVar _ [] = []
+getNotMatchOnVar x (NotDataCon k x' : cns) | x' == x = k : getNotMatchOnVar x cns
+getNotMatchOnVar x (_ : cns) = getNotMatchOnVar x cns
 
 getIsInt :: F.VarID -> [Constraint] -> Maybe Int
 getIsInt _ [] = Nothing

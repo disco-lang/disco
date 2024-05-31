@@ -1,4 +1,4 @@
-module Main (main, evalGdt, pfg, pdu, pdun, pdui, inhabNice, pduip, inhabNicePos) where
+module Main (main, evalGdt, pfg, pdu, pdun, pduip, inhabNicePos) where
 
 import Control.Monad.State
 import Data.List.NonEmpty (fromList)
@@ -25,7 +25,7 @@ parseFile file = do
     Right defs -> return defs
 
 main :: IO ()
-main = pdui "test/test.disc" >>= pPrint
+main = inhabNicePos "test/test.disc"
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
 desGdt clauses = do
@@ -48,19 +48,11 @@ uncov clauses tIn = do
 evalUncov :: [P.Clause] -> Ty.Type -> U.RefinementType
 evalUncov clauses tIn = evalState (uncov clauses tIn) F.blank
 
-inhab :: [P.Clause] -> Ty.Type -> F.Fresh [[P.Pattern]]
-inhab clauses tIn = do
-  u <- uncov clauses tIn
-  I.genInhabitants u
-
 inhabPos :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
 inhabPos clauses tIn = do
   u <- uncov clauses tIn
   s <- get
   return $ I.genInhabPos s u
-
-evalInhab :: [P.Clause] -> Ty.Type -> [[P.Pattern]]
-evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
 
 evalInhabPos :: [P.Clause] -> Ty.Type -> [I.InhabPat]
 evalInhabPos clauses tIn = evalState (inhabPos clauses tIn) F.blank
@@ -88,16 +80,6 @@ pdu file = do
       )
       defs
 
-pdui :: String -> IO [(Text, [[P.Pattern]])]
-pdui file = do
-  defs <- parseFile file
-  return $
-    map
-      ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
-          (name, evalInhab clauses tIn)
-      )
-      defs
-
 pduip :: String -> IO [(Text, [I.InhabPat])]
 pduip file = do
   defs <- parseFile file
@@ -105,16 +87,6 @@ pduip file = do
     map
       ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
           (name, evalInhabPos clauses tIn)
-      )
-      defs
-
-inhabNice :: String -> IO ()
-inhabNice file = do
-  defs <- parseFile file
-  pPrint $
-    map
-      ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
-          (name, map (map nicePattern) $ evalInhab clauses tIn)
       )
       defs
 

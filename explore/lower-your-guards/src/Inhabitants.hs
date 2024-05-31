@@ -89,24 +89,6 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
 
 -- kMatchingX = filter (\(k', _, _) -> k' == k) matchingX
 
-genInhabitants :: U.RefinementType -> F.Fresh [[P.Pattern]]
-genInhabitants (context, formula) = do
-  nrefs <- S.toList <$> normalize (context, []) formula
-  mapM (`expandVars` context) nrefs
-
-expandVars :: NormRefType -> U.Context -> F.Fresh [P.Pattern]
-expandVars nset = mapM (expandVar nset)
-
-expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh P.Pattern
-expandVar (ctx, cns) (x, xType) = case matchingCons of
-  [] -> return P.PWild
-  (k : _) -> do
-    freshVars <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
-    P.PMatch k <$> expandVars (ctx, cns) (zip freshVars (Ty.dcTypes k))
-  where
-    origX = lookupVar x cns
-    matchingCons = [k | k <- Ty.dataCons xType, any (origX `isMatchDataCon` k) cns]
-
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
   n1 <- S.toList <$> normalize nref f1

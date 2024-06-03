@@ -265,6 +265,26 @@ desugarCList2B p ty cts b = do
         )
   return $ mkLambda ty [c] body
 
+-- | Desugar the @min@ and @max@ functions into conditional expressions.
+desugarMinMax :: Member Fresh r => Prim -> Type -> Sem r DTerm
+desugarMinMax m ty = do
+  p <- fresh (string2Name "p")
+  a <- fresh (string2Name "a")
+  b <- fresh (string2Name "b")
+  body <-
+    desugarTerm $
+      ATCase
+        ty
+        [ bind
+            (toTelescope [AGPat (embed (atVar ty p)) (APTup (ty :*: ty) [APVar ty a, APVar ty b])])
+            $ ATCase
+              ty
+              [ atVar ty (if m == PrimMin then a else b) <==. [tif (atVar ty a <. atVar ty b)]
+              , atVar ty (if m == PrimMin then b else a) <==. []
+              ]
+        ]
+  return $ mkLambda ((ty :*: ty) :->: ty) [p] body
+
 -- | Desugar a typechecked term.
 desugarTerm :: Member Fresh r => ATerm -> Sem r DTerm
 desugarTerm (ATVar ty x) = return $ DTVar ty (coerce x)
@@ -274,6 +294,8 @@ desugarTerm (ATPrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop))
   | bopDesugars ty1 ty2 resTy bop = desugarPrimBOp ty1 ty2 resTy bop
 desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimC2B) = desugarCList2B PrimC2B ty cts b
 desugarTerm (ATPrim ty@(TyList cts :->: TyBag b) PrimUC2B) = desugarCList2B PrimUC2B ty cts b
+desugarTerm (ATPrim (_ :->: ty) PrimMin) = desugarMinMax PrimMin ty
+desugarTerm (ATPrim (_ :->: ty) PrimMax) = desugarMinMax PrimMax ty
 desugarTerm (ATPrim ty x) = return $ DTPrim ty x
 desugarTerm ATUnit = return DTUnit
 desugarTerm (ATBool ty b) = return $ DTBool ty b
@@ -345,8 +367,6 @@ bopDesugars _ _ _ bop =
            , Gt
            , Leq
            , Geq
-           , Min
-           , Max
            , IDiv
            , Sub
            , SSub
@@ -424,21 +444,6 @@ desugarBinApp _ Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
 desugarBinApp _ Gt t1 t2 = desugarTerm $ t2 <. t1
 desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)
 desugarBinApp _ Geq t1 t2 = desugarTerm $ tnot (t1 <. t2)
--- XXX sharing!
-desugarBinApp ty Min t1 t2 =
-  desugarTerm $
-    ATCase
-      ty
-      [ t1 <==. [tif (t1 <. t2)]
-      , t2 <==. []
-      ]
-desugarBinApp ty Max t1 t2 =
-  desugarTerm $
-    ATCase
-      ty
-      [ t1 <==. [tif (t2 <. t1)]
-      , t2 <==. []
-      ]
 -- t1 // t2 ==> floor (t1 / t2)
 desugarBinApp resTy IDiv t1 t2 =
   desugarTerm $
@@ -498,9 +503,9 @@ desugarBinApp ty op t1 t2
           , t2
           ]
  where
-  mergeOp _ Inter = PrimBOp Min
+  mergeOp _ Inter = PrimMin
   mergeOp _ Diff = PrimBOp SSub
-  mergeOp (TySet _) Union = PrimBOp Max
+  mergeOp (TySet _) Union = PrimMax
   mergeOp (TyBag _) Union = PrimBOp Add
   mergeOp _ _ = error $ "Impossible! mergeOp " ++ show ty ++ " " ++ show op
 
@@ -514,7 +519,7 @@ desugarBinApp _ Subset t1 t2 =
       (ATPrim (ty :*: ty :->: TyBool) (PrimBOp Eq))
       [ tapps
           (ATPrim ((TyN :*: TyN :->: TyN) :*: ty :*: ty :->: ty) PrimMerge)
-          [ ATPrim (TyN :*: TyN :->: TyN) (PrimBOp Max)
+          [ ATPrim (TyN :*: TyN :->: TyN) PrimMax
           , t1
           , t2
           ]

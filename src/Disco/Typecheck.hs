@@ -890,16 +890,6 @@ typecheck Infer (TPrim prim) = do
   inferPrim (PrimBOp Geq) = error "inferPrim Geq should be unreachable"
   ------------------------------------------------------------
 
-  inferPrim (PrimBOp op) | op `elem` [Min, Max] = do
-    ty <- freshTy
-    constraint $ CQual QCmp ty
-    return $ ty :*: ty :->: ty
-
-  -- See Note [Pattern coverage] -----------------------------
-  inferPrim (PrimBOp Min) = error "inferPrim Min should be unreachable"
-  inferPrim (PrimBOp Max) = error "inferPrim Max should be unreachable"
-  ------------------------------------------------------------
-
   ----------------------------------------
   -- Special arithmetic functions: fact, sqrt, floor, ceil, abs
 
@@ -920,6 +910,18 @@ typecheck Infer (TPrim prim) = do
     resTy <- freshTy
     cAbs argTy resTy `cOr` cSize argTy resTy
     return $ argTy :->: resTy
+
+  ----------------------------------------
+  -- min/max
+
+  inferPrim PrimMin = do
+    a <- freshTy
+    constraint $ CQual QCmp a
+    return $ (a :*: a) :->: a
+  inferPrim PrimMax = do
+    a <- freshTy
+    constraint $ CQual QCmp a
+    return $ (a :*: a) :->: a
 
   ----------------------------------------
   -- power set/bag

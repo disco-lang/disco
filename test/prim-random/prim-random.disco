@@ -16,9 +16,6 @@ encrypt key xs = each (encrypt1 key, xs)
 decrypt : N * N -> List(N) -> List(N)
 decrypt = encrypt
 
--- takes two primes, returns a pair of pairs containing the RSA public/private keys
--- prime -> prime -> (public key, private key)
-
 
 -- randKeys takes in a nat (number of digits in the random range) and a 
 -- generator (created using `seed`), and generates two random prime numbers 

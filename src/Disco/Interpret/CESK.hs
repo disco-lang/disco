@@ -432,9 +432,9 @@ appConst k = \case
   --------------------------------------------------
   -- Randomness
 
-  ORandom -> arity2 (\t g -> arity2 (\v1 v2 -> 
-      let (a,g') = R.randomR (vint v1,vint v2) (vgen g)
-      in out $ VPair (intv a) (genv g')) t)
+  ORandom -> arity2 . flip $ \g -> arity2 $ \v1 v2 -> 
+      let (a,g') = R.randomR (vint v1,vint v2) (vgen g) 
+      in out $ VPair (intv a) (genv g')
   OSeed -> out . VGen . (R.mkStdGen . fromIntegral . vint) 
   --------------------------------------------------
   -- Graph operations

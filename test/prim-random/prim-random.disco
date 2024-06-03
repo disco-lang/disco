@@ -4,11 +4,21 @@ import list
 -- Implementation of RSA encryption algorithm.
 -- Reference: https://simple.wikipedia.org/wiki/RSA_(algorithm)
 
--- To use, first call `getKeys` with two prime numbers, which returns
--- two pairs. The first pair is the public key, the second is the
--- private key. These keys, along with the `encrypt` and `decrypt`
--- functions can be used to encrypt and decrypt lists of natural
--- numbers.
+
+-- To use with randomly generated prime numbers, call `randKeys`
+-- with a number, representing how many digits the generated prime 
+-- will have, and a pseudorandom number generator, created 
+-- by calling `seed` with a natural number. 
+
+-- To use with particular prime numbers, call `getKeys` 
+-- with two prime numbers. 
+
+-- Output: Both of the above functions output two pairs of two 
+-- natural numbers. The first pair is the public key, the 
+-- second is the private key. These keys, along with the `encrypt` 
+-- and `decrypt` functions can be used to encrypt and decrypt 
+-- lists of natural numbers.
+
 
 encrypt : N * N -> List(N) -> List(N)
 encrypt key xs = each (encrypt1 key, xs)
@@ -17,14 +27,11 @@ decrypt : N * N -> List(N) -> List(N)
 decrypt = encrypt
 
 
--- randKeys takes in a nat (number of digits in the random range) and a 
--- generator (created using `seed`), and generates two random prime numbers 
--- in the range and calls getKeys with them
-
 randKeys : N -> Gen -> (N * N) * (N * N)
+randKeys 0 g = randKeys 1 g
 randKeys d g = 
-   let   p1 = genPrime (10^d,10^(d+1)) g,
-         p2 = genPrime (10^d,10^(d+1)) (snd p1)
+   let   p1 = genPrime (10^(d.-1),10^d) g,
+         p2 = genPrime (10^(d.-1),10^d) (snd p1)
    in getKeys (fst p1) (fst p2) 
 
 genPrime : (N * N) -> Gen -> (N * Gen)
@@ -38,6 +45,10 @@ fst (a,_) = a
 
 snd : (a * b) -> b 
 snd (_,b) = b 
+
+
+-- takes two primes, returns a pair of pairs containing the RSA public/private keys
+-- prime -> prime -> (public key, private key)
 
 getKeys : N -> N -> (N * N) * (N * N)
 getKeys p1 p2 =

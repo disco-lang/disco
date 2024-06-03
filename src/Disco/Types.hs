@@ -52,6 +52,7 @@ module Disco.Types (
   pattern TyF,
   pattern TyQ,
   pattern TyC,
+  pattern TyGen,
   -- , pattern TyFin
   pattern (:->:),
   pattern (:*:),
@@ -152,6 +153,7 @@ data BaseTy where
   -- the exact number of inhabitants.
   -- Fin  :: Integer -> BaseTy
 
+  Gen :: BaseTy
   -- | Set container type.  It's a bit odd putting these here since
   --   they have kind * -> * and all the other base types have kind *;
   --   but there's nothing fundamentally wrong with it and in
@@ -178,6 +180,7 @@ instance Pretty BaseTy where
     CtrList -> text "List"
     CtrBag -> text "Bag"
     CtrSet -> text "Set"
+    Gen -> text "Gen"
 
 -- | Test whether a 'BaseTy' is a container (set, bag, or list).
 isCtr :: BaseTy -> Bool
@@ -458,6 +461,9 @@ pattern TyQ = TyAtom (ABase Q)
 
 pattern TyC :: Type
 pattern TyC = TyAtom (ABase C)
+
+pattern TyGen :: Type
+pattern TyGen = TyAtom (ABase Gen)
 
 -- pattern TyFin :: Integer -> Type
 -- pattern TyFin n = TyAtom (ABase (Fin n))

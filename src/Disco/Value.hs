@@ -36,6 +36,8 @@ module Disco.Value (
   vpair,
   listv,
   vlist,
+  genv,
+  vgen,
 
   -- * Props & testing
   ValProp (..),
@@ -106,6 +108,8 @@ import Polysemy.Reader
 import Polysemy.State
 import Unbound.Generics.LocallyNameless (Name)
 
+import System.Random (StdGen)
+
 ------------------------------------------------------------
 -- Value type
 ------------------------------------------------------------
@@ -159,6 +163,7 @@ data Value where
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
   VMap :: Map SimpleValue Value -> Value
+  VGen :: StdGen -> Value
   deriving (Show)
 
 -- | Convenient pattern for the empty list.
@@ -268,6 +273,13 @@ vlist :: (Value -> a) -> Value -> [a]
 vlist _ VNil = []
 vlist velt (VCons v vs) = velt v : vlist velt vs
 vlist _ v = error $ "vlist " ++ show v
+
+vgen :: Value -> StdGen
+vgen (VGen v) = v
+vgen v = error $ "vgen " ++ show v
+
+genv :: StdGen -> Value
+genv = VGen
 
 ------------------------------------------------------------
 -- Propositions
@@ -492,6 +504,7 @@ prettyValue (_ :+: _) v =
 prettyValue _ (VNum d r) = text $ case (d, denominator r == 1) of
   (Decimal, False) -> prettyDecimal r
   _ -> prettyRational r
+prettyValue _ (VGen _) = prettyPlaceholder TyGen
 prettyValue ty@(_ :->: _) _ = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs) = braces $ prettySequence ty "," (map fst xs)
 prettyValue (TySet _) v =

@@ -116,6 +116,10 @@ data Prim where
   PrimLookupSeq :: Prim
   -- | Extend OEIS sequence
   PrimExtendSeq :: Prim
+  -- | Generates a pseudorandom number generator
+  PrimSeed :: Prim
+  -- | Given a range and a generator, generates random number
+  PrimRandom :: Prim
   deriving (Show, Read, Eq, Ord, Generic, Alpha, Subst t, Data)
 
 ------------------------------------------------------------
@@ -188,6 +192,8 @@ primTable =
   , PrimInfo PrimHolds "holds" True
   , PrimInfo PrimLookupSeq "lookupSequence" False
   , PrimInfo PrimExtendSeq "extendSequence" False
+  , PrimInfo PrimSeed "seed" True
+  , PrimInfo PrimRandom "random" True
   ]
 
 -- | Find any exposed prims with the given name.

@@ -6,11 +6,11 @@ import list
 
 
 -- To use with randomly generated prime numbers, call `randKeys`
--- with a number, representing how many digits the generated primes 
+-- with a number, representing how many digits the generated prime 
 -- will have, and a pseudorandom number generator, created 
 -- by calling `seed` with a natural number. 
 
--- To manually input prime numbers, call `getKeys` 
+-- To use with particular prime numbers, call `getKeys` 
 -- with two prime numbers. 
 
 -- Output: Both of the above functions output two pairs of two 

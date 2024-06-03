@@ -1,0 +1,14 @@
+:load test/prim-random/prim-random.disco
+
+seed(1000)
+random((1,10000000000),seed(2134))
+random((10000000000,1),seed(2134))
+random((10000000000,1),seed(2135))
+
+encrypt (fst (getKeys 43 59)) [1,2,3,4,5,6,7,8,9]
+decrypt (snd (getKeys 43 59)) [1,32,243,1024,588,165,1585,2324,698]
+decrypt (snd (getKeys 43 59)) (encrypt (fst (getKeys 43 59)) [1,2,3,4,5,6,7,8,9])
+
+encrypt (fst (randKeys 2 (seed 10000))) [1,2,3,4,5,6,7,8,9]
+decrypt (snd (randKeys 2 (seed 10000))) [1,32,243,1024,588,165,1585,2324,698]
+decrypt (snd (randKeys 2 (seed 10000))) (encrypt (fst (randKeys 2 (seed 10000))) [1,2,3,4,5,6,7,8,9])

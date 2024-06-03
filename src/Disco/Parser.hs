@@ -448,6 +448,7 @@ reservedWords =
   , "Set"
   , "Graph"
   , "Map"
+  , "Gen"
   , "N"
   , "Z"
   , "F"
@@ -1210,6 +1211,7 @@ parseAtomicType =
       <|> TyZ <$ (reserved "Integer" <|> reserved "Int" <|> reserved "Z" <|> reserved "ℤ")
       <|> TyF <$ (reserved "Fractional" <|> reserved "Frac" <|> reserved "F" <|> reserved "𝔽")
       <|> TyQ <$ (reserved "Rational" <|> reserved "Q" <|> reserved "ℚ")
+      <|> TyGen <$ reserved "Gen"
       <|> TyCon <$> parseCon <*> (fromMaybe [] <$> optional (parens (parseType `sepBy1` comma)))
       <|> TyVar <$> parseTyVar
       <|> parens parseType

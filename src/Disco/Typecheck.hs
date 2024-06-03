@@ -769,6 +769,11 @@ typecheck Infer (TPrim prim) = do
     return $ a :*: TyContainer c a :->: TyBool
 
   ----------------------------------------
+  -- Randomness
+
+  inferPrim PrimRandom = return $ (TyN :*: TyN) :*: TyGen :->: (TyN :*: TyGen)
+  inferPrim PrimSeed = return $ TyN :->: TyGen
+  ----------------------------------------
   -- Arithmetic
 
   inferPrim (PrimBOp IDiv) = do

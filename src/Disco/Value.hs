@@ -108,7 +108,7 @@ import Polysemy.Reader
 import Polysemy.State
 import Unbound.Generics.LocallyNameless (Name)
 
-import System.Random ( StdGen )
+import System.Random (StdGen)
 
 ------------------------------------------------------------
 -- Value type
@@ -163,7 +163,6 @@ data Value where
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
   VMap :: Map SimpleValue Value -> Value
-  
   VGen :: StdGen -> Value
   deriving (Show)
 
@@ -275,11 +274,11 @@ vlist _ VNil = []
 vlist velt (VCons v vs) = velt v : vlist velt vs
 vlist _ v = error $ "vlist " ++ show v
 
-vgen :: Value -> StdGen 
-vgen (VGen v) = v 
+vgen :: Value -> StdGen
+vgen (VGen v) = v
 vgen v = error $ "vgen " ++ show v
 
-genv :: StdGen -> Value 
+genv :: StdGen -> Value
 genv = VGen
 
 ------------------------------------------------------------

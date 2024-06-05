@@ -15,7 +15,7 @@ module Disco.Typecheck where
 
 import Control.Arrow ((&&&))
 import Control.Lens ((^..))
-import Control.Monad (forM_, unless, when, zipWithM)
+import Control.Monad (filterM, forM_, replicateM, unless, when, zipWithM)
 import Control.Monad.Trans.Maybe
 import Data.Bifunctor (first)
 import Data.Coerce
@@ -41,13 +41,16 @@ import qualified Disco.Subst as Subst
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck.Constraints
+import Disco.Typecheck.Solve (SolutionLimit (..), solveConstraint)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Types.Rules
 import Polysemy hiding (embed)
 import Polysemy.Error
+import Polysemy.Input
 import Polysemy.Output
 import Polysemy.Reader
+import Polysemy.State (evalState)
 import Polysemy.Writer
 import Text.EditDistance (defaultEditCosts, restrictedDamerauLevenshteinDistance)
 import Unbound.Generics.LocallyNameless (
@@ -141,7 +144,7 @@ checkModule name imports (Module es _ m docs terms) = do
         (x : _) -> throw $ noLoc $ DuplicateDefns (coerce x)
         [] -> do
           aprops <- mapError noLoc $ checkProperties docCtx -- XXX location?
-          aterms <- mapError noLoc $ mapM inferTop terms -- XXX location?
+          aterms <- mapError noLoc $ mapM inferTop1 terms -- XXX location?
           return $ ModuleInfo name imports (map ((name .-) . getDeclName) typeDecls) docCtx aprops tyCtx tyDefnCtx defnCtx aterms es
  where
   getDefnName :: Defn -> Name ATerm
@@ -279,6 +282,8 @@ checkDefn ::
   TermDefn ->
   Sem r Defn
 checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $ do
+  debug "======================================================================"
+  debug "Checking definition:"
   -- Check that all clauses have the same number of patterns
   checkNumPats clauses
 
@@ -293,11 +298,11 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
   -- patterns, and lazily unrolling type definitions along the way.
   (patTys, bodyTy) <- decomposeDefnTy (numPats (NE.head clauses)) ty
 
-  ((acs, _), theta) <- solve $ do
+  ((acs, _), thetas) <- solve 1 $ do
     aclauses <- forAll nms $ mapM (checkClause patTys bodyTy) clauses
     return (aclauses, ty)
 
-  return $ applySubst theta (Defn (coerce x) patTys bodyTy acs)
+  return $ applySubst (NE.head thetas) (Defn (coerce x) patTys bodyTy acs)
  where
   numPats = length . fst . unsafeUnbind
 
@@ -309,7 +314,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
     -- patterns don't match across different clauses
     | otherwise = return ()
 
-  -- \| Check a clause of a definition against a list of pattern types and a body type.
+  -- Check a clause of a definition against a list of pattern types and a body type.
   checkClause ::
     Members '[Reader TyCtx, Reader TyDefCtx, Writer Constraint, Error TCError, Fresh] r =>
     [Type] ->
@@ -357,9 +362,12 @@ checkProperty ::
   Property ->
   Sem r AProperty
 checkProperty prop = do
-  (at, theta) <- solve $ check prop TyProp
+  debug "======================================================================"
+  debug "Checking property:"
+  debugPretty prop
+  (at, thetas) <- solve 1 $ check prop TyProp
   -- XXX do we need to default container variables here?
-  return $ applySubst theta at
+  return $ applySubst (NE.head thetas) at
 
 ------------------------------------------------------------
 -- Type checking/inference
@@ -446,33 +454,86 @@ infer ::
   Sem r ATerm
 infer = typecheck Infer
 
--- | Top-level type inference algorithm: infer a (polymorphic) type
---   for a term by running type inference, solving the resulting
---   constraints, and quantifying over any remaining type variables.
-inferTop ::
+-- | Top-level type inference algorithm, returning only the first
+--   possible result.
+inferTop1 ::
   Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   Sem r (ATerm, PolyType)
-inferTop t = do
+inferTop1 t = NE.head <$> inferTop 1 t
+
+-- | Top-level type inference algorithm: infer up to the requested max
+--   number of possible (polymorphic) types for a term by running type
+--   inference, solving the resulting constraints, and quantifying
+--   over any remaining type variables.
+inferTop ::
+  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Int ->
+  Term ->
+  Sem r (NonEmpty (ATerm, PolyType))
+inferTop lim t = do
   -- Run inference on the term and try to solve the resulting
   -- constraints.
-  (at, theta) <- solve $ infer t
+  debug "======================================================================"
+  debug "Inferring the type of:"
+  debugPretty t
+  (at, thetas) <- solve lim $ infer t
 
   debug "Final annotated term (before substitution and container monomorphizing):"
   debugPretty at
 
-  -- Apply the resulting substitution.
-  let at' = applySubst theta at
+  -- Currently the following code generates *every possible*
+  -- combination of substitutions for container variables, which can
+  -- lead to exponential blowup in some cases.  For example, inferring
+  -- the type of
+  --
+  --   \x. \y. \z. (set(x), set(y), set(z))
+  --
+  -- takes a Very Long Time.  Potential solutions include:
+  --
+  --   1. Do something similar as in the 'solve' function, using a State SolutionLimit
+  --      effect to stop early once we've generated enough variety.
+  --
+  --   2. Use a proper backtracking search monad like LogicT to scope
+  --      over both the generation of solution substitutions *and*
+  --      choosing container variable monomorphizations, then just
+  --      take a limited number of solutions.  Unfortunately,
+  --      polysemy's NonDet effect seems to be somewhat broken
+  --      (https://stackoverflow.com/questions/62627695/running-the-nondet-effect-once-in-polysemy
+  --      ; https://github.com/polysemy-research/polysemy/issues/246 )
+  --      and using LogicT on top of Sem is going to be tedious since
+  --      it would require calling 'lift' on almost everything.
+  --
+  --   3. Also, it is probably (?) the case that no matter which of
+  --      the generated substitutions is used, the exact same
+  --      container variables are still unconstrained in all of them.
+  --      So we should be able to pick container variable
+  --      monomorphizations independently of the substitutions from
+  --      the solver.  Doing this would help though it would not
+  --      address the fundamental issue.
 
-      -- Find any remaining container variables.
-      cvs = containerVars (getType at')
-
-      -- Replace them all with List.
-      at'' = applySubst (Subst.fromList $ map (,TyAtom (ABase CtrList)) (S.toList cvs)) at'
-
-  -- Finally, quantify over any remaining type variables and return
+  -- Quantify over any remaining type variables and return
   -- the term along with the resulting polymorphic type.
-  return (at'', closeType (getType at''))
+  return $ do
+    -- Monad NonEmpty
+
+    -- Iterate over all possible solutions...
+    theta <- thetas
+
+    let -- Apply each one...
+        at' = applySubst theta at
+
+        -- Find any remaining container variables...
+        cvs = containerVars (getType at')
+
+    -- Build all possible substitutions for those container variables...
+    ctrs <- replicateM (S.size cvs) (NE.map (TyAtom . ABase) (CtrList :| [CtrBag, CtrSet]))
+
+    -- Substitute for the container variables...
+    let at'' = applySubst (Subst.fromList $ zip (S.toList cvs) ctrs) at'
+
+    -- Return the term along with its type, with all substitutions applied.
+    return (at'', closeType (getType at''))
 
 -- | Top-level type checking algorithm: check that a term has a given
 --   polymorphic type by running type checking and solving the
@@ -483,8 +544,12 @@ checkTop ::
   PolyType ->
   Sem r ATerm
 checkTop t ty = do
-  (at, theta) <- solve $ checkPolyTy t ty
-  return $ applySubst theta at
+  debug "======================================================================"
+  debug "Checking the type of:"
+  debugPretty t
+  debugPretty ty
+  (at, theta) <- solve 1 $ checkPolyTy t ty
+  return $ applySubst (NE.head theta) at
 
 --------------------------------------------------
 -- The typecheck function
@@ -730,7 +795,7 @@ typecheck Infer (TPrim prim) = do
     c <- freshAtom
     a <- freshTy
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         ]
@@ -745,7 +810,7 @@ typecheck Infer (TPrim prim) = do
     a <- freshTy
     c <- freshAtom
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         , CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         ]
@@ -829,7 +894,7 @@ typecheck Infer (TPrim prim) = do
 
     -- b can be either Nat (a binomial coefficient)
     -- or a list of Nat (a multinomial coefficient).
-    constraint $ COr [CEq b TyN, CEq b (TyList TyN)]
+    constraint $ cOr [CEq b TyN, CEq b (TyList TyN)]
     return $ TyN :*: b :->: TyN
 
   ----------------------------------------
@@ -908,7 +973,7 @@ typecheck Infer (TPrim prim) = do
   inferPrim PrimAbs = do
     argTy <- freshTy
     resTy <- freshTy
-    cAbs argTy resTy `cOr` cSize argTy resTy
+    cAbs argTy resTy `orElse` cSize argTy resTy
     return $ argTy :->: resTy
 
   ----------------------------------------
@@ -932,7 +997,7 @@ typecheck Infer (TPrim prim) = do
 
     constraint $ CQual QCmp a
     constraint $
-      COr
+      cOr
         [ CEq (TyAtom (ABase CtrSet)) (TyAtom c)
         , CEq (TyAtom (ABase CtrBag)) (TyAtom c)
         ]
@@ -1483,7 +1548,7 @@ cPos ty = do
       -- Valid types for absolute value are Z -> N, Q -> F, or T -> T
       -- (e.g. Z5 -> Z5).
       constraint $
-        COr
+        cOr
           [ cAnd [CSub ty TyZ, CSub TyN res]
           , cAnd [CSub ty TyQ, CSub TyF res]
           , CEq ty res
@@ -1512,7 +1577,7 @@ cInt ty = do
       -- Valid types for absolute value are F -> N, Q -> Z, or T -> T
       -- (e.g. Z5 -> Z5).
       constraint $
-        COr
+        cOr
           [ cAnd [CSub ty TyF, CSub TyN res]
           , cAnd [CSub ty TyQ, CSub TyZ res]
           , CEq ty res
@@ -1544,7 +1609,7 @@ cExp ty1 ty2 = do
   -- to support multiplication, or else the exponent is Z, in which
   -- case the result type also has to support division.
   constraint $
-    COr
+    cOr
       [ cAnd [CQual QNum resTy, CEq ty2 TyN]
       , cAnd [CQual QDiv resTy, CEq ty2 TyZ]
       ]
@@ -1716,3 +1781,39 @@ ensureEq :: Member (Writer Constraint) r => Type -> Type -> Sem r ()
 ensureEq ty1 ty2
   | ty1 == ty2 = return ()
   | otherwise = constraint $ CEq ty1 ty2
+
+------------------------------------------------------------
+-- Subtyping
+------------------------------------------------------------
+
+isSubPolyType ::
+  Members '[Input TyDefCtx, Output (Message ann), Fresh] r =>
+  PolyType ->
+  PolyType ->
+  Sem r Bool
+isSubPolyType (Forall b1) (Forall b2) = do
+  (as1, ty1) <- unbind b1
+  (as2, ty2) <- unbind b2
+  let c = CAll (bind as1 (CSub ty1 (substs (zip as2 (map TyVar as1)) ty2)))
+  debug "======================================================================"
+  debug "Checking subtyping..."
+  debugPretty (Forall b1)
+  debugPretty (Forall b2)
+  ss <- runError (evalState (SolutionLimit 1) (solveConstraint c))
+  return (either (const False) (not . P.null) ss)
+
+thin :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => NonEmpty PolyType -> Sem r (NonEmpty PolyType)
+thin = fmap NE.fromList . thin' . NE.toList
+
+-- Intuitively, this will always return a nonempty list given a nonempty list as input;
+-- we could probably rewrite it in terms of NonEmpty combinators but it's more effort than
+-- I cared to spend at the moment.
+thin' :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => [PolyType] -> Sem r [PolyType]
+thin' [] = return []
+thin' (ty : tys) = do
+  ss <- or <$> mapM (`isSubPolyType` ty) tys
+  if ss
+    then thin' tys
+    else do
+      tys' <- filterM (fmap not . (ty `isSubPolyType`)) tys
+      (ty :) <$> thin' tys'

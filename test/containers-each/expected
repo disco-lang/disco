@@ -1,5 +1,23 @@
+This expression has multiple possible types.  Some examples:
 λxs. each(λx. x + 1, xs) : List(ℕ) → List(ℕ)
+λxs. each(λx. x + 1, xs) : Bag(ℕ) → Bag(ℕ)
+λxs. each(λx. x + 1, xs) : Set(ℕ) → Set(ℕ)
+λxs. each(λx. x + 1, xs) : List(ℤ) → List(ℤ)
+λxs. each(λx. x + 1, xs) : Bag(ℤ) → Bag(ℤ)
+λxs. each(λx. x + 1, xs) : Set(ℤ) → Set(ℤ)
+λxs. each(λx. x + 1, xs) : List(𝔽) → List(𝔽)
+λxs. each(λx. x + 1, xs) : Bag(𝔽) → Bag(𝔽)
+...
+This expression has multiple possible types.  Some examples:
 λxs. each(list, xs) : List(List(a)) → List(List(a))
+λxs. each(list, xs) : List(Bag(a)) → List(List(a))
+λxs. each(list, xs) : List(Set(a)) → List(List(a))
+λxs. each(list, xs) : Bag(List(a)) → Bag(List(a))
+λxs. each(list, xs) : Bag(Bag(a)) → Bag(List(a))
+λxs. each(list, xs) : Bag(Set(a)) → Bag(List(a))
+λxs. each(list, xs) : Set(List(a)) → Set(List(a))
+λxs. each(list, xs) : Set(Bag(a)) → Set(List(a))
+...
 each(λx. x + 1, [1, 2, 3]) : List(ℕ)
 each(λx. x + 1, ⟅1, 2, 3⟆) : Bag(ℕ)
 each(λx. x + 1, {1, 2, 3}) : Set(ℕ)

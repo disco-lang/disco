@@ -1,13 +1,31 @@
-map : Set(ℕ × a) → Map(ℕ, a)
-map({(1, 3), (4, 6)}) : Map(ℕ, ℕ)
+This expression has multiple possible types.  Some examples:
+map : Set(ℚ × a) → Map(ℚ, a)
+map : Set(Bool × a) → Map(Bool, a)
+map : Set(Char × a) → Map(Char, a)
+map({(1, 3), (4, 6)}) : Map(ℚ, ℕ)
 map({(1, 3), (4, 6)})
+This expression has multiple possible types.  Some examples:
 insert : ℕ × a × Map(ℕ, a) → Map(ℕ, a)
-map({}) : Map(ℕ, a)
+insert : ℤ × a × Map(ℤ, a) → Map(ℤ, a)
+insert : 𝔽 × a × Map(𝔽, a) → Map(𝔽, a)
+insert : ℚ × a × Map(ℚ, a) → Map(ℚ, a)
+insert : Bool × a × Map(Bool, a) → Map(Bool, a)
+insert : Char × a × Map(Char, a) → Map(Char, a)
+This expression has multiple possible types.  Some examples:
+map({}) : Map(ℚ, a)
+map({}) : Map(Bool, a)
+map({}) : Map(Char, a)
 map({})
 insert(1, 3, insert(4, 6, map({}))) : Map(ℕ, ℕ)
 map({(1, 3), (4, 6)})
 map({(1, 3)})
+This expression has multiple possible types.  Some examples:
 lookup : ℕ × Map(ℕ, a) → Unit + a
+lookup : ℤ × Map(ℤ, a) → Unit + a
+lookup : 𝔽 × Map(𝔽, a) → Unit + a
+lookup : ℚ × Map(ℚ, a) → Unit + a
+lookup : Bool × Map(Bool, a) → Unit + a
+lookup : Char × Map(Char, a) → Unit + a
 right(3)
 right(6)
 left(■)

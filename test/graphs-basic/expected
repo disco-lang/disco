@@ -1,4 +1,7 @@
+This expression has multiple possible types.  Some examples:
 emptyGraph : Graph(ℕ)
+emptyGraph : Graph(Bool)
+emptyGraph : Graph(Char)
 emptyGraph
 vertex(1) : Graph(ℕ)
 vertex(1)

@@ -1,10 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE OverloadedStrings #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Typecheck.Constraints
 -- Copyright   :  disco team and contributors
@@ -16,20 +12,20 @@
 module Disco.Typecheck.Constraints (
   Constraint (..),
   cAnd,
+  cOr,
 )
 where
 
+import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Semigroup
-import GHC.Generics (Generic)
-import Unbound.Generics.LocallyNameless hiding (lunbind)
-
 import Disco.Effects.LFresh
-
 import Disco.Pretty hiding ((<>))
 import Disco.Syntax.Operators (BFixity (In, InL, InR))
 import Disco.Types
 import Disco.Types.Rules
+import GHC.Generics (Generic)
+import Unbound.Generics.LocallyNameless hiding (lunbind)
 
 -- | Constraints are generated as a result of type inference and checking.
 --   These constraints are accumulated during the inference and checking phase
@@ -38,9 +34,9 @@ data Constraint where
   CSub :: Type -> Type -> Constraint
   CEq :: Type -> Type -> Constraint
   CQual :: Qualifier -> Type -> Constraint
-  CAnd :: [Constraint] -> Constraint
+  CAnd :: NonEmpty Constraint -> Constraint
   CTrue :: Constraint
-  COr :: [Constraint] -> Constraint
+  COr :: NonEmpty Constraint -> Constraint
   CAll :: Bind [Name Type] Constraint -> Constraint
   deriving (Show, Generic, Alpha, Subst Type)
 
@@ -49,14 +45,10 @@ instance Pretty Constraint where
     CSub ty1 ty2 -> withPA (PA 4 In) $ lt (pretty ty1) <+> "<:" <+> rt (pretty ty2)
     CEq ty1 ty2 -> withPA (PA 4 In) $ lt (pretty ty1) <+> "=" <+> rt (pretty ty2)
     CQual q ty -> withPA (PA 10 InL) $ lt (pretty q) <+> rt (pretty ty)
-    CAnd [c] -> pretty c
-    -- Use rt for both, since we don't need to print parens for /\ at all
-    CAnd (c : cs) -> withPA (PA 3 InR) $ rt (pretty c) <+> "/\\" <+> rt (pretty (CAnd cs))
-    CAnd [] -> "True"
+    -- Use rt for everything, since we don't need to print parens for /\ at all
+    CAnd cs -> withPA (PA 3 InR) $ foldr1 (\a b -> a <+> "/\\" <+> b) (NE.map (rt . pretty) cs)
     CTrue -> "True"
-    COr [c] -> pretty c
-    COr (c : cs) -> withPA (PA 2 InR) $ lt (pretty c) <+> "\\/" <+> rt (pretty (COr cs))
-    COr [] -> "False"
+    COr cs -> withPA (PA 2 InR) $ foldr1 (\a b -> lt a <+> "\\/" <+> rt b) (NE.map pretty cs)
     CAll b -> lunbind b $ \(xs, c) ->
       "∀" <+> intercalate "," (map pretty xs) <> "." <+> pretty c
 
@@ -65,10 +57,15 @@ cAnd :: [Constraint] -> Constraint
 cAnd cs = case filter nontrivial cs of
   [] -> CTrue
   [c] -> c
-  cs' -> CAnd cs'
+  (c : cs') -> CAnd (c :| cs')
  where
   nontrivial CTrue = False
   nontrivial _ = True
+
+cOr :: [Constraint] -> Constraint
+cOr [] = error "Empty list of constraints in cOr"
+cOr [c] = c
+cOr (c : cs) = COr (c :| cs)
 
 instance Semigroup Constraint where
   c1 <> c2 = cAnd [c1, c2]

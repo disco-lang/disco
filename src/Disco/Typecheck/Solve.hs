@@ -1,10 +1,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
 
 -- |
 -- Module      :  Disco.Typecheck.Solve
@@ -27,13 +24,11 @@ import Unbound.Generics.LocallyNameless (
   substs,
  )
 
-import Data.Coerce
-import GHC.Generics (Generic)
-
 import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (use, (%=), (.=))
-import Control.Monad (unless, zipWithM)
+import Control.Monad (forM, join, unless, zipWithM)
 import Data.Bifunctor (first, second)
+import Data.Coerce
 import Data.Either (partitionEithers)
 import Data.List (
   find,
@@ -41,36 +36,39 @@ import Data.List (
   intersect,
   partition,
  )
+import Data.List.NonEmpty (NonEmpty (..))
+import Data.List.NonEmpty qualified as NE
 import Data.Map (Map, (!))
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Maybe (
   fromJust,
   fromMaybe,
   mapMaybe,
  )
 import Data.Monoid (First (..))
+import Data.Semigroup (sconcat)
 import Data.Set (Set)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Data.Tuple
-
 import Disco.Effects.Fresh
 import Disco.Effects.State
-import Polysemy
-import Polysemy.Error
-import Polysemy.Input
-import Polysemy.Output
-
 import Disco.Messages
 import Disco.Pretty hiding ((<>))
 import Disco.Subst
-import qualified Disco.Subst as Subst
+import Disco.Subst qualified as Subst
 import Disco.Typecheck.Constraints
 import Disco.Typecheck.Graph (Graph)
-import qualified Disco.Typecheck.Graph as G
+import Disco.Typecheck.Graph qualified as G
 import Disco.Typecheck.Unify
 import Disco.Types
 import Disco.Types.Qualifiers
 import Disco.Types.Rules
+import Disco.Util (partitionEithersNE)
+import GHC.Generics (Generic)
+import Polysemy
+import Polysemy.Error
+import Polysemy.Input
+import Polysemy.Output
 
 --------------------------------------------------
 -- Solver errors
@@ -91,26 +89,44 @@ instance Semigroup SolveError where
 --------------------------------------------------
 -- Error utilities
 
-runSolve :: Sem (Fresh ': Error SolveError ': r) a -> Sem r (Either SolveError a)
-runSolve = runError . runFresh
+runSolve :: SolutionLimit -> Sem (State SolutionLimit ': Fresh ': Error SolveError ': r) a -> Sem r (Either SolveError a)
+runSolve lim = runError . runFresh . evalState lim
 
 -- | Run a list of actions, and return the results from those which do
 --   not throw an error.  If all of them throw an error, rethrow the
 --   first one.
-filterErrors :: Member (Error e) r => [Sem r a] -> Sem r [a]
+filterErrors :: Member (Error e) r => NonEmpty (Sem r a) -> Sem r (NonEmpty a)
 filterErrors ms = do
   es <- mapM try ms
-  case partitionEithers es of
-    (e : _, []) -> throw e
-    (_, as) -> return as
+  case partitionEithersNE es of
+    Left (e :| _) -> throw e
+    Right (_, as) -> return as
 
--- | A variant of 'asum' which picks the first action that succeeds,
---   or re-throws the error of the last one if none of them
---   do. Precondition: the list must not be empty.
-asum' :: Member (Error e) r => [Sem r a] -> Sem r a
-asum' [] = error "Impossible: asum' []"
-asum' [m] = m
-asum' (m : ms) = m `catch` (\_ -> asum' ms)
+--------------------------------------------------
+-- Solution limits
+
+-- | Max number of solutions to generate.
+newtype SolutionLimit = SolutionLimit {getSolutionLimit :: Int}
+
+-- | Register the fact that we found one solution, by decrementing the
+--   solution limit.
+countSolution :: Member (State SolutionLimit) r => Sem r ()
+countSolution = modify (SolutionLimit . subtract 1 . getSolutionLimit)
+
+-- | Run a subcomputation conditional on the solution limit still
+--   being positive.  If the solution limit has reached zero, stop
+--   early.
+withSolutionLimit ::
+  (Member (State SolutionLimit) r, Member (Output (Message ann)) r, Monoid a) =>
+  Sem r a ->
+  Sem r a
+withSolutionLimit m = do
+  SolutionLimit lim <- get
+  case lim of
+    0 -> do
+      debug "Reached solution limit, stopping early..."
+      return mempty
+    _ -> m
 
 --------------------------------------------------
 -- Simple constraints
@@ -249,15 +265,16 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 -- Top-level solver algorithm
 
 solveConstraint ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
   Constraint ->
-  Sem r S
+  Sem r (NonEmpty S)
 solveConstraint c = do
   -- Step 1. Open foralls (instantiating with skolem variables) and
   -- collect wanted qualifiers; also expand disjunctions.  Result in a
   -- list of possible constraint sets; each one consists of equational
   -- and subtyping constraints in addition to qualifiers.
 
+  debug "============================================================"
   debug "Solving:"
   debugPretty c
 
@@ -266,16 +283,17 @@ solveConstraint c = do
 
   qcList <- decomposeConstraint c
 
-  -- Now try continuing with each set and pick the first one that has
-  -- a solution.
-  asum' (map (uncurry solveConstraintChoice) qcList)
+  -- Now try continuing with each set.
+  sconcat <$> filterErrors (NE.map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
-  Sem r S
+  Sem r (NonEmpty S)
 solveConstraintChoice quals cs = do
+  debug "solveConstraintChoice"
+
   debugPretty quals
   debug $ vcat (map pretty' cs)
 
@@ -387,16 +405,19 @@ solveConstraintChoice quals cs = do
   debug "------------------------------"
   debug "Solving for type variables..."
 
-  theta_sol <- solveGraph vm' g'''
-  debugPretty theta_sol
+  theta_sols <- solveGraph vm' g'''
+  case NE.nonEmpty theta_sols of
+    Nothing -> throw NoUnify
+    Just theta_sols_NE -> do
+      debugPretty theta_sols
 
-  debug "------------------------------"
-  debug "Composing final substitution..."
+      debug "------------------------------"
+      debug "Composing final substitution..."
 
-  let theta_final = theta_sol @@ theta_cyc @@ theta_skolem @@ theta_simp
-  debugPretty theta_final
+      let theta_finals = NE.map (@@ (theta_cyc @@ theta_skolem @@ theta_simp)) theta_sols_NE
+      debugPretty theta_finals
 
-  return theta_final
+      return theta_finals
 
 --------------------------------------------------
 -- Step 1. Constraint decomposition.
@@ -404,20 +425,20 @@ solveConstraintChoice quals cs = do
 decomposeConstraint ::
   Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
   Constraint ->
-  Sem r [(TyVarInfoMap, [SimpleConstraint])]
-decomposeConstraint (CSub t1 t2) = return [(mempty, [t1 :<: t2])]
-decomposeConstraint (CEq t1 t2) = return [(mempty, [t1 :=: t2])]
-decomposeConstraint (CQual q ty) = (: []) . (,[]) <$> decomposeQual ty q
-decomposeConstraint (CAnd cs) = map mconcat . sequence <$> mapM decomposeConstraint cs
-decomposeConstraint CTrue = return [mempty]
+  Sem r (NonEmpty (TyVarInfoMap, [SimpleConstraint]))
+decomposeConstraint (CSub t1 t2) = return $ NE.singleton (mempty, [t1 :<: t2])
+decomposeConstraint (CEq t1 t2) = return $ NE.singleton (mempty, [t1 :=: t2])
+decomposeConstraint (CQual q ty) = NE.singleton . (,[]) <$> decomposeQual ty q
+decomposeConstraint (CAnd cs) = fmap sconcat . sequence <$> mapM decomposeConstraint cs
+decomposeConstraint CTrue = return $ NE.singleton mempty
 decomposeConstraint (CAll ty) = do
   (vars, c) <- unbind ty
   let c' = substs (mkSkolems vars) c
-  (map . first . addSkolems) vars <$> decomposeConstraint c'
+  (NE.map . first . addSkolems) vars <$> decomposeConstraint c'
  where
   mkSkolems :: [Name Type] -> [(Name Type, Type)]
   mkSkolems = map (id &&& TySkolem)
-decomposeConstraint (COr cs) = concat <$> filterErrors (map decomposeConstraint cs)
+decomposeConstraint (COr cs) = sconcat <$> filterErrors (NE.map decomposeConstraint cs)
 
 decomposeQual ::
   Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
@@ -878,6 +899,7 @@ data Rels = Rels
 -- | A RelMap associates each variable to its sets of base type and
 --   variable predecessors and successors in the constraint graph.
 newtype RelMap = RelMap {unRelMap :: Map (Name Type, Dir) Rels}
+  deriving (Show)
 
 instance Pretty RelMap where
   pretty (RelMap rm) = vcat (map prettyVar byVar)
@@ -950,6 +972,18 @@ lubBySort, glbBySort :: TyVarInfoMap -> RelMap -> [BaseTy] -> Sort -> Set (Name 
 lubBySort vm rm = limBySort vm rm SuperTy
 glbBySort vm rm = limBySort vm rm SubTy
 
+allBySort :: TyVarInfoMap -> RelMap -> Dir -> [BaseTy] -> Sort -> Set (Name Type) -> Set BaseTy
+allBySort vm rm dir ts s x =
+  isects
+    . map (\t -> S.fromList (dirtypesBySort vm rm dir t s x))
+    $ ts
+ where
+  isects = foldr1 S.intersection
+
+ubsBySort, lbsBySort :: TyVarInfoMap -> RelMap -> [BaseTy] -> Sort -> Set (Name Type) -> Set BaseTy
+ubsBySort vm rm = allBySort vm rm SuperTy
+lbsBySort vm rm = allBySort vm rm SubTy
+
 -- | From the constraint graph, build the sets of sub- and super- base
 --   types of each type variable, as well as the sets of sub- and
 --   supertype variables.  For each type variable x in turn, try to
@@ -964,11 +998,14 @@ glbBySort vm rm = limBySort vm rm SubTy
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
 solveGraph ::
-  Members '[Fresh, Error SolveError, Output (Message ann)] r =>
+  Members '[Fresh, Error SolveError, Output (Message ann), State SolutionLimit] r =>
   TyVarInfoMap ->
   Graph UAtom ->
-  Sem r S
-solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
+  Sem r [S]
+solveGraph vm g = do
+  debug "Solving graph..."
+  debugPretty g
+  map (atomToTypeSubst . unifyWCC) <$> go topRelMap
  where
   unifyWCC :: Substitution BaseTy -> Substitution Atom
   unifyWCC s = compose (map mkEquateSubst wccVarGroups) @@ fmap ABase s
@@ -1030,35 +1067,37 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
     fromVar _ = error "Impossible! UB but uisVar."
 
   go ::
-    Members '[Fresh, Error SolveError, Output (Message ann)] r =>
+    Members '[Fresh, Output (Message ann), State SolutionLimit] r =>
     RelMap ->
-    Sem r (Substitution BaseTy)
-  go relMap@(RelMap rm) =
-    debugPretty relMap >> case as of
+    Sem r [Substitution BaseTy]
+  go relMap@(RelMap rm) = withSolutionLimit $ do
+    debugPretty relMap
+    case as of
       -- No variables left that have base type constraints.
-      [] -> return idS
+      [] -> do
+        -- Found a solution, decrement the counter.
+        countSolution
+        return [idS]
       -- Solve one variable at a time.  See below.
       (a : _) -> do
         debug $ "Solving for" <+> pretty' a
-        case solveVar a of
-          Nothing -> do
-            debug $ "Couldn't solve for" <+> pretty' a
-            throw NoUnify
+        let ss = solveVar a
+        debugPretty ss
 
-          -- If we solved for a, delete it from the maps, apply the
-          -- resulting substitution to the remainder (updating the
-          -- relMap appropriately), and recurse.  The substitution we
-          -- want will be the composition of the substitution for a
-          -- with the substitution generated by the recursive call.
-          --
-          -- Note we don't need to delete a from the TyVarInfoMap; we
-          -- never use the set of keys from the TyVarInfoMap for
-          -- anything (indeed, some variables might not be keys if
-          -- they have an empty sort), so it doesn't matter if old
-          -- variables hang around in it.
-          Just s -> do
-            debugPretty s
-            (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
+        -- If we solved for a, delete it from the maps, apply the
+        -- resulting substitution to the remainder (updating the
+        -- relMap appropriately), and recurse.  The substitution we
+        -- want will be the composition of the substitution for a
+        -- with the substitution generated by the recursive call.
+        --
+        -- Note we don't need to delete a from the TyVarInfoMap; we
+        -- never use the set of keys from the TyVarInfoMap for
+        -- anything (indeed, some variables might not be keys if
+        -- they have an empty sort), so it doesn't matter if old
+        -- variables hang around in it.
+        ss' <- forM ss $ \s ->
+          map (@@ s) <$> go (substRel a (fromJust $ Subst.lookup (coerce a) s) relMap)
+        return (join ss')
    where
     -- NOTE we can't solve a bunch in parallel!  Might end up
     -- assigning them conflicting solutions if some depend on
@@ -1099,9 +1138,14 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
       [] -> filter ((/= topSort) . getSort vm) . map fst $ M.keys rm
       _ -> asBase
 
-    -- Solve for a variable, failing if it has no solution, otherwise returning
-    -- a substitution for it.
-    solveVar :: Name Type -> Maybe (Substitution BaseTy)
+    -- XXX the right way to do this is to keep track of the
+    -- polarity of each variable.  For variables that have only
+    -- one polarity we can pick the greatest or least solution as
+    -- appropriate.  For other variables, we have to return all of
+    -- them.
+
+    -- Solve for a variable, returning all possible substitutions.
+    solveVar :: Name Type -> [Substitution BaseTy]
     solveVar v =
       case ((v, SuperTy), (v, SubTy)) & over both (S.toList . baseRels . lkup "solveGraph.solveVar" rm) of
         -- No sub- or supertypes; the only way this can happen is
@@ -1122,24 +1166,22 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
         -- nontrivial sorts means that we are dealing with numeric
         -- types; so we can just call N a base subtype and go from
         -- there.
+        --
+        -- Hmm, no, this is wrong!  E.g. we could have a QCmp
+        -- constraint, in which case something like Char or Bool
+        -- could be OK...  In any case, this is really just to be
+        -- able to show users some sample types, it's not an issue
+        -- of soundness.  We don't (can't?) guarantee to return ALL possible types.
 
         ([], []) ->
-          if getSort vm v == S.fromList [QBool]
-            then Just (coerce v |-> B)
-            else -- Debug.trace (show v ++ " has no sub- or supertypes.  Assuming N as a subtype.")
-
-              (coerce v |->)
-                <$> lubBySort
-                  vm
-                  relMap
-                  [N]
-                  (getSort vm v)
-                  (varRels (lkup "solveVar none, rels" rm (v, SubTy)))
+          -- Debug.trace (show v ++ " has no sub- or supertypes.")
+          -- Pick some base type with an appropriate sort.
+          map (coerce v |->) $ filter (`hasSort` getSort vm v) [N, Z, F, Q, B, C]
         -- Only supertypes.  Just assign a to their inf, if one exists.
         (bsupers, []) ->
           -- Debug.trace (show v ++ " has only supertypes (" ++ show bsupers ++ ")") $
-          (coerce v |->)
-            <$> glbBySort
+          map (coerce v |->) . S.toList $
+            lbsBySort
               vm
               relMap
               bsupers
@@ -1148,35 +1190,23 @@ solveGraph vm g = atomToTypeSubst . unifyWCC <$> go topRelMap
         -- Only subtypes.  Just assign a to their sup.
         ([], bsubs) ->
           -- Debug.trace (show v ++ " has only subtypes (" ++ show bsubs ++ ")") $
-          -- Debug.trace ("sortmap: " ++ show vm) $
+          -- Debug.trace ("varmap: " ++ show vm) $
           -- Debug.trace ("relmap: " ++ show relMap) $
           -- Debug.trace ("sort for " ++ show v ++ ": " ++ show (getSort vm v)) $
           -- Debug.trace ("relvars: " ++ show (varRels (relMap ! (v,SubTy)))) $
-          (coerce v |->)
-            <$> lubBySort
+          map (coerce v |->) . S.toList $
+            ubsBySort
               vm
               relMap
               bsubs
               (getSort vm v)
               (varRels (lkup "solveVar bsubs, rels" rm (v, SubTy)))
         -- Both successors and predecessors.  Both must have a
-        -- valid bound, and the bounds must not overlap.  Assign a
-        -- to the sup of its predecessors.
-        (bsupers, bsubs) -> do
-          ub <-
-            glbBySort
-              vm
-              relMap
-              bsupers
-              (getSort vm v)
-              (varRels (rm ! (v, SuperTy)))
-          lb <-
-            lubBySort
-              vm
-              relMap
-              bsubs
-              (getSort vm v)
-              (varRels (rm ! (v, SubTy)))
-          case isSubB lb ub of
-            True -> Just (coerce v |-> lb)
-            False -> Nothing
+        -- valid bound, and the bounds must not overlap.
+        (bsupers, bsubs) ->
+          let mub = glbBySort vm relMap bsupers (getSort vm v) (varRels (rm ! (v, SuperTy)))
+              mlb = lubBySort vm relMap bsubs (getSort vm v) (varRels (rm ! (v, SubTy)))
+           in case (mlb, mub) of
+                (Just lb, Just ub) ->
+                  map (coerce v |->) (filter (`isSubB` ub) (supertypes lb))
+                _ -> []

@@ -632,7 +632,7 @@ containerDelims SetContainer = braces
 
 prettyBranches :: Members '[Reader PA, LFresh] r => [Branch] -> Sem r (Doc ann)
 prettyBranches = \case
-  [] -> error "Empty branches are disallowed."
+  [] -> text ""
   b : bs ->
     pretty b
       $+$ foldr (($+$) . (text "," <+>) . pretty) empty bs
@@ -729,3 +729,4 @@ instance Pretty Pattern where
     PFrac p1 p2 ->
       withPA (getPA Div) $
         lt (pretty p1) <+> text "/" <+> rt (pretty p2)
+    PNonlinear p _ -> pretty p

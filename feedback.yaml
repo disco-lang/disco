@@ -1,3 +1,3 @@
 loops:
-  test8: stack test --fast --test-arguments '--hide-successes +RTS -N8 -RTS'
-  test30: stack test --fast --test-arguments '--hide-successes +RTS -N30 -RTS'
+  build: cabal -j build -O0
+  test: cabal -j test -O0 --test-show-details=direct

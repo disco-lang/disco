@@ -1,27 +1,2 @@
 cradle:
-  multi:
-    - path: "./explore"
-      config:
-        cradle:
-          none:
-    - path: "./nsf"
-      config:
-        cradle:
-          none:
-    - path: "./pubs"
-      config:
-        cradle:
-          none:
-    - path: "./notes"
-      config:
-        cradle:
-          none:
-    - path: "./example"
-      config:
-        cradle:
-          none:
-    - path: "./"
-      config:
-        cradle:
-          stack:
-            component: "disco:lib"
+  cabal:

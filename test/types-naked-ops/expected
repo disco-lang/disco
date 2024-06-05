@@ -1,5 +1,17 @@
+This expression has multiple possible types.  Some examples:
 max : ℕ × ℕ → ℕ
+max : ℤ × ℤ → ℤ
+max : 𝔽 × 𝔽 → 𝔽
+max : ℚ × ℚ → ℚ
+max : Bool × Bool → Bool
+max : Char × Char → Char
 ~! : ℕ → ℕ
+This expression has multiple possible types.  Some examples:
+~mod~ : ℕ × ℕ → ℕ
 ~mod~ : ℤ × ℤ → ℤ
+This expression has multiple possible types.  Some examples:
 ~+~ : ℕ × ℕ → ℕ
+~+~ : ℤ × ℤ → ℤ
+~+~ : 𝔽 × 𝔽 → 𝔽
+~+~ : ℚ × ℚ → ℚ
 not~ : Bool → Bool

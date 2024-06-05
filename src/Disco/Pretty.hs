@@ -24,6 +24,8 @@ import Prelude hiding ((<>))
 
 import Data.Bifunctor
 import Data.Char (isAlpha)
+import Data.List.NonEmpty (NonEmpty)
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
@@ -92,6 +94,9 @@ pretty' = runReader initPA . runLFresh . pretty
 
 instance Pretty a => Pretty [a] where
   pretty = brackets . intercalate "," . map pretty
+
+instance Pretty a => Pretty (NonEmpty a) where
+  pretty = pretty . NE.toList
 
 instance (Pretty k, Pretty v) => Pretty (Map k v) where
   pretty m = do

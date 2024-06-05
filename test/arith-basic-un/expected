@@ -17,7 +17,9 @@
 -6
 Error: that number would not even fit in the universe!
 -9
+This expression has multiple possible types.  Some examples:
 -~ : ℤ → ℤ
+-~ : ℚ → ℚ
 -3 : ℤ
 -(3 : ℕ) : ℤ
 -(3 : 𝔽) : ℚ

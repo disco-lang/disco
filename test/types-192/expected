@@ -1,1 +1,4 @@
+This expression has multiple possible types.  Some examples:
 λx. λy. λz. x + y / z : 𝔽 → 𝔽 → 𝔽 → 𝔽
+λx. λy. λz. x + y / z : ℕ → ℕ → ℚ → ℚ
+λx. λy. λz. x + y / z : ℕ → ℤ → ℤ → ℚ

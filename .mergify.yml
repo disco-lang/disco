@@ -27,7 +27,7 @@ pull_request_rules:
   - or:
     - and:
       - -files~=\.hs$
-      - -files~=\.sw$
+      - -files~=\.disco$
       - -files~=\.cabal$
       - -files=stack.yaml
     - and:

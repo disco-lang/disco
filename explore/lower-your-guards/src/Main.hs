@@ -43,7 +43,7 @@ uncov clauses tIn = do
   x1 <- F.fresh (Just "x_1")
   gdt <- G.desugarClauses [x1] . fromList $ clauses
   let argsCtx = [(x1, tIn)]
-  return $ U.uncovered (argsCtx, U.T) gdt
+  return $ U.uncovered (argsCtx, U.Literal U.T) gdt
 
 evalUncov :: [P.Clause] -> Ty.Type -> U.RefinementType
 evalUncov clauses tIn = evalState (uncov clauses tIn) F.blank

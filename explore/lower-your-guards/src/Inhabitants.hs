@@ -89,9 +89,9 @@ normalize nref (f1 `U.And` f2) = do
   rest <- traverse (`normalize` f2) n1
   return $ S.unions rest
 normalize nref (f1 `U.Or` f2) = S.union <$> normalize nref f1 <*> normalize nref f2
-normalize nref fl = maybe S.empty S.singleton <$> runMaybeT (nref <+> fl)
+normalize nref (U.Literal fl) = maybe S.empty S.singleton <$> runMaybeT (nref <+> fl)
 
-(<+>) :: NormRefType -> U.Formula -> MaybeT F.Fresh NormRefType
+(<+>) :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
 _ <+> U.F = MaybeT . pure $ Nothing
 n <+> U.T = return n
 (context, constraints) <+> U.MatchDataCon k ys x = (context ++ zip ys (Ty.dcTypes k), constraints) <+| MatchDataCon k ys x

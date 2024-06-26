@@ -109,16 +109,17 @@ normalize nref (f1 `U.And` f2) = do
   rest <- traverse (`normalize` f2) n1
   return $ S.unions rest
 normalize nref (f1 `U.Or` f2) = S.union <$> normalize nref f1 <*> normalize nref f2
-normalize nref (U.Literal fl) = maybe S.empty S.singleton <$> runMaybeT (nref <+> fl)
+normalize nref (U.Literal fl) = maybe S.empty S.singleton <$> runMaybeT (nref `addLiteral` fl)
 
-(<+>) :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
-_ <+> U.F = MaybeT . pure $ Nothing
-n <+> U.T = return n
-(context, constraints) <+> U.MatchDataCon k ys x = (context ++ zip ys (Ty.dcTypes k), constraints) `addConstraint` (x, MatchDataCon k ys)
-n <+> U.NotDataCon k x = n `addConstraint` (x, NotDataCon k)
-(context, constraints) <+> U.Let x xType y = (context ++ [(x, xType)], constraints) `addConstraint` (x, TermEquality y)
-n <+> U.MatchIntLit i x = n `addConstraint` (x, MatchIntLit i)
-n <+> U.NotIntLit i x = n `addConstraint` (x, NotIntLit i)
+addLiteral :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
+addLiteral n@(context, constraints) flit = case flit of
+  U.F -> MaybeT $ pure Nothing
+  U.T -> return n
+  U.Let x xType y -> (context ++ [(x, xType)], constraints) `addConstraint` (x, TermEquality y)
+  U.MatchDataCon k ys x -> (context ++ zip ys (Ty.dcTypes k), constraints) `addConstraint` (x, MatchDataCon k ys)
+  U.NotDataCon k x -> n `addConstraint` (x, NotDataCon k)
+  U.MatchIntLit i x -> n `addConstraint` (x, MatchIntLit i)
+  U.NotIntLit i x -> n `addConstraint` (x, NotIntLit i)
 
 breakIf :: (Alternative f) => Bool -> f ()
 breakIf = guard . not

@@ -21,6 +21,7 @@ executable lower-your-guards
                        containers,
                        mtl,
                        transformers,
+                       directory
   ghc-options:         -Wall
                        -Wcompat
                        -Widentities

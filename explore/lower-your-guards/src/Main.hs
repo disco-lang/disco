@@ -15,6 +15,8 @@ import Text.Pretty.Simple (pPrint)
 import qualified Types as Ty
 import qualified Uncovered as U
 import qualified Data.List.NonEmpty as NE
+import System.Directory (listDirectory)
+import Data.List (sort)
 
 parseFile :: String -> IO [P.FunctionDef]
 parseFile file = do
@@ -25,7 +27,10 @@ parseFile file = do
     Right defs -> return defs
 
 main :: IO ()
-main = inhabNicePos "test/test.disc"
+main = do
+  files <- listDirectory "./test"
+  let fileNames = map ("test/"++) . sort $ files
+  sequence_ $ concatMap (\f -> [pPrint f, inhabNicePos f]) fileNames
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
 desGdt clauses = do

@@ -32,11 +32,11 @@ lookupType x ((x', tau) : cs)
   | otherwise = lookupType x cs
 
 -- doesn't respect Term Equalities, which is important. Use matching instead
-matchingShallow :: F.VarID -> [ConstraintFor] -> [Constraint]
-matchingShallow x = map snd . filter ((== x) . fst)
+onVarShallow :: F.VarID -> [ConstraintFor] -> [Constraint]
+onVarShallow x = map snd . filter ((== x) . fst)
 
-matching :: F.VarID -> [ConstraintFor] -> [Constraint]
-matching x cs = matchingShallow (lookupVar x cs) cs
+onVar :: F.VarID -> [ConstraintFor] -> [Constraint]
+onVar x cs = onVarShallow (lookupVar x cs) cs
 
 data Constraint where
   MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> Constraint
@@ -97,7 +97,7 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
     l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
     return $ IPMatch k l
   where
-    constraintsOnX = matching x cns
+    constraintsOnX = onVar x cns
     matchOnX = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX
     cantMatchOnX = mapMaybe (\case NotDataCon k -> Just k; _ -> Nothing) constraintsOnX
     isIntX = listToMaybe $ mapMaybe (\case MatchIntLit i -> Just i; _ -> Nothing) constraintsOnX
@@ -155,14 +155,14 @@ getConstructorArgs k cfs =
 
 addConstraint :: NormRefType -> ConstraintFor -> MaybeT F.Fresh NormRefType
 addConstraint nref@(_, cns) (x, c) = do
-  breakIf $ any (conflictsWith c) (matching x cns)
+  breakIf $ any (conflictsWith c) (onVar x cns)
   addConstraintHelper nref (lookupVar x cns, c)
 
 addConstraintHelper :: NormRefType -> ConstraintFor -> MaybeT F.Fresh NormRefType
 addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
   --- Equation (10)
   MatchDataCon k args -> do
-    case getConstructorArgs k (matching origX cns) of
+    case getConstructorArgs k (onVar origX cns) of
       -- 10c -- TODO(colin): Still need to add type constraints!
       Just args' -> addConstraints nref (zipWith (\a b -> (a, TermEquality b)) args args')
       Nothing -> return added

@@ -1,4 +1,4 @@
-module Main (main, evalGdt, pfg, pdu, pdun, pduip, inhabNicePos) where
+module Main (main, nicePattern, evalGdt, pfg, pdu, pdun, pduip, inhabNice) where
 
 import Control.Monad.State
 import Data.List.NonEmpty (fromList)
@@ -30,7 +30,7 @@ main :: IO ()
 main = do
   files <- listDirectory "./test"
   let fileNames = map ("test/"++) . sort $ files
-  sequence_ $ concatMap (\f -> [pPrint f, inhabNicePos f]) fileNames
+  sequence_ $ concatMap (\f -> [pPrint f, inhabNice f]) fileNames
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
 desGdt clauses = do
@@ -53,14 +53,14 @@ uncov clauses tIn = do
 evalUncov :: [P.Clause] -> Ty.Type -> U.RefinementType
 evalUncov clauses tIn = evalState (uncov clauses tIn) F.blank
 
-inhabPos :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
-inhabPos clauses tIn = do
+inhab :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
+inhab clauses tIn = do
   u <- uncov clauses tIn
   s <- get
-  return $ I.genInhabPos s u
+  return $ I.genInhab s u
 
-evalInhabPos :: [P.Clause] -> Ty.Type -> [I.InhabPat]
-evalInhabPos clauses tIn = evalState (inhabPos clauses tIn) F.blank
+evalInhab :: [P.Clause] -> Ty.Type -> [I.InhabPat]
+evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
 
 norm :: [P.Clause] -> Ty.Type -> F.Fresh (S.Set I.NormRefType)
 norm clauses tIn = do
@@ -91,17 +91,17 @@ pduip file = do
   return $
     map
       ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
-          (name, evalInhabPos clauses tIn)
+          (name, evalInhab clauses tIn)
       )
       defs
 
-inhabNicePos :: String -> IO ()
-inhabNicePos file = do
+inhabNice :: String -> IO ()
+inhabNice file = do
   defs <- parseFile file
   pPrint $
     map
       ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
-          (name, map niceInhabPattern $ evalInhabPos clauses tIn)
+          (name, map niceInhabPattern $ evalInhab clauses tIn)
       )
       defs
 

@@ -56,19 +56,19 @@ data InhabPat where
   IPPlaceholderInt :: InhabPat
   deriving (Show, Eq, Ord)
 
-genInhabPos :: NE.NonEmpty F.Frame -> U.RefinementType -> [InhabPat]
-genInhabPos frames (context, formula) = do
+genInhab :: NE.NonEmpty F.Frame -> U.RefinementType -> [InhabPat]
+genInhab frames (context, formula) = do
   let mNrefs = S.toList <$> normalize (context, []) formula
   let (nrefs, frames') = runState mNrefs frames
   nref <- nrefs
-  join $ expandVarsPos frames' nref context
+  join $ expandVars frames' nref context
 
-expandVarsPos :: NE.NonEmpty F.Frame -> NormRefType -> U.Context -> [[InhabPat]]
-expandVarsPos frame nset vars = do
-  traverse (expandVarPos frame nset) vars
+expandVars :: NE.NonEmpty F.Frame -> NormRefType -> U.Context -> [[InhabPat]]
+expandVars frame nset vars = do
+  traverse (expandVar frame nset) vars
 
-expandVarPos :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
-expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
+expandVar :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
+expandVar frames nref@(_, cns) (x, xType) = case matchOnX of
   Nothing | xType == Ty.int -> case isIntX of
     Nothing -> case isNotIntX of
       [] -> return IPWild
@@ -93,9 +93,9 @@ expandVarPos frames nref@(_, cns) (x, xType) = case matchOnX of
           then return IPWild
           else do
             m <- matchers
-            expandVarPos frames' m (x, xType)
+            expandVar frames' m (x, xType)
   Just (k, ys) -> do
-    l <- expandVarsPos frames nref (zip ys (Ty.dcTypes k))
+    l <- expandVars frames nref (zip ys (Ty.dcTypes k))
     return $ IPMatch k l
   where
     constraintsOnX = onVar x cns

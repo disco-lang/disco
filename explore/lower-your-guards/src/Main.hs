@@ -115,9 +115,7 @@ niceInhabPattern :: I.InhabPat -> String
 niceInhabPattern (I.IPMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
 niceInhabPattern I.IPWild = "_"
 niceInhabPattern (I.IPIntLit i) = show i
-niceInhabPattern (I.IPNotIntLit i) = "(Not " ++ show i ++ ")"
 niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"
-niceInhabPattern I.IPPlaceholderInt = "placehold"
 
 pdun :: String -> IO [(Text, S.Set I.NormRefType)]
 pdun file = do

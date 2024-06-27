@@ -27,6 +27,14 @@ data Constraint where
   TermEquality :: F.VarID -> Constraint
   deriving (Show, Eq, Ord)
 
+data Pos where
+  Pos :: Ty.DataConstructor -> [F.VarID] -> Pos
+  PosInt :: Int -> Pos
+  
+data Neg where
+  Neg :: Ty.DataConstructor -> Neg
+  NegInt :: Int -> Neg
+
 -- Resolves term equalities, finding the leftmost id for a variable
 -- I believe I3 of section 3.4 allows us to
 -- do a linear scan from right to left
@@ -51,9 +59,7 @@ data InhabPat where
   IPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
   IPWild :: InhabPat
   IPIntLit :: Int -> InhabPat
-  IPNotIntLit :: Int -> InhabPat
   IPNotIntLits :: [Int] -> InhabPat
-  IPPlaceholderInt :: InhabPat
   deriving (Show, Eq, Ord)
 
 genInhab :: NE.NonEmpty F.Frame -> U.RefinementType -> [InhabPat]
@@ -68,41 +74,43 @@ expandVars frame nset vars = do
   traverse (expandVar frame nset) vars
 
 expandVar :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
-expandVar frames nref@(_, cns) (x, xType) = case matchOnX of
-  Nothing | xType == Ty.int -> case isIntX of
-    Nothing -> case isNotIntX of
-      [] -> return IPWild
-      is -> return $ IPNotIntLits (nub is)
-    Just i -> return $ IPIntLit i
-  Nothing -> case cantMatchOnX of
-    [] -> return IPWild
-    _ ->
-      do
-        let (matchers, frames') =
-              runState
-                ( catMaybes
-                    <$> forM
-                      (Ty.dataCons xType)
-                      ( \dc -> do
-                          frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
-                          runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
-                      )
-                )
-                frames
-        if null matchers
-          then return IPWild
-          else do
-            m <- matchers
-            expandVar frames' m (x, xType)
-  Just (k, ys) -> do
-    l <- expandVars frames nref (zip ys (Ty.dcTypes k))
-    return $ IPMatch k l
+expandVar frames nref@(_, cns) (x, xType) =
+  if xType == Ty.int
+    then case posIntMatch of
+      Just i -> return $ IPIntLit i
+      Nothing -> case negIntMatch of
+        [] -> return IPWild
+        is -> return $ IPNotIntLits (nub is)
+    else case posMatch of
+      Just (k, ys) -> do
+        l <- expandVars frames nref (zip ys (Ty.dcTypes k))
+        return $ IPMatch k l
+      Nothing -> case negMatch of
+        [] -> return IPWild
+        _ ->
+          do
+            let (matchers, frames') =
+                  runState
+                    ( catMaybes
+                        <$> forM
+                          (Ty.dataCons xType)
+                          ( \dc -> do
+                              frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
+                              runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
+                          )
+                    )
+                    frames
+            if null matchers
+              then return IPWild
+              else do
+                m <- matchers
+                expandVar frames' m (x, xType)
   where
     constraintsOnX = onVar x cns
-    matchOnX = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX
-    cantMatchOnX = mapMaybe (\case NotDataCon k -> Just k; _ -> Nothing) constraintsOnX
-    isIntX = listToMaybe $ mapMaybe (\case MatchIntLit i -> Just i; _ -> Nothing) constraintsOnX
-    isNotIntX = mapMaybe (\case NotIntLit i -> Just i; _ -> Nothing) constraintsOnX
+    posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX
+    negMatch = mapMaybe (\case NotDataCon k -> Just k; _ -> Nothing) constraintsOnX
+    posIntMatch = listToMaybe $ mapMaybe (\case MatchIntLit i -> Just i; _ -> Nothing) constraintsOnX
+    negIntMatch = mapMaybe (\case NotIntLit i -> Just i; _ -> Nothing) constraintsOnX
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do

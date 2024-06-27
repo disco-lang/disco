@@ -1,7 +1,10 @@
-module Main (main, nicePattern, evalGdt, pfg, pdu, pdun, pduip, inhabNice) where
+module Main (main, nicePattern, evalGdt, pfg, pdu, pda, pdun, pduip, inhabNice) where
 
+import qualified Annotated as A
 import Control.Monad.State
+import Data.List (sort)
 import Data.List.NonEmpty (fromList)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -10,13 +13,11 @@ import qualified Fresh as F
 import qualified GuardTree as G
 import qualified Inhabitants as I
 import qualified Parse as P
+import System.Directory (listDirectory)
 import Text.Megaparsec (eof, errorBundlePretty, many, runParser)
 import Text.Pretty.Simple (pPrint)
 import qualified Types as Ty
 import qualified Uncovered as U
-import qualified Data.List.NonEmpty as NE
-import System.Directory (listDirectory)
-import Data.List (sort)
 
 parseFile :: String -> IO [P.FunctionDef]
 parseFile file = do
@@ -29,7 +30,7 @@ parseFile file = do
 main :: IO ()
 main = do
   files <- listDirectory "./test"
-  let fileNames = map ("test/"++) . sort $ files
+  let fileNames = map ("test/" ++) . sort $ files
   sequence_ $ concatMap (\f -> [pPrint f, inhabNice f]) fileNames
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
@@ -82,6 +83,27 @@ pdu file = do
     map
       ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
           (name, evalUncov clauses tIn)
+      )
+      defs
+
+evalAnt :: [P.Clause] -> Ty.Type -> ([Int], [Int])
+evalAnt clauses tIn = evalState (ant clauses tIn) F.blank
+
+ant :: [P.Clause] -> Ty.Type -> F.Fresh ([Int], [Int])
+ant clauses tIn = do
+  x1 <- F.fresh (Just "x_1")
+  gdt <- G.desugarClauses [x1] . fromList $ clauses
+  let argsCtx = [(x1, tIn)]
+  let a = A.annotated (argsCtx, U.Literal U.T) gdt
+  I.accessableRedundant a
+
+pda :: String -> IO [(Text, ([Int], [Int]))]
+pda file = do
+  defs <- parseFile file
+  return $
+    map
+      ( \(P.FunctionDef (P.FunctionDecl name tIn _) clauses) ->
+          (name, evalAnt clauses tIn)
       )
       defs
 

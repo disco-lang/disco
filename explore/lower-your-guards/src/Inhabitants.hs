@@ -2,9 +2,11 @@
 
 module Inhabitants where
 
+import qualified Annotated as A
 import Control.Applicative
 import Control.Monad (foldM, forM, guard, join, replicateM)
 import Control.Monad.State (runState)
+import Control.Monad.State.Lazy (get)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
 import Data.List (nub, partition)
@@ -30,10 +32,20 @@ data Constraint where
 -- data Pos where
 --   Pos :: Ty.DataConstructor -> [F.VarID] -> Pos
 --   PosInt :: Int -> Pos
---   
+--
 -- data Neg where
 --   Neg :: Ty.DataConstructor -> Neg
 --   NegInt :: Int -> Neg
+
+accessableRedundant :: A.Ant -> F.Fresh ([Int], [Int])
+accessableRedundant ant = case ant of
+  A.Grhs ref i -> do
+    s <- get
+    return $
+      if null $ genInhab s ref
+        then ([], [i])
+        else ([i], [])
+  A.Branch a1 a2 -> mappend <$> accessableRedundant a1 <*> accessableRedundant a2
 
 -- Resolves term equalities, finding the leftmost id for a variable
 -- I believe I3 of section 3.4 allows us to

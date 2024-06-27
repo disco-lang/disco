@@ -2,12 +2,12 @@
 
 module GuardTree where
 
+import Control.Monad (replicateM)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
+import qualified Fresh as F
 import qualified Parse as P
 import qualified Types as Ty
-import qualified Fresh as F
-import Control.Monad (replicateM)
 
 data Gdt where
   Grhs :: Int -> Gdt

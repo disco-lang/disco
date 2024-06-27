@@ -39,6 +39,7 @@ executable lower-your-guards
                        GuardTree,
                        Uncovered
                        Inhabitants,
+                       Inhabitants2,
                        Types,
                        Fresh,
                        Play

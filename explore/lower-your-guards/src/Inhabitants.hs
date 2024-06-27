@@ -27,13 +27,13 @@ data Constraint where
   TermEquality :: F.VarID -> Constraint
   deriving (Show, Eq, Ord)
 
-data Pos where
-  Pos :: Ty.DataConstructor -> [F.VarID] -> Pos
-  PosInt :: Int -> Pos
-  
-data Neg where
-  Neg :: Ty.DataConstructor -> Neg
-  NegInt :: Int -> Neg
+-- data Pos where
+--   Pos :: Ty.DataConstructor -> [F.VarID] -> Pos
+--   PosInt :: Int -> Pos
+--   
+-- data Neg where
+--   Neg :: Ty.DataConstructor -> Neg
+--   NegInt :: Int -> Neg
 
 -- Resolves term equalities, finding the leftmost id for a variable
 -- I believe I3 of section 3.4 allows us to

@@ -19,6 +19,21 @@ foo4 :: (Int, Int) -> Bool
 foo4 (1, n) = True
 foo4 (n, 2) = False
 
+foo5 :: (Int, Int, Int) -> Bool
+foo5 (1, 2, _) = False
+foo5 (4, _, 6) = True
+foo5 (_, 8, 9) = False
+
+foo6 :: (Int, Int) -> Bool
+foo6 (1, 2) = False
+
+foo7 :: (Int, Int, Int) -> Bool
+foo7 (1, 2, 3) = False
+
+foo8 :: (Either Int Bool, Int) -> ()
+foo8 (Left 10, 2) = ()
+-- foo8 (Right True, 5) = ()
+
 data Pat where
     Base :: Pat
     Kon :: Pat -> Pat

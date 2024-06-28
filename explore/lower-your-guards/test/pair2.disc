@@ -1,4 +1,4 @@
 
 foo : , Int Int -> Bool
-foo , 0 0 = False
-foo , 1 b = False
+foo , 7 5 = False
+//foo , 1 b = False

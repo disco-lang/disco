@@ -43,4 +43,5 @@ executable lower-your-guards
                        Types,
                        Fresh,
                        Play,
-                       Annotated
+                       Annotated,
+                       MatchTree

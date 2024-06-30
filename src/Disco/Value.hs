@@ -68,6 +68,7 @@ module Disco.Value (
   Mem,
   emptyMem,
   allocate,
+  allocateV,
   allocateRec,
   lkup,
   set,
@@ -130,7 +131,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: Env -> [Name Core] -> Core -> Value
+  VClo :: Maybe Int -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -450,6 +451,12 @@ allocate e t = do
   Mem n m <- get
   put $ Mem (n + 1) (IM.insert n (E e t) m)
   return n
+
+allocateV :: Members '[State Mem] r => Sem r Int
+allocateV = do 
+   Mem n m <- get 
+   put $ Mem (n + 1) (IM.insert n (Disco.Value.V (VMap M.empty)) m)
+   return n
 
 -- | Allocate new memory cells for a group of mutually recursive
 --   bindings, and return the indices of the allocate cells.

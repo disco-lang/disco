@@ -169,7 +169,12 @@ compileDTerm term@(DTAbs q _ _) = do
   (xs, tys, body) <- unbindDeep term
   cbody <- compileDTerm body
   case q of
+
     Lam -> return $ abstract xs cbody
+   --  Lam -> case _ of 
+   --    _ -> return $ abstract xs cbody
+   --    _ -> return $ abstractMemo xs cbody
+
     Ex -> return $ quantify (OExists tys) (abstract xs cbody)
     All -> return $ quantify (OForall tys) (abstract xs cbody)
  where
@@ -182,7 +187,10 @@ compileDTerm term@(DTAbs q _ _) = do
   unbindDeep t = return ([], [], t)
 
   abstract :: [Name DTerm] -> Core -> Core
-  abstract xs body = CAbs (bind (map coerce xs) body)
+  abstract xs body = CAbs False (bind (map coerce xs) body)
+
+  abstractMemo :: [Name DTerm] -> Core -> Core
+  abstractMemo xs body = CAbs True (bind (map coerce xs) body)
 
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
@@ -234,13 +242,13 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
-  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
+  return $ CAbs False $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj L (CVar (localName a))
+  return $ CAbs False $ bind [a] $ CInj L (CVar (localName a))
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj R (CVar (localName a))
+  return $ CAbs False $ bind [a] $ CInj R (CVar (localName a))
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 compilePrim _ PrimSqrt = return $ CConst OSqrt
@@ -342,13 +350,13 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 --   of type (Unit → τ), in order to delay evaluation until explicitly
 --   applying it to the unit value.
 compileCase :: Member Fresh r => [DBranch] -> Sem r Core
-compileCase [] = return $ CAbs (bind [string2Name "_"] (CConst OMatchErr))
+compileCase [] = return $ CAbs False (bind [string2Name "_"] (CConst OMatchErr))
 -- empty case ==>  λ _ . error
 
 compileCase (b : bs) = do
   c1 <- compileBranch b
   c2 <- compileCase bs
-  return $ CAbs (bind [string2Name "_"] (CApp c1 c2))
+  return $ CAbs False (bind [string2Name "_"] (CApp c1 c2))
 
 -- | Compile a branch of a case expression of type τ to a core
 --   language expression of type (Unit → τ) → τ.  The idea is that it
@@ -362,7 +370,7 @@ compileBranch b = do
   c <- compileDTerm e
   k <- fresh (string2Name "k") -- Fresh name for the failure continuation
   bc <- compileGuards (fromTelescope gs) k c
-  return $ CAbs (bind [k] bc)
+  return $ CAbs False (bind [k] bc)
 
 -- | 'compileGuards' takes a list of guards, the name of the failure
 --   continuation of type (Unit → τ), and a Core term of type τ to
@@ -384,25 +392,25 @@ compileGuards (DGPat (unembed -> s) p : gs) k e = do
 --   calls the failure continuation in the case of failure, or the
 --   rest of the guards in the case of success.
 compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
-compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) s
+compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs False (bind [coerce x] e)) s
 -- Note in the below two cases that we can't just discard s since
 -- that would result in a lazy semantics.  With an eager/strict
 -- semantics, we have to make sure s gets evaluated even if its
 -- value is then discarded.
-compileMatch (DPWild _) s _ e = return $ CApp (CAbs (bind [string2Name "_"] e)) s
-compileMatch DPUnit s _ e = return $ CApp (CAbs (bind [string2Name "_"] e)) s
+compileMatch (DPWild _) s _ e = return $ CApp (CAbs False (bind [string2Name "_"] e)) s
+compileMatch DPUnit s _ e = return $ CApp (CAbs False (bind [string2Name "_"] e)) s
 compileMatch (DPPair _ x1 x2) s _ e = do
   y <- fresh (string2Name "y")
 
   -- {? e when s is (x1,x2) ?}   ==>   (\y. (\x1.\x2. e) (fst y) (snd y)) s
   return $
     CApp
-      ( CAbs
+      ( CAbs False
           ( bind
               [y]
               ( CApp
                   ( CApp
-                      (CAbs (bind [coerce x1, coerce x2] e))
+                      (CAbs False (bind [coerce x1, coerce x2] e))
                       (CProj L (CVar (localName y)))
                   )
                   (CProj R (CVar (localName y)))

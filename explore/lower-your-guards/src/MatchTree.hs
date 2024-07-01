@@ -72,14 +72,16 @@ treeMinus t1 t2 = case (t1, t2) of
   (Either _ _, Pair _ _) -> error "type error5"
   (Pair _ _, Either _ _) -> error "type error6"
   (Pair a b, Pair c d) ->
-    map mkPairL (a \\ c) ++ map mkPairR (b \\ d) ++ both
+    map mkPairL aMinusC ++ map mkPairR bMinusD ++ both
     where
       mkPairL aSubC = Pair aSubC d
       mkPairR bSubD = Pair c bSubD
-      both = [Pair aSubC bSubD | aSubC <- a \\ c, bSubD <- b \\ d]
+      both = [Pair aSubC bSubD | aSubC <- aMinusC, bSubD <- bMinusD]
       c' = treeIntersect a c
       d' = treeIntersect b d
-      -- aSubC = a \\ c'
+      aMinusC = concatMap (a \\) c'
+      bMinusD = concatMap (b \\) d'
+      -- [Pair d' aSubC, Pair c' bSubD, Pair aSubC bSubD]
   (Either a b, Either c d) ->
     [Either left right]
     where

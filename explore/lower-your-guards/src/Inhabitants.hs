@@ -37,15 +37,15 @@ data Constraint where
 --   Neg :: Ty.DataConstructor -> Neg
 --   NegInt :: Int -> Neg
 
-accessableRedundant :: A.Ant -> F.Fresh ([Int], [Int])
-accessableRedundant ant = case ant of
+accessableRedundant :: A.Ant -> U.Context -> F.Fresh ([Int], [Int])
+accessableRedundant ant args = case ant of
   A.Grhs ref i -> do
     s <- get
     return $
-      if null $ genInhab s ref
+      if null $ genInhab s ref args
         then ([], [i])
         else ([i], [])
-  A.Branch a1 a2 -> mappend <$> accessableRedundant a1 <*> accessableRedundant a2
+  A.Branch a1 a2 -> mappend <$> accessableRedundant a1 args <*> accessableRedundant a2 args
 
 -- Resolves term equalities, finding the leftmost id for a variable
 -- I believe I3 of section 3.4 allows us to
@@ -74,12 +74,16 @@ data InhabPat where
   IPNotIntLits :: [Int] -> InhabPat
   deriving (Show, Eq, Ord)
 
-genInhab :: NE.NonEmpty F.Frame -> U.RefinementType -> [InhabPat]
-genInhab frames (context, formula) = do
-  let mNrefs = S.toList <$> normalize (context, []) formula
+genInhab :: NE.NonEmpty F.Frame -> U.RefinementType -> U.Context -> [InhabPat]
+genInhab frames (ctx, formula) args = do
+  let mNrefs = S.toList <$> normalize (ctx, []) formula
   let (nrefs, frames') = runState mNrefs frames
+  genInhabNorm frames' nrefs args
+
+genInhabNorm :: NE.NonEmpty F.Frame -> [NormRefType] -> U.Context -> [InhabPat]
+genInhabNorm frames nrefs args = do
   nref <- nrefs
-  join $ expandVars frames' nref context
+  join $ expandVars frames nref args
 
 expandVars :: NE.NonEmpty F.Frame -> NormRefType -> U.Context -> [[InhabPat]]
 expandVars frame nset vars = do

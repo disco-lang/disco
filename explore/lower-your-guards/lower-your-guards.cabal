@@ -44,4 +44,5 @@ executable lower-your-guards
                        Fresh,
                        Play,
                        Annotated,
-                       MatchTree
+                       MatchTree,
+                       UA

@@ -11,8 +11,7 @@ foo , Left  3     n = True
 foo , Left  3     n = True
 
 /*
-Big slowdown
-Is this inherent, and
-will just be sped up by UA?
-hopefully
+UA makes this near instant!
+Before combining UA,
+this took about ~10 seconds to run
 */

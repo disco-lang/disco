@@ -72,15 +72,53 @@ treeMinus t1 t2 = case (t1, t2) of
   (Either _ _, Pair _ _) -> error "type error5"
   (Pair _ _, Either _ _) -> error "type error6"
   (Pair a b, Pair c d) ->
-    map mkPairL (a \\ c) ++ map mkPairR (b \\ d)
+    map mkPairL (a \\ c) ++ map mkPairR (b \\ d) ++ both
     where
-      mkPairL aSubC = Pair aSubC b
-      mkPairR bSubD = Pair a bSubD
+      mkPairL aSubC = Pair aSubC d
+      mkPairR bSubD = Pair c bSubD
+      both = [Pair aSubC bSubD | aSubC <- a \\ c, bSubD <- b \\ d]
+      c' = treeIntersect a c
+      d' = treeIntersect b d
+      -- aSubC = a \\ c'
   (Either a b, Either c d) ->
     [Either left right]
     where
+      -- l = foldr a (flip map (\\)) c
       left = concat [x \\ y | x <- a, y <- c]
       right = concat [x \\ y | x <- b, y <- d]
+
+treeIntersect :: MatchTree -> MatchTree -> [MatchTree]
+treeIntersect m1 m2 = case (m1, m2) of
+  (Status (Is Nothing), _) -> []
+  (_, Status (Is Nothing)) -> []
+  (a, Status (Not [])) -> [a]
+  (Status (Not []), a) -> [a]
+  (Status s1, Status s2) -> case statIntersect s1 s2 of
+    Is Nothing -> []
+    s -> [Status s]
+  (Status _, Pair _ _) -> error "type error"
+  (Pair _ _, Status _) -> error "type error2"
+  (Status _, Either _ _) -> error "type error3"
+  (Either _ _, Status _) -> error "type error4"
+  (Either _ _, Pair _ _) -> error "type error5"
+  (Pair _ _, Either _ _) -> error "type error6"
+  (Pair a b, Pair c d) -> error "pairs"
+    -- map mkPairL (a \\ c) ++ map mkPairR (b \\ d) ++ both
+    -- where
+    --   mkPairL aSubC = Pair aSubC d
+    --   mkPairR bSubD = Pair c bSubD
+    --   both = [Pair aSubC bSubD | aSubC <- a \\ c, bSubD <- b \\ d]
+      -- c' = statIntersect a c
+      -- d' = statIntersect b d
+  (Either a b, Either c d) -> error "eithers"
+    -- [Either left right]
+    -- where
+    --   -- l = foldr a (flip map (\\)) c
+    --   left = concat [x \\ y | x <- a, y <- c]
+    --   right = concat [x \\ y | x <- b, y <- d]
+  
+
+-- (a-c)*(b-d) + c*(b-d) + (a-c)*d
 
 -- (a X b) \ (c X d) = (a X (b\d)) U ((a\c) X b)
 -- I eventually stumbled onto the correct solution,
@@ -106,6 +144,15 @@ statMinus s1 s2 = case (s1, s2) of
   (Not [], Is (Just x)) -> Not [x]
   (Not xs, Is (Just x)) -> Not (x : xs)
   (Is (Just x), Is (Just x')) -> if x == x' then Is Nothing else Is (Just x)
+
+statIntersect :: Status -> Status -> Status
+statIntersect s1 s2 = case (s1, s2) of
+  (Is Nothing, _) -> Is Nothing
+  (_, Is Nothing) -> Is Nothing
+  (Not a, Not b) -> Not (a ++ b)
+  (Is (Just k), Not b) -> if k `elem` b then Is Nothing else Is (Just k)
+  (Not b, Is (Just k)) -> if k `elem` b then Is Nothing else Is (Just k)
+  (Is (Just k1), Is (Just k2)) -> if k1 == k2 then Is (Just k1) else Is Nothing
 
 -- (IsInt i1, IsInt i2) -> if i1 == i2 then Empty else IsInt i1
 

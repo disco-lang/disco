@@ -174,14 +174,16 @@ step cesk = case cesk of
   (In CUnit _ k) -> return $ Out VUnit k
   (In (CPair c1 c2) e k) -> return $ In c1 e (FPairR e c2 : k)
   (In (CProj s c) e k) -> return $ In c e (FProj s : k)
+
   (In (CAbs True b) e k) -> do
     (xs, body) <- unbind b
     -- Init memo map and memory loc
     cell <- allocateV
-    return $ Out (VClo (Just cell) e xs body) k
+    return $ Out (VClo VUnit (Just cell) e xs body) k
   (In (CAbs False b) e k) -> do
     (xs, body) <- unbind b
-    return $ Out (VClo Nothing e xs body) k
+    return $ Out (VClo VUnit Nothing e xs body) k
+
   (In (CApp c1 c2) e k) -> return $ In c1 e (FArg e c2 : k)
   (In (CType ty) _ k) -> return $ Out (VType ty) k
   (In (CDelay b) e k) -> do
@@ -202,13 +204,20 @@ step cesk = case cesk of
   (Out (VPair v1 v2) (FProj s : k)) -> return $ Out (selectSide s v1 v2) k
   (Out v (FArg e c2 : k)) -> return $ In c2 e (FApp v : k)
 
-  (Out v2 (FApp (VClo mi e [x] b) : k)) -> case mi of 
-   Just n -> undefined 
+  (Out v2 (FApp (VClo mem mi e [x] b) : k)) -> case mi of
+   Just n -> do
+      mv <- memoLookup n (toSimpleValue (VPair v2 mem))
+      case mv of 
+         Nothing -> return $ In b (Ctx.insert (localName x) v2 e) k 
+         Just v -> return $ Out v k
+      -- Created a frame for memo, but not sure how to effectively use it
+   -- Just n -> return $ In b (Ctx.insert (localName x) v2 e) (FMemo n (toSimpleValue (VPair v2 mem)) : k) 
    Nothing -> return $ In b (Ctx.insert (localName x) v2 e) k
-
-  (Out v2 (FApp (VClo mi e (x : xs) b) : k)) -> case mi of 
-   Just n -> return $ Out (VClo mi (Ctx.insert (localName x) v2 e) xs b) (FMemo n _ : k)
-   Nothing -> return $ Out (VClo mi (Ctx.insert (localName x) v2 e) xs b) k
+  (Out v2 (FApp (VClo mem mi e (x : xs) b) : k)) -> case mi of 
+   Just _ -> 
+      -- Where should the value be coming from? Converting `x` into value? Or v2? v2 seems very wrong but not sure
+      return $ Out (VClo (VPair v2 mem) mi (Ctx.insert (localName x) v2 e) xs b) k
+   Nothing -> return $ Out (VClo mem mi (Ctx.insert (localName x) v2 e) xs b) k
 
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
   (Out v2 (FApp (VFun f) : k)) -> return $ Out (f v2) k
@@ -216,8 +225,8 @@ step cesk = case cesk of
   -- The usual evaluation order (function then argument) doesn't work when
   -- we're applying a test function to randomly generated values.
 
-  (Out (VClo _ e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
-  (Out (VClo mi e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo mi (Ctx.insert (localName x) v e) xs b) k
+  (Out (VClo _ _ e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
+  (Out (VClo mem mi e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo mem mi (Ctx.insert (localName x) v e) xs b) k
 
   (Out (VConst op) (FArgV v : k)) -> appConst k op v
   (Out (VFun f) (FArgV v : k)) -> return $ Out (f v) k

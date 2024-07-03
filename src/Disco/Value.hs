@@ -71,6 +71,7 @@ module Disco.Value (
   allocateV,
   allocateRec,
   lkup,
+  memoLookup,
   set,
 
   -- * Pretty-printing
@@ -131,7 +132,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: Maybe Int -> Env -> [Name Core] -> Core -> Value
+  VClo :: Value -> Maybe Int -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -473,6 +474,13 @@ allocateRec e bs = do
 -- | Look up the cell at a given index.
 lkup :: Members '[State Mem] r => Int -> Sem r (Maybe Cell)
 lkup n = gets (IM.lookup n . mu)
+
+memoLookup :: Members '[State Mem] r => Int -> SimpleValue -> Sem r (Maybe Value)
+memoLookup n sv = gets (M.lookup sv . test . IM.lookup n . mu)
+   where 
+      test (Just (Disco.Value.V (VMap vmap))) = vmap 
+      test (Just _) = M.empty 
+      test Nothing = M.empty 
 
 -- | Set the cell at a given index.
 set :: Members '[State Mem] r => Int -> Cell -> Sem r ()

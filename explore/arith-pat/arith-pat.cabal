@@ -1,0 +1,43 @@
+cabal-version:      3.0
+name:               arith-pat
+version:            0.1.0.0
+synopsis:           Tools for testing completeness of arithmetic patterns
+-- description:
+license:            BSD-3-Clause
+license-file:       LICENSE
+author:             Katherine Reid
+maintainer:         reidst@hendrix.edu
+-- copyright:
+category:           Math
+build-type:         Simple
+-- extra-doc-files:
+-- extra-source-files:
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+    exposed-modules:
+        ArithmeticPattern,
+        SemilinearSet
+    -- other-modules:
+    -- other-extensions:
+    build-depends:    base ^>=4.17.2.1
+    hs-source-dirs:   lib
+    default-language: Haskell2010
+
+test-suite arit-pat-test
+    import:           warnings
+    default-language: Haskell2010
+    other-modules:
+        TestArithmeticPattern,
+        TestSemilinearSet,
+    -- other-extensions:
+    type:             exitcode-stdio-1.0
+    hs-source-dirs:   test
+    main-is:          Main.hs
+    build-depends:
+        base ^>=4.17.2.1,
+        arith-pat,
+        QuickCheck

@@ -4,7 +4,7 @@ module SemilinearSet where
 
 data LS = LS Int Int deriving (Show, Eq)  -- (initial, period)
 
-newtype SS = SS [LS] deriving (Show, Eq)     -- union
+newtype SS = SS [LS] deriving (Show, Eq)  -- union
 
 -- List Representation ---------------------------------------------------------
 
@@ -121,7 +121,7 @@ intersectSS (SS as) (SS bs) = case intersectLS <$> as <*> bs of
 
 -- | Unions two semilinear sets; a trivial operation due to their structure.
 unionSS :: SS -> SS -> SS
-unionSS (SS a) (SS b) = SS $ a ++ b
+unionSS (SS a) (SS b) = SS (a ++ b)
 
 -- | Returns the set complement of the given linear set, which is semilinear.
 complementLS :: LS -> SS
@@ -136,11 +136,6 @@ complementSS :: SS -> SS
 complementSS (SS lss) = case map complementLS lss of
   [] -> SS [LS 0 1, LS (-1) (-1)]
   (x:xs) -> foldr intersectSS x xs
-
--- | Returns the set difference of two linear sets; i.e. the intersection of A
--- with the complement of B.
-subtractSS :: SS -> SS -> SS
-subtractSS ssa ssb = intersectSS ssa (complementSS ssb)
 
 -- Math Helpers ----------------------------------------------------------------
 

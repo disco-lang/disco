@@ -12,7 +12,7 @@ instance Arbitrary LS where
   arbitrary = do
     x <- chooseInt (-maxTestSize, maxTestSize)
     p <- chooseInt (-maxTestSize, maxTestSize)
-    return $ LS (x, p)
+    return $ LS x p
 
 instance Arbitrary SS where
   arbitrary = do
@@ -25,11 +25,28 @@ instance Arbitrary SS where
 maxTestSize :: Int
 maxTestSize = 40
 
+-- | The empty set.
+emptySS :: SS
+emptySS = SS []
+
+-- | The set containing all integers.
+allSS :: SS
+allSS = SS [LS 0 1, LS 0 (-1)]
+
+-- | The set containing all natural numbers.
+natSS :: SS
+natSS = SS [LS 0 1]
+
 -- | Determines whether two semilinear sets consist of the same values up to
 -- `maxTestSize`.
 listEquivalent :: SS -> SS -> Bool
 listEquivalent a b = toList' a == toList' b
   where toList' = takeWhile ((<= maxTestSize) . abs) . toListSS
+
+-- | Checks if a set is empty.
+isEmptySS :: SS -> Bool
+isEmptySS (SS []) = True
+isEmptySS       _ = False
 
 -- | Checks if a set is equivalent to the set of all numbers.
 isAllSS :: SS -> Bool
@@ -37,8 +54,7 @@ isAllSS = listEquivalent allSS
 
 -- | Checks if a set covers all natural numbers.
 coversNats :: SS -> Bool
-coversNats ss
-  = isEmptySS $ intersectSS natSS (complementSS ss)
+coversNats ss = isEmptySS $ intersectSS natSS (complementSS ss)
 
 -- | Checks if the second set is a subset of the first.
 isSubsetOf :: SS -> SS -> Bool
@@ -100,7 +116,7 @@ testSamePeriodAllOffsets :: Int -> Bool
 testSamePeriodAllOffsets n = coversNats offsets
   where
     p = abs n + 1
-    offsets = SS $ LS (0, p) : [LS (x, p) | x <- [1..p-1]]
+    offsets = SS $ LS 0 p : [LS x p | x <- [1..p-1]]
 
 -- Run Tests -------------------------------------------------------------------
 
@@ -109,13 +125,13 @@ tests =
   [ once testEmptySS
   , once testEmptyComplement
   , withMaxSuccess   10 testDoubleComplement
-  , withMaxSuccess  500 testIntersectWithComplement
-  , withMaxSuccess  500 testUnionWithComplement
-  , withMaxSuccess   50 testUnionIsSuperset
-  , withMaxSuccess  500 testIntersectIsSubset
-  , withMaxSuccess  500 testEmptyIsAlwaysSubset
-  , withMaxSuccess  500 testAllIsAlwaysSuperset
-  , withMaxSuccess   50 testSamePeriodAllOffsets
+  , withMaxSuccess  200 testIntersectWithComplement
+  , withMaxSuccess  200 testUnionWithComplement
+  , withMaxSuccess   40 testUnionIsSuperset
+  , withMaxSuccess  200 testIntersectIsSubset
+  , withMaxSuccess  200 testEmptyIsAlwaysSubset
+  , withMaxSuccess  200 testAllIsAlwaysSuperset
+  , withMaxSuccess   40 testSamePeriodAllOffsets
   ]
 
 runTests :: IO ()

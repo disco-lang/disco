@@ -1,5 +1,6 @@
 module ArithmeticPattern where
 
+import Prelude hiding (elem, null, subtract)
 import SemilinearSet
 
 type Pattern = SS
@@ -18,46 +19,59 @@ mkIntPattern x p = SS [LS x p, LS x (-p)]
 mkConstPattern :: Int -> Pattern
 mkConstPattern x = SS [LS x 0]
 
-emptyPattern :: Pattern
-emptyPattern = SS []
+-- | The pattern covering nothing.
+empty :: Pattern
+empty = SS []
 
-allNatsPattern :: Pattern
-allNatsPattern = mkNatPattern 0 1
+-- | The pattern covering all natural numbers; i.e. the nonnegative integers.
+nats :: Pattern
+nats = mkNatPattern 0 1
 
-allIntsPattern :: Pattern
-allIntsPattern = mkIntPattern 0 1
+-- | The pattern covering all integers.
+ints :: Pattern
+ints = mkIntPattern 0 1
 
--- Coverage Checking -----------------------------------------------------------
+-- Pattern Operations ----------------------------------------------------------
+
+-- | Lists all numbers covered by this pattern, in ascending order by absolute
+-- value.
+toList :: Pattern -> [Int]
+toList = toListSS
+
+-- | Checks if a pattern covers nothing.
+null :: Pattern -> Bool
+null (SS []) = True
+null       _ = False
 
 -- | Checks if a number is covered by a pattern.
-elemPattern :: Int -> Pattern -> Bool
-elemPattern e (SS lss) = any (notNullSS . intersectWithSingle e) lss
-  where notNullSS (SS x) = not . null $ x
+elem :: Int -> Pattern -> Bool
+elem e (SS lss) = any (not . null . intersectWithSingle e) lss
 
--- | Subtracts 
-subtractPattern :: Pattern -> Pattern -> Pattern
-subtractPattern a b = intersectSS a (complementSS b)
+-- | Determines equality of patterns by checking if they are both a subset of
+-- the other.
+equal :: Pattern -> Pattern -> Bool
+equal a b = subset a b && subset b a
 
--- | Generates a (potentially infinite) list of natural numbers not covered by
--- any of the given patterns. If the list is empty, then the pattern coverage is
--- complete.
-missingNats :: [Pattern] -> [Int]
-missingNats pats = toListSS $ intersectSS allNatsPattern $ complementSS unionSet
-  where unionSet = foldr unionSS (SS []) pats
+-- | Unions two patterns.
+union :: Pattern -> Pattern -> Pattern
+union = unionSS
 
--- | Generates a (potentially infinite) list of integers not covered by any of
--- the given patterns. If the list is empty, then the pattern coverage is
--- complete.
-missingInts :: [Pattern] -> [Int]
-missingInts pats = toListSS $ complementSS unionSet
-  where unionSet = foldr unionSS emptyPattern pats
+-- | Intersects two patterns.
+intersect :: Pattern -> Pattern -> Pattern
+intersect = intersectSS
 
--- | Checks whether a set of patterns covers the natural numbers. Shorthand for
--- `null . missingNats`.
-coversNats :: [Pattern] -> Bool
-coversNats = null . missingNats
+-- | Complements a pattern, inverting its coverage.
+complement :: Pattern -> Pattern
+complement = complementSS
 
--- | Checks whether a set of patterns covers the integers. Shorthand for
--- `null . missingInts`.
-coversInts :: [Pattern] -> Bool
-coversInts = null . missingInts
+-- | Checks if the first pattern is entirely covered by the second.
+subset :: Pattern -> Pattern -> Bool
+subset a b = null $ subtract a b
+
+-- | Checks if the first pattern entirely covers the second.
+superset :: Pattern -> Pattern -> Bool
+superset = flip subset
+
+-- | Subtracts the second pattern from the first.
+subtract :: Pattern -> Pattern -> Pattern
+subtract a b = intersect a $ complement b

@@ -205,18 +205,18 @@ step cesk = case cesk of
 
   (Out v (FMemo n sv : k)) -> memoSet n sv v *> (return $ Out v k)
 
-  (Out v2 (FApp (VClo mem mi e [x] b) : k)) -> case mi of
-   Nothing -> return $ In b (Ctx.insert (localName x) v2 e) k
+  (Out v (FApp (VClo mem mi e [x] b) : k)) -> case mi of
+   Nothing -> return $ In b (Ctx.insert (localName x) v e) k
    Just n -> do
-      let sv = toSimpleValue $ foldr VPair VUnit (v2 : mem)
+      let sv = toSimpleValue $ foldr VPair VUnit (v : mem)
       mv <- memoLookup n sv
       case mv of
-         Nothing -> return $ In b (Ctx.insert (localName x) v2 e) (FMemo n sv : k)
-         Just v -> return $ Out v k
+         Nothing -> return $ In b (Ctx.insert (localName x) v e) (FMemo n sv : k)
+         Just v' -> return $ Out v' k
 
-  (Out v2 (FApp (VClo mem mi e (x : xs) b) : k)) -> case mi of
-   Just _ -> return $ Out (VClo (v2 : mem) mi (Ctx.insert (localName x) v2 e) xs b) k
-   Nothing -> return $ Out (VClo mem mi (Ctx.insert (localName x) v2 e) xs b) k
+  (Out v (FApp (VClo mem mi e (x : xs) b) : k)) -> case mi of
+   Just _ -> return $ Out (VClo (v : mem) mi (Ctx.insert (localName x) v e) xs b) k
+   Nothing -> return $ Out (VClo mem mi (Ctx.insert (localName x) v e) xs b) k
 
 
 

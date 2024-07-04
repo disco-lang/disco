@@ -170,11 +170,9 @@ compileDTerm term@(DTAbs q _ _) = do
   cbody <- compileDTerm body
   case q of
 
-    Lam -> return $ abstractMemo xs cbody
-   --  Lam -> case _ of 
-   --    _ -> return $ abstract xs cbody
-   --    _ -> return $ abstractMemo xs cbody
-
+    Lam -> case canMemo tys of 
+      False -> return $ abstract xs cbody
+      True -> return $ abstractMemo xs cbody
     Ex -> return $ quantify (OExists tys) (abstract xs cbody)
     All -> return $ quantify (OForall tys) (abstract xs cbody)
  where
@@ -194,6 +192,17 @@ compileDTerm term@(DTAbs q _ _) = do
 
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
+
+  canMemo :: [Type] -> Bool
+  canMemo [] = True
+  canMemo (x : xs) = case x of 
+   TyCon (CUser _) _ -> False
+   TyCon CGraph _ -> False
+   TyCon CMap _ -> False
+   -- TyCon CArr _ -> False 
+   TyCon _ _ -> canMemo xs 
+   TyAtom (ABase Gen) -> False
+   TyAtom _ -> canMemo xs
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.

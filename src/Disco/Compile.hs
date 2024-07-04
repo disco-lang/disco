@@ -170,7 +170,7 @@ compileDTerm term@(DTAbs q _ _) = do
   cbody <- compileDTerm body
   case q of
 
-    Lam -> return $ abstract xs cbody
+    Lam -> return $ abstractMemo xs cbody
    --  Lam -> case _ of 
    --    _ -> return $ abstract xs cbody
    --    _ -> return $ abstractMemo xs cbody

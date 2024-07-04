@@ -19,6 +19,12 @@ import list
 -- and `decrypt` functions can be used to encrypt and decrypt 
 -- lists of natural numbers.
 
+fib : N -> N 
+fib 0 = 0
+fib 1 = 1
+fib x = fib (x .- 1) + fib (x .- 2)
+
+
 
 encrypt : N * N -> List(N) -> List(N)
 encrypt key xs = each (encrypt1 key, xs)

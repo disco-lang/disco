@@ -73,6 +73,7 @@ module Disco.Value (
   lkup,
   memoLookup,
   set,
+  memoSet,
 
   -- * Pretty-printing
   prettyValue',
@@ -132,7 +133,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: Value -> Maybe Int -> Env -> [Name Core] -> Core -> Value
+  VClo :: [Value] -> Maybe Int -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -481,6 +482,14 @@ memoLookup n sv = gets (M.lookup sv . test . IM.lookup n . mu)
       test (Just (Disco.Value.V (VMap vmap))) = vmap 
       test (Just _) = M.empty 
       test Nothing = M.empty 
+
+memoSet :: Members '[State Mem] r => Int -> SimpleValue -> Value -> Sem r () 
+memoSet n sv v = do 
+   mc <- lkup n 
+   case mc of 
+      Nothing -> undefined 
+      Just (Disco.Value.V (VMap vmap)) -> set n (Disco.Value.V (VMap (M.insert sv v vmap))) 
+      Just _ -> undefined 
 
 -- | Set the cell at a given index.
 set :: Members '[State Mem] r => Int -> Cell -> Sem r ()

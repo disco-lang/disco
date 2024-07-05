@@ -68,7 +68,7 @@ module Disco.Value (
   Mem,
   emptyMem,
   allocate,
-  allocateV,
+  allocateValue,
   allocateRec,
   lkup,
   memoLookup,
@@ -454,10 +454,10 @@ allocate e t = do
   put $ Mem (n + 1) (IM.insert n (E e t) m)
   return n
 
-allocateV :: Members '[State Mem] r => Sem r Int
-allocateV = do 
+allocateValue :: Members '[State Mem] r => Value -> Sem r Int
+allocateValue v = do 
    Mem n m <- get 
-   put $ Mem (n + 1) (IM.insert n (Disco.Value.V (VMap M.empty)) m)
+   put $ Mem (n + 1) (IM.insert n (Disco.Value.V v) m)
    return n
 
 -- | Allocate new memory cells for a group of mutually recursive

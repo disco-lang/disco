@@ -169,10 +169,9 @@ compileDTerm term@(DTAbs q _ _) = do
   (xs, tys, body) <- unbindDeep term
   cbody <- compileDTerm body
   case q of
-
-    Lam -> case canMemo tys of 
-      False -> return $ abstract xs cbody
-      True -> return $ abstractMemo xs cbody
+    Lam -> if canMemo tys
+      then return $ abstractMemo xs cbody
+      else return $ abstract xs cbody
     Ex -> return $ quantify (OExists tys) (abstract xs cbody)
     All -> return $ quantify (OForall tys) (abstract xs cbody)
  where
@@ -193,16 +192,39 @@ compileDTerm term@(DTAbs q _ _) = do
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
 
+  -- Intend on changing this, but functional for now
   canMemo :: [Type] -> Bool
   canMemo [] = True
-  canMemo (x : xs) = case x of 
-   TyCon (CUser _) _ -> False
-   TyCon CGraph _ -> False
-   TyCon CMap _ -> False
-   -- TyCon CArr _ -> False 
-   TyCon _ _ -> canMemo xs 
-   TyAtom (ABase Gen) -> False
-   TyAtom _ -> canMemo xs
+  canMemo (x : xs) = case x of
+   TyAtom a -> checkAtom a && canMemo xs
+   TyCon CArr tys -> arrMemo tys && canMemo tys && canMemo xs
+   TyCon c tys -> checkCon c && canMemo tys && canMemo xs
+         
+  arrMemo :: [Type] -> Bool 
+  arrMemo [] = True 
+  arrMemo (x : xs) = case x of 
+   TyCon CArr _ -> False 
+   TyCon _ _ -> arrMemo xs
+   TyAtom _ -> arrMemo xs 
+
+  checkCon :: Con -> Bool 
+  checkCon (CUser _) = False 
+  checkCon CGraph = False 
+  checkCon CMap = False 
+  checkCon (CContainer a) = checkAtom a
+  checkCon _ = True
+
+  checkAtom :: Atom -> Bool 
+  checkAtom (AVar _) = False 
+  checkAtom (ABase b) = checkBase b 
+  
+  checkBase :: BaseTy -> Bool 
+  checkBase CtrList = False
+  checkBase CtrBag = False
+  checkBase CtrSet = False
+  checkBase Gen = False
+  checkBase _ = True
+
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.

@@ -24,7 +24,11 @@ fib 0 = 0
 fib 1 = 1
 fib x = fib (x .- 1) + fib (x .- 2)
 
+foo : (N -> Bool) -> N -> Bool 
+foo f n = f n 
 
+tru : N -> Bool 
+tru _ = True
 
 encrypt : N * N -> List(N) -> List(N)
 encrypt key xs = each (encrypt1 key, xs)

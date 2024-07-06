@@ -316,11 +316,11 @@ pattern SMExists :: SearchMotive
 pattern SMExists = SearchMotive (True, True)
 
 -- | A collection of variables that might need to be reported for
---   a toMap, along with their types and user-legible names.
+--   a test, along with their types and user-legible names.
 newtype TestVars = TestVars [(String, Type, Name Core)]
   deriving newtype (Show, Semigroup, Monoid)
 
--- | A variable assignment found during a toMap.
+-- | A variable assignment found during a test.
 newtype TestEnv = TestEnv [(String, Type, Value)]
   deriving newtype (Show, Semigroup, Monoid)
 
@@ -345,16 +345,16 @@ interpLOp LImpl = (==>)
   True ==> False = False
   _ ==> _ = True
 
--- | The possible outcomes of a property toMap, parametrized over
+-- | The possible outcomes of a property test, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
 data TestReason_ a
   = -- | The prop evaluated to a boolean.
     TestBool
-  | -- | The toMap was an equality toMap. Records the values being
+  | -- | The test was an equality test. Records the values being
     --   compared and also their type (which is needed for printing).
     TestEqual Type a a
-  | -- | The toMap was a less than toMap. Records the values being
+  | -- | The test was a less than test. Records the values being
     --   compared and also their type (which is needed for printing).
     TestLt Type a a
   | -- | The search didn't find any examples/counterexamples.
@@ -374,16 +374,16 @@ type TestReason = TestReason_ Value
 data TestResult = TestResult Bool TestReason TestEnv
   deriving (Show)
 
--- | Whether the property toMap resulted in a runtime error.
+-- | Whether the property test resulted in a runtime error.
 testIsError :: TestResult -> Bool
 testIsError (TestResult _ (TestRuntimeError _) _) = True
 testIsError _ = False
 
--- | Whether the property toMap resulted in success.
+-- | Whether the property test resulted in success.
 testIsOk :: TestResult -> Bool
 testIsOk (TestResult b _ _) = b
 
--- | The reason the property toMap had this result.
+-- | The reason the property test had this result.
 testReason :: TestResult -> TestReason
 testReason (TestResult _ r _) = r
 

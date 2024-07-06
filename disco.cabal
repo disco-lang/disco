@@ -486,6 +486,7 @@ library
                        polysemy-plugin >= 0.4 && < 0.5,
                        reflection >= 2.1.7 && < 2.2,
                        random >= 1.2.1.1 && < 1.3,
+                       list-tries,
                        constraints >= 0.13.4 && < 0.15,
                        text >= 2.0.2 && < 2.2,
                        lens >= 4.14 && < 5.4,

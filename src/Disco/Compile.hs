@@ -199,26 +199,25 @@ compileDTerm term@(DTAbs q _ _) = do
    TyAtom a -> checkAtom a && canMemo xs
    TyCon CArr tys -> arrMemo tys && canMemo tys && canMemo xs
    TyCon c tys -> checkCon c && canMemo tys && canMemo xs
-         
-  arrMemo :: [Type] -> Bool 
-  arrMemo [] = True 
-  arrMemo (x : xs) = case x of 
-   TyCon CArr _ -> False 
-   TyCon _ _ -> arrMemo xs
-   TyAtom _ -> arrMemo xs 
 
-  checkCon :: Con -> Bool 
-  checkCon (CUser _) = False 
-  checkCon CGraph = False 
-  checkCon CMap = False 
+  arrMemo :: [Type] -> Bool
+  arrMemo [] = True
+  arrMemo (x : xs) = case x of
+   TyCon CArr _ -> False
+   _ -> arrMemo xs
+
+  checkCon :: Con -> Bool
+  checkCon (CUser _) = False
+  checkCon CGraph = False
+  checkCon CMap = False
   checkCon (CContainer a) = checkAtom a
   checkCon _ = True
 
-  checkAtom :: Atom -> Bool 
-  checkAtom (AVar _) = False 
-  checkAtom (ABase b) = checkBase b 
-  
-  checkBase :: BaseTy -> Bool 
+  checkAtom :: Atom -> Bool
+  checkAtom (AVar _) = False
+  checkAtom (ABase b) = checkBase b
+
+  checkBase :: BaseTy -> Bool
   checkBase CtrList = False
   checkBase CtrBag = False
   checkBase CtrSet = False

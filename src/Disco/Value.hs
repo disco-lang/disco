@@ -316,11 +316,11 @@ pattern SMExists :: SearchMotive
 pattern SMExists = SearchMotive (True, True)
 
 -- | A collection of variables that might need to be reported for
---   a search, along with their types and user-legible names.
+--   a toMap, along with their types and user-legible names.
 newtype TestVars = TestVars [(String, Type, Name Core)]
   deriving newtype (Show, Semigroup, Monoid)
 
--- | A variable assignment found during a search.
+-- | A variable assignment found during a toMap.
 newtype TestEnv = TestEnv [(String, Type, Value)]
   deriving newtype (Show, Semigroup, Monoid)
 
@@ -345,16 +345,16 @@ interpLOp LImpl = (==>)
   True ==> False = False
   _ ==> _ = True
 
--- | The possible outcomes of a property search, parametrized over
+-- | The possible outcomes of a property toMap, parametrized over
 --   the type of values. A @TestReason@ explains why a proposition
 --   succeeded or failed.
 data TestReason_ a
   = -- | The prop evaluated to a boolean.
     TestBool
-  | -- | The search was an equality search. Records the values being
+  | -- | The toMap was an equality toMap. Records the values being
     --   compared and also their type (which is needed for printing).
     TestEqual Type a a
-  | -- | The search was a less than search. Records the values being
+  | -- | The toMap was a less than toMap. Records the values being
     --   compared and also their type (which is needed for printing).
     TestLt Type a a
   | -- | The search didn't find any examples/counterexamples.
@@ -374,16 +374,16 @@ type TestReason = TestReason_ Value
 data TestResult = TestResult Bool TestReason TestEnv
   deriving (Show)
 
--- | Whether the property search resulted in a runtime error.
+-- | Whether the property toMap resulted in a runtime error.
 testIsError :: TestResult -> Bool
 testIsError (TestResult _ (TestRuntimeError _) _) = True
 testIsError _ = False
 
--- | Whether the property search resulted in success.
+-- | Whether the property toMap resulted in success.
 testIsOk :: TestResult -> Bool
 testIsOk (TestResult b _ _) = b
 
--- | The reason the property search had this result.
+-- | The reason the property toMap had this result.
 testReason :: TestResult -> TestReason
 testReason (TestResult _ r _) = r
 
@@ -485,11 +485,11 @@ set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
 set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
 
 memoLookup :: Members '[State Mem] r => Int -> SimpleValue -> Sem r (Maybe Value)
-memoLookup n sv = gets (search . IM.lookup n . mu)
+memoLookup n sv = gets (mLookup . IM.lookup n . mu)
    where 
-      search (Just (Disco.Value.V (VMap vmap))) = M.lookup sv vmap 
-      search (Just (Disco.Value.V (VTrie vtrie))) = T.lookup [sv] vtrie
-      search _ = Nothing
+      mLookup (Just (Disco.Value.V (VMap vmap))) = M.lookup sv vmap 
+      mLookup (Just (Disco.Value.V (VTrie vtrie))) = T.lookup [sv] vtrie
+      mLookup _ = Nothing
 
 memoSet :: Members '[State Mem] r => Int -> SimpleValue -> Value -> Sem r () 
 memoSet n sv v = do 

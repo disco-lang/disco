@@ -134,7 +134,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: [Value] -> Maybe Int -> Env -> [Name Core] -> Core -> Value
+  VClo :: Maybe (Int,[Value]) -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -168,7 +168,7 @@ data Value where
   --   property when the key type is finite.
   VMap :: Map SimpleValue Value -> Value
 
-  VTrie :: T.TrieMap M.Map SimpleValue Value -> Value
+  VTrie :: T.TrieMap Map SimpleValue Value -> Value
 
   VGen :: StdGen -> Value
   deriving (Show)

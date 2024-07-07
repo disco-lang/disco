@@ -89,7 +89,6 @@ import Data.Char (chr, ord)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
 import Data.List (foldl')
-import qualified Data.ListTrie.Map as T
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
@@ -167,9 +166,6 @@ data Value where
   --   actually construct the set of entries, while functions only have this
   --   property when the key type is finite.
   VMap :: Map SimpleValue Value -> Value
-
-  VTrie :: T.TrieMap Map SimpleValue Value -> Value
-
   VGen :: StdGen -> Value
   deriving (Show)
 
@@ -488,7 +484,6 @@ memoLookup :: Members '[State Mem] r => Int -> SimpleValue -> Sem r (Maybe Value
 memoLookup n sv = gets (mLookup . IM.lookup n . mu)
    where 
       mLookup (Just (Disco.Value.V (VMap vmap))) = M.lookup sv vmap 
-      mLookup (Just (Disco.Value.V (VTrie vtrie))) = T.lookup [sv] vtrie
       mLookup _ = Nothing
 
 memoSet :: Members '[State Mem] r => Int -> SimpleValue -> Value -> Sem r () 
@@ -496,8 +491,7 @@ memoSet n sv v = do
    mc <- lkup n 
    case mc of 
       Just (Disco.Value.V (VMap vmap)) -> set n (Disco.Value.V (VMap (M.insert sv v vmap))) 
-      Just (Disco.Value.V (VTrie trie)) -> set n (Disco.Value.V (VTrie (T.insert [sv] v trie)))
-      _ -> undefined 
+      _ -> return ()
 
 ------------------------------------------------------------
 -- Pretty-printing values

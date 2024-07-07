@@ -31,7 +31,6 @@ import qualified Data.List.Infinite as InfList
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Ratio
-import qualified Data.ListTrie.Map as T
 import Disco.AST.Core
 import Disco.AST.Generic (
   Ellipsis (..),
@@ -180,8 +179,7 @@ step cesk = case cesk of
     (xs, body) <- unbind b
     case mem of
       Memo -> do 
-         cell <- allocateValue (VTrie T.empty)
-         -- cell <- allocateValue (VMap M.empty)
+         cell <- allocateValue (VMap M.empty)
          return $ Out (VClo (Just (cell,[])) e xs body) k
       NoMemo -> return $ Out (VClo Nothing e xs body) k
 

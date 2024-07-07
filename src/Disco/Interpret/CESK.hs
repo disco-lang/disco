@@ -179,11 +179,11 @@ step cesk = case cesk of
   (In (CAbs mem b) e k) -> do
     (xs, body) <- unbind b
     case mem of
-      True -> do 
+      Memo -> do 
          cell <- allocateValue (VTrie T.empty)
          -- cell <- allocateValue (VMap M.empty)
          return $ Out (VClo (Just (cell,[])) e xs body) k
-      False -> return $ Out (VClo Nothing e xs body) k
+      NoMemo -> return $ Out (VClo Nothing e xs body) k
 
   (In (CApp c1 c2) e k) -> return $ In c1 e (FArg e c2 : k)
   (In (CType ty) _ k) -> return $ Out (VType ty) k

@@ -445,6 +445,7 @@ library
                        Disco.Value
                        Disco.Error
                        Disco.Eval
+                       Disco.Exhaustiveness
                        Disco.Interpret.CESK
                        Disco.Subst
                        Disco.Typecheck

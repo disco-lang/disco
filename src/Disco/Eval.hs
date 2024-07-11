@@ -95,6 +95,8 @@ import Disco.Typecheck (checkModule)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Value
+import qualified Data.List.NonEmpty as NonEmpty
+import Disco.Exhaustiveness (checkClauses)
 
 ------------------------------------------------------------
 -- Configuation options
@@ -384,6 +386,9 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   -- Typecheck (and resolve names in) the module.
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
+  -- Check for partial functions
+  runFresh $ mapM_ checkExhaustive $ (Ctx.elems $ m^.miTermdefs)
+
   -- Evaluate all the module definitions and add them to the topEnv.
   mapError EvalErr $ loadDefsFrom m
 
@@ -443,3 +448,8 @@ loadDef ::
 loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
+
+checkExhaustive :: Members '[Fresh, Embed IO] r => Defn -> Sem r ()
+checkExhaustive (Defn name argsType _ boundClauses) = do
+  clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
+  checkClauses clauses

@@ -201,7 +201,7 @@ step cesk = case cesk of
   (Out v2 (FPairL v1 : k)) -> return $ Out (VPair v1 v2) k
   (Out (VPair v1 v2) (FProj s : k)) -> return $ Out (selectSide s v1 v2) k
   (Out v (FArg e c2 : k)) -> return $ In c2 e (FApp v : k)
-  (Out v (FMemo n sv : k)) -> memoSet n sv v Data.Functor.$> Out v k
+  (Out v (FMemo n sv : k)) -> memoSet n sv v *> return (Out v k)
   (Out v (FApp (VClo mi e [x] b) : k)) -> case mi of
     Nothing -> return $ In b (Ctx.insert (localName x) v e) k
     Just (n, mem) -> do

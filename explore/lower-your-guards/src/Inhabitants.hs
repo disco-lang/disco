@@ -78,12 +78,6 @@ newtype Possibilities a = Possibilities {getPossibilities :: [a]}
 retSingle :: (Monad m) => a -> m (Possibilities a)
 retSingle i = return $ Possibilities [i]
 
--- retMulti :: (Monad m) => [a] -> m (Possibilities a)
--- retMulti is = return $ Possibilities is
---
--- unionPossible :: [Possibilities a] -> Possibilities a
--- unionPossible pss = Possibilities $ concatMap (\(Possibilities ps) -> ps) pss
-
 genInhab :: U.RefinementType -> U.Context -> F.Fresh (Possibilities InhabPat)
 genInhab (ctx, formula) args = do
   nrefs <- S.toList <$> normalize (ctx, []) formula
@@ -91,44 +85,8 @@ genInhab (ctx, formula) args = do
 
 genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh (Possibilities InhabPat)
 genInhabNorm nrefs args = do
-  n <- sequence [expandVar nref arg | nref <- nrefs, arg <- args]
+  n <- sequence [findVarInhabitants arg nref | nref <- nrefs, arg <- args]
   return $ anyOf n
-
--- I don't actually know what to call this
--- Abbreviation for "multiple cartesian product"
--- I think of the [a]s as column vectors
--- that are different heights
--- This function finds all possible paths from the
--- left to the right
---
--- When I wasn't properly using the state monad,
--- I think traverse just did this for me,
--- but here I had to think a little
---
--- Or you can kind of think of it in a DFS way
---
--- Retun all elements of the cartesian product of a list of sets
--- multiCart :: [[a]] -> [[a]]
--- multiCart [] = [[]]
--- multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
-
--- cart2 :: (Show a) => [[a]] -> [[a]]
--- cart2 [] = [[]]
--- cart2 total@(as : rests) =
---   if length as > 1
---     then error $ show total
---     else [a : rest | a <- as, rest <- multiCart rests]
-
--- works
--- cart3 :: [[a]] -> [[a]]
--- cart3 = sequence
-
--- cartProdPossiblities :: [Possibilities a] -> Possibilities [a]
--- cartProdPossiblities [] = Possibilities []
--- cartProdPossiblities (Possibilities as : rests) = Possibilities $ do
---     a <- as
---     rest <- getPossible (cartProdPossiblities rests)
---     return (a : rest)
 
 instance Functor Possibilities where
   fmap f (Possibilities a) = Possibilities (f <$> a)
@@ -142,6 +100,12 @@ instance Monoid (Possibilities a) where
 prod :: Possibilities a -> Possibilities [a] -> Possibilities [a]
 prod (Possibilities xs) (Possibilities yss) = Possibilities [x : ys | x <- xs, ys <- yss]
 
+-- I think of the Possibilitie as column vectors
+-- that are different heights
+-- This function finds all possible paths from the
+-- left to the right
+--
+-- Or you can kind of think of it in a DFS way
 allCombinations :: [Possibilities a] -> Possibilities [a]
 allCombinations = foldr prod nil
   where
@@ -152,54 +116,16 @@ allCombinations = foldr prod nil
 anyOf :: [Possibilities a] -> Possibilities a
 anyOf = fold
 
--- cartProdPossiblities (Possibilities as : rests) = Possibilities [a : rest | a <- as, rest <- getPossible (cartProdPossiblities rests)]
-
--- or alternatively:
--- cart5 :: [Possibilities a] -> Possibilities [a]
--- cart5 ps = Possibilities (mapM getPossible ps)
---
--- cart6 :: [[a]] -> [[a]]
--- cart6 = sequence
---
--- cart7 :: [[a]] -> [[a]]
--- cart7 = foldr (liftA2 (:)) []
---
--- cart8 :: [[a]] -> [[a]]
--- cart8 = foldr cart []
---   where cart xs ys = [x : y | x <- xs, y <- ys]
-
-expandVars :: NormRefType -> U.Context -> F.Fresh (Possibilities [InhabPat])
-expandVars nref args = allCombinations <$> mapM (expandVar nref) args
-
--- newtype ArgsList = ArgsList {getArgs :: [Possibilities InhabPat]}
-
--- sequence <$> mapM (expandVar nref) args
--- l <- mapM (expandVar nref) args
--- if length (concat l) > length l then
---   error $ show l
---   else multiCart <$> mapM (expandVar nref) args
-
--- [[match foo, match bar], [wild]]
---
--- match foo |
---           | wild
--- match bar |
---
--- match foo, wild
--- match bar, wild
-
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
--- Maybe we could make this part of the type system somehow?
--- I don't know how
 mkIPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
 mkIPMatch k pats =
   if length (Ty.dcTypes k) /= length pats
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPMatch k pats
 
-expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh (Possibilities InhabPat)
-expandVar nref@(_, cns) var@(x, xType) =
+findVarInhabitants :: (F.VarID, Ty.Type) -> NormRefType -> F.Fresh (Possibilities InhabPat)
+findVarInhabitants var@(x, xType) nref@(_, cns) =
   if xType == Ty.int
     then case posIntMatch of
       Just i -> retSingle $ IPIntLit i
@@ -208,11 +134,12 @@ expandVar nref@(_, cns) var@(x, xType) =
         is -> retSingle $ IPNotIntLits (nub is)
     else case posMatch of
       Just (k, ys) -> do
-        -- get all possible inhabited argument lists
-        argsPossibilities <- expandVars nref (zip ys (Ty.dcTypes k))
-        -- create matching inhabited patterns for each of
-        -- the possible argument lists
-        return (mkIPMatch k <$> argsPossibilities)
+        let args = zip ys (Ty.dcTypes k)
+
+        argPats <- forM args (`findVarInhabitants` nref)
+        let argPossibilities = allCombinations argPats
+
+        return (mkIPMatch k <$> argPossibilities)
       Nothing -> case negMatch of
         [] -> retSingle IPWild
         _ ->
@@ -225,21 +152,11 @@ expandVar nref@(_, cns) var@(x, xType) =
             -- to the current nref
             -- If any of these additions succeed, save that nref,
             -- it now has positive information
-            matchers <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
+            posNrefs <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
 
-            if null matchers
+            if null posNrefs
               then retSingle IPWild
-              -- Go down each possible timeline, and get the
-              -- Inhabited patterns for each
-              -- Then simply concat to get a full list of
-              -- the Inhabited patterns for each timeline
-              -- else concat <$> mapM (`expandVar` var) matchers
-              -- else do
-              --   a <- mapM (`expandVar` var) matchers
-              --   if length a > 1
-              --     then error $ show a
-              --     else return $ inhabUnions a
-              else anyOf <$> mapM (`expandVar` var) matchers
+              else anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

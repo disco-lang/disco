@@ -129,6 +129,7 @@ pType =
   choice
     [ Ty.int <$ lexeme (string "Int"),
       Ty.bool <$ lexeme (string "Bool"),
+      Ty.throol <$ lexeme (string "Throol"),
       do
         _ <- symbol ","
         l <- pType

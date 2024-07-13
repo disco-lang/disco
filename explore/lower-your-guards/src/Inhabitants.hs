@@ -69,6 +69,7 @@ data InhabPat where
   IPWild :: InhabPat
   IPIntLit :: Int -> InhabPat
   IPNotIntLits :: [Int] -> InhabPat
+  -- IPTimelines :: S.Set InhabPat
   deriving (Show, Eq, Ord)
 
 genInhab :: U.RefinementType -> U.Context -> F.Fresh [InhabPat]
@@ -93,20 +94,41 @@ genInhabNorm nrefs args = do
 -- but here I had to think a little
 --
 -- Or you can kind of think of it in a DFS way
+--
+-- Retun all elements of the cartesian product of a list of sets
 multiCart :: [[a]] -> [[a]]
 multiCart [] = [[]]
 multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
 
-cart2 :: Show a => [[a]] -> [[a]]
+cart2 :: (Show a) => [[a]] -> [[a]]
 cart2 [] = [[]]
-cart2 (as : rests) = if length as == 0
-  then error $ show as
-  else [a : rest | a <- as, rest <- multiCart rests]
+cart2 total@(as : rests) =
+  if length as > 1
+    then error $ show total
+    else [a : rest | a <- as, rest <- multiCart rests]
+
+
+-- works
+cart3 :: [[a]] -> [[a]]
+cart3 = sequence
 
 expandVars :: NormRefType -> U.Context -> F.Fresh [[InhabPat]]
 expandVars nref args = do
-  -- Actually, I think this can be simplified...
-  multiCart <$> mapM (expandVar nref) args
+  sequence <$> mapM (expandVar nref) args
+  -- l <- mapM (expandVar nref) args
+  -- if length (concat l) > length l then
+  --   error $ show l
+  --   else multiCart <$> mapM (expandVar nref) args
+
+
+-- [[match foo, match bar], [wild]] 
+--
+-- match foo |
+--           | wild
+-- match bar |
+--
+-- match foo, wild
+-- match bar, wild
 
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
@@ -132,11 +154,7 @@ expandVar nref@(_, cns) var@(x, xType) =
         argss <- expandVars nref (zip ys (Ty.dcTypes k))
         -- create matching inhabited patterns for each of
         -- the possible argument lists
-        if length argss > 1
-          then
-            return $ error $ show $ argss
-          else
-            return [mkIPMatch k args | args <- argss]
+        return [mkIPMatch k args | args <- argss]
       Nothing -> case negMatch of
         [] -> return [IPWild]
         _ ->
@@ -158,6 +176,11 @@ expandVar nref@(_, cns) var@(x, xType) =
               -- Then simply concat to get a full list of
               -- the Inhabited patterns for each timeline
               else concat <$> mapM (`expandVar` var) matchers
+              -- else do
+              --   a <- mapM (`expandVar` var) matchers
+              --   if length a > 1
+              --     then error $ show a
+              --     else return $ concat a
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

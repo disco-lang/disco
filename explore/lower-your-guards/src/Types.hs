@@ -4,7 +4,7 @@ module Types where
 import Data.Text (Text)
 import qualified Data.Text as T
 
-data TypeConstructor = TBool | TPair | TEither | TInt
+data TypeConstructor = TBool | TPair | TEither | TInt | TThrool
   deriving (Show, Eq, Ord)
 
 data Type = Type
@@ -34,6 +34,17 @@ bool =
       dataCons =
           [ DataConstructor {dcName = "True", dcTypes = []},
             DataConstructor {dcName = "False", dcTypes = []}
+          ]
+    }
+
+throol :: Type
+throol =
+  Type
+    { typeCons = TThrool,
+      dataCons =
+          [ DataConstructor {dcName = "Foo", dcTypes = []},
+            DataConstructor {dcName = "Bar", dcTypes = []},
+            DataConstructor {dcName = "Baz", dcTypes = []}
           ]
     }
 

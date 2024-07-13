@@ -24,10 +24,10 @@ Examples
 
    Disco> {x | x in {1..5}}   -- same as {1..5}
    {1, 2, 3, 4, 5}
-   
+
    Disco> {3x | x in {1..5}}  -- multiply each element of {1..5} by 3
    {3, 6, 9, 12, 15}
-   
+
    -- Pick out the elements of {1..10} that satisfy the condition
    Disco> {x | x in {1 .. 10}, x^2 + 20 == 9x}
    {4, 5}
@@ -50,7 +50,7 @@ Details
 Each *qualifier* in a comprehension can be either
 
 * a *variable binding* of the form ``<variable> in <set>``, *e.g.* ``x
-  in {1 .. 10}`` or ``b in {false, true}``, or
+  in {1 .. 10}`` or ``b in {F, T}``, or
 * a *guard*, which can be any :doc:`boolean <bool>` expression.
 
 A variable binding locally defines a variable and causes it to "loop" through

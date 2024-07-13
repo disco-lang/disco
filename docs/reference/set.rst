@@ -49,11 +49,11 @@ To check whether a set contains a given element, one can use the
 ::
 
    Disco> 2 elem {1,2,3}
-   true
+   T
    Disco> 5 elem {1,2,3}
-   false
+   F
    Disco> 2 ∈ {1,2,3}
-   true
+   T
 
 Sets support various operations, including :doc:`size <size>`,
 :doc:`union <set-ops>`, :doc:`intersection <set-ops>`,

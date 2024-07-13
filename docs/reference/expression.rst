@@ -25,5 +25,5 @@ Examples of things which are *not* expressions include:
    Be careful not to confuse ``x = 3`` (a :doc:`definition <definition>`
    of the :doc:`variable <variable>` ``x``) with ``x == 3`` (a
    :doc:`comparison <compare>` expression which has a value of either
-   ``true`` or ``false`` depending on whether ``x`` is equal to ``3`` or
+   ``T`` or ``F`` depending on whether ``x`` is equal to ``3`` or
    not).  See :doc:`def-vs-test`.

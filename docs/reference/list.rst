@@ -1,0 +1,88 @@
+Lists
+=====
+
+For any :doc:`type <types>` ``T``,  ``List(T)`` is the type of *finite lists* with
+elements of type ``T``.  A list is an arbitrary *sequence*; that is, a
+list is a collection of ``T`` values where the order matters.
+
+In general, lists are written with square brackets.
+
+* The empty list is written ``[]``.
+* A list with specific elements can be written like this: ``[1, 2, 3]``.
+* An :doc:`ellipsis <ellipsis>` can be used to generate a range of
+  elements.  For example,
+
+    ::
+
+       Disco> [1 .. 5]
+       [1, 2, 3, 4, 5]
+       Disco> [1, 3 .. 9]
+       [1, 3, 5, 7, 9]
+
+* :doc:`List comprehension <comprehension>` notation can also be used,
+  for example:
+
+    ::
+
+       Disco> [ abs(x - 5) | x in [1 .. 10], x^2 > 5]
+       [2, 1, 0, 1, 2, 3, 4, 5]
+
+* The built-in ``list`` function can be used to convert other
+  collections (*e.g.* :doc:`sets <set>` or :doc:`bags <bag>`) to lists:
+
+    ::
+
+       Disco> list({1, 2, 3})
+       [1, 2, 3]
+       Disco> import num
+       Disco> list(factor(12))
+       [2, 2, 3]
+
+* The built-in `append` function can be used to append two lists.
+
+    ::
+
+       Disco> import list
+       Disco> :type append
+       append : List(a) × List(a) → List(a)
+       Disco> append([1,2,3], [5,6])
+       [1, 2, 3, 5, 6]
+
+* Strings (written in double quotes) are really just lists of characters.
+
+    ::
+
+       Disco> |"hello"|
+       5
+       Disco> append("hello", "world")
+       "helloworld"
+       Disco> [(c,1) | c in "hello"]
+       [('h', 1), ('e', 1), ('l', 1), ('l', 1), ('o', 1)]
+
+* The order of elements in a list matters.  Two lists with elements in a
+  different order, or different number of copies of the elements, are
+  not the same.  For example,
+
+    ::
+
+       Disco> [1,2,3] == [1,3,2]
+       F
+       Disco> [1,2,3] == [1,1,2,3]
+       F
+
+* To check whether a list contains a given element, one can use the
+  ``elem`` operator (also written ``∈``):
+
+    ::
+
+       Disco> 2 elem [1,2,3]
+       T
+       Disco> 5 elem [1,2,3]
+       F
+       Disco> 2 ∈ [1,2,3]
+       T
+
+Inductive definition of lists
+-----------------------------
+
+Write more here.

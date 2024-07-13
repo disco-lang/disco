@@ -15,7 +15,7 @@ can be compared:
 ::
 
    Disco> {(3, "hi"), (4, "there"), (6, "world")} < {(10, "what")}
-   true
+   T
 
 See the individual pages about each type for more information on how
 comparison works on values of that type.
@@ -36,9 +36,9 @@ many.
     ::
 
        Disco> 3 == 5
-       false
+       F
        Disco> "hi" == "hi"
-       true
+       T
 
   Equality is one critical point where Disco syntax has to deviate
   from standard mathematical notation: be sure to keep in mind the

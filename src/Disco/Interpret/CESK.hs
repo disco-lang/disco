@@ -113,7 +113,8 @@ data Frame
     FUpdate Int
   | -- | Record the results of a test.
     FTest TestVars Env
-  | -- | Memoize the result of a function.
+  | -- | Given the index of a memory cell and a function's arguments,
+    --   memoize the results of a function.
     FMemo Int SimpleValue
   deriving (Show)
 
@@ -216,10 +217,7 @@ step cesk = case cesk of
          Nothing -> return $ In b (Ctx.insert (localName x) v e) (FMemo n sv : k)
          Just v' -> return $ Out v' k
 
-  (Out v (FApp (VClo mi e (x : xs) b) : k)) -> case mi of
-   Just (n,mem) -> return $ Out (VClo (Just (n,v:mem)) (Ctx.insert (localName x) v e) xs b) k
-   Nothing -> return $ Out (VClo mi (Ctx.insert (localName x) v e) xs b) k
-
+  (Out v (FApp (VClo mi e (x : xs) b) : k)) -> return $ Out (VClo (second (v:) <$> mi) (Ctx.insert (localName x) v e) xs b) k
 
 
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2

@@ -169,9 +169,7 @@ compileDTerm term@(DTAbs q _ _) = do
   (xs, tys, body) <- unbindDeep term
   cbody <- compileDTerm body
   case q of
-    Lam -> if canMemo tys
-      then return $ abstract Memo xs cbody
-      else return $ abstract NoMemo xs cbody
+    Lam -> return $ abstract (canMemo tys) xs cbody
     Ex -> return $ quantify (OExists tys) (abstract NoMemo xs cbody)
     All -> return $ quantify (OForall tys) (abstract NoMemo xs cbody)
  where
@@ -188,38 +186,40 @@ compileDTerm term@(DTAbs q _ _) = do
 
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
+  
+  -- Given a function's arguments, determine if it is memoizable.
+  -- A function is memoizable if its arguments can be converted into
+  -- a simple value.
+  canMemo :: [Type] -> ShouldMemo
+  canMemo tys
+   | all canMemoTy tys = Memo
+   | otherwise = NoMemo
 
-  canMemo :: [Type] -> Bool 
-  canMemo = all canMemoTy
-
-  canMemoTy :: Type -> Bool 
-  canMemoTy (TyAtom a) = canMemoAtom a 
-  -- Anti-higher-order while permitting multiple arrows
-  canMemoTy (TyCon CArr tys@(t:_)) = case t of 
+  canMemoTy :: Type -> Bool
+  canMemoTy (TyAtom a) = canMemoAtom a
+  -- Anti-higher order while allowing for multiple arrows.
+  canMemoTy (TyCon CArr tys@(t:_)) = case t of
    TyCon CArr _ -> False
    _ -> all canMemoTy tys
   canMemoTy (TyCon c tys) = canMemoCon c && all canMemoTy tys
 
-  canMemoCon :: Con -> Bool 
-  canMemoCon = \case 
+  canMemoCon :: Con -> Bool
+  canMemoCon = \case
    CArr -> False
-   CUser _ -> False 
-   CGraph -> False 
-   CMap -> False 
-   CContainer a -> canMemoAtom a 
+   CUser _ -> False
+   CGraph -> False
+   CMap -> False
+   CContainer a -> canMemoAtom a
    _ -> True
 
-  canMemoAtom :: Atom -> Bool 
-  canMemoAtom (AVar _) = False 
-  canMemoAtom (ABase b) = canMemoBase b 
+  canMemoAtom :: Atom -> Bool
+  canMemoAtom (AVar _) = False
+  canMemoAtom (ABase b) = canMemoBase b
 
-  canMemoBase :: BaseTy -> Bool 
-  canMemoBase = \case 
-   Gen -> False 
-   CtrSet -> False 
-   CtrBag -> False 
-   CtrList -> False 
-   P -> False 
+  canMemoBase :: BaseTy -> Bool
+  canMemoBase = \case
+   Gen -> False
+   P -> False
    _ -> True
 
 

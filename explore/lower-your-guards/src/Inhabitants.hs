@@ -7,13 +7,13 @@ import Control.Applicative
 import Control.Monad (foldM, forM, guard, replicateM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
-import Data.Foldable (fold)
 import Data.List (nub, partition)
 import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Fresh as F
 import qualified Types as Ty
 import qualified Uncovered as U
+import qualified Possibilities as Poss
 
 type NormRefType = (U.Context, [ConstraintFor])
 
@@ -38,7 +38,7 @@ data Constraint where
 accessableRedundant :: A.Ant -> U.Context -> F.Fresh ([Int], [Int])
 accessableRedundant ant args = case ant of
   A.Grhs ref i -> do
-    nothing <- null . getPossibilities <$> genInhab ref args
+    nothing <- Poss.none <$> genInhab ref args
     return $
       if nothing
         then ([], [i])
@@ -72,49 +72,17 @@ data InhabPat where
   IPNotIntLits :: [Int] -> InhabPat
   deriving (Show, Eq, Ord)
 
-newtype Possibilities a = Possibilities {getPossibilities :: [a]}
-  deriving (Show, Eq, Ord)
 
-retSingle :: (Monad m) => a -> m (Possibilities a)
-retSingle i = return $ Possibilities [i]
-
-genInhab :: U.RefinementType -> U.Context -> F.Fresh (Possibilities InhabPat)
+genInhab :: U.RefinementType -> U.Context -> F.Fresh (Poss.Possibilities InhabPat)
 genInhab (ctx, formula) args = do
   nrefs <- S.toList <$> normalize (ctx, []) formula
   genInhabNorm nrefs args
 
-genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh (Possibilities InhabPat)
+genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh (Poss.Possibilities InhabPat)
 genInhabNorm nrefs args = do
   n <- sequence [findVarInhabitants arg nref | nref <- nrefs, arg <- args]
-  return $ anyOf n
+  return $ Poss.anyOf n
 
-instance Functor Possibilities where
-  fmap f (Possibilities a) = Possibilities (f <$> a)
-
-instance Semigroup (Possibilities a) where
-  (Possibilities p1) <> (Possibilities p2) = Possibilities $ p1 <> p2
-
-instance Monoid (Possibilities a) where
-  mempty = Possibilities []
-
-prod :: Possibilities a -> Possibilities [a] -> Possibilities [a]
-prod (Possibilities xs) (Possibilities yss) = Possibilities [x : ys | x <- xs, ys <- yss]
-
--- I think of the Possibilitie as column vectors
--- that are different heights
--- This function finds all possible paths from the
--- left to the right
---
--- Or you can kind of think of it in a DFS way
-allCombinations :: [Possibilities a] -> Possibilities [a]
-allCombinations = foldr prod nil
-  where
-    -- note, nil /= mempty
-    -- VERY important
-    nil = Possibilities [[]]
-
-anyOf :: [Possibilities a] -> Possibilities a
-anyOf = fold
 
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
@@ -124,24 +92,24 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPMatch k pats
 
-findVarInhabitants :: (F.VarID, Ty.Type) -> NormRefType -> F.Fresh (Possibilities InhabPat)
+findVarInhabitants :: (F.VarID, Ty.Type) -> NormRefType -> F.Fresh (Poss.Possibilities InhabPat)
 findVarInhabitants var@(x, xType) nref@(_, cns) =
   if xType == Ty.int
     then case posIntMatch of
-      Just i -> retSingle $ IPIntLit i
+      Just i -> Poss.retSingle $ IPIntLit i
       Nothing -> case negIntMatch of
-        [] -> retSingle IPWild
-        is -> retSingle $ IPNotIntLits (nub is)
+        [] -> Poss.retSingle IPWild
+        is -> Poss.retSingle $ IPNotIntLits (nub is)
     else case posMatch of
       Just (k, ys) -> do
         let args = zip ys (Ty.dcTypes k)
 
         argPats <- forM args (`findVarInhabitants` nref)
-        let argPossibilities = allCombinations argPats
+        let argPossibilities = Poss.allCombinations argPats
 
         return (mkIPMatch k <$> argPossibilities)
       Nothing -> case negMatch of
-        [] -> retSingle IPWild
+        [] -> Poss.retSingle IPWild
         _ ->
           do
             let tryAddDc dc = do
@@ -155,8 +123,8 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
             posNrefs <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
 
             if null posNrefs
-              then retSingle IPWild
-              else anyOf <$> forM posNrefs (findVarInhabitants var)
+              then Poss.retSingle IPWild
+              else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

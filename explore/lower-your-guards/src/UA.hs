@@ -5,7 +5,7 @@ import qualified Fresh as F
 import qualified GuardTree as G
 import qualified Inhabitants as I
 import qualified Uncovered as U
-import Control.Monad.State (get)
+import qualified Possibilities as Poss
 
 data NAnt where
   Grhs :: [I.NormRefType] -> Int -> NAnt
@@ -46,6 +46,6 @@ addLitMulti (n:ns) lit = do
 redundantNorm :: NAnt -> U.Context -> F.Fresh [Int]
 redundantNorm ant args = case ant of
   Grhs ref i -> do
-    nothing <- null . I.getPossibilities <$> I.genInhabNorm ref args
+    nothing <- Poss.none <$> I.genInhabNorm ref args
     return ([i | nothing])
   Branch a1 a2 -> mappend <$> redundantNorm a1 args <*> redundantNorm a2 args

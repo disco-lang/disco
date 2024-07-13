@@ -45,4 +45,5 @@ executable lower-your-guards
                        Play,
                        Annotated,
                        MatchTree,
-                       UA
+                       UA,
+                       Possibilities

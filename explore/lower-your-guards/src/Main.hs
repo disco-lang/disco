@@ -19,6 +19,7 @@ import Text.Pretty.Simple (pPrint)
 import qualified Types as Ty
 import qualified UA
 import qualified Uncovered as U
+import qualified Possibilities as Poss
 
 parseFile :: String -> IO [P.FunctionDef]
 parseFile file = do
@@ -68,7 +69,7 @@ evalUncov clauses tIn = fst $ evalState (uncov clauses tIn) F.blank
 inhab :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
 inhab clauses tIn = do
   (u, args) <- uncov clauses tIn
-  I.getPossibilities <$> I.genInhab u args
+  Poss.getPossibilities <$> I.genInhab u args
 
 evalInhab :: [P.Clause] -> Ty.Type -> [I.InhabPat]
 evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
@@ -120,7 +121,7 @@ evalFullUA clauses tIn = flip evalState F.blank $ do
   ipats <- I.genInhabNorm nref argsCtx
   redundant <- UA.redundantNorm nant argsCtx
 
-  return (map niceInhabPattern (I.getPossibilities ipats), redundant)
+  return (map niceInhabPattern (Poss.getPossibilities ipats), redundant)
 
 pFullUA :: String -> IO [(Text, ([String], [Int]))]
 pFullUA = handleFunctions evalFullUA

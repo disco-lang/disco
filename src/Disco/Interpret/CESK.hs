@@ -175,15 +175,13 @@ step cesk = case cesk of
   (In CUnit _ k) -> return $ Out VUnit k
   (In (CPair c1 c2) e k) -> return $ In c1 e (FPairR e c2 : k)
   (In (CProj s c) e k) -> return $ In c e (FProj s : k)
-
   (In (CAbs mem b) e k) -> do
     (xs, body) <- unbind b
     case mem of
-      Memo -> do 
-         cell <- allocateValue (VMap M.empty)
-         return $ Out (VClo (Just (cell,[])) e xs body) k
+      Memo -> do
+        cell <- allocateValue (VMap M.empty)
+        return $ Out (VClo (Just (cell, [])) e xs body) k
       NoMemo -> return $ Out (VClo Nothing e xs body) k
-
   (In (CApp c1 c2) e k) -> return $ In c1 e (FArg e c2 : k)
   (In (CType ty) _ k) -> return $ Out (VType ty) k
   (In (CDelay b) e k) -> do
@@ -203,23 +201,16 @@ step cesk = case cesk of
   (Out v2 (FPairL v1 : k)) -> return $ Out (VPair v1 v2) k
   (Out (VPair v1 v2) (FProj s : k)) -> return $ Out (selectSide s v1 v2) k
   (Out v (FArg e c2 : k)) -> return $ In c2 e (FApp v : k)
-
-
-
   (Out v (FMemo n sv : k)) -> memoSet n sv v *> (return $ Out v k)
-
   (Out v (FApp (VClo mi e [x] b) : k)) -> case mi of
-   Nothing -> return $ In b (Ctx.insert (localName x) v e) k
-   Just (n,mem) -> do
+    Nothing -> return $ In b (Ctx.insert (localName x) v e) k
+    Just (n, mem) -> do
       let sv = toSimpleValue $ foldr VPair VUnit (v : mem)
       mv <- memoLookup n sv
       case mv of
-         Nothing -> return $ In b (Ctx.insert (localName x) v e) (FMemo n sv : k)
-         Just v' -> return $ Out v' k
-
-  (Out v (FApp (VClo mi e (x : xs) b) : k)) -> return $ Out (VClo (second (v:) <$> mi) (Ctx.insert (localName x) v e) xs b) k
-
-
+        Nothing -> return $ In b (Ctx.insert (localName x) v e) (FMemo n sv : k)
+        Just v' -> return $ Out v' k
+  (Out v (FApp (VClo mi e (x : xs) b) : k)) -> return $ Out (VClo (second (v :) <$> mi) (Ctx.insert (localName x) v e) xs b) k
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
   (Out v2 (FApp (VFun f) : k)) -> return $ Out (f v2) k
   -- Annoying to repeat this code, not sure of a better way.

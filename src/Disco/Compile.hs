@@ -186,31 +186,31 @@ compileDTerm term@(DTAbs q _ _) = do
 
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
-  
+
   -- Given a function's arguments, determine if it is memoizable.
   -- A function is memoizable if its arguments can be converted into
   -- a simple value.
   canMemo :: [Type] -> ShouldMemo
   canMemo tys
-   | all canMemoTy tys = Memo
-   | otherwise = NoMemo
+    | all canMemoTy tys = Memo
+    | otherwise = NoMemo
 
   canMemoTy :: Type -> Bool
   canMemoTy (TyAtom a) = canMemoAtom a
   -- Anti-higher order while allowing for multiple arrows.
-  canMemoTy (TyCon CArr tys@(t:_)) = case t of
-   TyCon CArr _ -> False
-   _ -> all canMemoTy tys
+  canMemoTy (TyCon CArr tys@(t : _)) = case t of
+    TyCon CArr _ -> False
+    _ -> all canMemoTy tys
   canMemoTy (TyCon c tys) = canMemoCon c && all canMemoTy tys
 
   canMemoCon :: Con -> Bool
   canMemoCon = \case
-   CArr -> False
-   CUser _ -> False
-   CGraph -> False
-   CMap -> False
-   CContainer a -> canMemoAtom a
-   _ -> True
+    CArr -> False
+    CUser _ -> False
+    CGraph -> False
+    CMap -> False
+    CContainer a -> canMemoAtom a
+    _ -> True
 
   canMemoAtom :: Atom -> Bool
   canMemoAtom (AVar _) = False
@@ -218,10 +218,9 @@ compileDTerm term@(DTAbs q _ _) = do
 
   canMemoBase :: BaseTy -> Bool
   canMemoBase = \case
-   Gen -> False
-   P -> False
-   _ -> True
-
+    Gen -> False
+    P -> False
+    _ -> True
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -433,7 +432,8 @@ compileMatch (DPPair _ x1 x2) s _ e = do
   -- {? e when s is (x1,x2) ?}   ==>   (\y. (\x1.\x2. e) (fst y) (snd y)) s
   return $
     CApp
-      ( CAbs NoMemo
+      ( CAbs
+          NoMemo
           ( bind
               [y]
               ( CApp

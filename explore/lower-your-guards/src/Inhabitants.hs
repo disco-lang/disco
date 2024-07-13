@@ -4,13 +4,10 @@ module Inhabitants where
 
 import qualified Annotated as A
 import Control.Applicative
-import Control.Monad (foldM, forM, guard, join, replicateM)
-import Control.Monad.State (runState)
-import Control.Monad.State.Lazy (get)
+import Control.Monad (foldM, forM, guard, replicateM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
 import Data.List (nub, partition)
-import qualified Data.List.NonEmpty as NE
 import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Fresh as F
@@ -40,9 +37,9 @@ data Constraint where
 accessableRedundant :: A.Ant -> U.Context -> F.Fresh ([Int], [Int])
 accessableRedundant ant args = case ant of
   A.Grhs ref i -> do
-    s <- get
+    nothing <- null <$> genInhab ref args
     return $
-      if null $ genInhab s ref args
+      if nothing
         then ([], [i])
         else ([i], [])
   A.Branch a1 a2 -> mappend <$> accessableRedundant a1 args <*> accessableRedundant a2 args
@@ -74,53 +71,71 @@ data InhabPat where
   IPNotIntLits :: [Int] -> InhabPat
   deriving (Show, Eq, Ord)
 
-genInhab :: NE.NonEmpty F.Frame -> U.RefinementType -> U.Context -> [InhabPat]
-genInhab frames (ctx, formula) args = do
-  let mNrefs = S.toList <$> normalize (ctx, []) formula
-  let (nrefs, frames') = runState mNrefs frames
-  genInhabNorm frames' nrefs args
+genInhab :: U.RefinementType -> U.Context -> F.Fresh [InhabPat]
+genInhab (ctx, formula) args = do
+  nrefs <- S.toList <$> normalize (ctx, []) formula
+  genInhabNorm nrefs args
 
-genInhabNorm :: NE.NonEmpty F.Frame -> [NormRefType] -> U.Context -> [InhabPat]
-genInhabNorm frames nrefs args = do
-  nref <- nrefs
-  join $ expandVars frames nref args
+genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh [InhabPat]
+genInhabNorm nrefs args = do
+  let n = [expandVar nref arg | nref <- nrefs, arg <- args]
+  concat <$> sequence n
 
-expandVars :: NE.NonEmpty F.Frame -> NormRefType -> U.Context -> [[InhabPat]]
-expandVars frame nset vars = do
-  traverse (expandVar frame nset) vars
+-- I don't actually know what to call this
+-- Abbreviation for "multiple cartesian product"
+-- I think of the [a]s as column vectors
+-- that are different heights
+-- This function finds all possible paths from the
+-- left to the right
+--
+-- When I wasn't properly using the state monad,
+-- I think traverse just did this for me,
+-- but here I had to think a little
+--
+-- Or you can kind of think of it in a DFS way
+multiCart :: [[a]] -> [[a]]
+multiCart [] = [[]]
+multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
 
-expandVar :: NE.NonEmpty F.Frame -> NormRefType -> (F.VarID, Ty.Type) -> [InhabPat]
-expandVar frames nref@(_, cns) (x, xType) =
+expandVars :: NormRefType -> U.Context -> F.Fresh [[InhabPat]]
+expandVars nref args = do
+  multiCart <$> mapM (expandVar nref) args
+
+-- Sanity check: are we giving the dataconstructor the 
+-- correct number of arguments?
+-- Maybe we could make this part of the type system somehow?
+-- I don't know how
+mkIPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
+mkIPMatch k pats =
+  if length (Ty.dcTypes k) /= length pats
+    then error $ "Wrong number of DataCon args" ++ show (k, pats)
+    else IPMatch k pats
+
+expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh [InhabPat]
+expandVar nref@(_, cns) (x, xType) =
   if xType == Ty.int
     then case posIntMatch of
-      Just i -> return $ IPIntLit i
+      Just i -> return [IPIntLit i]
       Nothing -> case negIntMatch of
-        [] -> return IPWild
-        is -> return $ IPNotIntLits (nub is)
+        [] -> return [IPWild]
+        is -> return [IPNotIntLits (nub is)]
     else case posMatch of
       Just (k, ys) -> do
-        l <- expandVars frames nref (zip ys (Ty.dcTypes k))
-        return $ IPMatch k l
+        argss <- expandVars nref (zip ys (Ty.dcTypes k))
+        return $ map (mkIPMatch k) argss
       Nothing -> case negMatch of
-        [] -> return IPWild
+        [] -> return [IPWild]
         _ ->
           do
-            let (matchers, frames') =
-                  runState
-                    ( catMaybes
-                        <$> forM
-                          (Ty.dataCons xType)
-                          ( \dc -> do
-                              frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
-                              runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
-                          )
-                    )
-                    frames
+            let tryAddDc dc = do
+                  frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
+                  runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
+
+            matchers <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
+
             if null matchers
-              then return IPWild
-              else do
-                m <- matchers
-                expandVar frames' m (x, xType)
+              then return [IPWild]
+              else concat <$> mapM (`expandVar` (x, xType)) matchers
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

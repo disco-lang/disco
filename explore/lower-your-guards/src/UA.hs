@@ -46,6 +46,6 @@ addLitMulti (n:ns) lit = do
 redundantNorm :: NAnt -> U.Context -> F.Fresh [Int]
 redundantNorm ant args = case ant of
   Grhs ref i -> do
-    s <- get
-    return ([i | null $ I.genInhabNorm s ref args])
+    nothing <- null <$> I.genInhabNorm ref args
+    return ([i | nothing])
   Branch a1 a2 -> mappend <$> redundantNorm a1 args <*> redundantNorm a2 args

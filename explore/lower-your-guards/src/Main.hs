@@ -68,8 +68,7 @@ evalUncov clauses tIn = fst $ evalState (uncov clauses tIn) F.blank
 inhab :: [P.Clause] -> Ty.Type -> F.Fresh [I.InhabPat]
 inhab clauses tIn = do
   (u, args) <- uncov clauses tIn
-  s <- get
-  return $ I.genInhab s u args
+  I.genInhab u args
 
 evalInhab :: [P.Clause] -> Ty.Type -> [I.InhabPat]
 evalInhab clauses tIn = evalState (inhab clauses tIn) F.blank
@@ -118,8 +117,7 @@ evalFullUA clauses tIn = flip evalState F.blank $ do
   gdt <- G.desugarClauses [x1] . fromList $ clauses
   let argsCtx = [(x1, tIn)]
   (nref, nant) <- UA.ua [(argsCtx, [])] gdt
-  s <- get
-  let ipats = I.genInhabNorm s nref argsCtx
+  ipats <- I.genInhabNorm nref argsCtx
   redundant <- UA.redundantNorm nant argsCtx
 
   return (map niceInhabPattern ipats, redundant)

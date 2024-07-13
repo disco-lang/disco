@@ -7,6 +7,7 @@ import Control.Applicative
 import Control.Monad (foldM, forM, guard, replicateM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
+import Data.Foldable (fold)
 import Data.List (nub, partition)
 import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
@@ -37,7 +38,7 @@ data Constraint where
 accessableRedundant :: A.Ant -> U.Context -> F.Fresh ([Int], [Int])
 accessableRedundant ant args = case ant of
   A.Grhs ref i -> do
-    nothing <- null <$> genInhab ref args
+    nothing <- null . getPossibilities <$> genInhab ref args
     return $
       if nothing
         then ([], [i])
@@ -69,18 +70,29 @@ data InhabPat where
   IPWild :: InhabPat
   IPIntLit :: Int -> InhabPat
   IPNotIntLits :: [Int] -> InhabPat
-  -- IPTimelines :: S.Set InhabPat
   deriving (Show, Eq, Ord)
 
-genInhab :: U.RefinementType -> U.Context -> F.Fresh [InhabPat]
+newtype Possibilities a = Possibilities {getPossibilities :: [a]}
+  deriving (Show, Eq, Ord)
+
+retSingle :: (Monad m) => a -> m (Possibilities a)
+retSingle i = return $ Possibilities [i]
+
+-- retMulti :: (Monad m) => [a] -> m (Possibilities a)
+-- retMulti is = return $ Possibilities is
+--
+-- unionPossible :: [Possibilities a] -> Possibilities a
+-- unionPossible pss = Possibilities $ concatMap (\(Possibilities ps) -> ps) pss
+
+genInhab :: U.RefinementType -> U.Context -> F.Fresh (Possibilities InhabPat)
 genInhab (ctx, formula) args = do
   nrefs <- S.toList <$> normalize (ctx, []) formula
   genInhabNorm nrefs args
 
-genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh [InhabPat]
+genInhabNorm :: [NormRefType] -> U.Context -> F.Fresh (Possibilities InhabPat)
 genInhabNorm nrefs args = do
-  let n = [expandVar nref arg | nref <- nrefs, arg <- args]
-  concat <$> sequence n
+  n <- sequence [expandVar nref arg | nref <- nrefs, arg <- args]
+  return $ anyOf n
 
 -- I don't actually know what to call this
 -- Abbreviation for "multiple cartesian product"
@@ -96,32 +108,78 @@ genInhabNorm nrefs args = do
 -- Or you can kind of think of it in a DFS way
 --
 -- Retun all elements of the cartesian product of a list of sets
-multiCart :: [[a]] -> [[a]]
-multiCart [] = [[]]
-multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
+-- multiCart :: [[a]] -> [[a]]
+-- multiCart [] = [[]]
+-- multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
 
-cart2 :: (Show a) => [[a]] -> [[a]]
-cart2 [] = [[]]
-cart2 total@(as : rests) =
-  if length as > 1
-    then error $ show total
-    else [a : rest | a <- as, rest <- multiCart rests]
-
+-- cart2 :: (Show a) => [[a]] -> [[a]]
+-- cart2 [] = [[]]
+-- cart2 total@(as : rests) =
+--   if length as > 1
+--     then error $ show total
+--     else [a : rest | a <- as, rest <- multiCart rests]
 
 -- works
-cart3 :: [[a]] -> [[a]]
-cart3 = sequence
+-- cart3 :: [[a]] -> [[a]]
+-- cart3 = sequence
 
-expandVars :: NormRefType -> U.Context -> F.Fresh [[InhabPat]]
-expandVars nref args = do
-  sequence <$> mapM (expandVar nref) args
-  -- l <- mapM (expandVar nref) args
-  -- if length (concat l) > length l then
-  --   error $ show l
-  --   else multiCart <$> mapM (expandVar nref) args
+-- cartProdPossiblities :: [Possibilities a] -> Possibilities [a]
+-- cartProdPossiblities [] = Possibilities []
+-- cartProdPossiblities (Possibilities as : rests) = Possibilities $ do
+--     a <- as
+--     rest <- getPossible (cartProdPossiblities rests)
+--     return (a : rest)
 
+instance Functor Possibilities where
+  fmap f (Possibilities a) = Possibilities (f <$> a)
 
--- [[match foo, match bar], [wild]] 
+instance Semigroup (Possibilities a) where
+  (Possibilities p1) <> (Possibilities p2) = Possibilities $ p1 <> p2
+
+instance Monoid (Possibilities a) where
+  mempty = Possibilities []
+
+prod :: Possibilities a -> Possibilities [a] -> Possibilities [a]
+prod (Possibilities xs) (Possibilities yss) = Possibilities [x : ys | x <- xs, ys <- yss]
+
+allCombinations :: [Possibilities a] -> Possibilities [a]
+allCombinations = foldr prod nil
+  where
+    -- note, nil /= mempty
+    -- VERY important
+    nil = Possibilities [[]]
+
+anyOf :: [Possibilities a] -> Possibilities a
+anyOf = fold
+
+-- cartProdPossiblities (Possibilities as : rests) = Possibilities [a : rest | a <- as, rest <- getPossible (cartProdPossiblities rests)]
+
+-- or alternatively:
+-- cart5 :: [Possibilities a] -> Possibilities [a]
+-- cart5 ps = Possibilities (mapM getPossible ps)
+--
+-- cart6 :: [[a]] -> [[a]]
+-- cart6 = sequence
+--
+-- cart7 :: [[a]] -> [[a]]
+-- cart7 = foldr (liftA2 (:)) []
+--
+-- cart8 :: [[a]] -> [[a]]
+-- cart8 = foldr cart []
+--   where cart xs ys = [x : y | x <- xs, y <- ys]
+
+expandVars :: NormRefType -> U.Context -> F.Fresh (Possibilities [InhabPat])
+expandVars nref args = allCombinations <$> mapM (expandVar nref) args
+
+-- newtype ArgsList = ArgsList {getArgs :: [Possibilities InhabPat]}
+
+-- sequence <$> mapM (expandVar nref) args
+-- l <- mapM (expandVar nref) args
+-- if length (concat l) > length l then
+--   error $ show l
+--   else multiCart <$> mapM (expandVar nref) args
+
+-- [[match foo, match bar], [wild]]
 --
 -- match foo |
 --           | wild
@@ -140,23 +198,23 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPMatch k pats
 
-expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh [InhabPat]
+expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh (Possibilities InhabPat)
 expandVar nref@(_, cns) var@(x, xType) =
   if xType == Ty.int
     then case posIntMatch of
-      Just i -> return [IPIntLit i]
+      Just i -> retSingle $ IPIntLit i
       Nothing -> case negIntMatch of
-        [] -> return [IPWild]
-        is -> return [IPNotIntLits (nub is)]
+        [] -> retSingle IPWild
+        is -> retSingle $ IPNotIntLits (nub is)
     else case posMatch of
       Just (k, ys) -> do
         -- get all possible inhabited argument lists
-        argss <- expandVars nref (zip ys (Ty.dcTypes k))
+        argsPossibilities <- expandVars nref (zip ys (Ty.dcTypes k))
         -- create matching inhabited patterns for each of
         -- the possible argument lists
-        return [mkIPMatch k args | args <- argss]
+        return (mkIPMatch k <$> argsPossibilities)
       Nothing -> case negMatch of
-        [] -> return [IPWild]
+        [] -> retSingle IPWild
         _ ->
           do
             let tryAddDc dc = do
@@ -170,17 +228,18 @@ expandVar nref@(_, cns) var@(x, xType) =
             matchers <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
 
             if null matchers
-              then return [IPWild]
+              then retSingle IPWild
               -- Go down each possible timeline, and get the
               -- Inhabited patterns for each
               -- Then simply concat to get a full list of
               -- the Inhabited patterns for each timeline
-              else concat <$> mapM (`expandVar` var) matchers
+              -- else concat <$> mapM (`expandVar` var) matchers
               -- else do
               --   a <- mapM (`expandVar` var) matchers
               --   if length a > 1
               --     then error $ show a
-              --     else return $ concat a
+              --     else return $ inhabUnions a
+              else anyOf <$> mapM (`expandVar` var) matchers
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

@@ -97,11 +97,18 @@ multiCart :: [[a]] -> [[a]]
 multiCart [] = [[]]
 multiCart (as : rests) = [a : rest | a <- as, rest <- multiCart rests]
 
+cart2 :: Show a => [[a]] -> [[a]]
+cart2 [] = [[]]
+cart2 (as : rests) = if length as == 0
+  then error $ show as
+  else [a : rest | a <- as, rest <- multiCart rests]
+
 expandVars :: NormRefType -> U.Context -> F.Fresh [[InhabPat]]
 expandVars nref args = do
+  -- Actually, I think this can be simplified...
   multiCart <$> mapM (expandVar nref) args
 
--- Sanity check: are we giving the dataconstructor the 
+-- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
 -- Maybe we could make this part of the type system somehow?
 -- I don't know how
@@ -112,7 +119,7 @@ mkIPMatch k pats =
     else IPMatch k pats
 
 expandVar :: NormRefType -> (F.VarID, Ty.Type) -> F.Fresh [InhabPat]
-expandVar nref@(_, cns) (x, xType) =
+expandVar nref@(_, cns) var@(x, xType) =
   if xType == Ty.int
     then case posIntMatch of
       Just i -> return [IPIntLit i]
@@ -121,8 +128,15 @@ expandVar nref@(_, cns) (x, xType) =
         is -> return [IPNotIntLits (nub is)]
     else case posMatch of
       Just (k, ys) -> do
+        -- get all possible inhabited argument lists
         argss <- expandVars nref (zip ys (Ty.dcTypes k))
-        return $ map (mkIPMatch k) argss
+        -- create matching inhabited patterns for each of
+        -- the possible argument lists
+        if length argss > 1
+          then
+            return $ error $ show $ argss
+          else
+            return [mkIPMatch k args | args <- argss]
       Nothing -> case negMatch of
         [] -> return [IPWild]
         _ ->
@@ -131,11 +145,19 @@ expandVar nref@(_, cns) (x, xType) =
                   frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
                   runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
 
+            -- Try to add a positive constraint for each data constructor
+            -- to the current nref
+            -- If any of these additions succeed, save that nref,
+            -- it now has positive information
             matchers <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
 
             if null matchers
               then return [IPWild]
-              else concat <$> mapM (`expandVar` (x, xType)) matchers
+              -- Go down each possible timeline, and get the
+              -- Inhabited patterns for each
+              -- Then simply concat to get a full list of
+              -- the Inhabited patterns for each timeline
+              else concat <$> mapM (`expandVar` var) matchers
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX

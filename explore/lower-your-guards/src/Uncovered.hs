@@ -21,8 +21,6 @@ data Literal where
   F :: Literal
   NotDataCon :: Ty.DataConstructor -> F.VarID -> Literal
   MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Literal
-  NotIntLit :: Int -> F.VarID -> Literal
-  MatchIntLit :: Int -> F.VarID -> Literal
   Let :: F.VarID -> Ty.Type -> F.VarID -> Literal
   deriving (Show, Eq)
 

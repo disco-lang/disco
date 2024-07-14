@@ -34,8 +34,6 @@ uncovered r g = case g of
     uncovered (uncovered r t1) t2
   G.Guarded (G.Match dataCon terms var) t ->
     (r `liftAndLit` NotDataCon dataCon var) `union` uncovered (r `liftAndLit` MatchDataCon dataCon terms var) t
-  G.Guarded (G.MatchLit i v) t ->
-    (r `liftAndLit` NotIntLit i v) `union` uncovered (r `liftAndLit` MatchIntLit i v) t
   G.Guarded (G.Let lhs lType rhs) t ->
     uncovered (r `liftAndLit` Let lhs lType rhs) t
 

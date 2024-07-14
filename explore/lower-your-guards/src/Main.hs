@@ -138,13 +138,17 @@ inhabNice = handleFunctions (\clauses ty -> map niceInhabPattern $ evalInhab cla
 nicePattern :: P.Pattern -> String
 nicePattern (P.PMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . nicePattern) ps
 nicePattern P.PWild = "_"
-nicePattern (P.PLit i) = show i
 nicePattern (P.PVar x) = T.unpack x
 
 niceInhabPattern :: I.InhabPat -> String
 niceInhabPattern (I.IPIs k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
 niceInhabPattern (I.IPNot []) = "_"
-niceInhabPattern (I.IPNot nots) = "(Not " ++ show nots ++ ")"
+niceInhabPattern (I.IPNot nots) = "(Not " ++ niceDCList nots ++ ")"
+
+niceDCList :: [Ty.DataConstructor] -> String
+niceDCList dcs = concat $ tail $ concatMap comma dcs
+  where 
+    comma x = [", ", T.unpack . Ty.dcName $ x]
 -- niceInhabPattern I.IPWild = "_"
 -- niceInhabPattern (I.IPIntLit i) = show i
 -- niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"

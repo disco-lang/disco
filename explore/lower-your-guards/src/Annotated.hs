@@ -15,5 +15,4 @@ annotated ref gdt = case gdt of
   G.Branch t1 t2 -> Branch (annotated ref t1) (annotated (U.uncovered ref t1) t2)
   G.Guarded g t -> case g of
     G.Match k args x -> annotated (ref `U.liftAndLit` U.MatchDataCon k args x) t
-    G.MatchLit i x -> annotated (ref `U.liftAndLit` U.MatchIntLit i x) t
     G.Let lhs lType rhs -> annotated (ref `U.liftAndLit` U.Let lhs lType rhs) t

@@ -99,7 +99,7 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
       let argPossibilities = Poss.allCombinations argPats
 
       return (mkIPMatch k <$> argPossibilities)
-    Nothing -> case negMatch of
+    Nothing -> case nub negMatch of
       [] -> Poss.retSingle $ IPNot []
       neg ->
         case Ty.dataCons xType of

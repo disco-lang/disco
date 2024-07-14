@@ -17,7 +17,6 @@ data Gdt where
 
 data Guard where
   Match :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Guard
-  MatchLit :: Int -> F.VarID -> Guard
   Let :: F.VarID -> Ty.Type -> F.VarID -> Guard
   deriving (Show, Eq)
 
@@ -39,7 +38,6 @@ desugarMatch :: F.VarID -> Ty.Type -> P.Pattern -> F.Fresh [Guard]
 desugarMatch var varType pat = do
   case pat of
     P.PWild -> return []
-    P.PLit i -> return [MatchLit i var]
     P.PVar name -> do
       x <- F.fresh (Just name)
       return [Let x varType var]
@@ -47,6 +45,3 @@ desugarMatch var varType pat = do
       ys <- replicateM (length subPats) (F.fresh Nothing)
       guards <- sequence (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
       return $ Match dataCon ys var : concat guards
-
--- getYs :: Int -> [Text]
--- getYs n = map (T.pack . ("y" ++) . show) [1 .. n]

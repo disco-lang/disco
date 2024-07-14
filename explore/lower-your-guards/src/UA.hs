@@ -27,11 +27,6 @@ ua nrefs gdt = case gdt of
     (n',u) <- ua n t
     n'' <- addLitMulti nrefs (U.NotDataCon k x)
     return (n'' ++ n', u)
-  G.Guarded (G.MatchLit i x) t -> do
-    n <- addLitMulti nrefs (U.MatchIntLit i x)
-    (n',u) <- ua n t
-    n'' <- addLitMulti nrefs (U.NotIntLit i x)
-    return (n'' ++ n', u)
 
 addLitMulti :: [I.NormRefType] -> U.Literal -> F.Fresh [I.NormRefType]
 addLitMulti [] _ = return []

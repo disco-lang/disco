@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
 module UA (ua, redundantNorm, NAnt) where
 
 import Control.Monad.Trans.Maybe
@@ -20,14 +22,17 @@ ua nrefs gdt = case gdt of
     (n1, u1) <- ua nrefs t1
     (n2, u2) <- ua n1 t2
     return (n2, Branch u1 u2)
-  G.Guarded (G.GLet (old, HerebyBe new)) t -> do
-    n <- addLitMulti nrefs (U.VarInfo (old, Be new))
-    ua n t
-  G.Guarded (G.GMatch k args x) t -> do
-    n <- addLitMulti nrefs (U.VarInfo (x, Match k args))
-    (n', u) <- ua n t
-    n'' <- addLitMulti nrefs (U.VarInfo (x, Not k))
-    return (n'' ++ n', u)
+  G.Guarded (var, g) t -> case g of
+    G.GBe new -> do
+      n <- addLitMulti nrefs $ varInfo (HerebyBe new)
+      ua n t
+    G.GMatch k args -> do
+      n <- addLitMulti nrefs $ varInfo (Match k args)
+      (n', u) <- ua n t
+      n'' <- addLitMulti nrefs $ varInfo (Not k)
+      return (n'' ++ n', u)
+    where
+      varInfo = U.Info var
 
 addLitMulti :: [I.NormRefType] -> U.Literal -> F.Fresh [I.NormRefType]
 addLitMulti [] _ = return []

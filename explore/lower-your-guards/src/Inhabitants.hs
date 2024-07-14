@@ -8,7 +8,7 @@ import Control.Monad (foldM, forM, guard, replicateM)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe
 import Data.List (nub, partition)
-import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Fresh as F
 import MatchInfo
@@ -46,7 +46,7 @@ accessableRedundant ant args = case ant of
 lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
 lookupVar x = foldr getNextId x
   where
-    getNextId (x', MatchInfo (Be y)) | x' == x = const y
+    getNextId (x', MatchInfo (HerebyBe y)) | x' == x = const y
     getNextId _ = id
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
@@ -118,9 +118,13 @@ addLiteral :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
 addLiteral n@(context, constraints) flit = case flit of
   U.F -> MaybeT $ pure Nothing
   U.T -> return n
-  U.VarInfo (x, info@(Be typedY)) -> (context ++ [typedY], constraints) `addConstraint` (x, MatchInfo info)
-  U.VarInfo (x, info@(Match _ ys)) -> (context ++ ys, constraints) `addConstraint` (x, MatchInfo info)
-  U.VarInfo (x, info) -> n `addConstraint` (x, MatchInfo info)
+  U.Info x info -> (context ++ neededContext info, constraints) `addConstraint` (x, MatchInfo info)
+
+neededContext :: MatchInfo -> [TypedVar]
+neededContext info = case info of
+  Not _ -> []
+  Match _ ys -> ys
+  HerebyBe y -> [y]
 
 addConstraints :: NormRefType -> [ConstraintFor] -> MaybeT F.Fresh NormRefType
 addConstraints = foldM addConstraint
@@ -140,7 +144,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
         Just args' ->
           addConstraints
             nref
-            (zipWith (\a b -> (a, MatchInfo (Be b))) args args')
+            (zipWith (\a b -> (a, MatchInfo (HerebyBe b))) args args')
         Nothing -> return added
     --- Equation (11)
     Not _ -> do
@@ -148,7 +152,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
       guard inh -- ensure that origX is still inhabited, as per I2
       return added
     -- Equation (14)
-    Be y -> do
+    HerebyBe y -> do
       let origY = lookupVar y cns
       if origX == origY
         then return nref
@@ -180,7 +184,7 @@ conflictsWith c = case c of
     Not k -> \case
       MatchInfo (Match k' _) | k == k' -> True -- 11a
       _ -> False
-    Be _ -> const False
+    HerebyBe _ -> const False
 
 -- TermEquality _ -> const False
 

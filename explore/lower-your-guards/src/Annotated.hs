@@ -14,6 +14,7 @@ annotated :: U.RefinementType -> G.Gdt -> Ant
 annotated ref gdt = case gdt of
   G.Grhs i -> Grhs ref i
   G.Branch t1 t2 -> Branch (annotated ref t1) (annotated (U.uncovered ref t1) t2)
-  G.Guarded g t -> case g of
-    G.GMatch k args x -> annotated (ref `U.liftAndLit` U.VarInfo (x, Match k args)) t
-    G.GLet (old, HerebyBe new) -> annotated (ref `U.liftAndLit` U.VarInfo (old, Be new)) t
+  G.Guarded (var, g) t -> case g of
+    G.GMatch k args -> annotated (ref `U.liftAndLit` varInfo (Match k args)) t
+    G.GBe new -> annotated (ref `U.liftAndLit` varInfo (HerebyBe new)) t
+    where varInfo = U.Info var

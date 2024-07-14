@@ -13,12 +13,12 @@ import MatchInfo
 data Gdt where
   Grhs :: Int -> Gdt
   Branch :: Gdt -> Gdt -> Gdt
-  Guarded :: Guard -> Gdt -> Gdt
+  Guarded :: (TypedVar, Guard) -> Gdt -> Gdt
   deriving (Show, Eq)
 
 data Guard where
-  GMatch :: Ty.DataConstructor -> [TypedVar] -> TypedVar -> Guard
-  GLet :: (TypedVar, HerebyBe) -> Guard
+  GMatch :: Ty.DataConstructor -> [TypedVar] -> Guard
+  GBe :: TypedVar -> Guard
   deriving (Show, Eq)
 
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
@@ -35,15 +35,16 @@ desugarClause args (i, P.Clause pat typeIn _) = do
   guards <- desugarMatch (x1,typeIn) pat
   return $ foldr Guarded (Grhs i) guards
 
-desugarMatch :: TypedVar -> P.Pattern -> F.Fresh [Guard]
-desugarMatch var pat = do
+desugarMatch :: TypedVar -> P.Pattern -> F.Fresh [(TypedVar, Guard)]
+desugarMatch var@(_,ty) pat = do
   case pat of
     P.PWild -> return []
     P.PVar name -> do
       x <- F.fresh (Just name)
-      return [GLet ((x, snd var), HerebyBe var)]
+      let xTy = (x, ty)
+      return [(var, GBe xTy)]
     P.PMatch dataCon subPats -> do
       ys <- replicateM (length subPats) (F.fresh Nothing)
       let typedYs = zip ys (Ty.dcTypes dataCon)
       guards <- zipWithM desugarMatch typedYs subPats
-      return $ GMatch dataCon typedYs var : concat guards
+      return $ (var, GMatch dataCon typedYs) : concat guards

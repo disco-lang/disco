@@ -18,10 +18,7 @@ data Formula where
 data Literal where
   T :: Literal
   F :: Literal
-  VarInfo :: (TypedVar, MatchInfo) -> Literal
-  -- NotDataCon :: Ty.DataConstructor -> F.VarID -> Literal
-  -- MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Literal
-  -- Let :: (F.VarID, HerebyBe) -> Literal
+  Info :: TypedVar -> MatchInfo -> Literal
   deriving (Show, Eq)
 
 uncovered :: RefinementType -> G.Gdt -> RefinementType
@@ -30,10 +27,14 @@ uncovered r g = case g of
     let (context, _) = r in (context, Literal F)
   G.Branch t1 t2 ->
     uncovered (uncovered r t1) t2
-  G.Guarded (G.GMatch dataCon terms var) t ->
-    (r `liftAndLit` VarInfo (var, Not dataCon)) `union` uncovered (r `liftAndLit` VarInfo (var, Match dataCon terms)) t
-  G.Guarded (G.GLet (old, HerebyBe new)) t ->
-    uncovered (r `liftAndLit` VarInfo (old, Be new)) t
+  G.Guarded (var, guard) t -> case guard of
+    G.GMatch dataCon ys -> noMatch `union` matchedPath
+      where
+        noMatch = r `liftAndLit` varInfo (Not dataCon)
+        matchedPath = uncovered (r `liftAndLit` varInfo (Match dataCon ys)) t
+    G.GBe new -> uncovered (r `liftAndLit` varInfo (HerebyBe new)) t
+    where
+      varInfo = Info var
 
 liftAndLit :: RefinementType -> Literal -> RefinementType
 liftAndLit (cont, form) f = (cont, form `And` Literal f)

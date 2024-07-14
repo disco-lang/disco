@@ -17,24 +17,34 @@ instance Show Type where
   show Type { typeCons = t } = "Type: " ++ show t
 
 data DataConstructor = DataConstructor
-  { dcName :: Text,
+  { dcIdent :: DataConName,
     dcTypes :: [Type]
   }
   deriving (Eq, Ord)
 
+dcName :: DataConstructor -> Text
+dcName dc = case dcIdent dc of
+  NameText t -> t
+  NameInt i -> T.pack $ show i
+
+data DataConName where
+  NameText :: Text -> DataConName
+  NameInt :: Int -> DataConName
+  deriving (Show, Eq, Ord)
+
 instance Show DataConstructor where
-  show DataConstructor { dcName = n, dcTypes = t } = "(\'" ++ T.unpack n ++ "\' <" ++ (show . length $ t) ++ ">)"
+  show dc = "(\'" ++ T.unpack (dcName dc) ++ "\' <" ++ (show . length $ dcTypes dc) ++ ">)"
 
--- intCon i = DataConstcutor { dcName = show i, }
-
+intCon :: Int -> DataConstructor
+intCon i = DataConstructor { dcIdent = NameInt i, dcTypes = []}
 
 bool :: Type
 bool =
   Type
     { typeCons = TBool,
       dataCons = Just
-          [ DataConstructor {dcName = "True", dcTypes = []},
-            DataConstructor {dcName = "False", dcTypes = []}
+          [ DataConstructor {dcIdent = NameText "True", dcTypes = []},
+            DataConstructor {dcIdent = NameText "False", dcTypes = []}
           ]
     }
 
@@ -43,9 +53,9 @@ throol =
   Type
     { typeCons = TThrool,
       dataCons = Just
-          [ DataConstructor {dcName = "Foo", dcTypes = []},
-            DataConstructor {dcName = "Bar", dcTypes = []},
-            DataConstructor {dcName = "Baz", dcTypes = []}
+          [ DataConstructor {dcIdent = NameText "Foo", dcTypes = []},
+            DataConstructor {dcIdent = NameText "Bar", dcTypes = []},
+            DataConstructor {dcIdent = NameText "Baz", dcTypes = []}
           ]
     }
 
@@ -54,7 +64,7 @@ pair a b =
   Type
     { typeCons = TPair,
       dataCons = Just
-          [ DataConstructor {dcName = ",", dcTypes = [a, b]}
+          [ DataConstructor {dcIdent = NameText ",", dcTypes = [a, b]}
           ]
     }
 
@@ -63,8 +73,8 @@ either a b =
   Type
     { typeCons = TEither,
       dataCons = Just
-          [ DataConstructor {dcName = "Left", dcTypes = [a]},
-            DataConstructor {dcName = "Right", dcTypes = [b]}
+          [ DataConstructor {dcIdent = NameText "Left", dcTypes = [a]},
+            DataConstructor {dcIdent = NameText "Right", dcTypes = [b]}
           ]
     }
 

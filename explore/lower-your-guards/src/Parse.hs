@@ -6,8 +6,7 @@
 module Parse where
 
 import Control.Applicative (some)
-import Control.Monad (replicateM)
-import Data.Char (isSymbol, isUpper)
+import Data.Char (isUpper)
 import Data.Functor (($>), (<&>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -39,7 +38,7 @@ data Clause where
   deriving (Show, Eq)
 
 data Pattern where
-  PLit :: Int -> Pattern
+  -- PLit :: Int -> Pattern
   PWild :: Pattern
   PVar :: Text -> Pattern
   PMatch :: Ty.DataConstructor -> [Pattern] -> Pattern
@@ -84,7 +83,7 @@ pFnDecl = do
   return $ FunctionDecl name tFrom tTo
 
 pDataCons :: [Ty.DataConstructor] -> Parser Ty.DataConstructor
-pDataCons possible = choice $ map (\x -> x <$ symbol (Ty.dcName x)) possible
+pDataCons possible = choice $ map (\dc -> dc <$ symbol (Ty.dcName dc)) possible
 
 pDataConsMatch :: Ty.Type -> Parser Pattern
 pDataConsMatch typeIn =
@@ -99,7 +98,9 @@ pDataConsMatch typeIn =
       Nothing ->
         if typeIn /= Ty.int
           then error "Found opaque type that's not an int while parsing. How??"
-          else PLit <$> pInteger
+          else do
+            i <- Ty.intCon <$> pInteger
+            return $ PMatch i []
 
 pPattern :: Ty.Type -> Parser Pattern
 pPattern typeIn =

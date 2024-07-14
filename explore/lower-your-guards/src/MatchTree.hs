@@ -25,7 +25,7 @@ full = Status (Not [])
 
 empty = Status (Is Nothing)
 
-intCon i = Ty.DataConstructor {Ty.dcName = T.pack $ show i, Ty.dcTypes = []}
+intCon i = Ty.DataConstructor {Ty.dcIdent = Ty.NameInt i, Ty.dcTypes = []}
 
 isInt i = Status (Is (Just (intCon i)))
 

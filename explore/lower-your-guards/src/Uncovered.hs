@@ -4,6 +4,7 @@ module Uncovered where
 
 import qualified Fresh as F
 import qualified GuardTree as G
+import MatchInfo
 import qualified Types as Ty
 
 type RefinementType = (Context, Formula)
@@ -19,9 +20,10 @@ data Formula where
 data Literal where
   T :: Literal
   F :: Literal
-  NotDataCon :: Ty.DataConstructor -> F.VarID -> Literal
-  MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Literal
-  Let :: F.VarID -> Ty.Type -> F.VarID -> Literal
+  VarInfo :: (F.VarID, MatchInfo) -> Literal
+  -- NotDataCon :: Ty.DataConstructor -> F.VarID -> Literal
+  -- MatchDataCon :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Literal
+  Let :: (F.VarID, HerebyBe) -> Literal
   deriving (Show, Eq)
 
 uncovered :: RefinementType -> G.Gdt -> RefinementType
@@ -30,10 +32,10 @@ uncovered r g = case g of
     let (context, _) = r in (context, Literal F)
   G.Branch t1 t2 ->
     uncovered (uncovered r t1) t2
-  G.Guarded (G.Match dataCon terms var) t ->
-    (r `liftAndLit` NotDataCon dataCon var) `union` uncovered (r `liftAndLit` MatchDataCon dataCon terms var) t
-  G.Guarded (G.Let lhs lType rhs) t ->
-    uncovered (r `liftAndLit` Let lhs lType rhs) t
+  G.Guarded (G.GMatch dataCon terms var) t ->
+    (r `liftAndLit` VarInfo (var, Not dataCon)) `union` uncovered (r `liftAndLit` VarInfo (var, Match dataCon terms)) t
+  G.Guarded (G.Let alias) t ->
+    uncovered (r `liftAndLit` Let alias) t
 
 liftAndLit :: RefinementType -> Literal -> RefinementType
 liftAndLit (cont, form) f = (cont, form `And` Literal f)

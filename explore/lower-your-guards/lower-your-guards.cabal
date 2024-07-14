@@ -46,4 +46,5 @@ executable lower-your-guards
                        Annotated,
                        MatchTree,
                        UA,
-                       Possibilities
+                       Possibilities,
+                       MatchInfo

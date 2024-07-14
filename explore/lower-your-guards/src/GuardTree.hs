@@ -8,6 +8,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Fresh as F
 import qualified Parse as P
 import qualified Types as Ty
+import MatchInfo
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -16,8 +17,8 @@ data Gdt where
   deriving (Show, Eq)
 
 data Guard where
-  Match :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Guard
-  Let :: F.VarID -> Ty.Type -> F.VarID -> Guard
+  GMatch :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Guard
+  Let :: (F.VarID, HerebyBe) -> Guard
   deriving (Show, Eq)
 
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
@@ -40,8 +41,8 @@ desugarMatch var varType pat = do
     P.PWild -> return []
     P.PVar name -> do
       x <- F.fresh (Just name)
-      return [Let x varType var]
+      return [Let (x, HerebyBe (var,varType))]
     P.PMatch dataCon subPats -> do
       ys <- replicateM (length subPats) (F.fresh Nothing)
       guards <- sequence (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
-      return $ Match dataCon ys var : concat guards
+      return $ GMatch dataCon ys var : concat guards

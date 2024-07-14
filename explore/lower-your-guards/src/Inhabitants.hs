@@ -11,14 +11,10 @@ import Data.List (nub, partition)
 import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Fresh as F
+import MatchInfo
 import qualified Possibilities as Poss
 import qualified Types as Ty
 import qualified Uncovered as U
-
--- type VarMatchInfo = (F.VarID, MatchInfo)
--- data MatchInfo where
---   MatchI :: Ty.DataConstructor -> [F.VarID] -> MatchInfo
---   NotI :: [Ty.DataConstructor] -> MatchInfo
 
 data InhabPat where
   IPIs :: Ty.DataConstructor -> [InhabPat] -> InhabPat
@@ -30,8 +26,7 @@ type NormRefType = (U.Context, [ConstraintFor])
 type ConstraintFor = (F.VarID, Constraint)
 
 data Constraint where
-  Match :: Ty.DataConstructor -> [F.VarID] -> Constraint
-  Not :: Ty.DataConstructor -> Constraint
+  MatchInfo :: MatchInfo -> Constraint
   TermEquality :: F.VarID -> Constraint
   deriving (Show, Eq, Ord)
 
@@ -103,7 +98,7 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
             do
               let tryAddDc dc = do
                     frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
-                    runMaybeT (nref `addConstraint` (x, Match dc frs))
+                    runMaybeT (nref `addConstraint` (x, MatchInfo $ Match dc frs))
 
               -- Try to add a positive constraint for each data constructor
               -- to the current nref
@@ -116,8 +111,8 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
                 else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar x cns
-    posMatch = listToMaybe $ mapMaybe (\case Match k ys -> Just (k, ys); _ -> Nothing) constraintsOnX
-    negMatch = mapMaybe (\case Not k -> Just k; _ -> Nothing) constraintsOnX
+    posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
+    negMatch = mapMaybe (\case MatchInfo (Not k) -> Just k; _ -> Nothing) constraintsOnX
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
@@ -131,9 +126,9 @@ addLiteral :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
 addLiteral n@(context, constraints) flit = case flit of
   U.F -> MaybeT $ pure Nothing
   U.T -> return n
-  U.Let x xType y -> (context ++ [(x, xType)], constraints) `addConstraint` (x, TermEquality y)
-  U.MatchDataCon k ys x -> (context ++ zip ys (Ty.dcTypes k), constraints) `addConstraint` (x, Match k ys)
-  U.NotDataCon k x -> n `addConstraint` (x, Not k)
+  U.Let (x, HerebyBe typedY@(y, _)) -> (context ++ [typedY], constraints) `addConstraint` (x, TermEquality y)
+  U.VarInfo (x, Match k ys) -> (context ++ zip ys (Ty.dcTypes k), constraints) `addConstraint` (x, MatchInfo (Match k ys))
+  U.VarInfo (x, Not k) -> n `addConstraint` (x, MatchInfo (Not k))
 
 addConstraints :: NormRefType -> [ConstraintFor] -> MaybeT F.Fresh NormRefType
 addConstraints = foldM addConstraint
@@ -145,17 +140,18 @@ addConstraint nref@(_, cns) (x, c) = do
 
 addConstraintHelper :: NormRefType -> ConstraintFor -> MaybeT F.Fresh NormRefType
 addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
-  --- Equation (10)
-  Match k args -> do
-    case getConstructorArgs k (onVar origX cns) of
-      -- 10c -- TODO(colin): Still need to add type constraints!
-      Just args' -> addConstraints nref (zipWith (\a b -> (a, TermEquality b)) args args')
-      Nothing -> return added
-  --- Equation (11)
-  Not _ -> do
-    inh <- lift (inhabited added origX (lookupType origX ctx))
-    guard inh -- ensure that origX is still inhabited, as per I2
-    return added
+  MatchInfo info -> case info of
+    --- Equation (10)
+    Match k args -> do
+      case getConstructorArgs k (onVar origX cns) of
+        -- 10c -- TODO(colin): Still need to add type constraints!
+        Just args' -> addConstraints nref (zipWith (\a b -> (a, TermEquality b)) args args')
+        Nothing -> return added
+    --- Equation (11)
+    Not _ -> do
+      inh <- lift (inhabited added origX (lookupType origX ctx))
+      guard inh -- ensure that origX is still inhabited, as per I2
+      return added
   -- Equation (14)
   TermEquality y -> do
     let origY = lookupVar y cns
@@ -181,13 +177,14 @@ breakIf = guard . not
 -- filters out the easy negatives early on
 conflictsWith :: Constraint -> (Constraint -> Bool)
 conflictsWith c = case c of
-  Match k _ -> \case
-    Match k' _ | k /= k' -> True -- 10a
-    Not k' | k == k' -> True -- 10b
-    _ -> False
-  Not k -> \case
-    Match k' _ | k == k' -> True -- 11a
-    _ -> False
+  MatchInfo info -> case info of
+    Match k _ -> \case
+      MatchInfo (Match k' _) | k /= k' -> True -- 10a
+      MatchInfo (Not k') | k == k' -> True -- 10b
+      _ -> False
+    Not k -> \case
+      MatchInfo (Match k' _) | k == k' -> True -- 11a
+      _ -> False
   TermEquality _ -> const False
 
 -- Search for a MatchDataCon that is matching on k specifically
@@ -196,7 +193,7 @@ conflictsWith c = case c of
 getConstructorArgs :: Ty.DataConstructor -> [Constraint] -> Maybe [F.VarID]
 getConstructorArgs k cfs =
   listToMaybe $
-    mapMaybe (\case Match k' v | k' == k -> Just v; _ -> Nothing) cfs
+    mapMaybe (\case MatchInfo (Match k' v) | k' == k -> Just v; _ -> Nothing) cfs
 
 -- substituting y *for* x
 -- ie replace the second with the first, replace x with y
@@ -223,5 +220,5 @@ instantiate :: NormRefType -> F.VarID -> Ty.DataConstructor -> F.Fresh Bool
 instantiate (ctx, cns) x k = do
   newVarIDs <- replicateM (length . Ty.dcTypes $ k) (F.fresh Nothing)
   let newVars = zip newVarIDs (Ty.dcTypes k)
-  let attempt = (ctx ++ newVars, cns) `addConstraint` (x, Match k newVarIDs)
+  let attempt = (ctx ++ newVars, cns) `addConstraint` (x, MatchInfo $ Match k newVarIDs)
   isJust <$> runMaybeT attempt

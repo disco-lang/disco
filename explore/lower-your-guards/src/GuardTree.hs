@@ -2,7 +2,7 @@
 
 module GuardTree where
 
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, zipWithM)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Fresh as F
@@ -17,8 +17,8 @@ data Gdt where
   deriving (Show, Eq)
 
 data Guard where
-  GMatch :: Ty.DataConstructor -> [F.VarID] -> F.VarID -> Guard
-  Let :: (F.VarID, HerebyBe) -> Guard
+  GMatch :: Ty.DataConstructor -> [TypedVar] -> TypedVar -> Guard
+  GLet :: (TypedVar, HerebyBe) -> Guard
   deriving (Show, Eq)
 
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
@@ -32,17 +32,18 @@ desugarClauses args clauses = do
 desugarClause :: [F.VarID] -> (Int, P.Clause) -> F.Fresh Gdt
 desugarClause args (i, P.Clause pat typeIn _) = do
   let x1 = head args -- we only suport 1 arg for this toy lyg
-  guards <- desugarMatch x1 typeIn pat
+  guards <- desugarMatch (x1,typeIn) pat
   return $ foldr Guarded (Grhs i) guards
 
-desugarMatch :: F.VarID -> Ty.Type -> P.Pattern -> F.Fresh [Guard]
-desugarMatch var varType pat = do
+desugarMatch :: TypedVar -> P.Pattern -> F.Fresh [Guard]
+desugarMatch var pat = do
   case pat of
     P.PWild -> return []
     P.PVar name -> do
       x <- F.fresh (Just name)
-      return [Let (x, HerebyBe (var,varType))]
+      return [GLet ((x, snd var), HerebyBe var)]
     P.PMatch dataCon subPats -> do
       ys <- replicateM (length subPats) (F.fresh Nothing)
-      guards <- sequence (zipWith3 desugarMatch ys (Ty.dcTypes dataCon) subPats)
-      return $ GMatch dataCon ys var : concat guards
+      let typedYs = zip ys (Ty.dcTypes dataCon)
+      guards <- zipWithM desugarMatch typedYs subPats
+      return $ GMatch dataCon typedYs var : concat guards

@@ -20,8 +20,8 @@ ua nrefs gdt = case gdt of
     (n1, u1) <- ua nrefs t1
     (n2, u2) <- ua n1 t2
     return (n2, Branch u1 u2)
-  G.Guarded (G.Let alias) t -> do
-    n <- addLitMulti nrefs (U.Let alias)
+  G.Guarded (G.GLet (old, HerebyBe new)) t -> do
+    n <- addLitMulti nrefs (U.VarInfo (old, Be new))
     ua n t
   G.Guarded (G.GMatch k args x) t -> do
     n <- addLitMulti nrefs (U.VarInfo (x, Match k args))

@@ -16,4 +16,4 @@ annotated ref gdt = case gdt of
   G.Branch t1 t2 -> Branch (annotated ref t1) (annotated (U.uncovered ref t1) t2)
   G.Guarded g t -> case g of
     G.GMatch k args x -> annotated (ref `U.liftAndLit` U.VarInfo (x, Match k args)) t
-    G.Let alias -> annotated (ref `U.liftAndLit` U.Let alias) t
+    G.GLet (old, HerebyBe new) -> annotated (ref `U.liftAndLit` U.VarInfo (old, Be new)) t

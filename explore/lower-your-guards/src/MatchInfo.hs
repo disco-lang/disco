@@ -1,4 +1,4 @@
-module MatchInfo (MatchInfo (..), HerebyBe(..), TypedVar) where
+module MatchInfo (MatchInfo (..), HerebyBe(..), TypedVar, getDataCons) where
 
 import qualified Fresh as F
 import qualified Types as Ty
@@ -16,3 +16,6 @@ data HerebyBe where
   deriving (Show, Eq, Ord)
 
 type TypedVar = (F.VarID, Ty.Type)
+
+getDataCons :: TypedVar -> Maybe [Ty.DataConstructor]
+getDataCons = Ty.dataCons . snd

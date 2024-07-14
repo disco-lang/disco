@@ -27,7 +27,6 @@ type ConstraintFor = (TypedVar, Constraint)
 
 data Constraint where
   MatchInfo :: MatchInfo -> Constraint
-  -- TermEquality :: F.VarID -> Constraint
   deriving (Show, Eq, Ord)
 
 -- old, use UA
@@ -44,14 +43,8 @@ accessableRedundant ant args = case ant of
 -- Resolves term equalities, finding the leftmost id for a variable
 -- I believe I3 of section 3.4 allows us to
 -- do a linear scan from right to left
-lookupVar :: F.VarID -> [ConstraintFor] -> F.VarID
+lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
 lookupVar x = foldr getNextId x
-  where
-    getNextId ((x', _), MatchInfo (Be (y, _))) | x' == x = const y
-    getNextId _ = id
-
-lookupVarTyped :: TypedVar -> [ConstraintFor] -> TypedVar
-lookupVarTyped x = foldr getNextId x
   where
     getNextId (x', MatchInfo (Be y)) | x' == x = const y
     getNextId _ = id
@@ -59,19 +52,8 @@ lookupVarTyped x = foldr getNextId x
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
 alistLookup a = map snd . filter ((== a) . fst)
 
-alistLookupNested :: (Eq a) => a -> [((a, c), b)] -> [b]
-alistLookupNested a = map snd . filter ((== a) . fst . fst)
-
-lookupType :: F.VarID -> U.Context -> Ty.Type
-lookupType x ctx = fromMaybe (error errMsg) (listToMaybe $ alistLookup x ctx)
-  where
-    errMsg = "Var not found in context: " ++ show x ++ " " ++ show ctx
-
-onVar :: F.VarID -> [ConstraintFor] -> [Constraint]
-onVar x cs = alistLookupNested (lookupVar x cs) cs
-
-onVarTyped :: TypedVar -> [ConstraintFor] -> [Constraint]
-onVarTyped x cs = alistLookup (lookupVarTyped x cs) cs
+onVar :: TypedVar -> [ConstraintFor] -> [Constraint]
+onVar x cs = alistLookup (lookupVar x cs) cs
 
 genInhab :: U.RefinementType -> U.Context -> F.Fresh (Poss.Possibilities InhabPat)
 genInhab (ctx, formula) args = do
@@ -92,7 +74,7 @@ mkIPMatch k pats =
     else IPIs k pats
 
 findVarInhabitants :: TypedVar -> NormRefType -> F.Fresh (Poss.Possibilities InhabPat)
-findVarInhabitants var@(x, xType) nref@(_, cns) =
+findVarInhabitants var nref@(_, cns) =
   case posMatch of
     Just (k, args) -> do
       argPats <- forM args (`findVarInhabitants` nref)
@@ -102,7 +84,7 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
     Nothing -> case nub negMatch of
       [] -> Poss.retSingle $ IPNot []
       neg ->
-        case Ty.dataCons xType of
+        case getDataCons var of
           Nothing -> Poss.retSingle $ IPNot neg
           Just dcs ->
             do
@@ -120,7 +102,7 @@ findVarInhabitants var@(x, xType) nref@(_, cns) =
                 then Poss.retSingle $ IPNot []
                 else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
-    constraintsOnX = onVar x cns
+    constraintsOnX = onVar var cns
     posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
     negMatch = mapMaybe (\case MatchInfo (Not k) -> Just k; _ -> Nothing) constraintsOnX
 
@@ -145,15 +127,15 @@ addConstraints = foldM addConstraint
 
 addConstraint :: NormRefType -> ConstraintFor -> MaybeT F.Fresh NormRefType
 addConstraint nref@(_, cns) (x, c) = do
-  breakIf $ any (conflictsWith c) (onVarTyped x cns)
-  addConstraintHelper nref (lookupVarTyped x cns, c)
+  breakIf $ any (conflictsWith c) (onVar x cns)
+  addConstraintHelper nref (lookupVar x cns, c)
 
 addConstraintHelper :: NormRefType -> ConstraintFor -> MaybeT F.Fresh NormRefType
 addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
   MatchInfo info -> case info of
     --- Equation (10)
     Match k args -> do
-      case getConstructorArgs k (onVarTyped origX cns) of
+      case getConstructorArgs k (onVar origX cns) of
         -- 10c -- TODO(colin): Still need to add type constraints!
         Just args' ->
           addConstraints
@@ -167,13 +149,12 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
       return added
     -- Equation (14)
     Be y -> do
-      let origY = lookupVarTyped y cns
+      let origY = lookupVar y cns
       if origX == origY
         then return nref
         else do
           let (noX', withX') = partition ((/= origX) . fst) cns
-          addConstraints (ctx, noX' ++ [cf]) (substituteVarIDsTyped origY origX withX')
-          -- TermEquality y -> do
+          addConstraints (ctx, noX' ++ [cf]) (substituteVarIDs origY origX withX')
   where
     added = (ctx, cns ++ [cf])
 
@@ -213,13 +194,8 @@ getConstructorArgs k cfs =
 
 -- substituting y *for* x
 -- ie replace the second with the first, replace x with y
--- substituteVarIDs :: F.VarID -> F.VarID -> [ConstraintFor] -> [ConstraintFor]
--- substituteVarIDs y x = map (\case (x', c) | x' == x -> (y, c); cf -> cf)
-
--- substituting y *for* x
--- ie replace the second with the first, replace x with y
-substituteVarIDsTyped :: TypedVar -> TypedVar -> [ConstraintFor] -> [ConstraintFor]
-substituteVarIDsTyped y x = map (\case (x', c) | x' == x -> (y, c); cf -> cf)
+substituteVarIDs :: TypedVar -> TypedVar -> [ConstraintFor] -> [ConstraintFor]
+substituteVarIDs y x = map (\case (x', c) | x' == x -> (y, c); cf -> cf)
 
 -- Deals with I2 form section 3.4
 -- if a variable in the context has a resolvable type, there must be at least one constructor

@@ -9,7 +9,7 @@ data TypeConstructor = TBool | TPair | TEither | TInt | TThrool
 
 data Type = Type
   { typeCons :: TypeConstructor,
-    dataCons :: [DataConstructor]
+    dataCons :: Maybe [DataConstructor]
   }
   deriving (Eq, Ord)
 
@@ -25,13 +25,14 @@ data DataConstructor = DataConstructor
 instance Show DataConstructor where
   show DataConstructor { dcName = n, dcTypes = t } = "(\'" ++ T.unpack n ++ "\' <" ++ (show . length $ t) ++ ">)"
 
+-- intCon i = DataConstcutor { dcName = show i, }
 
 
 bool :: Type
 bool =
   Type
     { typeCons = TBool,
-      dataCons =
+      dataCons = Just
           [ DataConstructor {dcName = "True", dcTypes = []},
             DataConstructor {dcName = "False", dcTypes = []}
           ]
@@ -41,7 +42,7 @@ throol :: Type
 throol =
   Type
     { typeCons = TThrool,
-      dataCons =
+      dataCons = Just
           [ DataConstructor {dcName = "Foo", dcTypes = []},
             DataConstructor {dcName = "Bar", dcTypes = []},
             DataConstructor {dcName = "Baz", dcTypes = []}
@@ -52,7 +53,7 @@ pair :: Type -> Type -> Type
 pair a b =
   Type
     { typeCons = TPair,
-      dataCons =
+      dataCons = Just
           [ DataConstructor {dcName = ",", dcTypes = [a, b]}
           ]
     }
@@ -61,7 +62,7 @@ either :: Type -> Type -> Type
 either a b =
   Type
     { typeCons = TEither,
-      dataCons =
+      dataCons = Just
           [ DataConstructor {dcName = "Left", dcTypes = [a]},
             DataConstructor {dcName = "Right", dcTypes = [b]}
           ]
@@ -71,5 +72,6 @@ int :: Type
 int =
   Type
     { typeCons = TInt,
-      dataCons = []
+      -- int is an opaque type
+      dataCons = Nothing
     }

@@ -142,7 +142,9 @@ nicePattern (P.PLit i) = show i
 nicePattern (P.PVar x) = T.unpack x
 
 niceInhabPattern :: I.InhabPat -> String
-niceInhabPattern (I.IPMatch k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
-niceInhabPattern I.IPWild = "_"
-niceInhabPattern (I.IPIntLit i) = show i
-niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"
+niceInhabPattern (I.IPIs k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
+niceInhabPattern (I.IPNot []) = "_"
+niceInhabPattern (I.IPNot nots) = "(Not " ++ show nots ++ ")"
+-- niceInhabPattern I.IPWild = "_"
+-- niceInhabPattern (I.IPIntLit i) = show i
+-- niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"

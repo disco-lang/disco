@@ -7,15 +7,16 @@ module Parse where
 
 import Control.Applicative (some)
 import Control.Monad (replicateM)
+import Data.Char (isSymbol, isUpper)
 import Data.Functor (($>), (<&>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Void (Void)
-import Text.Megaparsec (Parsec, choice, satisfy, lookAhead)
+import GHC.Unicode (isDigit)
+import Text.Megaparsec (Parsec, choice, lookAhead, satisfy)
 import Text.Megaparsec.Char as C (alphaNumChar, space1, string)
 import qualified Text.Megaparsec.Char.Lexer as L
 import qualified Types as Ty
-import Data.Char (isUpper, isSymbol)
 
 data FunctionDecl where
   FunctionDecl :: Text -> Ty.Type -> Ty.Type -> FunctionDecl
@@ -88,20 +89,24 @@ pDataCons possible = choice $ map (\x -> x <$ symbol (Ty.dcName x)) possible
 pDataConsMatch :: Ty.Type -> Parser Pattern
 pDataConsMatch typeIn =
   do
-    _ <- lookAhead $ satisfy (\x -> isUpper x || x == ',')
+    _ <- lookAhead $ satisfy (\x -> isUpper x || x == ',' || isDigit x)
     let cons = Ty.dataCons typeIn
-    dataCon <- pDataCons cons
-    terms <- mapM pPattern (Ty.dcTypes dataCon) 
-    return $ PMatch dataCon terms
+    case cons of
+      Just dc -> do
+        dataCon <- pDataCons dc
+        terms <- mapM pPattern (Ty.dcTypes dataCon)
+        return $ PMatch dataCon terms
+      Nothing ->
+        if typeIn /= Ty.int
+          then error "Found opaque type that's not an int while parsing. How??"
+          else PLit <$> pInteger
 
 pPattern :: Ty.Type -> Parser Pattern
 pPattern typeIn =
   choice
-    [ 
-      pInteger <&> PLit,
-      symbol "_" $> PWild,
+    [ symbol "_" $> PWild,
       pDataConsMatch typeIn,
-      pName <&> PVar 
+      pName <&> PVar
     ]
 
 pClause :: Text -> Ty.Type -> Parser Clause

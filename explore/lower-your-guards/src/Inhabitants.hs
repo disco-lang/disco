@@ -11,9 +11,9 @@ import Data.List (nub, partition)
 import Data.Maybe (catMaybes, fromMaybe, isJust, listToMaybe, mapMaybe)
 import qualified Data.Set as S
 import qualified Fresh as F
+import qualified Possibilities as Poss
 import qualified Types as Ty
 import qualified Uncovered as U
-import qualified Possibilities as Poss
 
 type NormRefType = (U.Context, [ConstraintFor])
 
@@ -66,12 +66,10 @@ onVar :: F.VarID -> [ConstraintFor] -> [Constraint]
 onVar x cs = alistLookup (lookupVar x cs) cs
 
 data InhabPat where
-  IPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
-  IPWild :: InhabPat
-  IPIntLit :: Int -> InhabPat
-  IPNotIntLits :: [Int] -> InhabPat
+  IPIs :: Ty.DataConstructor -> [InhabPat] -> InhabPat
+  -- IPWild :: InhabPat
+  IPNot :: [Ty.DataConstructor] -> InhabPat
   deriving (Show, Eq, Ord)
-
 
 genInhab :: U.RefinementType -> U.Context -> F.Fresh (Poss.Possibilities InhabPat)
 genInhab (ctx, formula) args = do
@@ -83,54 +81,53 @@ genInhabNorm nrefs args = do
   n <- sequence [findVarInhabitants arg nref | nref <- nrefs, arg <- args]
   return $ Poss.anyOf n
 
-
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
 mkIPMatch :: Ty.DataConstructor -> [InhabPat] -> InhabPat
 mkIPMatch k pats =
   if length (Ty.dcTypes k) /= length pats
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
-    else IPMatch k pats
+    else IPIs k pats
 
 findVarInhabitants :: (F.VarID, Ty.Type) -> NormRefType -> F.Fresh (Poss.Possibilities InhabPat)
 findVarInhabitants var@(x, xType) nref@(_, cns) =
-  if xType == Ty.int
-    then case posIntMatch of
-      Just i -> Poss.retSingle $ IPIntLit i
-      Nothing -> case negIntMatch of
-        [] -> Poss.retSingle IPWild
-        is -> Poss.retSingle $ IPNotIntLits (nub is)
-    else case posMatch of
-      Just (k, ys) -> do
-        let args = zip ys (Ty.dcTypes k)
+  case posMatch of
+    Just (k, ys) -> do
+      let args = zip ys (Ty.dcTypes k)
 
-        argPats <- forM args (`findVarInhabitants` nref)
-        let argPossibilities = Poss.allCombinations argPats
+      argPats <- forM args (`findVarInhabitants` nref)
+      let argPossibilities = Poss.allCombinations argPats
 
-        return (mkIPMatch k <$> argPossibilities)
-      Nothing -> case negMatch of
-        [] -> Poss.retSingle IPWild
-        _ ->
-          do
-            let tryAddDc dc = do
-                  frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
-                  runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
+      return (mkIPMatch k <$> argPossibilities)
+    Nothing -> case negMatch of
+      [] -> Poss.retSingle $ IPNot []
+      neg ->
+        case Ty.dataCons xType of
+          Nothing ->
+            if null neg
+              then Poss.retSingle $ IPNot neg
+              else Poss.retSingle $ IPNot neg -- neg == []
+          Just dcs ->
+            do
+              let tryAddDc dc = do
+                    frs <- replicateM (length . Ty.dcTypes $ dc) (F.fresh Nothing)
+                    runMaybeT (nref `addConstraint` (x, MatchDataCon dc frs))
 
-            -- Try to add a positive constraint for each data constructor
-            -- to the current nref
-            -- If any of these additions succeed, save that nref,
-            -- it now has positive information
-            posNrefs <- catMaybes <$> forM (Ty.dataCons xType) tryAddDc
+              -- Try to add a positive constraint for each data constructor
+              -- to the current nref
+              -- If any of these additions succeed, save that nref,
+              -- it now has positive information
+              posNrefs <- catMaybes <$> forM dcs tryAddDc
 
-            if null posNrefs
-              then Poss.retSingle IPWild
-              else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
+              if null posNrefs
+                then Poss.retSingle $ IPNot []
+                else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar x cns
     posMatch = listToMaybe $ mapMaybe (\case MatchDataCon k ys -> Just (k, ys); _ -> Nothing) constraintsOnX
     negMatch = mapMaybe (\case NotDataCon k -> Just k; _ -> Nothing) constraintsOnX
-    posIntMatch = listToMaybe $ mapMaybe (\case MatchIntLit i -> Just i; _ -> Nothing) constraintsOnX
-    negIntMatch = mapMaybe (\case NotIntLit i -> Just i; _ -> Nothing) constraintsOnX
+    -- posIntMatch = listToMaybe $ mapMaybe (\case MatchIntLit i -> Just i; _ -> Nothing) constraintsOnX
+    -- negIntMatch = mapMaybe (\case NotIntLit i -> Just i; _ -> Nothing) constraintsOnX
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
@@ -232,13 +229,13 @@ substituteVarIDs y x = map (\case (x', c) | x' == x -> (y, c); cf -> cf)
 -- if a variable in the context has a resolvable type, there must be at least one constructor
 -- which can be instantiated without contradiction of the refinement type
 -- This function tests if this is true
+-- NOTE: we may eventually have type constraints
+-- and we would need to worry pulling them from nref here
 inhabited :: NormRefType -> F.VarID -> Ty.Type -> F.Fresh Bool
-inhabited n x tau = or <$> mapM (instantiate n x) (constructors n tau)
-
--- the NormRefType is taken in because we may eventually have type constraints
--- and we would need to worry about that here
-constructors :: NormRefType -> Ty.Type -> [Ty.DataConstructor]
-constructors _ Ty.Type {Ty.dataCons = ks} = ks
+inhabited n x tau = case Ty.dataCons tau of
+  Nothing -> return True -- assume opaque types are inhabited
+  Just constructors -> do
+    or <$> mapM (instantiate n x) constructors
 
 -- Attempts to "instantiate" a match of the dataconstructor k on x
 -- If we can add the MatchDataCon constraint to the normalized refinement

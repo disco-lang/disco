@@ -452,4 +452,4 @@ loadDef x body = do
 checkExhaustive :: Members '[Fresh, Embed IO] r => Defn -> Sem r ()
 checkExhaustive (Defn name argsType _ boundClauses) = do
   clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
-  checkClauses clauses
+  checkClauses argsType clauses

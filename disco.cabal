@@ -447,6 +447,7 @@ library
                        Disco.Eval
                        Disco.Exhaustiveness
                        Disco.Exhaustiveness.TypeInfo
+                       Disco.Exhaustiveness.Possibilities
                        Disco.Interpret.CESK
                        Disco.Subst
                        Disco.Typecheck

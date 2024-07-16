@@ -12,6 +12,6 @@ which can be used on them.
    size
    cp
    ellipsis
-   set-ops
+   container-ops
    power
    comprehension

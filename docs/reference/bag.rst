@@ -96,4 +96,7 @@ of each element there are.
        Disco> 2 ∈ ⟅1,2,3⟆
        T
 
-XXX operations on bags: intersection, union, power
+Bags support various operations, including :doc:`size <size>`,
+:doc:`union <container-ops>`, :doc:`intersection <container-ops>`,
+:doc:`difference <container-ops>`, :doc:`subset <container-ops>`, and :doc:`power set <power>`.
+

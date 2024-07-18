@@ -2,10 +2,12 @@
 
 module Disco.Exhaustiveness where
 
-import Control.Monad (replicateM, when, zipWithM, forM)
+import Control.Monad (forM, replicateM, when, zipWithM)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
+import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Maybe (catMaybes, listToMaybe, mapMaybe)
 import Disco.AST.Typed
   ( APattern,
     ATerm,
@@ -19,65 +21,72 @@ import Disco.AST.Typed
     pattern APWild,
   )
 import Disco.Effects.Fresh (Fresh, fresh)
+import qualified Disco.Exhaustiveness.Constraint as C
 import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import qualified Disco.Types as Ty
 import Polysemy
 import Text.Show.Pretty (pPrint)
 import Unbound.Generics.LocallyNameless (Name, s2n)
-import Data.List (nub)
-import Data.Maybe (catMaybes, mapMaybe, listToMaybe)
 
 checkClauses :: (Members '[Fresh, Embed IO] r) => [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses types pats = do
-  let relTypes = map TI.extractRelevant types
-  cl <- zipWithM (desugarClause relTypes) [1 ..] (NonEmpty.toList pats)
+  args <- TI.newVars (map TI.extractRelevant types)
+  cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
   let gdt = foldr1 Branch cl
 
-  embed $ pPrint gdt
+  let argsNref = (C.Context args, [])
+  (normalizedNrefs, annotated) <- ua [argsNref] gdt
+
+  inhab <- Poss.getPossibilities <$> findInhabitants normalizedNrefs args
+
+  redundant <- findRedundant annotated args
+
+  when False $ do
+    embed $ putStrLn "=====DEBUG=============================="
+    embed $ putStrLn "GDT:"
+    embed $ pPrint gdt
+    embed $ putStrLn "UNCOVERED:"
+    embed $ pPrint inhab
+    embed $ putStrLn "REDUNDANT:"
+    embed $ pPrint redundant
+    embed $ putStrLn "=====GUBED=============================="
+
+  let jspace = foldr (\a b -> a ++ " " ++ b) ""
+
+  when (not . null $ inhab) $ do
+    embed $ putStrLn "Warning: You haven't matched against:"
+    embed $ mapM_ (putStrLn . jspace . map prettyInhab) inhab
+  -- embed $ mapM_ (putStrLn . show) inhab
+
+  when (not . null $ redundant) $ do
+    embed $ putStrLn "Warning: These clause numbers (1-indexed) are redundant"
+    embed $ putStrLn $ show redundant
+
   return ()
 
--- TODO: should these really just be blank names?
-newName :: (Member Fresh r) => Sem r (Name ATerm)
-newName = fresh $ s2n ""
-
-newNames :: (Member Fresh r) => Int -> Sem r [Name ATerm]
-newNames i = replicateM i newName
-
-newVars :: Member Fresh r => [b] -> Sem r [(Name ATerm, b)]
-newVars types = do
-  names <- newNames (length types)
-  return $ zip names types
-
-desugarClause :: (Members '[Fresh, Embed IO] r) => [TI.Type] -> Int -> [APattern] -> Sem r Gdt
-desugarClause types clauseIdx args = do
-  vars <- newVars types
-  -- embed $ putStr "YO: "
-  -- embed $ pPrint names
-  guards <- zipWithM desugarMatch vars args
+desugarClause :: (Members '[Fresh, Embed IO] r) => [TI.TypedVar] -> Int -> [APattern] -> Sem r Gdt
+desugarClause args clauseIdx argsPats = do
+  guards <- zipWithM desugarMatch args argsPats
   return $ foldr Guarded (Grhs clauseIdx) $ concat guards
-
-type TypedVar = (Name ATerm, TI.Type)
-
--- maybe `varsBound` will be useful later?
 
 -- borrowed from `extra`
 allSame :: (Eq a) => [a] -> Bool
 allSame [] = True
 allSame (x : xs) = all (x ==) xs
 
-desugarMatch :: (Members '[Fresh, Embed IO] r) => TypedVar -> APattern -> Sem r [Guard]
+desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = do
   case pat of
     (APWild _) -> return []
     (APVar ty name) -> do
-      return $ [(var, GHerebyBe (name, TI.extractRelevant ty))]
+      return $ [(var, GHerebyBe $ TI.TypedVar (name, TI.extractRelevant ty))]
     (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
     (APUnit) -> return [(var, GMatch TI.unit [])]
     (APBool b) -> return [(var, GMatch (TI.bool b) [])]
     (APTup _ subs) -> do
       let types = map (TI.extractRelevant . Ty.getType) subs
-      vars <- newVars types
+      vars <- TI.newVars types
       guards <- sequence $ zipWith desugarMatch vars subs
       return $ (var, (GMatch (TI.tuple types) vars)) : concat guards
     (APList _ subs) -> do
@@ -85,18 +94,18 @@ desugarMatch var pat = do
       when
         (not . allSame $ types)
         (embed . putStrLn $ "WARNING, mismatched types in list!: " ++ show types)
-      vars <- newVars types
+      vars <- TI.newVars types
       guards <- sequence $ zipWith desugarMatch vars subs
       return $ (var, (GMatch (TI.list types) vars)) : concat guards
     (APCons _ subHead subTail) -> do
       embed $ putStr "Cons: "
       embed $ pPrint (subHead, subTail)
-      nameHead <- newName
-      nameTail <- newName
+      nameHead <- TI.newName
+      nameTail <- TI.newName
       let typeHead = (TI.extractRelevant . Ty.getType) subHead
       let typeTail = (TI.extractRelevant . Ty.getType) subTail
-      let varHead = (nameHead, typeHead)
-      let varTail = (nameTail, typeTail)
+      let varHead = TI.TypedVar (nameHead, typeHead)
+      let varTail = TI.TypedVar (nameTail, typeTail)
       guardsHead <- desugarMatch varHead subHead
       guardsTail <- desugarMatch varTail subTail
       return $ (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail])) : guardsHead ++ guardsTail
@@ -109,61 +118,31 @@ data Gdt where
   Guarded :: Guard -> Gdt -> Gdt
   deriving (Show, Eq)
 
-type Guard = (TypedVar, GuardConstraint)
+type Guard = (TI.TypedVar, GuardConstraint)
 
 data GuardConstraint where
-  GMatch :: TI.DataCon -> [TypedVar] -> GuardConstraint
-  GHerebyBe :: TypedVar -> GuardConstraint
+  GMatch :: TI.DataCon -> [TI.TypedVar] -> GuardConstraint
+  GHerebyBe :: TI.TypedVar -> GuardConstraint
   deriving (Show, Eq)
-
-data DataCon where
-  KUnit :: DataCon
-  Bool :: Bool -> DataCon
-  Tuple :: [TypedVar] -> DataCon
-  List :: [TypedVar] -> DataCon
-  Cons :: TypedVar -> TypedVar -> DataCon
-  deriving (Show, Eq, Ord)
-
-data DataConName = NUnit | NBool Bool | NTuple | NList | NCons
-  deriving (Show, Eq, Ord)
-
-getName :: DataCon -> DataConName
-getName KUnit = NUnit
-getName (Bool b) = NBool b
-getName (Tuple _) = NTuple
-getName (List _) = NList
-getName (Cons _ _) = NCons
 
 data Literal where
   T :: Literal
   F :: Literal
-  LitCond :: (TypedVar, LitCond) -> Literal
+  LitCond :: (TI.TypedVar, LitCond) -> Literal
   deriving (Show, Eq, Ord)
 
 data LitCond where
-  LitMatch :: TI.DataCon -> [TypedVar] -> LitCond
+  LitMatch :: TI.DataCon -> [TI.TypedVar] -> LitCond
   LitNot :: TI.DataCon -> LitCond
-  LitHerebyBe :: TypedVar -> LitCond
-  deriving (Show, Eq, Ord)
-
-type NormRefType = (Context, [ConstraintFor])
-
-type ConstraintFor = (TypedVar, Constraint)
-
-type Context = [TypedVar]
-
-data Constraint where
-  CMatch :: TI.DataCon -> [TypedVar] -> Constraint
-  CNot :: TI.DataCon -> Constraint
-  CHerebyBe :: TypedVar -> Constraint
+  LitHerebyBe :: TI.TypedVar -> LitCond
   deriving (Show, Eq, Ord)
 
 data Ant where
-  AGrhs :: [NormRefType] -> Int -> Ant
+  AGrhs :: [C.NormRefType] -> Int -> Ant
   ABranch :: Ant -> Ant -> Ant
   deriving (Show)
 
-ua :: (Member Fresh r) => [NormRefType] -> Gdt -> Sem r ([NormRefType], Ant)
+ua :: (Member Fresh r) => [C.NormRefType] -> Gdt -> Sem r ([C.NormRefType], Ant)
 ua nrefs gdt = case gdt of
   Grhs k -> return ([], AGrhs nrefs k)
   Branch t1 t2 -> do
@@ -179,7 +158,7 @@ ua nrefs gdt = case gdt of
     n'' <- addLitMulti nrefs $ LitCond (x, LitNot dc)
     return (n'' ++ n', u)
 
-addLitMulti :: (Members '[Fresh] r) => [NormRefType] -> Literal -> Sem r [NormRefType]
+addLitMulti :: (Members '[Fresh] r) => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
 addLitMulti [] _ = return []
 addLitMulti (n : ns) lit = do
   r <- runMaybeT $ addLiteral n lit
@@ -189,38 +168,42 @@ addLitMulti (n : ns) lit = do
       ns' <- addLitMulti ns lit
       return $ (ctx, cfs) : ns'
 
-redundantNorm :: (Member Fresh r) => Ant -> Context -> Sem r [Int]
-redundantNorm ant args = case ant of
-  AGrhs ref i -> do
-    inhabited <- null <$> genInhab ref args
-    return [i | inhabited]
-  ABranch a1 a2 -> mappend <$> redundantNorm a1 args <*> redundantNorm a2 args
-
-addLiteral :: (Members '[Fresh] r) => NormRefType -> Literal -> MaybeT (Sem r) NormRefType
-addLiteral n@(context, constraints) flit = case flit of
+addLiteral :: (Members '[Fresh] r) => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
+addLiteral (context, constraints) flit = case flit of
   F -> MaybeT $ pure Nothing
-  T -> return n
+  T -> return (context, constraints)
   LitCond (x, c) -> case c of
-    LitHerebyBe z -> (n <> ([z], [])) `addConstraint` (x, CHerebyBe z)
-    LitMatch dc args -> (n <> (args, [])) `addConstraint` (x, CMatch dc args)
-    LitNot dc -> n `addConstraint` (x, CNot dc)
-
--- Tuple types names -> (context ++ zip names types, constraints) `addConstraint` (x, CIs $ Tuple names)
--- List :: [Name ATerm] -> DataCon
--- Cons :: Name ATerm -> Name ATerm -> DataCon
-
--- MatchDataCon k ys x -> (context ++ zip ys (Ty.dcTypes k), constraints) `addConstraint` (x, MatchDataCon k ys)
--- NotDataCon k x -> n `addConstraint` (x, NotDataCon k)
+    LitHerebyBe z ->
+      (context `C.addVars` [z], constraints) `C.addConstraint` (x, C.CHerebyBe z)
+    LitMatch dc args ->
+      (context `C.addVars` args, constraints) `C.addConstraint` (x, C.CMatch dc args)
+    LitNot dc ->
+      (context, constraints) `C.addConstraint` (x, C.CNot dc)
 
 data InhabPat where
   IPIs :: TI.DataCon -> [InhabPat] -> InhabPat
   IPNot :: [TI.DataCon] -> InhabPat
   deriving (Show, Eq, Ord)
 
-genInhab :: (Members '[Fresh] r) => [NormRefType] -> Context -> Sem r (Poss.Possibilities InhabPat)
-genInhab nrefs args = do
-  n <- sequence [findVarInhabitants arg nref | nref <- nrefs, arg <- args]
-  return $ Poss.anyOf n
+join j a b = a ++ j ++ b
+
+joinComma = foldl (join ", ") ""
+
+joinSpace = foldl (join " ") ""
+
+prettyInhab :: InhabPat -> String
+prettyInhab (IPNot []) = "_"
+prettyInhab (IPNot nots) = "Not{" ++ joinComma (map dcToString nots) ++ "}"
+prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KTuple, TI.dcTypes = _} args) =
+  "(" ++ joinComma (map prettyInhab args) ++ ")"
+prettyInhab (IPIs dc []) = dcToString dc
+prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
+
+dcToString TI.DataCon {TI.dcIdent = TI.KNat n} = show n
+dcToString TI.DataCon {TI.dcIdent = TI.KBool b} = show b
+dcToString TI.DataCon {TI.dcIdent = TI.KUnit} = "Unit"
+dcToString TI.DataCon {TI.dcIdent = TI.KTuple} = "Tuple?"
+dcToString TI.DataCon {TI.dcIdent = _} = "AAAAA"
 
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
@@ -230,24 +213,32 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPIs k pats
 
-findVarInhabitants :: (Members '[Fresh] r) => TypedVar -> NormRefType -> Sem r (Poss.Possibilities InhabPat)
+findInhabitants :: (Members '[Fresh] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+findInhabitants nrefs args = do
+  a <- forM nrefs (`findAllForNref` args)
+  return $ Poss.anyOf a
+
+findAllForNref :: (Member Fresh r) => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+findAllForNref nref args = do
+  argPats <- forM args (`findVarInhabitants` nref)
+  return $ Poss.allCombinations argPats
+
+findVarInhabitants :: (Members '[Fresh] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
 findVarInhabitants var nref@(_, cns) =
   case posMatch of
     Just (k, args) -> do
-      argPats <- forM args (`findVarInhabitants` nref)
-      let argPossibilities = Poss.allCombinations argPats
-
+      argPossibilities <- findAllForNref nref args
       return (mkIPMatch k <$> argPossibilities)
-    Nothing -> case nub negMatch of
+    Nothing -> case nub negMatches of
       [] -> Poss.retSingle $ IPNot []
       neg ->
-        case TI.tyDataCons (snd var) of
+        case TI.tyDataCons . TI.getType $ var of
           Nothing -> Poss.retSingle $ IPNot neg
           Just dcs ->
             do
               let tryAddDc dc = do
-                    vars <- newVars (TI.dcTypes dc)
-                    runMaybeT (nref `addConstraint` (var, CMatch dc vars))
+                    vars <- TI.newVars (TI.dcTypes dc)
+                    runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
 
               -- Try to add a positive constraint for each data constructor
               -- to the current nref
@@ -259,11 +250,13 @@ findVarInhabitants var nref@(_, cns) =
                 then Poss.retSingle $ IPNot []
                 else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
-    constraintsOnX = onVar var cns
-    posMatch = listToMaybe $ mapMaybe (\case (CMatch k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
-    negMatch = mapMaybe (\case (CNot k) -> Just k; _ -> Nothing) constraintsOnX
+    constraintsOnX = C.onVar var cns
+    posMatch = C.posMatch constraintsOnX
+    negMatches = C.negMatches constraintsOnX
 
-,,,TODO I recommend breaking things up into a "Constraint.hs" file, which imports a "Context.hs" file, in
-        which we make Context a newtype instead of a alias for a pair, and expose the correct functions
-        adding constraints shouldn't depend on how the context is implemented
-        the only weird thing is going to be the substituting all the variables for the herebys
+findRedundant :: (Member Fresh r) => Ant -> [TI.TypedVar] -> Sem r [Int]
+findRedundant ant args = case ant of
+  AGrhs ref i -> do
+    uninhabited <- Poss.none <$> findInhabitants ref args
+    return [i | uninhabited]
+  ABranch a1 a2 -> mappend <$> findRedundant a1 args <*> findRedundant a2 args

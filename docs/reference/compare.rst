@@ -8,7 +8,7 @@ always return a :doc:`boolean <bool>` value.
 Values of almost any type can be compared: :doc:`numeric types
 <numeric>`, :doc:`booleans <bool>`, :doc:`characters <char>`,
 :doc:`strings <string>`, and any :doc:`pair <product-type>`,
-:doc:`sum <sum-type>`, or :doc:`container <container>` types built out
+:doc:`sum <sum-type>`, or :doc:`collection <collections>` types built out
 of these.  For example, sets of pairs of natural numbers and strings
 can be compared:
 

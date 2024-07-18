@@ -23,5 +23,6 @@ them.
    function
    collections
    combinatorics
+   library
    errors
    symbols

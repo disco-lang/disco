@@ -56,5 +56,5 @@ To check whether a set contains a given element, one can use the
    T
 
 Sets support various operations, including :doc:`size <size>`,
-:doc:`union <container-ops>`, :doc:`intersection <container-ops>`,
-:doc:`difference <container-ops>`, :doc:`subset <container-ops>`, and :doc:`power set <power>`.
+:doc:`union <collection-ops>`, :doc:`intersection <collection-ops>`,
+:doc:`difference <collection-ops>`, :doc:`subset <collection-ops>`, and :doc:`power set <power>`.

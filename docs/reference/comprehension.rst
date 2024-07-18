@@ -1,7 +1,7 @@
 Comprehensions
 ==============
 
-*Comprehension* notation can be used to describe collections such as
+*Comprehension* notation can be used to describe :doc:`collections <collections>` such as
 :doc:`sets <set>` or :doc:`lists <list>`.  The general syntax for a
 set comprehension is
 
@@ -15,7 +15,8 @@ some examples below; for the precise details, see the
 `Details`_ section.
 
 :doc:`List <list>` comprehensions are similar, but use square brackets
-(``[``, ``]``) instead of curly braces (``{``, ``}``).
+(``[``, ``]``) instead of curly braces (``{``, ``}``); :doc:`bag
+<bag>` comprehensions use bag brackets (``⟅``, ``⟆``).
 
 Examples
 --------
@@ -96,10 +97,17 @@ Specification
 .. note::
 
    In case you are curious about the precise definition and are not
-   afraid of the details, the exact way that set comprehensions
+   afraid of the details, the exact way that comprehensions
    work can be defined by the following three equations, making use of
-   the standard functions ``each`` and ``unions``:
+   the standard functions ``each`` and ``join``:
 
    * ``{ e | } = e``
-   * ``{ e | x in xs, gs } = unions(each(\x. {e | gs}, xs))``
+   * ``{ e | x in xs, gs } = join(each(\x. {e | gs}, xs))``
    * ``{ e | g, gs } = {? { e | gs } if g, {} otherwise ?}``
+
+   ``join`` is not directly available to users, but:
+
+   - For lists, ``join`` is equivalent to ``concat``
+   - For sets, ``join`` is equivalent to ``unions``
+   - For bags, ``join`` is equivalent to a straightforward
+     generalization of ``unions`` to work on bags instead of sets

@@ -2,15 +2,14 @@
 
 module Disco.Exhaustiveness where
 
-import Control.Monad (forM, replicateM, when, zipWithM)
+import Control.Monad (forM, when, zipWithM)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
-import Data.Maybe (catMaybes, listToMaybe, mapMaybe)
+import Data.Maybe (catMaybes)
 import Disco.AST.Typed
   ( APattern,
-    ATerm,
     pattern APBool,
     pattern APCons,
     pattern APList,
@@ -20,14 +19,13 @@ import Disco.AST.Typed
     pattern APVar,
     pattern APWild,
   )
-import Disco.Effects.Fresh (Fresh, fresh)
+import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
 import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import qualified Disco.Types as Ty
 import Polysemy
 import Text.Show.Pretty (pPrint)
-import Unbound.Generics.LocallyNameless (Name, s2n)
 
 checkClauses :: (Members '[Fresh, Embed IO] r) => [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses types pats = do
@@ -75,6 +73,13 @@ allSame :: (Eq a) => [a] -> Bool
 allSame [] = True
 allSame (x : xs) = all (x ==) xs
 
+-- TODO: explain. this was a pain
+desugarTuplePats :: [APattern] -> APattern
+desugarTuplePats [] = error "Found empty tuple, what happened?"
+desugarTuplePats [p] = p
+desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) [pfst, psnd]
+  where psnd = desugarTuplePats rest
+
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = do
   case pat of
@@ -84,12 +89,22 @@ desugarMatch var pat = do
     (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
     (APUnit) -> return [(var, GMatch TI.unit [])]
     (APBool b) -> return [(var, GMatch (TI.bool b) [])]
-    (APTup _ subs) -> do
-      let types = map (TI.extractRelevant . Ty.getType) subs
-      vars <- TI.newVars types
-      guards <- sequence $ zipWith desugarMatch vars subs
-      return $ (var, (GMatch (TI.tuple types) vars)) : concat guards
+    (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do
+      let tia = TI.extractRelevant ta
+      let tib = TI.extractRelevant tb
+
+      varFst <- TI.newVar tia
+      varSnd <- TI.newVar tib
+
+      guardsFst <- desugarMatch varFst pfst
+      guardsSnd <- desugarMatch varSnd psnd
+
+      let guardPair = (var, GMatch (TI.pair tia tib) [varFst, varSnd])
+      return $ [guardPair] ++ guardsFst ++ guardsSnd
+    (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
+    (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
     (APList _ subs) -> do
+      -- TODO: review, will this be a problem like tuples?
       let types = map (TI.extractRelevant . Ty.getType) subs
       when
         (not . allSame $ types)
@@ -98,17 +113,16 @@ desugarMatch var pat = do
       guards <- sequence $ zipWith desugarMatch vars subs
       return $ (var, (GMatch (TI.list types) vars)) : concat guards
     (APCons _ subHead subTail) -> do
-      embed $ putStr "Cons: "
-      embed $ pPrint (subHead, subTail)
-      nameHead <- TI.newName
-      nameTail <- TI.newName
+      -- TODO: review, will this be a problem like tuples?
       let typeHead = (TI.extractRelevant . Ty.getType) subHead
       let typeTail = (TI.extractRelevant . Ty.getType) subTail
-      let varHead = TI.TypedVar (nameHead, typeHead)
-      let varTail = TI.TypedVar (nameTail, typeTail)
+      varHead <- TI.newVar typeHead
+      varTail <- TI.newVar typeTail
       guardsHead <- desugarMatch varHead subHead
       guardsTail <- desugarMatch varTail subTail
-      return $ (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail])) : guardsHead ++ guardsTail
+      let guardCons = (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail]))
+      return $ [guardCons] ++ guardsHead ++ guardsTail
+    -- TODO: consider the rest of the patterns
     -- (APAdd)
     e -> return []
 
@@ -185,24 +199,30 @@ data InhabPat where
   IPNot :: [TI.DataCon] -> InhabPat
   deriving (Show, Eq, Ord)
 
+join :: [a] -> [a] -> [a] -> [a]
 join j a b = a ++ j ++ b
 
-joinComma = foldl (join ", ") ""
+joinComma :: [String] -> String
+joinComma = foldr1 (join ", ")
 
-joinSpace = foldl (join " ") ""
+joinSpace :: [String] -> String
+joinSpace = foldr1 (join " ")
 
+-- TODO: maybe fully print out tuples even if they have wildcars in the middle?
+-- e.g. (1,_,_) instead of just (1,_)
 prettyInhab :: InhabPat -> String
 prettyInhab (IPNot []) = "_"
 prettyInhab (IPNot nots) = "Not{" ++ joinComma (map dcToString nots) ++ "}"
-prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KTuple, TI.dcTypes = _} args) =
-  "(" ++ joinComma (map prettyInhab args) ++ ")"
+prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd]) =
+  "(" ++ prettyInhab ifst ++ ", " ++ prettyInhab isnd ++ ")"
 prettyInhab (IPIs dc []) = dcToString dc
 prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
 
+dcToString :: TI.DataCon -> String
 dcToString TI.DataCon {TI.dcIdent = TI.KNat n} = show n
 dcToString TI.DataCon {TI.dcIdent = TI.KBool b} = show b
 dcToString TI.DataCon {TI.dcIdent = TI.KUnit} = "Unit"
-dcToString TI.DataCon {TI.dcIdent = TI.KTuple} = "Tuple?"
+dcToString TI.DataCon {TI.dcIdent = TI.KPair} = "Pair?"
 dcToString TI.DataCon {TI.dcIdent = _} = "AAAAA"
 
 -- Sanity check: are we giving the dataconstructor the

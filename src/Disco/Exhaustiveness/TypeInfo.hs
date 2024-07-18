@@ -61,7 +61,7 @@ data Ident where
   KBool :: Bool -> Ident
   KNat :: Integer -> Ident
   KPair :: Ident
-  KTuple :: Ident
+  -- KTuple :: Ident
   KList :: Ident
   KCons :: Ident
   KDummy :: Ident
@@ -73,9 +73,6 @@ unit = DataCon {dcIdent = KUnit, dcTypes = []}
 bool :: Bool -> DataCon
 bool b = DataCon {dcIdent = KBool b, dcTypes = []}
 
-tuple :: [Type] -> DataCon
-tuple types = DataCon {dcIdent = KTuple, dcTypes = types}
-
 natural :: Integer -> DataCon
 natural n = DataCon {dcIdent = KNat n, dcTypes = []}
 
@@ -86,6 +83,9 @@ list types = DataCon {dcIdent = KList, dcTypes = types}
 
 cons :: Type -> Type -> DataCon
 cons tHead tTail = DataCon {dcIdent = KCons, dcTypes = [tHead, tTail]}
+
+pair :: Type -> Type -> DataCon
+pair a b = DataCon {dcIdent = KPair, dcTypes = [a, b]}
 
 extractRelevant :: Ty.Type -> Type
 -- extractRelevant Ty.TyVoid = Just []
@@ -102,14 +102,14 @@ extractRelevant t@(a Ty.:*: b) =
 -- extractRelevant (a Ty.:->: b) = enumFunction (enumType a) (enumType b)
 -- extractRelevant (Ty.TySet t) = ?
 -- extractRelevant (Ty.TyList t) = ?
-extractRelevant Ty.TyBool =
+extractRelevant t@Ty.TyBool =
   Type
-    { tyIdent = Ty.TyBool,
+    { tyIdent = t,
       tyDataCons = Just [bool True, bool False]
     }
-extractRelevant Ty.TyUnit =
+extractRelevant t@Ty.TyUnit =
   Type
-    { tyIdent = Ty.TyUnit,
+    { tyIdent = t,
       tyDataCons = Just [unit]
     }
 extractRelevant t@Ty.TyN = Type {tyIdent = t, tyDataCons = Nothing}
@@ -124,6 +124,11 @@ extractRelevant t = Type {tyIdent = t, tyDataCons = Nothing}
 -- TODO: should these really just be blank names?
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""
+
+newVar :: (Member Fresh r) => Type -> Sem r TypedVar
+newVar types = do
+  names <- newName
+  return $ TypedVar $ (names, types)
 
 newNames :: (Member Fresh r) => Int -> Sem r [Name ATerm]
 newNames i = replicateM i newName

@@ -47,6 +47,33 @@ onVar x cs = alistLookup (lookupVar x cs) cs
 
 type NormRefType = (Context, [ConstraintFor])
 
+{-
+ TODO: fix this!
+FIXME: big bug!
+
+in haskell, look at this:
+
+thing :: (Int, Bool) -> ()
+thing (n,True) = ()
+thing (0,n) = ()
+
+haskell reports (p, False) uncovered where p is one of {0}
+
+but our solver just responds with (_, False) uncovered.
+Its dropping the info about the 0!!!
+
+This is present in my test implementation,
+I just didn't discover it until now :[
+
+Clue discovered!
+If we swap these like this:
+thing (0,n) = unit
+thing (n,True) = unit
+Our solver actually gets this right!
+
+This is a good clue to start with
+-}
+
 addConstraints :: (Members '[Fresh] r) => NormRefType -> [ConstraintFor] -> MaybeT (Sem r) NormRefType
 addConstraints = foldM addConstraint
 

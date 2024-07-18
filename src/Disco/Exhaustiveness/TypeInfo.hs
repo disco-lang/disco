@@ -7,29 +7,6 @@ import qualified Disco.Types as Ty
 import Polysemy
 import Unbound.Generics.LocallyNameless (Name, s2n)
 
-{-
-
-Motivation:
-
-Imagine the function
-
-foo : N * N * N -> Unit
-foo (x,y,z) -> unit
-foo (x,(y,z)) -> unit
-
-So, we must make the decision on how we want to report back
-the uncovered patterns
-I am choosing to preserve the visual structure of what the user put in,
-So I must turn these product types into tuples, in order to get
-back out a similar pattern.
-
-I cannot look to Haskell for guidance, as
-(Int,Int,Int) /= (Int,(Int,Int)) in Haskell
-
-Also having convient lists of types and constructors
-Makes the algorithm easier to implement
--}
-
 newtype TypedVar = TypedVar (Name ATerm, Type)
   deriving (Show, Ord)
 

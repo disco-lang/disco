@@ -34,6 +34,5 @@ is a :doc:`subtype <subtypes>` of the one it was expecting.
    type-annot
    algebraic-types
    typedef
-   collection-types
    prop
    subtypes

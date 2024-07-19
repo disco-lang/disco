@@ -9,6 +9,10 @@ used on them.
 
 .. toctree::
 
+   list
+   string
+   set
+   bag
    size
    cp
    ellipsis

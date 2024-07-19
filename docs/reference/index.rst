@@ -24,5 +24,6 @@ them.
    collections
    combinatorics
    library
+   REPL
    errors
    symbols

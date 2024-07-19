@@ -15,7 +15,7 @@ Importing a module is done by writing, *e.g.*
 
    import num
 
-at the *top* of your ``.disco`` file (or at the :doc:`REPL`).  Replace
+at the *top* of your ``.disco`` file (or at the :doc:`REPL <REPL>`).  Replace
 ``num`` with the name of whatever file you want to import (without the
 ``.disco`` suffix).  For example, to import ``myfunctions.disco`` you
 could write

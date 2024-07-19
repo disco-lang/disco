@@ -18,6 +18,13 @@ which are evaluated.  However, you can also enter :doc:`definitions
 various special REPL commands, listed below.  All the special REPL
 commands begin with a colon.
 
+``:{`` / ``:}``
+---------------
+
+You can enter a multi-line input (*e.g.* a whole function definition)
+at the REPL by first entering ``:{``, then entering all the lines you
+want, then typing ``:}`` when you're done.
+
 ``:help``
 ---------
 

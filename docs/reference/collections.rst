@@ -22,3 +22,5 @@ used on them.
    filter
    comprehension
    boom
+   map
+   graph

@@ -1,5 +1,15 @@
 module Play where
 
+thing :: (Int, Bool) -> ()
+thing (n,True) = ()
+thing (0,n) = ()
+
+triple :: (Int, Int, Int) -> ()
+triple (7, 5, 3) = ()
+
+triple2 :: (Int, (Int, Int)) -> ()
+triple2 (7, (5, 3)) = ()
+
 foo :: (Either Int Bool, Int) -> Bool
 foo (Left  1     , 2) = True
 foo (Right False , n) = True

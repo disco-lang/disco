@@ -16,5 +16,5 @@ annotated ref gdt = case gdt of
   G.Branch t1 t2 -> Branch (annotated ref t1) (annotated (U.uncovered ref t1) t2)
   G.Guarded (var, g) t -> case g of
     G.GMatch k args -> annotated (ref `U.liftAndLit` varInfo (Match k args)) t
-    G.GBe new -> annotated (ref `U.liftAndLit` varInfo (HerebyBe new)) t
+    G.GWas new -> annotated (ref `U.liftAndLit` varInfo (WasOriginally new)) t
     where varInfo = U.Info var

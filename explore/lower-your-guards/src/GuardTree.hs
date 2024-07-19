@@ -18,7 +18,7 @@ data Gdt where
 
 data Guard where
   GMatch :: Ty.DataConstructor -> [TypedVar] -> Guard
-  GBe :: TypedVar -> Guard
+  GWas :: TypedVar -> Guard
   deriving (Show, Eq)
 
 enumerate :: NonEmpty a -> NonEmpty (Int, a)
@@ -42,7 +42,7 @@ desugarMatch var@(_,ty) pat = do
     P.PVar name -> do
       x <- F.fresh (Just name)
       let xTy = (x, ty)
-      return [(var, GBe xTy)]
+      return [(xTy, GWas var)]
     P.PMatch dataCon subPats -> do
       ys <- replicateM (length subPats) (F.fresh Nothing)
       let typedYs = zip ys (Ty.dcTypes dataCon)

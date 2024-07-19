@@ -1,0 +1,44 @@
+<h1 id="good-case">Good Case</h1>
+<p>Expected behavior</p>
+<pre class="disc"><code>foo : , Int Bool -&gt; Bool
+foo , 0 n = False
+foo , n True = False</code></pre>
+<p>outputs:</p>
+<pre><code>Uncoverd Pattern: , (Not 0) False
+Redundant Clauses: []</code></pre>
+<h1 id="bad-case-1">Bad Case 1</h1>
+<p>Is exactly the same as the good case, but with the clauses swapped.
+Forgets about the zero for some reason</p>
+<pre class="disc"><code>foo : , Int Bool -&gt; Bool
+foo , n True = False
+foo , 0 n = False</code></pre>
+<p>outputs:</p>
+<pre><code>Uncovered Pattern: , _ False
+Redundant Clauses: []</code></pre>
+<h1 id="bad-case-2">Bad Case 2</h1>
+<p>Is exactly the same as the good case, but with the fist clause added
+to the end. But this isn’t reported as redundant!!!</p>
+<pre><code>foo : , Int Bool -&gt; Bool
+foo , 0 n = False
+foo , n True = False
+foo , 0 n = False</code></pre>
+<p>outputs:</p>
+<pre><code>Uncoverd Pattern: , (Not 0) False
+Redundant Clauses: []</code></pre>
+<h1 id="thoughts">Thoughts</h1>
+<p>These two clauses in this order seem to cause problems</p>
+<pre><code>foo : , Int Bool -&gt; Bool
+...
+foo , n True = False
+foo , 0 n = False</code></pre>
+<p>And, this configuration always seems to not report (3) as a
+redundancy</p>
+<pre><code>foo : , Int Bool -&gt; Bool
+...
+foo , 0 n = False
+foo , n True = False
+foo , 0 n = False        (3)
+...</code></pre>
+<h1 id="possible">Possible</h1>
+<p>UA bug?</p>
+<p>No. Tested on the old uncovered function, same deal</p>

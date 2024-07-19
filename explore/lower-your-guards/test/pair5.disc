@@ -1,0 +1,18 @@
+
+foo : , Int Bool -> Bool
+foo , n True = False
+foo , 0 n = False
+
+// This currently only reports (_, False) as uncoverd.
+// TODO: Should we instead be reporiting (Not{0}, False)?
+
+// NOTE:
+// reversing the order actually fixes this! (though that should not matter)
+// having this:
+//
+// foo , 0 n = False
+// foo , n True = False
+//
+// reports things correctly.
+// 
+// So that is at least a clue

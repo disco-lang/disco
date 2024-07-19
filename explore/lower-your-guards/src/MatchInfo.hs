@@ -7,7 +7,7 @@ import qualified Types as Ty
 data MatchInfo where
   Match :: Ty.DataConstructor -> [TypedVar] -> MatchInfo
   Not :: Ty.DataConstructor -> MatchInfo
-  HerebyBe :: TypedVar -> MatchInfo
+  WasOriginally :: TypedVar -> MatchInfo
   deriving (Show, Eq, Ord)
 
 type TypedVar = (F.VarID, Ty.Type)

@@ -43,6 +43,8 @@ main :: IO ()
 main = do
   files <- listDirectory "./test"
   let fileNames = map ("test/" ++) . sort $ files
+
+  -- let fileNames = ["test/pair5.disc"]
   sequence_ $ concatMap (\f -> [pPrint f, pFullUA f >>= pPrint]) fileNames
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
@@ -143,12 +145,17 @@ nicePattern (P.PVar x) = T.unpack x
 niceInhabPattern :: I.InhabPat -> String
 niceInhabPattern (I.IPIs k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) . niceInhabPattern) ps
 niceInhabPattern (I.IPNot []) = "_"
-niceInhabPattern (I.IPNot nots) = "(Not " ++ niceDCList nots ++ ")"
+niceInhabPattern (I.IPNot nots) = "(Not " ++ niceList (map Ty.dcName nots) ++ ")"
 
-niceDCList :: [Ty.DataConstructor] -> String
-niceDCList dcs = concat $ tail $ concatMap comma dcs
+-- niceDCList :: [Ty.DataConstructor] -> String
+-- niceDCList dcs = concat $ tail $ concatMap comma dcs
+--   where 
+--     comma x = [", ", T.unpack . Ty.dcName $ x]
+
+niceList :: [Text] -> String
+niceList as = concat $ tail $ concatMap comma as
   where 
-    comma x = [", ", T.unpack . Ty.dcName $ x]
+    comma x = [", ", T.unpack x]
 -- niceInhabPattern I.IPWild = "_"
 -- niceInhabPattern (I.IPIntLit i) = show i
 -- niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"

@@ -23,8 +23,8 @@ ua nrefs gdt = case gdt of
     (n2, u2) <- ua n1 t2
     return (n2, Branch u1 u2)
   G.Guarded (var, g) t -> case g of
-    G.GBe new -> do
-      n <- addLitMulti nrefs $ varInfo (HerebyBe new)
+    G.GWas old -> do
+      n <- addLitMulti nrefs $ varInfo (WasOriginally old)
       ua n t
     G.GMatch k args -> do
       n <- addLitMulti nrefs $ varInfo (Match k args)

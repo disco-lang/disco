@@ -46,8 +46,13 @@ accessableRedundant ant args = case ant of
 lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
 lookupVar x = foldr getNextId x
   where
-    getNextId (x', MatchInfo (HerebyBe y)) | x' == x = const y
+    getNextId (x', MatchInfo (WasOriginally y)) | x' == x = const y
     getNextId _ = id
+-- lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
+-- lookupVar x = foldl getNextId x
+--   where
+--     getNextId old (x', MatchInfo (HerebyBe y)) | x' == x = y
+--     getNextId old _ = old
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
 alistLookup a = map snd . filter ((== a) . fst)
@@ -83,24 +88,24 @@ findVarInhabitants var nref@(_, cns) =
       return (mkIPMatch k <$> argPossibilities)
     Nothing -> case nub negMatch of
       [] -> Poss.retSingle $ IPNot []
-      neg ->
-        case getDataCons var of
-          Nothing -> Poss.retSingle $ IPNot neg
-          Just dcs ->
-            do
-              let tryAddDc dc = do
-                    newVars <- mkNewVars (Ty.dcTypes dc)
-                    runMaybeT (nref `addConstraint` (var, MatchInfo $ Match dc newVars))
+      neg -> do
+          case getDataCons var of
+            Nothing -> Poss.retSingle $ IPNot neg
+            Just dcs ->
+              do
+                let tryAddDc dc = do
+                      newVars <- mkNewVars (Ty.dcTypes dc)
+                      runMaybeT (nref `addConstraint` (var, MatchInfo $ Match dc newVars))
 
-              -- Try to add a positive constraint for each data constructor
-              -- to the current nref
-              -- If any of these additions succeed, save that nref,
-              -- it now has positive information
-              posNrefs <- catMaybes <$> forM dcs tryAddDc
+                -- Try to add a positive constraint for each data constructor
+                -- to the current nref
+                -- If any of these additions succeed, save that nref,
+                -- it now has positive information
+                posNrefs <- catMaybes <$> forM dcs tryAddDc
 
-              if null posNrefs
-                then Poss.retSingle $ IPNot []
-                else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
+                if null posNrefs
+                  then Poss.retSingle $ IPNot []
+                  else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar var cns
     posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
@@ -118,13 +123,9 @@ addLiteral :: NormRefType -> U.Literal -> MaybeT F.Fresh NormRefType
 addLiteral n@(context, constraints) flit = case flit of
   U.F -> MaybeT $ pure Nothing
   U.T -> return n
-  U.Info x info -> (context ++ neededContext info, constraints) `addConstraint` (x, MatchInfo info)
-
-neededContext :: MatchInfo -> [TypedVar]
-neededContext info = case info of
-  Not _ -> []
-  Match _ ys -> ys
-  HerebyBe y -> [y]
+  U.Info x info@(Match _ args) -> (context ++ args, constraints) `addConstraint` (x, MatchInfo info)
+  U.Info x info@(Not _) -> (context, constraints) `addConstraint` (x, MatchInfo info)
+  U.Info x info@(WasOriginally _) -> (context ++ [x], constraints) `addConstraint` (x, MatchInfo info)
 
 addConstraints :: NormRefType -> [ConstraintFor] -> MaybeT F.Fresh NormRefType
 addConstraints = foldM addConstraint
@@ -144,7 +145,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
         Just args' ->
           addConstraints
             nref
-            (zipWith (\a b -> (a, MatchInfo (HerebyBe b))) args args')
+            (zipWith (\a b -> (a, MatchInfo (WasOriginally b))) args args')
         Nothing -> return added
     --- Equation (11)
     Not _ -> do
@@ -152,7 +153,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
       guard inh -- ensure that origX is still inhabited, as per I2
       return added
     -- Equation (14)
-    HerebyBe y -> do
+    WasOriginally y -> do
       let origY = lookupVar y cns
       if origX == origY
         then return nref
@@ -184,7 +185,7 @@ conflictsWith c = case c of
     Not k -> \case
       MatchInfo (Match k' _) | k == k' -> True -- 11a
       _ -> False
-    HerebyBe _ -> const False
+    WasOriginally _ -> const False
 
 -- TermEquality _ -> const False
 

@@ -1,0 +1,5 @@
+foo : , Int Bool -> Bool
+foo , 0 n = False
+foo , n True = False
+
+// This is what pair5 should output

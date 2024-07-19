@@ -32,7 +32,7 @@ uncovered r g = case g of
       where
         noMatch = r `liftAndLit` varInfo (Not dataCon)
         matchedPath = uncovered (r `liftAndLit` varInfo (Match dataCon ys)) t
-    G.GBe new -> uncovered (r `liftAndLit` varInfo (HerebyBe new)) t
+    G.GWas old -> uncovered (r `liftAndLit` varInfo (WasOriginally old)) t
     where
       varInfo = Info var
 

@@ -1,7 +1,0 @@
-foo : , Int Bool -> Bool
-foo , 0 n = False
-foo , n True = False
-foo , 0 n = False
-
-// Doesn't report duplicates when it should!!!
-

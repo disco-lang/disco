@@ -48,11 +48,6 @@ lookupVar x = foldr getNextId x
   where
     getNextId (x', MatchInfo (WasOriginally y)) | x' == x = const y
     getNextId _ = id
--- lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
--- lookupVar x = foldl getNextId x
---   where
---     getNextId old (x', MatchInfo (HerebyBe y)) | x' == x = y
---     getNextId old _ = old
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
 alistLookup a = map snd . filter ((== a) . fst)
@@ -89,23 +84,23 @@ findVarInhabitants var nref@(_, cns) =
     Nothing -> case nub negMatch of
       [] -> Poss.retSingle $ IPNot []
       neg -> do
-          case getDataCons var of
-            Nothing -> Poss.retSingle $ IPNot neg
-            Just dcs ->
-              do
-                let tryAddDc dc = do
-                      newVars <- mkNewVars (Ty.dcTypes dc)
-                      runMaybeT (nref `addConstraint` (var, MatchInfo $ Match dc newVars))
+        case getDataCons var of
+          Nothing -> Poss.retSingle $ IPNot neg
+          Just dcs ->
+            do
+              let tryAddDc dc = do
+                    newVars <- mkNewVars (Ty.dcTypes dc)
+                    runMaybeT (nref `addConstraint` (var, MatchInfo $ Match dc newVars))
 
-                -- Try to add a positive constraint for each data constructor
-                -- to the current nref
-                -- If any of these additions succeed, save that nref,
-                -- it now has positive information
-                posNrefs <- catMaybes <$> forM dcs tryAddDc
+              -- Try to add a positive constraint for each data constructor
+              -- to the current nref
+              -- If any of these additions succeed, save that nref,
+              -- it now has positive information
+              posNrefs <- catMaybes <$> forM dcs tryAddDc
 
-                if null posNrefs
-                  then Poss.retSingle $ IPNot []
-                  else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
+              if null posNrefs
+                then Poss.retSingle $ IPNot []
+                else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
   where
     constraintsOnX = onVar var cns
     posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX

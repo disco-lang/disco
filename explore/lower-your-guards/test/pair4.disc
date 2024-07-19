@@ -2,4 +2,11 @@ foo : , Int Bool -> Bool
 foo , 0 n = False
 foo , n True = False
 
-// This is what pair5 should output
+revfoo : , Int Bool -> Bool
+revfoo , n True = False
+revfoo , 0 n = False
+
+bar : , Int Bool -> Bool
+bar , 0 n = False
+bar , n True = False
+bar , 0 n = False

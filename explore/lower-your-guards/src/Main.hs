@@ -13,13 +13,13 @@ import qualified Fresh as F
 import qualified GuardTree as G
 import qualified Inhabitants as I
 import qualified Parse as P
+import qualified Possibilities as Poss
 import System.Directory (listDirectory)
 import Text.Megaparsec (eof, errorBundlePretty, many, runParser)
 import Text.Pretty.Simple (pPrint)
 import qualified Types as Ty
 import qualified UA
 import qualified Uncovered as U
-import qualified Possibilities as Poss
 
 parseFile :: String -> IO [P.FunctionDef]
 parseFile file = do
@@ -43,8 +43,6 @@ main :: IO ()
 main = do
   files <- listDirectory "./test"
   let fileNames = map ("test/" ++) . sort $ files
-
-  -- let fileNames = ["test/pair5.disc"]
   sequence_ $ concatMap (\f -> [pPrint f, pFullUA f >>= pPrint]) fileNames
 
 desGdt :: [P.Clause] -> F.Fresh G.Gdt
@@ -147,15 +145,7 @@ niceInhabPattern (I.IPIs k ps) = T.unpack (Ty.dcName k) ++ concatMap ((" " ++) .
 niceInhabPattern (I.IPNot []) = "_"
 niceInhabPattern (I.IPNot nots) = "(Not " ++ niceList (map Ty.dcName nots) ++ ")"
 
--- niceDCList :: [Ty.DataConstructor] -> String
--- niceDCList dcs = concat $ tail $ concatMap comma dcs
---   where 
---     comma x = [", ", T.unpack . Ty.dcName $ x]
-
 niceList :: [Text] -> String
 niceList as = concat $ tail $ concatMap comma as
-  where 
+  where
     comma x = [", ", T.unpack x]
--- niceInhabPattern I.IPWild = "_"
--- niceInhabPattern (I.IPIntLit i) = show i
--- niceInhabPattern (I.IPNotIntLits i) = "(Not " ++ show i ++ ")"

@@ -98,7 +98,7 @@ extractRelevant t = Type {tyIdent = t, tyDataCons = Nothing}
 
 -- extractRelevant ty = error $ "Bad type in exhaust" ++ show ty
 
--- TODO: should these really just be blank names?
+-- TODO(colin): should these really just be blank names?
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""
 

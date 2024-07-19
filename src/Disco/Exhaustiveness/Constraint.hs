@@ -19,7 +19,7 @@ addVars (Context ctx) vars = Context (ctx ++ vars)
 data Constraint where
   CMatch :: TI.DataCon -> [TI.TypedVar] -> Constraint
   CNot :: TI.DataCon -> Constraint
-  CHerebyBe :: TI.TypedVar -> Constraint
+  CWasOriginally :: TI.TypedVar -> Constraint
   deriving (Show, Eq, Ord)
 
 posMatch :: [Constraint] -> Maybe (TI.DataCon, [TI.TypedVar])
@@ -36,7 +36,7 @@ type ConstraintFor = (TI.TypedVar, Constraint)
 lookupVar :: TI.TypedVar -> [ConstraintFor] -> TI.TypedVar
 lookupVar x = foldr getNextId x
   where
-    getNextId (x', CHerebyBe y) | x' == x = const y
+    getNextId (x', CWasOriginally y) | x' == x = const y
     getNextId _ = id
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
@@ -46,33 +46,6 @@ onVar :: TI.TypedVar -> [ConstraintFor] -> [Constraint]
 onVar x cs = alistLookup (lookupVar x cs) cs
 
 type NormRefType = (Context, [ConstraintFor])
-
-{-
- TODO: fix this!
-FIXME: big bug!
-
-in haskell, look at this:
-
-thing :: (Int, Bool) -> ()
-thing (n,True) = ()
-thing (0,n) = ()
-
-haskell reports (p, False) uncovered where p is one of {0}
-
-but our solver just responds with (_, False) uncovered.
-Its dropping the info about the 0!!!
-
-This is present in my test implementation,
-I just didn't discover it until now :[
-
-Clue discovered!
-If we swap these like this:
-thing (0,n) = unit
-thing (n,True) = unit
-Our solver actually gets this right!
-
-This is a good clue to start with
--}
 
 addConstraints :: (Members '[Fresh] r) => NormRefType -> [ConstraintFor] -> MaybeT (Sem r) NormRefType
 addConstraints = foldM addConstraint
@@ -91,7 +64,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
       Just args' ->
         addConstraints
           nref
-          (zipWith (\a b -> (a, CHerebyBe b)) args args')
+          (zipWith (\a b -> (a, CWasOriginally b)) args args')
       Nothing -> return added
   --- Equation (11)
   CNot _ -> do
@@ -99,7 +72,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
     guard inh -- ensure that origX is still inhabited, as per I2
     return added
   -- Equation (14)
-  CHerebyBe y -> do
+  CWasOriginally y -> do
     let origY = lookupVar y cns
     if origX == origY
       then return nref
@@ -130,7 +103,7 @@ conflictsWith c = case c of
   CNot k -> \case
     (CMatch k' _) | k == k' -> True -- 11a
     _ -> False
-  CHerebyBe _ -> const False
+  CWasOriginally _ -> const False
 
 -- Search for a MatchDataCon that is matching on k specifically
 -- (there should be at most one, see I4 in section 3.4)
@@ -151,7 +124,7 @@ substituteVarIDs y x = map (\(var, c) -> (subst var, c))
 -- if a variable in the context has a resolvable type, there must be at least one constructor
 -- which can be instantiated without contradiction of the refinement type
 -- This function tests if this is true
--- NOTE: we may eventually have type constraints
+-- NOTE(colin): we may eventually have type constraints
 -- and we would need to worry pulling them from nref here
 inhabited :: (Members '[Fresh] r) => NormRefType -> TI.TypedVar -> Sem r Bool
 inhabited n var = case TI.tyDataCons . TI.getType $ var of

@@ -73,7 +73,7 @@ allSame :: (Eq a) => [a] -> Bool
 allSame [] = True
 allSame (x : xs) = all (x ==) xs
 
--- TODO: explain. this was a pain
+-- TODO(colin): explain. this was a pain
 desugarTuplePats :: [APattern] -> APattern
 desugarTuplePats [] = error "Found empty tuple, what happened?"
 desugarTuplePats [p] = p
@@ -85,7 +85,8 @@ desugarMatch var pat = do
   case pat of
     (APWild _) -> return []
     (APVar ty name) -> do
-      return $ [(var, GHerebyBe $ TI.TypedVar (name, TI.extractRelevant ty))]
+      let newAlias = TI.TypedVar (name, TI.extractRelevant ty)
+      return $ [(newAlias, GWasOriginally var)]
     (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
     (APUnit) -> return [(var, GMatch TI.unit [])]
     (APBool b) -> return [(var, GMatch (TI.bool b) [])]
@@ -104,7 +105,7 @@ desugarMatch var pat = do
     (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
     (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
     (APList _ subs) -> do
-      -- TODO: review, will this be a problem like tuples?
+      -- TODO(colin): review, will this be a problem like tuples?
       let types = map (TI.extractRelevant . Ty.getType) subs
       when
         (not . allSame $ types)
@@ -113,7 +114,7 @@ desugarMatch var pat = do
       guards <- sequence $ zipWith desugarMatch vars subs
       return $ (var, (GMatch (TI.list types) vars)) : concat guards
     (APCons _ subHead subTail) -> do
-      -- TODO: review, will this be a problem like tuples?
+      -- TODO(colin): review, will this be a problem like tuples?
       let typeHead = (TI.extractRelevant . Ty.getType) subHead
       let typeTail = (TI.extractRelevant . Ty.getType) subTail
       varHead <- TI.newVar typeHead
@@ -122,7 +123,7 @@ desugarMatch var pat = do
       guardsTail <- desugarMatch varTail subTail
       let guardCons = (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail]))
       return $ [guardCons] ++ guardsHead ++ guardsTail
-    -- TODO: consider the rest of the patterns
+    -- TODO(colin): consider the rest of the patterns
     -- (APAdd)
     e -> return []
 
@@ -136,7 +137,7 @@ type Guard = (TI.TypedVar, GuardConstraint)
 
 data GuardConstraint where
   GMatch :: TI.DataCon -> [TI.TypedVar] -> GuardConstraint
-  GHerebyBe :: TI.TypedVar -> GuardConstraint
+  GWasOriginally :: TI.TypedVar -> GuardConstraint
   deriving (Show, Eq)
 
 data Literal where
@@ -148,7 +149,7 @@ data Literal where
 data LitCond where
   LitMatch :: TI.DataCon -> [TI.TypedVar] -> LitCond
   LitNot :: TI.DataCon -> LitCond
-  LitHerebyBe :: TI.TypedVar -> LitCond
+  LitWasOriginally :: TI.TypedVar -> LitCond
   deriving (Show, Eq, Ord)
 
 data Ant where
@@ -163,8 +164,8 @@ ua nrefs gdt = case gdt of
     (n1, u1) <- ua nrefs t1
     (n2, u2) <- ua n1 t2
     return (n2, ABranch u1 u2)
-  Guarded (x, GHerebyBe z) t -> do
-    n <- addLitMulti nrefs $ LitCond (x, LitHerebyBe z)
+  Guarded (y, GWasOriginally x) t -> do
+    n <- addLitMulti nrefs $ LitCond (y, LitWasOriginally x)
     ua n t
   Guarded (x, (GMatch dc args)) t -> do
     n <- addLitMulti nrefs $ LitCond (x, LitMatch dc args)
@@ -187,8 +188,8 @@ addLiteral (context, constraints) flit = case flit of
   F -> MaybeT $ pure Nothing
   T -> return (context, constraints)
   LitCond (x, c) -> case c of
-    LitHerebyBe z ->
-      (context `C.addVars` [z], constraints) `C.addConstraint` (x, C.CHerebyBe z)
+    LitWasOriginally z ->
+      (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
     LitMatch dc args ->
       (context `C.addVars` args, constraints) `C.addConstraint` (x, C.CMatch dc args)
     LitNot dc ->
@@ -208,7 +209,7 @@ joinComma = foldr1 (join ", ")
 joinSpace :: [String] -> String
 joinSpace = foldr1 (join " ")
 
--- TODO: maybe fully print out tuples even if they have wildcars in the middle?
+-- TODO(colin): maybe fully print out tuples even if they have wildcars in the middle?
 -- e.g. (1,_,_) instead of just (1,_)
 prettyInhab :: InhabPat -> String
 prettyInhab (IPNot []) = "_"

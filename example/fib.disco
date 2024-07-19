@@ -1,40 +1,47 @@
--- Normal, should be memoized
+-- | Normal: should be memoized.
 !!! fib 100 == 354224848179261915075
-fib : N -> N 
-fib 0 = 0 
+fib : N -> N
+fib 0 = 0
 fib 1 = 1
 fib x = fib (x .- 1) + fib (x .- 2)
 
--- Multiple arrows, should be memoized
+-- | Multiple arrows: should be memoized.
 !!! fibA 100 0 == 354224848179261915075
-fibA : N -> N -> N 
+fibA : N -> N -> N
 fibA 0 _ = 0
 fibA 1 _ = 1
 fibA x n = fibA (x .- 1) n + fibA (x .- 2) n
 
--- Container types, can all be memoized
-!!! fibList 100 [] == 354224848179261915075
-fibList : N -> List(N) -> N 
+-- | Container types: can be memoized but may cause
+--   performance issues depending on size of container.
+!!! fibList 100 [1..100] == 354224848179261915075
+fibList : N -> List(N) -> N
 fibList 0 _ = 0
 fibList 1 _ = 1
 fibList x l = fibList (x .- 1) l + fibList (x .- 2) l
 
-!!! fibSet 100 {} == 354224848179261915075
+!!! fibSet 100 {1..100} == 354224848179261915075
 fibSet : N -> Set(N) -> N
 fibSet 0 _ = 0
 fibSet 1 _ = 1
 fibSet x s = fibSet (x .- 1) s + fibSet (x .- 2) s
 
--- Higher-order, should not be memoized
-fibH : N -> (N -> N) -> N 
+!!! fibBag 100 ⟅1..100⟆ == 354224848179261915075
+fibBag : N -> Bag(N) -> N
+fibBag 0 _ = 0
+fibBag 1 _ = 1
+fibBag x b = fibBag (x .- 1) b + fibBag (x .- 2) b
+
+-- | Higher-order: should not be memoized.
+fibH : N -> (N -> N) -> N
 fibH 0 _ = 0
 fibH 1 _ = 1
 fibH x f = fibH (x .- 1) f + fibH (x .- 2) f
 
-fibHH : N -> (N -> (N -> N) -> N) -> N 
-fibHH 0 _ = 0 
+fibHH : N -> (N -> (N -> N) -> N) -> N
+fibHH 0 _ = 0
 fibHH 1 _ = 1
 fibHH x f = fibHH (x .- 1) f + fibHH (x .- 2) f
 
-id : a -> a 
+id : a -> a
 id x = x

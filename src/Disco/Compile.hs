@@ -189,7 +189,7 @@ compileDTerm term@(DTAbs q _ _) = do
 
   -- Given a function's arguments, determine if it is memoizable.
   -- A function is memoizable if its arguments can be converted into
-  -- a simple value.
+  -- a simple value (Haskell Ord instance can be derived).
   canMemo :: [Type] -> ShouldMemo
   canMemo tys
     | all canMemoTy tys = Memo
@@ -197,7 +197,7 @@ compileDTerm term@(DTAbs q _ _) = do
 
   canMemoTy :: Type -> Bool
   canMemoTy (TyAtom a) = canMemoAtom a
-  -- Anti-higher order while allowing for multiple arrows.
+  -- Anti-higher order while allowing for curried functions.
   canMemoTy (TyCon CArr tys@(t : _)) = case t of
     TyCon CArr _ -> False
     _ -> all canMemoTy tys

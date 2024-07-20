@@ -1,7 +1,7 @@
 Comprehensions
 ==============
 
-*Comprehension* notation can be used to describe :doc:`collections <collections>` such as
+*Comprehension* notation can be used to describe collections such as
 :doc:`sets <set>` or :doc:`lists <list>`.  The general syntax for a
 set comprehension is
 
@@ -15,8 +15,7 @@ some examples below; for the precise details, see the
 `Details`_ section.
 
 :doc:`List <list>` comprehensions are similar, but use square brackets
-(``[``, ``]``) instead of curly braces (``{``, ``}``); :doc:`bag
-<bag>` comprehensions use bag brackets (``⟅``, ``⟆``).
+(``[``, ``]``) instead of curly braces (``{``, ``}``).
 
 Examples
 --------
@@ -97,7 +96,7 @@ Specification
 .. note::
 
    In case you are curious about the precise definition and are not
-   afraid of the details, the exact way that comprehensions
+   afraid of the details, the exact way that set comprehensions
    work can be defined by the following three equations, making use of
    the standard functions :doc:`each <each>` and ``$join``:
 

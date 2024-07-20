@@ -82,7 +82,47 @@ In general, lists are written with square brackets.
        Disco> 2 ∈ [1,2,3]
        T
 
-Inductive definition of lists
------------------------------
+Recursive list processing
+-------------------------
 
-Write more here.
+Fundamentally, lists in Disco are built from two ingredients:
+
+- The empty list ``[]``
+- The "cons" operator ``::`` which adds one more element to the start
+  of a list.  That is, ``x :: rest`` is a list which has a first element ``x``
+  and where ``rest`` is the rest of the list.
+
+For example, ``1 :: [2,3,4,5]`` represents adding the element ``1`` to
+the beginning of the list ``[2,3,4,5]``; it is the same as
+``[1,2,3,4,5]``.
+
+::
+
+   Disco> 1 :: [2,3,4,5]
+   [1, 2, 3, 4, 5]
+
+In fact, any list can be written using only ``[]`` and ``::``.
+
+- The empty list is ``[]``;
+- ``x :: []`` represents a list with one element;
+- ``x :: (y :: [])`` is a list with two elements;
+- and so on.
+
+::
+
+   Disco> 1 :: []
+   [1]
+   Disco> 1 :: (2 :: [])
+   [1, 2]
+   Disco> 1 :: (2 :: (3 :: []))
+   [1, 2, 3]
+
+We can write recursive functions to process lists by :doc:`pattern
+matching <pattern>` on ``[]`` and ``::``.  For example, below is a
+function to add all the elements of a list of natural numbers:
+
+::
+
+   sum : List(N) -> N
+   sum([]) = 0
+   sum(n :: ns) = n + sum(ns)

@@ -10,14 +10,17 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
 import Disco.AST.Typed
   ( APattern,
+    ATerm,
     pattern APBool,
+    pattern APChar,
     pattern APCons,
     pattern APList,
     pattern APNat,
     pattern APTup,
     pattern APUnit,
     pattern APVar,
-    pattern APWild,
+    pattern APWild, 
+    pattern APString,
   )
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
@@ -26,10 +29,11 @@ import qualified Disco.Exhaustiveness.TypeInfo as TI
 import qualified Disco.Types as Ty
 import Polysemy
 import Text.Show.Pretty (pPrint)
+import Unbound.Generics.LocallyNameless (Name)
 
-checkClauses :: (Members '[Fresh, Embed IO] r) => [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
-checkClauses types pats = do
-  args <- TI.newVars (map TI.extractRelevant types)
+checkClauses :: (Members '[Fresh, Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
+checkClauses name types pats = do
+  args <- TI.newVars types
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
   let gdt = foldr1 Branch cl
 
@@ -53,12 +57,11 @@ checkClauses types pats = do
   let jspace = foldr (\a b -> a ++ " " ++ b) ""
 
   when (not . null $ inhab) $ do
-    embed $ putStrLn "Warning: You haven't matched against:"
+    embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", you haven't matched against:"
     embed $ mapM_ (putStrLn . jspace . map prettyInhab) inhab
-  -- embed $ mapM_ (putStrLn . show) inhab
 
   when (not . null $ redundant) $ do
-    embed $ putStrLn "Warning: These clause numbers (1-indexed) are redundant"
+    embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
     embed $ putStrLn $ show redundant
 
   return ()
@@ -68,63 +71,73 @@ desugarClause args clauseIdx argsPats = do
   guards <- zipWithM desugarMatch args argsPats
   return $ foldr Guarded (Grhs clauseIdx) $ concat guards
 
--- borrowed from `extra`
-allSame :: (Eq a) => [a] -> Bool
-allSame [] = True
-allSame (x : xs) = all (x ==) xs
-
--- TODO(colin): explain. this was a pain
+-- To work with the LYG algorithm, we need to desugar n-tuples to nested pairs
+-- Just having a Tuple type with a variable number of arguments breaks.
+-- Imagine we have
+-- foo (1,2,3) = ...
+-- foo (1,(2,n)) = ...
+-- if we keep things in our nice "sugared" form, the solver will get confused,
+-- and not realize that the last element of the tuple is fully covered by n,
+-- because there will be two notions of last element: the last in the triple and
+-- the last in the nested pair
 desugarTuplePats :: [APattern] -> APattern
 desugarTuplePats [] = error "Found empty tuple, what happened?"
 desugarTuplePats [p] = p
 desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) [pfst, psnd]
-  where psnd = desugarTuplePats rest
+  where
+    psnd = desugarTuplePats rest
 
+{-
+TODO(colin): handle remaining patterns
+  , APInj     --what is this?
+  , APNeg     --required for integers / rationals?
+  , APFrac    --required for rationals?
+  algebraic (probably will be replaced anyway):
+  , APAdd
+  , APMul
+  , APSub
+-}
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = do
   case pat of
-    (APWild _) -> return []
-    (APVar ty name) -> do
-      let newAlias = TI.TypedVar (name, TI.extractRelevant ty)
-      return $ [(newAlias, GWasOriginally var)]
-    (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
-    (APUnit) -> return [(var, GMatch TI.unit [])]
-    (APBool b) -> return [(var, GMatch (TI.bool b) [])]
     (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do
-      let tia = TI.extractRelevant ta
-      let tib = TI.extractRelevant tb
-
-      varFst <- TI.newVar tia
-      varSnd <- TI.newVar tib
-
+      varFst <- TI.newVar ta
+      varSnd <- TI.newVar tb
       guardsFst <- desugarMatch varFst pfst
       guardsSnd <- desugarMatch varSnd psnd
-
-      let guardPair = (var, GMatch (TI.pair tia tib) [varFst, varSnd])
+      let guardPair = (var, GMatch (TI.pair ta tb) [varFst, varSnd])
       return $ [guardPair] ++ guardsFst ++ guardsSnd
     (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
     (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
-    (APList _ subs) -> do
-      -- TODO(colin): review, will this be a problem like tuples?
-      let types = map (TI.extractRelevant . Ty.getType) subs
-      when
-        (not . allSame $ types)
-        (embed . putStrLn $ "WARNING, mismatched types in list!: " ++ show types)
-      vars <- TI.newVars types
-      guards <- sequence $ zipWith desugarMatch vars subs
-      return $ (var, (GMatch (TI.list types) vars)) : concat guards
     (APCons _ subHead subTail) -> do
-      -- TODO(colin): review, will this be a problem like tuples?
-      let typeHead = (TI.extractRelevant . Ty.getType) subHead
-      let typeTail = (TI.extractRelevant . Ty.getType) subTail
+      let typeHead = Ty.getType subHead
+      let typeTail = Ty.getType subTail
       varHead <- TI.newVar typeHead
       varTail <- TI.newVar typeTail
       guardsHead <- desugarMatch varHead subHead
       guardsTail <- desugarMatch varTail subTail
       let guardCons = (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail]))
       return $ [guardCons] ++ guardsHead ++ guardsTail
+    -- We have to desugar Lists into Cons and Nils
+    (APList _ []) -> do
+      return [(var, GMatch TI.nil [])]
+    (APList ty (phead : ptail)) -> do
+      -- APCons have the type of the list they are part of
+      desugarMatch var (APCons ty phead (APList ty ptail))
+    -- we have to desugar to a list, becuse we can match strings with cons
+    (APString str) -> do
+      let strType = (Ty.TyList Ty.TyC)
+      desugarMatch var (APList strType (map APChar str))
+    -- These are more straightforward:
+    (APWild _) -> return []
+    (APVar ty name) -> do
+      let newAlias = TI.TypedVar (name, ty)
+      return [(newAlias, GWasOriginally var)]
+    (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
+    (APUnit) -> return [(var, GMatch TI.unit [])]
+    (APBool b) -> return [(var, GMatch (TI.bool b) [])]
+    (APChar c) -> return [(var, GMatch (TI.char c) [])]
     -- TODO(colin): consider the rest of the patterns
-    -- (APAdd)
     e -> return []
 
 data Gdt where
@@ -211,20 +224,33 @@ joinSpace = foldr1 (join " ")
 
 -- TODO(colin): maybe fully print out tuples even if they have wildcars in the middle?
 -- e.g. (1,_,_) instead of just (1,_)
+-- Also, the display for matches against strings is really weird, 
+-- as strings are lists of chars.
+-- Maybe for strings, we just list the top 3 uncovered patterns
+-- consiting of only postive information, sorted by length?
 prettyInhab :: InhabPat -> String
 prettyInhab (IPNot []) = "_"
 prettyInhab (IPNot nots) = "Not{" ++ joinComma (map dcToString nots) ++ "}"
 prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd]) =
   "(" ++ prettyInhab ifst ++ ", " ++ prettyInhab isnd ++ ")"
+prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
+  "(" ++ prettyInhab ihead ++ " :: " ++ prettyInhab itail ++ ")"
 prettyInhab (IPIs dc []) = dcToString dc
 prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
 
 dcToString :: TI.DataCon -> String
-dcToString TI.DataCon {TI.dcIdent = TI.KNat n} = show n
-dcToString TI.DataCon {TI.dcIdent = TI.KBool b} = show b
-dcToString TI.DataCon {TI.dcIdent = TI.KUnit} = "Unit"
-dcToString TI.DataCon {TI.dcIdent = TI.KPair} = "Pair?"
-dcToString TI.DataCon {TI.dcIdent = _} = "AAAAA"
+dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
+  TI.KBool b -> show b
+  TI.KChar c -> show c
+  TI.KNat n -> show n
+  TI.KNil -> "[]"
+  TI.KUnit -> "unit"
+  -- TODO(colin): find a way to remove these? These two shouldn't be reachable
+  -- If we were in an IPIs, we already handled these above
+  -- If we were in an IPNot, these aren't fromo opaque types,
+  -- so they shouldn't appear in a Not{}
+  TI.KPair -> ","
+  TI.KCons -> "::"
 
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?

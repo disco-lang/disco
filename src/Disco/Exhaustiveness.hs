@@ -32,8 +32,9 @@ import qualified Disco.Types as Ty
 import Polysemy
 import Text.Show.Pretty (pPrint)
 import Unbound.Generics.LocallyNameless (Name)
+import Polysemy.Reader
 
-checkClauses :: (Members '[Fresh, Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
+checkClauses :: Members '[Fresh, Reader Ty.TyDefCtx, Embed IO] r => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
@@ -179,7 +180,7 @@ data Ant where
   ABranch :: Ant -> Ant -> Ant
   deriving (Show)
 
-ua :: (Member Fresh r) => [C.NormRefType] -> Gdt -> Sem r ([C.NormRefType], Ant)
+ua :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> Gdt -> Sem r ([C.NormRefType], Ant)
 ua nrefs gdt = case gdt of
   Grhs k -> return ([], AGrhs nrefs k)
   Branch t1 t2 -> do
@@ -195,7 +196,7 @@ ua nrefs gdt = case gdt of
     n'' <- addLitMulti nrefs $ Literal (x, LitNot dc)
     return (n'' ++ n', u)
 
-addLitMulti :: (Members '[Fresh] r) => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
+addLitMulti :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
 addLitMulti [] _ = return []
 addLitMulti (n : ns) lit = do
   r <- runMaybeT $ addLiteral n lit
@@ -205,7 +206,7 @@ addLitMulti (n : ns) lit = do
       ns' <- addLitMulti ns lit
       return $ (ctx, cfs) : ns'
 
-addLiteral :: (Members '[Fresh] r) => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
+addLiteral :: Members '[Fresh, Reader Ty.TyDefCtx] r => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
 addLiteral (context, constraints) (Literal (x, c)) = case c of
   LitWasOriginally z ->
     (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
@@ -234,6 +235,9 @@ joinSpace = foldr1 (join " ")
 -- as strings are lists of chars.
 -- Maybe for strings, we just list the top 3 uncovered patterns
 -- consiting of only postive information, sorted by length?
+-- Also, how should we print out sum types?
+-- We can do right(thing) or (right thing), or (right(thing))
+-- Which should we chose?
 prettyInhab :: InhabPat -> String
 prettyInhab (IPNot []) = "_"
 prettyInhab (IPNot nots) = "Not{" ++ joinComma (map dcToString nots) ++ "}"
@@ -272,17 +276,17 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPIs k pats
 
-findInhabitants :: (Members '[Fresh] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+findInhabitants :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
 findInhabitants nrefs args = do
   a <- forM nrefs (`findAllForNref` args)
   return $ Poss.anyOf a
 
-findAllForNref :: (Member Fresh r) => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+findAllForNref :: Members '[Fresh, Reader Ty.TyDefCtx] r => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
 findAllForNref nref args = do
   argPats <- forM args (`findVarInhabitants` nref)
   return $ Poss.allCombinations argPats
 
-findVarInhabitants :: (Members '[Fresh] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
+findVarInhabitants :: Members '[Fresh, Reader Ty.TyDefCtx] r => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
 findVarInhabitants var nref@(_, cns) =
   case posMatch of
     Just (k, args) -> do
@@ -290,8 +294,9 @@ findVarInhabitants var nref@(_, cns) =
       return (mkIPMatch k <$> argPossibilities)
     Nothing -> case nub negMatches of
       [] -> Poss.retSingle $ IPNot []
-      neg ->
-        case TI.tyDataCons . TI.getType $ var of
+      neg -> do
+        tyCtx <- ask @Ty.TyDefCtx
+        case TI.tyDataCons (TI.getType var) tyCtx of
           Nothing -> Poss.retSingle $ IPNot neg
           Just dcs ->
             do
@@ -313,7 +318,7 @@ findVarInhabitants var nref@(_, cns) =
     posMatch = C.posMatch constraintsOnX
     negMatches = C.negMatches constraintsOnX
 
-findRedundant :: (Member Fresh r) => Ant -> [TI.TypedVar] -> Sem r [Int]
+findRedundant :: Members '[Fresh, Reader Ty.TyDefCtx] r => Ant -> [TI.TypedVar] -> Sem r [Int]
 findRedundant ant args = case ant of
   AGrhs ref i -> do
     uninhabited <- Poss.none <$> findInhabitants ref args

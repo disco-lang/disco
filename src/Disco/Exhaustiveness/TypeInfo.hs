@@ -1,6 +1,7 @@
 module Disco.Exhaustiveness.TypeInfo where
 
 import Control.Monad (replicateM)
+import qualified Data.Map as M
 import Disco.AST.Typed (ATerm)
 import Disco.Effects.Fresh (Fresh, fresh)
 import qualified Disco.Types as Ty
@@ -63,32 +64,38 @@ left tl = DataCon {dcIdent = KLeft, dcTypes = [tl]}
 right :: Ty.Type -> DataCon
 right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
 
-{-
-TODO(colin): Fill out the remaining types here
-Remaining:
-    TyVar
-  , TySkolem
-  , TyProp
-  , TyBag
-  , TySet
-  , TyGraph
-  , TyMap
-  , TyUser
-Impossible:
-  , (:->:)
--}
-tyDataCons :: Ty.Type -> Maybe [DataCon]
-tyDataCons (a Ty.:*: b) = Just [pair a b]
-tyDataCons (l Ty.:+: r) = Just [left l, right r]
-tyDataCons t@(Ty.TyList a) = Just [cons a t, nil]
-tyDataCons Ty.TyVoid = Just []
-tyDataCons Ty.TyUnit = Just [unit]
-tyDataCons Ty.TyBool = Just [bool True, bool False]
-tyDataCons Ty.TyN = Nothing
-tyDataCons Ty.TyZ = Nothing
-tyDataCons Ty.TyF = Nothing
-tyDataCons Ty.TyQ = Nothing
-tyDataCons Ty.TyC = Nothing
+-- TODO(colin): ask yorgey, make sure I've done this correctly
+-- If I have, and this is enough, I can remove all mentions
+-- of type equality constraints in Constraint.hs,
+-- the lookup here will have handled that behavoir already
+tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Maybe [DataCon]
+tyDataCons (Ty.TyUser name args) ctx = case M.lookup name ctx of
+  Nothing -> error $ "Type definition not found for: " ++ show name
+  Just (Ty.TyDefBody _argNames typeCon) -> tyDataCons (typeCon args) ctx
+tyDataCons (a Ty.:*: b) _ = Just [pair a b]
+tyDataCons (l Ty.:+: r) _ = Just [left l, right r]
+tyDataCons t@(Ty.TyList a) _ = Just [cons a t, nil]
+tyDataCons Ty.TyVoid _ = Just []
+tyDataCons Ty.TyUnit _ = Just [unit]
+tyDataCons Ty.TyBool _ = Just [bool True, bool False]
+tyDataCons Ty.TyN _ = Nothing
+tyDataCons Ty.TyZ _ = Nothing
+tyDataCons Ty.TyF _ = Nothing
+tyDataCons Ty.TyQ _ = Nothing
+tyDataCons Ty.TyC _ = Nothing
+tyDataCons (_ Ty.:->: _) _ = error "Functions not allowed in patterns."
+tyDataCons (Ty.TySet _) _ = error "Sets not allowed in patterns."
+tyDataCons (Ty.TyBag _) _ = error "Bags not allowed in patterns."
+-- I'm unsure about these two.
+-- They may come up when doing generic stuff,
+-- I haven't ecnountered them so far
+-- TODO(colin): ask Yorgey about this
+tyDataCons (Ty.TyVar _) _ = error "Encountered type var in pattern"
+tyDataCons (Ty.TySkolem _) _ = error "Encountered skolem in pattern"
+-- Unsure about these as well
+tyDataCons (Ty.TyProp) _ = error "Propositions not allowed in patterns."
+tyDataCons (Ty.TyMap _ _) _ = error "Maps not allowed in patterns."
+tyDataCons (Ty.TyGraph _) _ = error "Graph not allowed in patterns."
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

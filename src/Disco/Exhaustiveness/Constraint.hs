@@ -1,7 +1,7 @@
 module Disco.Exhaustiveness.Constraint where
 
 import Control.Applicative (Alternative)
-import Control.Monad (foldM, guard, replicateM)
+import Control.Monad (foldM, guard)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.List (partition)
@@ -9,6 +9,8 @@ import Data.Maybe (isJust, listToMaybe, mapMaybe)
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import Polysemy
+import qualified Disco.Types as Ty
+import Polysemy.Reader
 
 newtype Context = Context {getCtxVars :: [TI.TypedVar]}
   deriving (Show, Eq)
@@ -47,15 +49,15 @@ onVar x cs = alistLookup (lookupVar x cs) cs
 
 type NormRefType = (Context, [ConstraintFor])
 
-addConstraints :: (Members '[Fresh] r) => NormRefType -> [ConstraintFor] -> MaybeT (Sem r) NormRefType
+addConstraints :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> [ConstraintFor] -> MaybeT (Sem r) NormRefType
 addConstraints = foldM addConstraint
 
-addConstraint :: (Members '[Fresh] r) => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
+addConstraint :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
 addConstraint nref@(_, cns) (x, c) = do
   breakIf $ any (conflictsWith c) (onVar x cns)
   addConstraintHelper nref (lookupVar x cns, c)
 
-addConstraintHelper :: (Members '[Fresh] r) => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
+addConstraintHelper :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
 addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
   --- Equation (10)
   CMatch k args -> do
@@ -126,17 +128,19 @@ substituteVarIDs y x = map (\(var, c) -> (subst var, c))
 -- This function tests if this is true
 -- NOTE(colin): we may eventually have type constraints
 -- and we would need to worry pulling them from nref here
-inhabited :: (Members '[Fresh] r) => NormRefType -> TI.TypedVar -> Sem r Bool
-inhabited n var = case TI.tyDataCons . TI.getType $ var of
-  Nothing -> return True -- assume opaque types are inhabited
-  Just constructors -> do
-    or <$> mapM (instantiate n var) constructors
+inhabited :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> Sem r Bool
+inhabited n var = do
+  tyCtx <- ask @Ty.TyDefCtx
+  case TI.tyDataCons (TI.getType var) tyCtx of
+    Nothing -> return True -- assume opaque types are inhabited
+    Just constructors -> do
+      or <$> mapM (instantiate n var) constructors
 
 -- Attempts to "instantiate" a match of the dataconstructor k on x
 -- If we can add the MatchDataCon constraint to the normalized refinement
 -- type without contradiction (a Nothing value),
 -- then x is inhabited by k and we return true
-instantiate :: (Members '[Fresh] r) => NormRefType -> TI.TypedVar -> TI.DataCon -> Sem r Bool
+instantiate :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> TI.DataCon -> Sem r Bool
 instantiate (ctx, cns) var k = do
   args <- TI.newVars $ TI.dcTypes k
   let attempt = (ctx `addVars` args, cns) `addConstraint` (var, CMatch k args)

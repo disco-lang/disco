@@ -387,7 +387,7 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
   -- Check for partial functions
-  runFresh $ mapM_ checkExhaustive $ (Ctx.elems $ m^.miTermdefs)
+  runFresh $ mapM_ (checkExhaustive tydefns) (Ctx.elems $ m^.miTermdefs)
 
   -- Evaluate all the module definitions and add them to the topEnv.
   mapError EvalErr $ loadDefsFrom m
@@ -449,7 +449,7 @@ loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
 
-checkExhaustive :: Members '[Fresh, Embed IO] r => Defn -> Sem r ()
-checkExhaustive (Defn name argsType _ boundClauses) = do
+checkExhaustive :: Members '[Fresh, Embed IO] r => TyDefCtx -> Defn -> Sem r ()
+checkExhaustive tyDefCtx (Defn name argsType _ boundClauses) = do
   clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
-  checkClauses name argsType clauses
+  runReader @TyDefCtx tyDefCtx $ checkClauses name argsType clauses

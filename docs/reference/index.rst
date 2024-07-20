@@ -25,5 +25,6 @@ them.
    combinatorics
    library
    REPL
+   extensions
    errors
    symbols

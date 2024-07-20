@@ -99,15 +99,35 @@ Specification
    In case you are curious about the precise definition and are not
    afraid of the details, the exact way that comprehensions
    work can be defined by the following three equations, making use of
-   the standard functions ``each`` and ``join``:
+   the standard functions :doc:`each <each>` and ``$join``:
 
    * ``{ e | } = e``
-   * ``{ e | x in xs, gs } = join(each(\x. {e | gs}, xs))``
+   * ``{ e | x in xs, gs } = $join(each(\x. {e | gs}, xs))``
    * ``{ e | g, gs } = {? { e | gs } if g, {} otherwise ?}``
 
-   ``join`` is not directly available to users, but:
+   ``$join`` is not directly available to users, but can be accessed
+   by enabling the ``Primitives`` :doc:`extension <extensions>`.  In
+   general, ``$join`` turns a thing-of-things into a thing
+   (list-of-lists into a list, bag-of-bags into a bag, *etc.*).
 
-   - For lists, ``join`` is equivalent to ``concat``
-   - For sets, ``join`` is equivalent to ``unions``
-   - For bags, ``join`` is equivalent to a straightforward
-     generalization of ``unions`` to work on bags instead of sets
+   - For lists, ``$join`` is equivalent to ``concat``.
+
+       ::
+
+          Disco> $join [[1,2,3], [4], [5,6]]
+          [1, 2, 3, 4, 5, 6]
+
+   - For sets, ``$join`` is equivalent to ``unions``.
+
+       ::
+
+          Disco> $join {{1,2,3}, {2,3,4}, {3,5,6}}
+          {1, 2, 3, 4, 5, 6}
+
+   - For bags, ``$join`` is equivalent to a straightforward
+     generalization of ``unions`` to work on bags instead of sets.
+
+       ::
+
+          Disco> $join (bag [bag [1,1,2], bag [1,1,2], bag [2,3,4], bag [2,5,6]])
+          ⟅1 # 4, 2 # 4, 3, 4, 5, 6⟆

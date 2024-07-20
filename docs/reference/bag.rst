@@ -21,7 +21,7 @@ of each element there are.
 
 * Notice how single elements are simply listed by themselves, but
   elements occuring more than once are written with a ``#`` followed
-  by a natural number.  You can write bags this way yourself:
+  by a natural number (called the *cardinality*).  You can write bags this way yourself:
 
     ::
 
@@ -100,3 +100,33 @@ Bags support various operations, including :doc:`size <size>`,
 :doc:`union <collection-ops>`, :doc:`intersection <collection-ops>`,
 :doc:`difference <collection-ops>`, :doc:`subset <collection-ops>`, and :doc:`power set <power>`.
 
+Converting to and from sets
+---------------------------
+
+Converting a bag to a :doc:`set <set>` using the ``set`` function
+simply discards the cardinalities; converting a set to a bag using
+``bag`` results in a bag where every element has cardinality 1.
+
+However, there is another type of conversion, using the built-in
+functions
+
+* ``bagCounts : Bag(a) -> Set(a * N)``
+
+* ``bagFromCounts : Collection(a * N) -> Bag(a)``
+
+The ``bagCounts`` function converts a bag into a set of pairs, where
+each pair has an element from the bag paired with its cardinality.
+For example:
+
+::
+
+   Disco> bagCounts(bag "hello world")
+   {(' ', 1), ('d', 1), ('e', 1), ('h', 1), ('l', 3), ('o', 2), ('r', 1), ('w', 1)}
+
+The ``bagFromCounts`` function takes any collection of (value,
+cardinality) pairs and converts it into a bag.  For example:
+
+::
+
+   Disco> bagFromCounts [('h', 3), ('i', 2), ('!', 7), ('i',3)]
+   ⟅'!' # 7, 'h' # 3, 'i' # 5⟆

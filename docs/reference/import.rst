@@ -15,10 +15,12 @@ Importing a module is done by writing, *e.g.*
 
    import num
 
-at the *top* of your ``.disco`` file (or at the :doc:`REPL <REPL>`).  Replace
-``num`` with the name of whatever file you want to import (without the
-``.disco`` suffix).  For example, to import ``myfunctions.disco`` you
-could write
+at the *very beginning* of your ``.disco`` file (with the exception
+that ``import`` must come after any :doc:`using <extensions>`
+statement).  ``import`` can also be used at the :doc:`REPL <REPL>`.
+Replace ``num`` with the name of whatever file you want to import
+(without the ``.disco`` suffix).  For example, to import
+``myfunctions.disco`` you could write
 
 ::
 

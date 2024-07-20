@@ -2,7 +2,7 @@
 
 module Disco.Exhaustiveness where
 
-import Control.Monad (forM, when, zipWithM)
+import Control.Monad (forM, forM_, when, zipWithM)
 import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
@@ -16,11 +16,11 @@ import Disco.AST.Typed
     pattern APCons,
     pattern APList,
     pattern APNat,
+    pattern APString,
     pattern APTup,
     pattern APUnit,
     pattern APVar,
-    pattern APWild, 
-    pattern APString,
+    pattern APWild,
   )
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
@@ -57,8 +57,12 @@ checkClauses name types pats = do
   let jspace = foldr (\a b -> a ++ " " ++ b) ""
 
   when (not . null $ inhab) $ do
-    embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", you haven't matched against:"
-    embed $ mapM_ (putStrLn . jspace . map prettyInhab) inhab
+    let patLine ipats = do
+          let ipatArgs = jspace (map prettyInhab ipats)
+          putStrLn $ show name ++ " " ++ ipatArgs ++ "= ..."
+
+    embed $ putStrLn $ "Warning: You haven't matched against:"
+    embed $ forM_ inhab patLine
 
   when (not . null $ redundant) $ do
     embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
@@ -153,11 +157,7 @@ data GuardConstraint where
   GWasOriginally :: TI.TypedVar -> GuardConstraint
   deriving (Show, Eq)
 
-data Literal where
-  T :: Literal
-  F :: Literal
-  LitCond :: (TI.TypedVar, LitCond) -> Literal
-  deriving (Show, Eq, Ord)
+newtype Literal = Literal (TI.TypedVar, LitCond)
 
 data LitCond where
   LitMatch :: TI.DataCon -> [TI.TypedVar] -> LitCond
@@ -178,12 +178,12 @@ ua nrefs gdt = case gdt of
     (n2, u2) <- ua n1 t2
     return (n2, ABranch u1 u2)
   Guarded (y, GWasOriginally x) t -> do
-    n <- addLitMulti nrefs $ LitCond (y, LitWasOriginally x)
+    n <- addLitMulti nrefs $ Literal (y, LitWasOriginally x)
     ua n t
   Guarded (x, (GMatch dc args)) t -> do
-    n <- addLitMulti nrefs $ LitCond (x, LitMatch dc args)
+    n <- addLitMulti nrefs $ Literal (x, LitMatch dc args)
     (n', u) <- ua n t
-    n'' <- addLitMulti nrefs $ LitCond (x, LitNot dc)
+    n'' <- addLitMulti nrefs $ Literal (x, LitNot dc)
     return (n'' ++ n', u)
 
 addLitMulti :: (Members '[Fresh] r) => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
@@ -197,16 +197,13 @@ addLitMulti (n : ns) lit = do
       return $ (ctx, cfs) : ns'
 
 addLiteral :: (Members '[Fresh] r) => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
-addLiteral (context, constraints) flit = case flit of
-  F -> MaybeT $ pure Nothing
-  T -> return (context, constraints)
-  LitCond (x, c) -> case c of
-    LitWasOriginally z ->
-      (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
-    LitMatch dc args ->
-      (context `C.addVars` args, constraints) `C.addConstraint` (x, C.CMatch dc args)
-    LitNot dc ->
-      (context, constraints) `C.addConstraint` (x, C.CNot dc)
+addLiteral (context, constraints) (Literal (x, c)) = case c of
+  LitWasOriginally z ->
+    (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
+  LitMatch dc args ->
+    (context `C.addVars` args, constraints) `C.addConstraint` (x, C.CMatch dc args)
+  LitNot dc ->
+    (context, constraints) `C.addConstraint` (x, C.CNot dc)
 
 data InhabPat where
   IPIs :: TI.DataCon -> [InhabPat] -> InhabPat
@@ -224,7 +221,7 @@ joinSpace = foldr1 (join " ")
 
 -- TODO(colin): maybe fully print out tuples even if they have wildcars in the middle?
 -- e.g. (1,_,_) instead of just (1,_)
--- Also, the display for matches against strings is really weird, 
+-- Also, the display for matches against strings is really weird,
 -- as strings are lists of chars.
 -- Maybe for strings, we just list the top 3 uncovered patterns
 -- consiting of only postive information, sorted by length?

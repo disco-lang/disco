@@ -3,17 +3,19 @@
 module Disco.Exhaustiveness where
 
 import Control.Monad (forM, forM_, when, zipWithM)
-import Control.Monad.Trans.Maybe (MaybeT (MaybeT), runMaybeT)
+import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
+import Disco.AST.Generic (Side (..))
 import Disco.AST.Typed
   ( APattern,
     ATerm,
     pattern APBool,
     pattern APChar,
     pattern APCons,
+    pattern APInj,
     pattern APList,
     pattern APNat,
     pattern APString,
@@ -93,7 +95,6 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
 
 {-
 TODO(colin): handle remaining patterns
-  , APInj     --what is this?
   , APNeg     --required for integers / rationals?
   , APFrac    --required for rationals?
   algebraic (probably will be replaced anyway):
@@ -141,7 +142,15 @@ desugarMatch var pat = do
     (APUnit) -> return [(var, GMatch TI.unit [])]
     (APBool b) -> return [(var, GMatch (TI.bool b) [])]
     (APChar c) -> return [(var, GMatch (TI.char c) [])]
-    -- TODO(colin): consider the rest of the patterns
+    (APInj (tl Ty.:+: tr) side subPat) -> do
+      let dc = case side of
+            L -> TI.left tl
+            R -> TI.right tr
+      newVar <- case side of
+        L -> TI.newVar tl
+        R -> TI.newVar tr
+      guards <- desugarMatch newVar subPat
+      return $ [(var, GMatch dc [newVar])] ++ guards
     e -> return []
 
 data Gdt where
@@ -232,6 +241,10 @@ prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd
   "(" ++ prettyInhab ifst ++ ", " ++ prettyInhab isnd ++ ")"
 prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
   "(" ++ prettyInhab ihead ++ " :: " ++ prettyInhab itail ++ ")"
+prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KLeft, TI.dcTypes = _} [l]) =
+  "left(" ++ prettyInhab l ++ ")"
+prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KRight, TI.dcTypes = _} [r]) =
+  "right(" ++ prettyInhab r ++ ")"
 prettyInhab (IPIs dc []) = dcToString dc
 prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
 
@@ -244,10 +257,12 @@ dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
   TI.KUnit -> "unit"
   -- TODO(colin): find a way to remove these? These two shouldn't be reachable
   -- If we were in an IPIs, we already handled these above
-  -- If we were in an IPNot, these aren't fromo opaque types,
+  -- If we were in an IPNot, these aren't from opaque types,
   -- so they shouldn't appear in a Not{}
   TI.KPair -> ","
   TI.KCons -> "::"
+  TI.KLeft -> "left()"
+  TI.KRight -> "right()"
 
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?

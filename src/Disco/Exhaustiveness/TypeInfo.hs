@@ -32,6 +32,8 @@ data Ident where
   KCons :: Ident
   KNil :: Ident
   KChar :: Char -> Ident
+  KLeft :: Ident
+  KRight :: Ident
   deriving (Eq, Ord, Show)
 
 unit :: DataCon
@@ -55,6 +57,12 @@ nil = DataCon {dcIdent = KNil, dcTypes = []}
 pair :: Ty.Type -> Ty.Type -> DataCon
 pair a b = DataCon {dcIdent = KPair, dcTypes = [a, b]}
 
+left :: Ty.Type -> DataCon
+left tl = DataCon {dcIdent = KLeft, dcTypes = [tl]}
+
+right :: Ty.Type -> DataCon
+right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
+
 {-
 TODO(colin): Fill out the remaining types here
 Remaining:
@@ -66,13 +74,12 @@ Remaining:
   , TyGraph
   , TyMap
   , TyUser
-Needed:
-  , (:+:)
 Impossible:
   , (:->:)
 -}
 tyDataCons :: Ty.Type -> Maybe [DataCon]
 tyDataCons (a Ty.:*: b) = Just [pair a b]
+tyDataCons (l Ty.:+: r) = Just [left l, right r]
 tyDataCons t@(Ty.TyList a) = Just [cons a t, nil]
 tyDataCons Ty.TyVoid = Just []
 tyDataCons Ty.TyUnit = Just [unit]

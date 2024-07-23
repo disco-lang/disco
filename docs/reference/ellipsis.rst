@@ -1,7 +1,7 @@
 Ellipsis
 ========
 
-:doc:`Sets <set>` and :doc:`lists <list>` may be defined using *ellipsis*,
+:doc:`Sets <set>`, :doc:`lists <list>`, and :doc:`bags <bag>` may be defined using *ellipsis*,
 that is, two or more dots meaning (intuitively) "and so on".  For
 example:
 
@@ -9,6 +9,8 @@ example:
 
    Disco> {1 .. 5}
    {1, 2, 3, 4, 5}
+   Disco> ⟅1 .. 5⟆
+   ⟅1, 2, 3, 4, 5⟆
    Disco> [2, 4 ... 10]
    [2, 4, 6, 8, 10]
    Disco> [1, 4, 9 ... 100]
@@ -55,9 +57,9 @@ a single number after the dots.
 
         ::
 
-           Disco> [1, 3 .. 10]
+           Disco> [1, 3 .. 10]  -- counting by twos
            [1, 3, 5, 7, 9]
-           Disco> {5, 10 .. 40}
+           Disco> {5, 10 .. 40} -- counting by fives
            {5, 10, 15, 20, 25, 30, 35, 40}
 
     - For :math:`k = 3`, Disco will use a quadratic polynomial, which
@@ -67,6 +69,6 @@ a single number after the dots.
         ::
 
            Disco> [1, 4, 9 ... 100]
-           [1, 4, 9, 16, 25, 36, 49]
+           [1, 4, 9, 16, 25, 36, 49, 64, 81, 100]
            Disco> [1, 3, 6 ... 28]
            [1, 3, 6, 10, 15, 21, 28]

@@ -1,7 +1,7 @@
 Comprehensions
 ==============
 
-*Comprehension* notation can be used to describe collections such as
+*Comprehension* notation can be used to describe :doc:`collections <collections>` such as
 :doc:`sets <set>` or :doc:`lists <list>`.  The general syntax for a
 set comprehension is
 
@@ -15,7 +15,8 @@ some examples below; for the precise details, see the
 `Details`_ section.
 
 :doc:`List <list>` comprehensions are similar, but use square brackets
-(``[``, ``]``) instead of curly braces (``{``, ``}``).
+(``[``, ``]``) instead of curly braces (``{``, ``}``); :doc:`bag
+<bag>` comprehensions use bag brackets (``⟅``, ``⟆``).
 
 Examples
 --------
@@ -24,10 +25,10 @@ Examples
 
    Disco> {x | x in {1..5}}   -- same as {1..5}
    {1, 2, 3, 4, 5}
-   
+
    Disco> {3x | x in {1..5}}  -- multiply each element of {1..5} by 3
    {3, 6, 9, 12, 15}
-   
+
    -- Pick out the elements of {1..10} that satisfy the condition
    Disco> {x | x in {1 .. 10}, x^2 + 20 == 9x}
    {4, 5}
@@ -50,7 +51,7 @@ Details
 Each *qualifier* in a comprehension can be either
 
 * a *variable binding* of the form ``<variable> in <set>``, *e.g.* ``x
-  in {1 .. 10}`` or ``b in {false, true}``, or
+  in {1 .. 10}`` or ``b in {F, T}``, or
 * a *guard*, which can be any :doc:`boolean <bool>` expression.
 
 A variable binding locally defines a variable and causes it to "loop" through
@@ -96,10 +97,37 @@ Specification
 .. note::
 
    In case you are curious about the precise definition and are not
-   afraid of the details, the exact way that set comprehensions
+   afraid of the details, the exact way that comprehensions
    work can be defined by the following three equations, making use of
-   the standard functions ``each`` and ``unions``:
+   the standard functions :doc:`each <each>` and ``$join``:
 
    * ``{ e | } = e``
-   * ``{ e | x in xs, gs } = unions(each(\x. {e | gs}, xs))``
+   * ``{ e | x in xs, gs } = $join(each(\x. {e | gs}, xs))``
    * ``{ e | g, gs } = {? { e | gs } if g, {} otherwise ?}``
+
+   ``$join`` is not directly available to users, but can be accessed
+   by enabling the ``Primitives`` :doc:`extension <extensions>`.  In
+   general, ``$join`` turns a thing-of-things into a thing
+   (list-of-lists into a list, bag-of-bags into a bag, *etc.*).
+
+   - For lists, ``$join`` is equivalent to ``concat``.
+
+       ::
+
+          Disco> $join [[1,2,3], [4], [5,6]]
+          [1, 2, 3, 4, 5, 6]
+
+   - For sets, ``$join`` is equivalent to ``unions``.
+
+       ::
+
+          Disco> $join {{1,2,3}, {2,3,4}, {3,5,6}}
+          {1, 2, 3, 4, 5, 6}
+
+   - For bags, ``$join`` is equivalent to a straightforward
+     generalization of ``unions`` to work on bags instead of sets.
+
+       ::
+
+          Disco> $join (bag [bag [1,1,2], bag [1,1,2], bag [2,3,4], bag [2,5,6]])
+          ⟅1 # 4, 2 # 4, 3, 4, 5, 6⟆

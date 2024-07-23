@@ -4,8 +4,8 @@ Logical operations
 Disco has various standard operations for manipulating :doc:`Boolean
 values <bool>`.
 
-* Logical negation is written ``not``; it inverts ``true`` to
-  ``false`` and vice versa.
+* Logical negation is written ``not``; it inverts ``T`` to
+  ``F`` and vice versa.
 * Logical conjunction, aka AND, is written ``/\``, ``and``, or
   ``&&``.  It has the following truth table:
 

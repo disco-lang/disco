@@ -4,9 +4,8 @@ Addition
 .. note::
 
    This page concerns the ``+`` operator on numbers; for the ``+``
-   operator on :doc:`types <types>`, see :doc:`sum types <sumtype>`; for
-   the ``+`` operator on :doc:`graphs <graphs>`, see :doc:`overlay
-   <overlay>`.
+   operator on :doc:`types <types>`, see :doc:`sum types <sumtype>`;
+   or see the ``+`` (``overlay``) operator on :doc:`graphs <graphs>`.
 
 Values of all :doc:`numeric types <numeric>` can be added using the ``+``
 operator.  For example:

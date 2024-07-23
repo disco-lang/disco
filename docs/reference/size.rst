@@ -13,3 +13,5 @@ notation ``|c|``.  For example,
    4
    Disco> |[2 .. 7]|
    6
+   Disco> |bag([1,1,2,3])|
+   4

@@ -51,7 +51,7 @@ eachlist(f, x::xs) = f(x) :: eachlist(f, xs)
 take : ℕ × List(a) → List(a)
 take(0, _)         = []
 take(_, [])        = []
-take(n+1, x :: xs) = x :: take(n, xs)
+take(n, x :: xs) = x :: take(n.-1, xs)
 
 ||| The length of a list.
 !!!   length [true, false, true] == 3

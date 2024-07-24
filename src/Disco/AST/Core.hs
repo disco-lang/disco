@@ -16,6 +16,7 @@
 module Disco.AST.Core (
   -- * Core AST
   RationalDisplay (..),
+  ShouldMemo (..),
   Core (..),
   Op (..),
   opArity,
@@ -62,6 +63,8 @@ instance Monoid RationalDisplay where
   mempty = Fraction
   mappend = (P.<>)
 
+data ShouldMemo = Memo | NoMemo deriving (Show, Generic, Data, Alpha)
+
 -- | AST for the desugared, untyped core language.
 data Core where
   -- | A variable.
@@ -87,7 +90,7 @@ data Core where
   -- | A projection from a product type, i.e. @fst@ or @snd@.
   CProj :: Side -> Core -> Core
   -- | An anonymous function.
-  CAbs :: Bind [Name Core] Core -> Core
+  CAbs :: ShouldMemo -> Bind [Name Core] Core -> Core
   -- | Function application.
   CApp :: Core -> Core -> Core
   -- | A "test frame" under which a test case is run. Records the
@@ -305,7 +308,7 @@ instance Pretty Core where
     CUnit -> "unit"
     CPair c1 c2 -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
     CProj s c -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
-    CAbs lam -> withPA initPA $ do
+    CAbs _ lam -> withPA initPA $ do
       lunbind lam $ \(xs, body) -> "λ" <> intercalate "," (map pretty xs) <> "." <+> lt (pretty body)
     CApp c1 c2 -> withPA funPA $ lt (pretty c1) <+> rt (pretty c2)
     CTest xs c -> "test" <+> prettyTestVars xs <+> pretty c

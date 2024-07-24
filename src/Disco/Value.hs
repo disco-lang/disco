@@ -68,9 +68,12 @@ module Disco.Value (
   Mem,
   emptyMem,
   allocate,
+  allocateValue,
   allocateRec,
   lkup,
+  memoLookup,
   set,
+  memoSet,
 
   -- * Pretty-printing
   prettyValue',
@@ -130,7 +133,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: Env -> [Name Core] -> Core -> Value
+  VClo :: Maybe (Int, [Value]) -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -451,6 +454,12 @@ allocate e t = do
   put $ Mem (n + 1) (IM.insert n (E e t) m)
   return n
 
+allocateValue :: Members '[State Mem] r => Value -> Sem r Int
+allocateValue v = do
+  Mem n m <- get
+  put $ Mem (n + 1) (IM.insert n (Disco.Value.V v) m)
+  return n
+
 -- | Allocate new memory cells for a group of mutually recursive
 --   bindings, and return the indices of the allocate cells.
 allocateRec :: Members '[State Mem] r => Env -> [(QName Core, Core)] -> Sem r [Int]
@@ -470,6 +479,19 @@ lkup n = gets (IM.lookup n . mu)
 -- | Set the cell at a given index.
 set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
 set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
+
+memoLookup :: Members '[State Mem] r => Int -> SimpleValue -> Sem r (Maybe Value)
+memoLookup n sv = gets (mLookup . IM.lookup n . mu)
+ where
+  mLookup (Just (Disco.Value.V (VMap vmap))) = M.lookup sv vmap
+  mLookup _ = Nothing
+
+memoSet :: Members '[State Mem] r => Int -> SimpleValue -> Value -> Sem r ()
+memoSet n sv v = do
+  mc <- lkup n
+  case mc of
+    Just (Disco.Value.V (VMap vmap)) -> set n (Disco.Value.V (VMap (M.insert sv v vmap)))
+    _ -> return ()
 
 ------------------------------------------------------------
 -- Pretty-printing values

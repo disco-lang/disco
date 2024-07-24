@@ -169,9 +169,9 @@ compileDTerm term@(DTAbs q _ _) = do
   (xs, tys, body) <- unbindDeep term
   cbody <- compileDTerm body
   case q of
-    Lam -> return $ abstract xs cbody
-    Ex -> return $ quantify (OExists tys) (abstract xs cbody)
-    All -> return $ quantify (OForall tys) (abstract xs cbody)
+    Lam -> return $ abstract (canMemo tys) xs cbody
+    Ex -> return $ quantify (OExists tys) (abstract NoMemo xs cbody)
+    All -> return $ quantify (OForall tys) (abstract NoMemo xs cbody)
  where
   -- Gather nested abstractions with the same quantifier.
   unbindDeep :: Member Fresh r => DTerm -> Sem r ([Name DTerm], [Type], DTerm)
@@ -181,11 +181,46 @@ compileDTerm term@(DTAbs q _ _) = do
     return (name : ns, ty : tys, body)
   unbindDeep t = return ([], [], t)
 
-  abstract :: [Name DTerm] -> Core -> Core
-  abstract xs body = CAbs (bind (map coerce xs) body)
+  abstract :: ShouldMemo -> [Name DTerm] -> Core -> Core
+  abstract m xs body = CAbs m (bind (map coerce xs) body)
 
   quantify :: Op -> Core -> Core
   quantify op = CApp (CConst op)
+
+  -- Given a function's arguments, determine if it is memoizable.
+  -- A function is memoizable if its arguments can be converted into
+  -- a simple value (Haskell Ord instance can be derived).
+  canMemo :: [Type] -> ShouldMemo
+  canMemo tys
+    | all canMemoTy tys = Memo
+    | otherwise = NoMemo
+
+  canMemoTy :: Type -> Bool
+  canMemoTy (TyAtom a) = canMemoAtom a
+  -- Anti-higher order while allowing for curried functions.
+  canMemoTy (TyCon CArr tys@(t : _)) = case t of
+    TyCon CArr _ -> False
+    _ -> all canMemoTy tys
+  canMemoTy (TyCon c tys) = canMemoCon c && all canMemoTy tys
+
+  canMemoCon :: Con -> Bool
+  canMemoCon = \case
+    CArr -> False
+    CUser _ -> False
+    CGraph -> False
+    CMap -> False
+    CContainer a -> canMemoAtom a
+    _ -> True
+
+  canMemoAtom :: Atom -> Bool
+  canMemoAtom (AVar _) = False
+  canMemoAtom (ABase b) = canMemoBase b
+
+  canMemoBase :: BaseTy -> Bool
+  canMemoBase = \case
+    Gen -> False
+    P -> False
+    _ -> True
 
 -- Special case for Cons, which compiles to a constructor application
 -- rather than a function application.
@@ -234,13 +269,13 @@ compilePrim ty p@(PrimUOp _) = compilePrimErr p ty
 compilePrim _ (PrimBOp Cons) = do
   hd <- fresh (string2Name "hd")
   tl <- fresh (string2Name "tl")
-  return $ CAbs $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
+  return $ CAbs NoMemo $ bind [hd, tl] $ CInj R (CPair (CVar (localName hd)) (CVar (localName tl)))
 compilePrim _ PrimLeft = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj L (CVar (localName a))
+  return $ CAbs NoMemo $ bind [a] $ CInj L (CVar (localName a))
 compilePrim _ PrimRight = do
   a <- fresh (string2Name "a")
-  return $ CAbs $ bind [a] $ CInj R (CVar (localName a))
+  return $ CAbs NoMemo $ bind [a] $ CInj R (CVar (localName a))
 compilePrim (ty1 :*: ty2 :->: resTy) (PrimBOp bop) = return $ compileBOp ty1 ty2 resTy bop
 compilePrim ty p@(PrimBOp _) = compilePrimErr p ty
 compilePrim _ PrimSqrt = return $ CConst OSqrt
@@ -342,13 +377,13 @@ compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad t
 --   of type (Unit → τ), in order to delay evaluation until explicitly
 --   applying it to the unit value.
 compileCase :: Member Fresh r => [DBranch] -> Sem r Core
-compileCase [] = return $ CAbs (bind [string2Name "_"] (CConst OMatchErr))
+compileCase [] = return $ CAbs NoMemo (bind [string2Name "_"] (CConst OMatchErr))
 -- empty case ==>  λ _ . error
 
 compileCase (b : bs) = do
   c1 <- compileBranch b
   c2 <- compileCase bs
-  return $ CAbs (bind [string2Name "_"] (CApp c1 c2))
+  return $ CAbs NoMemo (bind [string2Name "_"] (CApp c1 c2))
 
 -- | Compile a branch of a case expression of type τ to a core
 --   language expression of type (Unit → τ) → τ.  The idea is that it
@@ -362,7 +397,7 @@ compileBranch b = do
   c <- compileDTerm e
   k <- fresh (string2Name "k") -- Fresh name for the failure continuation
   bc <- compileGuards (fromTelescope gs) k c
-  return $ CAbs (bind [k] bc)
+  return $ CAbs NoMemo (bind [k] bc)
 
 -- | 'compileGuards' takes a list of guards, the name of the failure
 --   continuation of type (Unit → τ), and a Core term of type τ to
@@ -384,13 +419,13 @@ compileGuards (DGPat (unembed -> s) p : gs) k e = do
 --   calls the failure continuation in the case of failure, or the
 --   rest of the guards in the case of success.
 compileMatch :: Member Fresh r => DPattern -> Core -> Name Core -> Core -> Sem r Core
-compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs (bind [coerce x] e)) s
+compileMatch (DPVar _ x) s _ e = return $ CApp (CAbs NoMemo (bind [coerce x] e)) s
 -- Note in the below two cases that we can't just discard s since
 -- that would result in a lazy semantics.  With an eager/strict
 -- semantics, we have to make sure s gets evaluated even if its
 -- value is then discarded.
-compileMatch (DPWild _) s _ e = return $ CApp (CAbs (bind [string2Name "_"] e)) s
-compileMatch DPUnit s _ e = return $ CApp (CAbs (bind [string2Name "_"] e)) s
+compileMatch (DPWild _) s _ e = return $ CApp (CAbs NoMemo (bind [string2Name "_"] e)) s
+compileMatch DPUnit s _ e = return $ CApp (CAbs NoMemo (bind [string2Name "_"] e)) s
 compileMatch (DPPair _ x1 x2) s _ e = do
   y <- fresh (string2Name "y")
 
@@ -398,11 +433,12 @@ compileMatch (DPPair _ x1 x2) s _ e = do
   return $
     CApp
       ( CAbs
+          NoMemo
           ( bind
               [y]
               ( CApp
                   ( CApp
-                      (CAbs (bind [coerce x1, coerce x2] e))
+                      (CAbs NoMemo (bind [coerce x1, coerce x2] e))
                       (CProj L (CVar (localName y)))
                   )
                   (CProj R (CVar (localName y)))

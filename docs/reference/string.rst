@@ -43,11 +43,12 @@ Note the difference between ``'x'`` and ``"x"``:
 print command
 -------------
 
-When a string value is the result of an expression typed at the REPL,
-it will be displayed in double quotes, with escape sequences to
-represent special characters.  If you want the contents of the string
-to actually be printed on the screen, interpreting special characters
-appropriately, you can use the ``:print`` command.  For example:
+When a string value is the result of an expression typed at the
+:doc:`REPL <REPL>`, it will be displayed in double quotes, with escape
+sequences to represent special characters.  If you want the contents
+of the string to actually be printed on the screen, interpreting
+special characters appropriately, you can use the ``:print`` command.
+For example:
 
 ::
 

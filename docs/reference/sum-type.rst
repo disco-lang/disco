@@ -18,8 +18,8 @@ Sum types
 
        Disco> left(3) : N + Bool
        left(3)
-       Disco> right(false) : N + Bool
-       right(false)
+       Disco> right(F) : N + Bool
+       right(F)
 
 Note that the ``left`` or ``right`` ensures that ``A + B`` really does
 represent a *disjoint* union.  For example, although the usual

@@ -23,5 +23,8 @@ them.
    function
    collections
    combinatorics
+   library
+   REPL
+   extensions
    errors
    symbols

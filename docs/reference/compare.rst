@@ -8,14 +8,14 @@ always return a :doc:`boolean <bool>` value.
 Values of almost any type can be compared: :doc:`numeric types
 <numeric>`, :doc:`booleans <bool>`, :doc:`characters <char>`,
 :doc:`strings <string>`, and any :doc:`pair <product-type>`,
-:doc:`sum <sum-type>`, or :doc:`container <container>` types built out
+:doc:`sum <sum-type>`, or :doc:`collection <collections>` types built out
 of these.  For example, sets of pairs of natural numbers and strings
 can be compared:
 
 ::
 
    Disco> {(3, "hi"), (4, "there"), (6, "world")} < {(10, "what")}
-   true
+   T
 
 See the individual pages about each type for more information on how
 comparison works on values of that type.
@@ -36,9 +36,9 @@ many.
     ::
 
        Disco> 3 == 5
-       false
+       F
        Disco> "hi" == "hi"
-       true
+       T
 
   Equality is one critical point where Disco syntax has to deviate
   from standard mathematical notation: be sure to keep in mind the

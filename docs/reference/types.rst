@@ -31,7 +31,8 @@ is a :doc:`subtype <subtypes>` of the one it was expecting.
    base-types
    function-types
    polymorphism
+   type-annot
    algebraic-types
-   collection-types
+   typedef
    prop
    subtypes

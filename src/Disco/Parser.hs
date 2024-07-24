@@ -1029,6 +1029,11 @@ termToPattern (TAscr t s) = case s of
   _ -> Nothing
 termToPattern (TBin Cons t1 t2) =
   PCons <$> termToPattern t1 <*> termToPattern t2
+
+{- TODO replace these pattern parsers with a single pn+k parser. Nested
+ - patterns will be allowed, because composition is closed on pn+k patterns;
+ - i.e. we can parse nested patterns and then flatten them.
+
 termToPattern (TBin Add t1 t2) =
   case (termToPattern t1, termToPattern t2) of
     (Just p, _)
@@ -1074,6 +1079,9 @@ termToPattern (TBin Sub t1 t2) =
 termToPattern (TBin Div t1 t2) =
   PFrac <$> termToPattern t1 <*> termToPattern t2
 termToPattern (TUn Neg t) = PNeg <$> termToPattern t
+
+-}
+
 termToPattern (TContainer ListContainer ts Nothing) =
   PList <$> mapM (termToPattern . fst) ts
 termToPattern _ = Nothing

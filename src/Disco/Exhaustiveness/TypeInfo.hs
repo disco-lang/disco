@@ -35,7 +35,15 @@ data Ident where
   KChar :: Char -> Ident
   KLeft :: Ident
   KRight :: Ident
+  KUnkown :: Ident
   deriving (Eq, Ord, Show)
+
+data Constructors where
+  Finite :: [DataCon] -> Constructors
+  Infinite :: [DataCon] -> Constructors
+
+unknown :: DataCon
+unknown = DataCon {dcIdent = KUnkown, dcTypes = []}
 
 unit :: DataCon
 unit = DataCon {dcIdent = KUnit, dcTypes = []}
@@ -68,31 +76,32 @@ right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
 -- If I have, and this is enough, I can remove all mentions
 -- of type equality constraints in Constraint.hs,
 -- the lookup here will have handled that behavoir already
-tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Maybe [DataCon]
+tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Constructors
 tyDataCons (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Nothing -> error $ "Type definition not found for: " ++ show name
   Just (Ty.TyDefBody _argNames typeCon) -> tyDataCons (typeCon args) ctx
-tyDataCons (a Ty.:*: b) _ = Just [pair a b]
-tyDataCons (l Ty.:+: r) _ = Just [left l, right r]
-tyDataCons t@(Ty.TyList a) _ = Just [cons a t, nil]
-tyDataCons Ty.TyVoid _ = Just []
-tyDataCons Ty.TyUnit _ = Just [unit]
-tyDataCons Ty.TyBool _ = Just [bool True, bool False]
-tyDataCons Ty.TyN _ = Nothing
-tyDataCons Ty.TyZ _ = Nothing
-tyDataCons Ty.TyF _ = Nothing
-tyDataCons Ty.TyQ _ = Nothing
-tyDataCons Ty.TyC _ = Nothing
+tyDataCons (a Ty.:*: b) _ = Finite [pair a b]
+tyDataCons (l Ty.:+: r) _ = Finite [left l, right r]
+tyDataCons t@(Ty.TyList a) _ = Finite [cons a t, nil]
+tyDataCons Ty.TyVoid _ = Finite []
+tyDataCons Ty.TyUnit _ = Finite [unit]
+tyDataCons Ty.TyBool _ = Finite [bool True, bool False]
+tyDataCons Ty.TyN _ = Infinite $ map natural [0,1..]
+tyDataCons Ty.TyZ _ = Infinite [] -- TODO(colin): IMPORTANT! fill these in!
+tyDataCons Ty.TyF _ = Infinite []
+tyDataCons Ty.TyQ _ = Infinite []
+tyDataCons Ty.TyC _ = Infinite []
 tyDataCons (_ Ty.:->: _) _ = error "Functions not allowed in patterns."
 tyDataCons (Ty.TySet _) _ = error "Sets not allowed in patterns."
 tyDataCons (Ty.TyBag _) _ = error "Bags not allowed in patterns."
--- I'm unsure about these two.
--- They may come up when doing generic stuff,
--- I haven't ecnountered them so far
--- TODO(colin): ask Yorgey about this
-tyDataCons (Ty.TyVar _) _ = error "Encountered type var in pattern"
+-- This caused a problem in findPosExamples,
+-- we were trying to list of the constructors of an unknown type
+-- Here we return an Infinite to prevent the lyg algorithm
+-- from thinking a complete list of constructors exists,
+-- and pretty print this as "_" when displaying the result of findPosExamples
+tyDataCons (Ty.TyVar _) _ = Infinite [unknown]
+-- Unsure about these...
 tyDataCons (Ty.TySkolem _) _ = error "Encountered skolem in pattern"
--- Unsure about these as well
 tyDataCons (Ty.TyProp) _ = error "Propositions not allowed in patterns."
 tyDataCons (Ty.TyMap _ _) _ = error "Maps not allowed in patterns."
 tyDataCons (Ty.TyGraph _) _ = error "Graph not allowed in patterns."

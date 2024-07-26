@@ -30,11 +30,11 @@ import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import qualified Disco.Types as Ty
 import Polysemy
+import Polysemy.Reader
 import Text.Show.Pretty (pPrint)
 import Unbound.Generics.LocallyNameless (Name)
-import Polysemy.Reader
 
-checkClauses :: Members '[Fresh, Reader Ty.TyDefCtx, Embed IO] r => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
+checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
@@ -43,29 +43,37 @@ checkClauses name types pats = do
   let argsNref = (C.Context args, [])
   (normalizedNrefs, annotated) <- ua [argsNref] gdt
 
-  inhab <- Poss.getPossibilities <$> findInhabitants normalizedNrefs args
-
+  -- inhab <- Poss.getPossibilities <$> findInhabitants normalizedNrefs args
   redundant <- findRedundant annotated args
 
-  when False $ do
-    embed $ putStrLn "=====DEBUG=============================="
-    embed $ putStrLn "GDT:"
-    embed $ pPrint gdt
-    embed $ putStrLn "UNCOVERED:"
-    embed $ pPrint inhab
-    embed $ putStrLn "REDUNDANT:"
-    embed $ pPrint redundant
-    embed $ putStrLn "=====GUBED=============================="
+  examples <- findPosExamples normalizedNrefs args
+
+  -- when False $ do
+  --   embed $ putStrLn "=====DEBUG=============================="
+  --   embed $ putStrLn "GDT:"
+  --   embed $ pPrint gdt
+  --   embed $ putStrLn "UNCOVERED:"
+  --   embed $ pPrint inhab
+  --   embed $ putStrLn "REDUNDANT:"
+  --   embed $ pPrint redundant
+  --   embed $ putStrLn "=====GUBED=============================="
 
   let jspace = foldr (\a b -> a ++ " " ++ b) ""
 
-  when (not . null $ inhab) $ do
-    let patLine ipats = do
-          let ipatArgs = jspace (map prettyInhab ipats)
-          putStrLn $ show name ++ " " ++ ipatArgs ++ "= ..."
+  -- when (not . null $ inhab) $ do
+  --   let patLine ipats = do
+  --         let ipatArgs = jspace (map prettyInhab ipats)
+  --         putStrLn $ show name ++ " " ++ ipatArgs ++ "= ..."
+  --
+  --   embed $ putStrLn $ "Warning: You haven't matched against:"
+  --   embed $ forM_ inhab patLine
 
-    embed $ putStrLn $ "Warning: You haven't matched against:"
-    embed $ forM_ inhab patLine
+  when (not . null $ examples) $ do
+    embed $ putStrLn $ "Warning: You haven't covered these cases:"
+    let exampleLine exArgs = do
+          let line = jspace (map prettyExample exArgs)
+          putStrLn $ show name ++ " " ++ line ++ "= ..."
+    embed $ forM_ examples exampleLine
 
   when (not . null $ redundant) $ do
     embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
@@ -180,7 +188,7 @@ data Ant where
   ABranch :: Ant -> Ant -> Ant
   deriving (Show)
 
-ua :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> Gdt -> Sem r ([C.NormRefType], Ant)
+ua :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> Gdt -> Sem r ([C.NormRefType], Ant)
 ua nrefs gdt = case gdt of
   Grhs k -> return ([], AGrhs nrefs k)
   Branch t1 t2 -> do
@@ -196,7 +204,7 @@ ua nrefs gdt = case gdt of
     n'' <- addLitMulti nrefs $ Literal (x, LitNot dc)
     return (n'' ++ n', u)
 
-addLitMulti :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
+addLitMulti :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> Literal -> Sem r [C.NormRefType]
 addLitMulti [] _ = return []
 addLitMulti (n : ns) lit = do
   r <- runMaybeT $ addLiteral n lit
@@ -206,7 +214,7 @@ addLitMulti (n : ns) lit = do
       ns' <- addLitMulti ns lit
       return $ (ctx, cfs) : ns'
 
-addLiteral :: Members '[Fresh, Reader Ty.TyDefCtx] r => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
+addLiteral :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
 addLiteral (context, constraints) (Literal (x, c)) = case c of
   LitWasOriginally z ->
     (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
@@ -246,11 +254,27 @@ prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd
 prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
   "(" ++ prettyInhab ihead ++ " :: " ++ prettyInhab itail ++ ")"
 prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KLeft, TI.dcTypes = _} [l]) =
-  "left(" ++ prettyInhab l ++ ")"
+  "(left " ++ prettyInhab l ++ ")"
 prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KRight, TI.dcTypes = _} [r]) =
-  "right(" ++ prettyInhab r ++ ")"
+  "(right " ++ prettyInhab r ++ ")"
 prettyInhab (IPIs dc []) = dcToString dc
 prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
+
+data ExamplePat where
+  ExamplePat :: TI.DataCon -> [ExamplePat] -> ExamplePat
+  deriving (Show)
+
+prettyExample :: ExamplePat -> String
+prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd]) =
+  "(" ++ prettyExample ifst ++ ", " ++ prettyExample isnd ++ ")"
+prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
+  "(" ++ prettyExample ihead ++ " :: " ++ prettyExample itail ++ ")"
+prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KLeft, TI.dcTypes = _} [l]) =
+  "(left " ++ prettyExample l ++ ")"
+prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KRight, TI.dcTypes = _} [r]) =
+  "(right " ++ prettyExample r ++ ")"
+prettyExample (ExamplePat dc []) = dcToString dc
+prettyExample (ExamplePat dc args) = dcToString dc ++ " " ++ joinSpace (map prettyExample args)
 
 dcToString :: TI.DataCon -> String
 dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
@@ -259,6 +283,7 @@ dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
   TI.KNat n -> show n
   TI.KNil -> "[]"
   TI.KUnit -> "unit"
+  TI.KUnkown -> "_"
   -- TODO(colin): find a way to remove these? These two shouldn't be reachable
   -- If we were in an IPIs, we already handled these above
   -- If we were in an IPNot, these aren't from opaque types,
@@ -276,17 +301,21 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPIs k pats
 
-findInhabitants :: Members '[Fresh, Reader Ty.TyDefCtx] r => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+-- No longer used to report to the user like in Haskell
+-- we use findPosExamples instead because we think that will be easier
+-- on a student using disco for the first time
+-- However, this function is still used in redundancy checking
+findInhabitants :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
 findInhabitants nrefs args = do
   a <- forM nrefs (`findAllForNref` args)
   return $ Poss.anyOf a
 
-findAllForNref :: Members '[Fresh, Reader Ty.TyDefCtx] r => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
+findAllForNref :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
 findAllForNref nref args = do
   argPats <- forM args (`findVarInhabitants` nref)
   return $ Poss.allCombinations argPats
 
-findVarInhabitants :: Members '[Fresh, Reader Ty.TyDefCtx] r => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
+findVarInhabitants :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
 findVarInhabitants var nref@(_, cns) =
   case posMatch of
     Just (k, args) -> do
@@ -297,8 +326,8 @@ findVarInhabitants var nref@(_, cns) =
       neg -> do
         tyCtx <- ask @Ty.TyDefCtx
         case TI.tyDataCons (TI.getType var) tyCtx of
-          Nothing -> Poss.retSingle $ IPNot neg
-          Just dcs ->
+          TI.Infinite _ -> Poss.retSingle $ IPNot neg
+          TI.Finite dcs ->
             do
               let tryAddDc dc = do
                     vars <- TI.newVars (TI.dcTypes dc)
@@ -318,9 +347,59 @@ findVarInhabitants var nref@(_, cns) =
     posMatch = C.posMatch constraintsOnX
     negMatches = C.negMatches constraintsOnX
 
-findRedundant :: Members '[Fresh, Reader Ty.TyDefCtx] r => Ant -> [TI.TypedVar] -> Sem r [Int]
+findRedundant :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => Ant -> [TI.TypedVar] -> Sem r [Int]
 findRedundant ant args = case ant of
   AGrhs ref i -> do
     uninhabited <- Poss.none <$> findInhabitants ref args
     return [i | uninhabited]
   ABranch a1 a2 -> mappend <$> findRedundant a1 args <*> findRedundant a2 args
+
+-- Less general version of the above inhabitant finding function
+-- returns a maximum of 3 possible args lists that haven't been matched against,
+-- as to not overwhelm new users of the language.
+findPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r [[ExamplePat]]
+findPosExamples nrefs args = do
+  a <- forM nrefs (`findAllPosForNref` args)
+  return $ take 3 $ Poss.getPossibilities $ Poss.anyOf a
+
+findAllPosForNref :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [ExamplePat])
+findAllPosForNref nref args = do
+  argPats <- forM args (`findVarPosExamples` nref)
+  return $ Poss.allCombinations argPats
+
+findVarPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities ExamplePat)
+findVarPosExamples var nref@(_, cns) =
+  case posMatch of
+    Just (k, args) -> do
+      argPossibilities <- findAllPosForNref nref args
+      return (mkExampleMatch k <$> argPossibilities)
+    Nothing -> do
+      tyCtx <- ask @Ty.TyDefCtx
+      let dcs = getPosFrom (TI.getType var) tyCtx negMatches
+      let tryAddDc dc = do
+            vars <- TI.newVars (TI.dcTypes dc)
+            runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
+      -- Try to add a positive constraint for each data constructor
+      -- to the current nref
+      -- If any of these additions succeed, save that nref,
+      -- it now has positive information
+      posNrefs <- catMaybes <$> forM dcs tryAddDc
+
+      Poss.anyOf <$> forM posNrefs (findVarPosExamples var)
+  where
+    constraintsOnX = C.onVar var cns
+    posMatch = C.posMatch constraintsOnX
+    negMatches = C.negMatches constraintsOnX
+
+getPosFrom :: Ty.Type -> Ty.TyDefCtx -> [TI.DataCon] -> [TI.DataCon]
+getPosFrom ty ctx neg = take 3 $ filter (\x -> not (x `elem` neg)) dcs
+  where
+    dcs = case TI.tyDataCons ty ctx of
+      TI.Finite dcs' -> dcs'
+      TI.Infinite dcs' -> dcs'
+
+mkExampleMatch :: TI.DataCon -> [ExamplePat] -> ExamplePat
+mkExampleMatch k pats =
+  if length (TI.dcTypes k) /= length pats
+    then error $ "Wrong number of DataCon args" ++ show (k, pats)
+    else ExamplePat k pats

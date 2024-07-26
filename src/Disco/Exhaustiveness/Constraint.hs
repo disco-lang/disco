@@ -132,8 +132,8 @@ inhabited :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVa
 inhabited n var = do
   tyCtx <- ask @Ty.TyDefCtx
   case TI.tyDataCons (TI.getType var) tyCtx of
-    Nothing -> return True -- assume opaque types are inhabited
-    Just constructors -> do
+    TI.Infinite _ -> return True -- assume opaque types are inhabited
+    TI.Finite constructors -> do
       or <$> mapM (instantiate n var) constructors
 
 -- Attempts to "instantiate" a match of the dataconstructor k on x

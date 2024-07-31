@@ -1030,9 +1030,11 @@ termToPattern (TAscr t s) = case s of
 termToPattern (TBin Cons t1 t2) =
   PCons <$> termToPattern t1 <*> termToPattern t2
 
-{- TODO replace these pattern parsers with a single pn+k parser. Nested
- - patterns will be allowed, because composition is closed on pn+k patterns;
- - i.e. we can parse nested patterns and then flatten them.
+{- TODO replace N/Z pattern parsers with a single pn+k parser. Nested patterns
+ - will be allowed, because composition is closed on pn+k patterns; i.e. we can
+ - parse nested patterns and then flatten them. F/Q patterns can remain mostly
+ - the same, but division patterns with free vars should be restricted such that
+ - @x/2@ becomes @(1/2)*x@ and @2/x@ is disallowed entirely.
 
 termToPattern (TBin Add t1 t2) =
   case (termToPattern t1, termToPattern t2) of

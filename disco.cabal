@@ -446,6 +446,7 @@ library
                        Disco.Error
                        Disco.Eval
                        Disco.Interpret.CESK
+                       Disco.SemilinearSet
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints

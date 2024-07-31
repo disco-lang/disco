@@ -28,13 +28,16 @@ import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
 import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
+import Disco.Messages
+import qualified Disco.Pretty.DSL as DSL
 import qualified Disco.Types as Ty
 import Polysemy
+import Polysemy.Output
 import Polysemy.Reader
 import Text.Show.Pretty (pPrint)
 import Unbound.Generics.LocallyNameless (Name)
 
-checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
+checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
@@ -58,8 +61,6 @@ checkClauses name types pats = do
   --   embed $ pPrint redundant
   --   embed $ putStrLn "=====GUBED=============================="
 
-  let jspace = foldr (\a b -> a ++ " " ++ b) ""
-
   -- when (not . null $ inhab) $ do
   --   let patLine ipats = do
   --         let ipatArgs = jspace (map prettyInhab ipats)
@@ -69,11 +70,25 @@ checkClauses name types pats = do
   --   embed $ forM_ inhab patLine
 
   when (not . null $ examples) $ do
-    embed $ putStrLn $ "Warning: You haven't covered these cases:"
-    let exampleLine exArgs = do
-          let line = jspace (map prettyExample exArgs)
-          putStrLn $ show name ++ " " ++ line ++ "= ..."
-    embed $ forM_ examples exampleLine
+    -- let jspace = foldr (\a b -> a ++ " " ++ b) ""
+    -- embed $ putStrLn $ "Warning: You haven't covered these cases:"
+    -- let exampleLine exArgs = do
+    --       let line = jspace (map prettyExample exArgs)
+    --       putStrLn $ show name ++ " " ++ line ++ "= ..."
+    -- embed $ forM_ examples exampleLine
+
+    let prettyExampleArgs exArgs =
+          DSL.hsep $ map (DSL.text . prettyExample) exArgs
+
+    let prettyExampleLine prettyArgs =
+          DSL.text (show name) DSL.<+> prettyArgs DSL.<+> DSL.text "= ..."
+
+    let prettyExamples =
+          DSL.vcat $ map (prettyExampleLine . prettyExampleArgs) examples
+
+    warn $
+      DSL.text "Warning: You haven't covered these cases:"
+        DSL.$+$ prettyExamples
 
   when (not . null $ redundant) $ do
     embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
@@ -357,35 +372,41 @@ findRedundant ant args = case ant of
 -- Less general version of the above inhabitant finding function
 -- returns a maximum of 3 possible args lists that haven't been matched against,
 -- as to not overwhelm new users of the language.
+-- This is essentially a DFS, and it has a bad habbit of
+-- trying to build infinite lists whenever it can, so we give it a max depth of 32
+-- If we reach 32 levels of nested dataconstructors in this language,
+-- it is pretty safe to assume we were chasing after an infinite structure
 findPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r [[ExamplePat]]
 findPosExamples nrefs args = do
-  a <- forM nrefs (`findAllPosForNref` args)
+  a <- forM nrefs (\nref -> findAllPosForNref 32 nref args)
   return $ take 3 $ Poss.getPossibilities $ Poss.anyOf a
 
-findAllPosForNref :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [ExamplePat])
-findAllPosForNref nref args = do
-  argPats <- forM args (`findVarPosExamples` nref)
+findAllPosForNref :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => Int -> C.NormRefType -> [TI.TypedVar] -> Sem r (Poss.Possibilities [ExamplePat])
+findAllPosForNref fuel nref args = do
+  argPats <- forM args (\arg -> findVarPosExamples (fuel - 1) arg nref)
   return $ Poss.allCombinations argPats
 
-findVarPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities ExamplePat)
-findVarPosExamples var nref@(_, cns) =
-  case posMatch of
-    Just (k, args) -> do
-      argPossibilities <- findAllPosForNref nref args
-      return (mkExampleMatch k <$> argPossibilities)
-    Nothing -> do
-      tyCtx <- ask @Ty.TyDefCtx
-      let dcs = getPosFrom (TI.getType var) tyCtx negMatches
-      let tryAddDc dc = do
-            vars <- TI.newVars (TI.dcTypes dc)
-            runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
-      -- Try to add a positive constraint for each data constructor
-      -- to the current nref
-      -- If any of these additions succeed, save that nref,
-      -- it now has positive information
-      posNrefs <- catMaybes <$> forM dcs tryAddDc
+findVarPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => Int -> TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities ExamplePat)
+findVarPosExamples fuel var nref@(_, cns) =
+  if fuel < 0
+    then return mempty
+    else case posMatch of
+      Just (k, args) -> do
+        argPossibilities <- findAllPosForNref (fuel - 1) nref args
+        return (mkExampleMatch k <$> argPossibilities)
+      Nothing -> do
+        tyCtx <- ask @Ty.TyDefCtx
+        let dcs = getPosFrom (TI.getType var) tyCtx negMatches
+        let tryAddDc dc = do
+              vars <- TI.newVars (TI.dcTypes dc)
+              runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
+        -- Try to add a positive constraint for each data constructor
+        -- to the current nref
+        -- If any of these additions succeed, save that nref,
+        -- it now has positive information
+        posNrefs <- catMaybes <$> forM dcs tryAddDc
 
-      Poss.anyOf <$> forM posNrefs (findVarPosExamples var)
+        Poss.anyOf <$> forM posNrefs (findVarPosExamples (fuel - 1) var)
   where
     constraintsOnX = C.onVar var cns
     posMatch = C.posMatch constraintsOnX

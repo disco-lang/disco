@@ -82,15 +82,20 @@ tyDataCons (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Just (Ty.TyDefBody _argNames typeCon) -> tyDataCons (typeCon args) ctx
 tyDataCons (a Ty.:*: b) _ = Finite [pair a b]
 tyDataCons (l Ty.:+: r) _ = Finite [left l, right r]
-tyDataCons t@(Ty.TyList a) _ = Finite [cons a t, nil]
+tyDataCons t@(Ty.TyList a) _ = Finite [nil, cons a t]
 tyDataCons Ty.TyVoid _ = Finite []
 tyDataCons Ty.TyUnit _ = Finite [unit]
 tyDataCons Ty.TyBool _ = Finite [bool True, bool False]
-tyDataCons Ty.TyN _ = Infinite $ map natural [0,1..]
+tyDataCons Ty.TyN _ = Infinite $ map natural [0, 1 ..]
 tyDataCons Ty.TyZ _ = Infinite [] -- TODO(colin): IMPORTANT! fill these in!
 tyDataCons Ty.TyF _ = Infinite []
 tyDataCons Ty.TyQ _ = Infinite []
-tyDataCons Ty.TyC _ = Infinite []
+-- We could do all valid ASCII, but this is most likely good enough
+-- I think these starting from 'a' is good for students learning the language
+tyDataCons Ty.TyC _ =
+  Infinite $
+    map char $
+      ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
 tyDataCons (_ Ty.:->: _) _ = error "Functions not allowed in patterns."
 tyDataCons (Ty.TySet _) _ = error "Sets not allowed in patterns."
 tyDataCons (Ty.TyBag _) _ = error "Bags not allowed in patterns."

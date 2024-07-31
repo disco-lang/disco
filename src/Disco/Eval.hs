@@ -449,7 +449,7 @@ loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
 
-checkExhaustive :: Members '[Fresh, Embed IO] r => TyDefCtx -> Defn -> Sem r ()
+checkExhaustive :: Members '[Fresh, Output (Message ann), Embed IO] r => TyDefCtx -> Defn -> Sem r ()
 checkExhaustive tyDefCtx (Defn name argsType _ boundClauses) = do
   clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
   runReader @TyDefCtx tyDefCtx $ checkClauses name argsType clauses

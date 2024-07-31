@@ -450,6 +450,7 @@ library
                        Disco.Exhaustiveness.Possibilities
                        Disco.Exhaustiveness.TypeInfo
                        Disco.Interpret.CESK
+                       Disco.SemilinearSet
                        Disco.Subst
                        Disco.Typecheck
                        Disco.Typecheck.Constraints

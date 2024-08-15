@@ -2,7 +2,7 @@
 
 module Disco.Exhaustiveness where
 
-import Control.Monad (forM, forM_, when, zipWithM)
+import Control.Monad (forM, when, zipWithM)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
@@ -23,6 +23,7 @@ import Disco.AST.Typed
     pattern APUnit,
     pattern APVar,
     pattern APWild,
+    pattern APNeg,
   )
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
@@ -34,7 +35,6 @@ import qualified Disco.Types as Ty
 import Polysemy
 import Polysemy.Output
 import Polysemy.Reader
-import Text.Show.Pretty (pPrint)
 import Unbound.Generics.LocallyNameless (Name)
 
 checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
@@ -44,39 +44,11 @@ checkClauses name types pats = do
   let gdt = foldr1 Branch cl
 
   let argsNref = (C.Context args, [])
-  (normalizedNrefs, annotated) <- ua [argsNref] gdt
-
-  -- inhab <- Poss.getPossibilities <$> findInhabitants normalizedNrefs args
-  redundant <- findRedundant annotated args
+  (normalizedNrefs, _) <- ua [argsNref] gdt
 
   examples <- findPosExamples normalizedNrefs args
-  --
-  -- when True $ do
-  --   embed $ putStrLn "=====DEBUG=============================="
-  --   embed $ putStrLn "GDT:"
-  --   embed $ pPrint gdt
-  --   embed $ putStrLn "UNCOVERED:"
-  --   embed $ pPrint normalizedNrefs
-  --   embed $ putStrLn "REDUNDANT:"
-  --   embed $ pPrint redundant
-  --   embed $ putStrLn "=====GUBED=============================="
-  --
-  -- when (not . null $ inhab) $ do
-  --   let patLine ipats = do
-  --         let ipatArgs = jspace (map prettyInhab ipats)
-  --         putStrLn $ show name ++ " " ++ ipatArgs ++ "= ..."
-  --
-  --   embed $ putStrLn $ "Warning: You haven't matched against:"
-  --   embed $ forM_ inhab patLine
 
   when (not . null $ examples) $ do
-    -- let jspace = foldr (\a b -> a ++ " " ++ b) ""
-    -- embed $ putStrLn $ "Warning: You haven't covered these cases:"
-    -- let exampleLine exArgs = do
-    --       let line = jspace (map prettyExample exArgs)
-    --       putStrLn $ show name ++ " " ++ line ++ "= ..."
-    -- embed $ forM_ examples exampleLine
-
     let prettyExampleArgs exArgs =
           DSL.hsep $ map (DSL.text . prettyExample) exArgs
 
@@ -89,10 +61,6 @@ checkClauses name types pats = do
     warn $
       DSL.text "Warning: You haven't covered these cases:"
         DSL.$+$ prettyExamples
-
-  -- when (not . null $ redundant) $ do
-  --   embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
-  --   embed $ putStrLn $ show redundant
 
   return ()
 
@@ -119,7 +87,7 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
 
 {-
 TODO(colin): handle remaining patterns
-  , APNeg     --required for integers / rationals?
+  , APNeg     --still need to handle rational case
   , APFrac    --required for rationals?
   algebraic (probably will be replaced anyway):
   , APAdd
@@ -157,12 +125,15 @@ desugarMatch var pat = do
     (APString str) -> do
       let strType = (Ty.TyList Ty.TyC)
       desugarMatch var (APList strType (map APChar str))
+    -- A bit of strangeness is required here because of how patterns work
+    (APNat Ty.TyN nat) -> return [(var, GMatch (TI.natural nat) [])]
+    (APNat Ty.TyZ z) -> return [(var, GMatch (TI.integer z) [])]
+    (APNeg Ty.TyZ (APNat Ty.TyN z)) -> return [(var, GMatch (TI.integer (-z)) [])]
     -- These are more straightforward:
     (APWild _) -> return []
     (APVar ty name) -> do
       let newAlias = TI.TypedVar (name, ty)
       return [(newAlias, GWasOriginally var)]
-    (APNat _ nat) -> return [(var, GMatch (TI.natural nat) [])]
     (APUnit) -> return [(var, GMatch TI.unit [])]
     (APBool b) -> return [(var, GMatch (TI.bool b) [])]
     (APChar c) -> return [(var, GMatch (TI.char c) [])]
@@ -175,7 +146,7 @@ desugarMatch var pat = do
         R -> TI.newVar tr
       guards <- desugarMatch newVar subPat
       return $ [(var, GMatch dc [newVar])] ++ guards
-    e -> return []
+    _ -> return []
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -296,6 +267,7 @@ dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
   TI.KBool b -> show b
   TI.KChar c -> show c
   TI.KNat n -> show n
+  TI.KInt z -> show z
   TI.KNil -> "[]"
   TI.KUnit -> "unit"
   TI.KUnkown -> "_"
@@ -316,10 +288,6 @@ mkIPMatch k pats =
     then error $ "Wrong number of DataCon args" ++ show (k, pats)
     else IPIs k pats
 
--- No longer used to report to the user like in Haskell
--- we use findPosExamples instead because we think that will be easier
--- on a student using disco for the first time
--- However, this function is still used in redundancy checking
 findInhabitants :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r (Poss.Possibilities [InhabPat])
 findInhabitants nrefs args = do
   a <- forM nrefs (`findAllForNref` args)
@@ -369,13 +337,13 @@ findRedundant ant args = case ant of
     return [i | uninhabited]
   ABranch a1 a2 -> mappend <$> findRedundant a1 args <*> findRedundant a2 args
 
--- Less general version of the above inhabitant finding function
--- returns a maximum of 3 possible args lists that haven't been matched against,
--- as to not overwhelm new users of the language.
--- This is essentially a DFS, and it has a bad habbit of
--- trying to build infinite lists whenever it can, so we give it a max depth of 32
--- If we reach 32 levels of nested dataconstructors in this language,
--- it is pretty safe to assume we were chasing after an infinite structure
+-- | Less general version of the above inhabitant finding function
+--   returns a maximum of 3 possible args lists that haven't been matched against,
+--   as to not overwhelm new users of the language.
+--   This is essentially a DFS, and it has a bad habit of
+--   trying to build infinite lists whenever it can, so we give it a max depth of 32
+--   If we reach 32 levels of nested dataconstructors in this language,
+--   it is pretty safe to assume we were chasing after an infinite structure
 findPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => [C.NormRefType] -> [TI.TypedVar] -> Sem r [[ExamplePat]]
 findPosExamples nrefs args = do
   a <- forM nrefs (\nref -> findAllPosForNref 32 nref args)

@@ -91,11 +91,11 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
 breakIf :: (Alternative f) => Bool -> f ()
 breakIf = guard . not
 
--- Returns a predicate that returns true if another
--- constraint conflicts with the one given.
--- This alone is not sufficient to test
--- if a constraint can be added, but it
--- filters out the easy negatives early on
+-- | Returns a predicate that returns true if another
+--   constraint conflicts with the one given.
+--   This alone is not sufficient to test
+--   if a constraint can be added, but it
+--   filters out the easy negatives early on
 conflictsWith :: Constraint -> (Constraint -> Bool)
 conflictsWith c = case c of
   CMatch k _ -> \case
@@ -107,27 +107,27 @@ conflictsWith c = case c of
     _ -> False
   CWasOriginally _ -> const False
 
--- Search for a MatchDataCon that is matching on k specifically
--- (there should be at most one, see I4 in section 3.4)
--- and if it exists, return the variable ids of its arguments
+-- | Search for a MatchDataCon that is matching on k specifically
+--   (there should be at most one, see I4 in section 3.4)
+--   and if it exists, return the variable ids of its arguments
 getConstructorArgs :: TI.DataCon -> [Constraint] -> Maybe [TI.TypedVar]
 getConstructorArgs k cfs =
   listToMaybe $
     mapMaybe (\case (CMatch k' vs) | k' == k -> Just vs; _ -> Nothing) cfs
 
--- substituting y *for* x
--- ie replace the second with the first, replace x with y
+-- | substituting y *for* x
+--   ie replace the second with the first, replace x with y
 substituteVarIDs :: TI.TypedVar -> TI.TypedVar -> [ConstraintFor] -> [ConstraintFor]
 substituteVarIDs y x = map (\(var, c) -> (subst var, c))
   where
     subst var = if var == x then y else x
 
--- Deals with I2 form section 3.4
--- if a variable in the context has a resolvable type, there must be at least one constructor
--- which can be instantiated without contradiction of the refinement type
--- This function tests if this is true
--- NOTE(colin): we may eventually have type constraints
--- and we would need to worry pulling them from nref here
+-- | Deals with I2 form section 3.4
+--   if a variable in the context has a resolvable type, there must be at least one constructor
+--   which can be instantiated without contradiction of the refinement type
+--   This function tests if this is true
+--   NOTE(colin): we may eventually have type constraints
+--   and we would need to worry pulling them from nref here
 inhabited :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> Sem r Bool
 inhabited n var = do
   tyCtx <- ask @Ty.TyDefCtx
@@ -136,10 +136,10 @@ inhabited n var = do
     TI.Finite constructors -> do
       or <$> mapM (instantiate n var) constructors
 
--- Attempts to "instantiate" a match of the dataconstructor k on x
--- If we can add the MatchDataCon constraint to the normalized refinement
--- type without contradiction (a Nothing value),
--- then x is inhabited by k and we return true
+-- | Attempts to "instantiate" a match of the dataconstructor k on x
+--   If we can add the MatchDataCon constraint to the normalized refinement
+--   type without contradiction (a Nothing value),
+--   then x is inhabited by k and we return true
 instantiate :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> TI.DataCon -> Sem r Bool
 instantiate (ctx, cns) var k = do
   args <- TI.newVars $ TI.dcTypes k

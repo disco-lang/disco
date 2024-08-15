@@ -12,10 +12,8 @@ import Unbound.Generics.LocallyNameless (Name, s2n)
 newtype TypedVar = TypedVar (Name ATerm, Ty.Type)
   deriving (Show, Ord)
 
--- For now, equality is always in terms of the name
--- We will see if the causes problems later
 instance Eq TypedVar where
-  TypedVar (n1, _t1) == TypedVar (n2, _t2) = n1 == n2
+  TypedVar (n1, _) == TypedVar (n2, _) = n1 == n2
 
 getType :: TypedVar -> Ty.Type
 getType (TypedVar (_, t)) = t
@@ -33,6 +31,7 @@ data Ident where
   KUnit :: Ident
   KBool :: Bool -> Ident
   KNat :: Integer -> Ident
+  KInt :: Integer -> Ident
   KPair :: Ident
   KCons :: Ident
   KNil :: Ident
@@ -42,6 +41,9 @@ data Ident where
   KUnkown :: Ident
   deriving (Eq, Ord, Show)
 
+-- | Finite constructors are used in the LYG checker
+-- 'Infinite' constructors are used when reporting
+-- examples of uncovered patterns, we only pick out a few of them
 data Constructors where
   Finite :: [DataCon] -> Constructors
   Infinite :: [DataCon] -> Constructors
@@ -57,6 +59,9 @@ bool b = DataCon {dcIdent = KBool b, dcTypes = []}
 
 natural :: Integer -> DataCon
 natural n = DataCon {dcIdent = KNat n, dcTypes = []}
+
+integer :: Integer -> DataCon
+integer z = DataCon {dcIdent = KInt z, dcTypes = []}
 
 char :: Char -> DataCon
 char c = DataCon {dcIdent = KChar c, dcTypes = []}
@@ -97,7 +102,8 @@ tyDataConsHelper Ty.TyVoid = Finite []
 tyDataConsHelper Ty.TyUnit = Finite [unit]
 tyDataConsHelper Ty.TyBool = Finite [bool True, bool False]
 tyDataConsHelper Ty.TyN = Infinite $ map natural [0, 1 ..]
-tyDataConsHelper Ty.TyZ = Infinite [] -- TODO(colin): IMPORTANT! fill these in!
+-- TODO(colin): this integer generation was taken from stackoverflow. Is that okay?
+tyDataConsHelper Ty.TyZ = Infinite $ map integer $ 0 : [y | x <- [1 ..], y <- [x, -x]]
 tyDataConsHelper Ty.TyF = Infinite []
 tyDataConsHelper Ty.TyQ = Infinite []
 -- We could do all valid ASCII, but this is most likely good enough
@@ -106,21 +112,10 @@ tyDataConsHelper Ty.TyC =
   Infinite $
     map char $
       ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
--- This caused a problem in findPosExamples,
--- we were trying to list of the constructors of an unknown type
--- Here we return an Infinite to prevent the lyg algorithm
--- from thinking a complete list of constructors exists,
--- and pretty print this as "_" when displaying the result of findPosExamples
 tyDataConsHelper _ = Infinite [unknown]
 -- ^ This includes:
--- tyDataCons (_ Ty.:->: _)
--- tyDataCons (Ty.TySet _)
--- tyDataCons (Ty.TyBag _)
--- tyDataCons (Ty.TyVar _)
--- tyDataCons (Ty.TySkolem _)
--- tyDataCons (Ty.TyProp)
--- tyDataCons (Ty.TyMap _ _)
--- tyDataCons (Ty.TyGraph _)
+-- (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)
+-- (Ty.TySkolem _) (Ty.TyProp) (Ty.TyMap _ _) (Ty.TyGraph _)
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

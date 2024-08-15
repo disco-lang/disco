@@ -50,17 +50,17 @@ checkClauses name types pats = do
   redundant <- findRedundant annotated args
 
   examples <- findPosExamples normalizedNrefs args
-
-  -- when False $ do
+  --
+  -- when True $ do
   --   embed $ putStrLn "=====DEBUG=============================="
   --   embed $ putStrLn "GDT:"
   --   embed $ pPrint gdt
   --   embed $ putStrLn "UNCOVERED:"
-  --   embed $ pPrint inhab
+  --   embed $ pPrint normalizedNrefs
   --   embed $ putStrLn "REDUNDANT:"
   --   embed $ pPrint redundant
   --   embed $ putStrLn "=====GUBED=============================="
-
+  --
   -- when (not . null $ inhab) $ do
   --   let patLine ipats = do
   --         let ipatArgs = jspace (map prettyInhab ipats)
@@ -90,9 +90,9 @@ checkClauses name types pats = do
       DSL.text "Warning: You haven't covered these cases:"
         DSL.$+$ prettyExamples
 
-  when (not . null $ redundant) $ do
-    embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
-    embed $ putStrLn $ show redundant
+  -- when (not . null $ redundant) $ do
+  --   embed $ putStrLn $ "Warning: In function \"" ++ show name ++ "\", these clause numbers (1-indexed) are redundant:"
+  --   embed $ putStrLn $ show redundant
 
   return ()
 

@@ -1,6 +1,7 @@
 module Disco.Exhaustiveness.TypeInfo where
 
 import Control.Monad (replicateM)
+import Data.Function (on)
 import qualified Data.Map as M
 import Disco.AST.Typed (ATerm)
 import Disco.Effects.Fresh (Fresh, fresh)
@@ -23,7 +24,10 @@ data DataCon = DataCon
   { dcIdent :: Ident,
     dcTypes :: [Ty.Type]
   }
-  deriving (Eq, Ord, Show)
+  deriving (Ord, Show)
+
+instance Eq DataCon where
+  (==) = (==) `on` dcIdent
 
 data Ident where
   KUnit :: Ident
@@ -72,44 +76,51 @@ left tl = DataCon {dcIdent = KLeft, dcTypes = [tl]}
 right :: Ty.Type -> DataCon
 right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
 
+tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Constructors
+tyDataCons ty ctx = tyDataConsHelper $ resolveAlias ty ctx
+
+resolveAlias :: Ty.Type -> Ty.TyDefCtx -> Ty.Type
+resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
+  Nothing -> error $ show ctx ++ "\nType definition not found for: " ++ show name
+  Just (Ty.TyDefBody _argNames typeCon) -> resolveAlias (typeCon args) ctx
+resolveAlias t _ = t
+
 -- TODO(colin): ask yorgey, make sure I've done this correctly
 -- If I have, and this is enough, I can remove all mentions
 -- of type equality constraints in Constraint.hs,
 -- the lookup here will have handled that behavoir already
-tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Constructors
-tyDataCons (Ty.TyUser name args) ctx = case M.lookup name ctx of
-  Nothing -> error $ "Type definition not found for: " ++ show name
-  Just (Ty.TyDefBody _argNames typeCon) -> tyDataCons (typeCon args) ctx
-tyDataCons (a Ty.:*: b) _ = Finite [pair a b]
-tyDataCons (l Ty.:+: r) _ = Finite [left l, right r]
-tyDataCons t@(Ty.TyList a) _ = Finite [nil, cons a t]
-tyDataCons Ty.TyVoid _ = Finite []
-tyDataCons Ty.TyUnit _ = Finite [unit]
-tyDataCons Ty.TyBool _ = Finite [bool True, bool False]
-tyDataCons Ty.TyN _ = Infinite $ map natural [0, 1 ..]
-tyDataCons Ty.TyZ _ = Infinite [] -- TODO(colin): IMPORTANT! fill these in!
-tyDataCons Ty.TyF _ = Infinite []
-tyDataCons Ty.TyQ _ = Infinite []
+tyDataConsHelper :: Ty.Type -> Constructors
+tyDataConsHelper (a Ty.:*: b) = Finite [pair a b]
+tyDataConsHelper (l Ty.:+: r) = Finite [left l, right r]
+tyDataConsHelper t@(Ty.TyList a) = Finite [nil, cons a t]
+tyDataConsHelper Ty.TyVoid = Finite []
+tyDataConsHelper Ty.TyUnit = Finite [unit]
+tyDataConsHelper Ty.TyBool = Finite [bool True, bool False]
+tyDataConsHelper Ty.TyN = Infinite $ map natural [0, 1 ..]
+tyDataConsHelper Ty.TyZ = Infinite [] -- TODO(colin): IMPORTANT! fill these in!
+tyDataConsHelper Ty.TyF = Infinite []
+tyDataConsHelper Ty.TyQ = Infinite []
 -- We could do all valid ASCII, but this is most likely good enough
 -- I think these starting from 'a' is good for students learning the language
-tyDataCons Ty.TyC _ =
+tyDataConsHelper Ty.TyC =
   Infinite $
     map char $
       ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
-tyDataCons (_ Ty.:->: _) _ = error "Functions not allowed in patterns."
-tyDataCons (Ty.TySet _) _ = error "Sets not allowed in patterns."
-tyDataCons (Ty.TyBag _) _ = error "Bags not allowed in patterns."
 -- This caused a problem in findPosExamples,
 -- we were trying to list of the constructors of an unknown type
 -- Here we return an Infinite to prevent the lyg algorithm
 -- from thinking a complete list of constructors exists,
 -- and pretty print this as "_" when displaying the result of findPosExamples
-tyDataCons (Ty.TyVar _) _ = Infinite [unknown]
--- Unsure about these...
-tyDataCons (Ty.TySkolem _) _ = error "Encountered skolem in pattern"
-tyDataCons (Ty.TyProp) _ = error "Propositions not allowed in patterns."
-tyDataCons (Ty.TyMap _ _) _ = error "Maps not allowed in patterns."
-tyDataCons (Ty.TyGraph _) _ = error "Graph not allowed in patterns."
+tyDataConsHelper _ = Infinite [unknown]
+-- ^ This includes:
+-- tyDataCons (_ Ty.:->: _)
+-- tyDataCons (Ty.TySet _)
+-- tyDataCons (Ty.TyBag _)
+-- tyDataCons (Ty.TyVar _)
+-- tyDataCons (Ty.TySkolem _)
+-- tyDataCons (Ty.TyProp)
+-- tyDataCons (Ty.TyMap _ _)
+-- tyDataCons (Ty.TyGraph _)
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

@@ -1005,7 +1005,6 @@ findDuplicatePVar = flip evalState S.empty . go
   go (PMul _ p _) = go p
   go (PSub p _) = go p
   go (PNeg p) = go p
-  go (PFrac p1 p2) = findM go [p1, p2]
   go _ = return Nothing
 
 -- | Attempt converting a term to a pattern.
@@ -1030,11 +1029,11 @@ termToPattern (TAscr t s) = case s of
 termToPattern (TBin Cons t1 t2) =
   PCons <$> termToPattern t1 <*> termToPattern t2
 
-{- TODO replace N/Z pattern parsers with a single pn+k parser. Nested patterns
- - will be allowed, because composition is closed on pn+k patterns; i.e. we can
- - parse nested patterns and then flatten them. F/Q patterns can remain mostly
- - the same, but division patterns with free vars should be restricted such that
- - @x/2@ becomes @(1/2)*x@ and @2/x@ is disallowed entirely.
+-- TODO replace N/Z pattern parsers with a single pn+k parser. Nested patterns
+-- will be allowed, because composition is closed on pn+k patterns; i.e. we can
+-- parse nested patterns and then flatten them. F/Q patterns can remain mostly
+-- the same, but division patterns with free vars should be restricted such that
+-- @x/2@ becomes @(1/2)*x@ and @2/x@ is disallowed entirely.
 
 termToPattern (TBin Add t1 t2) =
   case (termToPattern t1, termToPattern t2) of
@@ -1078,11 +1077,7 @@ termToPattern (TBin Sub t1 t2) =
 -- less useful (and desugaring it would require extra code since
 -- subtraction is not commutative).
 
-termToPattern (TBin Div t1 t2) =
-  PFrac <$> termToPattern t1 <*> termToPattern t2
 termToPattern (TUn Neg t) = PNeg <$> termToPattern t
-
--}
 
 termToPattern (TContainer ListContainer ts Nothing) =
   PList <$> mapM (termToPattern . fst) ts

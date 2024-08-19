@@ -755,11 +755,6 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
 
   -- when dt is (p - t) ==> when dt is x0; let v = t; when x0 + v is p
   desugarMatch dt (APSub ty p t) = arithBinMatch (const Nothing) (+.) dt ty p t
-  -- when dt is (p/q) ==> when $frac(dt) is (p, q)
-  desugarMatch dt (APFrac _ p q) =
-    desugarMatch
-      (dtapp (DTPrim (TyQ :->: TyZ :*: TyN) PrimFrac) dt)
-      (APTup (TyZ :*: TyN) [p, q])
   -- when dt is (-p) ==> when dt is x0; if x0 < 0; when -x0 is p
   desugarMatch dt (APNeg ty p) = do
     -- when dt is x0

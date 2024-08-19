@@ -1,9 +1,10 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Disco.SemilinearSet (
+  LS(..),
   SS,
   nats,
   ints,
   empty,
-  constant,
   toList,
   null,
   elem,
@@ -13,14 +14,22 @@ module Disco.SemilinearSet (
   intersect,
   union,
   complement,
-  subtract
+  subtract,
+  compose
 ) where
 
 import Prelude hiding (elem, null, subtract)
+import Data.Data (Typeable, Data)
+import Unbound.Generics.LocallyNameless (Alpha)
+import GHC.Generics (Generic)
+
+-- | A one-dimensional linear set; basically an arithmetic sequence.
+data LS = LS Integer Integer deriving (Show, Eq, Generic, Typeable, Data)  -- (initial, period)
+instance Alpha LS
 
 -- | A union of linear sets. Any subset of the integers can be represented as a
 --   semilinear set.
-newtype SS = SS [LS] deriving (Show, Eq)
+newtype SS = SS [LS] deriving (Show, Eq, Typeable, Data)
 
 -- | The semilinear set containing exactly the natural numbers.
 nats :: SS
@@ -34,13 +43,9 @@ ints = SS [LS 0 1, LS 0 (-1)]
 empty :: SS
 empty = SS []
 
--- | The semilinear set containing only the given number.
-constant :: Int -> SS
-constant x = SS [LS x 0]
-
 -- | Represents a semilinear set as a list of numbers, sorted by absolute value
 --   in ascending order.
-toList :: SS -> [Int]
+toList :: SS -> [Integer]
 toList (SS lss) = answer
   where
     downLSs = filter (\(LS _ p) -> p < 0) lss
@@ -61,7 +66,7 @@ null (SS []) = True
 null       _ = False
 
 -- | Is the given number contained in the set?
-elem :: Int -> SS -> Bool
+elem :: Integer -> SS -> Bool
 elem e (SS lss) = not $ all (null . intersectWithSingle e) lss
 
 -- | Are two semilinear sets equal? This decision is made by checking if both
@@ -102,15 +107,16 @@ complement (SS lss) = case map complementLS lss of
 subtract :: SS -> SS -> SS
 subtract a b = intersect a $ complement b
 
+-- | Composes two linear sets.
+compose :: LS -> LS -> LS
+compose (LS j p) (LS k q) = LS (p * k + j) (p * q)
+
 ------------------------------------------------------------
 -- Internals
 ------------------------------------------------------------
 
--- | A one-dimensional linear set; basically an arithmetic sequence.
-data LS = LS Int Int deriving (Show, Eq)  -- (initial, period)
-
 -- | Represents a linear set as a list of numbers.
-toListLS :: LS -> [Int]
+toListLS :: LS -> [Integer]
 toListLS (LS x p) = if p == 0 then [x] else [x + p * i | i <- [0..]]
 
 -- | Merges two lists together via a selection function. The selection function
@@ -133,24 +139,24 @@ flipDirSS :: SS -> SS
 flipDirSS (SS lss) = SS $ map flipDirLS lss
 
 -- | Checks if a number is an element of a linear set.
-containsLS :: Int -> LS -> Bool
+containsLS :: Integer -> LS -> Bool
 containsLS n (LS x p) = case compare p 0 of
   LT -> n <= x && modEquiv p n x
   GT -> n >= x && modEquiv p n x
   EQ -> n == x
 
 -- | Sorts two linear sets by their initial value in descending order.
-sort2LS :: LS -> LS -> ((Int, Int), (Int, Int))
+sort2LS :: LS -> LS -> ((Integer, Integer), (Integer, Integer))
 sort2LS (LS x1 p1) (LS x2 p2) = if x1 > x2
   then ((x1, p1), (x2, p2))
   else ((x2, p2), (x1, p1))
 
 -- | Intersects two singleton linear sets.
-intersectTwoSingles :: Int -> Int -> SS
+intersectTwoSingles :: Integer -> Integer -> SS
 intersectTwoSingles x y = SS [LS x 0 | x == y]
 
 -- | Intersects a singleton linear set with a non-singleton one.
-intersectWithSingle :: Int -> LS -> SS
+intersectWithSingle :: Integer -> LS -> SS
 intersectWithSingle s ls = SS [LS s 0 | containsLS s ls]
 
 -- | Intersects two linear sets when both have positive periods. Expects
@@ -197,7 +203,7 @@ complementLS (LS x p) = case compare p 0 of
 
 -- | Extended Euclidean Algorithm. @egcd a b@ returns @(gcd a b, x, y)@ such
 --   that @a*x + b*y == gcd a b@.
-egcd :: Int -> Int -> (Int, Int, Int)
+egcd :: Integer -> Integer -> (Integer, Integer, Integer)
 egcd 0 b = (b, 0, 1)
 egcd a b = (g, t - d * s, s)
   where
@@ -206,10 +212,10 @@ egcd a b = (g, t - d * s, s)
 
 -- | The multiplicative inverse for a given modulus. @modInv m a = x@ such that
 --   @mod (a*x) m == gcd a m@.
-modInv :: Int -> Int -> Int
+modInv :: Integer -> Integer -> Integer
 modInv m a = mod x m
   where (_, x, _) = egcd a m
 
 -- | Are the latter two arguments equivalent modulo the first argument?
-modEquiv :: Int -> Int -> Int -> Bool
+modEquiv :: Integer -> Integer -> Integer -> Bool
 modEquiv m a b = mod a m == mod b m

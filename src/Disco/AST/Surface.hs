@@ -102,7 +102,6 @@ module Disco.AST.Surface (
   pattern PMul,
   pattern PSub,
   pattern PNeg,
-  pattern PFrac,
   pattern PNonlinear,
   pattern Binding,
 
@@ -435,7 +434,6 @@ type instance X_PAdd UD = ()
 type instance X_PMul UD = ()
 type instance X_PSub UD = ()
 type instance X_PNeg UD = ()
-type instance X_PFrac UD = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -488,9 +486,6 @@ pattern PSub p t = PSub_ () p t
 pattern PNeg :: Pattern -> Pattern
 pattern PNeg p = PNeg_ () p
 
-pattern PFrac :: Pattern -> Pattern -> Pattern
-pattern PFrac p1 p2 = PFrac_ () p1 p2
-
 pattern PNonlinear :: Pattern -> Name Term -> Pattern
 pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   where
@@ -513,7 +508,6 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   , PMul
   , PSub
   , PNeg
-  , PFrac
   , PNonlinear
   #-}
 
@@ -730,7 +724,4 @@ instance Pretty Pattern where
     PNeg p ->
       withPA (ugetPA Neg) $
         text "-" <> rt (pretty p)
-    PFrac p1 p2 ->
-      withPA (getPA Div) $
-        lt (pretty p1) <+> text "/" <+> rt (pretty p2)
     PNonlinear p _ -> pretty p

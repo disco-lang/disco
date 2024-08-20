@@ -98,10 +98,6 @@ module Disco.AST.Surface (
   pattern PNat,
   pattern PCons,
   pattern PList,
-  pattern PAdd,
-  pattern PMul,
-  pattern PSub,
-  pattern PNeg,
   pattern PNonlinear,
   pattern Binding,
 )
@@ -427,10 +423,6 @@ type instance X_PChar UD = ()
 type instance X_PString UD = ()
 type instance X_PCons UD = ()
 type instance X_PList UD = ()
-type instance X_PAdd UD = ()
-type instance X_PMul UD = ()
-type instance X_PSub UD = ()
-type instance X_PNeg UD = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -471,18 +463,6 @@ pattern PCons p1 p2 = PCons_ () p1 p2
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
-pattern PAdd :: Side -> Pattern -> Term -> Pattern
-pattern PAdd s p t = PAdd_ () s p t
-
-pattern PMul :: Side -> Pattern -> Term -> Pattern
-pattern PMul s p t = PMul_ () s p t
-
-pattern PSub :: Pattern -> Term -> Pattern
-pattern PSub p t = PSub_ () p t
-
-pattern PNeg :: Pattern -> Pattern
-pattern PNeg p = PNeg_ () p
-
 pattern PNonlinear :: Pattern -> Name Term -> Pattern
 pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   where
@@ -501,10 +481,6 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   , PString
   , PCons
   , PList
-  , PAdd
-  , PMul
-  , PSub
-  , PNeg
   #-}
 
 ------------------------------------------------------------
@@ -702,22 +678,4 @@ instance Pretty Pattern where
     PList ps -> setPA initPA $ do
       ds <- punctuate (text ",") (map pretty ps)
       brackets (hsep ds)
-    PAdd L p t ->
-      withPA (getPA Add) $
-        lt (pretty p) <+> text "+" <+> rt (pretty t)
-    PAdd R p t ->
-      withPA (getPA Add) $
-        lt (pretty t) <+> text "+" <+> rt (pretty p)
-    PMul L p t ->
-      withPA (getPA Mul) $
-        lt (pretty p) <+> text "*" <+> rt (pretty t)
-    PMul R p t ->
-      withPA (getPA Mul) $
-        lt (pretty t) <+> text "*" <+> rt (pretty p)
-    PSub p t ->
-      withPA (getPA Sub) $
-        lt (pretty p) <+> text "-" <+> rt (pretty t)
-    PNeg p ->
-      withPA (ugetPA Neg) $
-        text "-" <> rt (pretty p)
     PNonlinear p _ -> pretty p

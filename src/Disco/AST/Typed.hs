@@ -64,10 +64,6 @@ module Disco.AST.Typed (
   pattern APString,
   pattern APCons,
   pattern APList,
-  pattern APAdd,
-  pattern APMul,
-  pattern APSub,
-  pattern APNeg,
   pattern ABinding,
 
   -- * Utilities
@@ -286,10 +282,6 @@ type instance X_PInj TY = Embed Type
 type instance X_PNat TY = Embed Type
 type instance X_PCons TY = Embed Type
 type instance X_PList TY = Embed Type
-type instance X_PAdd TY = Embed Type
-type instance X_PMul TY = Embed Type
-type instance X_PSub TY = Embed Type
-type instance X_PNeg TY = Embed Type
 
 type instance X_Pattern TY = ()
 
@@ -340,26 +332,6 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   where
     APList ty lp = PList_ (embed ty) lp
 
-pattern APAdd :: Type -> Side -> APattern -> ATerm -> APattern
-pattern APAdd ty s p t <- PAdd_ (unembed -> ty) s p t
-  where
-    APAdd ty s p t = PAdd_ (embed ty) s p t
-
-pattern APMul :: Type -> Side -> APattern -> ATerm -> APattern
-pattern APMul ty s p t <- PMul_ (unembed -> ty) s p t
-  where
-    APMul ty s p t = PMul_ (embed ty) s p t
-
-pattern APSub :: Type -> APattern -> ATerm -> APattern
-pattern APSub ty p t <- PSub_ (unembed -> ty) p t
-  where
-    APSub ty p t = PSub_ (embed ty) p t
-
-pattern APNeg :: Type -> APattern -> APattern
-pattern APNeg ty p <- PNeg_ (unembed -> ty) p
-  where
-    APNeg ty p = PNeg_ (embed ty) p
-
 {-# COMPLETE
   APVar
   , APWild
@@ -372,10 +344,6 @@ pattern APNeg ty p <- PNeg_ (unembed -> ty) p
   , APNat
   , APCons
   , APList
-  , APAdd
-  , APMul
-  , APSub
-  , APNeg
   #-}
 
 varsBound :: APattern -> [(Name ATerm, Type)]
@@ -390,10 +358,6 @@ varsBound (APInj _ _ p) = varsBound p
 varsBound (APNat _ _) = []
 varsBound (APCons _ p q) = varsBound p ++ varsBound q
 varsBound (APList _ ps) = varsBound =<< ps
-varsBound (APAdd _ _ p _) = varsBound p
-varsBound (APMul _ _ p _) = varsBound p
-varsBound (APSub _ p _) = varsBound p
-varsBound (APNeg _ p) = varsBound p
 
 ------------------------------------------------------------
 -- getType
@@ -450,10 +414,6 @@ instance HasType APattern where
   getType (APNat ty _) = ty
   getType (APCons ty _ _) = ty
   getType (APList ty _) = ty
-  getType (APAdd ty _ _ _) = ty
-  getType (APMul ty _ _ _) = ty
-  getType (APSub ty _ _) = ty
-  getType (APNeg ty _) = ty
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind
@@ -526,10 +486,6 @@ explodePattern = \case
   APNat ty n -> PAscr (PNat n) ty
   APCons ty p1 p2 -> PAscr (PCons (explodePattern p1) (explodePattern p2)) ty
   APList ty ps -> PAscr (PList (map explodePattern ps)) ty
-  APAdd ty s p t -> PAscr (PAdd s (explodePattern p) (explode t)) ty
-  APMul ty s p t -> PAscr (PMul s (explodePattern p) (explode t)) ty
-  APSub ty p t -> PAscr (PSub (explodePattern p) (explode t)) ty
-  APNeg ty p -> PAscr (PNeg (explodePattern p)) ty
 
 explodeBranch :: ABranch -> Branch
 explodeBranch = explodeTelescope explodeGuard

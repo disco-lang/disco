@@ -1001,10 +1001,6 @@ findDuplicatePVar = flip evalState S.empty . go
   go (PInj _ p) = go p
   go (PCons p1 p2) = findM go [p1, p2]
   go (PList ps) = findM go ps
-  go (PAdd _ p _) = go p
-  go (PMul _ p _) = go p
-  go (PSub p _) = go p
-  go (PNeg p) = go p
   go _ = return Nothing
 
 -- | Attempt converting a term to a pattern.
@@ -1028,56 +1024,6 @@ termToPattern (TAscr t s) = case s of
   _ -> Nothing
 termToPattern (TBin Cons t1 t2) =
   PCons <$> termToPattern t1 <*> termToPattern t2
-
--- TODO replace N/Z pattern parsers with a single pn+k parser. Nested patterns
--- will be allowed, because composition is closed on pn+k patterns; i.e. we can
--- parse nested patterns and then flatten them. F/Q patterns can remain mostly
--- the same, but division patterns with free vars should be restricted such that
--- @x/2@ becomes @(1/2)*x@ and @2/x@ is disallowed entirely.
-
-termToPattern (TBin Add t1 t2) =
-  case (termToPattern t1, termToPattern t2) of
-    (Just p, _)
-      | length (toListOf fvAny p) == 1
-          && null (toListOf fvAny t2) ->
-          Just $ PAdd L p t2
-    (_, Just p)
-      | length (toListOf fvAny p) == 1
-          && null (toListOf fvAny t1) ->
-          Just $ PAdd R p t1
-    _ -> Nothing
--- If t1 is a pattern binding one variable, and t2 has no fvs,
--- this can be a PAdd L.  Also vice versa for PAdd R.
-
-termToPattern (TBin Mul t1 t2) =
-  case (termToPattern t1, termToPattern t2) of
-    (Just p, _)
-      | length (toListOf fvAny p) == 1
-          && null (toListOf fvAny t2) ->
-          Just $ PMul L p t2
-    (_, Just p)
-      | length (toListOf fvAny p) == 1
-          && null (toListOf fvAny t1) ->
-          Just $ PMul R p t1
-    _ -> Nothing
--- If t1 is a pattern binding one variable, and t2 has no fvs,
--- this can be a PMul L.  Also vice versa for PMul R.
-
-termToPattern (TBin Sub t1 t2) =
-  case termToPattern t1 of
-    Just p
-      | length (toListOf fvAny p) == 1
-          && null (toListOf fvAny t2) ->
-          Just $ PSub p t2
-    _ -> Nothing
--- If t1 is a pattern binding one variable, and t2 has no fvs,
--- this can be a PSub.
-
--- For now we don't handle the case of t - p, since it seems
--- less useful (and desugaring it would require extra code since
--- subtraction is not commutative).
-
-termToPattern (TUn Neg t) = PNeg <$> termToPattern t
 
 termToPattern (TContainer ListContainer ts Nothing) =
   PList <$> mapM (termToPattern . fst) ts

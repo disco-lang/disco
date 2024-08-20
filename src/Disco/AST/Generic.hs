@@ -119,10 +119,6 @@ module Disco.AST.Generic (
   X_PString,
   X_PCons,
   X_PList,
-  X_PAdd,
-  X_PMul,
-  X_PSub,
-  X_PNeg,
   X_Pattern,
   ForallPattern,
 
@@ -493,10 +489,6 @@ type family X_PChar e
 type family X_PString e
 type family X_PCons e
 type family X_PList e
-type family X_PAdd e
-type family X_PMul e
-type family X_PSub e
-type family X_PNeg e
 type family X_Pattern e
 
 -- | Patterns.
@@ -525,14 +517,6 @@ data Pattern_ e where
   PCons_ :: X_PCons e -> Pattern_ e -> Pattern_ e -> Pattern_ e
   -- | List pattern @[p1, .., pn]@.
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
-  -- | Addition pattern, @p + t@ or @t + p@
-  PAdd_ :: X_PAdd e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
-  -- | Multiplication pattern, @p * t@ or @t * p@
-  PMul_ :: X_PMul e -> Side -> Pattern_ e -> Term_ e -> Pattern_ e
-  -- | Subtraction pattern, @p - t@
-  PSub_ :: X_PSub e -> Pattern_ e -> Term_ e -> Pattern_ e
-  -- | Negation pattern, @-p@
-  PNeg_ :: X_PNeg e -> Pattern_ e -> Pattern_ e
   -- | A special placeholder node for a nonlinear occurrence of a
   --   variable; we can only detect this at parse time but need to
   --   generate an error later.
@@ -554,10 +538,6 @@ type ForallPattern (a :: * -> Constraint) e =
   , a (X_PInj e)
   , a (X_PCons e)
   , a (X_PList e)
-  , a (X_PAdd e)
-  , a (X_PMul e)
-  , a (X_PSub e)
-  , a (X_PNeg e)
   , a (X_Pattern e)
   , a (Term_ e)
   )

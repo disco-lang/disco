@@ -1482,26 +1482,6 @@ checkPattern p@(PList ps) ty = do
   listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (mconcat ctxs, APList (TyList tyl) aps)
-checkPattern (PAdd s p t) ty = do
-  constraint $ CQual QNum ty
-  (ctx, apt) <- checkPattern p ty
-  at <- check t ty
-  return (ctx, APAdd ty s apt at)
-checkPattern (PMul s p t) ty = do
-  constraint $ CQual QNum ty
-  (ctx, apt) <- checkPattern p ty
-  at <- check t ty
-  return (ctx, APMul ty s apt at)
-checkPattern (PSub p t) ty = do
-  constraint $ CQual QNum ty
-  (ctx, apt) <- checkPattern p ty
-  at <- check t ty
-  return (ctx, APSub ty apt at)
-checkPattern (PNeg p) ty = do
-  constraint $ CQual QSub ty
-  tyInner <- cPos ty
-  (ctx, apt) <- checkPattern p tyInner
-  return (ctx, APNeg ty apt)
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

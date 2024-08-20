@@ -739,35 +739,6 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   desugarMatch dt (APList ty []) = desugarMatch dt (APInj ty L APUnit)
   desugarMatch dt (APList ty ps) =
     desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
-  -- when dt is (p + t) ==> when dt is x0; let v = t; [if x0 >= v]; when x0-v is p
-  desugarMatch dt (APAdd ty _ p t) = arithBinMatch posRestrict (-.) dt ty p t
-   where
-    posRestrict plusty
-      | plusty `elem` [TyN, TyF] = Just (>=.)
-      | otherwise = Nothing
-
-  -- when dt is (p * t) ==> when dt is x0; let v = t; [if v divides x0]; when x0 / v is p
-  desugarMatch dt (APMul ty _ p t) = arithBinMatch intRestrict (/.) dt ty p t
-   where
-    intRestrict plusty
-      | plusty `elem` [TyN, TyZ] = Just (flip (|.))
-      | otherwise = Nothing
-
-  -- when dt is (p - t) ==> when dt is x0; let v = t; when x0 + v is p
-  desugarMatch dt (APSub ty p t) = arithBinMatch (const Nothing) (+.) dt ty p t
-  -- when dt is (-p) ==> when dt is x0; if x0 < 0; when -x0 is p
-  desugarMatch dt (APNeg ty p) = do
-    -- when dt is x0
-    (x0, g1) <- varFor dt
-
-    -- if x0 < 0
-    g2 <- desugarGuard $ AGBool (embed (atVar ty (coerce x0) <. ATNat ty 0))
-
-    -- when -x0 is p
-    neg <- desugarTerm $ mkUn ty Neg (atVar ty (coerce x0))
-    g3 <- desugarMatch neg p
-
-    return (g1 ++ g2 ++ g3)
 
   mkMatch :: Member Fresh r => DTerm -> DPattern -> Sem r [DGuard]
   mkMatch dt dp = return [DGPat (embed dt) dp]

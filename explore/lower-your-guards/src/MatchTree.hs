@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyCase #-}
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Eta reduce" #-}
@@ -39,9 +39,9 @@ final2 = ([full] \\\ c2) \\\ c1
 
 -- true = Status $ Is $ Just $ head $ Ty.dataCons Ty.bool
 
-e1 = Pair (Either [(isInt 10)] []) (isInt 2)
+e1 = Pair (Either [isInt 10] []) (isInt 2)
 
-e2 = Pair (Either [(isInt 4)] []) (isInt 5)
+e2 = Pair (Either [isInt 4] []) (isInt 5)
 
 -- e3 = Pair (Either [] [true]) (isInt 5)
 

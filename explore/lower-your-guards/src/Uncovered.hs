@@ -29,12 +29,12 @@ uncovered r g = case g of
     uncovered (uncovered r t1) t2
   G.Guarded (var, guard) t -> case guard of
     G.GMatch dataCon ys -> noMatch `union` matchedPath
-      where
-        noMatch = r `liftAndLit` varInfo (Not dataCon)
-        matchedPath = uncovered (r `liftAndLit` varInfo (Match dataCon ys)) t
+     where
+      noMatch = r `liftAndLit` varInfo (Not dataCon)
+      matchedPath = uncovered (r `liftAndLit` varInfo (Match dataCon ys)) t
     G.GWas old -> uncovered (r `liftAndLit` varInfo (WasOriginally old)) t
-    where
-      varInfo = Info var
+   where
+    varInfo = Info var
 
 liftAndLit :: RefinementType -> Literal -> RefinementType
 liftAndLit (cont, form) f = (cont, form `And` Literal f)

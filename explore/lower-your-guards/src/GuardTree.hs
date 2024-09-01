@@ -6,9 +6,9 @@ import Control.Monad (replicateM, zipWithM)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Fresh as F
+import MatchInfo
 import qualified Parse as P
 import qualified Types as Ty
-import MatchInfo
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -32,11 +32,11 @@ desugarClauses args clauses = do
 desugarClause :: [F.VarID] -> (Int, P.Clause) -> F.Fresh Gdt
 desugarClause args (i, P.Clause pat typeIn _) = do
   let x1 = head args -- we only suport 1 arg for this toy lyg
-  guards <- desugarMatch (x1,typeIn) pat
+  guards <- desugarMatch (x1, typeIn) pat
   return $ foldr Guarded (Grhs i) guards
 
 desugarMatch :: TypedVar -> P.Pattern -> F.Fresh [(TypedVar, Guard)]
-desugarMatch var@(_,ty) pat = do
+desugarMatch var@(_, ty) pat = do
   case pat of
     P.PWild -> return []
     P.PVar name -> do

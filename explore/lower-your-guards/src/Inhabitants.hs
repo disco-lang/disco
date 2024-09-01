@@ -45,9 +45,9 @@ accessableRedundant ant args = case ant of
 -- do a linear scan from right to left
 lookupVar :: TypedVar -> [ConstraintFor] -> TypedVar
 lookupVar x = foldr getNextId x
-  where
-    getNextId (x', MatchInfo (WasOriginally y)) | x' == x = const y
-    getNextId _ = id
+ where
+  getNextId (x', MatchInfo (WasOriginally y)) | x' == x = const y
+  getNextId _ = id
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
 alistLookup a = map snd . filter ((== a) . fst)
@@ -101,10 +101,10 @@ findVarInhabitants var nref@(_, cns) =
               if null posNrefs
                 then Poss.retSingle $ IPNot []
                 else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
-  where
-    constraintsOnX = onVar var cns
-    posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
-    negMatch = mapMaybe (\case MatchInfo (Not k) -> Just k; _ -> Nothing) constraintsOnX
+ where
+  constraintsOnX = onVar var cns
+  posMatch = listToMaybe $ mapMaybe (\case MatchInfo (Match k ys) -> Just (k, ys); _ -> Nothing) constraintsOnX
+  negMatch = mapMaybe (\case MatchInfo (Not k) -> Just k; _ -> Nothing) constraintsOnX
 
 normalize :: NormRefType -> U.Formula -> F.Fresh (S.Set NormRefType)
 normalize nref (f1 `U.And` f2) = do
@@ -155,8 +155,8 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
         else do
           let (noX', withX') = partition ((/= origX) . fst) cns
           addConstraints (ctx, noX' ++ [cf]) (substituteVarIDs origY origX withX')
-  where
-    added = (ctx, cns ++ [cf])
+ where
+  added = (ctx, cns ++ [cf])
 
 -----
 ----- Helper functions for adding constraints:

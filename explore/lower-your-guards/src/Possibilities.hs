@@ -55,10 +55,10 @@ retSingle i = return $ Possibilities [i]
 -- cartesian product of multiple sets
 allCombinations :: [Possibilities a] -> Possibilities [a]
 allCombinations = foldr prod nil
-  where
-    -- note, nil /= mempty
-    -- VERY important
-    nil = Possibilities [[]]
+ where
+  -- note, nil /= mempty
+  -- VERY important
+  nil = Possibilities [[]]
 
 prod :: Possibilities a -> Possibilities [a] -> Possibilities [a]
 prod (Possibilities xs) (Possibilities yss) = Possibilities [x : ys | x <- xs, ys <- yss]

@@ -147,5 +147,5 @@ niceInhabPattern (I.IPNot nots) = "(Not " ++ niceList (map Ty.dcName nots) ++ ")
 
 niceList :: [Text] -> String
 niceList as = concat $ tail $ concatMap comma as
-  where
-    comma x = [", ", T.unpack x]
+ where
+  comma x = [", ", T.unpack x]

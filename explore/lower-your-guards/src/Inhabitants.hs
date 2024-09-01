@@ -136,7 +136,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
     --- Equation (10)
     Match k args -> do
       case getConstructorArgs k (onVar origX cns) of
-        -- 10c -- TODO(colin): Still need to add type constraints!
+        -- 10c -- NOTE: This is where we would add type constraints, if we needed them
         Just args' ->
           addConstraints
             nref

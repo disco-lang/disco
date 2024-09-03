@@ -3,8 +3,8 @@
 module Annotated where
 
 import qualified GuardTree as G
-import qualified Uncovered as U
 import MatchInfo
+import qualified Uncovered as U
 
 data Ant where
   Grhs :: U.RefinementType -> Int -> Ant
@@ -17,4 +17,5 @@ annotated ref gdt = case gdt of
   G.Guarded (var, g) t -> case g of
     G.GMatch k args -> annotated (ref `U.liftAndLit` varInfo (Match k args)) t
     G.GWas new -> annotated (ref `U.liftAndLit` varInfo (WasOriginally new)) t
-    where varInfo = U.Info var
+   where
+    varInfo = U.Info var

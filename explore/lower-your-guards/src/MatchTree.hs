@@ -1,4 +1,4 @@
-{-# LANGUAGE EmptyCase #-}
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Eta reduce" #-}
@@ -39,9 +39,9 @@ final2 = ([full] \\\ c2) \\\ c1
 
 -- true = Status $ Is $ Just $ head $ Ty.dataCons Ty.bool
 
-e1 = Pair (Either [(isInt 10)] []) (isInt 2)
+e1 = Pair (Either [isInt 10] []) (isInt 2)
 
-e2 = Pair (Either [(isInt 4)] []) (isInt 5)
+e2 = Pair (Either [isInt 4] []) (isInt 5)
 
 -- e3 = Pair (Either [] [true]) (isInt 5)
 
@@ -73,21 +73,21 @@ treeMinus t1 t2 = case (t1, t2) of
   (Pair _ _, Either _ _) -> error "type error6"
   (Pair a b, Pair c d) ->
     map mkPairL aMinusC ++ map mkPairR bMinusD ++ both
-    where
-      mkPairL aSubC = Pair aSubC d
-      mkPairR bSubD = Pair c bSubD
-      both = [Pair aSubC bSubD | aSubC <- aMinusC, bSubD <- bMinusD]
-      c' = treeIntersect a c
-      d' = treeIntersect b d
-      aMinusC = concatMap (a \\) c'
-      bMinusD = concatMap (b \\) d'
-      -- [Pair d' aSubC, Pair c' bSubD, Pair aSubC bSubD]
+   where
+    mkPairL aSubC = Pair aSubC d
+    mkPairR bSubD = Pair c bSubD
+    both = [Pair aSubC bSubD | aSubC <- aMinusC, bSubD <- bMinusD]
+    c' = treeIntersect a c
+    d' = treeIntersect b d
+    aMinusC = concatMap (a \\) c'
+    bMinusD = concatMap (b \\) d'
+  -- [Pair d' aSubC, Pair c' bSubD, Pair aSubC bSubD]
   (Either a b, Either c d) ->
     [Either left right]
-    where
-      -- l = foldr a (flip map (\\)) c
-      left = concat [x \\ y | x <- a, y <- c]
-      right = concat [x \\ y | x <- b, y <- d]
+   where
+    -- l = foldr a (flip map (\\)) c
+    left = concat [x \\ y | x <- a, y <- c]
+    right = concat [x \\ y | x <- b, y <- d]
 
 treeIntersect :: MatchTree -> MatchTree -> [MatchTree]
 treeIntersect m1 m2 = case (m1, m2) of
@@ -105,20 +105,20 @@ treeIntersect m1 m2 = case (m1, m2) of
   (Either _ _, Pair _ _) -> error "type error5"
   (Pair _ _, Either _ _) -> error "type error6"
   (Pair a b, Pair c d) -> error "pairs"
-    -- map mkPairL (a \\ c) ++ map mkPairR (b \\ d) ++ both
-    -- where
-    --   mkPairL aSubC = Pair aSubC d
-    --   mkPairR bSubD = Pair c bSubD
-    --   both = [Pair aSubC bSubD | aSubC <- a \\ c, bSubD <- b \\ d]
-      -- c' = statIntersect a c
-      -- d' = statIntersect b d
+  -- map mkPairL (a \\ c) ++ map mkPairR (b \\ d) ++ both
+  -- where
+  --   mkPairL aSubC = Pair aSubC d
+  --   mkPairR bSubD = Pair c bSubD
+  --   both = [Pair aSubC bSubD | aSubC <- a \\ c, bSubD <- b \\ d]
+  -- c' = statIntersect a c
+  -- d' = statIntersect b d
   (Either a b, Either c d) -> error "eithers"
-    -- [Either left right]
-    -- where
-    --   -- l = foldr a (flip map (\\)) c
-    --   left = concat [x \\ y | x <- a, y <- c]
-    --   right = concat [x \\ y | x <- b, y <- d]
-  
+
+-- [Either left right]
+-- where
+--   -- l = foldr a (flip map (\\)) c
+--   left = concat [x \\ y | x <- a, y <- c]
+--   right = concat [x \\ y | x <- b, y <- d]
 
 -- (a-c)*(b-d) + c*(b-d) + (a-c)*d
 

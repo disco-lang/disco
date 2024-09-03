@@ -105,9 +105,9 @@ pDataConsMatch typeIn =
 pPattern :: Ty.Type -> Parser Pattern
 pPattern typeIn =
   choice
-    [ symbol "_" $> PWild,
-      pDataConsMatch typeIn,
-      pName <&> PVar
+    [ symbol "_" $> PWild
+    , pDataConsMatch typeIn
+    , pName <&> PVar
     ]
 
 pClause :: Text -> Ty.Type -> Parser Clause
@@ -133,15 +133,15 @@ pFn = do
 pType :: Parser Ty.Type
 pType =
   choice
-    [ Ty.int <$ lexeme (string "Int"),
-      Ty.bool <$ lexeme (string "Bool"),
-      Ty.throol <$ lexeme (string "Throol"),
-      do
+    [ Ty.int <$ lexeme (string "Int")
+    , Ty.bool <$ lexeme (string "Bool")
+    , Ty.throol <$ lexeme (string "Throol")
+    , do
         _ <- symbol ","
         l <- pType
         r <- pType
-        return $ Ty.pair l r,
-      do
+        return $ Ty.pair l r
+    , do
         _ <- lexeme (string "Either")
         l <- pType
         r <- pType

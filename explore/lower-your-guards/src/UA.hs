@@ -31,8 +31,8 @@ ua nrefs gdt = case gdt of
       (n', u) <- ua n t
       n'' <- addLitMulti nrefs $ varInfo (Not k)
       return (n'' ++ n', u)
-    where
-      varInfo = U.Info var
+   where
+    varInfo = U.Info var
 
 addLitMulti :: [I.NormRefType] -> U.Literal -> F.Fresh [I.NormRefType]
 addLitMulti [] _ = return []

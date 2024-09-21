@@ -18,23 +18,25 @@ import Disco.AST.Typed
     pattern APInj,
     pattern APList,
     pattern APNat,
+    pattern APNeg,
     pattern APString,
     pattern APTup,
     pattern APUnit,
     pattern APVar,
     pattern APWild,
-    pattern APNeg,
   )
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.Constraint as C
 import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import Disco.Messages
+import Disco.Pretty (Doc)
 import qualified Disco.Pretty.DSL as DSL
 import qualified Disco.Types as Ty
 import Polysemy
 import Polysemy.Output
 import Polysemy.Reader
+import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
 
 checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
@@ -50,7 +52,7 @@ checkClauses name types pats = do
 
   when (not . null $ examples) $ do
     let prettyExampleArgs exArgs =
-          DSL.hsep $ map (DSL.text . prettyExample) exArgs
+          DSL.hsep $ map pe exArgs
 
     let prettyExampleLine prettyArgs =
           DSL.text (show name) DSL.<+> prettyArgs DSL.<+> DSL.text "= ..."
@@ -63,6 +65,30 @@ checkClauses name types pats = do
         DSL.$+$ prettyExamples
 
   return ()
+
+pe :: (Applicative f) => ExamplePat -> f (Doc ann)
+pe e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
+  (TI.KPair, _) -> tupled (traverse pe (resugarPair e))
+  (TI.KCons, _) -> list (traverse pe (resugarList e))
+  (TI.KLeft, [l]) -> DSL.parens $ DSL.text "left" DSL.<+> pe l
+  (TI.KRight, [r]) -> DSL.parens $ DSL.text "right" DSL.<+> pe r
+  (_, _) -> DSL.hsep $ DSL.text (show ident) : map pe args
+
+tupled :: (Applicative f) => f [Doc ann] -> f (Doc ann)
+tupled = fmap (PP.tupled)
+
+list :: (Applicative f) => f [Doc ann] -> f (Doc ann)
+list = fmap (PP.list)
+
+resugarPair :: ExamplePat -> [ExamplePat]
+resugarPair e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
+  (TI.KPair, [efst, esnd]) -> efst : resugarPair esnd
+  (_, _) -> e : []
+
+resugarList :: ExamplePat -> [ExamplePat]
+resugarList (ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
+  (TI.KCons, [ehead, etail]) -> ehead : resugarList etail
+  (_, _) -> []
 
 desugarClause :: (Members '[Fresh, Embed IO] r) => [TI.TypedVar] -> Int -> [APattern] -> Sem r Gdt
 desugarClause args clauseIdx argsPats = do
@@ -93,6 +119,8 @@ TODO(colin): handle remaining patterns
   , APAdd
   , APMul
   , APSub
+We treat unhandled patterns as if they are exhaustively matched against
+This necessarily results in some false negatives, but no false positives.
 -}
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = do

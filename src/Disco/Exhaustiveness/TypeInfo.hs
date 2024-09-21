@@ -24,6 +24,10 @@ data DataCon = DataCon
   }
   deriving (Ord, Show)
 
+-- This is very important, as we have (sometimes recursive) type aliases
+-- Equality of dcTypes doesn't measure equality of dataconstructors,
+-- because we could have two different aliases for the same type
+-- (And we can't just resolve all aliases up front, because they can be recursive)
 instance Eq DataCon where
   (==) = (==) `on` dcIdent
 
@@ -39,7 +43,25 @@ data Ident where
   KLeft :: Ident
   KRight :: Ident
   KUnkown :: Ident
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
+
+instance Show Ident where
+  show i = case i of
+    KBool b -> show b
+    KChar c -> show c
+    KNat n -> show n
+    KInt z ->
+      if z < 0
+        then "(" ++ show z ++ ")"
+        else show z
+    KNil -> "[]"
+    KUnit -> "unit"
+    KUnkown -> "_"
+    -- These should never actually be printed in warnings
+    KPair -> ","
+    KCons -> "::"
+    KLeft -> "left()"
+    KRight -> "right()"
 
 -- | Finite constructors are used in the LYG checker
 -- 'Infinite' constructors are used when reporting

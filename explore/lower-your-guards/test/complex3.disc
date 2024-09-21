@@ -1,0 +1,3 @@
+foo : , Either Int Bool Int -> Bool
+foo , Left  a     x = False
+foo , Right b     y = False

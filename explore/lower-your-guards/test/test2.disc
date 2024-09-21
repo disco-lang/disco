@@ -1,0 +1,3 @@
+shouldntPass : Int -> Bool
+shouldntPass 123 = asdf
+shouldntPass 123 = asdf

@@ -1,0 +1,3 @@
+foo : , Throol Throol -> Bool
+foo , Baz Foo = False
+// foo , Bar Baz = False

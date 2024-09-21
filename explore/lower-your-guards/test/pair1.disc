@@ -1,0 +1,4 @@
+
+foo : , Int Int -> Bool
+foo , 1 n = True
+foo , n 2 = False

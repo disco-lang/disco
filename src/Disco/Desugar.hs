@@ -739,6 +739,19 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   desugarMatch dt (APList ty []) = desugarMatch dt (APInj ty L APUnit)
   desugarMatch dt (APList ty ps) =
     desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
+  {- n must have same type as dt, and it must be N or Z
+   - when dt is (pn+k) ==>
+   -   when dt is x0;
+   -   let v0 = k;
+   -   [if x0 >= v0;] -- only if type is N
+   -   when x0-v0 is x1;
+   -   let v1 = p;
+   -   if v1 divides x1;
+   -   when x1 / v1 is n
+   -}
+  desugarMatch dt (APArith ty k p n) = do
+    (x0, g1) <- varFor dt
+    _
 
   mkMatch :: Member Fresh r => DTerm -> DPattern -> Sem r [DGuard]
   mkMatch dt dp = return [DGPat (embed dt) dp]

@@ -120,6 +120,7 @@ module Disco.AST.Generic (
   X_PCons,
   X_PList,
   X_Pattern,
+  X_PArith,
   ForallPattern,
 
   -- * Quantifiers
@@ -489,6 +490,7 @@ type family X_PChar e
 type family X_PString e
 type family X_PCons e
 type family X_PList e
+type family X_PArith e
 type family X_Pattern e
 
 -- | Patterns.
@@ -517,6 +519,8 @@ data Pattern_ e where
   PCons_ :: X_PCons e -> Pattern_ e -> Pattern_ e -> Pattern_ e
   -- | List pattern @[p1, .., pn]@.
   PList_ :: X_PList e -> [Pattern_ e] -> Pattern_ e
+  -- | Arithmetic pattern @pn+k@.
+  PArith_ :: X_PArith e -> Integer -> Integer -> Name (Term_ e) -> Pattern_ e
   -- | A special placeholder node for a nonlinear occurrence of a
   --   variable; we can only detect this at parse time but need to
   --   generate an error later.
@@ -538,6 +542,7 @@ type ForallPattern (a :: * -> Constraint) e =
   , a (X_PInj e)
   , a (X_PCons e)
   , a (X_PList e)
+  , a (X_PArith e)
   , a (X_Pattern e)
   , a (Term_ e)
   )

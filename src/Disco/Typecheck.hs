@@ -1482,6 +1482,8 @@ checkPattern p@(PList ps) ty = do
   listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (mconcat ctxs, APList (TyList tyl) aps)
+checkPattern (PArith k p x) ty = do
+  _
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

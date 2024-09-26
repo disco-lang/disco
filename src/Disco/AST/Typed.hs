@@ -64,6 +64,7 @@ module Disco.AST.Typed (
   pattern APString,
   pattern APCons,
   pattern APList,
+  pattern APArith,
   pattern ABinding,
 
   -- * Utilities
@@ -282,6 +283,7 @@ type instance X_PInj TY = Embed Type
 type instance X_PNat TY = Embed Type
 type instance X_PCons TY = Embed Type
 type instance X_PList TY = Embed Type
+type instance X_PArith TY = Embed Type
 
 type instance X_Pattern TY = ()
 
@@ -332,6 +334,11 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   where
     APList ty lp = PList_ (embed ty) lp
 
+pattern APArith :: Type -> Integer -> Integer -> Name ATerm -> APattern
+pattern APArith ty k p n <- PArith_ (unembed -> ty) k p n
+  where
+    APArith ty k p n = PArith_ (embed ty) k p n
+
 {-# COMPLETE
   APVar
   , APWild
@@ -344,6 +351,7 @@ pattern APList ty lp <- PList_ (unembed -> ty) lp
   , APNat
   , APCons
   , APList
+  , APArith
   #-}
 
 varsBound :: APattern -> [(Name ATerm, Type)]
@@ -358,6 +366,7 @@ varsBound (APInj _ _ p) = varsBound p
 varsBound (APNat _ _) = []
 varsBound (APCons _ p q) = varsBound p ++ varsBound q
 varsBound (APList _ ps) = varsBound =<< ps
+varsBound (APArith ty _ _ n) = [(n, ty)]
 
 ------------------------------------------------------------
 -- getType
@@ -414,6 +423,7 @@ instance HasType APattern where
   getType (APNat ty _) = ty
   getType (APCons ty _ _) = ty
   getType (APList ty _) = ty
+  getType (APArith ty _ _ _) = ty
 
 instance HasType ABranch where
   getType = getType . snd . unsafeUnbind
@@ -486,6 +496,7 @@ explodePattern = \case
   APNat ty n -> PAscr (PNat n) ty
   APCons ty p1 p2 -> PAscr (PCons (explodePattern p1) (explodePattern p2)) ty
   APList ty ps -> PAscr (PList (map explodePattern ps)) ty
+  APArith ty k p n -> PAscr (PArith k p (coerce n)) ty
 
 explodeBranch :: ABranch -> Branch
 explodeBranch = explodeTelescope explodeGuard

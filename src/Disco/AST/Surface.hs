@@ -98,6 +98,7 @@ module Disco.AST.Surface (
   pattern PNat,
   pattern PCons,
   pattern PList,
+  pattern PArith,
   pattern PNonlinear,
   pattern Binding,
 
@@ -426,6 +427,7 @@ type instance X_PChar UD = ()
 type instance X_PString UD = ()
 type instance X_PCons UD = ()
 type instance X_PList UD = ()
+type instance X_PArith UD = ()
 type instance X_Pattern UD = Void
 
 pattern PVar :: Name Term -> Pattern
@@ -466,6 +468,9 @@ pattern PCons p1 p2 = PCons_ () p1 p2
 pattern PList :: [Pattern] -> Pattern
 pattern PList lp = PList_ () lp
 
+pattern PArith :: Integer -> Integer -> Name Term -> Pattern
+pattern PArith k p n = PArith_ () k p n
+
 pattern PNonlinear :: Pattern -> Name Term -> Pattern
 pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   where
@@ -484,6 +489,7 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   , PString
   , PCons
   , PList
+  , PArith
   , PNonlinear
   #-}
 
@@ -682,4 +688,12 @@ instance Pretty Pattern where
     PList ps -> setPA initPA $ do
       ds <- punctuate (text ",") (map pretty ps)
       brackets (hsep ds)
+    PArith k p n ->
+      withPA (getPA Add) $
+        lt
+          ( withPA (getPA Mul) $
+              lt (text . show $ p) <+> text "*" <+> rt (pretty n)
+          )
+          <+> text "+"
+          <+> rt (text . show $ k)
     PNonlinear p _ -> pretty p

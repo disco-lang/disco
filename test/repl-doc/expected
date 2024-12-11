@@ -56,7 +56,7 @@ not~ : Bool → Bool
 Alternative syntax: ¬~
 precedence level 15
 
-Logical negation: not(true) = false and not(false) = true.
+Logical negation: not(T) = F and not(F) = T.
 
 https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
 

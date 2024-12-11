@@ -402,7 +402,7 @@ handleDoc (Doc (DocOther s)) = handleDocOther s
 handleDocBool :: Members '[Output (Message ())] r => Sem r ()
 handleDocBool =
   info $
-    "true and false (also written True and False) are the two possible values of type Boolean."
+    "T and F (also written true and false, or True and False) are the two possible values of type Boolean."
       $+$ mkReference "bool"
 
 handleDocUnit :: Members '[Output (Message ())] r => Sem r ()

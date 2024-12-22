@@ -33,10 +33,9 @@ is a :doc:`subtype <subtypes>` of the one it was expecting.
    type-sig
    type-annot
    polymorphism
-   type-annot
    algebraic-types
    typedef
-   collection-types
+   collections
    string
    prop
    subtypes

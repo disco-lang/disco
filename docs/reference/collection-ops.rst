@@ -1,5 +1,5 @@
 Collection operations
-====================
+=====================
 
 The :doc:`Cartesian product <cp>` of two collections (:doc:`finite sets
 <set>`, :doc:`lists <list>`, or :doc:`bags <bag>`) can be found

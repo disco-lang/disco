@@ -8,7 +8,7 @@ a letter.  For example, ``myHorse3``, ``some_name``, and ``X__17'x'_``
 are all valid variable names.
 
 To define a variable, one must first use a :doc:`type signature
-<type-sig>` to declare its :doc:`type` on a line by itself, like
+<type-sig>` to declare its :doc:`type <types>` on a line by itself, like
 
 ::
 

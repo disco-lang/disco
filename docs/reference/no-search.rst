@@ -1,7 +1,7 @@
 The type T is not searchable
 ============================
 
-When writing a :doc:`property <property>` using a ``forall``, we are
+When writing a :doc:`property <prop>` using a ``forall``, we are
 only allowed to use types which are *searchable*, that is, types for
 which we can effectively generate sample values.  Note this is not the
 same thing as being finite.  For example, the type of natural numbers

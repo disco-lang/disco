@@ -1,7 +1,7 @@
 Size
 ====
 
-The *size* of a :doc:`collection <collection-types>` ``c`` (a :doc:`list
+The *size* of a :doc:`collection <collections>` ``c`` (a :doc:`list
 <list>`, :doc:`bag <bag>`, or :doc:`set <set>`) can be found using the
 notation ``|c|``.  For example,
 

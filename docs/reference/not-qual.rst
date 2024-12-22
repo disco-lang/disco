@@ -8,4 +8,4 @@ operations to types that do not allow that operation.  For example:
   two :doc:`natural numbers <natural>`
 
 - Trying to :doc:`compare <compare>` two :doc:`functions
-  <function-type>`
+  <function-types>`

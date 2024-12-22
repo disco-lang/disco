@@ -20,7 +20,7 @@ can be compared:
 See the individual pages about each type for more information on how
 comparison works on values of that type.
 
-:doc:`Functions <function-type>`, on the other hand, cannot be
+:doc:`Functions <function-types>`, on the other hand, cannot be
 compared, because in general this would require testing the functions
 on every single possible input, of which there might be infinitely
 many.

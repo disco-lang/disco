@@ -12,8 +12,8 @@ Any :doc:`Boolean <bool>` expression can be used as a proposition.
 For example, ``T``, ``x > 5``, and ``(x < y) -> ((x == 2) \/ (x ==
 3))`` can all be used as propositions.
 
-However, unlike Boolean expressions, propositions can use :doc:`quantifiers
-<quantifier>`, that is, ``forall`` or ``exists``.  For example,
+However, unlike Boolean expressions, propositions can use
+*quantifiers*, that is, ``forall`` or ``exists``.  For example,
 ``forall x : Z. x^2 >= 0`` is a ``Prop`` (but not a ``Bool``).
 
 If you type a proposition at the Disco prompt, it will simply print
@@ -23,12 +23,14 @@ whether a proposition is true or false, you have two options:
 - The built-in ``holds`` function tries its best to determine whether
   a proposition is true or false.  If it returns a value at all, it is
   definitely correct.  For example,
-    - ``holds ((5 < 3) \/ ((2 < 1) -> F))`` yields ``T``
-    - ``holds (forall p:Bool. forall q:Bool. (p \/ q) <-> (q \/ p))``
-      yields ``T``
-    - ``holds (forall p:Bool. forall q:Bool. (p \/ q) <-> (p /\ q))``
-      yields ``F``
-    - ``holds (forall n:N. n < 529)`` yields ``F``
+
+  - ``holds ((5 < 3) \/ ((2 < 1) -> F))`` yields ``T``
+  - ``holds (forall p:Bool. forall q:Bool. (p \/ q) <-> (q \/ p))``
+    yields ``T``
+  - ``holds (forall p:Bool. forall q:Bool. (p \/ q) <-> (p /\ q))``
+    yields ``F``
+  - ``holds (forall n:N. n < 529)`` yields ``F``
+
   However, sometimes it may simply get stuck in an infinite loop.  For
   example, ``holds (forall n:N. n >= 0)`` will simply get stuck. Even
   though it is obvious to us that this proposition is true, ``holds``
@@ -41,6 +43,7 @@ whether a proposition is true or false, you have two options:
   output much more information than a simple ``T`` or ``F``,
   for example, showing a counterexample if a ``forall`` is false, or a
   witness if an ``exists`` is true.  For example,
+
     - ``:test forall p:Bool. forall q:Bool. (p \/ q) <-> (p /\ q)``
       prints
 

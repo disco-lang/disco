@@ -23,7 +23,7 @@ Sum types
 
 Note that the ``left`` or ``right`` ensures that ``A + B`` really does
 represent a *disjoint* union.  For example, although the usual
-:doc:`union <union>` operator is idempotent, that is,
+:doc:`union <collection-ops>` operator is idempotent, that is,
 :math:`\mathbb{N} \cup \mathbb{N} = \mathbb{N}`, with a disjoint union
 of types ``N + N`` is not at all the same as ``N``.  Elements of ``N +
 N`` look like either ``left(3)`` or ``right(3)``, that is, ``N + N``

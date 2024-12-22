@@ -3,7 +3,7 @@ The pattern p is supposed to have type T, but instead...
 
 This is a similar sort of error as :doc:`notcon`, but concerns
 :doc:`patterns <pattern>` instead of :doc:`expressions <expression>`.
-On the one hand, disco can figure out what :doc:`type <type>` a
+On the one hand, disco can figure out what :doc:`type <types>` a
 pattern should be based on the type of the :doc:`function <function>`.
 On the other hand, the pattern itself may correspond to a different
 type.  For example,

@@ -97,7 +97,7 @@ precedence level.  For example, let's check out the documentation for
    https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 There is a lot of information here, so let's go through it slowly.
-The first few lines tell us some of the :doc:`type <types>`
+The first few lines tell us some of the :doc:`types`
 the addition operator can have.  Don't worry for now about what the various
 symbols like ``~``, ``×``, and ``→`` mean; essentially this is telling
 us that ``+`` takes a pair of natural numbers and returns a natural
@@ -175,21 +175,84 @@ and rational numbers into fractional numbers.  For example:
 Division
 --------
 
-Division is written using ``/``.  Only fractional numbers (``F``) and
-rational numbers (``Q``) support division.
+Division can be performed in Disco, using the ``/`` operator.  As you
+learned in the section on :doc:`types`, only fractional numbers
+(``F``) and rational numbers (``Q``) support division; however,
+natural numbers or integers can be converted to those types as
+necessary.
 
-Integer division
-----------------
+::
 
-Division on N, Z that rounds down.
+   Disco> :type 3
+   3 : ℕ
+   Disco> :type (-5)
+   -5 : ℤ
+   Disco> :type 3/(-5)
+   3 / (-5) : ℚ
+   Disco> 3/(-5)
+   -3/5
+
+Division in Disco always gives an exact answer; it never rounds down
+or gives an approximate result.
 
 Floor and ceiling
 -----------------
 
-``floor(x)``, ``ceiling(x)``.  Definitions.  Cool Unicode notation.
-Turns Q into Z, F into N.
+In many cases, we might want to round some number to an integer.
+Disco provides the ``floor`` and ``ceiling`` functions for this
+purpose.
 
-Note that ``x // y`` is really just shorthand for ``floor(x / y)``.
+* ``floor(x)`` rounds ``x`` *down* to the nearest integer.  In other
+  words, ``floor(x)`` is the largest integer which is less than or
+  equal to ``x``.  As an alternative, Disco also supports the standard
+  mathematical notation ``⌊x⌋`` instead of ``floor(x)``.
+* Likewise, ``ceiling(x)`` rounds *up* to the nearest integer, that
+  is, it results in the smallest integer greater than or equal to
+  ``x``.  As an alternative, Disco also supports the standard
+  mathematical notation ``⌈x⌉`` instead of ``ceiling(x)``.
+* Disco does not provide a built-in ``round`` function for rounding to
+  the *nearest* integer; however, you can use ``floor(x + 1/2)`` for
+  this purpose.
+
+Note that ``floor`` and ``ceiling`` turn rational numbers into
+integers, and fractional numbers into natural numbers.  In other
+words, they have types like:
+
+::
+
+   floor : 𝔽 → ℕ
+   floor : ℚ → ℤ
+
+Integer division
+----------------
+
+One common application for ``floor`` is *integer division*, that is,
+dividing two integers and rounding the result down to the nearest
+integer.  Integer division can therefore be written ``floor(x / y)``.
+However, this is such a common operation that Disco provides a
+built-in integer division operator ``//``, so ``x // y`` is shorthand
+for ``floor(x / y)``.
 
 Exponentiation
 --------------
+
+Exponentiation in Disco can be written using the ``^`` operator, just
+like most calculators.  For example:
+
+::
+
+   Disco> 2 ^ 4
+   16
+   Disco> 5 ^ 1
+   5
+   Disco> 3 ^ 0
+   1
+   Disco> 2 ^ (-3)
+   1/8
+   Disco> 2 ^ 500
+   3273390607896141870013189696827599152216642046043064789483291368096133796404674554883270092325904157150886684127560071009217256545885393053328527589376
+
+Note that exponentiation can handle exponents which are zero or negative.
+
+The type of exponentiation is somewhat complex, but it is not
+too important to understand at the moment.

@@ -65,7 +65,7 @@ docMap =
       [mkIntro "arithmetic", mkRef "subtraction"]
     , PrimKey (PrimBOp SSub) ==>
       "The difference of two numbers, with a lower bound of 0." ==>
-      [mkIntro "arithmetic", mkRef "subtraction"]
+      [mkIntro "arithmetic", mkRef "subtraction", mkRef "symbols"]
     , PrimKey (PrimBOp Mul) ==>
       "The product of two numbers, types, or graphs." ==>
       [mkIntro "arithmetic", mkRef "multiplication"]
@@ -86,10 +86,10 @@ docMap =
       [mkRef "factorial"]
     , PrimKey PrimFloor ==>
       "floor(x) is the largest integer which is <= x." ==>
-      [mkIntro "arithmetic", mkRef "round"]
+      [mkIntro "arithmetic", mkRef "round", mkRef "symbols"]
     , PrimKey PrimCeil ==>
       "ceiling(x) is the smallest integer which is >= x." ==>
-      [mkIntro "arithmetic", mkRef "round"]
+      [mkIntro "arithmetic", mkRef "round", mkRef "symbols"]
     , PrimKey PrimAbs ==>
       "abs(x) is the absolute value of x." ==>
       [mkIntro "arithmetic", mkRef "abs"]
@@ -101,25 +101,25 @@ docMap =
       [mkRef "compare"]
     , PrimKey (PrimUOp Not) ==>
       "Logical negation: not(T) = F and not(F) = T." ==>
-      [mkRef "logic-ops"]
+      [mkRef "logic-ops", mkRef "symbols"]
     , PrimKey (PrimBOp And) ==>
       "Logical conjunction (and): T /\\ T = T; otherwise x /\\ y = F." ==>
-      [mkRef "logic-ops"]
+      [mkRef "logic-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Or) ==>
       "Logical disjunction (or): F \\/ F = F; otherwise x \\/ y = T." ==>
-      [mkRef "logic-ops"]
+      [mkRef "logic-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Impl) ==>
       "Logical implication (implies): T -> F = F; otherwise x -> y = T." ==>
-      [mkRef "logic-ops"]
+      [mkRef "logic-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Iff) ==>
       "Biconditional (if and only if)." ==>
-      [mkRef "logic-ops"]
+      [mkRef "logic-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Eq) ==>
       "Equality test.  x == y is T if x and y are equal." ==>
       [mkRef "compare"]
     , PrimKey (PrimBOp Neq) ==>
       "Inequality test.  x /= y is T if x and y are unequal." ==>
-      [mkRef "compare"]
+      [mkRef "compare", mkRef "symbols"]
     , PrimKey (PrimBOp Lt) ==>
       "Less-than test. x < y is T if x is less than (but not equal to) y." ==>
       [mkRef "compare"]
@@ -128,95 +128,73 @@ docMap =
       [mkRef "compare"]
     , PrimKey (PrimBOp Leq) ==>
       "Less-than-or-equal test. x <= y is T if x is less than or equal to y." ==>
-      [mkRef "compare"]
+      [mkRef "compare", mkRef "symbols"]
     , PrimKey (PrimBOp Geq) ==>
       "Greater-than-or-equal test. x >= y is T if x is greater than or equal to y." ==>
-      [mkRef "compare"]
+      [mkRef "compare", mkRef "symbols"]
     , PrimKey (PrimBOp CartProd) ==>
       "Cartesian product, i.e. the collection of all pairs.  Also works on bags and sets." ==>
-      [mkRef "cp"]
+      [mkRef "cp", mkRef "symbols"]
     , PrimKey (PrimPower) ==>
       "Power set, i.e. the set of all subsets.  Also works on bags." ==>
       [mkRef "power"]
     , PrimKey (PrimBOp Union) ==>
       "Union of two sets (or bags)." ==>
-      [mkRef "set-ops"]
+      [mkRef "set-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Inter) ==>
       "Intersection of two sets (or bags)." ==>
-      [mkRef "set-ops"]
+      [mkRef "set-ops", mkRef "symbols"]
     , PrimKey (PrimBOp Diff) ==>
       "Difference of two sets (or bags)." ==>
       [mkRef "set-ops"]
-    , OtherKey "N" ==>
-      docN ==>
-      [mkIntro "types", mkRef "natural"]
-    , OtherKey "ℕ" ==>
-      docN ==>
-      [mkIntro "types", mkRef "natural"]
-    , OtherKey "Nat" ==>
-      docN ==>
-      [mkIntro "types", mkRef "natural"]
-    , OtherKey "Natural" ==>
-      docN ==>
-      [mkIntro "types", mkRef "natural"]
-    , OtherKey "Z" ==>
-      docZ ==>
-      [mkIntro "types", mkRef "integer"]
-    , OtherKey "ℤ" ==>
-      docZ ==>
-      [mkIntro "types", mkRef "integer"]
-    , OtherKey "Int" ==>
-      docZ ==>
-      [mkIntro "types", mkRef "integer"]
-    , OtherKey "Integer" ==>
-      docZ ==>
-      [mkIntro "types", mkRef "integer"]
-    , OtherKey "F" ==>
-      docF ==>
-      [mkIntro "types", mkRef "fraction"]
-    , OtherKey "𝔽" ==>
-      docF ==>
-      [mkIntro "types", mkRef "fraction"]
-    , OtherKey "Frac" ==>
-      docF ==>
-      [mkIntro "types", mkRef "fraction"]
-    , OtherKey "Fractional" ==>
-      docF ==>
-      [mkIntro "types", mkRef "fraction"]
-    , OtherKey "Q" ==>
-      docQ ==>
-      [mkIntro "types", mkRef "rational"]
-    , OtherKey "ℚ" ==>
-      docQ ==>
-      [mkIntro "types", mkRef "rational"]
-    , OtherKey "Rational" ==>
-      docQ ==>
-      [mkIntro "types", mkRef "rational"]
-    , OtherKey "Bool" ==>
-      docB ==>
-      [mkRef "bool"]
-    , OtherKey "Boolean" ==>
-      docB ==>
-      [mkRef "bool"]
+    , OtherKey "N" ==> docN
+    , OtherKey "ℕ" ==> docN
+    , OtherKey "Nat" ==> docN
+    , OtherKey "Natural" ==> docN
+    , OtherKey "Z" ==> docZ
+    , OtherKey "ℤ" ==> docZ
+    , OtherKey "Int" ==> docZ
+    , OtherKey "Integer" ==> docZ
+    , OtherKey "F" ==> docF
+    , OtherKey "𝔽" ==> docF
+    , OtherKey "Frac" ==> docF
+    , OtherKey "Fractional" ==> docF
+    , OtherKey "Q" ==> docQ
+    , OtherKey "ℚ" ==> docQ
+    , OtherKey "Rational" ==> docQ
+    , OtherKey "Bool" ==> docB
+    , OtherKey "Boolean" ==> docB
     , OtherKey "Unit" ==>
       "The unit type, i.e. a type with only a single value." ==>
-      [mkRef "unit"]
+      [mkRef "unit", mkRef "symbols"]
     , OtherKey "Prop" ==>
       "The type of propositions." ==>
       [mkRef "prop"]
     , OtherKey "Set" ==>
       "The type of finite sets." ==>
-      [mkRef "set"]
+      [mkRef "set", mkRef "symbols"]
     , OtherKey "|~|" ==>
       "Absolute value, or the size of a collection." ==>
       [mkIntro "arithmetic", mkRef "size"]
     , OtherKey "{?" ==>
       "{? ... ?} is a case expression, for choosing a result based on conditions." ==>
       [mkRef "case"]
+    , OtherKey "λ" ==>
+      "λ (aka lambda, alternatively `\\`) introduces an anonymous function." ==>
+      [mkRef "anonymous-func", mkRef "symbols"]
     ]
  where
-  docN = "The type of natural numbers: 0, 1, 2, ..."
-  docZ = "The type of integers: ..., -2, -1, 0, 1, 2, ..."
-  docF = "The type of fractional numbers p/q >= 0."
-  docQ = "The type of rational numbers p/q."
-  docB = "The type of Booleans (T or F)."
+  docN = ("The type of natural numbers: 0, 1, 2, ...", refsN)
+  refsN = [mkIntro "types", mkRef "natural", mkRef "symbols"]
+
+  docZ = ("The type of integers: ..., -2, -1, 0, 1, 2, ...", refsZ)
+  refsZ = [mkIntro "types", mkRef "integer", mkRef "symbols"]
+
+  docF = ("The type of fractional numbers p/q >= 0.", refsF)
+  refsF = [mkIntro "types", mkRef "fraction", mkRef "symbols"]
+
+  docQ = ("The type of rational numbers p/q.", refsQ)
+  refsQ = [mkIntro "types", mkRef "rational", mkRef "symbols"]
+
+  docB = ("The type of Booleans (T or F).", refsB)
+  refsB = [mkRef "bool"]

@@ -25,6 +25,7 @@ precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/arithmetic.html
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 This expression has multiple possible types.  Some examples:
@@ -36,6 +37,7 @@ precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/arithmetic.html
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 ~! : ℕ → ℕ

@@ -4,10 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Value
 -- Copyright   :  disco team and contributors
@@ -120,9 +116,8 @@ import System.Random (StdGen)
 -- | Different types of values which can result from the evaluation
 --   process.
 data Value where
-  -- | A numeric value, which also carries a flag saying how
-  --   fractional values should be diplayed.
-  VNum :: RationalDisplay -> Rational -> Value
+  -- | A numeric value.
+  VNum :: Rational -> Value
   -- | A built-in function constant.
   VConst :: Op -> Value
   -- | An injection into a sum type.
@@ -187,7 +182,7 @@ pattern VCons h t = VInj R (VPair h t)
 --   only reason for actually doing this would be constructing graphs
 --   of graphs or maps of maps, or the like.
 data SimpleValue where
-  SNum :: RationalDisplay -> Rational -> SimpleValue
+  SNum :: Rational -> SimpleValue
   SUnit :: SimpleValue
   SInj :: Side -> SimpleValue -> SimpleValue
   SPair :: SimpleValue -> SimpleValue -> SimpleValue
@@ -197,7 +192,7 @@ data SimpleValue where
 
 toSimpleValue :: Value -> SimpleValue
 toSimpleValue = \case
-  VNum d n -> SNum d n
+  VNum n -> SNum n
   VUnit -> SUnit
   VInj s v1 -> SInj s (toSimpleValue v1)
   VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
@@ -206,7 +201,7 @@ toSimpleValue = \case
   t -> error $ "A non-simple value was passed as simple: " ++ show t
 
 fromSimpleValue :: SimpleValue -> Value
-fromSimpleValue (SNum d n) = VNum d n
+fromSimpleValue (SNum n) = VNum n
 fromSimpleValue SUnit = VUnit
 fromSimpleValue (SInj s v) = VInj s (fromSimpleValue v)
 fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
@@ -230,13 +225,11 @@ pattern VFun f = VFun_ (ValFun f)
 
 -- XXX write some comments about partiality
 
--- | A convenience function for creating a default @VNum@ value with a
---   default (@Fractional@) flag.
 ratv :: Rational -> Value
-ratv = VNum mempty
+ratv = VNum
 
 vrat :: Value -> Rational
-vrat (VNum _ r) = r
+vrat (VNum r) = r
 vrat v = error $ "vrat " ++ show v
 
 -- | A convenience function for creating a default @VNum@ value with a
@@ -245,7 +238,7 @@ intv :: Integer -> Value
 intv = ratv . (% 1)
 
 vint :: Value -> Integer
-vint (VNum _ n) = numerator n
+vint (VNum n) = numerator n
 vint v = error $ "vint " ++ show v
 
 vchar :: Value -> Char
@@ -523,9 +516,7 @@ prettyValue (ty1 :+: _) (VInj L v) = "left" <> prettyVP ty1 v
 prettyValue (_ :+: ty2) (VInj R v) = "right" <> prettyVP ty2 v
 prettyValue (_ :+: _) v =
   error $ "Non-VInj passed with sum type to prettyValue: " ++ show v
-prettyValue _ (VNum d r) = text $ case (d, denominator r == 1) of
-  (Decimal, False) -> prettyDecimal r
-  _ -> prettyRational r
+prettyValue _ (VNum r) = text $ prettyRational r
 prettyValue _ (VGen _) = prettyPlaceholder TyGen
 prettyValue ty@(_ :->: _) _ = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs) = braces $ prettySequence ty "," (map fst xs)

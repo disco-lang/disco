@@ -167,7 +167,7 @@ step cesk = case cesk of
   (In (CVar x) e k) -> case Ctx.lookup' x e of
     Nothing -> return $ Up (UnboundError x) k
     Just v -> return $ Out v k
-  (In (CNum d r) _ k) -> return $ Out (VNum d r) k
+  (In (CNum r) _ k) -> return $ Out (VNum r) k
   (In (CConst OMatchErr) _ k) -> return $ Up NonExhaustive k
   (In (CConst OEmptyGraph) _ k) -> return $ Out (VGraph empty) k
   (In (CConst op) _ k) -> return $ Out (VConst op) k
@@ -519,7 +519,7 @@ numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
 numOp1 f = numOp1' $ return . ratv . f
 
 numOp1' :: (Rational -> Sem r Value) -> Value -> Sem r Value
-numOp1' f (VNum _ m) = f m
+numOp1' f (VNum m) = f m
 numOp1' _ v = error $ "Impossible! numOp1' on non-VNum " ++ show v
 
 numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
@@ -528,11 +528,7 @@ numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))
 numOp2' :: (Rational -> Rational -> Sem r Value) -> Value -> Sem r Value
 numOp2' (#) =
   arity2 $ \v1 v2 -> case (v1, v2) of
-    (VNum d1 n1, VNum d2 n2) -> do
-      res <- n1 # n2
-      case res of
-        VNum _ r -> return $ VNum (d1 <> d2) r
-        _ -> return res
+    (VNum n1, VNum n2) -> n1 # n2
     (VNum {}, _) -> error $ "Impossible! numOp2' on non-VNum " ++ show v2
     _ -> error $ "Impossible! numOp2' on non-VNum " ++ show v1
 
@@ -570,7 +566,7 @@ valLt :: Value -> Value -> Bool
 valLt v1 v2 = valCmp v1 v2 == LT
 
 valCmp :: Value -> Value -> Ordering
-valCmp (VNum _ r1) (VNum _ r2) = compare r1 r2
+valCmp (VNum r1) (VNum r2) = compare r1 r2
 valCmp (VInj L _) (VInj R _) = LT
 valCmp (VInj R _) (VInj L _) = GT
 valCmp (VInj L v1) (VInj L v2) = valCmp v1 v2
@@ -728,8 +724,8 @@ mergeM g = go
   mergeCons a m1 m2 zs = do
     nm <- evalApp g [VPair (intv m1) (intv m2)]
     return $ case nm of
-      VNum _ 0 -> zs
-      VNum _ n -> (a, numerator n) : zs
+      VNum 0 -> zs
+      VNum n -> (a, numerator n) : zs
       v -> error $ "Impossible! merge function in mergeM returned non-VNum " ++ show v
 
 ------------------------------------------------------------

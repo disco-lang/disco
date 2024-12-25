@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Compile
 -- Copyright   :  disco team and contributors
@@ -162,9 +158,9 @@ compileDTerm (DTVar _ x) = return $ CVar (coerce x)
 compileDTerm (DTPrim ty x) = compilePrim ty x
 compileDTerm DTUnit = return CUnit
 compileDTerm (DTBool _ b) = return $ CInj (bool L R b) CUnit
-compileDTerm (DTChar c) = return $ CNum Fraction (toInteger (fromEnum c) % 1)
-compileDTerm (DTNat _ n) = return $ CNum Fraction (n % 1) -- compileNat ty n
-compileDTerm (DTRat r) = return $ CNum Decimal r
+compileDTerm (DTChar c) = return $ CNum (toInteger (fromEnum c) % 1)
+compileDTerm (DTNat _ n) = return $ CNum (n % 1) -- compileNat ty n
+compileDTerm (DTRat r) = return $ CNum r
 compileDTerm term@(DTAbs q _ _) = do
   (xs, tys, body) <- unbindDeep term
   cbody <- compileDTerm body

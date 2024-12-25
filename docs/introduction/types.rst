@@ -38,14 +38,15 @@ Let's begin by looking at a few standard built-in types.
 Natural numbers
 ---------------
 
-The type of *natural numbers* includes the counting numbers 0, 1, 2,
-3, 4, 5, ... (*including* zero).  Disco displays the type of natural
-numbers using the special symbol ``ℕ``; however, it can also be
-written ``Natural``, ``Nat``, or just ``N``.
+The type of *natural numbers* encompasses the counting numbers 0, 1,
+2, 3, 4, 5, ... (*including* zero).  Disco displays the type of
+:doc:`natural numbers </reference/natural>` using the special symbol
+``ℕ``; however, it can also be written ``Natural``, ``Nat``, or just
+``N``.
 
   - Natural numbers can be *added*; adding two natural numbers
     always results in another natural number (that is, the natural
-    numbers are "closed under addition").
+    numbers are "closed under :doc:`addition </reference/addition>`").
 
     ::
 
@@ -56,7 +57,8 @@ written ``Natural``, ``Nat``, or just ``N``.
 
   - Natural numbers can also be *multiplied*; again, multiplying two
     natural numbers always results in another natural number (that is,
-    the natural numbers are "closed under multiplication").
+    the natural numbers are "closed under :doc:`multiplication
+    </reference/multiplication>`").
 
     ::
 
@@ -70,12 +72,13 @@ Integers
 
 Although we can add and multiply natural numbers, subtracting two
 natural numbers will not necessarily yield another natural
-number---the natural numbers are not closed under subtraction.
-The type of numbers that support addition, multiplication, and
-subtraction is called the *integers*, and includes values like ...,
--3, -2, -1, 0, 1, 2, 3, ...  Disco displays the type of integers using
-the special symbol ``ℤ``, but it can also be written ``Z``, ``Int``,
-or ``Integer``.
+number---the natural numbers are not closed under :doc:`subtraction
+</reference/subtraction>`.  The type of numbers that support addition,
+multiplication, and subtraction is called the *integers*, and includes
+values like ..., -3, -2, -1, 0, 1, 2, 3, ...  Disco displays the type
+of :doc:`integers </reference/integer>` using the special symbol
+``ℤ``, but it can also be written ``Z``, ``Int``, or ``Integer``. (The
+traditional symbol ``ℤ`` stands for the German word for integers, *Zahlen*.)
 
   - We can add, multiply, or subtract two integers, resulting in
     another integer:
@@ -141,22 +144,6 @@ This automatic conversion is called :doc:`subtyping
 </reference/subtypes>`.  We will discuss it in more depth later; for
 now it mostly won't make much difference.
 
-Exercises
----------
-
-What **type** will Disco give to each of the following expressions?
-(You do not have to predict their value.)  Make a prediction, then
-use the ``:type`` command to see if you were right.
-
-- ``1``
-- ``777``
-- ``-2``
-- ``0``
-- ``1 + 99``
-- ``(-1) + 99``
-- ``1 + (-99)``
-- ``19 - 6``
-
 Fractional and Rational numbers
 -------------------------------
 
@@ -164,20 +151,21 @@ Just as subtracting two natural numbers may not give us another
 natural number, we also cannot *divide* two natural numbers.
 
 - The natural numbers plus fractions such as ``2/3`` make up the type
-  of *fractional numbers*, written ``F``, ``𝔽``, ``Frac`` or ``Fractional``.
-  This type supports addition, multiplication, and division.
+  of *fractional numbers*, written ``F``, ``𝔽``, ``Frac`` or
+  ``Fractional``.  This type supports addition, multiplication, and
+  :doc:`division </reference/division>`.
 
 - The integers plus all positive or negative fractions make up the
   type of *rational numbers*, written ``Q``, ``ℚ``, or ``Rational``.
   This type supports all four standard arithmetic operations:
   addition, multiplication, subtraction, and division.
 
-You will learn more about these types, how to convert between them,
-*etc.*; for now it's important just to know that they exist and to
+You will learn more about these types and how to convert between them
+later; for now it's important just to know that they exist and to
 understand the basic distinctions between them.
 
-Note that Disco does not have floating-point numbers: all rational
-numbers are stored exactly as a ratio, not as a decimal
+Note that Disco does not have so-called "floating-point" numbers: all
+rational numbers are stored exactly as a fraction, not as a decimal
 approximation.  For example,
 
 ::
@@ -198,10 +186,18 @@ input rational numbers:
 Exercises
 ---------
 
-What **type** will Disco give to each of the following expressions?
-(You do not have to predict their value.)  Make a prediction, then use
-the ``:type`` command to see if you were right.
+What **type** do you think Disco will give to each of the following
+expressions?  (You do not have to predict their value.)  Make a
+prediction, then use the ``:type`` command to see if you were right.
 
+- ``1``
+- ``777``
+- ``-2``
+- ``0``
+- ``1 + 99``
+- ``(-1) + 99``
+- ``1 + (-99)``
+- ``19 - 6``
 - ``2 / 3``
 - ``5 / (-6)``
 - ``(-5)``

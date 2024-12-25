@@ -25,6 +25,7 @@ precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/arithmetic.html
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 This expression has multiple possible types.  Some examples:
@@ -36,6 +37,7 @@ precedence level 7, left associative
 
 The sum of two numbers, types, or graphs.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/arithmetic.html
 https://disco-lang.readthedocs.io/en/latest/reference/addition.html
 
 ~! : ℕ → ℕ
@@ -59,18 +61,25 @@ precedence level 15
 Logical negation: not(T) = F and not(F) = T.
 
 https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
+https://disco-lang.readthedocs.io/en/latest/reference/symbols.html
 
 The type of natural numbers: 0, 1, 2, ...
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+https://disco-lang.readthedocs.io/en/latest/reference/symbols.html
 
 The type of natural numbers: 0, 1, 2, ...
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/natural.html
+https://disco-lang.readthedocs.io/en/latest/reference/symbols.html
 
 The type of rational numbers p/q.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/rational.html
+https://disco-lang.readthedocs.io/en/latest/reference/symbols.html
 
 append : List(a) × List(a) → List(a)
 

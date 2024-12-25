@@ -68,3 +68,9 @@ many.
   as combining all the individual comparisons with "and".  For
   example, ``3 <= x < y <= 10`` means the same thing as ``3 <= x /\ x
   < y /\ y <= 10``.
+
+* The ``max`` and ``min`` functions can be used on any type which
+  supports comparison.  ``max`` takes two arguments and returns
+  whichever one is larger; ``min`` is similar but returns the smaller
+  argument. For example, ``max(3,6)`` and ``max(6,3)`` both evaluate
+  to ``6``.

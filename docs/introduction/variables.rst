@@ -2,10 +2,10 @@ Variables
 =========
 
 We can create *variables* in Disco as names to stand for certain
-values.  Variable names can be any combination of lower and uppercase
-letters, digits, underscores (``_``), and single quotes (``'``), but
-they must start with a letter.  For example, these are all valid
-variable names:
+values.  :doc:`Variable </reference/variable>` names can be any
+combination of lower and uppercase letters, digits, underscores
+(``_``), and single quotes (``'``), but they must start with a letter.
+For example, these are all valid variable names:
 
 ::
 
@@ -14,7 +14,7 @@ variable names:
    f_99x'
    e1E10
 
-On the other hand, these are not valid as variable names:
+On the other hand, these are not valid variable names:
 
 ::
 
@@ -26,21 +26,24 @@ To create a variable, there are two steps.
 
 1. We must first *declare* the variable's :doc:`type <types>`, that
    is, we must say what type of value the variable will hold. We do
-   this by writing the variable's name, a colon, and a type.  For
-   example:
+   this by writing the variable's name, a colon, and a type, which is
+   called a :doc:`type signature </reference/type-sig>`.  For example:
 
    ::
 
       x : N
 
 2. We can then *define* the variable to be equal to the value of some
-   *expression*.  For now, just think of an expression as any combination of
-   numbers, operations, parentheses, and other variables.  For
-   example:
+   *expression*.  For now, just think of an :doc:`expression
+   </reference/expression>` as any combination of numbers, operations,
+   parentheses, and other variables.  For example:
 
    ::
 
       x = (3 + 77) * 5
+
+   If you wish, you can read more about :doc:`definitions
+   </reference/definition>` in the reference documentation.
 
 Expressions are *evaluated* to find out what value they have, using
 the same order of operations you are used to from math.  For example,

@@ -32,7 +32,8 @@ Exercises
 ---------
 
 Disco can be used as a basic calculator.  Enter each of the following
-expressions at the Disco prompt and report the results.
+:doc:`arithmetic expressions </reference/arithmetic>` at the Disco
+:doc:`prompt </reference/REPL>` and report the results.
 
 - ``2 + 3``
 - ``5 - 8``

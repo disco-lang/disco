@@ -466,9 +466,9 @@ handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
   let attrs =
         ( case prim of
-            PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
-             where
-              OpInfo (UOpF f _) syns _ = uopMap ! u
+            PrimUOp u -> case uopMap ! u of
+              OpInfo (UOpF f _) syns _ -> describeAlts (f == Post) (f == Pre) syns
+              _ -> error $ "handleDocPrim: No OpInfo for unary op " ++ show u
             PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
             PrimFloor -> describeAlts False False ["floor(x)", "⌊x⌋"]
             PrimCeil -> describeAlts False False ["ceiling(x)", "⌈x⌉"]

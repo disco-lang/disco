@@ -73,7 +73,7 @@ import Disco.Pretty qualified as PP
 import Disco.Property (prettyTestResult)
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims (
-  Prim (PrimBOp, PrimUOp, PrimFloor, PrimCeil, PrimAbs),
+  Prim (PrimAbs, PrimBOp, PrimCeil, PrimFloor, PrimUOp),
   toPrim,
  )
 import Disco.Typecheck
@@ -475,11 +475,11 @@ handleDocPrim prim = do
             PrimAbs -> describeAlts False False ["abs(x)", "|x|"]
             _ -> []
         )
-        ++ ( case prim of
-              PrimUOp u -> [describePrec (uPrec u)]
-              PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
-              _ -> []
-           )
+          ++ ( case prim of
+                PrimUOp u -> [describePrec (uPrec u)]
+                PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+                _ -> []
+             )
   case attrs of
     [] -> pure ()
     _ -> info . vcat $ attrs
@@ -520,10 +520,9 @@ handleDocMap k = case M.lookup k docMap of
       [ text d
       , PP.empty
       ]
-      ++
-      case refs of
-        [] -> []
-        _ -> map formatReference refs ++ [PP.empty]
+        ++ case refs of
+          [] -> []
+          _ -> map formatReference refs ++ [PP.empty]
 
 ------------------------------------------------------------
 -- eval

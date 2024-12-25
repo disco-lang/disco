@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Typecheck.Unify
 -- Copyright   :  disco team and contributors
@@ -16,7 +12,7 @@ import Unbound.Generics.LocallyNameless (Name, fv)
 
 import Control.Lens (anyOf)
 import Control.Monad (mzero)
-import Control.Monad.State
+import Control.Monad.State (StateT, modify, get, evalStateT)
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S

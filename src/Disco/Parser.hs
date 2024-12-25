@@ -93,7 +93,6 @@ import Unbound.Generics.LocallyNameless (
   string2Name,
  )
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-
 import Control.Monad.Combinators.Expr
 import Text.Megaparsec hiding (
   State,
@@ -102,7 +101,6 @@ import Text.Megaparsec hiding (
 import qualified Text.Megaparsec as MP
 import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
 import Control.Lens (
   makeLenses,
   toListOf,
@@ -113,7 +111,7 @@ import Control.Lens (
   (.=),
  )
 import Control.Monad (guard, void)
-import Control.Monad.State
+import Control.Monad.State (StateT, State, evalStateT, evalState, gets, modify)
 import Data.Char (isAlpha, isDigit)
 import Data.Foldable (asum)
 import Data.List (find, intercalate)

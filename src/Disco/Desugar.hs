@@ -29,7 +29,6 @@ where
 import Control.Monad (zipWithM)
 import Data.Bool (bool)
 import Data.Coerce
-import Data.Functor (unzip)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe, isJust)
@@ -55,7 +54,6 @@ import Unbound.Generics.LocallyNameless (
   unrebind,
  )
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-import Prelude hiding (unzip)
 
 ------------------------------------------------------------
 -- Running desugaring computations
@@ -205,7 +203,7 @@ desugarAbs Lam ty (cl@(unsafeUnbind -> ([APVar _ _], _)) :| []) = do
 -- General case
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
-  let (pats, bodies) = unzip clausePairs
+  let (pats, bodies) = NE.unzip clausePairs
   let patTys = map getType (NE.head pats)
   let bodyTy = getType (NE.head bodies)
 

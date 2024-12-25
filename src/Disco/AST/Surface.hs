@@ -511,6 +511,7 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   , PSub
   , PNeg
   , PFrac
+  , PNonlinear
   #-}
 
 ------------------------------------------------------------

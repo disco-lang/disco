@@ -362,8 +362,14 @@ compilePrim _ PrimHolds = return $ CConst OHolds
 compilePrim _ PrimLookupSeq = return $ CConst OLookupSeq
 compilePrim _ PrimExtendSeq = return $ CConst OExtendSeq
 
+compilePrim ty PrimMin = desugaredPrimErr PrimMin ty
+compilePrim ty PrimMax = desugaredPrimErr PrimMax ty
+
 compilePrimErr :: Prim -> Type -> a
 compilePrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " on bad type " ++ show ty
+
+desugaredPrimErr :: Prim -> Type -> a
+desugaredPrimErr p ty = error $ "Impossible! compilePrim " ++ show p ++ " at type " ++ show ty ++ ", should have been desugared away"
 
 ------------------------------------------------------------
 -- Case expressions

@@ -1,10 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Error
 -- Copyright   :  disco team and contributors
@@ -109,8 +105,8 @@ instance Pretty DiscoError where
 rtd :: String -> Sem r (Doc ann)
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
 
-issue :: Int -> Sem r (Doc ann)
-issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
+-- issue :: Int -> Sem r (Doc ann)
+-- issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
 
 squote :: String -> String
 squote x = "'" ++ x ++ "'"

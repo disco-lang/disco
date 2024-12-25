@@ -121,7 +121,7 @@ unify' baseEq tyDefns eqs = evalStateT (go eqs) S.empty
 equate :: TyDefCtx -> [Type] -> Maybe S
 equate tyDefns tys = unify tyDefns eqns
  where
-  eqns = zip tys (tail tys)
+  eqns = zip tys (drop 1 tys)
 
 occurs :: Name Type -> Type -> Bool
 occurs x = anyOf fv (== x)

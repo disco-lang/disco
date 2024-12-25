@@ -170,8 +170,14 @@ docMap =
     , OtherKey "Prop" ==>
       "The type of propositions." ==>
       [mkRef "prop"]
+    , OtherKey "List" ==>
+      "List(T) is the type of lists whose elements have type T." ==>
+      [mkRef "list", mkRef "list-lib"]
+    , OtherKey "Bag" ==>
+      "Bag(T) is the type of bags (i.e. sets with multiplicity) whose elements have type T." ==>
+      [mkRef "bag", mkRef "symbols"]
     , OtherKey "Set" ==>
-      "The type of finite sets." ==>
+      "Set(T) is the type of finite sets whose elements have type T." ==>
       [mkRef "set", mkRef "symbols"]
     , OtherKey "|~|" ==>
       "Absolute value, or the size of a collection." ==>
@@ -182,6 +188,9 @@ docMap =
     , OtherKey "λ" ==>
       "λ (aka lambda, alternatively `\\`) introduces an anonymous function." ==>
       [mkRef "anonymous-func", mkRef "symbols"]
+    , OtherKey "#" ==>
+      "The # character is used to denote the cardinality of an element in a bag." ==>
+      [mkRef "bag"]
     ]
  where
   docN = ("The type of natural numbers: 0, 1, 2, ...", refsN)

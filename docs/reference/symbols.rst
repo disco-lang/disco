@@ -39,4 +39,6 @@ with a link to the relevant Disco documentation.
     ⌋      U+230B            ``\rfloor``       ``floor``        :doc:`Floor <round>`
     ⌈      U+2308            ``\lceil``        ``ceiling``      :doc:`Ceiling <round>`
     ⌉      U+2309            ``\rceil``        ``ceiling``      :doc:`Ceiling <round>`
+    ⟅      U+27C5            ``\Lbag``         ``bag``          :doc:`Bags <bag>`
+    ⟆      U+27C6            ``\Rbag``         ``bag``          :doc:`Bags <bag>`
     ====== ================= ================= ================ ====================================

@@ -2,9 +2,9 @@ Bags
 ====
 
 For any :doc:`type <types>` ``T``, ``Bag(T)`` is the type of *finite
-bags* with elements of type ``T``.  A bag is like a :doc:`set` (and
-unlike a :doc:`list`) in that it doesn't care about the order of the
-elements; however, unlike a :doc:`set`, a bag cares *how many copies*
+bags* with elements of type ``T``.  A bag is like a :doc:`set <set>` (and
+unlike a :doc:`list <list>`) in that it doesn't care about the order of the
+elements; however, unlike a :doc:`set <set>`, a bag cares *how many copies*
 of each element there are.
 
 * The built-in ``bag`` function can be used to convert other
@@ -96,9 +96,11 @@ of each element there are.
        Disco> 2 ∈ ⟅1,2,3⟆
        T
 
-Bags support various operations, including :doc:`size <size>`,
-:doc:`union <collection-ops>`, :doc:`intersection <collection-ops>`,
-:doc:`difference <collection-ops>`, :doc:`subset <collection-ops>`, and :doc:`power set <power>`.
+Bags support various operations common to other collection types,
+including :doc:`size <size>`, :doc:`union <collection-ops>`,
+:doc:`intersection <collection-ops>`, :doc:`difference
+<collection-ops>`, :doc:`subset <collection-ops>`, and :doc:`power set
+<power>`.
 
 Converting to and from sets
 ---------------------------

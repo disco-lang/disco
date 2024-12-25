@@ -8,9 +8,9 @@ queue_rules:
               - -files~=\.cabal$
               - -files=stack.yaml
           - and:
-              - check-success=Haskell-CI - Linux - ghc-9.8.2
-              - check-success=Haskell-CI - Linux - ghc-9.6.5
-              - check-success=Haskell-CI - Linux - ghc-9.4.8
+              - check-success=Haskell-CI - Linux - ghc-9.10.1
+              - check-success=Haskell-CI - Linux - ghc-9.8.4
+              - check-success=Haskell-CI - Linux - ghc-9.6.6
       - label=merge me
       - '#approved-reviews-by>=1'
       - '#changes-requested-reviews-by=0'
@@ -22,9 +22,9 @@ queue_rules:
               - -files~=\.cabal$
               - -files=stack.yaml
           - and:
-              - check-success=Haskell-CI - Linux - ghc-9.8.2
-              - check-success=Haskell-CI - Linux - ghc-9.6.5
-              - check-success=Haskell-CI - Linux - ghc-9.4.8
+              - check-success=Haskell-CI - Linux - ghc-9.10.1
+              - check-success=Haskell-CI - Linux - ghc-9.8.4
+              - check-success=Haskell-CI - Linux - ghc-9.6.6
 
     commit_message_template: |
       {{ title }} (#{{ number }})

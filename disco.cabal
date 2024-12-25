@@ -12,7 +12,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC ==9.4.8 || ==9.6.6 || ==9.8.4 || ==9.10.1
+tested-with:         GHC ==9.6.6 || ==9.8.4 || ==9.10.1
 
 data-dir:            lib
 

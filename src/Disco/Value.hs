@@ -76,38 +76,33 @@ module Disco.Value (
   prettyValue,
 ) where
 
-import Prelude hiding ((<>))
-import qualified Prelude as P
-
+import Algebra.Graph (Graph, foldg)
 import Control.Monad (forM)
 import Data.Bifunctor (first)
 import Data.Char (chr, ord)
+import Data.Foldable (Foldable (..))
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
-import Data.List (foldl')
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
-
-import Algebra.Graph (Graph, foldg)
-
 import Disco.AST.Core
 import Disco.AST.Generic (Side (..))
 import Disco.Context as Ctx
+import Disco.Effects.LFresh
 import Disco.Error
 import Disco.Names
 import Disco.Pretty
 import Disco.Syntax.Operators (BOp (Add, Mul))
 import Disco.Types
-
-import Disco.Effects.LFresh
 import Polysemy
 import Polysemy.Input
 import Polysemy.Reader
 import Polysemy.State
-import Unbound.Generics.LocallyNameless (Name)
-
 import System.Random (StdGen)
+import Unbound.Generics.LocallyNameless (Name)
+import Prelude hiding (Foldable (..), (<>))
+import qualified Prelude as P
 
 ------------------------------------------------------------
 -- Value type

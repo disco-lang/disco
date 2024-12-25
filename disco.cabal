@@ -12,7 +12,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC ==9.4.8 || ==9.6.5 || ==9.8.2
+tested-with:         GHC ==9.4.8 || ==9.6.6 || ==9.8.4 || ==9.10.1
 
 data-dir:            lib
 
@@ -469,7 +469,7 @@ library
 
   autogen-modules:     Paths_disco
 
-  build-depends:       base >=4.8 && <4.20,
+  build-depends:       base >=4.8 && <4.21,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.4,

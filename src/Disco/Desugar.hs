@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+{-# OPTIONS_GHC -fno-warn-x-data-list-nonempty-unzip #-}
 
 {-# HLINT ignore "Functor law" #-}
 

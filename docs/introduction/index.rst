@@ -24,3 +24,10 @@ more detail on some particular topic.
    variables
    arithmetic
    functions
+   booleans
+   number-theory
+   pairs
+   sets
+   lists
+   polymorphism
+   algebraic

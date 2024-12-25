@@ -44,7 +44,6 @@ import Disco.Syntax.Prims
 import Disco.Typecheck (containerTy)
 import Disco.Types
 import Polysemy (Member, Sem, run)
-import Prelude hiding (unzip)
 import Unbound.Generics.LocallyNameless (
   Bind,
   Name,
@@ -56,6 +55,7 @@ import Unbound.Generics.LocallyNameless (
   unrebind,
  )
 import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
+import Prelude hiding (unzip)
 
 ------------------------------------------------------------
 -- Running desugaring computations

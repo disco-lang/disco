@@ -8,7 +8,7 @@ through a series of short lessons with exercises, introducing the
 
 .. _`Disco language`: https://github.com/disco-lang/disco/#readme
 
-**The Gentle Introduction is currently (Spring 2024) under construction,
+**The Gentle Introduction is currently (Spring 2025) under construction,
 check back later for more!**
 
 Note that the gentle introduction contains many links to the

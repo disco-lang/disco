@@ -8,14 +8,16 @@ deeper into the arithmetic operations supported by Disco.
 Addition and multiplication
 ---------------------------
 
-The most basic arithmetic operations Disco supports are addition and
-multiplication.
+The most basic arithmetic operations Disco supports are :doc:`addition
+</reference/addition>` and :doc:`multiplication
+</reference/multiplication>`.
 
 - Addition is written using ``+``, for example, ``3 + 5 + 2/3``.
 - Multiplication is written using ``*``, for example, ``(-2) * 6 *
   (1/3)``.
-- The multiplication sign can also sometimes be omitted, just like in
-  standard mathematical notation.  For example:
+- The multiplication sign can also :doc:`sometimes
+  </reference/multiplication>` be omitted, just like in standard
+  mathematical notation.  For example:
 
   ::
 
@@ -30,7 +32,7 @@ multiplication.
      Disco> (1 + 3)(5 - 2)  -- means the same as above
      12
 
-All the number types (:doc:`natural numbers </reference/natural>`
+All the numeric types (:doc:`natural numbers </reference/natural>`
 ``N``, :doc:`integers </reference/integer>` ``Z``, :doc:`fractional
 numbers </reference/fraction>` ``F``, and :doc:`rational numbers
 </reference/rational>` ``Q``) support both addition and
@@ -79,8 +81,8 @@ Of course, Disco has many more operators than we have seen so far
 (almost 30 in total), but you do not need to memorize the precedence
 (*i.e.* order of operations) for all the operators!  You can use the
 ``:doc`` command to see information about an operator, including its
-precedence level.  For example, let's check out the documentation for
-``+``:
+precedence level.  For example, let's check out the
+:doc:`documentation </reference/docs>` for ``+``:
 
 ::
 

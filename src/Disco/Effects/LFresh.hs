@@ -43,7 +43,7 @@ runLFresh' =
       let s = name2String nm
       used <- ask
       let ok n = S.notMember (AnyName n) used
-      pureT $ iterUntil (+1) (gate ok . makeName s) 0
+      pureT $ iterUntil (+ 1) (gate ok . makeName s) 0
     Avoid names m -> do
       m' <- runT m
       raise (subsume (runLFresh' (local (S.union (S.fromList names)) m')))

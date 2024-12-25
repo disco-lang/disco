@@ -361,7 +361,6 @@ compilePrim _ PrimUntil = return $ CConst OUntil
 compilePrim _ PrimHolds = return $ CConst OHolds
 compilePrim _ PrimLookupSeq = return $ CConst OLookupSeq
 compilePrim _ PrimExtendSeq = return $ CConst OExtendSeq
-
 compilePrim ty PrimMin = desugaredPrimErr PrimMin ty
 compilePrim ty PrimMax = desugaredPrimErr PrimMax ty
 

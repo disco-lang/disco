@@ -10,6 +10,8 @@
 -- Miscellaneous utilities.
 module Disco.Util where
 
+import Control.Applicative (Alternative)
+import Control.Monad (guard)
 import Data.Bifunctor (bimap)
 import Data.List.NonEmpty (NonEmpty)
 import Data.List.NonEmpty qualified as NE
@@ -62,3 +64,16 @@ partitionEithersNE = foldr1 combine . NE.map (bimap NE.singleton (([],) . NE.sin
   combine (Left as1) (Right (as2, bs)) = Right (NE.toList as1 ++ as2, bs)
   combine (Right (as1, bs)) (Left as2) = Right (as1 ++ NE.toList as2, bs)
   combine (Right (as1, bs1)) (Right (as2, bs2)) = Right (as1 ++ as2, NE.append bs1 bs2)
+
+-- | Iterate a function until finding the first value that satisfies
+--   the given predicate.  @iterUntil f p@ is equivalent to @head
+--   . filter p . iterate f@ but does not trigger a partiality
+--   warning.
+iterUntil :: (a -> a) -> (a -> Maybe b) -> a -> b
+iterUntil f p a = case p a of
+  Just b -> b
+  _ -> iterUntil f p (f a)
+
+-- | Allow a value through only if it satisfies the given predicate.
+gate :: Alternative f => (a -> Bool) -> a -> f a
+gate p a = a <$ guard (p a)

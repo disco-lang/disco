@@ -2,10 +2,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Effects.LFresh
 -- Copyright   :  disco team and contributors
@@ -20,6 +16,7 @@ module Disco.Effects.LFresh where
 import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Typeable (Typeable)
+import Disco.Util (gate, iterUntil)
 import Polysemy
 import Polysemy.ConstraintAbsorber
 import Polysemy.Reader
@@ -45,12 +42,8 @@ runLFresh' =
     Lfresh nm -> do
       let s = name2String nm
       used <- ask
-      pureT $
-        head
-          ( filter
-              (\x -> not (S.member (AnyName x) used))
-              (map (makeName s) [0 ..])
-          )
+      let ok n = S.notMember (AnyName n) used
+      pureT $ iterUntil (+1) (gate ok . makeName s) 0
     Avoid names m -> do
       m' <- runT m
       raise (subsume (runLFresh' (local (S.union (S.fromList names)) m')))

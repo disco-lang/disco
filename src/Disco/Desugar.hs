@@ -197,10 +197,11 @@ desugarAbs :: Member Fresh r => Quantifier -> Type -> NonEmpty Clause -> Sem r D
 -- Special case for compiling a single lambda with no pattern matching directly to a lambda
 desugarAbs Lam ty (cl@(unsafeUnbind -> ([APVar _ _], _)) :| []) = do
   (ps, at) <- unbind cl
-  d <- desugarTerm at
-  return $ DTAbs Lam ty (bind (getVar (head ps)) d)
- where
-  getVar (APVar _ x) = coerce x
+  case ps of
+    [APVar _ x] -> do
+      d <- desugarTerm at
+      return $ DTAbs Lam ty (bind (coerce x) d)
+    _ -> error "desugarAbs: impossible: ps must be a singleton APVar"
 -- General case
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body

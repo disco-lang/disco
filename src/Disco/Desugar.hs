@@ -29,6 +29,7 @@ where
 import Control.Monad (zipWithM)
 import Data.Bool (bool)
 import Data.Coerce
+import Data.Functor (unzip)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe, isJust)
@@ -43,6 +44,7 @@ import Disco.Syntax.Prims
 import Disco.Typecheck (containerTy)
 import Disco.Types
 import Polysemy (Member, Sem, run)
+import Prelude hiding (unzip)
 import Unbound.Generics.LocallyNameless (
   Bind,
   Name,
@@ -203,16 +205,16 @@ desugarAbs Lam ty (cl@(unsafeUnbind -> ([APVar _ _], _)) :| []) = do
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
   let (pats, bodies) = unzip clausePairs
-  let patTys = map getType (head pats)
-  let bodyTy = getType (head bodies)
+  let patTys = map getType (NE.head pats)
+  let bodyTy = getType (NE.head bodies)
 
   -- generate dummy variables for lambdas
-  args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
+  args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (NE.head pats) [0 :: Int ..]
 
   -- Create lambdas and one big case.  Recursively desugar the case to
   -- deal with arithmetic patterns.
-  let branches = zipWith (mkBranch (zip args patTys)) bodies pats
-  dcase <- desugarTerm $ ATCase bodyTy branches
+  let branches = NE.zipWith (mkBranch (zip args patTys)) bodies pats
+  dcase <- desugarTerm $ ATCase bodyTy (NE.toList branches)
   return $ mkAbs quant overallTy patTys (coerce args) dcase
  where
   mkBranch :: [(Name ATerm, Type)] -> ATerm -> [APattern] -> ABranch
@@ -225,11 +227,11 @@ desugarAbs quant overallTy body = do
   -- with the same quantifier when there's only a single clause. That
   -- way, we generate a chain of abstractions followed by a case, instead
   -- of a bunch of alternating abstractions and cases.
-  unbindClauses :: Member Fresh r => NonEmpty Clause -> Sem r [([APattern], ATerm)]
+  unbindClauses :: Member Fresh r => NonEmpty Clause -> Sem r (NonEmpty ([APattern], ATerm))
   unbindClauses (c :| []) | quant `elem` [All, Ex] = do
     (ps, t) <- liftClause c
-    return [(ps, addDbgInfo ps t)]
-  unbindClauses cs = mapM unbind (NE.toList cs)
+    return ((ps, addDbgInfo ps t) :| [])
+  unbindClauses cs = mapM unbind cs
 
   liftClause :: Member Fresh r => Bind [APattern] ATerm -> Sem r ([APattern], ATerm)
   liftClause c =

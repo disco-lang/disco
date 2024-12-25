@@ -58,7 +58,8 @@ the same function:
    double : N -> N
    double(flerb) = 2 * flerb
 
-(Here we also used an explicit :doc:`multiplication <arithmetic>`
+(Here we also used an explicit :ref:`multiplication
+<introduction/arithmetic:addition and multiplication>`
 operator ``*``, but writing ``2flerb`` or ``2 flerb`` would work too.)
 
 Function application

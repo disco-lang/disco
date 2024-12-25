@@ -132,8 +132,8 @@ has a *higher* precedence (8) than addition:
 The higher precedence level of ``*`` is how Disco knows that it should
 come before (*i.e.* have parentheses put around it before) addition.
 
-Exercises
----------
+Precedence exercises
+--------------------
 
 * What is the precedence level of subtraction, and how does it compare
   to the precedence levels of addition and multiplication?  Does this
@@ -258,3 +258,7 @@ Note that exponentiation can handle exponents which are zero or negative.
 
 The type of exponentiation is somewhat complex, but it is not
 too important to understand at the moment.
+
+.. admonition:: To be written
+
+   * Exercises

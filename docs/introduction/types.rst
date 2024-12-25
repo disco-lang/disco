@@ -144,22 +144,6 @@ This automatic conversion is called :doc:`subtyping
 </reference/subtypes>`.  We will discuss it in more depth later; for
 now it mostly won't make much difference.
 
-Exercises
----------
-
-What **type** will Disco give to each of the following expressions?
-(You do not have to predict their value.)  Make a prediction, then
-use the ``:type`` command to see if you were right.
-
-- ``1``
-- ``777``
-- ``-2``
-- ``0``
-- ``1 + 99``
-- ``(-1) + 99``
-- ``1 + (-99)``
-- ``19 - 6``
-
 Fractional and Rational numbers
 -------------------------------
 
@@ -206,6 +190,14 @@ What **type** do you think Disco will give to each of the following
 expressions?  (You do not have to predict their value.)  Make a
 prediction, then use the ``:type`` command to see if you were right.
 
+- ``1``
+- ``777``
+- ``-2``
+- ``0``
+- ``1 + 99``
+- ``(-1) + 99``
+- ``1 + (-99)``
+- ``19 - 6``
 - ``2 / 3``
 - ``5 / (-6)``
 - ``(-5)``

@@ -135,7 +135,7 @@ docMap =
     , PrimKey (PrimBOp CartProd)
         ==> "Cartesian product, i.e. the collection of all pairs.  Also works on bags and sets."
         ==> [mkRef "cp", mkRef "symbols"]
-    , PrimKey (PrimPower)
+    , PrimKey PrimPower
         ==> "Power set, i.e. the set of all subsets.  Also works on bags."
         ==> [mkRef "power"]
     , PrimKey (PrimBOp Union)

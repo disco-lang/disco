@@ -1,9 +1,5 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Enumerate
 -- Copyright   :  disco team and contributors
@@ -63,39 +59,30 @@ enumBool = E.mapE toV fromV $ E.finiteList [L, R]
   fromV (VInj i VUnit) = i
   fromV _ = error "enumBool.fromV: value isn't a bool"
 
--- | Unsafely extract the numeric value of a @Value@
---   (assumed to be a VNum).
-valToRat :: Value -> Rational
-valToRat (VNum _ r) = r
-valToRat _ = error "valToRat: value isn't a number"
-
-ratToVal :: Rational -> Value
-ratToVal = VNum mempty
-
 -- | Enumerate all values of type @Nat@ (0, 1, 2, ...).
 enumN :: ValueEnumeration
-enumN = E.mapE (ratToVal . fromInteger) (floor . valToRat) E.nat
+enumN = E.mapE (ratv . fromInteger) (floor . vrat) E.nat
 
 -- | Enumerate all values of type @Integer@ (0, 1, -1, 2, -2, ...).
 enumZ :: ValueEnumeration
-enumZ = E.mapE (ratToVal . fromInteger) (floor . valToRat) E.int
+enumZ = E.mapE (ratv . fromInteger) (floor . vrat) E.int
 
 -- | Enumerate all values of type @Fractional@ in the Calkin-Wilf
 --   order (1, 1/2, 2, 1/3, 3/2, 2/3, 3, ...).
 enumF :: ValueEnumeration
-enumF = E.mapE ratToVal valToRat E.cw
+enumF = E.mapE ratv vrat E.cw
 
 -- | Enumerate all values of type @Rational@ in the Calkin-Wilf order,
 --   with negatives interleaved (0, 1, -1, 1/2, -1/2, 2, -2, ...).
 enumQ :: ValueEnumeration
-enumQ = E.mapE ratToVal valToRat E.rat
+enumQ = E.mapE ratv vrat E.rat
 
 -- | Enumerate all Unicode characters.
 enumC :: ValueEnumeration
 enumC = E.mapE toV fromV (E.boundedEnum @Char)
  where
-  toV = ratToVal . fromIntegral . fromEnum
-  fromV = toEnum . floor . valToRat
+  toV = ratv . fromIntegral . fromEnum
+  fromV = toEnum . floor . vrat
 
 -- | Enumerate all *finite* sets over a certain element type, given an
 --   enumeration of the elements.  If we think of each finite set as a

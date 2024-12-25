@@ -15,7 +15,6 @@
 -- language for Disco.
 module Disco.AST.Core (
   -- * Core AST
-  RationalDisplay (..),
   ShouldMemo (..),
   Core (..),
   Op (..),
@@ -44,25 +43,6 @@ import Disco.Names (QName)
 import Disco.Pretty
 import Disco.Types
 
--- | A type of flags specifying whether to display a rational number
---   as a fraction or a decimal.
-data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic, Data, Ord, Alpha)
-
-instance Semigroup RationalDisplay where
-  Decimal <> _ = Decimal
-  _ <> Decimal = Decimal
-  _ <> _ = Fraction
-
--- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
---   idea that the result should be displayed as a decimal if any
---   decimal literals are used in the input; otherwise, the default is
---   to display as a fraction.  So the identity element is 'Fraction',
---   and 'Decimal' always wins when combining.
-instance Monoid RationalDisplay where
-  mempty = Fraction
-  mappend = (P.<>)
-
 data ShouldMemo = Memo | NoMemo deriving (Show, Generic, Data, Alpha)
 
 -- | AST for the desugared, untyped core language.
@@ -70,7 +50,7 @@ data Core where
   -- | A variable.
   CVar :: QName Core -> Core
   -- | A rational number.
-  CNum :: RationalDisplay -> Rational -> Core
+  CNum :: Rational -> Core
   -- | A built-in constant.
   CConst :: Op -> Core
   -- | An injection into a sum type, i.e. a value together with a tag
@@ -283,7 +263,7 @@ substsQC xs = transform $ \case
 instance Pretty Core where
   pretty = \case
     CVar qn -> pretty qn
-    CNum _ r
+    CNum r
       | denominator r == 1 -> text (show (numerator r))
       | otherwise -> text (show (numerator r)) <> "/" <> text (show (denominator r))
     CApp (CConst op) (CPair c1 c2)

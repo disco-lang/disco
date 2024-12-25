@@ -64,14 +64,17 @@ https://disco-lang.readthedocs.io/en/latest/reference/logic-ops.html
 
 The type of natural numbers: 0, 1, 2, ...
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/natural.html
 
 The type of natural numbers: 0, 1, 2, ...
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/natural.html
 
 The type of rational numbers p/q.
 
+https://disco-lang.readthedocs.io/en/latest/introduction/types.html
 https://disco-lang.readthedocs.io/en/latest/reference/rational.html
 
 append : List(a) × List(a) → List(a)

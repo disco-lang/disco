@@ -65,40 +65,40 @@ docMap =
       [mkIntro "arithmetic", mkRef "subtraction"]
     , PrimKey (PrimBOp SSub) ==>
       "The difference of two numbers, with a lower bound of 0." ==>
-      [mkRef "subtraction"]
+      [mkIntro "arithmetic", mkRef "subtraction"]
     , PrimKey (PrimBOp Mul) ==>
       "The product of two numbers, types, or graphs." ==>
-      [mkRef "multiplication"]
+      [mkIntro "arithmetic", mkRef "multiplication"]
     , PrimKey (PrimBOp Div) ==>
       "Divide two numbers." ==>
-      [mkRef "division"]
+      [mkIntro "arithmetic", mkRef "division"]
     , PrimKey (PrimBOp IDiv) ==>
       "The integer quotient of two numbers, rounded down." ==>
-      [mkRef "integerdiv"]
+      [mkIntro "arithmetic", mkRef "integerdiv"]
     , PrimKey (PrimBOp Mod) ==>
       "a mod b is the remainder when a is divided by b." ==>
       [mkRef "mod"]
     , PrimKey (PrimBOp Exp) ==>
       "Exponentiation.  a ^ b is a raised to the b power." ==>
-      [mkRef "exponentiation"]
+      [mkIntro "arithmetic", mkRef "exponentiation"]
     , PrimKey (PrimUOp Fact) ==>
       "n! computes the factorial of n, that is, 1 * 2 * ... * n." ==>
       [mkRef "factorial"]
-    , PrimKey (PrimFloor) ==>
+    , PrimKey PrimFloor ==>
       "floor(x) is the largest integer which is <= x." ==>
-      [mkRef "round"]
-    , PrimKey (PrimCeil) ==>
+      [mkIntro "arithmetic", mkRef "round"]
+    , PrimKey PrimCeil ==>
       "ceiling(x) is the smallest integer which is >= x." ==>
-      [mkRef "round"]
-    , PrimKey (PrimAbs) ==>
-      "abs(x) is the absolute value of x.  Also written |x|." ==>
-      [mkRef "abs"]
-    , PrimKey (PrimMin) ==>
+      [mkIntro "arithmetic", mkRef "round"]
+    , PrimKey PrimAbs ==>
+      "abs(x) is the absolute value of x." ==>
+      [mkIntro "arithmetic", mkRef "abs"]
+    , PrimKey PrimMin ==>
       "min(x,y) is the minimum of x and y, i.e. whichever is smaller." ==>
-      []
-    , PrimKey (PrimMax) ==>
+      [mkRef "compare"]
+    , PrimKey PrimMax ==>
       "max(x,y) is the maximum of x and y, i.e. whichever is larger." ==>
-      []
+      [mkRef "compare"]
     , PrimKey (PrimUOp Not) ==>
       "Logical negation: not(T) = F and not(F) = T." ==>
       [mkRef "logic-ops"]
@@ -149,49 +149,49 @@ docMap =
       [mkRef "set-ops"]
     , OtherKey "N" ==>
       docN ==>
-      [mkRef "natural"]
+      [mkIntro "types", mkRef "natural"]
     , OtherKey "ℕ" ==>
       docN ==>
-      [mkRef "natural"]
+      [mkIntro "types", mkRef "natural"]
     , OtherKey "Nat" ==>
       docN ==>
-      [mkRef "natural"]
+      [mkIntro "types", mkRef "natural"]
     , OtherKey "Natural" ==>
       docN ==>
-      [mkRef "natural"]
+      [mkIntro "types", mkRef "natural"]
     , OtherKey "Z" ==>
       docZ ==>
-      [mkRef "integer"]
+      [mkIntro "types", mkRef "integer"]
     , OtherKey "ℤ" ==>
       docZ ==>
-      [mkRef "integer"]
+      [mkIntro "types", mkRef "integer"]
     , OtherKey "Int" ==>
       docZ ==>
-      [mkRef "integer"]
+      [mkIntro "types", mkRef "integer"]
     , OtherKey "Integer" ==>
       docZ ==>
-      [mkRef "integer"]
+      [mkIntro "types", mkRef "integer"]
     , OtherKey "F" ==>
       docF ==>
-      [mkRef "fraction"]
+      [mkIntro "types", mkRef "fraction"]
     , OtherKey "𝔽" ==>
       docF ==>
-      [mkRef "fraction"]
+      [mkIntro "types", mkRef "fraction"]
     , OtherKey "Frac" ==>
       docF ==>
-      [mkRef "fraction"]
+      [mkIntro "types", mkRef "fraction"]
     , OtherKey "Fractional" ==>
       docF ==>
-      [mkRef "fraction"]
+      [mkIntro "types", mkRef "fraction"]
     , OtherKey "Q" ==>
       docQ ==>
-      [mkRef "rational"]
+      [mkIntro "types", mkRef "rational"]
     , OtherKey "ℚ" ==>
       docQ ==>
-      [mkRef "rational"]
+      [mkIntro "types", mkRef "rational"]
     , OtherKey "Rational" ==>
       docQ ==>
-      [mkRef "rational"]
+      [mkIntro "types", mkRef "rational"]
     , OtherKey "Bool" ==>
       docB ==>
       [mkRef "bool"]
@@ -209,7 +209,7 @@ docMap =
       [mkRef "set"]
     , OtherKey "|~|" ==>
       "Absolute value, or the size of a collection." ==>
-      [mkRef "size"]
+      [mkIntro "arithmetic", mkRef "size"]
     , OtherKey "{?" ==>
       "{? ... ?} is a case expression, for choosing a result based on conditions." ==>
       [mkRef "case"]

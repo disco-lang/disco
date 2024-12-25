@@ -73,7 +73,7 @@ import Disco.Pretty qualified as PP
 import Disco.Property (prettyTestResult)
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims (
-  Prim (PrimBOp, PrimUOp),
+  Prim (PrimBOp, PrimUOp, PrimFloor, PrimCeil, PrimAbs),
   toPrim,
  )
 import Disco.Typecheck
@@ -464,20 +464,26 @@ handleDocPrim ::
   Sem r ()
 handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  info
-    . vcat
-    $ ( case prim of
-          PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
-           where
-            OpInfo (UOpF f _) syns _ = uopMap ! u
-          PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
-          _ -> []
-      )
-      ++ ( case prim of
-            PrimUOp u -> [describePrec (uPrec u)]
-            PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+  let attrs =
+        ( case prim of
+            PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
+             where
+              OpInfo (UOpF f _) syns _ = uopMap ! u
+            PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
+            PrimFloor -> describeAlts False False ["floor(x)", "⌊x⌋"]
+            PrimCeil -> describeAlts False False ["ceiling(x)", "⌈x⌉"]
+            PrimAbs -> describeAlts False False ["abs(x)", "|x|"]
             _ -> []
-         )
+        )
+        ++ ( case prim of
+              PrimUOp u -> [describePrec (uPrec u)]
+              PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+              _ -> []
+           )
+  case attrs of
+    [] -> pure ()
+    _ -> info . vcat $ attrs
+  info PP.empty
   handleDocMap (PrimKey prim)
  where
   describePrec p = "precedence level" <+> text (show p)
@@ -511,8 +517,6 @@ handleDocMap k = case M.lookup k docMap of
     OtherKey s -> info $ "No documentation found for '" <> text s <> "'."
   Just (d, refs) ->
     info . vcat $
-      case k of { PrimKey {} -> [PP.empty]; _ -> [] }
-      ++
       [ text d
       , PP.empty
       ]

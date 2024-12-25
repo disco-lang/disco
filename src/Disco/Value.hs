@@ -45,6 +45,7 @@ module Disco.Value (
   TestVars (..),
   TestEnv (..),
   emptyTestEnv,
+  mergeTestEnv,
   getTestEnv,
   extendPropEnv,
   extendResultEnv,
@@ -81,8 +82,10 @@ import Control.Monad (forM)
 import Data.Bifunctor (first)
 import Data.Char (chr, ord)
 import Data.Foldable (Foldable (..))
+import Data.Function (on)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
+import Data.List (nubBy)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
@@ -310,6 +313,11 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
+
+mergeTestEnv :: TestEnv -> TestEnv -> TestEnv
+mergeTestEnv (TestEnv e1) (TestEnv e2) = TestEnv (nubBy ((==) `on` fst3) (e1 P.<> e2))
+  where
+    fst3 (a,_,_) = a
 
 getTestEnv :: TestVars -> Env -> Either EvalError TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do

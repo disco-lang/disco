@@ -1,10 +1,11 @@
 Loading higher-order.disco...
 Loaded.
-  - Possibly true: ∀x. x =!= 0 \/ (∃n. n * x >= 1)
+  - Possibly true: ∀x. x == 0 \/ (∃n. n * x >= 1)
     Checked 100 possibilities without finding a counterexample.
-  - Certainly true: ∀f. any([∀x. f(x) =!= not x, ∀x. f(x) =!= x, ∀x. f(x) =!= F, ∀x. f(x) =!= T])
+  - Certainly true: ∀f. any([∀x. f(x) == not x, ∀x. f(x) == x, ∀x. f(x) == F, ∀x. f(x) == T])
     No counterexamples exist; all possible values were checked.
   - Certainly false: all([T, T, T, F, T])
   - Certainly true: ∃k. hasFactors(2 ^ k + 1)
     Found example:
       k = 3
+      n = 3

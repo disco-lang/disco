@@ -761,8 +761,9 @@ ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _ = error "ensureProp: non-prop value"
 
-combineTestResultBool :: LOp -> TestResult -> TestResult -> Bool
-combineTestResultBool op (TestResult b1 _ _) (TestResult b2 _ _) = interpLOp op b1 b2
+combineTestResults :: LOp -> TestResult -> TestResult -> TestResult
+combineTestResults op tr1@(TestResult b1 _ e1) tr2@(TestResult b2 _ e2) =
+  TestResult (interpLOp op b1 b2) (TestBin op tr1 tr2) (mergeTestEnv e1 e2)
 
 testProperty ::
   Members '[Random, State Mem] r =>
@@ -779,7 +780,7 @@ testProperty initialSt = checkProp . ensureProp
   checkProp (VPBin op vp1 vp2) = do
     tr1 <- checkProp vp1
     tr2 <- checkProp vp2
-    return $ TestResult (combineTestResultBool op tr1 tr2) (TestBin op tr1 tr2) emptyTestEnv
+    return $ combineTestResults op tr1 tr2
   checkProp (VPSearch sm tys f e) =
     extendResultEnv e <$> (generateSamples initialSt vals >>= go)
    where

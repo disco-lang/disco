@@ -13,3 +13,4 @@ then go through each of the available standard libraries.
    prop-lib
    string-lib
    prim-lib
+   oeis-lib

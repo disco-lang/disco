@@ -537,11 +537,11 @@ test-suite disco-tests
   hs-source-dirs: test
   ghc-options: -threaded
   build-tool-depends: disco:disco
-  build-depends:    base >= 4.7 && < 4.20,
+  build-depends:    base >= 4.7 && < 4.21,
                     tasty >= 0.10 && < 1.6,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
-                    filepath >= 1.4 && < 1.5,
+                    filepath >= 1.4 && < 1.6,
                     process >= 1.4 && < 1.7,
                     bytestring >= 0.9 && < 0.13,
                     disco
@@ -554,8 +554,8 @@ test-suite disco-examples
   hs-source-dirs: example
   ghc-options: -threaded
   build-tool-depends: disco:disco
-  build-depends:    base >= 4.7 && < 4.20,
+  build-depends:    base >= 4.7 && < 4.21,
                     directory >= 1.2 && < 1.4,
-                    filepath >= 1.4 && < 1.5,
+                    filepath >= 1.4 && < 1.6,
                     process >= 1.4 && < 1.7
   default-language: Haskell2010

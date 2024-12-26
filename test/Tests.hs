@@ -1,43 +1,47 @@
 module Main where
 
-import           Control.Monad              (filterM)
-import qualified Data.ByteString            as BS
-import           Data.Function              (on)
-import           Data.List                  (groupBy, sort)
-import           System.Directory           (doesFileExist,
-                                             getDirectoryContents)
-import           System.FilePath            (isPathSeparator, (</>))
-import           System.IO                  (hGetContents)
-import           System.Process             (StdStream (CreatePipe),
-                                             createProcess, shell, std_out,
-                                             system)
-import           Text.Printf
-
-import           Test.Tasty
-import           Test.Tasty.Golden.Advanced
+import Control.Monad (filterM)
+import qualified Data.ByteString as BS
+import Data.Function (on)
+import Data.List (sort)
+import qualified Data.List.NonEmpty as NE
+import System.Directory (
+  doesFileExist,
+  getDirectoryContents,
+ )
+import System.FilePath (isPathSeparator, (</>))
+import System.IO (hGetContents)
+import System.Process (
+  StdStream (CreatePipe),
+  createProcess,
+  shell,
+  std_out,
+  system,
+ )
+import Test.Tasty
+import Test.Tasty.Golden.Advanced
+import Text.Printf
 
 main :: IO ()
 main = do
-  testDirs <- getDirectoryContents "test"
-    >>= filterM (doesFileExist . (\d -> ("test" </> d </> "input")))
-  let testDirs'
-        = groupBy ((==) `on` extractGroup)
-        . sort
-        . filter (\f -> f /= "." && f /= "..")
-        $ testDirs
+  testDirs <-
+    getDirectoryContents "test"
+      >>= filterM (doesFileExist . (\d -> ("test" </> d </> "input")))
+  let testDirs' =
+        NE.groupBy ((==) `on` extractGroup)
+          . sort
+          . filter (\f -> f /= "." && f /= "..")
+          $ testDirs
   let testTree = testGroup "disco" $ map mkGroup testDirs'
   defaultMain testTree
-  where
-    mkGroup ds = testGroup (extractGroup (head ds)) $ map mkGolden ds
-      -- (head ds) is safe since mkGroup is called on testDirs', which
-      -- is the output of groupBy, so each element of testDirs' will
-      -- be a non-empty list.
+ where
+  mkGroup ds = testGroup (extractGroup (NE.head ds)) $ map mkGolden (NE.toList ds)
 
 extractGroup :: FilePath -> String
-extractGroup = takeWhile (/='-')
+extractGroup = takeWhile (/= '-')
 
 extractName :: FilePath -> String
-extractName = takeWhile (not . isPathSeparator) . drop 1 . dropWhile (/='-')
+extractName = takeWhile (not . isPathSeparator) . drop 1 . dropWhile (/= '-')
 
 mkGolden :: FilePath -> TestTree
 mkGolden relDir =
@@ -46,18 +50,23 @@ mkGolden relDir =
     (dir </> "expected")
     (dir </> "output")
     (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")) >> return ())
-  where
-    dir = "test" </> relDir
+ where
+  dir = "test" </> relDir
 
 -- | A variant of goldenVsFile that prints the result of @diff@ if
 --   the files are different, so we don't have to manually call @diff@
 --   every time there is a test failure.
-goldenVsFileWithDiff
-  :: TestName -- ^ test name
-  -> FilePath -- ^ path to the «golden» file (the file that contains correct output)
-  -> FilePath -- ^ path to the output file
-  -> IO ()    -- ^ action that creates the output file
-  -> TestTree -- ^ the test verifies that the output file contents is the same as the golden file contents
+goldenVsFileWithDiff ::
+  -- | test name
+  TestName ->
+  -- | path to the «golden» file (the file that contains correct output)
+  FilePath ->
+  -- | path to the output file
+  FilePath ->
+  -- | action that creates the output file
+  IO () ->
+  -- | the test verifies that the output file contents is the same as the golden file contents
+  TestTree
 goldenVsFileWithDiff name ref new act =
   goldenTest
     name
@@ -65,7 +74,7 @@ goldenVsFileWithDiff name ref new act =
     (act >> BS.readFile new)
     cmp
     upd
-  where
+ where
   cmp = cmpWithDiff ref new
   upd = BS.writeFile ref
 
@@ -74,10 +83,12 @@ cmpWithDiff f1 f2 x y = do
   if x == y
     then return Nothing
     else do
-      (_, Just hout, _, _)
-        <- createProcess (shell $ printf "diff %s %s" f1 f2) { std_out = CreatePipe }
+      (_, Just hout, _, _) <-
+        createProcess (shell $ printf "diff %s %s" f1 f2) {std_out = CreatePipe}
       diffStr <- hGetContents hout
-      return $ Just $ unlines
-        [ printf "Files '%s' and '%s' differ:" f1 f2
-        , diffStr
-        ]
+      return $
+        Just $
+          unlines
+            [ printf "Files '%s' and '%s' differ:" f1 f2
+            , diffStr
+            ]

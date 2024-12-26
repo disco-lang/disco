@@ -32,6 +32,7 @@ import qualified Data.List.Infinite as InfList
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Ratio
+import qualified Data.Text as T
 import Disco.AST.Core
 import Disco.AST.Generic (
   Ellipsis (..),
@@ -41,6 +42,8 @@ import Disco.AST.Generic (
 import Disco.AST.Typed (AProperty)
 import Disco.Compile
 import Disco.Context as Ctx
+import Disco.Effects.Fresh
+import Disco.Effects.Input
 import Disco.Enumerate
 import Disco.Error
 import Disco.Names
@@ -51,15 +54,12 @@ import Math.Combinatorics.Exact.Binomial (choose)
 import Math.Combinatorics.Exact.Factorial (factorial)
 import Math.NumberTheory.Primes (factorise, unPrime)
 import Math.NumberTheory.Primes.Testing (isPrime)
-
--- import Math.OEIS (
---   catalogNums,
---   extendSequence,
---   lookupSequence,
---  )
-
-import Disco.Effects.Fresh
-import Disco.Effects.Input
+import Math.OEIS (
+  SearchStatus (SubSeq),
+  extendSeq,
+  lookupSeq,
+  number,
+ )
 import Polysemy
 import Polysemy.Error
 import Polysemy.Random
@@ -356,8 +356,8 @@ appConst k = \case
   -- Sequences
 
   OUntil -> arity2 $ \v1 -> out . ellipsis (Until v1)
-  -- OLookupSeq -> out . oeisLookup
-  -- OExtendSeq -> out . oeisExtend
+  OLookupSeq -> out . oeisLookup
+  OExtendSeq -> out . oeisExtend
   --------------------------------------------------
   -- Comparison
 
@@ -639,23 +639,19 @@ constdiff (x : xs)
 -- OEIS
 ------------------------------------------------------------
 
--- -- | Looks up a sequence of integers in OEIS.
--- --   Returns 'left()' if the sequence is unknown in OEIS,
--- --   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
--- oeisLookup :: Value -> Value
--- oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSequence ns)
---  where
---   parseResult r = VInj R (listv charv ("https://oeis.org/" ++ seqNum r))
---   seqNum = getCatalogNum . catalogNums
+-- | Looks up a sequence of integers in OEIS.
+--   Returns 'left()' if the sequence is unknown in OEIS,
+--   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
+oeisLookup :: Value -> Value
+oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSeq (SubSeq ns))
+ where
+  parseResult r = VInj R (listv charv ("https://oeis.org/" ++ T.unpack (number r)))
 
---   getCatalogNum [] = error "No catalog info"
---   getCatalogNum (n : _) = n
-
--- -- | Extends a Disco integer list with data from a known OEIS
--- --   sequence.  Returns a list of integers upon success, otherwise the
--- --   original list (unmodified).
--- oeisExtend :: Value -> Value
--- oeisExtend = listv intv . extendSequence . vlist vint
+-- | Extends a Disco integer list with data from a known OEIS
+--   sequence.  Returns a list of integers upon success, otherwise the
+--   original list (unmodified).
+oeisExtend :: Value -> Value
+oeisExtend = listv intv . extendSeq . vlist vint
 
 ------------------------------------------------------------
 -- Normalizing bags/sets

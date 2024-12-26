@@ -26,7 +26,7 @@ main :: IO ()
 main = do
   testDirs <-
     getDirectoryContents "test"
-      >>= filterM (doesFileExist . (\d -> ("test" </> d </> "input")))
+      >>= filterM (doesFileExist . (\d -> "test" </> d </> "input"))
   let testDirs' =
         NE.groupBy ((==) `on` extractGroup)
           . sort
@@ -49,7 +49,7 @@ mkGolden relDir =
     (extractName relDir)
     (dir </> "expected")
     (dir </> "output")
-    (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")) >> return ())
+    (Control.Monad.void (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output"))))
  where
   dir = "test" </> relDir
 

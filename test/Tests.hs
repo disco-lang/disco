@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad (filterM)
+import Control.Monad (filterM, void)
 import qualified Data.ByteString as BS
 import Data.Function (on)
 import Data.List (sort)
@@ -26,7 +26,7 @@ main :: IO ()
 main = do
   testDirs <-
     getDirectoryContents "test"
-      >>= filterM (doesFileExist . (\d -> ("test" </> d </> "input")))
+      >>= filterM (doesFileExist . (\d -> "test" </> d </> "input"))
   let testDirs' =
         NE.groupBy ((==) `on` extractGroup)
           . sort
@@ -49,7 +49,7 @@ mkGolden relDir =
     (extractName relDir)
     (dir </> "expected")
     (dir </> "output")
-    (system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")) >> return ())
+    (void $ system ("disco -f " ++ (dir </> "input") ++ " > " ++ (dir </> "output")))
  where
   dir = "test" </> relDir
 

@@ -316,8 +316,8 @@ emptyTestEnv = TestEnv []
 
 mergeTestEnv :: TestEnv -> TestEnv -> TestEnv
 mergeTestEnv (TestEnv e1) (TestEnv e2) = TestEnv (nubBy ((==) `on` fst3) (e1 P.<> e2))
-  where
-    fst3 (a,_,_) = a
+ where
+  fst3 (a, _, _) = a
 
 getTestEnv :: TestVars -> Env -> Either EvalError TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do

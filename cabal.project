@@ -1,0 +1,6 @@
+packages: .
+
+source-repository-package
+  type: git
+  location: https://github.com/Mesabloo/diagnose
+  tag: d3ffbb7f376ddc64f3f349fe3a6a8e49d405cde0

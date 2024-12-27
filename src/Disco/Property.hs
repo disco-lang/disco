@@ -91,7 +91,7 @@ prettyTestReason _ _ TestBool = empty
 prettyTestReason b (ATAbs _ _ body) (TestFound (TestResult b' r' env)) = do
   lunbind body $ \(_, p) ->
     prettyTestEnv ("Found " ++ if b then "example:" else "counterexample:") env
-    $+$ prettyTestReason b' p r'
+      $+$ prettyTestReason b' p r'
 prettyTestReason b _ (TestNotFound Exhaustive)
   | b = "No counterexamples exist; all possible values were checked."
   | otherwise = "No example exists; all possible values were checked."

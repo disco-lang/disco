@@ -27,20 +27,20 @@ where
 import Control.Lens.Plated
 import Data.Data (Data)
 import Data.Data.Lens (uniplate)
+import Data.Ratio
 import qualified Data.Set as S
+import Disco.AST.Generic (Side, selectSide)
+import Disco.Effects.LFresh
+import Disco.Names (QName)
+import Disco.Pretty
+import Disco.Syntax.Operators (BOp (..))
+import Disco.Types
 import GHC.Generics
+import Polysemy (Members, Sem)
+import Polysemy.Reader
 import Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
 import Prelude hiding ((<>))
 import qualified Prelude as P
-import Disco.Effects.LFresh
-import Polysemy (Members, Sem)
-import Polysemy.Reader
-import Data.Ratio
-import Disco.AST.Generic (Side, selectSide)
-import Disco.Syntax.Operators (BOp (..))
-import Disco.Names (QName)
-import Disco.Pretty
-import Disco.Types
 
 data ShouldMemo = Memo | NoMemo deriving (Show, Generic, Data, Alpha)
 

@@ -297,7 +297,6 @@ appConst k = \case
       | n == 0 = throw DivByZero
       | otherwise = return $ intv (numerator m `mod` numerator n)
   ODivides -> numOp2' (\m n -> return (boolv $ divides m n)) >=> out
-
   --------------------------------------------------
   -- Number theory
 

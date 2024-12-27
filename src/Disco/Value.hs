@@ -45,6 +45,7 @@ module Disco.Value (
   TestVars (..),
   TestEnv (..),
   emptyTestEnv,
+  mergeTestEnv,
   getTestEnv,
   extendPropEnv,
   extendResultEnv,
@@ -81,8 +82,10 @@ import Control.Monad (forM)
 import Data.Bifunctor (first)
 import Data.Char (chr, ord)
 import Data.Foldable (Foldable (..))
+import Data.Function (on)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
+import Data.List (nubBy)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
@@ -311,6 +314,11 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
+mergeTestEnv :: TestEnv -> TestEnv -> TestEnv
+mergeTestEnv (TestEnv e1) (TestEnv e2) = TestEnv (nubBy ((==) `on` fst3) (e1 P.<> e2))
+ where
+  fst3 (a, _, _) = a
+
 getTestEnv :: TestVars -> Env -> Either EvalError TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
@@ -335,12 +343,10 @@ interpLOp LImpl = (==>)
 data TestReason_ a
   = -- | The prop evaluated to a boolean.
     TestBool
-  | -- | The test was an equality test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestEqual Type a a
-  | -- | The test was a less than test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestLt Type a a
+  | -- | The test was a comparison. Records the comparison operator,
+    --   the values being compared, and also their type (which is
+    --   needed for printing).
+    TestCmp BOp Type a a
   | -- | The search didn't find any examples/counterexamples.
     TestNotFound SearchType
   | -- | The search found an example/counterexample.
@@ -379,8 +385,7 @@ testIsCertain (TestResult _ r _) = resultIsCertain r
 
 resultIsCertain :: TestReason -> Bool
 resultIsCertain TestBool = True
-resultIsCertain TestEqual {} = True
-resultIsCertain TestLt {} = True
+resultIsCertain TestCmp {} = True
 resultIsCertain (TestNotFound Exhaustive) = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r) = testIsCertain r

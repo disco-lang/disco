@@ -48,6 +48,7 @@ import Disco.Enumerate
 import Disco.Error
 import Disco.Names
 import Disco.Property
+import Disco.Syntax.Operators (BOp (..))
 import Disco.Types hiding (V)
 import Disco.Value
 import Math.Combinatorics.Exact.Binomial (choose)
@@ -296,11 +297,6 @@ appConst k = \case
       | n == 0 = throw DivByZero
       | otherwise = return $ intv (numerator m `mod` numerator n)
   ODivides -> numOp2' (\m n -> return (boolv $ divides m n)) >=> out
-   where
-    divides 0 0 = True
-    divides 0 _ = False
-    divides x y = denominator (y / x) == 1
-
   --------------------------------------------------
   -- Number theory
 
@@ -468,10 +464,8 @@ appConst k = \case
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv))
   OHolds -> testProperty Exhaustive >=> resultToBool >>> outWithErr
   ONotProp -> out . VProp . notProp . ensureProp
-  OShouldEq ty -> arity2 $ \v1 v2 ->
-    out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
-  OShouldLt ty -> arity2 $ \v1 v2 ->
-    out $ VProp (VPDone (TestResult (valLt v1 v2) (TestLt ty v1 v2) emptyTestEnv))
+  OShould op ty -> arity2 $ \v1 v2 ->
+    out $ VProp (VPDone (TestResult (valOp op v1 v2) (TestCmp op ty v1 v2) emptyTestEnv))
   OAnd -> arity2 $ \p1 p2 ->
     out $ VProp (VPBin LAnd (ensureProp p1) (ensureProp p2))
   OOr -> arity2 $ \p1 p2 ->
@@ -559,11 +553,29 @@ integerSqrt' n =
 -- Comparison
 ------------------------------------------------------------
 
-valEq :: Value -> Value -> Bool
-valEq v1 v2 = valCmp v1 v2 == EQ
+valEq, valLt :: Value -> Value -> Bool
+valEq = valOp Eq
+valLt = valOp Lt
 
-valLt :: Value -> Value -> Bool
-valLt v1 v2 = valCmp v1 v2 == LT
+valOp :: BOp -> Value -> Value -> Bool
+valOp op v1 v2 = case op of
+  Eq -> valCmp v1 v2 == EQ
+  Neq -> valCmp v1 v2 /= EQ
+  Lt -> valCmp v1 v2 == LT
+  Gt -> valCmp v1 v2 == GT
+  Leq -> valCmp v1 v2 /= GT
+  Geq -> valCmp v1 v2 /= LT
+  Divides -> valDivides v1 v2
+  _ -> False
+
+valDivides :: Value -> Value -> Bool
+valDivides (VNum r1) (VNum r2) = divides r1 r2
+valDivides _ _ = False
+
+divides :: Rational -> Rational -> Bool
+divides 0 0 = True
+divides 0 _ = False
+divides x y = denominator (y / x) == 1
 
 valCmp :: Value -> Value -> Ordering
 valCmp (VNum r1) (VNum r2) = compare r1 r2
@@ -761,8 +773,9 @@ ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _ = error "ensureProp: non-prop value"
 
-combineTestResultBool :: LOp -> TestResult -> TestResult -> Bool
-combineTestResultBool op (TestResult b1 _ _) (TestResult b2 _ _) = interpLOp op b1 b2
+combineTestResults :: LOp -> TestResult -> TestResult -> TestResult
+combineTestResults op tr1@(TestResult b1 _ e1) tr2@(TestResult b2 _ e2) =
+  TestResult (interpLOp op b1 b2) (TestBin op tr1 tr2) (mergeTestEnv e1 e2)
 
 testProperty ::
   Members '[Random, State Mem] r =>
@@ -779,7 +792,7 @@ testProperty initialSt = checkProp . ensureProp
   checkProp (VPBin op vp1 vp2) = do
     tr1 <- checkProp vp1
     tr2 <- checkProp vp2
-    return $ TestResult (combineTestResultBool op tr1 tr2) (TestBin op tr1 tr2) emptyTestEnv
+    return $ combineTestResults op tr1 tr2
   checkProp (VPSearch sm tys f e) =
     extendResultEnv e <$> (generateSamples initialSt vals >>= go)
    where

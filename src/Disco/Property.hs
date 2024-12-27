@@ -1,5 +1,3 @@
------------------------------------------------------------------------------
------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -90,22 +88,17 @@ prettyTestReason ::
   TestReason ->
   Sem r (Doc ann)
 prettyTestReason _ _ TestBool = empty
-prettyTestReason b _ (TestFound (TestResult _ _ env))
-  | b = prettyTestEnv "Found example:" env
-  | not b = prettyTestEnv "Found counterexample:" env
+prettyTestReason b (ATAbs _ _ body) (TestFound (TestResult b' r' env)) = do
+  lunbind body $ \(_, p) ->
+    prettyTestEnv ("Found " ++ if b then "example:" else "counterexample:") env
+      $+$ prettyTestReason b' p r'
 prettyTestReason b _ (TestNotFound Exhaustive)
   | b = "No counterexamples exist; all possible values were checked."
-  | not b = "No example exists; all possible values were checked."
+  | otherwise = "No example exists; all possible values were checked."
 prettyTestReason b _ (TestNotFound (Randomized n m))
   | b = "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
-  | not b = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-prettyTestReason _ _ (TestEqual t a1 a2) =
-  bulletList
-    "-"
-    [ "Left side:  " <> prettyValue t a1
-    , "Right side: " <> prettyValue t a2
-    ]
-prettyTestReason _ _ (TestLt t a1 a2) =
+  | otherwise = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
+prettyTestReason _ _ (TestCmp _ t a1 a2) =
   bulletList
     "-"
     [ "Left side:  " <> prettyValue t a1
@@ -121,8 +114,8 @@ prettyTestReason _ _ (TestRuntimeError ee) =
 prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
   bulletList
     "-"
-    [ nest 2 $ "Left side:" $+$ prettyTestResult' b p1 tr1
-    , nest 2 $ "Right side:" $+$ prettyTestResult' b p2 tr2
+    [ nest 2 $ prettyTestResult' b p1 tr1
+    , nest 2 $ prettyTestResult' b p2 tr2
     ]
 -- See Note [prettyTestReason fallback]
 prettyTestReason _ _ _ = empty

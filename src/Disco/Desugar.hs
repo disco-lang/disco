@@ -330,7 +330,7 @@ desugarTerm (ATTest info t) = DTTest (coerce info) <$> desugarTerm t
 -- | Desugar a property by wrapping its corresponding term in a test
 --   frame to catch its exceptions & convert booleans to props.
 desugarProperty :: Member Fresh r => AProperty -> Sem r DTerm
-desugarProperty p = DTTest [] <$> desugarTerm p
+desugarProperty p = DTTest [] <$> desugarTerm (setType TyProp p)
 
 ------------------------------------------------------------
 -- Desugaring operators
@@ -355,10 +355,8 @@ bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _ TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 
--- And, Or, Impl for Props don't desugar because they are primitive
--- Prop constructors.  On the other hand, logical operations on Bool
--- can desugar in terms of more primitive conditional expressions.
-bopDesugars _ _ TyProp bop | bop `elem` [And, Or, Impl] = False
+-- Eq and Lt at type Prop desugar into ShouldEq, ShouldLt .
+bopDesugars _ _ TyProp bop | bop `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = True
 bopDesugars _ _ _ bop =
   bop
     `elem` [ And
@@ -422,6 +420,14 @@ desugarBinApp :: Member Fresh r => Type -> BOp -> ATerm -> ATerm -> Sem r DTerm
 -- modules/a standard library, including (2) the ability to define
 -- infix operators.
 
+-- And, Or, Impl at type Prop are primitive Prop constructors so don't
+-- desugar; but we push the Prop type down so we properly desugar
+-- their arguments.
+desugarBinApp TyProp b t1 t2 | b `elem` [And, Or, Impl] = do
+  d1 <- desugarTerm $ setType TyProp t1
+  d2 <- desugarTerm $ setType TyProp t2
+  pure $ dtbin TyProp (PrimBOp b) d1 d2
+
 -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
 desugarBinApp _ And t1 t2 =
   desugarTerm $
@@ -442,6 +448,8 @@ desugarBinApp _ Or t1 t2 =
       [ tru <==. [tif t1]
       , t2 <==. []
       ]
+desugarBinApp TyProp op t1 t2
+  | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = desugarTerm $ mkBin TyProp (Should op) t1 t2
 desugarBinApp _ Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
 desugarBinApp _ Gt t1 t2 = desugarTerm $ t2 <. t1
 desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)

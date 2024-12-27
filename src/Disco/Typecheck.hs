@@ -920,13 +920,9 @@ typecheck Infer (TPrim prim) = do
 
   -- 'holds' converts a Prop into a Bool (but might not terminate).
   inferPrim PrimHolds = return $ TyProp :->: TyBool
-  -- An equality assertion =!= is just like a comparison ==, except
+  -- An binary assertion is just like a comparison, except
   -- the result is a Prop.
-  inferPrim (PrimBOp ShouldEq) = do
-    ty <- freshTy
-    constraint $ CQual QCmp ty
-    return $ ty :*: ty :->: TyProp
-  inferPrim (PrimBOp ShouldLt) = do
+  inferPrim (PrimBOp (Should _)) = do
     ty <- freshTy
     constraint $ CQual QCmp ty
     return $ ty :*: ty :->: TyProp

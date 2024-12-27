@@ -1,4 +1,4 @@
-holds (∀ℕ. (λarg0. (λ_. (λk. (λx. test [(x, ℕ, x)] (3 < x)) arg0) (λ_1. matchErr)) unit))
+holds (∀ℕ. (λarg0. (λ_. (λk. (λx. test [(x, ℕ, x)] (x !> 3)) arg0) (λ_1. matchErr)) unit))
 λx, y. x
 (λ_. (λk. (λy. (λp, q. p) (fst y) (snd y)) (frac (2 / 3))) (λ_1. matchErr)) unit
 (λ_. (λk. case (3 < 2) of {

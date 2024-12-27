@@ -129,6 +129,7 @@ instance Pretty UOp where
 -- | Pretty-print a binary operator, by looking up its concrete syntax
 --   in the 'bopMap'.
 instance Pretty BOp where
+  pretty (Should op) = pretty op <> "!"
   pretty op = case M.lookup op bopMap of
     Just (OpInfo _ (syn : _) _) -> text syn
     _ -> error $ "BOp " ++ show op ++ " not in bopMap!"

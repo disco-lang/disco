@@ -111,10 +111,8 @@ data BOp
     Elem
   | -- | Subset test (@⊆@)
     Subset
-  | -- | Equality assertion (@=!=@)
-    ShouldEq
-  | -- | Less than assertion (@!<@)
-    ShouldLt
+  | -- | Make a binary boolean operator into a testable proposition
+    Should BOp
   deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.
@@ -214,8 +212,6 @@ opTable =
       ]
     ,
       [ bopInfo InR Eq ["=="]
-      , bopInfo InR ShouldEq ["=!="]
-      , bopInfo InR ShouldLt ["!<"]
       , bopInfo InR Neq ["/=", "≠", "!="]
       , bopInfo InR Lt ["<"]
       , bopInfo InR Gt [">"]

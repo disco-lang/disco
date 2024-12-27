@@ -26,6 +26,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 0) /\ (∃n. 2 * n == 1)
     - Certainly true: ∃n. 2 * n == 0
         Found example:
@@ -53,6 +55,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n >= 0) /\ (∃n. 2 * n == 1)
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
@@ -62,6 +66,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
@@ -71,19 +77,27 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∀n. n > 0) /\ (∀n. n > 0)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly false: (∀n. n > 0) /\ (∃n. 2 * n == 1)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Possibly false: (∃n. 2 * n == 1) /\ (∃n. 2 * n == 0)
@@ -105,6 +119,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 1) /\ (∃n. 2 * n == 1)
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
@@ -138,6 +154,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∃n. 2 * n == 0) \/ (∃n. 2 * n == 1)
     - Certainly true: ∃n. 2 * n == 0
         Found example:
@@ -165,6 +183,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n >= 0) \/ (∃n. 2 * n == 1)
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
@@ -174,6 +194,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
@@ -183,19 +205,27 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∀n. n > 0) \/ (∀n. n > 0)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n > 0) \/ (∃n. 2 * n == 1)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 1) \/ (∃n. 2 * n == 0)
@@ -217,6 +247,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 1) \/ (∃n. 2 * n == 1)
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
@@ -250,6 +282,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 0) -> (∃n. 2 * n == 1)
     - Certainly true: ∃n. 2 * n == 0
         Found example:
@@ -277,6 +311,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n >= 0) -> (∃n. 2 * n == 1)
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
@@ -286,6 +322,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
@@ -295,19 +333,27 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly true: (∀n. n > 0) -> (∀n. n > 0)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∀n. n > 0) -> (∃n. 2 * n == 1)
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 1) -> (∃n. 2 * n == 0)
@@ -329,6 +375,8 @@
     - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 1) -> (∃n. 2 * n == 1)
     - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.

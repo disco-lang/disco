@@ -356,7 +356,7 @@ bopDesugars _ TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 
 -- Eq and Lt at type Prop desugar into ShouldEq, ShouldLt .
-bopDesugars _ _ TyProp bop | bop `elem` [Eq, Lt] = True
+bopDesugars _ _ TyProp bop | bop `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = True
 bopDesugars _ _ _ bop =
   bop
     `elem` [ And
@@ -448,8 +448,8 @@ desugarBinApp _ Or t1 t2 =
       [ tru <==. [tif t1]
       , t2 <==. []
       ]
-desugarBinApp TyProp Eq t1 t2 = desugarTerm $ mkBin TyProp ShouldEq t1 t2
-desugarBinApp TyProp Lt t1 t2 = desugarTerm $ mkBin TyProp ShouldLt t1 t2
+desugarBinApp TyProp op t1 t2
+  | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = desugarTerm $ mkBin TyProp (Should op) t1 t2
 desugarBinApp _ Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
 desugarBinApp _ Gt t1 t2 = desugarTerm $ t2 <. t1
 desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)

@@ -32,13 +32,12 @@ import GHC.Generics
 import Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
 import Prelude hiding ((<>))
 import qualified Prelude as P
-
 import Disco.Effects.LFresh
 import Polysemy (Members, Sem)
 import Polysemy.Reader
-
 import Data.Ratio
 import Disco.AST.Generic (Side, selectSide)
+import Disco.Syntax.Operators (BOp (..))
 import Disco.Names (QName)
 import Disco.Pretty
 import Disco.Types
@@ -211,10 +210,8 @@ data Op
     OHolds
   | -- | Flip success and failure for a prop.
     ONotProp
-  | -- | Equality assertion, @=!=@
-    OShouldEq Type
-  | -- Other primitives
-    OShouldLt Type
+  | -- | Comparison assertion
+    OShould BOp Type
   | -- | Error for non-exhaustive pattern match
     OMatchErr
   | -- | Crash with a user-supplied message
@@ -307,8 +304,7 @@ prettyTestVars = brackets . intercalate "," . map prettyTestVar
   prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
 
 isInfix, isPrefix, isPostfix :: Op -> Bool
-isInfix OShouldEq {} = True
-isInfix OShouldLt {} = True
+isInfix OShould {} = True
 isInfix op =
   op
     `S.member` S.fromList
@@ -377,8 +373,14 @@ opToStr = \case
   OFrac -> "frac"
   OHolds -> "holds"
   ONotProp -> "not"
-  OShouldEq _ -> "=!="
-  OShouldLt _ -> "!<"
+  OShould Eq _ -> "=!="
+  OShould Neq _ -> "=!!="
+  OShould Lt _ -> "!<"
+  OShould Gt _ -> "!>"
+  OShould Leq _ -> "!<="
+  OShould Geq _ -> "!>="
+  OShould Divides _ -> "!|"
+  OShould _ _ -> "<!>"
   OMatchErr -> "matchErr"
   OCrash -> "crash"
   OId -> "id"

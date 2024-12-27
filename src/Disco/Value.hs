@@ -343,12 +343,10 @@ interpLOp LImpl = (==>)
 data TestReason_ a
   = -- | The prop evaluated to a boolean.
     TestBool
-  | -- | The test was an equality test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestEqual Type a a
-  | -- | The test was a less than test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestLt Type a a
+  | -- | The test was a comparison. Records the comparison operator,
+    --   the values being compared, and also their type (which is
+    --   needed for printing).
+    TestCmp BOp Type a a
   | -- | The search didn't find any examples/counterexamples.
     TestNotFound SearchType
   | -- | The search found an example/counterexample.
@@ -387,8 +385,7 @@ testIsCertain (TestResult _ r _) = resultIsCertain r
 
 resultIsCertain :: TestReason -> Bool
 resultIsCertain TestBool = True
-resultIsCertain TestEqual {} = True
-resultIsCertain TestLt {} = True
+resultIsCertain TestCmp {} = True
 resultIsCertain (TestNotFound Exhaustive) = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r) = testIsCertain r

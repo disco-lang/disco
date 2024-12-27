@@ -98,13 +98,7 @@ prettyTestReason b _ (TestNotFound Exhaustive)
 prettyTestReason b _ (TestNotFound (Randomized n m))
   | b = "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
   | otherwise = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-prettyTestReason _ _ (TestEqual t a1 a2) =
-  bulletList
-    "-"
-    [ "Left side:  " <> prettyValue t a1
-    , "Right side: " <> prettyValue t a2
-    ]
-prettyTestReason _ _ (TestLt t a1 a2) =
+prettyTestReason _ _ (TestCmp _ t a1 a2) =
   bulletList
     "-"
     [ "Left side:  " <> prettyValue t a1

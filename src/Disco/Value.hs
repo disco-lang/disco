@@ -366,7 +366,7 @@ data TestResult = TestResult Bool TestReason TestEnv
 
 -- | Whether the property test resulted in a runtime error.
 testIsError :: TestResult -> Bool
-testIsError (TestResult _ (TestRuntimeError _) _) = True
+testIsError (TestResult _ (TestRuntimeError {}) _) = True
 testIsError _ = False
 
 -- | Whether the property test resulted in success.
@@ -389,7 +389,7 @@ resultIsCertain TestCmp {} = True
 resultIsCertain (TestNotFound Exhaustive) = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r) = testIsCertain r
-resultIsCertain (TestRuntimeError _) = True
+resultIsCertain (TestRuntimeError {}) = True
 resultIsCertain (TestBin op tr1 tr2)
   | c1 && c2 = True
   | c1 && ((op == LOr) == ok1) = True
@@ -412,7 +412,7 @@ data ValProp
   deriving (Show)
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
-extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
+extendPropEnv g (VPDone res) = VPDone (extendResultEnv g res)
 extendPropEnv g (VPSearch sm tys v e) = VPSearch sm tys v (g P.<> e)
 extendPropEnv g (VPBin op vp1 vp2) = VPBin op (extendPropEnv g vp1) (extendPropEnv g vp2)
 

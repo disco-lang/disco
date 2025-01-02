@@ -88,6 +88,7 @@ import Polysemy.Reader
 import System.FilePath (splitFileName)
 import Text.Megaparsec hiding (State, runParser)
 import Text.Megaparsec.Char qualified as C
+import Text.Megaparsec.Char.Lexer qualified as L
 import Text.PrettyPrint.Boxes qualified as B
 import Unbound.Generics.LocallyNameless (
   Name,
@@ -269,7 +270,9 @@ parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) .
 
 -- | Parse a file name.
 fileParser :: Parser FilePath
-fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
+fileParser = many C.spaceChar *> some (escapedSpace <|> L.charLiteral <|> anySingle)
+ where
+  escapedSpace = try (C.char '\\' *> C.char ' ')
 
 -- | A parser for something entered at the REPL prompt.
 lineParser :: REPLCommands -> Parser SomeREPLExpr

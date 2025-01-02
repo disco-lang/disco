@@ -559,3 +559,18 @@ test-suite disco-examples
                     filepath >= 1.4 && < 1.6,
                     process >= 1.4 && < 1.7
   default-language: Haskell2010
+
+executable disco-wasm
+  main-is:          DiscoWASM.hs
+  build-depends:
+    , base >=4.19.1.0 && <= 4.21
+    , ghc-experimental
+    , disco
+  ghc-options:
+    -rtsopts
+    -no-hs-main
+    -optl-mexec-model=reactor
+    "-optl-Wl,--export=discoWasm"
+
+  hs-source-dirs:   web/app
+  default-language: GHC2021

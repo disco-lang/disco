@@ -124,7 +124,8 @@ tyDataConsHelper Ty.TyVoid = Finite []
 tyDataConsHelper Ty.TyUnit = Finite [unit]
 tyDataConsHelper Ty.TyBool = Finite [bool True, bool False]
 tyDataConsHelper Ty.TyN = Infinite $ map natural [0, 1 ..]
--- TODO(colin): this integer generation was taken from stackoverflow. Is that okay?
+-- Many thanks to this answer and its comment for a convenient way to list the integers
+-- https://stackoverflow.com/a/9749957
 tyDataConsHelper Ty.TyZ = Infinite $ map integer $ 0 : [y | x <- [1 ..], y <- [x, -x]]
 tyDataConsHelper Ty.TyF = Infinite []
 tyDataConsHelper Ty.TyQ = Infinite []

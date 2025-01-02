@@ -274,7 +274,6 @@ fileParser = many C.spaceChar *> some (escapedSpace <|> L.charLiteral <|> anySin
  where
   escapedSpace = try (C.char '\\' *> C.char ' ')
 
-
 -- | A parser for something entered at the REPL prompt.
 lineParser :: REPLCommands -> Parser SomeREPLExpr
 lineParser allCommands =

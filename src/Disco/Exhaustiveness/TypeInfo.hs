@@ -106,16 +106,18 @@ right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
 tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Constructors
 tyDataCons ty ctx = tyDataConsHelper $ resolveAlias ty ctx
 
+-- TODO(colin): ask yorgey, make sure I've done this correctly
+-- If I have, and this is enough, I can remove all mentions
+-- of type equality constraints in Constraint.hs,
+-- the lookup here will have handled that behavoir already
 resolveAlias :: Ty.Type -> Ty.TyDefCtx -> Ty.Type
 resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Nothing -> error $ show ctx ++ "\nType definition not found for: " ++ show name
   Just (Ty.TyDefBody _argNames typeCon) -> resolveAlias (typeCon args) ctx
 resolveAlias t _ = t
 
--- TODO(colin): ask yorgey, make sure I've done this correctly
--- If I have, and this is enough, I can remove all mentions
--- of type equality constraints in Constraint.hs,
--- the lookup here will have handled that behavoir already
+-- TODO(colin): ask yorgey to see if I've handled all the thing
+-- I need to here. The list of things caught by the wildcard is below
 tyDataConsHelper :: Ty.Type -> Constructors
 tyDataConsHelper (a Ty.:*: b) = Finite [pair a b]
 tyDataConsHelper (l Ty.:+: r) = Finite [left l, right r]
@@ -129,7 +131,7 @@ tyDataConsHelper Ty.TyN = Infinite $ map natural [0, 1 ..]
 tyDataConsHelper Ty.TyZ = Infinite $ map integer $ 0 : [y | x <- [1 ..], y <- [x, -x]]
 tyDataConsHelper Ty.TyF = Infinite []
 tyDataConsHelper Ty.TyQ = Infinite []
--- We could do all valid ASCII, but this is most likely good enough
+-- TODO(colin): We could do all valid ASCII, but this is most likely good enough
 -- I think these starting from 'a' is good for students learning the language
 tyDataConsHelper Ty.TyC =
   Infinite $
@@ -139,6 +141,20 @@ tyDataConsHelper _ = Infinite [unknown]
 -- ^ This includes:
 -- (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)
 -- (Ty.TySkolem _) (Ty.TyProp) (Ty.TyMap _ _) (Ty.TyGraph _)
+-- TODO(colin): confim below:
+-- I think all of these are impossible to pattern match against
+-- with anything other than a wildcard.
+-- So they should be always fully covered. 
+-- But if they are in a pair, like a Set(Int)*Int,
+-- We still need to generate 3 examples of the pair if that Int
+-- part isn't covered.
+-- So how do we fill the concrete part of Set(Int)?
+-- For now I'm calling that unknown, and printing an underscore
+-- I believe this also applies when pattern matching 'Maybe a' types
+-- We need stand in for an example of a concrete 'a'
+--
+-- I remember the Infinite part making sense at the time
+-- but I should probably double check that
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

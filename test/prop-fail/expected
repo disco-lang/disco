@@ -14,6 +14,9 @@ Running tests...
   - Certainly false: ∀a, b. divide(a)(b) * b == a
     Test failed with an error:
       Error: division by zero.
+      Example inputs that caused the error:
+        a = 0
+        b = 0
   - Certainly false: ∀a. divide(a)(2) < a
     Found counterexample:
       a = 0

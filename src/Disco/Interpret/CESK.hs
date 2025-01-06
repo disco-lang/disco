@@ -55,12 +55,6 @@ import Math.Combinatorics.Exact.Binomial (choose)
 import Math.Combinatorics.Exact.Factorial (factorial)
 import Math.NumberTheory.Primes (factorise, unPrime)
 import Math.NumberTheory.Primes.Testing (isPrime)
-import Math.OEIS (
-  SearchStatus (SubSeq),
-  extendSeq,
-  lookupSeq,
-  number,
- )
 import Polysemy
 import Polysemy.Error
 import Polysemy.Random
@@ -352,8 +346,6 @@ appConst k = \case
   -- Sequences
 
   OUntil -> arity2 $ \v1 -> out . ellipsis (Until v1)
-  OLookupSeq -> out . oeisLookup
-  OExtendSeq -> out . oeisExtend
   --------------------------------------------------
   -- Comparison
 
@@ -646,24 +638,6 @@ constdiff [] = error "Impossible! Disco.Interpret.Core.constdiff []"
 constdiff (x : xs)
   | all (== x) xs = x
   | otherwise = constdiff (diff (x : xs))
-
-------------------------------------------------------------
--- OEIS
-------------------------------------------------------------
-
--- | Looks up a sequence of integers in OEIS.
---   Returns 'left()' if the sequence is unknown in OEIS,
---   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
-oeisLookup :: Value -> Value
-oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSeq (SubSeq ns))
- where
-  parseResult r = VInj R (listv charv ("https://oeis.org/" ++ T.unpack (number r)))
-
--- | Extends a Disco integer list with data from a known OEIS
---   sequence.  Returns a list of integers upon success, otherwise the
---   original list (unmodified).
-oeisExtend :: Value -> Value
-oeisExtend = listv intv . extendSeq . vlist vint
 
 ------------------------------------------------------------
 -- Normalizing bags/sets

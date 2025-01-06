@@ -146,13 +146,13 @@ withConstraint = fmap swap . runWriter
 --   (or failing with an error).  Note that this locally dispatches
 --   the constraint writer and solution limit effects.
 solve ::
-  Members '[Reader TyDefCtx, Error TCError, Output (Message ann)] r =>
+  Members '[Reader TyDefCtx, Error TCError, Output Message] r =>
   Int ->
   Sem (Writer Constraint ': r) a ->
   Sem r (a, NonEmpty S)
 solve lim m = do
   (a, c) <- withConstraint m
-  res <- runSolve (SolutionLimit lim) . inputToReader . solveConstraint $ c
+  res <- runSolve (SolutionLimit lim) . inputToReader @TyDefCtx . solveConstraint $ c
   case res of
     Left e -> throw (Unsolvable e)
     Right ss -> return (a, ss)

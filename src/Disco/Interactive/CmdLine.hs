@@ -188,7 +188,7 @@ discoMain = do
 
   loop :: Members DiscoEffects r => Sem r ()
   loop = do
-    minput <- embedFinal $ withCtrlC (return $ Just "") (getInputLine "Disco> ")
+    minput <- embedFinal @(InputT IO) $ withCtrlC (return $ Just "") (getInputLine "Disco> ")
     case minput of
       Nothing -> return ()
       Just input
@@ -199,7 +199,7 @@ discoMain = do
             multiLineLoop []
             loop
         | otherwise -> do
-            mapError @_ @DiscoError (Panic . show) $
+            mapError @SomeException @DiscoError (Panic . show) $
               absorbMonadCatch $
                 withCtrlC (return ()) $
                   handleCMD input
@@ -207,12 +207,12 @@ discoMain = do
 
   multiLineLoop :: Members DiscoEffects r => [String] -> Sem r ()
   multiLineLoop ls = do
-    minput <- embedFinal $ withCtrlC (return Nothing) (getInputLine "Disco| ")
+    minput <- embedFinal $ withCtrlC @(InputT IO) (return Nothing) (getInputLine "Disco| ")
     case minput of
       Nothing -> return ()
       Just input
         | ":}" `isPrefixOf` input -> do
-            mapError @_ @DiscoError (Panic . show) $
+            mapError @SomeException @DiscoError (Panic . show) $
               absorbMonadCatch $
                 withCtrlC (return ()) $
                   handleCMD (unlines (reverse ls))

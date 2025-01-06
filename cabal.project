@@ -1,0 +1,6 @@
+packages: *.cabal
+
+source-repository-package
+    type: git
+    location: https://github.com/disco-lang/polysemy
+    tag: db923b90c88374c8de4e597136f0ec3154533677

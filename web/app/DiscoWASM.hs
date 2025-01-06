@@ -15,24 +15,27 @@ discoBasic :: String -> String
 discoBasic = ('3':)
 
 -- Ignore output here
-foreign import javascript unsafe "new Array"
-  js_emptyArr :: IO JSVal
+-- foreign import javascript unsafe "new Array"
+--   js_emptyArr :: IO JSVal
 
-foreign import javascript unsafe "$1.push($2)"
-  js_push :: JSVal -> JSString -> IO JSVal
+foreign import javascript unsafe "new String($1)"
+  js_newString :: JSString -> IO JSVal
 
-foreign export javascript "pointfreeWasm"
-  pointfreeWasm :: JSString -> IO JSVal
+-- foreign import javascript unsafe "$1.push($2)"
+--   js_push :: JSVal -> JSString -> IO JSVal
 
-mkArr :: IO JSVal
-mkArr = js_emptyArr
+foreign export javascript "discoWasm"
+  discoWasm :: JSString -> IO JSVal
 
-pushArr :: JSVal -> JSString -> IO ()
-pushArr arr str = void $ js_push arr str
+-- mkArr :: IO JSVal
+-- mkArr = js_emptyArr
 
-pointfreeWasm :: JSString -> IO JSVal
-pointfreeWasm input = do
+-- pushArr :: JSVal -> JSString -> IO ()
+-- pushArr arr str = void $ js_push arr str
+
+discoWasm :: JSString -> IO JSVal
+discoWasm input = do
   let input' = fromJSString input
   let result :: String
       result = discoBasic input'
-  pure $ toJSString result
+  js_newString (toJSString result)

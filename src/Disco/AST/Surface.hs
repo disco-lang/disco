@@ -234,7 +234,7 @@ instance Pretty (Name a, Bind [Pattern] Term) where
     pretty x <> hcat (map prettyPatternP ps) <+> text "=" <+> setPA initPA (pretty t)
 
 -- | Pretty-print a type declaration.
-prettyTyDecl :: Members '[Reader PA, LFresh] r => Name t -> Type -> Sem r (Doc ann)
+prettyTyDecl :: Members '[Reader PA, LFresh] r => Name t -> Type -> Sem r Doc
 prettyTyDecl x ty = hsep [pretty x, text ":", pretty ty]
 
 ------------------------------------------------------------
@@ -525,7 +525,7 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
 -- term (e.g. via the :doc REPL command).
 
 -- | Pretty-print a term with guaranteed parentheses.
-prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r (Doc ann)
+prettyTermP :: Members '[LFresh, Reader PA] r => Term -> Sem r Doc
 prettyTermP t@TTup {} = setPA initPA $ pretty t
 -- prettyTermP t@TContainer{} = setPA initPA $ "" <+> prettyTerm t
 prettyTermP t = withPA initPA $ pretty t
@@ -629,12 +629,12 @@ instance Pretty Term where
     TWild -> text "_"
 
 -- | Print appropriate delimiters for a container literal.
-containerDelims :: Member (Reader PA) r => Container -> (Sem r (Doc ann) -> Sem r (Doc ann))
+containerDelims :: Member (Reader PA) r => Container -> (Sem r Doc -> Sem r Doc)
 containerDelims ListContainer = brackets
 containerDelims BagContainer = bag
 containerDelims SetContainer = braces
 
-prettyBranches :: Members '[Reader PA, LFresh] r => [Branch] -> Sem r (Doc ann)
+prettyBranches :: Members '[Reader PA, LFresh] r => [Branch] -> Sem r Doc
 prettyBranches = \case
   [] -> text ""
   b : bs ->
@@ -680,7 +680,7 @@ instance Pretty Qual where
     QGuard (unembed -> t) -> pretty t
 
 -- | Pretty-print a pattern with guaranteed parentheses.
-prettyPatternP :: Members '[LFresh, Reader PA] r => Pattern -> Sem r (Doc ann)
+prettyPatternP :: Members '[LFresh, Reader PA] r => Pattern -> Sem r Doc
 prettyPatternP p@PTup {} = setPA initPA $ pretty p
 prettyPatternP p = withPA initPA $ pretty p
 

@@ -41,7 +41,7 @@ import qualified Disco.Subst as Subst
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck.Constraints
-import Disco.Typecheck.Solve (SolutionLimit (..), solveConstraint)
+import Disco.Typecheck.Solve (SolutionLimit (..), solveConstraint, SolveError)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Types.Rules
@@ -120,7 +120,7 @@ suggestionsFrom x = filter ((<= 1) . restrictedDamerauLevenshteinDistance defaul
 --   imports should already be checked and passed in as the second
 --   argument.
 checkModule ::
-  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r =>
+  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh] r =>
   ModuleName ->
   Map ModuleName ModuleInfo ->
   Module ->
@@ -277,7 +277,7 @@ checkCtx = mapM_ checkPolyTyValid . Ctx.elems
 
 -- | Type check a top-level definition in the given module.
 checkDefn ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output (Message ann)] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error LocTCError, Fresh, Output Message] r =>
   ModuleName ->
   TermDefn ->
   Sem r Defn
@@ -346,7 +346,7 @@ checkDefn name (TermDefn x clauses) = mapError (LocTCError (Just (name .- x))) $
 -- | Given a context mapping names to documentation, extract the
 --   properties attached to each name and typecheck them.
 checkProperties ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output (Message ann)] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r =>
   Ctx Term Docs ->
   Sem r (Ctx ATerm [AProperty])
 checkProperties docs =
@@ -358,7 +358,7 @@ checkProperties docs =
 
 -- | Check the types of the terms embedded in a property.
 checkProperty ::
-  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output (Message ann)] r =>
+  Members '[Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh, Output Message] r =>
   Property ->
   Sem r AProperty
 checkProperty prop = do
@@ -457,7 +457,7 @@ infer = typecheck Infer
 -- | Top-level type inference algorithm, returning only the first
 --   possible result.
 inferTop1 ::
-  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   Sem r (ATerm, PolyType)
 inferTop1 t = NE.head <$> inferTop 1 t
@@ -467,7 +467,7 @@ inferTop1 t = NE.head <$> inferTop 1 t
 --   inference, solving the resulting constraints, and quantifying
 --   over any remaining type variables.
 inferTop ::
-  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Int ->
   Term ->
   Sem r (NonEmpty (ATerm, PolyType))
@@ -539,7 +539,7 @@ inferTop lim t = do
 --   polymorphic type by running type checking and solving the
 --   resulting constraints.
 checkTop ::
-  Members '[Output (Message ann), Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
+  Members '[Output Message, Reader TyCtx, Reader TyDefCtx, Error TCError, Fresh] r =>
   Term ->
   PolyType ->
   Sem r ATerm
@@ -1788,7 +1788,7 @@ ensureEq ty1 ty2
 ------------------------------------------------------------
 
 isSubPolyType ::
-  Members '[Input TyDefCtx, Output (Message ann), Fresh] r =>
+  Members '[Input TyDefCtx, Output Message, Fresh] r =>
   PolyType ->
   PolyType ->
   Sem r Bool
@@ -1800,16 +1800,16 @@ isSubPolyType (Forall b1) (Forall b2) = do
   debug "Checking subtyping..."
   debugPretty (Forall b1)
   debugPretty (Forall b2)
-  ss <- runError (evalState (SolutionLimit 1) (solveConstraint c))
+  ss <- runError @SolveError (evalState (SolutionLimit 1) (solveConstraint c))
   return (either (const False) (not . P.null) ss)
 
-thin :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => NonEmpty PolyType -> Sem r (NonEmpty PolyType)
+thin :: Members '[Input TyDefCtx, Output Message, Fresh] r => NonEmpty PolyType -> Sem r (NonEmpty PolyType)
 thin = fmap NE.fromList . thin' . NE.toList
 
 -- Intuitively, this will always return a nonempty list given a nonempty list as input;
 -- we could probably rewrite it in terms of NonEmpty combinators but it's more effort than
 -- I cared to spend at the moment.
-thin' :: Members '[Input TyDefCtx, Output (Message ann), Fresh] r => [PolyType] -> Sem r [PolyType]
+thin' :: Members '[Input TyDefCtx, Output Message, Fresh] r => [PolyType] -> Sem r [PolyType]
 thin' [] = return []
 thin' (ty : tys) = do
   ss <- or <$> mapM (`isSubPolyType` ty) tys

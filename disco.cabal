@@ -397,7 +397,7 @@ common common
 
 library
   import:              common
-  ghc-options:         -flate-specialise -fspecialise-aggressively -fplugin=Polysemy.Plugin
+  ghc-options:         -flate-specialise -fspecialise-aggressively
   default-extensions:  DataKinds
                        DeriveGeneric
                        FlexibleContexts
@@ -487,7 +487,6 @@ library
                        -- Need the Alpha and Subst instances for
                        -- NonEmpty from unbound-generics 0.4.4
                        polysemy >= 1.6.0.0 && < 1.10,
-                       polysemy-plugin >= 0.4 && < 0.5,
                        reflection >= 2.1.7 && < 2.2,
                        random >= 1.2.1.1 && < 1.4,
                        constraints >= 0.13.4 && < 0.15,

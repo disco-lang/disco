@@ -1,6 +1,7 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 
 -- TODO: the calls to 'error' should be replaced with logging/error capabilities.
 
@@ -16,7 +17,7 @@ module Disco.Pretty (
   module Disco.Pretty.DSL,
   module Disco.Pretty,
   module Disco.Pretty.Prec,
-  Doc,
+  Doc
 )
 where
 
@@ -37,8 +38,12 @@ import Disco.Pretty.Prec
 import Disco.Syntax.Operators
 import Polysemy
 import Polysemy.Reader
-import Prettyprinter (Doc)
+import Prettyprinter qualified as PP
 import Unbound.Generics.LocallyNameless (Name)
+
+------------------------------------------------------------
+
+type Doc = PP.Doc ()
 
 ------------------------------------------------------------
 -- Utilities for handling precedence and associativity
@@ -48,7 +53,7 @@ import Unbound.Generics.LocallyNameless (Name)
 --   associativity of a term is, and optionally surround it with
 --   parentheses depending on the precedence and associativity of its
 --   parent.
-withPA :: Member (Reader PA) r => PA -> Sem r (Doc ann) -> Sem r (Doc ann)
+withPA :: Member (Reader PA) r => PA -> Sem r (PP.Doc ann) -> Sem r (PP.Doc ann)
 withPA pa = mparens pa . setPA pa
 
 -- | Locally set the precedence and associativity within a
@@ -59,20 +64,20 @@ setPA = local . const
 -- | Mark a subcomputation as pretty-printing a term on the left of an
 --   operator (so parentheses can be inserted appropriately, depending
 --   on the associativity).
-lt :: Member (Reader PA) r => Sem r (Doc ann) -> Sem r (Doc ann)
+lt :: Member (Reader PA) r => Sem r (PP.Doc ann) -> Sem r (PP.Doc ann)
 lt = local (\(PA p _) -> PA p InL)
 
 -- | Mark a subcomputation as pretty-printing a term on the right of
 --   an operator (so parentheses can be inserted appropriately,
 --   depending on the associativity).
-rt :: Member (Reader PA) r => Sem r (Doc ann) -> Sem r (Doc ann)
+rt :: Member (Reader PA) r => Sem r (PP.Doc ann) -> Sem r (PP.Doc ann)
 rt = local (\(PA p _) -> PA p InR)
 
 -- | Optionally surround a pretty-printed term with parentheses,
 --   depending on its precedence and associativity (given as the 'PA'
 --   argument) and that of its context (given by the ambient 'Reader
 --   PA' effect).
-mparens :: Member (Reader PA) r => PA -> Sem r (Doc ann) -> Sem r (Doc ann)
+mparens :: Member (Reader PA) r => PA -> Sem r (PP.Doc ann) -> Sem r (PP.Doc ann)
 mparens pa doc = do
   parentPA <- ask
   (if pa `lowerPrec` parentPA then parens else id) doc
@@ -81,12 +86,12 @@ mparens pa doc = do
 -- Pretty type class
 
 class Pretty t where
-  pretty :: Members '[Reader PA, LFresh] r => t -> Sem r (Doc ann)
+  pretty :: Members '[Reader PA, LFresh] r => t -> Sem r Doc
 
 prettyStr :: Pretty t => t -> Sem r String
 prettyStr = renderDoc . runLFresh . pretty
 
-pretty' :: Pretty t => t -> Sem r (Doc ann)
+pretty' :: Pretty t => t -> Sem r Doc
 pretty' = runReader initPA . runLFresh . pretty
 
 ------------------------------------------------------------

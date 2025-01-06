@@ -32,7 +32,6 @@ import qualified Data.List.Infinite as InfList
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Ratio
-import qualified Data.Text as T
 import Disco.AST.Core
 import Disco.AST.Generic (
   Ellipsis (..),

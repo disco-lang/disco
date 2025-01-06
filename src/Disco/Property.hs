@@ -77,7 +77,7 @@ generateSamples (Randomized n m) e
 -- Pretty-printing for test results
 ------------------------------------------------------------
 
-prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r (Doc ann)
+prettyResultCertainty :: Members '[LFresh, Reader PA] r => TestReason -> AProperty -> String -> Sem r Doc
 prettyResultCertainty r prop res =
   (if resultIsCertain r then "Certainly" else "Possibly") <+> text res <> ":" <+> pretty (eraseProperty prop)
 
@@ -87,7 +87,7 @@ prettyTestReason ::
   AProperty ->
   TestReason ->
   TestEnv ->
-  Sem r (Doc ann)
+  Sem r Doc
 prettyTestReason _ _ TestBool _ = empty
 prettyTestReason b (ATAbs _ _ body) (TestFound (TestResult b' r' env')) env = do
   lunbind body $ \(_, p) ->
@@ -143,7 +143,7 @@ prettyTestResult ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>
   AProperty ->
   TestResult ->
-  Sem r (Doc ann)
+  Sem r Doc
 prettyTestResult prop (TestResult bool tr env) =
   prettyResultCertainty tr prop (map toLower (show bool))
     $+$ prettyTestReason bool prop tr env
@@ -152,7 +152,7 @@ prettyTestEnv ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>
   String ->
   TestEnv ->
-  Sem r (Doc ann)
+  Sem r Doc
 prettyTestEnv _ (TestEnv []) = empty
 prettyTestEnv s (TestEnv vs) = nest 2 $ text s $+$ vcat (map prettyBind vs)
  where

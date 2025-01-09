@@ -39,6 +39,8 @@ import Polysemy.Reader
 import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
 
+-- TODO(colin): should I explain that this comes from the LYG paper
+-- in some sort of comment, of leave some sort of link to the publication, etc?
 checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types

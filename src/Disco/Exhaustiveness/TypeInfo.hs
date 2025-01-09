@@ -69,6 +69,9 @@ instance Show Ident where
 data Constructors where
   Finite :: [DataCon] -> Constructors
   Infinite :: [DataCon] -> Constructors
+-- TODO(colin): should I quote 'Infinite' with single quotes in the above doc comment?
+-- is there a proper way to reference that that will get
+-- picked up and put in the docs in a nice way?
 
 unknown :: DataCon
 unknown = DataCon {dcIdent = KUnkown, dcTypes = []}
@@ -110,6 +113,12 @@ tyDataCons ty ctx = tyDataConsHelper $ resolveAlias ty ctx
 -- If I have, and this is enough, I can remove all mentions
 -- of type equality constraints in Constraint.hs,
 -- the lookup here will have handled that behavoir already
+--
+-- I was worried about infinite recursion at first,
+-- but I think the types that that would happen for
+-- are rejected with an error:
+--  Error: cyclic type definition for A.
+-- So I don't think that is an issue, but I would like confirmation
 resolveAlias :: Ty.Type -> Ty.TyDefCtx -> Ty.Type
 resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Nothing -> error $ show ctx ++ "\nType definition not found for: " ++ show name
@@ -117,7 +126,7 @@ resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
 resolveAlias t _ = t
 
 -- TODO(colin): ask yorgey to see if I've handled all the thing
--- I need to here. The list of things caught by the wildcard is below
+-- I need to here. The list of things caught by the wildcard is in the comment below the function
 tyDataConsHelper :: Ty.Type -> Constructors
 tyDataConsHelper (a Ty.:*: b) = Finite [pair a b]
 tyDataConsHelper (l Ty.:+: r) = Finite [left l, right r]
@@ -157,7 +166,7 @@ tyDataConsHelper _ = Infinite [unknown]
 -- them is with a wildcard or variable pattern, and marking them 'Infinite'
 -- conveys essentially just that to the LYG checker
 --
--- Maybe this should be in a big doc comment above?
+-- Maybe this should be rewritten in a big doc comment above?
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

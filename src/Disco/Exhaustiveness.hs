@@ -109,17 +109,21 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
   where
     psnd = desugarTuplePats rest
 
-{-
-TODO(colin): handle remaining patterns
-  , APNeg     --still need to handle rational case
-  , APFrac    --required for rationals?
-  algebraic (probably will be replaced anyway):
-  , APAdd
-  , APMul
-  , APSub
-We treat unhandled patterns as if they are exhaustively matched against
-This necessarily results in some false negatives, but no false positives.
--}
+-- | Convert a Disco APattern into a list of Guards which cover that pattern
+--
+--   These patterns are currently not handled:
+--     , APNeg     --still need to handle rational case
+--     , APFrac    --required for rationals?
+--     algebraic (probably will be eventually replaced anyway):
+--     , APAdd
+--     , APMul
+--     , APSub
+--   We treat unhandled patterns as if they are exhaustively matched against
+--   This necessarily results in some false negatives, but no false positives.
+--
+--   TODO(colin):
+--   Without general arithmetic patterns, maybe we should just leave these unhandled?
+--   not much else we can do
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = case pat of
   (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do
@@ -129,7 +133,6 @@ desugarMatch var pat = case pat of
     guardsSnd <- desugarMatch varSnd psnd
     let guardPair = (var, GMatch (TI.pair ta tb) [varFst, varSnd])
     return $ [guardPair] ++ guardsFst ++ guardsSnd
-  (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
   (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
   (APCons _ subHead subTail) -> do
     let typeHead = Ty.getType subHead

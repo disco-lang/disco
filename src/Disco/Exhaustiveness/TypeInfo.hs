@@ -64,8 +64,8 @@ instance Show Ident where
     KRight -> "right()"
 
 -- | Finite constructors are used in the LYG checker
--- 'Infinite' constructors are used when reporting
--- examples of uncovered patterns, we only pick out a few of them
+--   'Infinite' constructors are used when reporting
+--   examples of uncovered patterns, we only pick out a few of them
 data Constructors where
   Finite :: [DataCon] -> Constructors
   Infinite :: [DataCon] -> Constructors
@@ -153,8 +153,11 @@ tyDataConsHelper _ = Infinite [unknown]
 -- I believe this also applies when pattern matching 'Maybe a' types
 -- We need stand in for an example of a concrete 'a'
 --
--- I remember the Infinite part making sense at the time
--- but I should probably double check that
+-- iirc, these are 'Infinite' because the only way to match against
+-- them is with a wildcard or variable pattern, and marking them 'Infinite'
+-- conveys essentially just that to the LYG checker
+--
+-- Maybe this should be in a big doc comment above?
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

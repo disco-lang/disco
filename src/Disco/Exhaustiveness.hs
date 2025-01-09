@@ -52,7 +52,7 @@ checkClauses name types pats = do
 
   unless (null examples) $ do
     let prettyExampleArgs exArgs =
-          DSL.hsep $ map pe exArgs
+          DSL.hsep $ map prettyPrintExample exArgs
 
     let prettyExampleLine prettyArgs =
           DSL.text (show name) DSL.<+> prettyArgs DSL.<+> DSL.text "= ..."
@@ -64,13 +64,13 @@ checkClauses name types pats = do
       DSL.text "Warning: You haven't covered these cases:"
         DSL.$+$ prettyExamples
 
-pe :: (Applicative f) => ExamplePat -> f (Doc ann)
-pe e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
-  (TI.KPair, _) -> tupled (traverse pe (resugarPair e))
-  (TI.KCons, _) -> list (traverse pe (resugarList e))
-  (TI.KLeft, [l]) -> DSL.parens $ DSL.text "left" DSL.<+> pe l
-  (TI.KRight, [r]) -> DSL.parens $ DSL.text "right" DSL.<+> pe r
-  (_, _) -> DSL.hsep $ DSL.text (show ident) : map pe args
+prettyPrintExample :: (Applicative f) => ExamplePat -> f (Doc ann)
+prettyPrintExample e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
+  (TI.KPair, _) -> tupled (traverse prettyPrintExample (resugarPair e))
+  (TI.KCons, _) -> list (traverse prettyPrintExample (resugarList e))
+  (TI.KLeft, [l]) -> DSL.parens $ DSL.text "left" DSL.<+> prettyPrintExample l
+  (TI.KRight, [r]) -> DSL.parens $ DSL.text "right" DSL.<+> prettyPrintExample r
+  (_, _) -> DSL.hsep $ DSL.text (show ident) : map prettyPrintExample args
 
 tupled :: (Applicative f) => f [Doc ann] -> f (Doc ann)
 tupled = fmap PP.tupled
@@ -238,72 +238,6 @@ data InhabPat where
   IPNot :: [TI.DataCon] -> InhabPat
   deriving (Show, Eq, Ord)
 
-join :: [a] -> [a] -> [a] -> [a]
-join j a b = a ++ j ++ b
-
-joinComma :: [String] -> String
-joinComma = foldr1 (join ", ")
-
-joinSpace :: [String] -> String
-joinSpace = foldr1 (join " ")
-
--- TODO(colin): maybe fully print out tuples even if they have wildcars in the middle?
--- e.g. (1,_,_) instead of just (1,_)
--- Also, the display for matches against strings is really weird,
--- as strings are lists of chars.
--- Maybe for strings, we just list the top 3 uncovered patterns
--- consiting of only postive information, sorted by length?
--- Also, how should we print out sum types?
--- We can do right(thing) or (right thing), or (right(thing))
--- Which should we chose?
-prettyInhab :: InhabPat -> String
-prettyInhab (IPNot []) = "_"
-prettyInhab (IPNot nots) = "Not{" ++ joinComma (map dcToString nots) ++ "}"
-prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd]) =
-  "(" ++ prettyInhab ifst ++ ", " ++ prettyInhab isnd ++ ")"
-prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
-  "(" ++ prettyInhab ihead ++ " :: " ++ prettyInhab itail ++ ")"
-prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KLeft, TI.dcTypes = _} [l]) =
-  "(left " ++ prettyInhab l ++ ")"
-prettyInhab (IPIs TI.DataCon {TI.dcIdent = TI.KRight, TI.dcTypes = _} [r]) =
-  "(right " ++ prettyInhab r ++ ")"
-prettyInhab (IPIs dc []) = dcToString dc
-prettyInhab (IPIs dc args) = dcToString dc ++ " " ++ joinSpace (map prettyInhab args)
-
-data ExamplePat where
-  ExamplePat :: TI.DataCon -> [ExamplePat] -> ExamplePat
-  deriving (Show)
-
-prettyExample :: ExamplePat -> String
-prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KPair, TI.dcTypes = _} [ifst, isnd]) =
-  "(" ++ prettyExample ifst ++ ", " ++ prettyExample isnd ++ ")"
-prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KCons, TI.dcTypes = _} [ihead, itail]) =
-  "(" ++ prettyExample ihead ++ " :: " ++ prettyExample itail ++ ")"
-prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KLeft, TI.dcTypes = _} [l]) =
-  "(left " ++ prettyExample l ++ ")"
-prettyExample (ExamplePat TI.DataCon {TI.dcIdent = TI.KRight, TI.dcTypes = _} [r]) =
-  "(right " ++ prettyExample r ++ ")"
-prettyExample (ExamplePat dc []) = dcToString dc
-prettyExample (ExamplePat dc args) = dcToString dc ++ " " ++ joinSpace (map prettyExample args)
-
-dcToString :: TI.DataCon -> String
-dcToString TI.DataCon {TI.dcIdent = ident} = case ident of
-  TI.KBool b -> show b
-  TI.KChar c -> show c
-  TI.KNat n -> show n
-  TI.KInt z -> show z
-  TI.KNil -> "[]"
-  TI.KUnit -> "unit"
-  TI.KUnkown -> "_"
-  -- TODO(colin): find a way to remove these? These two shouldn't be reachable
-  -- If we were in an IPIs, we already handled these above
-  -- If we were in an IPNot, these aren't from opaque types,
-  -- so they shouldn't appear in a Not{}
-  TI.KPair -> ","
-  TI.KCons -> "::"
-  TI.KLeft -> "left()"
-  TI.KRight -> "right()"
-
 -- Sanity check: are we giving the dataconstructor the
 -- correct number of arguments?
 mkIPMatch :: TI.DataCon -> [InhabPat] -> InhabPat
@@ -360,6 +294,10 @@ findRedundant ant args = case ant of
     uninhabited <- Poss.none <$> findInhabitants ref args
     return [i | uninhabited]
   ABranch a1 a2 -> mappend <$> findRedundant a1 args <*> findRedundant a2 args
+
+data ExamplePat where
+  ExamplePat :: TI.DataCon -> [ExamplePat] -> ExamplePat
+  deriving (Show)
 
 -- | Less general version of the above inhabitant finding function
 --   returns a maximum of 3 possible args lists that haven't been matched against,

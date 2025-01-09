@@ -120,12 +120,12 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
 --     , APAdd
 --     , APMul
 --     , APSub
---   We treat unhandled patterns as if they are exhaustively matched against
---   This necessarily results in some false negatives, but no false positives.
+--   These (or some updated version of them) may be handled eventually, 
+--   once updated arithmetic patterns are merged.
 --
---   TODO(colin):
---   Without general arithmetic patterns, maybe we should just leave these unhandled?
---   not much else we can do
+--   We treat unhandled patterns as if they are exhaustively matched against
+--   (aka, they are seen as wildcards by the checker).
+--   This necessarily results in some false negatives, but no false positives.
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
 desugarMatch var pat = case pat of
   (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do

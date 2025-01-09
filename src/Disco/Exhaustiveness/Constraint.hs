@@ -12,13 +12,6 @@ import Polysemy
 import qualified Disco.Types as Ty
 import Polysemy.Reader
 import Data.Bifunctor (first)
-import qualified Data.Set as S
-
-newtype Context = Context {getCtxVars :: S.Set TI.TypedVar}
-  deriving (Show, Eq)
-
-addVars :: Context -> [TI.TypedVar] -> Context
-addVars (Context ctx) vars = Context (foldr S.insert ctx vars)
 
 data Constraint where
   CMatch :: TI.DataCon -> [TI.TypedVar] -> Constraint
@@ -49,18 +42,18 @@ alistLookup a = map snd . filter ((== a) . fst)
 onVar :: TI.TypedVar -> [ConstraintFor] -> [Constraint]
 onVar x cs = alistLookup (lookupVar x cs) cs
 
-type NormRefType = (Context, [ConstraintFor])
+type NormRefType = [ConstraintFor]
 
 addConstraints :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> [ConstraintFor] -> MaybeT (Sem r) NormRefType
 addConstraints = foldM addConstraint
 
 addConstraint :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
-addConstraint nref@(_, cns) (x, c) = do
+addConstraint cns (x, c) = do
   breakIf $ any (conflictsWith c) (onVar x cns)
-  addConstraintHelper nref (lookupVar x cns, c)
+  addConstraintHelper cns (lookupVar x cns, c)
 
 addConstraintHelper :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> ConstraintFor -> MaybeT (Sem r) NormRefType
-addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
+addConstraintHelper cns cf@(origX, c) = case c of
   --- Equation (10)
   CMatch k args -> do
     case getConstructorArgs k (onVar origX cns) of
@@ -69,7 +62,7 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
       -- then we are actually done
       Just args' ->
         addConstraints
-          nref
+          cns
           (zipWith (\a b -> (a, CWasOriginally b)) args args')
       Nothing -> return added
   --- Equation (11)
@@ -81,12 +74,12 @@ addConstraintHelper nref@(ctx, cns) cf@(origX, c) = case c of
   CWasOriginally y -> do
     let origY = lookupVar y cns
     if origX == origY
-      then return nref
+      then return cns
       else do
         let (noX', withX') = partition ((/= origX) . fst) cns
-        addConstraints (ctx, noX' ++ [cf]) (substituteVarIDs origY origX withX')
+        addConstraints (noX' ++ [cf]) (substituteVarIDs origY origX withX')
   where
-    added = (ctx, cns ++ [cf])
+    added = cns ++ [cf]
 
 -----
 ----- Helper functions for adding constraints:
@@ -146,7 +139,7 @@ inhabited n var = do
 --   type without contradiction (a Nothing value),
 --   then x is inhabited by k and we return true
 instantiate :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> TI.DataCon -> Sem r Bool
-instantiate (ctx, cns) var k = do
+instantiate cns var k = do
   args <- TI.newVars $ TI.dcTypes k
-  let attempt = (ctx `addVars` args, cns) `addConstraint` (var, CMatch k args)
+  let attempt = cns `addConstraint` (var, CMatch k args)
   isJust <$> runMaybeT attempt

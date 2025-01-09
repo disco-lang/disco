@@ -38,7 +38,6 @@ import Polysemy.Output
 import Polysemy.Reader
 import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
-import qualified Data.Set as S
 
 -- TODO(colin): should I explain that this comes from the LYG paper
 -- in some sort of comment, of leave some sort of link to the publication, etc?
@@ -48,7 +47,7 @@ checkClauses name types pats = do
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
   let gdt = foldr1 Branch cl
 
-  let argsNref = (C.Context (S.fromList args), [])
+  let argsNref = []
   (normalizedNrefs, _) <- ua [argsNref] gdt
 
   examples <- findPosExamples normalizedNrefs args
@@ -226,18 +225,18 @@ addLitMulti (n : ns) lit = do
   r <- runMaybeT $ addLiteral n lit
   case r of
     Nothing -> addLitMulti ns lit
-    Just (ctx, cfs) -> do
+    Just cfs -> do
       ns' <- addLitMulti ns lit
-      return $ (ctx, cfs) : ns'
+      return $ cfs : ns'
 
 addLiteral :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => C.NormRefType -> Literal -> MaybeT (Sem r) C.NormRefType
-addLiteral (context, constraints) (Literal (x, c)) = case c of
+addLiteral constraints (Literal (x, c)) = case c of
   LitWasOriginally z ->
-    (context `C.addVars` [x], constraints) `C.addConstraint` (x, C.CWasOriginally z)
+    constraints `C.addConstraint` (x, C.CWasOriginally z)
   LitMatch dc args ->
-    (context `C.addVars` args, constraints) `C.addConstraint` (x, C.CMatch dc args)
+    constraints `C.addConstraint` (x, C.CMatch dc args)
   LitNot dc ->
-    (context, constraints) `C.addConstraint` (x, C.CNot dc)
+    constraints `C.addConstraint` (x, C.CNot dc)
 
 data InhabPat where
   IPIs :: TI.DataCon -> [InhabPat] -> InhabPat
@@ -263,10 +262,10 @@ findAllForNref nref args = do
   return $ Poss.allCombinations argPats
 
 findVarInhabitants :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities InhabPat)
-findVarInhabitants var nref@(_, cns) =
+findVarInhabitants var cns =
   case posMatch of
     Just (k, args) -> do
-      argPossibilities <- findAllForNref nref args
+      argPossibilities <- findAllForNref cns args
       return (mkIPMatch k <$> argPossibilities)
     Nothing -> case nub negMatches of
       [] -> Poss.retSingle $ IPNot []
@@ -278,7 +277,7 @@ findVarInhabitants var nref@(_, cns) =
             do
               let tryAddDc dc = do
                     vars <- TI.newVars (TI.dcTypes dc)
-                    runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
+                    runMaybeT (cns `C.addConstraint` (var, C.CMatch dc vars))
 
               -- Try to add a positive constraint for each data constructor
               -- to the current nref
@@ -323,19 +322,19 @@ findAllPosForNref fuel nref args = do
   return $ Poss.allCombinations argPats
 
 findVarPosExamples :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => Int -> TI.TypedVar -> C.NormRefType -> Sem r (Poss.Possibilities ExamplePat)
-findVarPosExamples fuel var nref@(_, cns) =
+findVarPosExamples fuel var cns =
   if fuel < 0
     then return mempty
     else case posMatch of
       Just (k, args) -> do
-        argPossibilities <- findAllPosForNref (fuel - 1) nref args
+        argPossibilities <- findAllPosForNref (fuel - 1) cns args
         return (mkExampleMatch k <$> argPossibilities)
       Nothing -> do
         tyCtx <- ask @Ty.TyDefCtx
         let dcs = getPosFrom (TI.getType var) tyCtx negMatches
         let tryAddDc dc = do
               vars <- TI.newVars (TI.dcTypes dc)
-              runMaybeT (nref `C.addConstraint` (var, C.CMatch dc vars))
+              runMaybeT (cns `C.addConstraint` (var, C.CMatch dc vars))
         -- Try to add a positive constraint for each data constructor
         -- to the current nref
         -- If any of these additions succeed, save that nref,

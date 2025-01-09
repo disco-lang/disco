@@ -119,7 +119,7 @@ substituteVarIDs y x = map (first subst)
   where
     subst var = if var == x then y else x
 
--- | Deals with I2 form section 3.4
+-- | Deals with I2 from section 3.4
 --   if a variable in the context has a resolvable type, there must be at least one constructor
 --   which can be instantiated without contradiction of the refinement type
 --   This function tests if this is true

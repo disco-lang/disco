@@ -12,12 +12,13 @@ import Polysemy
 import qualified Disco.Types as Ty
 import Polysemy.Reader
 import Data.Bifunctor (first)
+import qualified Data.Set as S
 
-newtype Context = Context {getCtxVars :: [TI.TypedVar]}
+newtype Context = Context {getCtxVars :: S.Set TI.TypedVar}
   deriving (Show, Eq)
 
 addVars :: Context -> [TI.TypedVar] -> Context
-addVars (Context ctx) vars = Context (ctx ++ vars)
+addVars (Context ctx) vars = Context (foldr S.insert ctx vars)
 
 data Constraint where
   CMatch :: TI.DataCon -> [TI.TypedVar] -> Constraint

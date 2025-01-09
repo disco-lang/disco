@@ -38,6 +38,7 @@ import Polysemy.Output
 import Polysemy.Reader
 import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
+import qualified Data.Set as S
 
 -- TODO(colin): should I explain that this comes from the LYG paper
 -- in some sort of comment, of leave some sort of link to the publication, etc?
@@ -47,7 +48,7 @@ checkClauses name types pats = do
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
   let gdt = foldr1 Branch cl
 
-  let argsNref = (C.Context args, [])
+  let argsNref = (C.Context (S.fromList args), [])
   (normalizedNrefs, _) <- ua [argsNref] gdt
 
   examples <- findPosExamples normalizedNrefs args

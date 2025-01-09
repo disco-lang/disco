@@ -162,7 +162,7 @@ newName = fresh $ s2n ""
 newVar :: (Member Fresh r) => Ty.Type -> Sem r TypedVar
 newVar types = do
   names <- newName
-  return $ TypedVar $ (names, types)
+  return $ TypedVar (names, types)
 
 newNames :: (Member Fresh r) => Int -> Sem r [Name ATerm]
 newNames i = replicateM i newName
@@ -170,4 +170,4 @@ newNames i = replicateM i newName
 newVars :: (Member Fresh r) => [Ty.Type] -> Sem r [TypedVar]
 newVars types = do
   names <- newNames (length types)
-  return $ map TypedVar $ zip names types
+  return $ zipWith (curry TypedVar) names types

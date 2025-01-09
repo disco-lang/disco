@@ -11,6 +11,7 @@ import qualified Disco.Exhaustiveness.TypeInfo as TI
 import Polysemy
 import qualified Disco.Types as Ty
 import Polysemy.Reader
+import Data.Bifunctor (first)
 
 newtype Context = Context {getCtxVars :: [TI.TypedVar]}
   deriving (Show, Eq)
@@ -28,7 +29,7 @@ posMatch :: [Constraint] -> Maybe (TI.DataCon, [TI.TypedVar])
 posMatch constraints = listToMaybe $ mapMaybe (\case (CMatch k ys) -> Just (k, ys); _ -> Nothing) constraints
 
 negMatches :: [Constraint] -> [TI.DataCon]
-negMatches constraints = mapMaybe (\case (CNot k) -> Just k; _ -> Nothing) constraints
+negMatches = mapMaybe (\case (CNot k) -> Just k; _ -> Nothing)
 
 type ConstraintFor = (TI.TypedVar, Constraint)
 
@@ -118,7 +119,7 @@ getConstructorArgs k cfs =
 -- | substituting y *for* x
 --   ie replace the second with the first, replace x with y
 substituteVarIDs :: TI.TypedVar -> TI.TypedVar -> [ConstraintFor] -> [ConstraintFor]
-substituteVarIDs y x = map (\(var, c) -> (subst var, c))
+substituteVarIDs y x = map (first subst)
   where
     subst var = if var == x then y else x
 

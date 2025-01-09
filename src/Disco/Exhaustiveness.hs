@@ -2,7 +2,7 @@
 
 module Disco.Exhaustiveness where
 
-import Control.Monad (forM, when, zipWithM)
+import Control.Monad (forM, zipWithM, unless)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
@@ -50,7 +50,7 @@ checkClauses name types pats = do
 
   examples <- findPosExamples normalizedNrefs args
 
-  when (not . null $ examples) $ do
+  unless (null examples) $ do
     let prettyExampleArgs exArgs =
           DSL.hsep $ map pe exArgs
 
@@ -64,8 +64,6 @@ checkClauses name types pats = do
       DSL.text "Warning: You haven't covered these cases:"
         DSL.$+$ prettyExamples
 
-  return ()
-
 pe :: (Applicative f) => ExamplePat -> f (Doc ann)
 pe e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
   (TI.KPair, _) -> tupled (traverse pe (resugarPair e))
@@ -75,15 +73,15 @@ pe e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
   (_, _) -> DSL.hsep $ DSL.text (show ident) : map pe args
 
 tupled :: (Applicative f) => f [Doc ann] -> f (Doc ann)
-tupled = fmap (PP.tupled)
+tupled = fmap PP.tupled
 
 list :: (Applicative f) => f [Doc ann] -> f (Doc ann)
-list = fmap (PP.list)
+list = fmap PP.list
 
 resugarPair :: ExamplePat -> [ExamplePat]
 resugarPair e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
   (TI.KPair, [efst, esnd]) -> efst : resugarPair esnd
-  (_, _) -> e : []
+  (_, _) -> [e]
 
 resugarList :: ExamplePat -> [ExamplePat]
 resugarList (ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
@@ -123,58 +121,56 @@ We treat unhandled patterns as if they are exhaustively matched against
 This necessarily results in some false negatives, but no false positives.
 -}
 desugarMatch :: (Members '[Fresh, Embed IO] r) => TI.TypedVar -> APattern -> Sem r [Guard]
-desugarMatch var pat = do
-  case pat of
-    (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do
-      varFst <- TI.newVar ta
-      varSnd <- TI.newVar tb
-      guardsFst <- desugarMatch varFst pfst
-      guardsSnd <- desugarMatch varSnd psnd
-      let guardPair = (var, GMatch (TI.pair ta tb) [varFst, varSnd])
-      return $ [guardPair] ++ guardsFst ++ guardsSnd
-    (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
-    (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
-    (APCons _ subHead subTail) -> do
-      let typeHead = Ty.getType subHead
-      let typeTail = Ty.getType subTail
-      varHead <- TI.newVar typeHead
-      varTail <- TI.newVar typeTail
-      guardsHead <- desugarMatch varHead subHead
-      guardsTail <- desugarMatch varTail subTail
-      let guardCons = (var, (GMatch (TI.cons typeHead typeTail) [varHead, varTail]))
-      return $ [guardCons] ++ guardsHead ++ guardsTail
-    -- We have to desugar Lists into Cons and Nils
-    (APList _ []) -> do
-      return [(var, GMatch TI.nil [])]
-    (APList ty (phead : ptail)) -> do
-      -- APCons have the type of the list they are part of
-      desugarMatch var (APCons ty phead (APList ty ptail))
-    -- we have to desugar to a list, becuse we can match strings with cons
-    (APString str) -> do
-      let strType = (Ty.TyList Ty.TyC)
-      desugarMatch var (APList strType (map APChar str))
-    -- A bit of strangeness is required here because of how patterns work
-    (APNat Ty.TyN nat) -> return [(var, GMatch (TI.natural nat) [])]
-    (APNat Ty.TyZ z) -> return [(var, GMatch (TI.integer z) [])]
-    (APNeg Ty.TyZ (APNat Ty.TyN z)) -> return [(var, GMatch (TI.integer (-z)) [])]
-    -- These are more straightforward:
-    (APWild _) -> return []
-    (APVar ty name) -> do
-      let newAlias = TI.TypedVar (name, ty)
-      return [(newAlias, GWasOriginally var)]
-    (APUnit) -> return [(var, GMatch TI.unit [])]
-    (APBool b) -> return [(var, GMatch (TI.bool b) [])]
-    (APChar c) -> return [(var, GMatch (TI.char c) [])]
-    (APInj (tl Ty.:+: tr) side subPat) -> do
-      let dc = case side of
-            L -> TI.left tl
-            R -> TI.right tr
-      newVar <- case side of
-        L -> TI.newVar tl
-        R -> TI.newVar tr
-      guards <- desugarMatch newVar subPat
-      return $ [(var, GMatch dc [newVar])] ++ guards
-    _ -> return []
+desugarMatch var pat = case pat of
+  (APTup (ta Ty.:*: tb) [pfst, psnd]) -> do
+    varFst <- TI.newVar ta
+    varSnd <- TI.newVar tb
+    guardsFst <- desugarMatch varFst pfst
+    guardsSnd <- desugarMatch varSnd psnd
+    let guardPair = (var, GMatch (TI.pair ta tb) [varFst, varSnd])
+    return $ [guardPair] ++ guardsFst ++ guardsSnd
+  (APTup ty [_, _]) -> error $ "Tuple type that wasn't a pair???: " ++ show ty
+  (APTup _ sugary) -> desugarMatch var (desugarTuplePats sugary)
+  (APCons _ subHead subTail) -> do
+    let typeHead = Ty.getType subHead
+    let typeTail = Ty.getType subTail
+    varHead <- TI.newVar typeHead
+    varTail <- TI.newVar typeTail
+    guardsHead <- desugarMatch varHead subHead
+    guardsTail <- desugarMatch varTail subTail
+    let guardCons = (var, GMatch (TI.cons typeHead typeTail) [varHead, varTail])
+    return $ [guardCons] ++ guardsHead ++ guardsTail
+  -- We have to desugar Lists into Cons and Nils
+  (APList _ []) -> return [(var, GMatch TI.nil [])]
+  (APList ty (phead : ptail)) -> do
+    -- APCons have the type of the list they are part of
+    desugarMatch var (APCons ty phead (APList ty ptail))
+  -- we have to desugar to a list, becuse we can match strings with cons
+  (APString str) -> do
+    let strType = Ty.TyList Ty.TyC
+    desugarMatch var (APList strType (map APChar str))
+  -- A bit of strangeness is required here because of how patterns work
+  (APNat Ty.TyN nat) -> return [(var, GMatch (TI.natural nat) [])]
+  (APNat Ty.TyZ z) -> return [(var, GMatch (TI.integer z) [])]
+  (APNeg Ty.TyZ (APNat Ty.TyN z)) -> return [(var, GMatch (TI.integer (-z)) [])]
+  -- These are more straightforward:
+  (APWild _) -> return []
+  (APVar ty name) -> do
+    let newAlias = TI.TypedVar (name, ty)
+    return [(newAlias, GWasOriginally var)]
+  APUnit -> return [(var, GMatch TI.unit [])]
+  (APBool b) -> return [(var, GMatch (TI.bool b) [])]
+  (APChar c) -> return [(var, GMatch (TI.char c) [])]
+  (APInj (tl Ty.:+: tr) side subPat) -> do
+    let dc = case side of
+          L -> TI.left tl
+          R -> TI.right tr
+    newVar <- case side of
+      L -> TI.newVar tl
+      R -> TI.newVar tr
+    guards <- desugarMatch newVar subPat
+    return $ (var, GMatch dc [newVar]) : guards
+  _ -> return []
 
 data Gdt where
   Grhs :: Int -> Gdt
@@ -212,7 +208,7 @@ ua nrefs gdt = case gdt of
   Guarded (y, GWasOriginally x) t -> do
     n <- addLitMulti nrefs $ Literal (y, LitWasOriginally x)
     ua n t
-  Guarded (x, (GMatch dc args)) t -> do
+  Guarded (x, GMatch dc args) t -> do
     n <- addLitMulti nrefs $ Literal (x, LitMatch dc args)
     (n', u) <- ua n t
     n'' <- addLitMulti nrefs $ Literal (x, LitNot dc)
@@ -409,7 +405,7 @@ findVarPosExamples fuel var nref@(_, cns) =
     negMatches = C.negMatches constraintsOnX
 
 getPosFrom :: Ty.Type -> Ty.TyDefCtx -> [TI.DataCon] -> [TI.DataCon]
-getPosFrom ty ctx neg = take 3 $ filter (\x -> not (x `elem` neg)) dcs
+getPosFrom ty ctx neg = take 3 $ filter (`notElem` neg) dcs
   where
     dcs = case TI.tyDataCons ty ctx of
       TI.Finite dcs' -> dcs'

@@ -63,15 +63,12 @@ instance Show Ident where
     KLeft -> "left()"
     KRight -> "right()"
 
--- | Finite constructors are used in the LYG checker
+-- | 'Finite' constructors are used in the LYG checker
 --   'Infinite' constructors are used when reporting
 --   examples of uncovered patterns, we only pick out a few of them
 data Constructors where
   Finite :: [DataCon] -> Constructors
   Infinite :: [DataCon] -> Constructors
--- TODO(colin): should I quote 'Infinite' with single quotes in the above doc comment?
--- is there a proper way to reference that that will get
--- picked up and put in the docs in a nice way?
 
 unknown :: DataCon
 unknown = DataCon {dcIdent = KUnkown, dcTypes = []}

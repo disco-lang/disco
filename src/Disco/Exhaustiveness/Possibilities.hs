@@ -1,18 +1,11 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 module Disco.Exhaustiveness.Possibilities (Possibilities, retSingle, allCombinations, anyOf, none, getPossibilities) where
 
-import Data.Foldable (Foldable (fold))
+import Data.Foldable (fold)
 
 newtype Possibilities a = Possibilities {getPossibilities :: [a]}
-  deriving (Show, Eq, Ord)
-
-instance Functor Possibilities where
-  fmap f (Possibilities a) = Possibilities (f <$> a)
-
-instance Semigroup (Possibilities a) where
-  (Possibilities p1) <> (Possibilities p2) = Possibilities $ p1 <> p2
-
-instance Monoid (Possibilities a) where
-  mempty = Possibilities []
+  deriving (Show, Eq, Ord, Functor, Semigroup, Monoid, Applicative)
 
 anyOf :: [Possibilities a] -> Possibilities a
 anyOf = fold
@@ -54,11 +47,4 @@ retSingle i = return $ Possibilities [i]
 --   In other words, this lists all elements of the
 --   cartesian product of multiple sets
 allCombinations :: [Possibilities a] -> Possibilities [a]
-allCombinations = foldr prod nil
-  where
-    -- note, nil /= mempty
-    -- VERY important
-    nil = Possibilities [[]]
-
-prod :: Possibilities a -> Possibilities [a] -> Possibilities [a]
-prod (Possibilities xs) (Possibilities yss) = Possibilities [x : ys | x <- xs, ys <- yss]
+allCombinations = sequenceA

@@ -57,9 +57,7 @@ addConstraintHelper cns cf@(origX, c) = case c of
   --- Equation (10)
   CMatch k args -> do
     case getConstructorArgs k (onVar origX cns) of
-      -- 10c -- TODO(colin): Still need to add type constraints!
-      -- ...unless resolveAlias in TypeInfo works all of the time.
-      -- then we are actually done
+      -- 10c
       Just args' ->
         addConstraints
           cns
@@ -123,9 +121,6 @@ substituteVarIDs y x = map (first subst)
 --   if a variable in the context has a resolvable type, there must be at least one constructor
 --   which can be instantiated without contradiction of the refinement type
 --   This function tests if this is true
---   TODO(colin): we may eventually have type constraints
---   and we would need to worry pulling them from nref here
---   ...unless resolveAlias works. see above note
 inhabited :: Members '[Fresh, Reader Ty.TyDefCtx] r => NormRefType -> TI.TypedVar -> Sem r Bool
 inhabited n var = do
   tyCtx <- ask @Ty.TyDefCtx

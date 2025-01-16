@@ -111,11 +111,9 @@ tyDataCons ty ctx = tyDataConsHelper $ resolveAlias ty ctx
 -- of type equality constraints in Constraint.hs,
 -- the lookup here will have handled that behavoir already
 --
--- I was worried about infinite recursion at first,
--- but I think the types that that would happen for
--- are rejected with an error:
---  Error: cyclic type definition for A.
--- So I don't think that is an issue, but I would like confirmation
+-- Type aliases that would cause infinite recursion here are
+-- not possible to construct, so we don't have to worry about that.
+-- (aka cyclic type definitions are not allowed in Disco)
 resolveAlias :: Ty.Type -> Ty.TyDefCtx -> Ty.Type
 resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Nothing -> error $ show ctx ++ "\nType definition not found for: " ++ show name

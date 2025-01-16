@@ -69,7 +69,7 @@ checkClauses name types pats = do
           DSL.vcat $ map (prettyExampleLine . prettyExampleArgs) examples
 
     warn $
-      DSL.text "Warning: You haven't covered these cases:"
+      DSL.text "Warning: the function" DSL.<+> DSL.text (show name) DSL.<+> DSL.text "is undefined for some inputs. For example:"
         DSL.$+$ prettyExamples
 
 prettyPrintExample :: (Applicative f) => ExamplePat -> f (Doc ann)

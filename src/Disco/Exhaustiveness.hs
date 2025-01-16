@@ -39,8 +39,14 @@ import Polysemy.Reader
 import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
 
--- TODO(colin): should I explain that this comes from the LYG paper
--- in some sort of comment, of leave some sort of link to the publication, etc?
+-- | This exhaustiveness checking algorithm is based on the paper
+--   "Lower Your Guards: A Compositional Pattern-Match Coverage Checker":
+--   https://www.microsoft.com/en-us/research/uploads/prod/2020/03/lyg.pdf
+--
+--   Some simplifications were made to adapt the algorithm to suit Disco.
+--   The most notable change is that here we always generate (at most) 3
+--   concrete examples of uncovered patterns, instead of finding the most
+--   general complete description of every uncovered input.
 checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types

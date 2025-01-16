@@ -2,6 +2,7 @@ module Disco.Exhaustiveness.TypeInfo where
 
 import Control.Monad (replicateM)
 import Data.Function (on)
+import Data.List ((\\))
 import qualified Data.Map as M
 import Disco.AST.Typed (ATerm)
 import Disco.Effects.Fresh (Fresh, fresh)
@@ -135,12 +136,19 @@ tyDataConsHelper Ty.TyN = Infinite $ map natural [0, 1 ..]
 tyDataConsHelper Ty.TyZ = Infinite $ map integer $ 0 : [y | x <- [1 ..], y <- [x, -x]]
 tyDataConsHelper Ty.TyF = Infinite []
 tyDataConsHelper Ty.TyQ = Infinite []
--- TODO(colin): We could do all valid ASCII, but this is most likely good enough
--- I think these starting from 'a' is good for students learning the language
+-- The Char constructors are all unicode characters, but
+-- starting with the alphanumerics and ending with the
+-- ascii control characters to give nice warnings.
+-- Many thanks to Dr. Yorgey for mentioning [minBound .. maxBound] and \\
 tyDataConsHelper Ty.TyC =
   Infinite $
     map char $
-      ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
+      alphanum ++ rest ++ controlChars
+  where
+    allChars = [minBound .. maxBound]
+    alphanum = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
+    noAlphanum = allChars \\ alphanum
+    (controlChars, rest) = splitAt 32 noAlphanum
 tyDataConsHelper _ = Infinite [unknown]
 -- ^ This includes:
 -- (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)

@@ -1,3 +1,14 @@
+-- |
+-- Module      :  Disco.Exhaustiveness.Constraint
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- The heart of the Lower Your Guards algorithm.
+-- Functions for converting constraints detailing
+-- pattern matches into a normalized description
+-- of everything that is left uncovered.
 module Disco.Exhaustiveness.Constraint where
 
 import Control.Applicative (Alternative)

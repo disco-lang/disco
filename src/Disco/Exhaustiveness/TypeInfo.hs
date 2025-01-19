@@ -1,3 +1,13 @@
+-- |
+-- Module      :  Disco.Exhaustiveness.TypeInfo
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- Utilities for converting Disco types into 'Constructors'
+-- that the exhaustiveness checker understands, and utilities
+-- for working with 'TypedVar's and their names.
 module Disco.Exhaustiveness.TypeInfo where
 
 import Control.Monad (replicateM)

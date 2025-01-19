@@ -1,5 +1,15 @@
 {-# LANGUAGE PatternSynonyms #-}
 
+-- |
+-- Module      :  Disco.Exhaustiveness
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- Entry point into the exhaustiveness checker.
+-- Converts information into a format the checker understands,
+-- then pretty prints the results of running it.
 module Disco.Exhaustiveness where
 
 import Control.Monad (forM, zipWithM, unless)

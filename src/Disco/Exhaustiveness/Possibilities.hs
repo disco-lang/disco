@@ -1,5 +1,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
+-- |
+-- Module      :  Disco.Exhaustiveness.Possibilities
+-- Copyright   :  disco team and contributors
+-- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
+--
+-- Meaningful types and functions for describing
+-- combinations of different possible options.
 module Disco.Exhaustiveness.Possibilities (Possibilities, retSingle, allCombinations, anyOf, none, getPossibilities) where
 
 import Data.Foldable (fold)

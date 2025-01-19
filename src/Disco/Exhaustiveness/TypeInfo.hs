@@ -43,7 +43,7 @@ data Ident where
   KChar :: Char -> Ident
   KLeft :: Ident
   KRight :: Ident
-  KUnkown :: Ident
+  KUnknown :: Ident
   deriving (Eq, Ord)
 
 instance Show Ident where
@@ -57,7 +57,7 @@ instance Show Ident where
         else show z
     KNil -> "[]"
     KUnit -> "unit"
-    KUnkown -> "_"
+    KUnknown -> "_"
     -- These should never actually be printed in warnings
     KPair -> ","
     KCons -> "::"
@@ -72,7 +72,7 @@ data Constructors where
   Infinite :: [DataCon] -> Constructors
 
 unknown :: DataCon
-unknown = DataCon {dcIdent = KUnkown, dcTypes = []}
+unknown = DataCon {dcIdent = KUnknown, dcTypes = []}
 
 unit :: DataCon
 unit = DataCon {dcIdent = KUnit, dcTypes = []}

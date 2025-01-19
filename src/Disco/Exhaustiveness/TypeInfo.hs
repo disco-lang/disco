@@ -117,11 +117,6 @@ right tr = DataCon {dcIdent = KRight, dcTypes = [tr]}
 tyDataCons :: Ty.Type -> Ty.TyDefCtx -> Constructors
 tyDataCons ty ctx = tyDataConsHelper $ resolveAlias ty ctx
 
--- TODO(colin): ask yorgey, make sure I've done this correctly
--- If I have, and this is enough, I can remove all mentions
--- of type equality constraints in Constraint.hs,
--- the lookup here will have handled that behavoir already
---
 -- Type aliases that would cause infinite recursion here are
 -- not possible to construct, so we don't have to worry about that.
 -- (aka cyclic type definitions are not allowed in Disco)

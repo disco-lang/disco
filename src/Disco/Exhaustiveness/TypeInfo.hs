@@ -137,18 +137,16 @@ tyDataConsHelper Ty.TyZ = Infinite $ map integer $ 0 : [y | x <- [1 ..], y <- [x
 tyDataConsHelper Ty.TyF = Infinite []
 tyDataConsHelper Ty.TyQ = Infinite []
 -- The Char constructors are all unicode characters, but
--- starting with the alphanumerics and ending with the
--- ascii control characters to give nice warnings.
+-- given in a very particular order that I think will
+-- make the most sense for students.
 -- Many thanks to Dr. Yorgey for mentioning [minBound .. maxBound] and \\
 tyDataConsHelper Ty.TyC =
   Infinite $
     map char $
-      alphanum ++ rest ++ controlChars
+      alphanum ++ (allUnicodeNicelyOrdered \\ alphanum)
   where
-    allChars = [minBound .. maxBound]
+    allUnicodeNicelyOrdered = [(toEnum 32) .. (toEnum 126)] ++ [(toEnum 161) .. maxBound] ++ [minBound .. (toEnum 31)] ++ [(toEnum 127) .. (toEnum 160)]
     alphanum = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
-    noAlphanum = allChars \\ alphanum
-    (controlChars, rest) = splitAt 32 noAlphanum
 tyDataConsHelper _ = Infinite [unknown]
 -- ^ This includes:
 -- (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)
@@ -156,7 +154,7 @@ tyDataConsHelper _ = Infinite [unknown]
 -- TODO(colin): confim below:
 -- I think all of these are impossible to pattern match against
 -- with anything other than a wildcard.
--- So they should be always fully covered. 
+-- So they should be always fully covered.
 -- But if they are in a pair, like a Set(Int)*Int,
 -- We still need to generate 3 examples of the pair if that Int
 -- part isn't covered.

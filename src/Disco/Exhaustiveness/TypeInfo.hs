@@ -121,8 +121,34 @@ resolveAlias (Ty.TyUser name args) ctx = case M.lookup name ctx of
   Just (Ty.TyDefBody _argNames typeCon) -> resolveAlias (typeCon args) ctx
 resolveAlias t _ = t
 
--- TODO(colin): ask yorgey to see if I've handled all the thing
--- I need to here. The list of things caught by the wildcard is in the comment below the function
+-- | Assuming type aliases have been resolved, this
+--   function converts Disco types into lists of DataCons
+--   that are compatible with the LYG checker.
+--
+--   A list of constructors is 'Infinite' if the only way to fully
+--   match against the type is with a wildcard or variable pattern.
+--   Otherwise, it is 'Finite'.
+--
+--   The LYG checker only reads the list of constructors if
+--   a type is 'Finite'. From the point of view of the checker,
+--   'Infinite' is a synonym for opaque, and the constructors are discarded.
+--   The dataconstructors in an `Infinite` list are only
+--   used when generating the 3 positive examples of what
+--   you haven't matched against.
+--   This will probably need to change a bit when bringing
+--   exhaustiveness checking to the new arithmetic patterns.
+--
+--   Notice the last case of this function, which a wildcard handling the types:
+--   (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)
+--   (Ty.TySkolem _) (Ty.TyProp) (Ty.TyMap _ _) (Ty.TyGraph _)
+--
+--   I believe all of these are impossible to pattern match against
+--   with anything other than a wildcard (or variable pattern) in Disco, so they should always
+--   be fully covered. But if they are in a pair, for example, Set(Int)*Int,
+--   we still need to generate 3 examples of the pair if that Int part isn't covered.
+--   So how do we fill the concrete part of Set(Int), (or a generic type "a", or a function, etc.)?
+--   I'm calling that 'unknown', and printing an underscore.
+--   (Also, I'm using 'Infinite' for reasons metioned above).
 tyDataConsHelper :: Ty.Type -> Constructors
 tyDataConsHelper (a Ty.:*: b) = Finite [pair a b]
 tyDataConsHelper (l Ty.:+: r) = Finite [left l, right r]
@@ -148,26 +174,6 @@ tyDataConsHelper Ty.TyC =
     allUnicodeNicelyOrdered = [(toEnum 32) .. (toEnum 126)] ++ [(toEnum 161) .. maxBound] ++ [minBound .. (toEnum 31)] ++ [(toEnum 127) .. (toEnum 160)]
     alphanum = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
 tyDataConsHelper _ = Infinite [unknown]
--- ^ This includes:
--- (_ Ty.:->: _) (Ty.TySet _) (Ty.TyBag _) (Ty.TyVar _)
--- (Ty.TySkolem _) (Ty.TyProp) (Ty.TyMap _ _) (Ty.TyGraph _)
--- TODO(colin): confim below:
--- I think all of these are impossible to pattern match against
--- with anything other than a wildcard.
--- So they should be always fully covered.
--- But if they are in a pair, like a Set(Int)*Int,
--- We still need to generate 3 examples of the pair if that Int
--- part isn't covered.
--- So how do we fill the concrete part of Set(Int)?
--- For now I'm calling that unknown, and printing an underscore
--- I believe this also applies when pattern matching 'Maybe a' types
--- We need stand in for an example of a concrete 'a'
---
--- iirc, these are 'Infinite' because the only way to match against
--- them is with a wildcard or variable pattern, and marking them 'Infinite'
--- conveys essentially just that to the LYG checker
---
--- Maybe this should be rewritten in a big doc comment above?
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)
 newName = fresh $ s2n ""

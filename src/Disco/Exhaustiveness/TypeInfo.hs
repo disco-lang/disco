@@ -42,6 +42,10 @@ data DataCon = DataCon
 instance Eq DataCon where
   (==) = (==) `on` dcIdent
 
+-- The Show instance of 'Ident' should never be used
+-- for displaying results to the user.
+-- Instead, convert to a proper pattern and use the
+-- pretty printer, like in Exhaustiveness.hs
 data Ident where
   KUnit :: Ident
   KBool :: Bool -> Ident
@@ -54,25 +58,7 @@ data Ident where
   KLeft :: Ident
   KRight :: Ident
   KUnknown :: Ident
-  deriving (Eq, Ord)
-
-instance Show Ident where
-  show i = case i of
-    KBool b -> show b
-    KChar c -> show c
-    KNat n -> show n
-    KInt z ->
-      if z < 0
-        then "(" ++ show z ++ ")"
-        else show z
-    KNil -> "[]"
-    KUnit -> "unit"
-    KUnknown -> "_"
-    -- These should never actually be printed in warnings
-    KPair -> ","
-    KCons -> "::"
-    KLeft -> "left()"
-    KRight -> "right()"
+  deriving (Show, Eq, Ord)
 
 -- | 'Finite' constructors are used in the LYG checker
 --   'Infinite' constructors are used when reporting

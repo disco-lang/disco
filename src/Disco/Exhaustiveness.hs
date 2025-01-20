@@ -12,13 +12,27 @@
 -- then pretty prints the results of running it.
 module Disco.Exhaustiveness where
 
-import Control.Monad (forM, zipWithM, unless)
+import Control.Monad (forM, unless, zipWithM)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
 import Data.List (nub)
 import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
 import Disco.AST.Generic (Side (..))
+import Disco.AST.Surface
+  ( Pattern,
+    prettyPatternP,
+    pattern PBool,
+    pattern PChar,
+    pattern PInj,
+    pattern PList,
+    pattern PNat,
+    pattern PNeg,
+    pattern PString,
+    pattern PTup,
+    pattern PUnit,
+    pattern PWild,
+  )
 import Disco.AST.Typed
   ( APattern,
     ATerm,
@@ -36,17 +50,18 @@ import Disco.AST.Typed
     pattern APWild,
   )
 import Disco.Effects.Fresh (Fresh)
+import Disco.Effects.LFresh (LFresh, runLFresh)
 import qualified Disco.Exhaustiveness.Constraint as C
 import qualified Disco.Exhaustiveness.Possibilities as Poss
 import qualified Disco.Exhaustiveness.TypeInfo as TI
 import Disco.Messages
-import Disco.Pretty (Doc)
+import Disco.Pretty (Doc, initPA, withPA)
 import qualified Disco.Pretty.DSL as DSL
+import Disco.Pretty.Prec (PA, funPA)
 import qualified Disco.Types as Ty
 import Polysemy
 import Polysemy.Output
 import Polysemy.Reader
-import qualified Prettyprinter as PP
 import Unbound.Generics.LocallyNameless (Name)
 
 -- | This exhaustiveness checking algorithm is based on the paper
@@ -70,31 +85,47 @@ checkClauses name types pats = do
 
   unless (null examples) $ do
     let prettyExampleArgs exArgs =
-          DSL.hsep $ map prettyPrintExample exArgs
+          DSL.hcat $ map prettyPrintExample exArgs
 
     let prettyExampleLine prettyArgs =
-          DSL.text (show name) DSL.<+> prettyArgs DSL.<+> DSL.text "= ..."
+          DSL.text (show name) DSL.<> prettyArgs DSL.<+> DSL.text "= ..."
 
     let prettyExamples =
           DSL.vcat $ map (prettyExampleLine . prettyExampleArgs) examples
 
     warn $
-      DSL.text "Warning: the function" DSL.<+> DSL.text (show name) DSL.<+> DSL.text "is undefined for some inputs. For example:"
+      DSL.text "Warning: the function"
+        DSL.<+> DSL.text (show name)
+        DSL.<+> DSL.text "is undefined for some inputs. For example:"
         DSL.$+$ prettyExamples
 
-prettyPrintExample :: (Applicative f) => ExamplePat -> f (Doc ann)
-prettyPrintExample e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
-  (TI.KPair, _) -> tupled (traverse prettyPrintExample (resugarPair e))
-  (TI.KCons, _) -> list (traverse prettyPrintExample (resugarList e))
-  (TI.KLeft, [l]) -> DSL.parens $ DSL.text "left" DSL.<+> prettyPrintExample l
-  (TI.KRight, [r]) -> DSL.parens $ DSL.text "right" DSL.<+> prettyPrintExample r
-  (_, _) -> DSL.hsep $ DSL.text (show ident) : map prettyPrintExample args
+prettyPrintExample :: ExamplePat -> Sem r (Doc ann)
+prettyPrintExample = runLFresh . runReader initPA . prettyPrintPattern . exampleToDiscoPattern
 
-tupled :: (Applicative f) => f [Doc ann] -> f (Doc ann)
-tupled = fmap PP.tupled
+prettyPrintPattern :: (Members '[Reader PA, LFresh] r) => Pattern -> Sem r (Doc ann)
+prettyPrintPattern = withPA funPA . prettyPatternP
 
-list :: (Applicative f) => f [Doc ann] -> f (Doc ann)
-list = fmap PP.list
+exampleToDiscoPattern :: ExamplePat -> Pattern
+exampleToDiscoPattern e@(ExamplePat TI.DataCon {TI.dcIdent = ident, TI.dcTypes = types} args) = case (ident, args) of
+  (TI.KUnknown, _) -> PWild
+  (TI.KUnit, _) -> PUnit
+  (TI.KBool b, _) -> PBool b
+  (TI.KNat n, _) -> PNat n
+  (TI.KInt z, _) ->
+    if z >= 0
+      then PNat z
+      else PNeg (PNat (abs z))
+  (TI.KPair, _) -> PTup $ map exampleToDiscoPattern $ resugarPair e
+  (TI.KCons, _) ->
+    if take 1 types == [Ty.TyC]
+      then PString $ resugarString e
+      else PList $ map exampleToDiscoPattern $ resugarList e
+  (TI.KNil, _) -> PList []
+  (TI.KChar c, _) -> PChar c
+  (TI.KLeft, [l]) -> PInj L $ exampleToDiscoPattern l
+  (TI.KRight, [r]) -> PInj R $ exampleToDiscoPattern r
+  (TI.KLeft, _) -> error "Found KLeft data constructor with 0 or multiple arguments"
+  (TI.KRight, _) -> error "Found KRight data constructor with 0 or multiple arguments"
 
 resugarPair :: ExamplePat -> [ExamplePat]
 resugarPair e@(ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
@@ -105,6 +136,15 @@ resugarList :: ExamplePat -> [ExamplePat]
 resugarList (ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
   (TI.KCons, [ehead, etail]) -> ehead : resugarList etail
   (_, _) -> []
+
+resugarString :: ExamplePat -> String
+resugarString (ExamplePat TI.DataCon {TI.dcIdent = ident} args) = case (ident, args) of
+  (TI.KCons, [ehead, etail]) -> assumeExampleChar ehead : resugarString etail
+  (_, _) -> []
+
+assumeExampleChar :: ExamplePat -> Char
+assumeExampleChar (ExamplePat TI.DataCon {TI.dcIdent = TI.KChar c} _) = c
+assumeExampleChar _ = error "Wrongly assumed that an ExamplePat was a Char"
 
 desugarClause :: (Members '[Fresh, Embed IO] r) => [TI.TypedVar] -> Int -> [APattern] -> Sem r Gdt
 desugarClause args clauseIdx argsPats = do
@@ -136,7 +176,7 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
 --     , APAdd
 --     , APMul
 --     , APSub
---   These (or some updated version of them) may be handled eventually, 
+--   These (or some updated version of them) may be handled eventually,
 --   once updated arithmetic patterns are merged.
 --
 --   We treat unhandled patterns as if they are exhaustively matched against

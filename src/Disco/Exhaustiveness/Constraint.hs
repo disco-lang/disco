@@ -15,14 +15,14 @@ import Control.Applicative (Alternative)
 import Control.Monad (foldM, guard)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.Maybe (MaybeT, runMaybeT)
+import Data.Bifunctor (first)
 import Data.List (partition)
 import Data.Maybe (isJust, listToMaybe, mapMaybe)
 import Disco.Effects.Fresh (Fresh)
 import qualified Disco.Exhaustiveness.TypeInfo as TI
-import Polysemy
 import qualified Disco.Types as Ty
+import Polysemy
 import Polysemy.Reader
-import Data.Bifunctor (first)
 
 data Constraint where
   CMatch :: TI.DataCon -> [TI.TypedVar] -> Constraint
@@ -43,9 +43,9 @@ type ConstraintFor = (TI.TypedVar, Constraint)
 -- do a linear scan from right to left
 lookupVar :: TI.TypedVar -> [ConstraintFor] -> TI.TypedVar
 lookupVar x = foldr getNextId x
-  where
-    getNextId (x', CWasOriginally y) | x' == x = const y
-    getNextId _ = id
+ where
+  getNextId (x', CWasOriginally y) | x' == x = const y
+  getNextId _ = id
 
 alistLookup :: (Eq a) => a -> [(a, b)] -> [b]
 alistLookup a = map snd . filter ((== a) . fst)
@@ -87,8 +87,8 @@ addConstraintHelper cns cf@(origX, c) = case c of
       else do
         let (noX', withX') = partition ((/= origX) . fst) cns
         addConstraints (noX' ++ [cf]) (substituteVarIDs origY origX withX')
-  where
-    added = cns ++ [cf]
+ where
+  added = cns ++ [cf]
 
 -----
 ----- Helper functions for adding constraints:
@@ -125,8 +125,8 @@ getConstructorArgs k cfs =
 --   ie replace the second with the first, replace x with y
 substituteVarIDs :: TI.TypedVar -> TI.TypedVar -> [ConstraintFor] -> [ConstraintFor]
 substituteVarIDs y x = map (first subst)
-  where
-    subst var = if var == x then y else x
+ where
+  subst var = if var == x then y else x
 
 -- | Deals with I2 from section 3.4
 --   if a variable in the context has a resolvable type, there must be at least one constructor

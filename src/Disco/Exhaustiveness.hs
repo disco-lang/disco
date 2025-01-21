@@ -19,36 +19,36 @@ import Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Maybe (catMaybes)
 import Disco.AST.Generic (Side (..))
-import Disco.AST.Surface
-  ( Pattern,
-    prettyPatternP,
-    pattern PBool,
-    pattern PChar,
-    pattern PInj,
-    pattern PList,
-    pattern PNat,
-    pattern PNeg,
-    pattern PString,
-    pattern PTup,
-    pattern PUnit,
-    pattern PWild,
-  )
-import Disco.AST.Typed
-  ( APattern,
-    ATerm,
-    pattern APBool,
-    pattern APChar,
-    pattern APCons,
-    pattern APInj,
-    pattern APList,
-    pattern APNat,
-    pattern APNeg,
-    pattern APString,
-    pattern APTup,
-    pattern APUnit,
-    pattern APVar,
-    pattern APWild,
-  )
+import Disco.AST.Surface (
+  Pattern,
+  prettyPatternP,
+  pattern PBool,
+  pattern PChar,
+  pattern PInj,
+  pattern PList,
+  pattern PNat,
+  pattern PNeg,
+  pattern PString,
+  pattern PTup,
+  pattern PUnit,
+  pattern PWild,
+ )
+import Disco.AST.Typed (
+  APattern,
+  ATerm,
+  pattern APBool,
+  pattern APChar,
+  pattern APCons,
+  pattern APInj,
+  pattern APList,
+  pattern APNat,
+  pattern APNeg,
+  pattern APString,
+  pattern APTup,
+  pattern APUnit,
+  pattern APVar,
+  pattern APWild,
+ )
 import Disco.Effects.Fresh (Fresh)
 import Disco.Effects.LFresh (LFresh, runLFresh)
 import qualified Disco.Exhaustiveness.Constraint as C
@@ -164,8 +164,8 @@ desugarTuplePats :: [APattern] -> APattern
 desugarTuplePats [] = error "Found empty tuple, what happened?"
 desugarTuplePats [p] = p
 desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) [pfst, psnd]
-  where
-    psnd = desugarTuplePats rest
+ where
+  psnd = desugarTuplePats rest
 
 -- | Convert a Disco APattern into a list of Guards which cover that pattern
 --
@@ -344,10 +344,10 @@ findVarInhabitants var cns =
               if null posNrefs
                 then Poss.retSingle $ IPNot []
                 else Poss.anyOf <$> forM posNrefs (findVarInhabitants var)
-  where
-    constraintsOnX = C.onVar var cns
-    posMatch = C.posMatch constraintsOnX
-    negMatches = C.negMatches constraintsOnX
+ where
+  constraintsOnX = C.onVar var cns
+  posMatch = C.posMatch constraintsOnX
+  negMatches = C.negMatches constraintsOnX
 
 findRedundant :: (Members '[Fresh, Reader Ty.TyDefCtx] r) => Ant -> [TI.TypedVar] -> Sem r [Int]
 findRedundant ant args = case ant of
@@ -398,17 +398,17 @@ findVarPosExamples fuel var cns =
         posNrefs <- catMaybes <$> forM dcs tryAddDc
 
         Poss.anyOf <$> forM posNrefs (findVarPosExamples (fuel - 1) var)
-  where
-    constraintsOnX = C.onVar var cns
-    posMatch = C.posMatch constraintsOnX
-    negMatches = C.negMatches constraintsOnX
+ where
+  constraintsOnX = C.onVar var cns
+  posMatch = C.posMatch constraintsOnX
+  negMatches = C.negMatches constraintsOnX
 
 getPosFrom :: Ty.Type -> Ty.TyDefCtx -> [TI.DataCon] -> [TI.DataCon]
 getPosFrom ty ctx neg = take 3 $ filter (`notElem` neg) dcs
-  where
-    dcs = case TI.tyDataCons ty ctx of
-      TI.Finite dcs' -> dcs'
-      TI.Infinite dcs' -> dcs'
+ where
+  dcs = case TI.tyDataCons ty ctx of
+    TI.Finite dcs' -> dcs'
+    TI.Infinite dcs' -> dcs'
 
 mkExampleMatch :: TI.DataCon -> [ExamplePat] -> ExamplePat
 mkExampleMatch k pats =

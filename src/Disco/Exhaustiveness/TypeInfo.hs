@@ -30,8 +30,8 @@ getType :: TypedVar -> Ty.Type
 getType (TypedVar (_, t)) = t
 
 data DataCon = DataCon
-  { dcIdent :: Ident,
-    dcTypes :: [Ty.Type]
+  { dcIdent :: Ident
+  , dcTypes :: [Ty.Type]
   }
   deriving (Ord, Show)
 
@@ -161,9 +161,9 @@ tyDataConsHelper Ty.TyC =
   Infinite $
     map char $
       alphanum ++ (allUnicodeNicelyOrdered \\ alphanum)
-  where
-    allUnicodeNicelyOrdered = [(toEnum 32) .. (toEnum 126)] ++ [(toEnum 161) .. maxBound] ++ [minBound .. (toEnum 31)] ++ [(toEnum 127) .. (toEnum 160)]
-    alphanum = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
+ where
+  allUnicodeNicelyOrdered = [(toEnum 32) .. (toEnum 126)] ++ [(toEnum 161) .. maxBound] ++ [minBound .. (toEnum 31)] ++ [(toEnum 127) .. (toEnum 160)]
+  alphanum = ['a' .. 'z'] ++ ['A' .. 'Z'] ++ ['0' .. '9']
 tyDataConsHelper _ = Infinite [unknown]
 
 newName :: (Member Fresh r) => Sem r (Name ATerm)

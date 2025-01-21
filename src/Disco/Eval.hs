@@ -78,11 +78,13 @@ import Polysemy.Output
 import Polysemy.Random
 import Polysemy.Reader
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Disco.AST.Core
 import Disco.AST.Surface
 import Disco.Compile (compileDefns)
 import Disco.Context as Ctx
 import Disco.Error
+import Disco.Exhaustiveness (checkClauses)
 import Disco.Extensions
 import Disco.Interpret.CESK
 import Disco.Messages
@@ -95,8 +97,6 @@ import Disco.Typecheck (checkModule)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Value
-import qualified Data.List.NonEmpty as NonEmpty
-import Disco.Exhaustiveness (checkClauses)
 
 ------------------------------------------------------------
 -- Configuation options
@@ -387,8 +387,8 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
   -- Check for partial functions
-  let allTyDefs = M.unionWith const tydefns (m^.miTydefs)
-  runFresh $ mapM_ (checkExhaustive allTyDefs) (Ctx.elems $ m^.miTermdefs)
+  let allTyDefs = M.unionWith const tydefns (m ^. miTydefs)
+  runFresh $ mapM_ (checkExhaustive allTyDefs) (Ctx.elems $ m ^. miTermdefs)
 
   -- Evaluate all the module definitions and add them to the topEnv.
   mapError EvalErr $ loadDefsFrom m

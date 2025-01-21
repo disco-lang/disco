@@ -5,17 +5,6 @@ Disco is a programming language intended to teach basic functional
 programming principles in the context of a discrete mathematics
 course.
 
-Using Disco on replit.com
----------------------------
-
-If you just want to *use* disco (*i.e.* if you are a student, or just
-checking out the language), the recommended way is to use it via
-`replit.com`.  Simply [visit this
-REPL](https://replit.com/@BrentYorgey/Disco#README.md) and follow the
-instructions there to fork your own copy, where you will be able to
-evaluate Disco expressions, and edit and run your own `.disco` files,
-all via your web browser, without installing anything on your computer.
-
 Design principles
 -----------------
 
@@ -52,64 +41,16 @@ Contributing
 If you'd like to contribute to disco development, check out
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Building with stack
--------------------
+Building disco
+--------------
 
-First, make sure you have
-[the `stack` tool](https://docs.haskellstack.org/en/stable/README/)
-(the easiest way to install it is via [ghcup](https://www.haskell.org/ghcup/)).
-Then open a command prompt, navigate to the root directory of this
-repository, and execute
+- The first step is to install the Haskell programming language (the
+  language in which Disco is implemented).  If you don't already have
+  Haskell installed, you can [follow the directions
+  here](http://ozark.hendrix.edu/~yorgey/install-haskell.html).
 
-```
-stack build
-```
-
-After this completes, you should be able to
-
-```
-stack exec disco
-```
-
-to run the Disco command-line REPL.
-
-While developing, you may want to use a command like
-
-```
-stack test --fast --file-watch --ghc-options='-Wall'
-```
-
-which will turn on warnings, turn off optimizations for a faster
-edit-compile-test cycle, and automatically recompile and run the test
-suite every time a source file changes.
-
-Installation
-------------
-
-If for some reasons you want to actually install `disco` on your
-computer, follow the below instructions.  (If you want to *contribute*
-to disco development, you should skip to the instructions about
-building with stack.)
-
-**Note**, if you are a student, you should **not** need to do this!
-The above instructions about using `disco` on `replit.com` should be
-all you need.  The below instructions are kept here for completeness.
-
-- Follow the instructions to [install
-  ghcup](https://www.haskell.org/ghcup/) by opening a terminal or
-  command prompt and copy-pasting the given installation command.  You
-  can just accept all the defaults.  If you don't have [Windows
-  Subsystem for Linux](https://docs.microsoft.com/en-us/windows/wsl/)
-  (if you don't know what that is, then you don't have it), see the
-  [instructions here](https://www.haskell.org/ghcup/install/) for a
-  PowerShell command to run.
-    - If you use PowerShell, note that after running the magic
-      PowerShell command to set up `ghcup`, you need to close and
-      reopen PowerShell in order for it to recognize the `cabal`
-      command.
-
-- Run `cabal update`, which will download the latest information about
-  Haskell packages.
+- Now, at a command prompt, run `cabal update`, which will download
+  the latest information about Haskell packages.
 
 - Now run `cabal install disco` at a command prompt.
 
@@ -155,7 +96,7 @@ all you need.  The below instructions are kept here for completeness.
 - If installation seems like it succeeded but the `disco` command is
   not recognized, it may be an issue with your path environment
   variable settings.  Try running `disco` using an explicit path:
-    - `~/.cabal/bin/disco` on Linux or OSX
+    - `~/.cabal/bin/disco` on Linux, OSX, or WSL2
     - `C:\cabal\bin\disco` on Windows
     - If those don't work, poke around and see if you can figure
       out where the `cabal/bin` folder is on your computer, and

@@ -1,0 +1,12 @@
+
+f : Int -> Bool
+f 0 = False
+f 10 = True
+
+f n = False
+f _ = True
+
+
+g : Bool -> Bool
+g b = not b
+

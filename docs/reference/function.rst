@@ -49,6 +49,25 @@ given the pair ``(x,y)``, it produces ``f(x) / (y - 1)`` as output.
   is the function which takes an input called ``n`` and outputs ``3n +
   1``.  This is the same function as the example function ``f`` above.
 
+- Functions can be *applied* to an input by writing the input after
+  the name of the function.  Parentheses are not required: for
+  example, ``f 5`` is a valid way to apply the function ``f`` to the
+  input ``5``.  The space is required in this case to separate the
+  function name from the input; ``f5`` would not be valid since it
+  would be interpreted as a single variable name.  With the customary
+  syntax ``f(5)``, we simply wrap the ``5`` in redundant
+  parentheses---any expression can be wrapped in extra parentheses
+  without changing its meaning.  In this case a space is not needed
+  since the parentheses force Disco to interpret the ``5`` separately
+  from ``f``.
+
+  Multi-argument functions follow the same pattern: a "multi-argument"
+  function is really a single-argument function that takes a
+  :doc:`tuple <product-type>` as input, which must be written with
+  parentheses.  So writing ``f (2,3)`` is actually similar to writing
+  ``f 5``: a function name followed by an input value.  As is
+  customary, we can also omit the space, as in ``f(2,3)``.
+
 - Attempting to print a function value will simply result in the type
   of the function being printed as a placeholder:
 

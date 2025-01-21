@@ -84,25 +84,6 @@ module Disco.Parser (
 )
 where
 
-import Unbound.Generics.LocallyNameless (
-  Name,
-  bind,
-  embed,
-  fvAny,
-  name2String,
-  string2Name,
- )
-import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
-
-import Control.Monad.Combinators.Expr
-import Text.Megaparsec hiding (
-  State,
-  runParser,
- )
-import qualified Text.Megaparsec as MP
-import Text.Megaparsec.Char
-import qualified Text.Megaparsec.Char.Lexer as L
-
 import Control.Lens (
   makeLenses,
   toListOf,
@@ -113,7 +94,8 @@ import Control.Lens (
   (.=),
  )
 import Control.Monad (guard, void)
-import Control.Monad.State
+import Control.Monad.Combinators.Expr
+import Control.Monad.State (State, StateT, evalState, evalStateT, gets, modify)
 import Data.Char (isAlpha, isDigit)
 import Data.Foldable (asum)
 import Data.List (find, intercalate)
@@ -131,6 +113,22 @@ import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Types
 import Polysemy (run)
+import Text.Megaparsec hiding (
+  State,
+  runParser,
+ )
+import qualified Text.Megaparsec as MP
+import Text.Megaparsec.Char
+import qualified Text.Megaparsec.Char.Lexer as L
+import Unbound.Generics.LocallyNameless (
+  Name,
+  bind,
+  embed,
+  fvAny,
+  name2String,
+  string2Name,
+ )
+import Unbound.Generics.LocallyNameless.Unsafe (unsafeUnbind)
 
 ------------------------------------------------------------
 -- Lexer

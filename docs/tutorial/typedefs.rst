@@ -70,7 +70,6 @@ Type definitions can also be parameterized. For example, we can make
 the ``Tree`` type polymorphic:
 
 .. literalinclude:: example/tydefs-poly.disco
-   :language: idris
    :caption:
 
 ::

@@ -111,10 +111,8 @@ data BOp
     Elem
   | -- | Subset test (@⊆@)
     Subset
-  | -- | Equality assertion (@=!=@)
-    ShouldEq
-  | -- | Less than assertion (@!<@)
-    ShouldLt
+  | -- | Make a binary boolean operator into a testable proposition
+    Should BOp
   deriving (Show, Read, Eq, Ord, Generic, Data, Alpha, Subst t)
 
 -- | Type operators.
@@ -214,8 +212,6 @@ opTable =
       ]
     ,
       [ bopInfo InR Eq ["=="]
-      , bopInfo InR ShouldEq ["=!="]
-      , bopInfo InR ShouldLt ["!<"]
       , bopInfo InR Neq ["/=", "≠", "!="]
       , bopInfo InR Lt ["<"]
       , bopInfo InR Gt [">"]
@@ -267,10 +263,14 @@ uPrec = opPrec . (uopMap !)
 
 -- | A convenient function for looking up the precedence of a binary operator.
 bPrec :: BOp -> Int
-bPrec = opPrec . (bopMap !)
+bPrec (Should op) = bPrec op
+bPrec op = case M.lookup op bopMap of
+  Just (OpInfo _ _ p) -> p
+  _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
 
 -- | Look up the \"fixity\" (/i.e./ associativity) of a binary operator.
 assoc :: BOp -> BFixity
+assoc (Should op) = assoc op
 assoc op =
   case M.lookup op bopMap of
     Just (OpInfo (BOpF fx _) _ _) -> fx

@@ -5,8 +5,7 @@ Multiplication
 
    This page concerns the ``*`` operator on numbers; for the ``*``
    operator on :doc:`types <types>`, see :doc:`pair types
-   <product-type>`; for the ``*`` operator on :doc:`graphs <graphs>`, see
-   :doc:`connect <connect>`.
+   <product-type>`; or see the ``*`` (``connect``) operator on :doc:`graphs <graph>`.
 
 All :doc:`numeric types <numeric>` can be multiplied using the ``*``
 operator.  For example:

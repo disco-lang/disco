@@ -1,0 +1,3 @@
+foo : Bool -> Bool
+foo True = False
+// foo False = True

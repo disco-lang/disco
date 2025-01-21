@@ -1,5 +1,3 @@
------------------------------------------------------------------------------
------------------------------------------------------------------------------
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -52,7 +50,7 @@ invertMotive (SearchMotive (a, b)) = SearchMotive (not a, b)
 --   the explanation unchanged.
 invertPropResult :: TestResult -> TestResult
 invertPropResult res@(TestResult b r env)
-  | TestRuntimeError _ <- r = res
+  | TestRuntimeError {} <- r = res
   | otherwise = TestResult (not b) r env
 
 randomLarge :: Member Random r => [Integer] -> Sem r [Integer]
@@ -88,44 +86,38 @@ prettyTestReason ::
   Bool ->
   AProperty ->
   TestReason ->
+  TestEnv ->
   Sem r (Doc ann)
-prettyTestReason _ _ TestBool = empty
-prettyTestReason b _ (TestFound (TestResult _ _ env))
-  | b = prettyTestEnv "Found example:" env
-  | not b = prettyTestEnv "Found counterexample:" env
-prettyTestReason b _ (TestNotFound Exhaustive)
+prettyTestReason _ _ TestBool _ = empty
+prettyTestReason b (ATAbs _ _ body) (TestFound (TestResult b' r' env')) env = do
+  lunbind body $ \(_, p) ->
+    prettyTestEnv ("Found " ++ if b then "example:" else "counterexample:") env
+      $+$ prettyTestReason b' p r' env'
+prettyTestReason b _ (TestNotFound Exhaustive) _
   | b = "No counterexamples exist; all possible values were checked."
-  | not b = "No example exists; all possible values were checked."
-prettyTestReason b _ (TestNotFound (Randomized n m))
+  | otherwise = "No example exists; all possible values were checked."
+prettyTestReason b _ (TestNotFound (Randomized n m)) _
   | b = "Checked" <+> text (show (n + m)) <+> "possibilities without finding a counterexample."
-  | not b = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
-prettyTestReason _ _ (TestEqual t a1 a2) =
+  | otherwise = "No example was found; checked" <+> text (show (n + m)) <+> "possibilities."
+prettyTestReason _ _ (TestCmp _ t a1 a2) _ =
   bulletList
     "-"
     [ "Left side:  " <> prettyValue t a1
     , "Right side: " <> prettyValue t a2
     ]
-prettyTestReason _ _ (TestLt t a1 a2) =
-  bulletList
-    "-"
-    [ "Left side:  " <> prettyValue t a1
-    , "Right side: " <> prettyValue t a2
-    ]
-prettyTestReason _ _ (TestRuntimeError ee) =
+prettyTestReason _ _ (TestRuntimeError ee) env =
   nest 2 $
     "Test failed with an error:"
       $+$ pretty (EvalErr ee)
--- \$+$
--- prettyTestEnv "Example inputs that caused the error:" env
--- See #364
-prettyTestReason b (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) =
+      $+$ prettyTestEnv "Example inputs that caused the error:" env
+prettyTestReason _ (ATApp _ (ATPrim _ (PrimBOp _)) (ATTup _ [p1, p2])) (TestBin _ tr1 tr2) _ =
   bulletList
     "-"
-    [ nest 2 $ "Left side:" $+$ prettyTestResult' b p1 tr1
-    , nest 2 $ "Right side:" $+$ prettyTestResult' b p2 tr2
+    [ nest 2 $ prettyTestResult p1 tr1
+    , nest 2 $ prettyTestResult p2 tr2
     ]
 -- See Note [prettyTestReason fallback]
-prettyTestReason _ _ _ = empty
+prettyTestReason _ _ _ _ = empty
 
 -- ~~~~ Note [prettyTestReason fallback]
 --
@@ -147,22 +139,14 @@ prettyTestReason _ _ _ = empty
 -- of the test result.  So we just give up and decline to print a
 -- reason.
 
-prettyTestResult' ::
-  Members '[Input TyDefCtx, LFresh, Reader PA] r =>
-  Bool ->
-  AProperty ->
-  TestResult ->
-  Sem r (Doc ann)
-prettyTestResult' _ prop (TestResult bool tr _) =
-  prettyResultCertainty tr prop (map toLower (show bool))
-    $+$ prettyTestReason bool prop tr
-
 prettyTestResult ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>
   AProperty ->
   TestResult ->
   Sem r (Doc ann)
-prettyTestResult prop (TestResult b r env) = prettyTestResult' b prop (TestResult b r env)
+prettyTestResult prop (TestResult bool tr env) =
+  prettyResultCertainty tr prop (map toLower (show bool))
+    $+$ prettyTestReason bool prop tr env
 
 prettyTestEnv ::
   Members '[Input TyDefCtx, LFresh, Reader PA] r =>

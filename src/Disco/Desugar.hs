@@ -1,4 +1,5 @@
 {-# OPTIONS_GHC -fno-warn-unrecognised-pragmas #-}
+{-# OPTIONS_GHC -fno-warn-x-data-list-nonempty-unzip #-}
 
 {-# HLINT ignore "Functor law" #-}
 
@@ -195,24 +196,25 @@ desugarAbs :: Member Fresh r => Quantifier -> Type -> NonEmpty Clause -> Sem r D
 -- Special case for compiling a single lambda with no pattern matching directly to a lambda
 desugarAbs Lam ty (cl@(unsafeUnbind -> ([APVar _ _], _)) :| []) = do
   (ps, at) <- unbind cl
-  d <- desugarTerm at
-  return $ DTAbs Lam ty (bind (getVar (head ps)) d)
- where
-  getVar (APVar _ x) = coerce x
+  case ps of
+    [APVar _ x] -> do
+      d <- desugarTerm at
+      return $ DTAbs Lam ty (bind (coerce x) d)
+    _ -> error "desugarAbs: impossible: ps must be a singleton APVar"
 -- General case
 desugarAbs quant overallTy body = do
   clausePairs <- unbindClauses body
-  let (pats, bodies) = unzip clausePairs
-  let patTys = map getType (head pats)
-  let bodyTy = getType (head bodies)
+  let (pats, bodies) = NE.unzip clausePairs
+  let patTys = map getType (NE.head pats)
+  let bodyTy = getType (NE.head bodies)
 
   -- generate dummy variables for lambdas
-  args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (head pats) [0 :: Int ..]
+  args <- zipWithM (\_ i -> fresh (string2Name ("arg" ++ show i))) (NE.head pats) [0 :: Int ..]
 
   -- Create lambdas and one big case.  Recursively desugar the case to
   -- deal with arithmetic patterns.
-  let branches = zipWith (mkBranch (zip args patTys)) bodies pats
-  dcase <- desugarTerm $ ATCase bodyTy branches
+  let branches = NE.zipWith (mkBranch (zip args patTys)) bodies pats
+  dcase <- desugarTerm $ ATCase bodyTy (NE.toList branches)
   return $ mkAbs quant overallTy patTys (coerce args) dcase
  where
   mkBranch :: [(Name ATerm, Type)] -> ATerm -> [APattern] -> ABranch
@@ -225,11 +227,11 @@ desugarAbs quant overallTy body = do
   -- with the same quantifier when there's only a single clause. That
   -- way, we generate a chain of abstractions followed by a case, instead
   -- of a bunch of alternating abstractions and cases.
-  unbindClauses :: Member Fresh r => NonEmpty Clause -> Sem r [([APattern], ATerm)]
+  unbindClauses :: Member Fresh r => NonEmpty Clause -> Sem r (NonEmpty ([APattern], ATerm))
   unbindClauses (c :| []) | quant `elem` [All, Ex] = do
     (ps, t) <- liftClause c
-    return [(ps, addDbgInfo ps t)]
-  unbindClauses cs = mapM unbind (NE.toList cs)
+    return ((ps, addDbgInfo ps t) :| [])
+  unbindClauses cs = mapM unbind cs
 
   liftClause :: Member Fresh r => Bind [APattern] ATerm -> Sem r ([APattern], ATerm)
   liftClause c =
@@ -328,7 +330,7 @@ desugarTerm (ATTest info t) = DTTest (coerce info) <$> desugarTerm t
 -- | Desugar a property by wrapping its corresponding term in a test
 --   frame to catch its exceptions & convert booleans to props.
 desugarProperty :: Member Fresh r => AProperty -> Sem r DTerm
-desugarProperty p = DTTest [] <$> desugarTerm p
+desugarProperty p = DTTest [] <$> desugarTerm (setType TyProp p)
 
 ------------------------------------------------------------
 -- Desugaring operators
@@ -353,10 +355,8 @@ bopDesugars :: Type -> Type -> Type -> BOp -> Bool
 bopDesugars _ TyN _ Choose = True
 -- bopDesugars _   _   (TyFin _) bop | bop `elem` [Add, Mul] = True
 
--- And, Or, Impl for Props don't desugar because they are primitive
--- Prop constructors.  On the other hand, logical operations on Bool
--- can desugar in terms of more primitive conditional expressions.
-bopDesugars _ _ TyProp bop | bop `elem` [And, Or, Impl] = False
+-- Eq and Lt at type Prop desugar into ShouldEq, ShouldLt .
+bopDesugars _ _ TyProp bop | bop `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = True
 bopDesugars _ _ _ bop =
   bop
     `elem` [ And
@@ -420,6 +420,14 @@ desugarBinApp :: Member Fresh r => Type -> BOp -> ATerm -> ATerm -> Sem r DTerm
 -- modules/a standard library, including (2) the ability to define
 -- infix operators.
 
+-- And, Or, Impl at type Prop are primitive Prop constructors so don't
+-- desugar; but we push the Prop type down so we properly desugar
+-- their arguments.
+desugarBinApp TyProp b t1 t2 | b `elem` [And, Or, Impl] = do
+  d1 <- desugarTerm $ setType TyProp t1
+  d2 <- desugarTerm $ setType TyProp t2
+  pure $ dtbin TyProp (PrimBOp b) d1 d2
+
 -- t1 and t2 ==> {? t2 if t1, false otherwise ?}
 desugarBinApp _ And t1 t2 =
   desugarTerm $
@@ -440,6 +448,8 @@ desugarBinApp _ Or t1 t2 =
       [ tru <==. [tif t1]
       , t2 <==. []
       ]
+desugarBinApp TyProp op t1 t2
+  | op `elem` [Eq, Neq, Lt, Gt, Leq, Geq, Divides] = desugarTerm $ mkBin TyProp (Should op) t1 t2
 desugarBinApp _ Neq t1 t2 = desugarTerm $ tnot (t1 ==. t2)
 desugarBinApp _ Gt t1 t2 = desugarTerm $ t2 <. t1
 desugarBinApp _ Leq t1 t2 = desugarTerm $ tnot (t2 <. t1)

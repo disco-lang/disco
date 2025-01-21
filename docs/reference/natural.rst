@@ -17,7 +17,7 @@ counting numbers 0, 1, 2, 3, 4, 5, ...
    6 : ℕ
 
 Natural numbers cannot be directly :doc:`subtracted <subtraction>` or
-:doc:`divided <division>`.  However, ``N`` is a :doc:`subtype` of all
+:doc:`divided <division>`.  However, ``N`` is a :doc:`subtypes` of all
 the other numeric types, so using subtraction or division with natural
 numbers will cause them to be automatically converted into a
 different type like :doc:`integers <integer>` or :doc:`rationals

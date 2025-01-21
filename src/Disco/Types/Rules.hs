@@ -1,13 +1,9 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
--- SPDX-License-Identifier: BSD-3-Clause
-
 -- |
 -- Module      :  Disco.Types.Rules
 -- Copyright   :  disco team and contributors
 -- Maintainer  :  byorgey@gmail.com
+--
+-- SPDX-License-Identifier: BSD-3-Clause
 --
 -- "Disco.Types.Rules" defines some generic rules about arity,
 -- subtyping, and sorts for disco base types.
@@ -44,13 +40,13 @@ module Disco.Types.Rules (
 where
 
 import Control.Monad ((>=>))
-import Data.List (foldl')
+import Data.Foldable (Foldable (..))
 import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.Set as S
-
 import Disco.Types
 import Disco.Types.Qualifiers
+import Prelude hiding (Foldable (..))
 
 ------------------------------------------------------------
 -- Arity

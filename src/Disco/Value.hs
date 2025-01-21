@@ -4,10 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternSynonyms #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Value
 -- Copyright   :  disco team and contributors
@@ -49,6 +45,7 @@ module Disco.Value (
   TestVars (..),
   TestEnv (..),
   emptyTestEnv,
+  mergeTestEnv,
   getTestEnv,
   extendPropEnv,
   extendResultEnv,
@@ -68,47 +65,47 @@ module Disco.Value (
   Mem,
   emptyMem,
   allocate,
+  allocateValue,
   allocateRec,
   lkup,
+  memoLookup,
   set,
+  memoSet,
 
   -- * Pretty-printing
   prettyValue',
   prettyValue,
 ) where
 
-import Prelude hiding ((<>))
-import qualified Prelude as P
-
+import Algebra.Graph (Graph, foldg)
 import Control.Monad (forM)
 import Data.Bifunctor (first)
 import Data.Char (chr, ord)
+import Data.Foldable (Foldable (..))
+import Data.Function (on)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IM
-import Data.List (foldl')
+import Data.List (nubBy)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Ratio
-
-import Algebra.Graph (Graph, foldg)
-
 import Disco.AST.Core
 import Disco.AST.Generic (Side (..))
 import Disco.Context as Ctx
+import Disco.Effects.LFresh
 import Disco.Error
 import Disco.Names
 import Disco.Pretty
 import Disco.Syntax.Operators (BOp (Add, Mul))
 import Disco.Types
-
-import Disco.Effects.LFresh
 import Polysemy
 import Polysemy.Input
 import Polysemy.Reader
 import Polysemy.State
-import Unbound.Generics.LocallyNameless (Name)
-
 import System.Random (StdGen)
+import Unbound.Generics.LocallyNameless (Name)
+import Prelude hiding (Foldable (..), (<>))
+import qualified Prelude as P
 
 ------------------------------------------------------------
 -- Value type
@@ -117,9 +114,8 @@ import System.Random (StdGen)
 -- | Different types of values which can result from the evaluation
 --   process.
 data Value where
-  -- | A numeric value, which also carries a flag saying how
-  --   fractional values should be diplayed.
-  VNum :: RationalDisplay -> Rational -> Value
+  -- | A numeric value.
+  VNum :: Rational -> Value
   -- | A built-in function constant.
   VConst :: Op -> Value
   -- | An injection into a sum type.
@@ -130,7 +126,7 @@ data Value where
   VPair :: Value -> Value -> Value
   -- | A closure, i.e. a function body together with its
   --   environment.
-  VClo :: Env -> [Name Core] -> Core -> Value
+  VClo :: Maybe (Int, [Value]) -> Env -> [Name Core] -> Core -> Value
   -- | A disco type can be a value.  For now, there are only a very
   --   limited number of places this could ever show up (in
   --   particular, as an argument to @enumerate@ or @count@).
@@ -184,7 +180,7 @@ pattern VCons h t = VInj R (VPair h t)
 --   only reason for actually doing this would be constructing graphs
 --   of graphs or maps of maps, or the like.
 data SimpleValue where
-  SNum :: RationalDisplay -> Rational -> SimpleValue
+  SNum :: Rational -> SimpleValue
   SUnit :: SimpleValue
   SInj :: Side -> SimpleValue -> SimpleValue
   SPair :: SimpleValue -> SimpleValue -> SimpleValue
@@ -194,7 +190,7 @@ data SimpleValue where
 
 toSimpleValue :: Value -> SimpleValue
 toSimpleValue = \case
-  VNum d n -> SNum d n
+  VNum n -> SNum n
   VUnit -> SUnit
   VInj s v1 -> SInj s (toSimpleValue v1)
   VPair v1 v2 -> SPair (toSimpleValue v1) (toSimpleValue v2)
@@ -203,7 +199,7 @@ toSimpleValue = \case
   t -> error $ "A non-simple value was passed as simple: " ++ show t
 
 fromSimpleValue :: SimpleValue -> Value
-fromSimpleValue (SNum d n) = VNum d n
+fromSimpleValue (SNum n) = VNum n
 fromSimpleValue SUnit = VUnit
 fromSimpleValue (SInj s v) = VInj s (fromSimpleValue v)
 fromSimpleValue (SPair v1 v2) = VPair (fromSimpleValue v1) (fromSimpleValue v2)
@@ -227,13 +223,11 @@ pattern VFun f = VFun_ (ValFun f)
 
 -- XXX write some comments about partiality
 
--- | A convenience function for creating a default @VNum@ value with a
---   default (@Fractional@) flag.
 ratv :: Rational -> Value
-ratv = VNum mempty
+ratv = VNum
 
 vrat :: Value -> Rational
-vrat (VNum _ r) = r
+vrat (VNum r) = r
 vrat v = error $ "vrat " ++ show v
 
 -- | A convenience function for creating a default @VNum@ value with a
@@ -242,7 +236,7 @@ intv :: Integer -> Value
 intv = ratv . (% 1)
 
 vint :: Value -> Integer
-vint (VNum _ n) = numerator n
+vint (VNum n) = numerator n
 vint v = error $ "vint " ++ show v
 
 vchar :: Value -> Char
@@ -320,6 +314,11 @@ newtype TestEnv = TestEnv [(String, Type, Value)]
 emptyTestEnv :: TestEnv
 emptyTestEnv = TestEnv []
 
+mergeTestEnv :: TestEnv -> TestEnv -> TestEnv
+mergeTestEnv (TestEnv e1) (TestEnv e2) = TestEnv (nubBy ((==) `on` fst3) (e1 P.<> e2))
+ where
+  fst3 (a, _, _) = a
+
 getTestEnv :: TestVars -> Env -> Either EvalError TestEnv
 getTestEnv (TestVars tvs) e = fmap TestEnv . forM tvs $ \(s, ty, name) -> do
   let value = Ctx.lookup' (localName name) e
@@ -344,12 +343,10 @@ interpLOp LImpl = (==>)
 data TestReason_ a
   = -- | The prop evaluated to a boolean.
     TestBool
-  | -- | The test was an equality test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestEqual Type a a
-  | -- | The test was a less than test. Records the values being
-    --   compared and also their type (which is needed for printing).
-    TestLt Type a a
+  | -- | The test was a comparison. Records the comparison operator,
+    --   the values being compared, and also their type (which is
+    --   needed for printing).
+    TestCmp BOp Type a a
   | -- | The search didn't find any examples/counterexamples.
     TestNotFound SearchType
   | -- | The search found an example/counterexample.
@@ -369,7 +366,7 @@ data TestResult = TestResult Bool TestReason TestEnv
 
 -- | Whether the property test resulted in a runtime error.
 testIsError :: TestResult -> Bool
-testIsError (TestResult _ (TestRuntimeError _) _) = True
+testIsError (TestResult _ (TestRuntimeError {}) _) = True
 testIsError _ = False
 
 -- | Whether the property test resulted in success.
@@ -388,12 +385,11 @@ testIsCertain (TestResult _ r _) = resultIsCertain r
 
 resultIsCertain :: TestReason -> Bool
 resultIsCertain TestBool = True
-resultIsCertain TestEqual {} = True
-resultIsCertain TestLt {} = True
+resultIsCertain TestCmp {} = True
 resultIsCertain (TestNotFound Exhaustive) = True
 resultIsCertain (TestNotFound (Randomized _ _)) = False
 resultIsCertain (TestFound r) = testIsCertain r
-resultIsCertain (TestRuntimeError _) = True
+resultIsCertain (TestRuntimeError {}) = True
 resultIsCertain (TestBin op tr1 tr2)
   | c1 && c2 = True
   | c1 && ((op == LOr) == ok1) = True
@@ -416,7 +412,7 @@ data ValProp
   deriving (Show)
 
 extendPropEnv :: TestEnv -> ValProp -> ValProp
-extendPropEnv g (VPDone (TestResult b r e)) = VPDone (TestResult b r (g P.<> e))
+extendPropEnv g (VPDone res) = VPDone (extendResultEnv g res)
 extendPropEnv g (VPSearch sm tys v e) = VPSearch sm tys v (g P.<> e)
 extendPropEnv g (VPBin op vp1 vp2) = VPBin op (extendPropEnv g vp1) (extendPropEnv g vp2)
 
@@ -451,6 +447,12 @@ allocate e t = do
   put $ Mem (n + 1) (IM.insert n (E e t) m)
   return n
 
+allocateValue :: Members '[State Mem] r => Value -> Sem r Int
+allocateValue v = do
+  Mem n m <- get
+  put $ Mem (n + 1) (IM.insert n (Disco.Value.V v) m)
+  return n
+
 -- | Allocate new memory cells for a group of mutually recursive
 --   bindings, and return the indices of the allocate cells.
 allocateRec :: Members '[State Mem] r => Env -> [(QName Core, Core)] -> Sem r [Int]
@@ -470,6 +472,19 @@ lkup n = gets (IM.lookup n . mu)
 -- | Set the cell at a given index.
 set :: Members '[State Mem] r => Int -> Cell -> Sem r ()
 set n c = modify $ \(Mem nxt m) -> Mem nxt (IM.insert n c m)
+
+memoLookup :: Members '[State Mem] r => Int -> SimpleValue -> Sem r (Maybe Value)
+memoLookup n sv = gets (mLookup . IM.lookup n . mu)
+ where
+  mLookup (Just (Disco.Value.V (VMap vmap))) = M.lookup sv vmap
+  mLookup _ = Nothing
+
+memoSet :: Members '[State Mem] r => Int -> SimpleValue -> Value -> Sem r ()
+memoSet n sv v = do
+  mc <- lkup n
+  case mc of
+    Just (Disco.Value.V (VMap vmap)) -> set n (Disco.Value.V (VMap (M.insert sv v vmap)))
+    _ -> return ()
 
 ------------------------------------------------------------
 -- Pretty-printing values
@@ -501,9 +516,7 @@ prettyValue (ty1 :+: _) (VInj L v) = "left" <> prettyVP ty1 v
 prettyValue (_ :+: ty2) (VInj R v) = "right" <> prettyVP ty2 v
 prettyValue (_ :+: _) v =
   error $ "Non-VInj passed with sum type to prettyValue: " ++ show v
-prettyValue _ (VNum d r) = text $ case (d, denominator r == 1) of
-  (Decimal, False) -> prettyDecimal r
-  _ -> prettyRational r
+prettyValue _ (VNum r) = text $ prettyRational r
 prettyValue _ (VGen _) = prettyPlaceholder TyGen
 prettyValue ty@(_ :->: _) _ = prettyPlaceholder ty
 prettyValue (TySet ty) (VBag xs) = braces $ prettySequence ty "," (map fst xs)

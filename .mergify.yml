@@ -1,0 +1,44 @@
+queue_rules:
+  - name: default
+    queue_conditions:
+      - or:
+          - and:
+              - -files~=\.hs$
+              - -files~=\.disco$
+              - -files~=\.cabal$
+              - -files=stack.yaml
+          - and:
+              - check-success=Haskell-CI - Linux - ghc-9.10.1
+              - check-success=Haskell-CI - Linux - ghc-9.8.4
+              - check-success=Haskell-CI - Linux - ghc-9.6.6
+      - label=merge me
+      - '#approved-reviews-by>=1'
+      - '#changes-requested-reviews-by=0'
+    merge_conditions:
+      - or:
+          - and:
+              - -files~=\.hs$
+              - -files~=\.disco$
+              - -files~=\.cabal$
+              - -files=stack.yaml
+          - and:
+              - check-success=Haskell-CI - Linux - ghc-9.10.1
+              - check-success=Haskell-CI - Linux - ghc-9.8.4
+              - check-success=Haskell-CI - Linux - ghc-9.6.6
+
+    commit_message_template: |
+      {{ title }} (#{{ number }})
+
+      {{ body }}
+    merge_method: squash
+
+pull_request_rules:
+  - actions:
+      delete_head_branch: {}
+    name: Delete head branch after merge
+    conditions:
+      - merged
+  - name: Automatically merge pull requests
+    conditions: []
+    actions:
+      queue:

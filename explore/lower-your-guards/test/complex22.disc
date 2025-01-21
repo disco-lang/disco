@@ -1,0 +1,17 @@
+foo : , Either Int Bool Int -> Bool
+foo , Left  1     2 = True
+foo , Right False n = True
+foo , Right True  n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+foo , Left  3     n = True
+
+/*
+UA makes this near instant!
+Before combining UA,
+this took about ~10 seconds to run
+*/

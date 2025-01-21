@@ -8,19 +8,19 @@ always return a :doc:`boolean <bool>` value.
 Values of almost any type can be compared: :doc:`numeric types
 <numeric>`, :doc:`booleans <bool>`, :doc:`characters <char>`,
 :doc:`strings <string>`, and any :doc:`pair <product-type>`,
-:doc:`sum <sum-type>`, or :doc:`container <container>` types built out
+:doc:`sum <sum-type>`, or :doc:`collection <collections>` types built out
 of these.  For example, sets of pairs of natural numbers and strings
 can be compared:
 
 ::
 
    Disco> {(3, "hi"), (4, "there"), (6, "world")} < {(10, "what")}
-   true
+   T
 
 See the individual pages about each type for more information on how
 comparison works on values of that type.
 
-:doc:`Functions <function-type>`, on the other hand, cannot be
+:doc:`Functions <function-types>`, on the other hand, cannot be
 compared, because in general this would require testing the functions
 on every single possible input, of which there might be infinitely
 many.
@@ -36,9 +36,9 @@ many.
     ::
 
        Disco> 3 == 5
-       false
+       F
        Disco> "hi" == "hi"
-       true
+       T
 
   Equality is one critical point where Disco syntax has to deviate
   from standard mathematical notation: be sure to keep in mind the
@@ -68,3 +68,9 @@ many.
   as combining all the individual comparisons with "and".  For
   example, ``3 <= x < y <= 10`` means the same thing as ``3 <= x /\ x
   < y /\ y <= 10``.
+
+* The ``max`` and ``min`` functions can be used on any type which
+  supports comparison.  ``max`` takes two arguments and returns
+  whichever one is larger; ``min`` is similar but returns the smaller
+  argument. For example, ``max(3,6)`` and ``max(6,3)`` both evaluate
+  to ``6``.

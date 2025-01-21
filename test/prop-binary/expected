@@ -1,401 +1,399 @@
   - Certainly true: (∃n. 2 * n == 0) /\ (∃n. 2 * n == 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 0) /\ (∀n. n >= 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∃n. 2 * n == 0) /\ (∀n. n > 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 0) /\ (∃n. 2 * n == 1)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Possibly true: (∀n. n >= 0) /\ (∃n. 2 * n == 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n >= 0) /\ (∀n. n >= 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∀n. n >= 0) /\ (∀n. n > 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n >= 0) /\ (∃n. 2 * n == 1)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly false: (∀n. n > 0) /\ (∃n. 2 * n == 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly false: (∀n. n > 0) /\ (∀n. n >= 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∀n. n > 0) /\ (∀n. n > 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly false: (∀n. n > 0) /\ (∃n. 2 * n == 1)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Possibly false: (∃n. 2 * n == 1) /\ (∃n. 2 * n == 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 1) /\ (∀n. n >= 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∃n. 2 * n == 1) /\ (∀n. n > 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 1) /\ (∃n. 2 * n == 1)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 0) \/ (∃n. 2 * n == 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∃n. 2 * n == 0) \/ (∀n. n >= 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly true: (∃n. 2 * n == 0) \/ (∀n. n > 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∃n. 2 * n == 0) \/ (∃n. 2 * n == 1)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∀n. n >= 0) \/ (∃n. 2 * n == 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n >= 0) \/ (∀n. n >= 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Possibly true: (∀n. n >= 0) \/ (∀n. n > 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n >= 0) \/ (∃n. 2 * n == 1)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∀n. n > 0) \/ (∃n. 2 * n == 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n > 0) \/ (∀n. n >= 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∀n. n > 0) \/ (∀n. n > 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n > 0) \/ (∃n. 2 * n == 1)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 1) \/ (∃n. 2 * n == 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 1) \/ (∀n. n >= 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Possibly false: (∃n. 2 * n == 1) \/ (∀n. n > 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 1) \/ (∃n. 2 * n == 1)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 0) -> (∃n. 2 * n == 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 0) -> (∀n. n >= 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly false: (∃n. 2 * n == 0) -> (∀n. n > 0)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∃n. 2 * n == 0) -> (∃n. 2 * n == 1)
-    - Left side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∀n. n >= 0) -> (∃n. 2 * n == 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∀n. n >= 0) -> (∀n. n >= 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Possibly false: (∀n. n >= 0) -> (∀n. n > 0)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly false: (∀n. n >= 0) -> (∃n. 2 * n == 1)
-    - Left side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∀n. n > 0) -> (∃n. 2 * n == 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∀n. n > 0) -> (∀n. n >= 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly true: ∀n. n >= 0
+        - Left side:  0
+        - Right side: 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Certainly true: (∀n. n > 0) -> (∀n. n > 0)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Certainly false: ∀n. n > 0
+        - Left side:  0
+        - Right side: 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Certainly true: (∀n. n > 0) -> (∃n. 2 * n == 1)
-    - Left side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+        - Left side:  0
+        - Right side: 0
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Certainly true: (∃n. 2 * n == 1) -> (∃n. 2 * n == 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly true: ∃n. 2 * n == 0
+    - Certainly true: ∃n. 2 * n == 0
         Found example:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 1) -> (∀n. n >= 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly true: ∀n. n >= 0
+    - Possibly true: ∀n. n >= 0
         Checked 100 possibilities without finding a counterexample.
   - Possibly true: (∃n. 2 * n == 1) -> (∀n. n > 0)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Certainly false: ∀n. n > 0
+    - Certainly false: ∀n. n > 0
         Found counterexample:
           n = 0
+        - Left side:  0
+        - Right side: 0
   - Possibly true: (∃n. 2 * n == 1) -> (∃n. 2 * n == 1)
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
   - Possibly true: (∃n. 2 * n == 1) -> (∃n. 2 * n == 1) /\ (5 == 5 \/ (∀n. n < 5))
-    - Left side:
-        Possibly false: ∃n. 2 * n == 1
+    - Possibly false: ∃n. 2 * n == 1
         No example was found; checked 100 possibilities.
-    - Right side:
-        Possibly false: (∃n. 2 * n == 1) /\ (5 == 5 \/ (∀n. n < 5))
-        - Left side:
-            Possibly false: ∃n. 2 * n == 1
+    - Possibly false: (∃n. 2 * n == 1) /\ (5 == 5 \/ (∀n. n < 5))
+        - Possibly false: ∃n. 2 * n == 1
             No example was found; checked 100 possibilities.
-        - Right side:
-            Certainly true: 5 == 5 \/ (∀n. n < 5)
-            - Left side:
-                Certainly true: 5 == 5
-            - Right side:
-                Certainly false: ∀n. n < 5
+        - Certainly true: 5 == 5 \/ (∀n. n < 5)
+            - Certainly true: 5 == 5
+                - Left side:  5
+                - Right side: 5
+            - Certainly false: ∀n. n < 5
                 Found counterexample:
                   n = 5
+                - Left side:  5
+                - Right side: 5

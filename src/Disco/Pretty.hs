@@ -129,6 +129,7 @@ instance Pretty UOp where
 -- | Pretty-print a binary operator, by looking up its concrete syntax
 --   in the 'bopMap'.
 instance Pretty BOp where
+  pretty (Should op) = pretty op <> "!"
   pretty op = case M.lookup op bopMap of
     Just (OpInfo _ (syn : _) _) -> text syn
     _ -> error $ "BOp " ++ show op ++ " not in bopMap!"
@@ -146,17 +147,20 @@ prettyRational r
 --   the format @nnn.prefix[rep]...@, with any repeating digits enclosed
 --   in square brackets.
 prettyDecimal :: Rational -> String
-prettyDecimal r = printedDecimal
+prettyDecimal r = wholePart ++ "." ++ decimalPart
  where
-  (n, d) = properFraction r :: (Integer, Rational)
+  (n', d') = properFraction r :: (Integer, Rational)
+  d = abs d'
+  n = abs n'
   (expan, len) = digitalExpansion 10 (numerator d) (denominator d)
-  printedDecimal
+  wholePart = (if d' < 0 then "-" else "") ++ show n
+  decimalPart
     | length first102 > 101 || length first102 == 101 && last first102 /= 0 =
-        show n ++ "." ++ concatMap show (take 100 expan) ++ "..."
+        concatMap show (take 100 expan) ++ "..."
     | rep == [0] =
-        show n ++ "." ++ (if null pre then "0" else concatMap show pre)
+        if null pre then "0" else concatMap show pre
     | otherwise =
-        show n ++ "." ++ concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
+        concatMap show pre ++ "[" ++ concatMap show rep ++ "]"
    where
     (pre, rep) = splitAt len expan
     first102 = take 102 expan

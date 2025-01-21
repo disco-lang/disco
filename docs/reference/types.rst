@@ -30,8 +30,12 @@ is a :doc:`subtype <subtypes>` of the one it was expecting.
 
    base-types
    function-types
+   type-sig
+   type-annot
    polymorphism
    algebraic-types
-   collection-types
+   typedef
+   collections
+   string
    prop
    subtypes

@@ -8,8 +8,8 @@ their two arguments, like ``1 + 2``.  Disco has many built-in
 operators which are symbols (like ``+``, ``*``, ``/``, *etc.*) as well
 as a few which are words (like ``mod``, ``choose``, and ``divides``).
 
-Disco also has three *unary* operators: :doc:`arithmetic negation <neg>` (``-``)
-and :doc:`logical negation <not>` (``¬`` or ``not``) are written in front of their
+Disco also has three *unary* operators: :doc:`arithmetic negation <subtraction>` (``-``)
+and :doc:`logical negation <logic-ops>` (``¬`` or ``not``) are written in front of their
 one argument, and :doc:`factorial <factorial>` (``!``) is written after its argument.
 
 When multiple operators are used together, Disco uses their
@@ -38,7 +38,7 @@ Note that in this case, we can write ``!`` or ``~!`` and Disco
 understands either one.
 
 The twiddle notation is also useful when giving an operator as an
-argument to a :doc:`higher-order function <hof>`:
+argument to a :doc:`higher-order function <higher-order>`:
 
 ::
 

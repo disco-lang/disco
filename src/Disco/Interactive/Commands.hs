@@ -73,7 +73,7 @@ import Disco.Pretty qualified as PP
 import Disco.Property (prettyTestResult)
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims (
-  Prim (PrimBOp, PrimUOp),
+  Prim (PrimAbs, PrimBOp, PrimCeil, PrimFloor, PrimUOp),
   toPrim,
  )
 import Disco.Typecheck
@@ -88,6 +88,7 @@ import Polysemy.Reader
 import System.FilePath (splitFileName)
 import Text.Megaparsec hiding (State, runParser)
 import Text.Megaparsec.Char qualified as C
+import Text.Megaparsec.Char.Lexer qualified as L
 import Text.PrettyPrint.Boxes qualified as B
 import Unbound.Generics.LocallyNameless (
   Name,
@@ -269,7 +270,9 @@ parseCommandArgs allCommands cmd = maybe badCmd snd $ find ((cmd `isPrefixOf`) .
 
 -- | Parse a file name.
 fileParser :: Parser FilePath
-fileParser = many C.spaceChar *> many (satisfy (not . isSpace))
+fileParser = many C.spaceChar *> some (escapedSpace <|> L.charLiteral <|> anySingle)
+ where
+  escapedSpace = try (C.char '\\' *> C.char ' ')
 
 -- | A parser for something entered at the REPL prompt.
 lineParser :: REPLCommands -> Parser SomeREPLExpr
@@ -397,25 +400,25 @@ handleDoc (Doc (DocTerm (TVar x))) = handleDocVar x
 handleDoc (Doc (DocTerm _)) =
   err "Can't display documentation for an expression.  Try asking about a function, operator, or type name."
 handleDoc (Doc (DocPrim p)) = handleDocPrim p
-handleDoc (Doc (DocOther s)) = handleDocOther s
+handleDoc (Doc (DocOther s)) = handleDocMap (OtherKey s)
 
 handleDocBool :: Members '[Output (Message ())] r => Sem r ()
 handleDocBool =
   info $
-    "true and false (also written True and False) are the two possible values of type Boolean."
-      $+$ mkReference "bool"
+    "T and F (also written true and false, or True and False) are the two possible values of type Boolean."
+      $+$ formatReference (mkRef "bool")
 
 handleDocUnit :: Members '[Output (Message ())] r => Sem r ()
 handleDocUnit =
   info $
     "The unit value, i.e. the single value of type Unit."
-      $+$ mkReference "unit"
+      $+$ formatReference (mkRef "unit")
 
 handleDocWild :: Members '[Output (Message ())] r => Sem r ()
 handleDocWild =
   info $
     "A wildcard pattern."
-      $+$ mkReference "wild-pattern"
+      $+$ formatReference (mkRef "wild-pattern")
 
 handleDocVar ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
@@ -445,16 +448,16 @@ handleDocVar x = do
     (binds, def) ->
       mapM_ (showDoc docs) (map Left binds ++ map Right (maybeToList def))
  where
-  showDoc docMap (Left (qn, ty)) =
+  showDoc docs (Left (qn, ty)) =
     info $
       hsep [pretty' x, ":", pretty' ty]
-        $+$ case Ctx.lookup' qn docMap of
+        $+$ case Ctx.lookup' qn docs of
           Just (DocString ss : _) -> vcat (text "" : map text ss ++ [text ""])
           _ -> PP.empty
-  showDoc docMap (Right tdBody) =
+  showDoc docs (Right tdBody) =
     info $
       pretty' (name2String x, tdBody)
-        $+$ case Ctx.lookupAll' x docMap of
+        $+$ case Ctx.lookupAll' x docs of
           ((_, DocString ss : _) : _) -> vcat (text "" : map text ss ++ [text ""])
           _ -> PP.empty
 
@@ -464,31 +467,27 @@ handleDocPrim ::
   Sem r ()
 handleDocPrim prim = do
   handleTypeCheck (TypeCheck (TPrim prim))
-  info
-    . vcat
-    $ ( case prim of
-          PrimUOp u -> describeAlts (f == Post) (f == Pre) syns
-           where
-            OpInfo (UOpF f _) syns _ = uopMap ! u
-          PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
-          _ -> []
-      )
-      ++ ( case prim of
-            PrimUOp u -> [describePrec (uPrec u)]
-            PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+  let attrs =
+        ( case prim of
+            PrimUOp u -> case uopMap ! u of
+              OpInfo (UOpF f _) syns _ -> describeAlts (f == Post) (f == Pre) syns
+              _ -> error $ "handleDocPrim: No OpInfo for unary op " ++ show u
+            PrimBOp b -> describeAlts True True (opSyns $ bopMap ! b)
+            PrimFloor -> describeAlts False False ["floor(x)", "⌊x⌋"]
+            PrimCeil -> describeAlts False False ["ceiling(x)", "⌈x⌉"]
+            PrimAbs -> describeAlts False False ["abs(x)", "|x|"]
             _ -> []
-         )
-  case (M.lookup prim primDoc, M.lookup prim primReference) of
-    (Nothing, Nothing) -> return ()
-    (Nothing, Just p) -> info $ mkReference p
-    (Just d, mp) ->
-      info $
-        vcat
-          [ PP.empty
-          , text d
-          , PP.empty
-          , maybe PP.empty (\p -> vcat [mkReference p, PP.empty]) mp
-          ]
+        )
+          ++ ( case prim of
+                PrimUOp u -> [describePrec (uPrec u)]
+                PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+                _ -> []
+             )
+  case attrs of
+    [] -> pure ()
+    _ -> info . vcat $ attrs
+  info PP.empty
+  handleDocMap (PrimKey prim)
  where
   describePrec p = "precedence level" <+> text (show p)
   describeFixity In = PP.empty
@@ -505,25 +504,28 @@ handleDocPrim prim = do
         , if post then "~" else PP.empty
         ]
 
-mkReference :: String -> Sem r (Doc ann)
-mkReference p =
-  "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
+formatReference :: Reference -> Sem r (Doc ann)
+formatReference (Reference rty p) = case rty of
+  Ref -> "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
+  Intro -> "https://disco-lang.readthedocs.io/en/latest/introduction/" <> text p <> ".html"
+  URL -> text p
 
-handleDocOther ::
+handleDocMap ::
   Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
-  String ->
+  DocKey ->
   Sem r ()
-handleDocOther s =
-  case (M.lookup s otherDoc, M.lookup s otherReference) of
-    (Nothing, Nothing) -> info $ "No documentation found for '" <> text s <> "'."
-    (Nothing, Just p) -> info $ mkReference p
-    (Just d, mp) ->
-      info $
-        vcat
-          [ text d
-          , PP.empty
-          , maybe PP.empty (\p -> vcat [mkReference p, PP.empty]) mp
-          ]
+handleDocMap k = case M.lookup k docMap of
+  Nothing -> case k of
+    PrimKey _ -> pure ()
+    OtherKey s -> info $ "No documentation found for '" <> text s <> "'."
+  Just (d, refs) ->
+    info . vcat $
+      [ text d
+      , PP.empty
+      ]
+        ++ case refs of
+          [] -> []
+          _ -> map formatReference refs ++ [PP.empty]
 
 ------------------------------------------------------------
 -- eval

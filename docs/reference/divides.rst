@@ -9,20 +9,20 @@ example:
 ::
 
    Disco> 3 divides 6
-   true
+   T
    Disco> 6 divides 3
-   false
+   F
    Disco> 3 divides (-6)
-   true
+   T
    Disco> 5 divides 5
-   true
+   T
    Disco> 4 divides 6
-   false
+   F
    Disco> 0 divides 10
-   false
+   F
    Disco> 10 divides 0
-   true
+   T
    Disco> 0 divides 0
-   true
+   T
    Disco> 1/2 divides 3/2
-   true
+   T

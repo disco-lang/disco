@@ -14,25 +14,15 @@
 -- checking/inference.
 module Disco.Typecheck.Solve where
 
-import Unbound.Generics.LocallyNameless (
-  Alpha,
-  Name,
-  Subst,
-  fv,
-  name2Integer,
-  string2Name,
-  substs,
- )
-
 import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (use, (%=), (.=))
 import Control.Monad (forM, join, unless, zipWithM)
 import Data.Bifunctor (first, second)
 import Data.Coerce
 import Data.Either (partitionEithers)
+import Data.Foldable (Foldable (..))
 import Data.List (
   find,
-  foldl',
   intersect,
   partition,
  )
@@ -69,6 +59,16 @@ import Polysemy
 import Polysemy.Error
 import Polysemy.Input
 import Polysemy.Output
+import Unbound.Generics.LocallyNameless (
+  Alpha,
+  Name,
+  Subst,
+  fv,
+  name2Integer,
+  string2Name,
+  substs,
+ )
+import Prelude hiding (Foldable (..))
 
 --------------------------------------------------
 -- Solver errors

@@ -15,7 +15,7 @@
 -- language for Disco.
 module Disco.AST.Core (
   -- * Core AST
-  RationalDisplay (..),
+  ShouldMemo (..),
   Core (..),
   Op (..),
   opArity,
@@ -27,47 +27,29 @@ where
 import Control.Lens.Plated
 import Data.Data (Data)
 import Data.Data.Lens (uniplate)
+import Data.Ratio
 import qualified Data.Set as S
+import Disco.AST.Generic (Side, selectSide)
+import Disco.Effects.LFresh
+import Disco.Names (QName)
+import Disco.Pretty
+import Disco.Syntax.Operators (BOp (..))
+import Disco.Types
 import GHC.Generics
+import Polysemy (Members, Sem)
+import Polysemy.Reader
 import Unbound.Generics.LocallyNameless hiding (LFresh, lunbind)
 import Prelude hiding ((<>))
 import qualified Prelude as P
 
-import Disco.Effects.LFresh
-import Polysemy (Members, Sem)
-import Polysemy.Reader
-
-import Data.Ratio
-import Disco.AST.Generic (Side, selectSide)
-import Disco.Names (QName)
-import Disco.Pretty
-import Disco.Types
-
--- | A type of flags specifying whether to display a rational number
---   as a fraction or a decimal.
-data RationalDisplay = Fraction | Decimal
-  deriving (Eq, Show, Generic, Data, Ord, Alpha)
-
-instance Semigroup RationalDisplay where
-  Decimal <> _ = Decimal
-  _ <> Decimal = Decimal
-  _ <> _ = Fraction
-
--- | The 'Monoid' instance for 'RationalDisplay' corresponds to the
---   idea that the result should be displayed as a decimal if any
---   decimal literals are used in the input; otherwise, the default is
---   to display as a fraction.  So the identity element is 'Fraction',
---   and 'Decimal' always wins when combining.
-instance Monoid RationalDisplay where
-  mempty = Fraction
-  mappend = (P.<>)
+data ShouldMemo = Memo | NoMemo deriving (Show, Generic, Data, Alpha)
 
 -- | AST for the desugared, untyped core language.
 data Core where
   -- | A variable.
   CVar :: QName Core -> Core
   -- | A rational number.
-  CNum :: RationalDisplay -> Rational -> Core
+  CNum :: Rational -> Core
   -- | A built-in constant.
   CConst :: Op -> Core
   -- | An injection into a sum type, i.e. a value together with a tag
@@ -87,7 +69,7 @@ data Core where
   -- | A projection from a product type, i.e. @fst@ or @snd@.
   CProj :: Side -> Core -> Core
   -- | An anonymous function.
-  CAbs :: Bind [Name Core] Core -> Core
+  CAbs :: ShouldMemo -> Bind [Name Core] Core -> Core
   -- | Function application.
   CApp :: Core -> Core -> Core
   -- | A "test frame" under which a test case is run. Records the
@@ -228,10 +210,8 @@ data Op
     OHolds
   | -- | Flip success and failure for a prop.
     ONotProp
-  | -- | Equality assertion, @=!=@
-    OShouldEq Type
-  | -- Other primitives
-    OShouldLt Type
+  | -- | Comparison assertion
+    OShould BOp Type
   | -- | Error for non-exhaustive pattern match
     OMatchErr
   | -- | Crash with a user-supplied message
@@ -280,7 +260,7 @@ substsQC xs = transform $ \case
 instance Pretty Core where
   pretty = \case
     CVar qn -> pretty qn
-    CNum _ r
+    CNum r
       | denominator r == 1 -> text (show (numerator r))
       | otherwise -> text (show (numerator r)) <> "/" <> text (show (denominator r))
     CApp (CConst op) (CPair c1 c2)
@@ -305,7 +285,7 @@ instance Pretty Core where
     CUnit -> "unit"
     CPair c1 c2 -> setPA initPA $ parens (pretty c1 <> ", " <> pretty c2)
     CProj s c -> withPA funPA $ selectSide s "fst" "snd" <+> rt (pretty c)
-    CAbs lam -> withPA initPA $ do
+    CAbs _ lam -> withPA initPA $ do
       lunbind lam $ \(xs, body) -> "λ" <> intercalate "," (map pretty xs) <> "." <+> lt (pretty body)
     CApp c1 c2 -> withPA funPA $ lt (pretty c1) <+> rt (pretty c2)
     CTest xs c -> "test" <+> prettyTestVars xs <+> pretty c
@@ -324,8 +304,7 @@ prettyTestVars = brackets . intercalate "," . map prettyTestVar
   prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
 
 isInfix, isPrefix, isPostfix :: Op -> Bool
-isInfix OShouldEq {} = True
-isInfix OShouldLt {} = True
+isInfix OShould {} = True
 isInfix op =
   op
     `S.member` S.fromList
@@ -394,8 +373,14 @@ opToStr = \case
   OFrac -> "frac"
   OHolds -> "holds"
   ONotProp -> "not"
-  OShouldEq _ -> "=!="
-  OShouldLt _ -> "!<"
+  OShould Eq _ -> "=!="
+  OShould Neq _ -> "=!!="
+  OShould Lt _ -> "!<"
+  OShould Gt _ -> "!>"
+  OShould Leq _ -> "!<="
+  OShould Geq _ -> "!>="
+  OShould Divides _ -> "!|"
+  OShould _ _ -> "<!>"
   OMatchErr -> "matchErr"
   OCrash -> "crash"
   OId -> "id"

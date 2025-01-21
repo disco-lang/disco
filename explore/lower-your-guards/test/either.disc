@@ -1,0 +1,5 @@
+
+bar : Either Int Bool -> Int
+bar Left n = 20 * n
+bar Right b = -1
+

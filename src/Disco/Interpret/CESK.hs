@@ -26,11 +26,13 @@ import qualified Algebra.Graph.AdjacencyMap as AdjMap
 import Control.Arrow ((***), (>>>))
 import Control.Monad ((>=>))
 import Data.Bifunctor (first, second)
+import Data.Functor (($>))
 import Data.List (find)
 import qualified Data.List.Infinite as InfList
 import qualified Data.Map as M
 import Data.Maybe (isJust)
 import Data.Ratio
+import qualified Data.Text as T
 import Disco.AST.Core
 import Disco.AST.Generic (
   Ellipsis (..),
@@ -40,25 +42,25 @@ import Disco.AST.Generic (
 import Disco.AST.Typed (AProperty)
 import Disco.Compile
 import Disco.Context as Ctx
+import Disco.Effects.Fresh
+import Disco.Effects.Input
 import Disco.Enumerate
 import Disco.Error
 import Disco.Names
 import Disco.Property
+import Disco.Syntax.Operators (BOp (..))
 import Disco.Types hiding (V)
 import Disco.Value
 import Math.Combinatorics.Exact.Binomial (choose)
 import Math.Combinatorics.Exact.Factorial (factorial)
 import Math.NumberTheory.Primes (factorise, unPrime)
 import Math.NumberTheory.Primes.Testing (isPrime)
-
--- import Math.OEIS (
---   catalogNums,
---   extendSequence,
---   lookupSequence,
---  )
-
-import Disco.Effects.Fresh
-import Disco.Effects.Input
+import Math.OEIS (
+  SearchStatus (SubSeq),
+  extendSeq,
+  lookupSeq,
+  number,
+ )
 import Polysemy
 import Polysemy.Error
 import Polysemy.Random
@@ -113,6 +115,9 @@ data Frame
     FUpdate Int
   | -- | Record the results of a test.
     FTest TestVars Env
+  | -- | Given the index of a memory cell and a function's arguments,
+    --   memoize the results of a function.
+    FMemo Int SimpleValue
   deriving (Show)
 
 ------------------------------------------------------------
@@ -163,7 +168,7 @@ step cesk = case cesk of
   (In (CVar x) e k) -> case Ctx.lookup' x e of
     Nothing -> return $ Up (UnboundError x) k
     Just v -> return $ Out v k
-  (In (CNum d r) _ k) -> return $ Out (VNum d r) k
+  (In (CNum r) _ k) -> return $ Out (VNum r) k
   (In (CConst OMatchErr) _ k) -> return $ Up NonExhaustive k
   (In (CConst OEmptyGraph) _ k) -> return $ Out (VGraph empty) k
   (In (CConst op) _ k) -> return $ Out (VConst op) k
@@ -172,9 +177,13 @@ step cesk = case cesk of
   (In CUnit _ k) -> return $ Out VUnit k
   (In (CPair c1 c2) e k) -> return $ In c1 e (FPairR e c2 : k)
   (In (CProj s c) e k) -> return $ In c e (FProj s : k)
-  (In (CAbs b) e k) -> do
+  (In (CAbs mem b) e k) -> do
     (xs, body) <- unbind b
-    return $ Out (VClo e xs body) k
+    case mem of
+      Memo -> do
+        cell <- allocateValue (VMap M.empty)
+        return $ Out (VClo (Just (cell, [])) e xs body) k
+      NoMemo -> return $ Out (VClo Nothing e xs body) k
   (In (CApp c1 c2) e k) -> return $ In c1 e (FArg e c2 : k)
   (In (CType ty) _ k) -> return $ Out (VType ty) k
   (In (CDelay b) e k) -> do
@@ -194,15 +203,23 @@ step cesk = case cesk of
   (Out v2 (FPairL v1 : k)) -> return $ Out (VPair v1 v2) k
   (Out (VPair v1 v2) (FProj s : k)) -> return $ Out (selectSide s v1 v2) k
   (Out v (FArg e c2 : k)) -> return $ In c2 e (FApp v : k)
-  (Out v2 (FApp (VClo e [x] b) : k)) -> return $ In b (Ctx.insert (localName x) v2 e) k
-  (Out v2 (FApp (VClo e (x : xs) b) : k)) -> return $ Out (VClo (Ctx.insert (localName x) v2 e) xs b) k
+  (Out v (FMemo n sv : k)) -> memoSet n sv v $> Out v k
+  (Out v (FApp (VClo mi e [x] b) : k)) -> case mi of
+    Nothing -> return $ In b (Ctx.insert (localName x) v e) k
+    Just (n, mem) -> do
+      let sv = toSimpleValue $ foldr VPair VUnit (v : mem)
+      mv <- memoLookup n sv
+      case mv of
+        Nothing -> return $ In b (Ctx.insert (localName x) v e) (FMemo n sv : k)
+        Just v' -> return $ Out v' k
+  (Out v (FApp (VClo mi e (x : xs) b) : k)) -> return $ Out (VClo (second (v :) <$> mi) (Ctx.insert (localName x) v e) xs b) k
   (Out v2 (FApp (VConst op) : k)) -> appConst k op v2
   (Out v2 (FApp (VFun f) : k)) -> return $ Out (f v2) k
   -- Annoying to repeat this code, not sure of a better way.
   -- The usual evaluation order (function then argument) doesn't work when
   -- we're applying a test function to randomly generated values.
-  (Out (VClo e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
-  (Out (VClo e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo (Ctx.insert (localName x) v e) xs b) k
+  (Out (VClo _ e [x] b) (FArgV v : k)) -> return $ In b (Ctx.insert (localName x) v e) k
+  (Out (VClo mi e (x : xs) b) (FArgV v : k)) -> return $ Out (VClo mi (Ctx.insert (localName x) v e) xs b) k
   (Out (VConst op) (FArgV v : k)) -> appConst k op v
   (Out (VFun f) (FArgV v : k)) -> return $ Out (f v) k
   (Out (VRef n) (FForce : k)) -> do
@@ -280,11 +297,6 @@ appConst k = \case
       | n == 0 = throw DivByZero
       | otherwise = return $ intv (numerator m `mod` numerator n)
   ODivides -> numOp2' (\m n -> return (boolv $ divides m n)) >=> out
-   where
-    divides 0 0 = True
-    divides 0 _ = False
-    divides x y = denominator (y / x) == 1
-
   --------------------------------------------------
   -- Number theory
 
@@ -340,8 +352,8 @@ appConst k = \case
   -- Sequences
 
   OUntil -> arity2 $ \v1 -> out . ellipsis (Until v1)
-  -- OLookupSeq -> out . oeisLookup
-  -- OExtendSeq -> out . oeisExtend
+  OLookupSeq -> out . oeisLookup
+  OExtendSeq -> out . oeisExtend
   --------------------------------------------------
   -- Comparison
 
@@ -452,10 +464,8 @@ appConst k = \case
   OExists tys -> out . (\v -> VProp (VPSearch SMExists tys v emptyTestEnv))
   OHolds -> testProperty Exhaustive >=> resultToBool >>> outWithErr
   ONotProp -> out . VProp . notProp . ensureProp
-  OShouldEq ty -> arity2 $ \v1 v2 ->
-    out $ VProp (VPDone (TestResult (valEq v1 v2) (TestEqual ty v1 v2) emptyTestEnv))
-  OShouldLt ty -> arity2 $ \v1 v2 ->
-    out $ VProp (VPDone (TestResult (valLt v1 v2) (TestLt ty v1 v2) emptyTestEnv))
+  OShould op ty -> arity2 $ \v1 v2 ->
+    out $ VProp (VPDone (TestResult (valOp op v1 v2) (TestCmp op ty v1 v2) emptyTestEnv))
   OAnd -> arity2 $ \p1 p2 ->
     out $ VProp (VPBin LAnd (ensureProp p1) (ensureProp p2))
   OOr -> arity2 $ \p1 p2 ->
@@ -503,7 +513,7 @@ numOp1 :: (Rational -> Rational) -> Value -> Sem r Value
 numOp1 f = numOp1' $ return . ratv . f
 
 numOp1' :: (Rational -> Sem r Value) -> Value -> Sem r Value
-numOp1' f (VNum _ m) = f m
+numOp1' f (VNum m) = f m
 numOp1' _ v = error $ "Impossible! numOp1' on non-VNum " ++ show v
 
 numOp2 :: (Rational -> Rational -> Rational) -> Value -> Sem r Value
@@ -512,11 +522,7 @@ numOp2 (#) = numOp2' $ \m n -> return (ratv (m # n))
 numOp2' :: (Rational -> Rational -> Sem r Value) -> Value -> Sem r Value
 numOp2' (#) =
   arity2 $ \v1 v2 -> case (v1, v2) of
-    (VNum d1 n1, VNum d2 n2) -> do
-      res <- n1 # n2
-      case res of
-        VNum _ r -> return $ VNum (d1 <> d2) r
-        _ -> return res
+    (VNum n1, VNum n2) -> n1 # n2
     (VNum {}, _) -> error $ "Impossible! numOp2' on non-VNum " ++ show v2
     _ -> error $ "Impossible! numOp2' on non-VNum " ++ show v1
 
@@ -547,14 +553,32 @@ integerSqrt' n =
 -- Comparison
 ------------------------------------------------------------
 
-valEq :: Value -> Value -> Bool
-valEq v1 v2 = valCmp v1 v2 == EQ
+valEq, valLt :: Value -> Value -> Bool
+valEq = valOp Eq
+valLt = valOp Lt
 
-valLt :: Value -> Value -> Bool
-valLt v1 v2 = valCmp v1 v2 == LT
+valOp :: BOp -> Value -> Value -> Bool
+valOp op v1 v2 = case op of
+  Eq -> valCmp v1 v2 == EQ
+  Neq -> valCmp v1 v2 /= EQ
+  Lt -> valCmp v1 v2 == LT
+  Gt -> valCmp v1 v2 == GT
+  Leq -> valCmp v1 v2 /= GT
+  Geq -> valCmp v1 v2 /= LT
+  Divides -> valDivides v1 v2
+  _ -> False
+
+valDivides :: Value -> Value -> Bool
+valDivides (VNum r1) (VNum r2) = divides r1 r2
+valDivides _ _ = False
+
+divides :: Rational -> Rational -> Bool
+divides 0 0 = True
+divides 0 _ = False
+divides x y = denominator (y / x) == 1
 
 valCmp :: Value -> Value -> Ordering
-valCmp (VNum _ r1) (VNum _ r2) = compare r1 r2
+valCmp (VNum r1) (VNum r2) = compare r1 r2
 valCmp (VInj L _) (VInj R _) = LT
 valCmp (VInj R _) (VInj L _) = GT
 valCmp (VInj L v1) (VInj L v2) = valCmp v1 v2
@@ -627,23 +651,19 @@ constdiff (x : xs)
 -- OEIS
 ------------------------------------------------------------
 
--- -- | Looks up a sequence of integers in OEIS.
--- --   Returns 'left()' if the sequence is unknown in OEIS,
--- --   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
--- oeisLookup :: Value -> Value
--- oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSequence ns)
---  where
---   parseResult r = VInj R (listv charv ("https://oeis.org/" ++ seqNum r))
---   seqNum = getCatalogNum . catalogNums
+-- | Looks up a sequence of integers in OEIS.
+--   Returns 'left()' if the sequence is unknown in OEIS,
+--   otherwise 'right "https://oeis.org/<oeis_sequence_id>"'
+oeisLookup :: Value -> Value
+oeisLookup (vlist vint -> ns) = maybe VNil parseResult (lookupSeq (SubSeq ns))
+ where
+  parseResult r = VInj R (listv charv ("https://oeis.org/" ++ T.unpack (number r)))
 
---   getCatalogNum [] = error "No catalog info"
---   getCatalogNum (n : _) = n
-
--- -- | Extends a Disco integer list with data from a known OEIS
--- --   sequence.  Returns a list of integers upon success, otherwise the
--- --   original list (unmodified).
--- oeisExtend :: Value -> Value
--- oeisExtend = listv intv . extendSequence . vlist vint
+-- | Extends a Disco integer list with data from a known OEIS
+--   sequence.  Returns a list of integers upon success, otherwise the
+--   original list (unmodified).
+oeisExtend :: Value -> Value
+oeisExtend = listv intv . extendSeq . vlist vint
 
 ------------------------------------------------------------
 -- Normalizing bags/sets
@@ -712,8 +732,8 @@ mergeM g = go
   mergeCons a m1 m2 zs = do
     nm <- evalApp g [VPair (intv m1) (intv m2)]
     return $ case nm of
-      VNum _ 0 -> zs
-      VNum _ n -> (a, numerator n) : zs
+      VNum 0 -> zs
+      VNum n -> (a, numerator n) : zs
       v -> error $ "Impossible! merge function in mergeM returned non-VNum " ++ show v
 
 ------------------------------------------------------------
@@ -753,8 +773,9 @@ ensureProp (VInj L _) = VPDone (TestResult False TestBool emptyTestEnv)
 ensureProp (VInj R _) = VPDone (TestResult True TestBool emptyTestEnv)
 ensureProp _ = error "ensureProp: non-prop value"
 
-combineTestResultBool :: LOp -> TestResult -> TestResult -> Bool
-combineTestResultBool op (TestResult b1 _ _) (TestResult b2 _ _) = interpLOp op b1 b2
+combineTestResults :: LOp -> TestResult -> TestResult -> TestResult
+combineTestResults op tr1@(TestResult b1 _ e1) tr2@(TestResult b2 _ e2) =
+  TestResult (interpLOp op b1 b2) (TestBin op tr1 tr2) (mergeTestEnv e1 e2)
 
 testProperty ::
   Members '[Random, State Mem] r =>
@@ -771,7 +792,7 @@ testProperty initialSt = checkProp . ensureProp
   checkProp (VPBin op vp1 vp2) = do
     tr1 <- checkProp vp1
     tr2 <- checkProp vp2
-    return $ TestResult (combineTestResultBool op tr1 tr2) (TestBin op tr1 tr2) emptyTestEnv
+    return $ combineTestResults op tr1 tr2
   checkProp (VPSearch sm tys f e) =
     extendResultEnv e <$> (generateSamples initialSt vals >>= go)
    where

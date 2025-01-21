@@ -53,7 +53,7 @@ We can arrange the four numeric types in a diamond shape, like this:
    :alt: Diamond lattice
    :align: center
 
-Each type is a subset, or :doc:`subtype`, of the type or types above
+Each type is a subset, or :doc:`subtypes`, of the type or types above
 it.  For example, the fact that :math:`\mathbb{N}` is below
 :math:`\mathbb{Z}` means that every natural number is also an integer.
 

@@ -1,0 +1,6 @@
+notCovered : Int -> Int
+notCovered 10 = -1
+
+covered : Int -> Int
+covered 10 = -1
+covered x = x

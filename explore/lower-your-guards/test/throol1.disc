@@ -1,0 +1,2 @@
+foo : Throol -> Bool
+foo Foo = False

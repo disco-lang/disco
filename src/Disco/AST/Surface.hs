@@ -105,6 +105,9 @@ module Disco.AST.Surface (
   pattern PFrac,
   pattern PNonlinear,
   pattern Binding,
+
+  -- ** Pretty printing
+  prettyPatternP,
 )
 where
 

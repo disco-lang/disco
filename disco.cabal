@@ -445,6 +445,10 @@ library
                        Disco.Value
                        Disco.Error
                        Disco.Eval
+                       Disco.Exhaustiveness
+                       Disco.Exhaustiveness.Constraint
+                       Disco.Exhaustiveness.Possibilities
+                       Disco.Exhaustiveness.TypeInfo
                        Disco.Interpret.CESK
                        Disco.Subst
                        Disco.Typecheck

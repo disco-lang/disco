@@ -78,11 +78,13 @@ import Polysemy.Output
 import Polysemy.Random
 import Polysemy.Reader
 
+import qualified Data.List.NonEmpty as NonEmpty
 import Disco.AST.Core
 import Disco.AST.Surface
 import Disco.Compile (compileDefns)
 import Disco.Context as Ctx
 import Disco.Error
+import Disco.Exhaustiveness (checkClauses)
 import Disco.Extensions
 import Disco.Interpret.CESK
 import Disco.Messages
@@ -384,6 +386,10 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
   -- Typecheck (and resolve names in) the module.
   m <- runTCM tyctx tydefns $ checkModule name importMap cm
 
+  -- Check for partial functions
+  let allTyDefs = M.unionWith const tydefns (m ^. miTydefs)
+  runFresh $ mapM_ (checkExhaustive allTyDefs) (Ctx.elems $ m ^. miTermdefs)
+
   -- Evaluate all the module definitions and add them to the topEnv.
   mapError EvalErr $ loadDefsFrom m
 
@@ -443,3 +449,8 @@ loadDef ::
 loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
+
+checkExhaustive :: Members '[Fresh, Output (Message ann), Embed IO] r => TyDefCtx -> Defn -> Sem r ()
+checkExhaustive tyDefCtx (Defn name argsType _ boundClauses) = do
+  clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
+  runReader @TyDefCtx tyDefCtx $ checkClauses name argsType clauses

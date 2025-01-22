@@ -1,3 +1,22 @@
+* 0.2 (22 January 2025)
+
+  - Allow `><` as syntax for product types
+  - Use syntax `T` and `F` for booleans
+  - New `:table` command
+  - Suggest alternate variable names based on edit distance
+  - Fix crash when computing `0^(-1)`
+  - `min` and `max` are now prefix instead of infix
+  - Display multiple example types for things with nontrivial polymorphism (#388)
+  - Randomness primitives (Justin Grubbs, #390)
+  - Automatic memoization (Justin Grubbs, #394)
+  - Remove decimal output
+  - Function pattern coverage checking (Colin Phillips, #434)
+  - A lot more documentation, including the start of a "gentle
+    introduction"
+  - Add support for GHC 9.10 and drop 9.4
+  - Better parser for `:load` (#430)
+  - Better test result reporting (#428)
+
 * 0.1.6 (16 December 2023)
 
   - A bunch more documentation

@@ -5,6 +5,9 @@ Disco is a programming language intended to teach basic functional
 programming principles in the context of a discrete mathematics
 course.
 
+**If you are a student sent here to install Disco on your computer**,
+[see the instructions below](https://github.com/disco-lang/disco#building-disco)!
+
 Design principles
 -----------------
 
@@ -44,43 +47,38 @@ If you'd like to contribute to disco development, check out
 Building disco
 --------------
 
-- The first step is to install the Haskell programming language (the
-  language in which Disco is implemented).  If you don't already have
-  Haskell installed, you can [follow the directions
-  here](http://ozark.hendrix.edu/~yorgey/install-haskell.html).
+Scroll down to find the instructions appropriate to your OS!
 
-- Now, at a command prompt, run `cabal update`, which will download
-  the latest information about Haskell packages.
+Building disco on Windows
+-------------------------
 
-- Now run `cabal install disco` at a command prompt.
+- Open a PowerShell terminal.
 
-    - Note that this may take a very long time, on the order of an
-      hour or so.
-    - The good news is that most of this work only needs to be done
-      once, even if you later install an updated version of disco.
-      Even if installation fails partway through, the work already
-      completed up to that point need not be redone.
-    - On OSX, if building fails with an error like `ghc: could not
-      execute: opt`, it means you need to install LLVM.  The easiest
-      way to do this is to first [follow the instructions to install
-      Homebrew](https://brew.sh/) (if you don't already have it), and
-      then type
+- Run the command `wsl --install`.
 
-          brew install llvm
+- Now type `wsl` to open a Windows Subsystem for Linux prompt.
 
-      at a terminal prompt.
+- Paste this command:
 
-        - If this fails with an error like `Could not resolve HEAD to
-          a revision`, then try running these two commands at a
-          terminal prompt:
+  ```
+  sudo apt install build-essential curl libffi-dev libffi8 libgmp-dev libgmp10 libncurses-dev pkg-config
+  ```
 
-              rm -rf $(brew --repo homebrew/core)
-              brew tap homebrew/core
+- Paste the following command:
 
-          Then re-run the `brew install llvm` command.
+  ```
+  curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+  ```
 
-        - After installing `llvm`, you may need to close and re-open
-          the terminal before running `cabal install disco` again.
+- Keep hitting Enter to accept the defaults.
+
+- Once it finishes, type the following commands:
+
+  ```
+  sudo apt install zlib1g-dev
+  cabal update
+  cabal install disco
+  ```
 
 - If it works, you should be able to now type `disco` at a command
   prompt, which should display a message like this:
@@ -92,6 +90,68 @@ Building disco
 
     Disco>
     ```
+
+- See the [Troubleshooting](#troubleshooting) section below if you
+  have any issues.
+
+Building disco on Mac OS / Linux
+--------------------------------
+
+- Open a terminal.
+
+- Paste the following command:
+
+  ```
+  curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+  ```
+
+- Keep hitting Enter to accept the defaults.
+
+- Now run the following:
+
+  ```
+  cabal update
+  cabal install disco
+  ```
+
+- If building fails with an error like `ghc: could not
+  execute: opt`, it means you need to install LLVM.  The easiest
+  way to do this is to first [follow the instructions to install
+  Homebrew](https://brew.sh/) (if you don't already have it), and
+  then type
+
+      brew install llvm
+
+  at a terminal prompt.
+
+    - If this fails with an error like `Could not resolve HEAD to
+      a revision`, then try running these two commands at a
+      terminal prompt:
+
+          rm -rf $(brew --repo homebrew/core)
+          brew tap homebrew/core
+
+      Then re-run the `brew install llvm` command.
+
+    - After installing `llvm`, you may need to close and re-open
+      the terminal before running `cabal install disco` again.
+
+- If it works, you should be able to now type `disco` at a command
+  prompt, which should display a message like this:
+
+    ```
+    Welcome to Disco!
+
+    A language for programming discrete mathematics.
+
+    Disco>
+    ```
+
+- See the [Troubleshooting](#troubleshooting) section below if you
+  have any issues.
+
+Troubleshooting
+---------------
 
 - If installation seems like it succeeded but the `disco` command is
   not recognized, it may be an issue with your path environment

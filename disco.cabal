@@ -383,7 +383,7 @@ build-type:          Simple
 
 source-repository head
   type:     git
-  location: git://github.com/disco-lang/disco.git
+  location: http://github.com/disco-lang/disco.git
 
 common common
   ghc-options:      -Wall

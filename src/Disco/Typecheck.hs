@@ -849,10 +849,15 @@ typecheck Infer (TPrim prim) = do
     a <- freshTy
     constraint $ CSub a TyZ
     return $ a :*: a :->: a
-  inferPrim (PrimBOp op) | op `elem` [Add, Mul, Sub, Div, SSub] = do
+  inferPrim (PrimBOp op) | op `elem` [Add, Mul, Sub, Div] = do
     a <- freshTy
     constraint $ CQual (bopQual op) a
     return $ a :*: a :->: a
+  inferPrim (PrimBOp SSub) = do
+    argTy <- freshTy
+    resTy <- freshTy
+    cAbs argTy resTy
+    return $ argTy :*: argTy :->: resTy
 
   -- See Note [Pattern coverage] -----------------------------
   inferPrim (PrimBOp Add) = error "inferPrim Add should be unreachable"

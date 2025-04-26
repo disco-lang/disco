@@ -12,7 +12,7 @@ maintainer:          byorgey@gmail.com
 copyright:           Disco team 2016-2022 (see LICENSE)
 category:            Language
 
-tested-with:         GHC ==9.6.6 || ==9.8.4 || ==9.10.1
+tested-with:         GHC ==9.6.6 || ==9.8.4 || ==9.10.1 || ==9.12.1
 
 data-dir:            lib
 
@@ -473,11 +473,11 @@ library
 
   autogen-modules:     Paths_disco
 
-  build-depends:       base >=4.8 && <4.21,
+  build-depends:       base >=4.8 && <4.22,
                        filepath,
                        directory,
                        mtl >=2.2 && <2.4,
-                       megaparsec >= 6.1.1 && < 9.7,
+                       megaparsec >= 6.1.1 && < 9.8,
                        parser-combinators >= 1.0.0 && < 1.4,
                        prettyprinter >=1.7 && < 1.8,
                        split >= 0.2 && < 0.3,
@@ -489,7 +489,7 @@ library
                        polysemy >= 1.6.0.0 && < 1.10,
                        polysemy-plugin >= 0.4 && < 0.5,
                        reflection >= 2.1.7 && < 2.2,
-                       random >= 1.2.1.1 && < 1.3,
+                       random >= 1.2.1.1 && < 1.4,
                        constraints >= 0.13.4 && < 0.15,
                        text >= 2.0.2 && < 2.2,
                        lens >= 4.14 && < 5.4,
@@ -525,7 +525,7 @@ executable disco
                        haskeline >=0.8 && <0.9,
                        mtl >=2.2 && <2.4,
                        transformers >= 0.4 && < 0.7,
-                       megaparsec >= 6.1.1 && < 9.7,
+                       megaparsec >= 6.1.1 && < 9.8,
                        containers >= 0.5 && < 0.8,
                        unbound-generics >= 0.3 && < 0.5,
                        lens >= 4.14 && < 5.4,
@@ -541,7 +541,7 @@ test-suite disco-tests
   hs-source-dirs: test
   ghc-options: -threaded
   build-tool-depends: disco:disco
-  build-depends:    base >= 4.7 && < 4.21,
+  build-depends:    base >= 4.7 && < 4.22,
                     tasty >= 0.10 && < 1.6,
                     tasty-golden >= 2.3 && < 2.4,
                     directory >= 1.2 && < 1.4,
@@ -558,7 +558,7 @@ test-suite disco-examples
   hs-source-dirs: example
   ghc-options: -threaded
   build-tool-depends: disco:disco
-  build-depends:    base >= 4.7 && < 4.21,
+  build-depends:    base >= 4.7 && < 4.22,
                     directory >= 1.2 && < 1.4,
                     filepath >= 1.4 && < 1.6,
                     process >= 1.4 && < 1.7

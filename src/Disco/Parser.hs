@@ -902,8 +902,8 @@ parseLet =
   TLet
     <$> ( reserved "let"
             *> ( bind
-                   <$> (toTelescope <$> (parseBinding `sepBy` comma))
-                   <*> (reserved "in" *> parseTerm)
+                  <$> (toTelescope <$> (parseBinding `sepBy` comma))
+                  <*> (reserved "in" *> parseTerm)
                )
         )
 

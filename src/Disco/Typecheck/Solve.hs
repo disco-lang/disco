@@ -658,9 +658,9 @@ simplify origVM cs =
   simplifyOne' (TyCon c1@(CContainer ctr1) tys1 :<: TyCon (CContainer ctr2) tys2) =
     ssConstraints
       %= ( ( (TyAtom ctr1 :<: TyAtom ctr2)
-              : zipWith3 variance (arity c1) tys1 tys2
+               : zipWith3 variance (arity c1) tys1 tys2
            )
-            ++
+             ++
          )
   simplifyOne' (TyCon c1 tys1 :<: TyCon c2 tys2)
     | c1 /= c2 = throw NoUnify

@@ -1004,8 +1004,6 @@ typecheck Infer (TPrim prim) = do
         ]
 
     return $ TyContainer c a :->: TyContainer c (TyContainer c a)
-  inferPrim PrimLookupSeq = return $ TyList TyN :->: (TyUnit :+: TyString)
-  inferPrim PrimExtendSeq = return $ TyList TyN :->: TyList TyN
 
 --------------------------------------------------
 -- Base types

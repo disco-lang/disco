@@ -261,8 +261,7 @@ prettyTCError = \case
       [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
       , indent
           2
-          ( text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
-          )
+          (text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule.")
       , rtd "no-poly-rec"
       ]
   NoError -> empty

@@ -218,10 +218,6 @@ data Op
     OCrash
   | -- | No-op/identity function
     OId
-  | -- | Lookup OEIS sequence
-    OLookupSeq
-  | -- | Extend a List via OEIS
-    OExtendSeq
   | -- | Not the Boolean `And`, but instead a propositional BOp
     -- | Should only be seen and used with Props.
     OAnd
@@ -384,8 +380,6 @@ opToStr = \case
   OMatchErr -> "matchErr"
   OCrash -> "crash"
   OId -> "id"
-  OLookupSeq -> "lookupSeq"
-  OExtendSeq -> "extendSeq"
   OForall {} -> "∀"
   OExists {} -> "∃"
   OAnd -> "and"

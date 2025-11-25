@@ -41,7 +41,7 @@ import qualified Disco.Subst as Subst
 import Disco.Syntax.Operators
 import Disco.Syntax.Prims
 import Disco.Typecheck.Constraints
-import Disco.Typecheck.Solve (SolutionLimit (..), solveConstraint, SolveError)
+import Disco.Typecheck.Solve (SolutionLimit (..), SolveError, solveConstraint)
 import Disco.Typecheck.Util
 import Disco.Types
 import Disco.Types.Rules

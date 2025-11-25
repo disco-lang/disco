@@ -14,7 +14,6 @@
 -- checking/inference.
 module Disco.Typecheck.Solve where
 
-import Data.Proxy
 import Control.Arrow ((&&&), (***))
 import Control.Lens hiding (use, (%=), (.=))
 import Control.Monad (forM, join, unless, zipWithM)
@@ -37,6 +36,7 @@ import Data.Maybe (
   mapMaybe,
  )
 import Data.Monoid (First (..))
+import Data.Proxy
 import Data.Semigroup (sconcat)
 import Data.Set (Set)
 import Data.Set qualified as S

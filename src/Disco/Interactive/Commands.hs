@@ -479,9 +479,9 @@ handleDocPrim prim = do
             _ -> []
         )
           ++ ( case prim of
-                 PrimUOp u -> [describePrec (uPrec u)]
-                 PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
-                 _ -> []
+                PrimUOp u -> [describePrec (uPrec u)]
+                PrimBOp b -> [describePrec (bPrec b) <> describeFixity (assoc b)]
+                _ -> []
              )
   case attrs of
     [] -> pure ()

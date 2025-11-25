@@ -36,6 +36,7 @@ import Data.Maybe (
   mapMaybe,
  )
 import Data.Monoid (First (..))
+import Data.Proxy
 import Data.Semigroup (sconcat)
 import Data.Set (Set)
 import Data.Set qualified as S
@@ -95,9 +96,9 @@ runSolve lim = runError . runFresh . evalState lim
 -- | Run a list of actions, and return the results from those which do
 --   not throw an error.  If all of them throw an error, rethrow the
 --   first one.
-filterErrors :: Member (Error e) r => NonEmpty (Sem r a) -> Sem r (NonEmpty a)
-filterErrors ms = do
-  es <- mapM try ms
+filterErrors :: Member (Error e) r => Proxy e -> NonEmpty (Sem r a) -> Sem r (NonEmpty a)
+filterErrors (Proxy :: Proxy err) ms = do
+  es <- mapM (try @err) ms
   case partitionEithersNE es of
     Left (e :| _) -> throw e
     Right (_, as) -> return as
@@ -117,7 +118,7 @@ countSolution = modify (SolutionLimit . subtract 1 . getSolutionLimit)
 --   being positive.  If the solution limit has reached zero, stop
 --   early.
 withSolutionLimit ::
-  (Member (State SolutionLimit) r, Member (Output (Message ann)) r, Monoid a) =>
+  (Member (State SolutionLimit) r, Member (Output Message) r, Monoid a) =>
   Sem r a ->
   Sem r a
 withSolutionLimit m = do
@@ -265,7 +266,7 @@ lkup messg m k = fromMaybe (error errMsg) (M.lookup k m)
 -- Top-level solver algorithm
 
 solveConstraint ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
+  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx, State SolutionLimit] r =>
   Constraint ->
   Sem r (NonEmpty S)
 solveConstraint c = do
@@ -284,10 +285,10 @@ solveConstraint c = do
   qcList <- decomposeConstraint c
 
   -- Now try continuing with each set.
-  sconcat <$> filterErrors (NE.map (uncurry solveConstraintChoice) qcList)
+  sconcat <$> filterErrors (Proxy :: Proxy SolveError) (NE.map (uncurry solveConstraintChoice) qcList)
 
 solveConstraintChoice ::
-  Members '[Fresh, Error SolveError, Output (Message ann), Input TyDefCtx, State SolutionLimit] r =>
+  Members '[Fresh, Error SolveError, Output Message, Input TyDefCtx, State SolutionLimit] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
   Sem r (NonEmpty S)
@@ -438,7 +439,7 @@ decomposeConstraint (CAll ty) = do
  where
   mkSkolems :: [Name Type] -> [(Name Type, Type)]
   mkSkolems = map (id &&& TySkolem)
-decomposeConstraint (COr cs) = sconcat <$> filterErrors (NE.map decomposeConstraint cs)
+decomposeConstraint (COr cs) = sconcat <$> filterErrors (Proxy :: Proxy SolveError) (NE.map decomposeConstraint cs)
 
 decomposeQual ::
   Members '[Fresh, Error SolveError, Input TyDefCtx] r =>
@@ -508,7 +509,7 @@ checkQual q (ABase bty) =
 --   constraints, that is, only of the form (v1 <: v2), (v <: b), or
 --   (b <: v), where v is a type variable and b is a base type.
 simplify ::
-  Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
   TyVarInfoMap ->
   [SimpleConstraint] ->
   Sem r (TyVarInfoMap, [(Atom, Atom)], S)
@@ -538,7 +539,7 @@ simplify origVM cs =
   -- Iterate picking one simplifiable constraint and simplifying it
   -- until none are left.
   simplify' ::
-    Members '[State SimplifyState, Fresh, Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+    Members '[State SimplifyState, Fresh, Error SolveError, Output Message, Input TyDefCtx] r =>
     Sem r ()
   simplify' = do
     -- q <- gets fst
@@ -772,7 +773,7 @@ mkConstraintGraph as cs = G.mkGraph nodes (S.fromList cs)
 --   only unsorted variables, just unify them all with the skolem and
 --   remove those components.
 checkSkolems ::
-  Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+  Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
   TyVarInfoMap ->
   Graph Atom ->
   Sem r (Graph UAtom, S)
@@ -805,7 +806,7 @@ checkSkolems vm graph = do
   noSkolems (AVar (S v)) = error $ "Skolem " ++ show v ++ " remaining in noSkolems"
 
   unifyWCCs ::
-    Members '[Error SolveError, Output (Message ann), Input TyDefCtx] r =>
+    Members '[Error SolveError, Output Message, Input TyDefCtx] r =>
     Graph Atom ->
     S ->
     [Set Atom] ->
@@ -998,7 +999,7 @@ lbsBySort vm rm = allBySort vm rm SubTy
 --   predecessors in this case, since it seems nice to default to
 --   "simpler" types lower down in the subtyping chain.
 solveGraph ::
-  Members '[Fresh, Error SolveError, Output (Message ann), State SolutionLimit] r =>
+  Members '[Fresh, Error SolveError, Output Message, State SolutionLimit] r =>
   TyVarInfoMap ->
   Graph UAtom ->
   Sem r [S]
@@ -1067,7 +1068,7 @@ solveGraph vm g = do
     fromVar _ = error "Impossible! UB but uisVar."
 
   go ::
-    Members '[Fresh, Output (Message ann), State SolutionLimit] r =>
+    Members '[Fresh, Output Message, State SolutionLimit] r =>
     RelMap ->
     Sem r [Substitution BaseTy]
   go relMap@(RelMap rm) = withSolutionLimit $ do

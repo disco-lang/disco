@@ -1,10 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Effects.Store
 -- Copyright   :  disco team and contributors
@@ -18,19 +14,20 @@ module Disco.Effects.Store where
 import qualified Data.IntMap.Lazy as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Proxy
 
 import Disco.Effects.Counter
 import Polysemy
 import Polysemy.State
 
 data Store v m a where
-  ClearStore :: Store v m ()
+  ClearStore :: Proxy v -> Store v m ()
   New :: v -> Store v m Int
   LookupStore :: Int -> Store v m (Maybe v)
   InsertStore :: Int -> v -> Store v m ()
   MapStore :: (v -> v) -> Store v m ()
   AssocsStore :: Store v m [(Int, v)]
-  KeepKeys :: IntSet -> Store v m ()
+  KeepKeys :: Proxy v -> IntSet -> Store v m ()
 
 makeSem ''Store
 
@@ -40,7 +37,7 @@ runStore =
   runCounter
     . evalState @(IntMap.IntMap v) IntMap.empty
     . reinterpret2 \case
-      ClearStore -> put IntMap.empty
+      ClearStore _ -> put @(IntMap.IntMap v) IntMap.empty
       New v -> do
         loc <- fromIntegral <$> next
         modify $ IntMap.insert loc v
@@ -49,4 +46,6 @@ runStore =
       InsertStore k v -> modify (IntMap.insert k v)
       MapStore f -> modify (IntMap.map f)
       AssocsStore -> gets IntMap.assocs
-      KeepKeys ks -> modify (\m -> IntMap.withoutKeys m (IntMap.keysSet m `IntSet.difference` ks))
+      KeepKeys _ ks ->
+        modify @(IntMap.IntMap v) $ \m ->
+          IntMap.withoutKeys m (IntMap.keysSet m `IntSet.difference` ks)

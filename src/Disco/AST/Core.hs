@@ -218,10 +218,6 @@ data Op
     OCrash
   | -- | No-op/identity function
     OId
-  | -- | Lookup OEIS sequence
-    OLookupSeq
-  | -- | Extend a List via OEIS
-    OExtendSeq
   | -- | Not the Boolean `And`, but instead a propositional BOp
     -- | Should only be seen and used with Props.
     OAnd
@@ -298,7 +294,7 @@ instance Pretty Core where
 toTuple :: [Core] -> Core
 toTuple = foldr CPair CUnit
 
-prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r (Doc ann)
+prettyTestVars :: Members '[Reader PA, LFresh] r => [(String, Type, Name Core)] -> Sem r Doc
 prettyTestVars = brackets . intercalate "," . map prettyTestVar
  where
   prettyTestVar (s, ty, n) = parens (intercalate "," [text s, pretty ty, pretty n])
@@ -384,8 +380,6 @@ opToStr = \case
   OMatchErr -> "matchErr"
   OCrash -> "crash"
   OId -> "id"
-  OLookupSeq -> "lookupSeq"
-  OExtendSeq -> "extendSeq"
   OForall {} -> "∀"
   OExists {} -> "∃"
   OAnd -> "and"

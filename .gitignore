@@ -82,3 +82,5 @@ tmp/
 
 *.pygtex
 *.pygstyle
+
+*/_minted/*

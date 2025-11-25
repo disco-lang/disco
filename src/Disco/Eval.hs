@@ -162,10 +162,10 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 -- However, just manually implementing it here seems easier.
 
 -- | Effects needed at the top level.
-type TopEffects = '[Error DiscoError, State TopInfo, Output (Message ()), Embed IO, Final (H.InputT IO)]
+type TopEffects = '[Error DiscoError, State TopInfo, Output Message, Embed IO, Final (H.InputT IO)]
 
 -- | Effects needed for evaluation.
-type EvalEffects = [Error EvalError, Random, LFresh, Output (Message ()), State Mem]
+type EvalEffects = [Error EvalError, Random, LFresh, Output Message, State Mem]
 
 -- XXX write about order.
 -- memory, counter etc. should not be reset by errors.
@@ -191,11 +191,11 @@ runDisco cfg =
   void
     . H.runInputT inputSettings
     . runFinal @(H.InputT IO)
-    . embedToFinal
+    . embedToFinal @(H.InputT IO)
     . runEmbedded @_ @(H.InputT IO) liftIO
     . runOutputSem (handleMsg msgFilter) -- Handle Output Message via printing to console
     . stateToIO (initTopInfo cfg) -- Run State TopInfo via an IORef
-    . inputToState -- Dispatch Input TopInfo effect via State effect
+    . inputToState @TopInfo -- Dispatch Input TopInfo effect via State effect
     . runState emptyMem -- Start with empty memory
     . outputDiscoErrors -- Output any top-level errors
     . runLFresh -- Generate locally fresh names
@@ -293,7 +293,7 @@ typecheckTop tcm = do
 --   The 'Resolver' argument specifies where to look for imported
 --   modules.
 loadDiscoModule ::
-  Members '[State TopInfo, Output (Message ann), Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
   Bool ->
   Resolver ->
   FilePath ->
@@ -307,7 +307,7 @@ loadDiscoModule quiet resolver =
 --   module loaded from disk).  Used for e.g. blocks/modules entered
 --   at the REPL prompt.
 loadParsedDiscoModule ::
-  Members '[State TopInfo, Output (Message ann), Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
   Bool ->
   Resolver ->
   ModuleName ->
@@ -321,7 +321,7 @@ loadParsedDiscoModule quiet resolver =
 --   any imported module more than once. Resolve the module, load and
 --   parse it, then call 'loadParsedDiscoModule''.
 loadDiscoModule' ::
-  Members '[State TopInfo, Output (Message ann), Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
   Bool ->
   Resolver ->
   [ModuleName] ->
@@ -353,7 +353,7 @@ stdLib = ["list", "container"]
 --   'LoadingMode' parameter is 'REPL'.  Recursively load all its
 --   imports, then typecheck it.
 loadParsedDiscoModule' ::
-  Members '[State TopInfo, Output (Message ann), Random, State Mem, Error DiscoError, Embed IO] r =>
+  Members '[State TopInfo, Output Message, Random, State Mem, Error DiscoError, Embed IO] r =>
   Bool ->
   LoadingMode ->
   Resolver ->
@@ -399,7 +399,7 @@ loadParsedDiscoModule' quiet mode resolver inProcess name cm@(Module _ mns _ _ _
 
 -- | Try loading the contents of a file from the filesystem, emitting
 --   an error if it's not found.
-loadFile :: Members '[Output (Message ann), Embed IO] r => FilePath -> Sem r (Maybe String)
+loadFile :: Members '[Output Message, Embed IO] r => FilePath -> Sem r (Maybe String)
 loadFile file = do
   res <- liftIO $ handle @SomeException (return . Left) (Right <$> readFile file)
   case res of
@@ -409,7 +409,7 @@ loadFile file = do
 -- | Add things from the given module to the set of currently loaded
 --   things.
 addToREPLModule ::
-  Members '[Error DiscoError, State TopInfo, Random, State Mem, Output (Message ann)] r =>
+  Members '[Error DiscoError, State TopInfo, Random, State Mem, Output Message] r =>
   ModuleInfo ->
   Sem r ()
 addToREPLModule mi = modify @TopInfo (replModInfo <>~ mi)
@@ -419,7 +419,7 @@ addToREPLModule mi = modify @TopInfo (replModInfo <>~ mi)
 --   term definitions, documentation, types, and type definitions.
 --   Replaces any previously loaded module.
 setREPLModule ::
-  Members '[State TopInfo, Random, Error EvalError, State Mem, Output (Message ann)] r =>
+  Members '[State TopInfo, Random, Error EvalError, State Mem, Output Message] r =>
   ModuleInfo ->
   Sem r ()
 setREPLModule mi = do
@@ -450,7 +450,7 @@ loadDef x body = do
   v <- inputToState @TopInfo . inputTopEnv $ eval body
   modify @TopInfo $ topEnv %~ Ctx.insert x v
 
-checkExhaustive :: Members '[Fresh, Output (Message ann), Embed IO] r => TyDefCtx -> Defn -> Sem r ()
+checkExhaustive :: Members '[Fresh, Output Message, Embed IO] r => TyDefCtx -> Defn -> Sem r ()
 checkExhaustive tyDefCtx (Defn name argsType _ boundClauses) = do
   clauses <- NonEmpty.map fst <$> mapM unbind boundClauses
   runReader @TyDefCtx tyDefCtx $ checkClauses name argsType clauses

@@ -309,7 +309,7 @@ annCmd =
     }
 
 handleAnn ::
-  Members '[Error DiscoError, Input TopInfo, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, Output Message] r =>
   REPLExpr 'CAnn ->
   Sem r ()
 handleAnn (Ann t) = do
@@ -332,7 +332,7 @@ compileCmd =
     }
 
 handleCompile ::
-  Members '[Error DiscoError, Input TopInfo, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, Output Message] r =>
   REPLExpr 'CCompile ->
   Sem r ()
 handleCompile (Compile t) = do
@@ -355,7 +355,7 @@ desugarCmd =
     }
 
 handleDesugar ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDesugar ->
   Sem r ()
 handleDesugar (Desugar t) = do
@@ -389,7 +389,7 @@ parseDoc =
     <|> (DocOther <$> (sc *> many (anySingleBut ' ')))
 
 handleDoc ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CDoc ->
   Sem r ()
 handleDoc (Doc (DocTerm (TBool _))) = handleDocBool
@@ -402,26 +402,26 @@ handleDoc (Doc (DocTerm _)) =
 handleDoc (Doc (DocPrim p)) = handleDocPrim p
 handleDoc (Doc (DocOther s)) = handleDocMap (OtherKey s)
 
-handleDocBool :: Members '[Output (Message ())] r => Sem r ()
+handleDocBool :: Members '[Output Message] r => Sem r ()
 handleDocBool =
   info $
     "T and F (also written true and false, or True and False) are the two possible values of type Boolean."
       $+$ formatReference (mkRef "bool")
 
-handleDocUnit :: Members '[Output (Message ())] r => Sem r ()
+handleDocUnit :: Members '[Output Message] r => Sem r ()
 handleDocUnit =
   info $
     "The unit value, i.e. the single value of type Unit."
       $+$ formatReference (mkRef "unit")
 
-handleDocWild :: Members '[Output (Message ())] r => Sem r ()
+handleDocWild :: Members '[Output Message] r => Sem r ()
 handleDocWild =
   info $
     "A wildcard pattern."
       $+$ formatReference (mkRef "wild-pattern")
 
 handleDocVar ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   Name Term ->
   Sem r ()
 handleDocVar x = do
@@ -462,7 +462,7 @@ handleDocVar x = do
           _ -> PP.empty
 
 handleDocPrim ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   Prim ->
   Sem r ()
 handleDocPrim prim = do
@@ -504,14 +504,14 @@ handleDocPrim prim = do
         , if post then "~" else PP.empty
         ]
 
-formatReference :: Reference -> Sem r (Doc ann)
+formatReference :: Reference -> Sem r Doc
 formatReference (Reference rty p) = case rty of
   Ref -> "https://disco-lang.readthedocs.io/en/latest/reference/" <> text p <> ".html"
   Intro -> "https://disco-lang.readthedocs.io/en/latest/introduction/" <> text p <> ".html"
   URL -> text p
 
 handleDocMap ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   DocKey ->
   Sem r ()
 handleDocMap k = case M.lookup k docMap of
@@ -543,7 +543,7 @@ evalCmd =
     }
 
 handleEval ::
-  Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r =>
   REPLExpr 'CEval ->
   Sem r ()
 handleEval (Eval m) = do
@@ -554,7 +554,7 @@ handleEval (Eval m) = do
 -- garbageCollect?
 
 -- First argument = should the value be printed?
-evalTerm :: Members (Error EvalError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => Bool -> ATerm -> Sem r Value
+evalTerm :: Members (Error EvalError ': State TopInfo ': Output Message ': EvalEffects) r => Bool -> ATerm -> Sem r Value
 evalTerm pr at = do
   env <- use @TopInfo topEnv
   v <- runInputConst env $ eval (compileTerm at)
@@ -584,7 +584,7 @@ helpCmd =
     , parser = return Help
     }
 
-handleHelp :: Member (Output (Message ())) r => REPLExpr 'CHelp -> Sem r ()
+handleHelp :: Member (Output Message) r => REPLExpr 'CHelp -> Sem r ()
 handleHelp Help =
   info $
     vcat
@@ -623,13 +623,13 @@ loadCmd =
 --   in the parent module are executed.
 --   Disco.Interactive.CmdLine uses a version of this function that returns a Bool.
 handleLoadWrapper ::
-  Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r =>
   REPLExpr 'CLoad ->
   Sem r ()
 handleLoadWrapper (Load fp) = void (handleLoad fp)
 
 handleLoad ::
-  Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r =>
   FilePath ->
   Sem r Bool
 handleLoad fp = do
@@ -645,7 +645,7 @@ handleLoad fp = do
   setREPLModule m
 
   -- Now run any tests
-  t <- inputToState $ runAllTests (m ^. miNames) (m ^. miProps)
+  t <- inputToState @TopInfo $ runAllTests (m ^. miNames) (m ^. miProps)
 
   -- Evaluate and print any top-level terms
   forM_ (m ^. miTerms) (mapError EvalErr . evalTerm True . fst)
@@ -657,7 +657,7 @@ handleLoad fp = do
 
 -- XXX Return a structured summary of the results, not a Bool; & move
 -- this somewhere else?
-runAllTests :: Members (Output (Message ()) ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
+runAllTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => [QName Term] -> Ctx ATerm [AProperty] -> Sem r Bool -- (Ctx ATerm [TestResult])
 runAllTests declNames aprops
   | Ctx.null aprops = return True
   | otherwise = do
@@ -667,7 +667,7 @@ runAllTests declNames aprops
  where
   numSamples :: Int
   numSamples = 50 -- XXX make this configurable somehow
-  runTests :: Members (Output (Message ()) ': Input TopInfo ': EvalEffects) r => QName Term -> [AProperty] -> Sem r Bool
+  runTests :: Members (Output Message ': Input TopInfo ': EvalEffects) r => QName Term -> [AProperty] -> Sem r Bool
   runTests (QName _ n) props = do
     results <- inputTopEnv $ traverse (sequenceA . (id &&& runTest numSamples)) props
     let failures = P.filter (not . testIsOk . snd) results
@@ -697,13 +697,13 @@ namesCmd =
     , shortHelp = "Show all names in current scope"
     , category = User
     , cmdtype = ColonCmd
-    , action = inputToState . handleNames
+    , action = inputToState @TopInfo . handleNames
     , parser = return Names
     }
 
 -- | Show names and types for each item in the top-level context.
 handleNames ::
-  Members '[Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CNames ->
   Sem r ()
 handleNames Names = do
@@ -748,7 +748,7 @@ parseCmd =
     , parser = Parse <$> term
     }
 
-handleParse :: Member (Output (Message ())) r => REPLExpr 'CParse -> Sem r ()
+handleParse :: Member (Output Message) r => REPLExpr 'CParse -> Sem r ()
 handleParse (Parse t) = info (text (show t))
 
 ------------------------------------------------------------
@@ -766,7 +766,7 @@ prettyCmd =
     , parser = Pretty <$> term
     }
 
-handlePretty :: Members '[LFresh, Output (Message ())] r => REPLExpr 'CPretty -> Sem r ()
+handlePretty :: Members '[LFresh, Output Message] r => REPLExpr 'CPretty -> Sem r ()
 handlePretty (Pretty t) = info $ pretty' t
 
 ------------------------------------------------------------
@@ -784,9 +784,9 @@ printCmd =
     , parser = Print <$> term
     }
 
-handlePrint :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CPrint -> Sem r ()
+handlePrint :: Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r => REPLExpr 'CPrint -> Sem r ()
 handlePrint (Print t) = do
-  at <- inputToState . typecheckTop $ checkTop t (toPolyType TyString)
+  at <- inputToState @TopInfo . typecheckTop $ checkTop t (toPolyType TyString)
   v <- mapError EvalErr . evalTerm False $ at
   info $ text (vlist vchar v)
 
@@ -805,9 +805,9 @@ tableCmd =
     , parser = Table <$> parseTermOrOp
     }
 
-handleTable :: Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
+handleTable :: Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r => REPLExpr 'CTable -> Sem r ()
 handleTable (Table t) = do
-  (at, ty) <- inputToState . typecheckTop $ inferTop1 t
+  (at, ty) <- inputToState @TopInfo . typecheckTop $ inferTop1 t
   v <- mapError EvalErr . evalTerm False $ at
 
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
@@ -948,7 +948,7 @@ reloadCmd =
     }
 
 handleReload ::
-  Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': Embed IO ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output Message ': Embed IO ': EvalEffects) r =>
   REPLExpr 'CReload ->
   Sem r ()
 handleReload Reload = do
@@ -973,7 +973,7 @@ showDefnCmd =
     }
 
 handleShowDefn ::
-  Members '[Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CShowDefn ->
   Sem r ()
 handleShowDefn (ShowDefn x) = do
@@ -1006,13 +1006,13 @@ testPropCmd =
     }
 
 handleTest ::
-  Members (Error DiscoError ': State TopInfo ': Output (Message ()) ': EvalEffects) r =>
+  Members (Error DiscoError ': State TopInfo ': Output Message ': EvalEffects) r =>
   REPLExpr 'CTestProp ->
   Sem r ()
 handleTest (TestProp t) = do
-  at <- inputToState . typecheckTop $ checkProperty t
+  at <- inputToState @TopInfo . typecheckTop $ checkProperty t
   tydefs <- use @TopInfo (replModInfo . to allTydefs)
-  inputToState . inputTopEnv $ do
+  inputToState @TopInfo . inputTopEnv $ do
     r <- runTest 100 at -- XXX make configurable
     info $ runInputConst tydefs . runReader initPA $ indent 2 . nest 2 $ "-" <+> prettyTestResult at r
 
@@ -1035,7 +1035,7 @@ maxInferredTypes :: Int
 maxInferredTypes = 16
 
 handleTypeCheck ::
-  Members '[Error DiscoError, Input TopInfo, LFresh, Output (Message ())] r =>
+  Members '[Error DiscoError, Input TopInfo, LFresh, Output Message] r =>
   REPLExpr 'CTypeCheck ->
   Sem r ()
 handleTypeCheck (TypeCheck t) = do

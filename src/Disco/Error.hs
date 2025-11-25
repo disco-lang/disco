@@ -78,7 +78,7 @@ deriving instance Show EvalError
 panic :: Member (Error DiscoError) r => String -> Sem r a
 panic = throw . Panic
 
-outputDiscoErrors :: Member (Output (Message ann)) r => Sem (Error DiscoError ': r) () -> Sem r ()
+outputDiscoErrors :: Member (Output Message) r => Sem (Error DiscoError ': r) () -> Sem r ()
 outputDiscoErrors m = do
   e <- runError m
   either (err . pretty') return e
@@ -102,10 +102,10 @@ instance Pretty DiscoError where
         , "Please report this as a bug at https://github.com/disco-lang/disco/issues/ ."
         ]
 
-rtd :: String -> Sem r (Doc ann)
+rtd :: String -> Sem r Doc
 rtd page = "https://disco-lang.readthedocs.io/en/latest/reference/" <> text page <> ".html"
 
--- issue :: Int -> Sem r (Doc ann)
+-- issue :: Int -> Sem r Doc
 -- issue n = "See https://github.com/disco-lang/disco/issues/" <> text (show n)
 
 squote :: String -> String
@@ -114,7 +114,7 @@ squote x = "'" ++ x ++ "'"
 cyclicImportError ::
   Members '[Reader PA, LFresh] r =>
   [ModuleName] ->
-  Sem r (Doc ann)
+  Sem r Doc
 cyclicImportError ms =
   nest 2 $
     vcat
@@ -122,7 +122,7 @@ cyclicImportError ms =
       , intercalate " ->" (map pretty ms)
       ]
 
-prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r (Doc ann)
+prettyEvalError :: Members '[Reader PA, LFresh] r => EvalError -> Sem r Doc
 prettyEvalError = \case
   UnboundPanic x ->
     ("Bug! No variable found named" <+> pretty' x <> ".")
@@ -139,7 +139,7 @@ prettyEvalError = \case
 -- [ ] Step 3: improve error messages according to notes below
 -- [ ] Step 4: get it to return multiple error messages
 -- [ ] Step 5: save parse locations, display with errors
-prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r (Doc ann)
+prettyTCError :: Members '[Reader PA, LFresh] r => TCError -> Sem r Doc
 prettyTCError = \case
   -- XXX include some potential misspellings along with Unbound
   --   see https://github.com/disco-lang/disco/issues/180
@@ -261,13 +261,12 @@ prettyTCError = \case
       [ "Error: in the definition of " <> text s <> parens (intercalate "," (map text ss)) <> ": recursive occurrences of" <+> text s <+> "may only have type variables as arguments."
       , indent
           2
-          ( text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule."
-          )
+          (text s <> parens (intercalate "," (map pretty' tys)) <+> "does not follow this rule.")
       , rtd "no-poly-rec"
       ]
   NoError -> empty
 
-conWord :: Con -> Sem r (Doc ann)
+conWord :: Con -> Sem r Doc
 conWord = \case
   CArr -> "function"
   CProd -> "pair"
@@ -280,7 +279,7 @@ conWord = \case
   CGraph -> "graph"
   CUser s -> text s
 
-prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r (Doc ann)
+prettySolveError :: Members '[Reader PA, LFresh] r => SolveError -> Sem r Doc
 prettySolveError = \case
   -- XXX say which types!
   NoWeakUnifier ->
@@ -311,12 +310,12 @@ prettySolveError = \case
       , rtd "qual-skolem"
       ]
 
-qualPhrase :: Bool -> Qualifier -> Sem r (Doc ann)
+qualPhrase :: Bool -> Qualifier -> Sem r Doc
 qualPhrase b q
   | q `elem` [QBool, QBasic, QSimple] = "are" <+> (if b then empty else "not") <+> qualAction q
   | otherwise = "can" <> (if b then empty else "not") <+> "be" <+> qualAction q
 
-qualAction :: Qualifier -> Sem r (Doc ann)
+qualAction :: Qualifier -> Sem r Doc
 qualAction = \case
   QNum -> "added and multiplied"
   QSub -> "subtracted"

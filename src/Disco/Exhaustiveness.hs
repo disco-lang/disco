@@ -72,7 +72,7 @@ import Unbound.Generics.LocallyNameless (Name)
 --   The most notable change is that here we always generate (at most) 3
 --   concrete examples of uncovered patterns, instead of finding the most
 --   general complete description of every uncovered input.
-checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output (Message ann), Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
+checkClauses :: (Members '[Fresh, Reader Ty.TyDefCtx, Output Message, Embed IO] r) => Name ATerm -> [Ty.Type] -> NonEmpty [APattern] -> Sem r ()
 checkClauses name types pats = do
   args <- TI.newVars types
   cl <- zipWithM (desugarClause args) [1 ..] (NonEmpty.toList pats)
@@ -99,10 +99,10 @@ checkClauses name types pats = do
         DSL.<+> DSL.text "is undefined for some inputs. For example:"
         DSL.$+$ prettyExamples
 
-prettyPrintExample :: ExamplePat -> Sem r (Doc ann)
+prettyPrintExample :: ExamplePat -> Sem r Doc
 prettyPrintExample = runLFresh . runReader initPA . prettyPrintPattern . exampleToDiscoPattern
 
-prettyPrintPattern :: (Members '[Reader PA, LFresh] r) => Pattern -> Sem r (Doc ann)
+prettyPrintPattern :: (Members '[Reader PA, LFresh] r) => Pattern -> Sem r Doc
 prettyPrintPattern = withPA funPA . prettyPatternP
 
 exampleToDiscoPattern :: ExamplePat -> Pattern

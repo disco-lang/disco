@@ -112,10 +112,6 @@ data Prim where
   PrimUntil :: Prim
   -- | Test whether a proposition holds
   PrimHolds :: Prim
-  -- | Lookup OEIS sequence
-  PrimLookupSeq :: Prim
-  -- | Extend OEIS sequence
-  PrimExtendSeq :: Prim
   -- | Generates a pseudorandom number generator
   PrimSeed :: Prim
   -- | Given a range and a generator, generates random number
@@ -190,8 +186,6 @@ primTable =
   , PrimInfo PrimCrash "crash" False
   , PrimInfo PrimUntil "until" False
   , PrimInfo PrimHolds "holds" True
-  , PrimInfo PrimLookupSeq "lookupSequence" False
-  , PrimInfo PrimExtendSeq "extendSequence" False
   , PrimInfo PrimSeed "seed" True
   , PrimInfo PrimRandom "random" True
   ]

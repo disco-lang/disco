@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE QuantifiedConstraints #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- |
 -- Module      :  Disco.Messages

@@ -1,7 +1,7 @@
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 
 -- TODO: the calls to 'error' should be replaced with logging/error capabilities.
 
@@ -17,7 +17,7 @@ module Disco.Pretty (
   module Disco.Pretty.DSL,
   module Disco.Pretty,
   module Disco.Pretty.Prec,
-  Doc
+  Doc,
 )
 where
 
@@ -26,12 +26,12 @@ import Prelude hiding ((<>))
 import Data.Bifunctor
 import Data.Char (isAlpha)
 import Data.List.NonEmpty (NonEmpty)
-import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty qualified as NE
 import Data.Map (Map)
-import qualified Data.Map as M
+import Data.Map qualified as M
 import Data.Ratio
 import Data.Set (Set)
-import qualified Data.Set as S
+import Data.Set qualified as S
 import Disco.Effects.LFresh
 import Disco.Pretty.DSL
 import Disco.Pretty.Prec

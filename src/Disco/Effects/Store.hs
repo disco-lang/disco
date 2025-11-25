@@ -11,10 +11,10 @@
 -- Polysemy effect for a memory store with integer keys.
 module Disco.Effects.Store where
 
-import Data.Proxy
 import qualified Data.IntMap.Lazy as IntMap
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
+import Data.Proxy
 
 import Disco.Effects.Counter
 import Polysemy

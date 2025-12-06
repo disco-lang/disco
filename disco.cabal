@@ -418,6 +418,7 @@ library
                        Disco.Syntax.Prims
                        Disco.Extensions
                        Disco.Effects.Counter
+                       Disco.Effects.FileSystem
                        Disco.Effects.Fresh
                        Disco.Effects.Input
                        Disco.Effects.LFresh

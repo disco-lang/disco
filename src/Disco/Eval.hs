@@ -164,6 +164,9 @@ type family AppendEffects (r :: EffectRow) (s :: EffectRow) :: EffectRow where
 -- | Effects needed at the top level.
 type TopEffects = '[Error DiscoError, State TopInfo, Output Message, Embed IO, Final (H.InputT IO)]
 
+-- XXX step 1: move Final (H.InputT IO) into CmdLine specifically
+-- XXX step 2: replace Embed IO with FileSystem effect having sufficient operations
+
 -- | Effects needed for evaluation.
 type EvalEffects = [Error EvalError, Random, LFresh, Output Message, State Mem]
 

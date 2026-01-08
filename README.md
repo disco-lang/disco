@@ -1,12 +1,12 @@
-[![Build Status](https://travis-ci.org/disco-lang/disco.svg?branch=master)](https://travis-ci.org/disco-lang/disco)
+[![Build Status](https://github.com/disco-lang/disco/actions/workflows/haskell-ci.yml/badge.svg](https://github.com/disco-lang/disco/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Disco is a programming language intended to teach basic functional
 programming principles in the context of a discrete mathematics
 course.
 
-**If you are a student sent here to install Disco on your computer**,
-[see the instructions below](https://github.com/disco-lang/disco#building-disco)!
+**Visit [Disco Live](https://disco-lang.github.io/disco-live/) to use
+Disco directly in your browser without installing anything!**
 
 Design principles
 -----------------
@@ -47,7 +47,10 @@ If you'd like to contribute to disco development, check out
 Building disco
 --------------
 
-Scroll down to find the instructions appropriate to your OS!
+Scroll down to find the instructions appropriate to your operating system.  **Note,
+if you are a student using Disco for a class, you should not need
+these instructions!**  You should be able to use [Disco
+Live](https://disco-lang.github.io/disco-live/) in your browser.
 
 Building disco on Windows
 -------------------------

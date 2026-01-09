@@ -1,4 +1,4 @@
-[![Build Status](https://github.com/disco-lang/disco/actions/workflows/haskell-ci.yml/badge.svg](https://github.com/disco-lang/disco/actions)
+[![Build Status](https://github.com/disco-lang/disco/actions/workflows/haskell-ci.yml/badge.svg)](https://github.com/disco-lang/disco/actions)
 [![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-v2.0%20adopted-ff69b4.svg)](CODE_OF_CONDUCT.md)
 
 Disco is a programming language intended to teach basic functional

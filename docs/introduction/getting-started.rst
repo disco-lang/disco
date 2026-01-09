@@ -7,15 +7,13 @@ mathematics course.  Even if you've never done any programming before,
 this series of tutorials is intended to gently introduce you to the
 language from first principles.
 
-To get started using Disco, just `visit this Disco REPL on
-replit.com <https://replit.com/@BrentYorgey/Disco#README.md>`_ and
-follow the instructions there to fork your own copy, where you will be
-able to evaluate Disco expressions, and edit and run your own
+To get started using Disco, just `visit Disco Live <https://disco-lang.github.io/disco-live/>`_, where you will be
+able to evaluate Disco expressions and edit and run your own
 ``.disco`` files, all via your web browser, without installing
 anything on your computer.
 
 (It is also possible to install Disco on your own computer if you
-wish; `see here for
+really want to; `see here for
 instructions <https://github.com/disco-lang/disco/#readme>`_.)
 
 A few useful resources as you get started:

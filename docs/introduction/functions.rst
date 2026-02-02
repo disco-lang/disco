@@ -84,9 +84,68 @@ example:
    quadruplePlusOne : N -> N
    quadruplePlusOne(n) = double(double(n)) + 1
 
-.. admonition:: To be written
+Typechecking for functions
+--------------------------
 
-   * Applying functions to inputs of the wrong type.
-   * Loading functions from a file.
-   * Example: factorial function.
-   * Exercises.
+Disco ensures that every function definition matches its declared
+type: that is, if the function is given a value of the declared input
+type, then it is guaranteed to produce an output of the declared
+output type.
+
+For example, here is a function definition that Disco rejects with a
+typechecking error:
+
+::
+
+   bad :: N -> N
+   bad(n) = n - 3
+
+The problem is that although the type ``N -> N`` *promises* that it
+will always return a natural number as output when given a natural
+number as input, this is not true: for example, when ``n`` is 1, ``n -
+3`` would be ``-2``, which is not a natural number.
+
+Likewise, Disco ensures that functions are only applied to inputs of
+their declared input type.  For example, the ``quadruplePlusOne``
+function defined at the end of the previous section is declared to
+have type ``N -> N``.  If we attempt to apply it to an input that is
+not a natural number, Disco will complain:
+
+::
+
+   Disco> quadruplePlusOne(-3)
+
+Example: factorial
+------------------
+
+As another example, let's implement the *factorial* function.  Recall
+that the factorial of n is the product of all the natural numbers
+from 1 up to n, that is, :math:`n! = n \cdot (n-1) \cdot (n-2) \cdot \dots
+\cdot 1`.  Another way to write this is :math:`n! = n \cdot (n-1)!`. If
+we add a "base case" :math:`0! = 1`, this becomes a perfectly viable way
+to *define* factorial.  We could transcribe it into Disco as follows:
+
+::
+
+    fac : N -> N
+    fac(0) = 1
+    fac(n) = n * fac (n-1)
+
+Unfortunately, this is a type error. The reason is that since the
+input to ``fac`` is supposed to be a natural number, that means
+:math:`n-1` must be a natural number, but it cannot be since it uses
+subtraction. We can use the ``.-`` operator instead, which works on
+natural numbers.  It is like subtraction but with a lower bound of
+zero.
+
+::
+
+    fac : N -> N
+    fac(0) = 1
+    fac(n) = n * fac (n .- 1)
+
+Exercises
+---------
+
+* Define a Disco function which returns one more than three times its
+  input.  What types can you give it?

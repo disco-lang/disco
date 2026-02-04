@@ -85,10 +85,84 @@ equality testing </reference/def-vs-test>`.
 Boolean operators
 -----------------
 
-.. admonition:: To be written
+Disco has a number of *operators* that can be used to manipulate and
+combine Boolean values.
 
-   - Introduce logic operators (and, or, not, implies, iff)
-   - Mention `:table` command
-   - Introduce basic tests
-   - Exercises:
-     - xor
+* The ``not`` operator (which can also be written ``¬``) flips ``T``
+  to ``F`` and vice versa.
+
+    ::
+
+       Disco> not T
+       F
+       Disco> not F
+       T
+       Disco> ¬ true
+       F
+
+  We can also use the ``:table`` command to ask Disco to print out a
+  table showing all the possible values of a function or operator:
+
+    ::
+
+       Disco> :table not
+       F  T
+       T  F
+
+* The ``and`` operator (which can also be written ``&&`` or ``/\`` or
+  ``∧``) implements logical conjunction: the result is only ``T`` if
+  both inputs are ``T``.
+
+    ::
+
+       Disco> :table and
+       F  F  F
+       F  T  F
+       T  F  F
+       T  T  T
+
+* The ``or`` operator (also written ``||`` or ``\/`` or ``∨``)
+  implements logical disjunction: the result is only ``T`` if at least one
+  of the inputs is ``T``.
+
+    ::
+
+       Disco> :table or
+       F  F  F
+       F  T  T
+       T  F  T
+       T  T  T
+
+* The ``implies`` operator (also written ``->``) implements logical
+  implication: the result is only ``F`` when the left-hand side is
+  ``T`` but the right-hand side is ``F``, and it is ``T`` otherwise.
+
+    ::
+
+       Disco> :table implies
+       F  F  T
+       F  T  T
+       T  F  F
+       T  T  T
+
+* Finally, there is an ``iff`` operator (also written ``<->``) which
+  is true when its two inputs are the same, and false otherwise.
+
+    ::
+
+       Disco> :table iff
+       F  F  T
+       F  T  F
+       T  F  F
+       T  T  T
+
+Tests
+-----
+
+- Introduce basic tests: syntax, `:test` command
+
+Exercises
+---------
+
+- Exercises:
+  - xor

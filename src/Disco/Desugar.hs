@@ -749,19 +749,29 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   desugarMatch dt (APList ty []) = desugarMatch dt (APInj ty L APUnit)
   desugarMatch dt (APList ty ps) =
     desugarMatch dt $ foldr (APCons ty) (APList ty []) ps
-  {- n must have same type as dt, and it must be N or Z
-   - when dt is (pn+k) ==>
-   -   when dt is x0;
-   -   let v0 = k;
-   -   [if x0 >= v0;] -- only if type is N
-   -   when x0-v0 is x1;
-   -   let v1 = p;
-   -   if v1 divides x1;
-   -   when x1 / v1 is n
-   -}
   desugarMatch dt (APArith ty k p n) = do
+    -- when dt is x0
     (x0, g1) <- varFor dt
-    _
+
+    -- [if x0 >= k] (if ty = N)
+    g2 <- case ty of
+      TyN ->
+        desugarGuard $
+          AGBool (embed (atVar ty (coerce x0) >=. ATNat TyN k))
+      _ -> pure []
+
+    -- when x0 - k is x1
+    inv <- desugarTerm (atVar ty (coerce x0) -. ATNat ty k)
+    (x1, g3) <- varFor inv
+
+    -- if p divides x1
+    g4 <- desugarGuard $ AGBool (embed (ATNat ty p |. atVar ty (coerce x1)))
+
+    -- when x1 / p is n
+    q <- desugarTerm (atVar ty (coerce x1) /. ATNat ty p)
+    g5 <- desugarMatch q (APVar ty (coerce n))
+
+    pure $ g1 ++ g2 ++ g3 ++ g4 ++ g5
 
   mkMatch :: Member Fresh r => DTerm -> DPattern -> Sem r [DGuard]
   mkMatch dt dp = return [DGPat (embed dt) dp]
@@ -781,35 +791,6 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   varForPat p = do
     x <- fresh (string2Name "px") -- changing this from x fixed a bug and I don't know why =(
     (x,) <$> desugarMatch (dtVar (getType p) x) p
-
-  arithBinMatch ::
-    Member Fresh r =>
-    (Type -> Maybe (ATerm -> ATerm -> ATerm)) ->
-    (ATerm -> ATerm -> ATerm) ->
-    DTerm ->
-    Type ->
-    APattern ->
-    ATerm ->
-    Sem r [DGuard]
-  arithBinMatch restrict inverse dt ty p t = do
-    (x0, g1) <- varFor dt
-
-    -- let v = t
-    t' <- desugarTerm t
-    (v, g2) <- varFor t'
-
-    g3 <- case restrict ty of
-      Nothing -> return []
-      -- if x0 `cmp` v
-      Just cmp ->
-        desugarGuard $
-          AGBool (embed (atVar ty (coerce x0) `cmp` atVar (getType t) (coerce v)))
-
-    -- when x0 `inverse` v is p
-    inv <- desugarTerm (atVar ty (coerce x0) `inverse` atVar (getType t) (coerce v))
-    g4 <- desugarMatch inv p
-
-    return (g1 ++ g2 ++ g3 ++ g4)
 
 -- | Desugar a container literal such as @[1,2,3]@ or @{1,2,3}@.
 desugarContainer :: Member Fresh r => Type -> Container -> [(ATerm, Maybe ATerm)] -> Maybe (Ellipsis ATerm) -> Sem r DTerm

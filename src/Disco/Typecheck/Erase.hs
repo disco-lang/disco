@@ -1,7 +1,3 @@
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
-
 -- |
 -- Module      :  Disco.Typecheck.Erase
 -- Copyright   :  (c) 2016 disco team (see LICENSE)
@@ -62,7 +58,7 @@ erasePattern (APChar c) = PChar c
 erasePattern (APString s) = PString s
 erasePattern (APTup _ alp) = PTup $ map erasePattern alp
 erasePattern (APInj _ s apt) = PInj s (erasePattern apt)
-erasePattern (APNat _ n) = PNat n
+erasePattern (APInt _ n) = PInt n
 erasePattern (APCons _ ap1 ap2) = PCons (erasePattern ap1) (erasePattern ap2)
 erasePattern (APList _ alp) = PList $ map erasePattern alp
 erasePattern (APArith _ k p n) = PArith k p (coerce n)

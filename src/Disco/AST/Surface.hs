@@ -95,7 +95,7 @@ module Disco.AST.Surface (
   pattern PString,
   pattern PTup,
   pattern PInj,
-  pattern PNat,
+  pattern PInt,
   pattern PCons,
   pattern PList,
   pattern PArith,
@@ -459,8 +459,8 @@ pattern PTup lp = PTup_ () lp
 pattern PInj :: Side -> Pattern -> Pattern
 pattern PInj s p = PInj_ () s p
 
-pattern PNat :: Integer -> Pattern
-pattern PNat n = PNat_ () n
+pattern PInt :: Integer -> Pattern
+pattern PInt n = PInt_ () n
 
 pattern PCons :: Pattern -> Pattern -> Pattern
 pattern PCons p1 p2 = PCons_ () p1 p2
@@ -484,7 +484,7 @@ pattern PNonlinear p x <- PNonlinear_ (unembed -> p) x
   , PBool
   , PTup
   , PInj
-  , PNat
+  , PInt
   , PChar
   , PString
   , PCons
@@ -681,7 +681,7 @@ instance Pretty Pattern where
     PInj s p ->
       withPA funPA $
         pretty s <> prettyPatternP p
-    PNat n -> integer n
+    PInt n -> integer n
     PCons p1 p2 ->
       withPA (getPA Cons) $
         lt (pretty p1) <+> text "::" <+> rt (pretty p2)

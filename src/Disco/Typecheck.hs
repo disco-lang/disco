@@ -1468,9 +1468,11 @@ checkPattern p@(PInj R pat) ty = do
 --   false
 
 -- checkPattern (PNat n) (TyFin m) = return (emptyCtx, APNat (TyFin m) n)
-checkPattern (PNat n) ty = do
-  constraint $ CSub TyN ty
-  return (emptyCtx, APNat ty n)
+checkPattern (PInt n) ty = do
+  case n < 0 of
+    True -> constraint $ CSub TyZ ty
+    False -> constraint $ CSub TyN ty
+  return (emptyCtx, APInt ty n)
 checkPattern p@(PCons p1 p2) ty = do
   tyl <- ensureConstr1 CList ty (Right p)
   (ctx1, ap1) <- checkPattern p1 tyl
@@ -1481,8 +1483,7 @@ checkPattern p@(PList ps) ty = do
   listCtxtAps <- mapM (`checkPattern` tyl) ps
   let (ctxs, aps) = unzip listCtxtAps
   return (mconcat ctxs, APList (TyList tyl) aps)
-checkPattern (PArith k p x) ty = do
-  _
+checkPattern (PArith k p x) ty = error "Typechecking for arithmetic patterns unhandled" -- XXX checkPattern for PArith
 
 ------------------------------------------------------------
 -- Constraints for abs, floor/ceiling/idiv, and exp

@@ -505,8 +505,8 @@ data Pattern_ e where
   PTup_ :: X_PTup e -> [Pattern_ e] -> Pattern_ e
   -- | Injection pattern (@inl pat@ or @inr pat@).
   PInj_ :: X_PInj e -> Side -> Pattern_ e -> Pattern_ e
-  -- | Literal natural number pattern.
-  PNat_ :: X_PNat e -> Integer -> Pattern_ e
+  -- | Literal integer pattern.
+  PInt_ :: X_PNat e -> Integer -> Pattern_ e
   -- | Unicode character pattern
   PChar_ :: X_PChar e -> Char -> Pattern_ e
   -- | String pattern.

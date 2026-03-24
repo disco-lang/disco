@@ -59,7 +59,7 @@ module Disco.AST.Typed (
   pattern APBool,
   pattern APTup,
   pattern APInj,
-  pattern APNat,
+  pattern APInt,
   pattern APChar,
   pattern APString,
   pattern APCons,
@@ -319,10 +319,10 @@ pattern APInj ty s p <- PInj_ (unembed -> ty) s p
   where
     APInj ty s p = PInj_ (embed ty) s p
 
-pattern APNat :: Type -> Integer -> APattern
-pattern APNat ty n <- PNat_ (unembed -> ty) n
+pattern APInt :: Type -> Integer -> APattern
+pattern APInt ty n <- PInt_ (unembed -> ty) n
   where
-    APNat ty n = PNat_ (embed ty) n
+    APInt ty n = PInt_ (embed ty) n
 
 pattern APCons :: Type -> APattern -> APattern -> APattern
 pattern APCons ty p1 p2 <- PCons_ (unembed -> ty) p1 p2
@@ -348,7 +348,7 @@ pattern APArith ty k p n <- PArith_ (unembed -> ty) k p n
   , APString
   , APTup
   , APInj
-  , APNat
+  , APInt
   , APCons
   , APList
   , APArith
@@ -363,7 +363,7 @@ varsBound (APChar _) = []
 varsBound (APString _) = []
 varsBound (APTup _ ps) = varsBound =<< ps
 varsBound (APInj _ _ p) = varsBound p
-varsBound (APNat _ _) = []
+varsBound (APInt _ _) = []
 varsBound (APCons _ p q) = varsBound p ++ varsBound q
 varsBound (APList _ ps) = varsBound =<< ps
 varsBound (APArith ty _ _ n) = [(n, ty)]
@@ -420,7 +420,7 @@ instance HasType APattern where
   getType (APString _) = TyList TyC
   getType (APTup ty _) = ty
   getType (APInj ty _ _) = ty
-  getType (APNat ty _) = ty
+  getType (APInt ty _) = ty
   getType (APCons ty _ _) = ty
   getType (APList ty _) = ty
   getType (APArith ty _ _ _) = ty
@@ -493,7 +493,7 @@ explodePattern = \case
   APString s -> PString s
   APTup ty ps -> PAscr (PTup (map explodePattern ps)) ty
   APInj ty s p -> PAscr (PInj s (explodePattern p)) ty
-  APNat ty n -> PAscr (PNat n) ty
+  APInt ty n -> PAscr (PInt n) ty
   APCons ty p1 p2 -> PAscr (PCons (explodePattern p1) (explodePattern p2)) ty
   APList ty ps -> PAscr (PList (map explodePattern ps)) ty
   APArith ty k p n -> PAscr (PArith k p (coerce n)) ty

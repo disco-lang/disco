@@ -107,12 +107,9 @@ infixr 2 ||.
 (||.) :: ATerm -> ATerm -> ATerm
 (||.) = mkBin TyBool Or
 
-infixl 6 -., +.
+infixl 6 -.
 (-.) :: ATerm -> ATerm -> ATerm
 at1 -. at2 = mkBin (getType at1) Sub at1 at2
-
-(+.) :: ATerm -> ATerm -> ATerm
-at1 +. at2 = mkBin (getType at1) Add at1 at2
 
 infixl 7 /.
 (/.) :: ATerm -> ATerm -> ATerm
@@ -705,7 +702,7 @@ desugarGuards = fmap (toTelescope . concat) . mapM desugarGuard . fromTelescope
   desugarMatch _ (APWild _) = return []
   desugarMatch dt APUnit = mkMatch dt DPUnit
   desugarMatch dt (APBool b) = desugarMatch dt (APInj TyBool (bool L R b) APUnit)
-  desugarMatch dt (APNat ty n) = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTNat ty n)) (APBool True)
+  desugarMatch dt (APInt ty n) = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTNat ty n)) (APBool True)
   desugarMatch dt (APChar c) = desugarMatch (dtbin TyBool (PrimBOp Eq) dt (DTChar c)) (APBool True)
   desugarMatch dt (APString s) = desugarMatch dt (APList (TyList TyC) (map APChar s))
   desugarMatch dt (APTup tupTy pat) = desugarTuplePats tupTy dt pat

@@ -86,7 +86,6 @@ where
 
 import Control.Lens (
   makeLenses,
-  toListOf,
   use,
   (%=),
   (%~),
@@ -124,7 +123,6 @@ import Unbound.Generics.LocallyNameless (
   Name,
   bind,
   embed,
-  fvAny,
   name2String,
   string2Name,
  )
@@ -902,8 +900,8 @@ parseLet =
   TLet
     <$> ( reserved "let"
             *> ( bind
-                  <$> (toTelescope <$> (parseBinding `sepBy` comma))
-                  <*> (reserved "in" *> parseTerm)
+                   <$> (toTelescope <$> (parseBinding `sepBy` comma))
+                   <*> (reserved "in" *> parseTerm)
                )
         )
 
@@ -1008,7 +1006,7 @@ termToPattern (TVar x) = Just $ PVar x
 termToPattern (TParens t) = termToPattern t
 termToPattern TUnit = Just PUnit
 termToPattern (TBool b) = Just $ PBool b
-termToPattern (TNat n) = Just $ PNat n
+termToPattern (TNat n) = Just $ PInt n
 termToPattern (TChar c) = Just $ PChar c
 termToPattern (TString s) = Just $ PString s
 termToPattern (TTup ts) = PTup <$> mapM termToPattern ts
@@ -1022,41 +1020,36 @@ termToPattern (TAscr t s) = case s of
   _ -> Nothing
 termToPattern (TBin Cons t1 t2) =
   PCons <$> termToPattern t1 <*> termToPattern t2
-
 termToPattern (TBin Add t1 t2) =
   case (termToPattern t1, termToPattern t2) of
-    (Just (PNat n1), Just (PNat n2)) -> Just $ PNat (n1 + n2)
-    (Just (PNat n), Just (PVar x)) -> Just $ PArith n 1 x
-    (Just (PVar x), Just (PNat n)) -> Just $ PArith n 1 x
-    (Just (PNat n), Just (PArith k p x)) -> Just $ PArith (n + k) p x
-    (Just (PArith k p x), Just (PNat n)) -> Just $ PArith (n + k) p x
+    (Just (PInt n1), Just (PInt n2)) -> Just $ PInt (n1 + n2)
+    (Just (PInt n), Just (PVar x)) -> Just $ PArith n 1 x
+    (Just (PVar x), Just (PInt n)) -> Just $ PArith n 1 x
+    (Just (PInt n), Just (PArith k p x)) -> Just $ PArith (n + k) p x
+    (Just (PArith k p x), Just (PInt n)) -> Just $ PArith (n + k) p x
     _ -> Nothing
-
 termToPattern (TBin Mul t1 t2) =
   case (termToPattern t1, termToPattern t2) of
-    (Just (PNat n1), Just (PNat n2)) -> Just $ PNat (n1 + n2)
-    (Just (PNat n), Just (PVar x)) -> Just $ PArith 0 n x
-    (Just (PVar x), Just (PNat n)) -> Just $ PArith 0 n x
-    (Just (PNat n), Just (PArith k p x)) -> Just $ PArith (n * k) (n * p) x
-    (Just (PArith k p x), Just (PNat n)) -> Just $ PArith (n * k) (n * p) x
+    (Just (PInt n1), Just (PInt n2)) -> Just $ PInt (n1 + n2)
+    (Just (PInt n), Just (PVar x)) -> Just $ PArith 0 n x
+    (Just (PVar x), Just (PInt n)) -> Just $ PArith 0 n x
+    (Just (PInt n), Just (PArith k p x)) -> Just $ PArith (n * k) (n * p) x
+    (Just (PArith k p x), Just (PInt n)) -> Just $ PArith (n * k) (n * p) x
     _ -> Nothing
-
 termToPattern (TBin Sub t1 t2) =
   case (termToPattern t1, termToPattern t2) of
-    (Just (PNat n1), Just (PNat n2)) -> Just $ PNat (n1 - n2)
-    (Just (PNat n), Just (PVar x)) -> Just $ PArith n (-1) x
-    (Just (PVar x), Just (PNat n)) -> Just $ PArith (-n) 1 x
-    (Just (PNat n), Just (PArith k p x)) -> Just $ PArith (n - k) (-p) x
-    (Just (PArith k p x), Just (PNat n)) -> Just $ PArith (k - n) p x
+    (Just (PInt n1), Just (PInt n2)) -> Just $ PInt (n1 - n2)
+    (Just (PInt n), Just (PVar x)) -> Just $ PArith n (-1) x
+    (Just (PVar x), Just (PInt n)) -> Just $ PArith (-n) 1 x
+    (Just (PInt n), Just (PArith k p x)) -> Just $ PArith (n - k) (-p) x
+    (Just (PArith k p x), Just (PInt n)) -> Just $ PArith (k - n) p x
     _ -> Nothing
-
 termToPattern (TUn Neg t) =
   case termToPattern t of
-    Just (PNat n) -> Just $ PNat (-n)
+    Just (PInt n) -> Just $ PInt (-n)
     Just (PVar x) -> Just $ PArith 0 (-1) x
     Just (PArith k p x) -> Just $ PArith (-k) (-p) x
     _ -> Nothing
-
 termToPattern (TContainer ListContainer ts Nothing) =
   PList <$> mapM (termToPattern . fst) ts
 termToPattern _ = Nothing

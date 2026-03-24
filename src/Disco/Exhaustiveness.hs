@@ -22,12 +22,12 @@ import Disco.AST.Generic (Side (..))
 import Disco.AST.Surface (
   Pattern,
   prettyPatternP,
+  pattern PArith,
   pattern PBool,
   pattern PChar,
   pattern PInj,
+  pattern PInt,
   pattern PList,
-  pattern PNat,
-  pattern PNeg,
   pattern PString,
   pattern PTup,
   pattern PUnit,
@@ -40,9 +40,8 @@ import Disco.AST.Typed (
   pattern APChar,
   pattern APCons,
   pattern APInj,
+  pattern APInt,
   pattern APList,
-  pattern APNat,
-  pattern APNeg,
   pattern APString,
   pattern APTup,
   pattern APUnit,
@@ -110,11 +109,8 @@ exampleToDiscoPattern e@(ExamplePat TI.DataCon {TI.dcIdent = ident, TI.dcTypes =
   (TI.KUnknown, _) -> PWild
   (TI.KUnit, _) -> PUnit
   (TI.KBool b, _) -> PBool b
-  (TI.KNat n, _) -> PNat n
-  (TI.KInt z, _) ->
-    if z >= 0
-      then PNat z
-      else PNeg (PNat (abs z))
+  (TI.KNat n, _) -> PInt n
+  (TI.KInt z, _) -> PInt z
   (TI.KPair, _) -> PTup $ map exampleToDiscoPattern $ resugarPair e
   (TI.KCons, _) ->
     if take 1 types == [Ty.TyC]
@@ -169,16 +165,6 @@ desugarTuplePats (pfst : rest) = APTup (Ty.getType pfst Ty.:*: Ty.getType psnd) 
 
 -- | Convert a Disco APattern into a list of Guards which cover that pattern
 --
---   These patterns are currently not handled:
---     , APNeg     --still need to handle rational case
---     , APFrac    --required for rationals?
---     algebraic (probably will be eventually replaced anyway):
---     , APAdd
---     , APMul
---     , APSub
---   These (or some updated version of them) may be handled eventually,
---   once updated arithmetic patterns are merged.
---
 --   We treat unhandled patterns as if they are exhaustively matched against
 --   (aka, they are seen as wildcards by the checker).
 --   This necessarily results in some false negatives, but no false positives.
@@ -211,9 +197,8 @@ desugarMatch var pat = case pat of
     let strType = Ty.TyList Ty.TyC
     desugarMatch var (APList strType (map APChar str))
   -- A bit of strangeness is required here because of how patterns work
-  (APNat Ty.TyN nat) -> return [(var, GMatch (TI.natural nat) [])]
-  (APNat Ty.TyZ z) -> return [(var, GMatch (TI.integer z) [])]
-  (APNeg Ty.TyZ (APNat Ty.TyN z)) -> return [(var, GMatch (TI.integer (-z)) [])]
+  (APInt Ty.TyN nat) -> return [(var, GMatch (TI.natural nat) [])]
+  (APInt Ty.TyZ z) -> return [(var, GMatch (TI.integer z) [])]
   -- These are more straightforward:
   (APWild _) -> return []
   (APVar ty name) -> do

@@ -1,10 +1,10 @@
 Documentation is built using [Sphinx](https://www.sphinx-doc.org/en/master/) and
-hosted on [readthedocs.io](htts://readthedocs.io).
+hosted on [Read the Docs](https://disco-lang.readthedocs.io/en/latest/).
 
 Contributing to the documentation can be done in the same way as contributing to
 any other part of the project. Commits pushed to the `master` branch on GitHub
 are automatically built and hosted at
-[https://disco-lang.readthedocs/io](https://disco-lang.readthedocs/io).
+[https://disco-lang.readthedocs.io](https://disco-lang.readthedocs.io/en/latest/).
 
 To build the documentation locally, first install Sphinx and the Sphinx theme
 for readthedocs with
